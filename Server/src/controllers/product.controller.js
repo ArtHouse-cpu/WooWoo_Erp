@@ -5,9 +5,16 @@ import path from 'path';
 import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 
-const uploadDir = 'uploads/products';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+const localUploadDir = path.resolve('uploads/products');
+const tmpUploadDir = path.join('/tmp', 'uploads', 'products');
+
+let uploadDir = localUploadDir;
+try {
+  fs.mkdirSync(localUploadDir, { recursive: true });
+} catch (error) {
+  // Fallback for read-only runtime filesystems (common in serverless envs).
+  fs.mkdirSync(tmpUploadDir, { recursive: true });
+  uploadDir = tmpUploadDir;
 }
 
 const storage = multer.diskStorage({
