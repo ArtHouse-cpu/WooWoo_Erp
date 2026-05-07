@@ -12,7 +12,6 @@ type UserModalProps = {
 
 export const UserModal = ({ open, onClose, user: propUser }: UserModalProps) => {
   const staff = useAppSelector((state) => state.user);
-  console.log(staff);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -38,7 +37,6 @@ export const UserModal = ({ open, onClose, user: propUser }: UserModalProps) => 
     whatsappNumber: isPropUserObject && propUser.whatsappNumber ? propUser.whatsappNumber : staff.whatsappNumber || "",
     AlternateMobile: isPropUserObject && propUser.AlternateMobile ? propUser.AlternateMobile : staff.alternateMobile || "",
   };
-  console.log(displayUser);
 
   const [formData, setFormData] = useState(displayUser);
 
@@ -96,7 +94,7 @@ export const UserModal = ({ open, onClose, user: propUser }: UserModalProps) => 
     }
     setLoading(true);
     try {
-      const payload = { ...formData };
+      const payload: any = { ...formData };
       delete payload._id; 
       
       if (payload.name) {

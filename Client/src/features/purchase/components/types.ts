@@ -4,4 +4,5 @@ export type InvoiceItem = {
   qty: number;
   unitPrice: number;
   discount: number;
+  image?: string;
 };

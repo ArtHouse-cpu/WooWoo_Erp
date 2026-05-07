@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-import { ImagePlus, Trash2 } from "lucide-react";
+import { ImagePlus } from "lucide-react";
+
 export default function CreateNewMembershipScreen() {
-  const [imagesPreview, setImagesPreview] = useState<string[]>([]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    const previews = files.map((file) => URL.createObjectURL(file));
-    setImagesPreview((prev) => [...prev, ...previews]);
+    // const files = Array.from(e.target.files || []);
+    // const previews = files.map((file) => URL.createObjectURL(file));
+    // setImagesPreview((prev) => [...prev, ...previews]);
+    console.log(e.target.files);
   };
 
   return (

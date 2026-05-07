@@ -28,7 +28,6 @@ import {
   DebitNoteScreen,
   InventoryScreen,
   PurchaseOrderScreen,
-  PurchaseProductScreen,
 } from "@/features/purchase";
 import {
   CreateInvoiceScreen,

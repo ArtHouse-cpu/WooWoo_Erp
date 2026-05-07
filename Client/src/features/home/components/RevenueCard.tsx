@@ -1,12 +1,18 @@
-import React from "react";
 import { CalendarRange } from "lucide-react";
+
+interface RevenueCardProps {
+  title?: string;
+  amount?: string | number;
+  date?: string;
+  stats?: Record<string, string | number>;
+}
 
 export default function RevenueCard({
   title = "Revenue",
   amount = "₹0.00",
   date = "",
   stats = {},
-}) {
+}: RevenueCardProps) {
   return (
     <div
       className="bg-white rounded-2xl shadow-md p-6 w-full border border-gray-100 
@@ -27,13 +33,13 @@ export default function RevenueCard({
 
       {/* Stats Section */}
       <div className="grid grid-cols-2 gap-4">
-        {Object.keys(stats).map((key, index) => (
+        {Object.entries(stats).map(([key, value], index) => (
           <div
             key={index}
             className="bg-gray-50 rounded-xl p-4 border border-gray-100"
           >
             <p className="text-sm text-gray-500">{key}</p>
-            <p className="text-xl font-bold text-gray-900 mt-1">{stats[key]}</p>
+            <p className="text-xl font-bold text-gray-900 mt-1">{value}</p>
           </div>
         ))}
       </div>

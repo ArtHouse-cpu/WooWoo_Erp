@@ -1,8 +1,6 @@
-import React from "react";
 import img from "@/assets/images/404.png";
-
 import { Link } from "react-router-dom";
-import ButtonComponent from "@/components/ButtonComponent";
+
 export default function NotfoundScreen() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">

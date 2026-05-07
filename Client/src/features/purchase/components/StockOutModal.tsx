@@ -1,5 +1,4 @@
 import { X } from "lucide-react";
-import React from "react";
 
 export default function StockOutModal({ onClose }: any) {
   return (

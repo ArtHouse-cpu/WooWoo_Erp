@@ -56,7 +56,7 @@ type PurchaseLine = {
 
 export default function LedgerModal({ onClose, customer, vendor }: Props) {
   const [loading, setLoading] = useState(false);
-  const [walletRecord, setWalletRecord] = useState<unknown>(null);
+  const [walletRecord, setWalletRecord] = useState<any>(null);
   const [purchaseLines, setPurchaseLines] = useState<PurchaseLine[]>([]);
   const [loadingPurchases, setLoadingPurchases] = useState(false);
 
@@ -97,11 +97,10 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
   }, [customer?._id, customer?.mobile]);
 
   useEffect(() => {
-    const vendorId = String(vendor?._id ?? "").trim();
     const vendorName = String(vendor?.name ?? "").trim();
     const vendorMobile = String(vendor?.mobile ?? "").trim();
 
-    if (!vendorId && !vendorName && !vendorMobile) {
+    if (!vendor?._id && !vendorName && !vendorMobile) {
       setPurchaseLines([]);
       return;
     }
@@ -111,28 +110,24 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
       try {
         setLoadingPurchases(true);
         const res = await handleGetPurchases(controller.signal);
-        const r = res as {
-          purchases?: unknown;
-          data?: unknown;
-        };
+        const r = res as any;
         const purchases = Array.isArray(r?.purchases)
-          ? (r.purchases as unknown[])
+          ? r.purchases
           : Array.isArray(r?.data)
-            ? (r.data as unknown[])
+            ? r.data
             : Array.isArray(res)
-              ? (res as unknown[])
+              ? res
               : [];
 
         const targetName = normalizeVendorKey(vendorName);
         const targetMobile = vendorMobile.replace(/\D/g, "");
 
-        const filtered = purchases.filter((p) => {
-          const rec = p as Record<string, unknown>;
+        const filtered = purchases.filter((p: any) => {
           const name = normalizeVendorKey(
-            rec?.supplierName ?? rec?.vendorName ?? "",
+            p?.supplierName ?? p?.vendorName ?? "",
           );
-          const phone = String(rec?.vendorPhone ?? rec?.mobile ?? "").replace(
-            /\\D/g,
+          const phone = String(p?.vendorPhone ?? p?.mobile ?? "").replace(
+            /\D/g,
             "",
           );
           if (targetMobile && phone && phone.endsWith(targetMobile.slice(-10))) return true;
@@ -142,24 +137,23 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
 
         const lines: PurchaseLine[] = [];
         for (const p of filtered) {
-          const rec = p as Record<string, unknown>;
+          const rec = p as any;
           const purchaseId = String(rec?._id ?? "");
           const invoiceNumber = String(rec?.invoiceNumber ?? rec?.billNumber ?? "-");
           const invoiceDate = String(rec?.invoiceDate ?? rec?.vendorDate ?? rec?.createdAt ?? "");
           const supplierName = String(rec?.supplierName ?? vendorName ?? "-");
-          const items = Array.isArray(rec?.items) ? (rec.items as unknown[]) : [];
-          items.forEach((it) => {
-            const itemRec = it as Record<string, unknown>;
+          const items = Array.isArray(rec?.items) ? rec.items : [];
+          items.forEach((it: any) => {
             const qty = Number(it?.qty ?? 0);
-            const unitPrice = Number(itemRec?.unitPrice ?? itemRec?.price ?? 0);
-            const discount = Number(itemRec?.discount ?? 0);
+            const unitPrice = Number(it?.unitPrice ?? it?.price ?? 0);
+            const discount = Number(it?.discount ?? 0);
             const lineTotal = Math.max(0, qty * unitPrice - discount);
             lines.push({
               purchaseId,
               invoiceNumber,
               invoiceDate,
               supplierName,
-              itemName: String(itemRec?.productName ?? itemRec?.name ?? "Item"),
+              itemName: String(it?.productName ?? it?.name ?? "Item"),
               qty,
               unitPrice,
               discount,
@@ -188,9 +182,9 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
   }, [vendor?._id, vendor?.name, vendor?.mobile]);
 
   const transactions = useMemo(() => {
-    const rec = walletRecord as { transactions?: unknown } | null;
-    return Array.isArray(rec?.transactions) ? (rec!.transactions as unknown[]) : [];
+    return Array.isArray(walletRecord?.transactions) ? walletRecord.transactions : [];
   }, [walletRecord]);
+
   const closingBalance = toAmount(
     walletRecord?.walletAmount,
     walletRecord?.balance,
@@ -319,16 +313,15 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
                 </td>
                 <td></td>
               </tr>
-              {transactions.map((entry, index: number) => {
-                const e = entry as Record<string, unknown>;
+              {transactions.map((entry: any, index: number) => {
                 const amount = toAmount(entry?.amount, entry?.value);
-                const status = String(e?.status ?? "posted");
-                const mode = String(e?.type ?? e?.mode ?? "wallet");
-                const id = String(e?._id ?? e?.id ?? index + 1);
-                const dateValue = String(e?.createdAt ?? e?.date ?? "").trim();
+                const status = String(entry?.status ?? "posted");
+                const mode = String(entry?.type ?? entry?.mode ?? "wallet");
+                const id = String(entry?._id ?? entry?.id ?? index + 1);
+                const dateValue = String(entry?.createdAt ?? entry?.date ?? "").trim();
                 const closing = toAmount(
-                  e?.closingBalance,
-                  e?.balanceAfter,
+                  entry?.closingBalance,
+                  entry?.balanceAfter,
                   closingBalance,
                 );
 
@@ -346,7 +339,7 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
                     <td className="p-3 font-medium">
                       ₹ {closing.toLocaleString("en-IN")}
                     </td>
-                    <td className="p-3">{String(e?.note ?? e?.remark ?? "-")}</td>
+                    <td className="p-3">{String(entry?.note ?? entry?.remark ?? "-")}</td>
                   </tr>
                 );
               })}

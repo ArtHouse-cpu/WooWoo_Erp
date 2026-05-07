@@ -1,12 +1,12 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
-import { Link } from "react-router-dom";
 import { Eye, SquarePen, Trash2 } from "lucide-react";
 import LedgerModal from "@/features/network/components/LedgerModal";
 import CreateGuestModal from "@/features/network/components/CreateGuestModal";
+
 export default function GuestScreen() {
   const [openCreateGuestModal, setOpenCreateGuestModal] = useState(false);
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
@@ -76,7 +76,7 @@ export default function GuestScreen() {
         header: "Ledger",
         accessorKey: "ledger",
         size: 40,
-        Cell: ({ row }) => (
+        Cell: ({ row: _row }: { row: any }) => (
           <button
             onClick={() => setOpenLedgerModal(true)}
             title="View Ledger"
@@ -90,7 +90,7 @@ export default function GuestScreen() {
       {
         header: "Actions",
         accessorKey: "actions",
-        Cell: ({ row }) => (
+        Cell: ({ row }: { row: any }) => (
           <div className="flex items-center gap-2">
             <button
               onClick={() => console.log("Edit:", row.original)}
@@ -114,14 +114,6 @@ export default function GuestScreen() {
   const table = useMaterialReactTable({
     columns,
     data,
-    muiPaperProps: {
-      elevation: 0,
-      square: true,
-      style: {
-        boxShadow: "none",
-        border: "1px solid #e5e7eb",
-      },
-    },
     muiTablePaperProps: {
       elevation: 0,
       style: {

@@ -329,7 +329,7 @@ export default function CreatePurchaseOrderScreen() {
   return (
     <div className="space-y-4 p-2">
       <CreatePurchaseOrderHeader
-        purchaseNumber={purchaseOrderNo}
+        purchaseOrderNo={purchaseOrderNo}
         onBack={() => navigate(-1)}
         onSaveDraft={() => void handleSaveDraft()}
         onSavePrint={() => void handleSavePrint()}

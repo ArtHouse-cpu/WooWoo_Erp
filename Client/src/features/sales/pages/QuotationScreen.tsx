@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
-import { Eye, IndianRupee, MoreHorizontal, SendHorizontal } from "lucide-react";
+import { Eye, SendHorizontal } from "lucide-react";
 
 export default function QuotationScreen() {
   const columns = useMemo(
@@ -14,7 +14,7 @@ export default function QuotationScreen() {
       {
         accessorKey: "status",
         header: "Status",
-        Cell: ({ cell }) => {
+        Cell: ({ cell }: { cell: any }) => {
           const value = cell.getValue();
 
           const badgeClass =
@@ -130,14 +130,6 @@ export default function QuotationScreen() {
   const table = useMaterialReactTable({
     columns,
     data,
-    muiPaperProps: {
-      elevation: 0,
-      square: true,
-      style: {
-        boxShadow: "none",
-        border: "1px solid #e5e7eb",
-      },
-    },
     muiTablePaperProps: {
       elevation: 0,
       style: {

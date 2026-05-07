@@ -51,7 +51,6 @@ export default function CustomerScreen() {
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [updatingCustomer, setUpdatingCustomer] = useState(false);
-  const [walletMap, setWalletMap] = useState<Record<string, number>>({});
   const staff = useAppSelector((state) => state.user);
   // console.log("staff", staff);
 
@@ -188,7 +187,7 @@ export default function CustomerScreen() {
         {},
       );
 
-      setWalletMap(nextWalletMap);
+
       setCustomers(
         customerList.map((customer: CustomerRow) => {
           const membershipType =
@@ -204,7 +203,6 @@ export default function CustomerScreen() {
       );
     } catch {
       setCustomers([]);
-      setWalletMap({});
     } finally {
       setLoadingCustomers(false);
     }
@@ -314,7 +312,7 @@ export default function CustomerScreen() {
       {
         header: "Customer",
         size: 260,
-        Cell: ({ row }) => {
+        Cell: ({ row }: { row: any }) => {
           const name = row.original.name;
           const membershipType = row.original.membershipType;
           return (

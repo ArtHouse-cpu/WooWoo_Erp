@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -17,7 +17,7 @@ export default function InvoiceScreen() {
       {
         accessorKey: "status",
         header: "Status",
-        Cell: ({ cell }) => {
+        Cell: ({ cell }: { cell: any }) => {
           const value = cell.getValue() as string;
 
           let badgeClass = "bg-slate-100 text-slate-700 ring-slate-600/20";

@@ -1,5 +1,5 @@
 import { SquarePen, Trash2, X } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -29,7 +29,7 @@ export default function CategoryListModal({ onClose }: any) {
         accessorKey: "image",
         header: "Image",
         size: 80,
-        Cell: ({ row }) => (
+        Cell: ({ row }: { row: any }) => (
           <img
             src={row.original.image}
             alt="category"
@@ -42,7 +42,7 @@ export default function CategoryListModal({ onClose }: any) {
         accessorKey: "name",
         header: "Category Name",
         size: 160,
-        Cell: ({ cell }) => (
+        Cell: ({ cell }: { cell: any }) => (
           <span className="font-semibold text-gray-800">{cell.getValue()}</span>
         ),
       },
@@ -57,7 +57,7 @@ export default function CategoryListModal({ onClose }: any) {
         accessorKey: "online",
         header: "Online",
         size: 70,
-        Cell: ({ row }) => (
+        Cell: ({ row }: { row: any }) => (
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
@@ -76,7 +76,7 @@ export default function CategoryListModal({ onClose }: any) {
       {
         header: "Actions",
         size: 90,
-        Cell: ({ row }) => (
+        Cell: ({ row }: { row: any }) => (
           <div className="flex justify-center gap-2">
             <button
               onClick={() => console.log("Edit:", row.original)}
@@ -147,7 +147,7 @@ export default function CategoryListModal({ onClose }: any) {
     enableColumnOrdering: false,
     enableDensityToggle: false,
     enableHiding: false,
-    initialState: { pagination: { pageSize: 5 } },
+    initialState: { pagination: { pageSize: 5, pageIndex: 0 } },
     muiTablePaperProps: {
       elevation: 0,
       sx: { border: "1px solid #e5e7eb" },

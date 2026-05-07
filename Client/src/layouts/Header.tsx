@@ -3,7 +3,6 @@ import {
   User,
   Megaphone,
   Zap,
-  ChevronDown,
   Search,
   LocationEdit,
 } from "lucide-react";

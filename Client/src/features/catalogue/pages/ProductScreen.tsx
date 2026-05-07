@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -27,7 +27,7 @@ export default function ProductScreen() {
       {
         header: "Actions",
         accessorKey: "actions",
-        Cell: ({ row }) => (
+        Cell: ({ row }: { row: any }) => (
           <div className="flex items-center gap-2">
             {/* Edit */}
             <button
@@ -89,14 +89,6 @@ export default function ProductScreen() {
   const table = useMaterialReactTable({
     columns,
     data,
-    muiPaperProps: {
-      elevation: 0,
-      square: true,
-      style: {
-        boxShadow: "none",
-        border: "1px solid #e5e7eb",
-      },
-    },
     muiTablePaperProps: {
       elevation: 0,
       style: {

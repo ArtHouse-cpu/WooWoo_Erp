@@ -5,11 +5,12 @@ import { handleGetProducts, handleCreateProduct } from "@/services/apiClient";
 import Swal from "sweetalert2";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
 
-type DraftItem = {
+export type DraftItem = {
   name: string;
   qty: string;
   price: string;
   discount: string;
+  image: string;
 };
 
 type Props = {
@@ -23,7 +24,7 @@ type Props = {
 const inputStyle =
   "h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-500";
 
-export default function purchaseReturnServicesSection({
+export default function PurchaseReturnServicesSection({
   draft,
   items,
   onDraftChange,
@@ -54,13 +55,9 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
 
     const { products = [] } = await handleGetProducts(searchText, signal);
 
-    console.log("products", products);
-
     const filteredProducts = products.filter(
       (item: any) => item.itemType === "product" && item.type === "product"
     );
-
-    console.log("filteredProducts", filteredProducts);
 
     setProducts(filteredProducts);
   } catch {
@@ -88,6 +85,7 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
   const handleSelectProduct = (product: any) => {
     onDraftChange("name", product.productName);
     onDraftChange("price", String(product.sellingPrice ?? 0));
+    onDraftChange("image", String(product.image ?? product.imageUrl ?? ""));
     setDropdownOpen(false);
   };
 
@@ -99,6 +97,7 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
       if (prod) {
         onDraftChange("name", prod.productName);
         onDraftChange("price", String(prod.sellingPrice ?? 0));
+        onDraftChange("image", String(prod.image ?? prod.imageUrl ?? ""));
       }
       setShowCreateModal(false);
       Swal.fire("Product created", "Product has been successfully added.", "success");
@@ -178,9 +177,17 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
           placeholder="Unit Price"
           className={`${inputStyle} md:col-span-2`}
         />
+        <input
+          value={draft.discount}
+          onChange={(e) => onDraftChange("discount", e.target.value)}
+          type="number"
+          min={0}
+          placeholder="Discount"
+          className={`${inputStyle} md:col-span-2`}
+        />
         <button
           onClick={onAddItem}
-          className="inline-flex h-10 items-center justify-center gap-1 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white md:col-span-4 lg:col-span-2"
+          className="inline-flex h-10 items-center justify-center gap-1 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white md:col-span-12 lg:col-span-2"
         >
           <Plus size={14} /> Add to Bill
         </button>
@@ -193,6 +200,7 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
               <th className="px-3 py-2 text-left">Product Name</th>
               <th className="px-3 py-2 text-right">Qty</th>
               <th className="px-3 py-2 text-right">Unit Price</th>
+              <th className="px-3 py-2 text-right">Discount</th>
               <th className="px-3 py-2 text-right">Total</th>
               <th className="px-3 py-2 text-center">Action</th>
             </tr>
@@ -201,7 +209,7 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
             {items.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-3 py-10 text-center text-gray-500">
-                  Search or add products to start creating invoice.
+                  Search or add products to start creating return.
                 </td>
               </tr>
             ) : (
@@ -212,7 +220,7 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
                     <td className="px-3 py-2 font-medium text-gray-800">{item.productName}</td>
                     <td className="px-3 py-2 text-right">{item.qty}</td>
                     <td className="px-3 py-2 text-right">₹ {item.unitPrice.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-right">₹ {item.discount.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-right text-red-500">- ₹ {item.discount.toFixed(2)}</td>
                     <td className="px-3 py-2 text-right font-semibold">₹ {lineTotal.toFixed(2)}</td>
                     <td className="px-3 py-2 text-center">
                       <button

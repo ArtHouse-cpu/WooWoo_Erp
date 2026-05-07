@@ -3,7 +3,7 @@ import { ThermalPrint } from "@/features/sales/components/invoice/ThermalPrint";
 
 export const printThermalReceipt = (data: {
   invoiceNo: string;
-  subscriptionCode: string;
+  subscriptionCode?: string;
   customerName: string;
   customerPhone: string;
   items: Array<{ name: string; qty: number; price: number; discount: number }>;

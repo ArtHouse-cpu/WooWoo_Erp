@@ -1,7 +1,7 @@
 import {ArrowLeft, Save} from "lucide-react";
 
 type Props = {
-  purchaseNumber: string;
+  purchaseOrderNo: string;
   onBack: () => void;
   onSaveDraft?: () => void;
   onSavePrint?: () => void;

@@ -397,18 +397,17 @@ export default function UpdateCustomerModal({
                       Membership
                     </label>
                     <select
-                      value={form.membershipType}
+                      value={form.membershipType ?? ""}
                       onChange={(e) => update("membershipType", e.target.value)}
                       className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                     >
                       {loadingMemberships ? (
-                        <option value={form.membershipType}>
+                        <option value={form.membershipType ?? ""}>
                           Loading memberships...
                         </option>
                       ) : (
                         <>
                           <option value="none">None</option>
-
                           {memberships.map((m) => (
                             <option key={m.planId} value={m.planId}>
                               {m.displayName}

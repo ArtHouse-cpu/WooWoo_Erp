@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -13,7 +13,7 @@ export default function PaymentScreen() {
       {
         accessorKey: "status",
         header: "Status",
-        Cell: ({ cell }) => {
+        Cell: ({ cell }: { cell: any }) => {
           const value = cell.getValue();
 
           const badgeClass =
@@ -40,7 +40,7 @@ export default function PaymentScreen() {
       {
         header: "Actions",
         accessorKey: "actions",
-        Cell: ({ row }) => (
+        Cell: ({ row: _row }: { row: any }) => (
           <div className="flex items-center gap-2">
             {/* ₹ Button */}
             <button className="px-2 py-1 rounded bg-yellow-100 hover:bg-yellow-200">
@@ -130,14 +130,6 @@ export default function PaymentScreen() {
   const table = useMaterialReactTable({
     columns,
     data,
-    muiPaperProps: {
-      elevation: 0,
-      square: true,
-      style: {
-        boxShadow: "none",
-        border: "1px solid #e5e7eb",
-      },
-    },
     muiTablePaperProps: {
       elevation: 0,
       style: {

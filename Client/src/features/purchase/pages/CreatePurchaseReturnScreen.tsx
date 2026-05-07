@@ -11,7 +11,7 @@ import {
   type VendorPayload,
 } from "@/services/apiClient";
 import CreatePurchaseReturnHeader from "../components/CreatePurchaseReturnHeader";
-import PurchaseReturnServicesSection from "../components/PurchaseReturnServicesSection";
+import PurchaseReturnServicesSection, { type DraftItem } from "../components/PurchaseReturnServicesSection";
 import PurchaseReturnDetailSection from "../components/PurchaseReturnDetailsSection";
 import PurchaseSummaryCard from "../components/PurchaseSummaryCard";
 import NotesSection from "@/features/sales/components/invoice/NotesSection";
@@ -72,6 +72,8 @@ export default function CreatePurchaseReturnScreen() {
       qty?: number;
       unitPrice?: number;
       discount?: number;
+      image?: string;
+      imageUrl?: string;
     };
     type Doc = {
       _id?: string;
@@ -111,7 +113,8 @@ export default function CreatePurchaseReturnScreen() {
       );
     }
   }, [location.state]);
-  const draft = {
+
+  const draft: DraftItem = {
     name: draftName,
     qty: draftQty,
     price: draftPrice,
@@ -181,6 +184,7 @@ export default function CreatePurchaseReturnScreen() {
       qty: item.qty,
       unitPrice: item.unitPrice,
       discount: item.discount,
+      image: item.image,
     })),
     status,
   });

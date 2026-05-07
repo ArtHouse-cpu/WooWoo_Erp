@@ -14,6 +14,7 @@ type PosItem = {
   name: string;
   qty: number;
   price: number;
+  discount: number;
   stockQty?: number;
   image?: string;
 };

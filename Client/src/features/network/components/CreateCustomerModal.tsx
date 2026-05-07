@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -16,7 +15,6 @@ import {
   Contact2,
 } from "lucide-react";
 import {
-  handleGetSubscriptions,
   type CustomerPayload,
 } from "@/services/apiClient";
 import { useNavigate } from "react-router-dom";
@@ -123,45 +121,6 @@ export default function CreateCustomerModal({
   const [form, setForm] = useState<FormState>(initialState);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const [memberships, setMemberships] = useState<
-    Array<{ planId: string; displayName: string }>
-  >([]);
-  const [loadingMemberships, setLoadingMemberships] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const run = async () => {
-      try {
-        setLoadingMemberships(true);
-        const res = await handleGetSubscriptions("", 300, controller.signal);
-        const list = Array.isArray(res?.subscriptions) ? res.subscriptions : [];
-        const planMap = new Map<string, string>();
-        list.forEach((subscription: any) => {
-          const planId = String(subscription?.membershipType ?? "").trim();
-          const displayName = String(
-            subscription?.membershipName ??
-              subscription?.membershipType ??
-              subscription?.items?.[0]?.productName ??
-              "",
-          ).trim();
-          if (!planId || !displayName || planMap.has(planId)) return;
-          planMap.set(planId, displayName);
-        });
-        setMemberships(
-          Array.from(planMap.entries()).map(([planId, displayName]) => ({
-            planId,
-            displayName,
-          })),
-        );
-      } catch {
-        setMemberships([]);
-      } finally {
-        setLoadingMemberships(false);
-      }
-    };
-    void run();
-    return () => controller.abort();
-  }, []);
 
   const initials = useMemo(() => {
     const cleaned = String(form.name ?? "").trim();

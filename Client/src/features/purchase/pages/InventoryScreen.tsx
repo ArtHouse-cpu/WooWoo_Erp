@@ -77,7 +77,7 @@ export default function InventoryScreen() {
       {
         accessorKey: "status",
         header: "Status",
-        Cell: ({ row }) => {
+        Cell: ({ row }: { row: any }) => {
           const qty = Number(row.original.qty ?? 0);
           const isLowStock = qty <= 0;
           return (
@@ -99,7 +99,7 @@ export default function InventoryScreen() {
         header: "Actions",
         accessorKey: "actions",
         size: 200,
-        Cell: ({ row }) => (
+        Cell: ({ row: _row }: { row: any }) => (
           <div className="flex items-center gap-2">
             <button
               className="flex items-center px-3 py-1.5 text-sm bg-green-100 rounded hover:bg-green-200 cursor-pointer gap-1"
@@ -131,14 +131,6 @@ export default function InventoryScreen() {
     columns,
     data,
     state: { isLoading: loading },
-    muiPaperProps: {
-      elevation: 0,
-      square: true,
-      style: {
-        boxShadow: "none",
-        border: "1px solid #e5e7eb",
-      },
-    },
     muiTablePaperProps: {
       elevation: 0,
       style: {

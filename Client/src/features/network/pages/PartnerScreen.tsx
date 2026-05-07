@@ -1,13 +1,12 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
-import { Link } from "react-router-dom";
 import { Eye, SquarePen, Trash2 } from "lucide-react";
-import CreateVendorModal from "@/features/network/components/CreateVendorModal";
 import LedgerModal from "@/features/network/components/LedgerModal";
 import CreatePartnerModal from "@/features/network/components/CreatePartnerModal";
+
 export default function PartnerScreen() {
   const [openCreatePartnerModal, setOpenCreatePartnerModal] = useState(false);
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
@@ -20,43 +19,25 @@ export default function PartnerScreen() {
         category: "Art Supplies Distributor",
         mobile: "9876543210",
         email: "rajesh.kumar@example.com",
-        gstin: "27AAECK1234F1Z5",
+        gstin: "22AAAAA0000A1Z5",
       },
       {
         id: 2,
-        name: "Aisha Patel",
-        company: "Patel Textiles",
-        category: "Plain Textiles Supplier",
-        mobile: "9123456780",
-        email: "aisha.patel@example.com",
-        gstin: "24AABCP1234M1Z9",
+        name: "Suresh Singh",
+        company: "Singh & Sons",
+        category: "Canvas Manufacturer",
+        mobile: "9123456789",
+        email: "suresh.singh@example.com",
+        gstin: "22BBBBB0000B1Z5",
       },
       {
         id: 3,
-        name: "Mohammed Usman",
-        company: "Usman Footwear Distributors",
-        category: "Sketch Pens Supplier",
+        name: "Anita Verma",
+        company: "Verma Art Gallery",
+        category: "Retail Partner",
         mobile: "9988776655",
-        email: "usman.footwear@example.com",
-        gstin: "29AACCU5678D1Z2",
-      },
-      {
-        id: 4,
-        name: "Simran Kaur",
-        company: "Kaur Home Essentials",
-        category: "Home Decor Supplier",
-        mobile: "9876501234",
-        email: "simran.kaur@example.com",
-        gstin: "07AAACK4321L1Z3",
-      },
-      {
-        id: 5,
-        name: "Vikram Sharma",
-        company: "Sharma Construction Supplies",
-        category: "Design Materials Supplier",
-        mobile: "9090909090",
-        email: "vikram.sharma@example.com",
-        gstin: "09ABCDF9876A1Z1",
+        email: "anita.verma@example.com",
+        gstin: "22CCCCC0000C1Z5",
       },
     ],
     []
@@ -64,19 +45,19 @@ export default function PartnerScreen() {
 
   const columns = useMemo(
     () => [
-      { accessorKey: "id", header: "ID", size: 90 },
-      { accessorKey: "name", header: "Partner Name" },
-      { accessorKey: "company", header: "Company" },
-      { accessorKey: "category", header: "Category" },
-      { accessorKey: "mobile", header: "Mobile" },
-      { accessorKey: "email", header: "Email" },
-      { accessorKey: "gstin", header: "GSTIN" },
+      { accessorKey: "id", header: "ID", size: 50 },
+      { accessorKey: "name", header: "Partner Name", size: 150 },
+      { accessorKey: "company", header: "Company", size: 200 },
+      { accessorKey: "category", header: "Category", size: 150 },
+      { accessorKey: "mobile", header: "Mobile", size: 120 },
+      { accessorKey: "email", header: "Email", size: 180 },
+      { accessorKey: "gstin", header: "GSTIN", size: 150 },
 
       {
         header: "Ledger",
         accessorKey: "ledger",
         size: 40,
-        Cell: ({ row }) => (
+        Cell: ({ row: _row }: { row: any }) => (
           <button
             onClick={() => setOpenLedgerModal(true)}
             title="View Ledger"
@@ -90,7 +71,7 @@ export default function PartnerScreen() {
       {
         header: "Actions",
         accessorKey: "actions",
-        Cell: ({ row }) => (
+        Cell: ({ row }: { row: any }) => (
           <div className="flex items-center gap-2">
             <button
               onClick={() => console.log("Edit:", row.original)}
@@ -114,14 +95,6 @@ export default function PartnerScreen() {
   const table = useMaterialReactTable({
     columns,
     data,
-    muiPaperProps: {
-      elevation: 0,
-      square: true,
-      style: {
-        boxShadow: "none",
-        border: "1px solid #e5e7eb",
-      },
-    },
     muiTablePaperProps: {
       elevation: 0,
       style: {
@@ -130,27 +103,24 @@ export default function PartnerScreen() {
       },
     },
   });
+
   return (
     <div className="p-1">
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-xl font-semibold ">Partners List</h1>
-        <div className="flex gap-3">
-          <div
-            className="w-[170px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
-            onClick={() => setOpenCreatePartnerModal(true)}
-          >
-            Create New Partner
-          </div>
-          {openCreatePartnerModal && (
-            <CreatePartnerModal
-              onClose={() => setOpenCreatePartnerModal(false)}
-            />
-          )}
-        </div>
+        <h1 className="text-xl font-semibold">Partners List</h1>
+        <button
+          className="w-[150px] bg-black text-white py-2 px-3 rounded text-[14px] font-semibold transition text-center cursor-pointer"
+          onClick={() => setOpenCreatePartnerModal(true)}
+        >
+          Create Partner
+        </button>
       </div>
 
       <MaterialReactTable table={table} />
 
+      {openCreatePartnerModal && (
+        <CreatePartnerModal onClose={() => setOpenCreatePartnerModal(false)} />
+      )}
       {openLedgerModal && (
         <LedgerModal onClose={() => setOpenLedgerModal(false)} />
       )}
