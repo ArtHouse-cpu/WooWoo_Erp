@@ -9,8 +9,17 @@ import { uploadOnCloudinary } from '../utils/cloudinary.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const uploadsDir = path.join(__dirname, '../../uploads/customers');
-fs.mkdirSync(uploadsDir, {recursive: true});
+const localUploadsDir = path.resolve(__dirname, '../../uploads/customers');
+const tmpUploadsDir = path.join('/tmp', 'uploads', 'customers');
+
+let uploadsDir = localUploadsDir;
+try {
+  fs.mkdirSync(localUploadsDir, {recursive: true});
+} catch (error) {
+  // Fallback for read-only runtime filesystems (common in serverless envs).
+  fs.mkdirSync(tmpUploadsDir, {recursive: true});
+  uploadsDir = tmpUploadsDir;
+}
 
 // Storage config
 const storage = multer.diskStorage({
