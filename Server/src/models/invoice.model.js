@@ -1,0 +1,138 @@
+import mongoose from 'mongoose';
+
+const invoiceItemSchema = new mongoose.Schema(
+  {
+    productName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    qty: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    unitPrice: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    discount: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+    lineTotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  {_id: false},
+);
+
+const invoiceSchema = new mongoose.Schema(
+  {
+    invoicePrefix: {
+      type: String,
+      required: true,
+      default: 'INVVWAH',
+      trim: true,
+    },
+    invoiceNumber: {
+      type: Number,
+      required: true,
+      unique: true,
+      index: true,
+    },
+    invoiceCode: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+      trim: true,
+    },
+    customerName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    customerPhone: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    invoiceDate: {
+      type: Date,
+      required: true,
+    },
+    dueDate: {
+      type: Date,
+      required: true,
+    },
+    salesPersonName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    notes: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    status: {
+      type: String,
+      enum: ['draft', 'final', 'cancelled'],
+      default: 'final',
+    },
+    items: {
+      type: [invoiceItemSchema],
+      default: [],
+    },
+    subTotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    discountTotal: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+    grandTotal: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    mode: {
+      type: String,
+      trim: true,
+      default: 'Cash',
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['full', 'partial'],
+      default: 'full',
+    },
+    paymentBreakdown: {
+      cash: {type: Number, min: 0, default: 0},
+      upi: {type: Number, min: 0, default: 0},
+      card: {type: Number, min: 0, default: 0},
+      wallet: {type: Number, min: 0, default: 0},
+      paidAmount: {type: Number, min: 0, default: 0},
+      dueAmount: {type: Number, min: 0, default: 0},
+      changeAmount: {type: Number, min: 0, default: 0},
+    },
+    createdBy: {
+      m_staff_id: {type: String, default: null},
+      m_staff_name: {type: String, default: null},
+      m_staff_email: {type: String, default: null},
+    },
+  },
+  {timestamps: true},
+);
+
+const Invoice = mongoose.model('Invoice', invoiceSchema);
+export default Invoice;

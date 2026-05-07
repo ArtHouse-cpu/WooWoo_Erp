@@ -1,0 +1,95 @@
+import Category from "../models/category.model.js";
+import Product from "../models/product.model.js";
+
+//Get categories
+export const getCategories = async (_req, res) => {
+  try {
+    let categories = await Category.find().sort({ name: 1 }).lean();
+
+    if (!categories.length) {
+      const distinctNames = await Product.distinct("category");
+
+      categories = await Category.insertMany(
+        distinctNames.map((name) => ({ name }))
+      );
+    }
+
+    return res.status(200).json({ success: true, categories });
+  } catch (error) {
+    console.error("getCategories error:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch categories" });
+  }
+};
+
+//Add categories
+export const addCategories = async (req, res) => {
+  try {
+    const { categories } = req.body;
+
+    if (!categories || !Array.isArray(categories)) {
+      return res.status(400).json({ success: false, message: "Invalid categories" });
+    }
+
+    const existingNames = await Category.find({
+      name: { $in: categories.map((c) => c.name) },
+    }).distinct("name");
+
+    const newCategories = categories.filter(
+      (c) => !existingNames.includes(c.name)
+    );
+
+    const created = await Category.insertMany(newCategories);
+
+    return res.status(201).json({
+      success: true,
+      categories: created,
+    });
+  } catch (error) {
+    console.error("addCategories error:", error);
+    return res.status(500).json({ success: false, message: "Failed to add categories" });
+  }
+};
+
+//Update categories
+export const updateCategories = async (req, res) => {
+  try {
+    const { categories } = req.body;
+
+    const updates = await Promise.all(
+      categories.map((cat) =>
+        Category.findByIdAndUpdate(cat._id, { name: cat.name }, { new: true })
+      )
+    );
+
+    return res.status(200).json({ success: true, categories: updates });
+  } catch (error) {
+    console.error("updateCategories error:", error);
+    return res.status(500).json({ success: false, message: "Failed to update categories" });
+  }
+};
+
+//Delete categories
+export const deleteCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const isUsed = await Product.findOne({ category: id });
+
+    if (isUsed) {
+      return res.status(400).json({
+        success: false,
+        message: "Category is used in products",
+      });
+    }
+
+    await Category.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Category deleted",
+    });
+  } catch (error) {
+    console.error("deleteCategory error:", error);
+    return res.status(500).json({ success: false, message: "Failed to delete category" });
+  }
+};
