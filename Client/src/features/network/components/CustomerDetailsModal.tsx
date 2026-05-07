@@ -35,7 +35,7 @@ function toAssetUrl(path?: string) {
   const p = String(path ?? "").trim();
   if (!p) return "";
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
-  return new URL(p, "http://localhost:8000/").toString();
+  return new URL(p, import.meta.env.VITE_API_URL || "https://woo-woo-erp.vercel.app/").toString();
 }
 
 export default function CustomerDetailsModal({
@@ -230,4 +230,3 @@ export default function CustomerDetailsModal({
     </div>
   );
 }
-
