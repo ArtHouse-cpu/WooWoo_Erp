@@ -118,6 +118,7 @@ export type CreateInvoicePayload = {
     dueAmount: number;
     changeAmount: number;
   };
+  pendingAmount?: number;
   createdBy?: {
     m_staff_id?: string | null;
     m_staff_name?: string | null;

@@ -1,11 +1,4 @@
-import {
-  Bell,
-  User,
-  Megaphone,
-  Zap,
-  Search,
-  LocationEdit,
-} from "lucide-react";
+import { Bell, User ,LocationEdit } from "lucide-react";
 import logo from "../assets/images/logo/woo_woo_art_house_logo.png";
 import { useState } from "react";
 import { UserModal } from "./UserModal";
@@ -36,7 +29,7 @@ export default function Header() {
           </button>
         </div>
       </div>
-
+      {/* 
       <div className="hidden lg:flex items-center w-1/2">
         <div className="flex items-center w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600">
           <Search size={18} />
@@ -49,10 +42,10 @@ export default function Header() {
             ctrl + k
           </span>
         </div>
-      </div>
+      </div> */}
 
       <div className="flex items-center gap-4 md:gap-5">
-        {[Zap, Bell, Megaphone, User].map((Icon, i) => (
+        {[Bell, User].map((Icon, i) => (
           <Icon
             key={i}
             size={20}

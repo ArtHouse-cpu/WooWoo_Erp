@@ -381,23 +381,7 @@ export default function ManagePlanScreen() {
         </div>
       </div>
 
-      <div className="mb-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-600 ring-1 ring-slate-100">
-              <Plus size={16} />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-slate-900">
-                Membership Plans
-              </div>
-              <div className="text-xs text-slate-500">
-                {loading ? "Loading..." : `${plans.length} plans found`}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+  
 
       <MaterialReactTable table={table} />
 

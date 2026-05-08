@@ -92,11 +92,15 @@ const createInvoice = async (req, res) => {
       paymentStatus,
       paymentBreakdown,
       createdBy,
+      pendingAmount
     } = req.body;
 
     console.log(req.body);
 
     const walletAmount = Number(paymentBreakdown?.wallet ?? 0);
+    const normalizedPendingAmount = Number(
+      pendingAmount ?? paymentBreakdown?.dueAmount ?? 0,
+    );
 
     if (!customerName || !invoiceDate || !dueDate || !salesPersonName ||!customerPhone) {
       return res.status(400).json({
@@ -211,14 +215,19 @@ const createInvoice = async (req, res) => {
       discountTotal: Number(discountTotal ?? 0),
       grandTotal: Number(grandTotal),
       mode: String(mode ?? 'Cash'),
-      paymentStatus: paymentStatus === 'partial' ? 'partial' : 'full',
+      paymentStatus:
+        status === 'draft'
+          ? 'partial'
+          : normalizedPendingAmount > 0 || paymentStatus === 'partial'
+            ? 'partial'
+            : 'full',
       paymentBreakdown: {
         cash: Number(paymentBreakdown?.cash ?? 0),
         upi: Number(paymentBreakdown?.upi ?? 0),
         card: Number(paymentBreakdown?.card ?? 0),
         wallet: walletAmount,
         paidAmount: Number(paymentBreakdown?.paidAmount ?? 0),
-        dueAmount: Number(paymentBreakdown?.dueAmount ?? 0),
+        dueAmount: normalizedPendingAmount,
         changeAmount: Number(paymentBreakdown?.changeAmount ?? 0),
       },
       createdBy: actor,

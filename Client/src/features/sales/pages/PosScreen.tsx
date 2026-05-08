@@ -28,7 +28,7 @@ import {
 type PosRow = {
   id: number;
   amount: number;
-  mode: "Cash" | "UPI" | "Card" | "Multi" | "Wallet";
+  mode: "Cash" | "UPI" | "Card" | "Multi" | "Wallet" | "Draft";
   status: "Paid" | "Pending" | "Cancelled" | "Draft";
   bill: string;
   owner: string;
@@ -39,6 +39,7 @@ type PosRow = {
   salesPerson: string;
   _id: string;
   raw: any;
+  dueAmount: number;
 };
 
 function paymentStatusForWhatsApp(
@@ -165,6 +166,7 @@ export default function PosScreen() {
     if (v === "CARD") return "Card";
     if (v === "MULTI") return "Multi";
     if (v === "WALLET") return "Wallet";
+  if (v === "DRAFT") return "Draft";
     return "Cash";
   };
 
@@ -195,6 +197,9 @@ export default function PosScreen() {
         salesPerson: String(invoice?.salesPersonName),
         _id: invoice._id,
         raw: invoice,
+        dueAmount: Number(
+          invoice?.pendingAmount ?? invoice?.paymentBreakdown?.dueAmount ?? 0,
+        ),
       }));
 
       setData(rows);
@@ -264,8 +269,26 @@ export default function PosScreen() {
       {
         accessorKey: "mode",
         header: "Mode",
-        Cell: ({ cell }: { cell: { getValue: () => PosRow["mode"] } }) => {
+        Cell: ({
+          cell,
+          row,
+        }: {
+          cell: { getValue: () => PosRow["mode"] };
+          row: { original: PosRow };
+        }) => {
           const value = cell.getValue();
+          const dueAmount = Number(row.original.dueAmount ?? 0);
+
+          if (dueAmount > 0) {
+            return (
+              <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700">
+                {`Due ₹ ${dueAmount.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`}
+              </span>
+            );
+          }
 
           const modeStyles: Record<string, string> = {
             WALLET: "bg-gray-100 text-gray-700",
@@ -273,6 +296,7 @@ export default function PosScreen() {
             CARD: "bg-sky-100 text-sky-700",
             MULTI: "bg-purple-100 text-purple-700",
             CASH: "bg-green-100 text-green-700",
+            DRAFT: "bg-slate-100 text-slate-700",
           };
 
           const className =
@@ -332,7 +356,10 @@ export default function PosScreen() {
         Cell: ({ row }: { row: { original: PosRow } }) => (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setSelectedActionRow(row.original)}
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedActionRow(row.original);
+              }}
               className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
             >
               Actions
@@ -482,7 +509,10 @@ export default function PosScreen() {
             <div className="flex items-center gap-2">
               {/* WhatsApp Share */}
               <button
-                onClick={handleWhatsAppShare}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleWhatsAppShare();
+                }}
                 className="flex items-center gap-1 rounded-md bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200"
               >
                 <img
@@ -495,7 +525,10 @@ export default function PosScreen() {
 
               {/* Download Bill */}
               <button
-                onClick={handleDownloadBill}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleDownloadBill();
+                }}
                 className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
               >
                 Download
@@ -533,6 +566,16 @@ export default function PosScreen() {
         fontSize: "13px",
       },
     },
+    muiTableBodyRowProps: ({ row }) => ({
+      onClick: () => {
+        const rowData = row.original as PosRow;
+        if (rowData.status !== "Draft") return;
+        navigate("/create-invoice", { state: { invoice: rowData.raw, mode: "edit" } });
+      },
+      sx: {
+        cursor: (row.original as PosRow).status === "Draft" ? "pointer" : "default",
+      },
+    }),
     muiTablePaperProps: {
       elevation: 0,
       square: false,

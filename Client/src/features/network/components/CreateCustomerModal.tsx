@@ -6,7 +6,6 @@ import {
 } from "react";
 import {
   Camera,
-  Plus,
   X,
   UserRound,
   MapPin,
@@ -14,10 +13,7 @@ import {
   Wallet,
   Contact2,
 } from "lucide-react";
-import {
-  type CustomerPayload,
-} from "@/services/apiClient";
-import { useNavigate } from "react-router-dom";
+import { type CustomerPayload } from "@/services/apiClient";
 
 type Props = {
   onClose: () => void;
@@ -117,7 +113,6 @@ export default function CreateCustomerModal({
   onSubmit,
   loading,
 }: Props) {
-  const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(initialState);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -329,11 +324,12 @@ export default function CreateCustomerModal({
 
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Gender
+                      Gender <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={form.gender}
                       onChange={(e) => update("gender", e.target.value)}
+                      required
                       className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                     >
                       <option value="Not Specified">Not Specified</option>
@@ -341,17 +337,6 @@ export default function CreateCustomerModal({
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>
                     </select>
-                  </div>
-                  <div className="mt-6">
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => navigate("/create-subscription")}
-                      className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Plus size={14} />
-                      Create Subscription
-                    </button>
                   </div>
                 </div>
               </section>

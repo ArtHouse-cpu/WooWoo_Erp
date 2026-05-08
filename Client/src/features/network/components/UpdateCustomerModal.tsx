@@ -13,9 +13,9 @@ import {
   Building2,
   Wallet,
   Contact2,
+  Award,
 } from "lucide-react";
 import {
-  handleGetMemberships,
   type CustomerPayload,
 } from "@/services/apiClient";
 
@@ -126,38 +126,38 @@ export default function UpdateCustomerModal({
   const [form, setForm] = useState<FormState>(initialState);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const [memberships, setMemberships] = useState<
-    Array<{ planId: string; displayName: string }>
-  >([]);
-  const [loadingMemberships, setLoadingMemberships] = useState(false);
+  // const [memberships, setMemberships] = useState<
+  //   Array<{ planId: string; displayName: string }>
+  // >([]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const run = async () => {
-      try {
-        setLoadingMemberships(true);
-        const res = await handleGetMemberships(
-          { status: "Active" },
-          controller.signal,
-        );
-        const list = Array.isArray(res?.memberships) ? res.memberships : [];
-        setMemberships(
-          list
-            .map((m: any) => ({
-              planId: String(m?.planId ?? "").trim(),
-              displayName: String(m?.displayName ?? "").trim(),
-            }))
-            .filter((m: any) => m.planId && m.displayName),
-        );
-      } catch {
-        setMemberships([]);
-      } finally {
-        setLoadingMemberships(false);
-      }
-    };
-    void run();
-    return () => controller.abort();
-  }, []);
+
+  // useEffect(() => {
+  //   const controller = new AbortController();
+  //   const run = async () => {
+  //     try {
+  //       setLoadingMemberships(true);
+  //       const res = await handleGetMemberships(
+  //         { status: "Active" },
+  //         controller.signal,
+  //       );
+  //       const list = Array.isArray(res?.memberships) ? res.memberships : [];
+  //       setMemberships(
+  //         list
+  //           .map((m: any) => ({
+  //             planId: String(m?.planId ?? "").trim(),
+  //             displayName: String(m?.displayName ?? "").trim(),
+  //           }))
+  //           .filter((m: any) => m.planId && m.displayName),
+  //       );
+  //     } catch {
+  //       setMemberships([]);
+  //     } finally {
+  //       setLoadingMemberships(false);
+  //     }
+  //   };
+  //   void run();
+  //   return () => controller.abort();
+  // }, []);
 
   const initials = useMemo(() => {
     const cleaned = String(form.name ?? "").trim();
@@ -173,7 +173,6 @@ export default function UpdateCustomerModal({
     return URL.createObjectURL(profileImageFile);
   }, [profileImageFile]);
 
-  // ✅ Prefill data when modal opens
   useEffect(() => {
     if (customer) {
       setForm({
@@ -233,9 +232,8 @@ export default function UpdateCustomerModal({
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900">
-                Update Customer
+                Update Customer Details
               </h2>
-              <p className="text-sm text-slate-500">Update customer details.</p>
             </div>
           </div>
           <button
@@ -316,6 +314,19 @@ export default function UpdateCustomerModal({
                       Remove
                     </button>
                   )}
+
+                  <div className="ml-auto">
+                    <div className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition-all ${form.membershipType
+                        ? "border-amber-200 bg-amber-50 text-amber-700 shadow-sm shadow-amber-100"
+                        : "border-slate-200 bg-slate-50 text-slate-500"
+                      }`}>
+                      <Award size={18} className={form.membershipType ? "text-amber-500" : "text-slate-400"} />
+                      <div className="flex flex-col leading-tight">
+                        <span className="text-[10px] uppercase tracking-wider opacity-60">Membership</span>
+                        <span>{form.membershipType}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </section>
 
@@ -378,12 +389,13 @@ export default function UpdateCustomerModal({
 
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Gender
+                      Gender <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={form.gender}
                       onChange={(e) => update("gender", e.target.value)}
                       className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                      required
                     >
                       <option value="Not Specified">Not Specified</option>
                       <option value="Male">Male</option>
@@ -392,7 +404,7 @@ export default function UpdateCustomerModal({
                     </select>
                   </div>
 
-                  <div>
+                  {/* <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">
                       Membership
                     </label>
@@ -416,7 +428,7 @@ export default function UpdateCustomerModal({
                         </>
                       )}
                     </select>
-                  </div>
+                  </div> */}
                 </div>
               </section>
 

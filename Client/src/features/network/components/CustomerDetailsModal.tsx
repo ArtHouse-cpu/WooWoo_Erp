@@ -6,6 +6,7 @@ import {
   handleUpdateCustomer,
   type CustomerPayload,
 } from "@/services/apiClient";
+import UpdateCustomerModal from "./UpdateCustomerModal";
 
 type CustomerDetails = CustomerPayload & {
   _id?: string;
@@ -46,6 +47,8 @@ export default function CustomerDetailsModal({
 }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [updatingCustomer, setUpdatingCustomer] = useState(false);
 
   const avatarUrl = useMemo(() => toAssetUrl(customer?.profileImage), [customer?.profileImage]);
   const initials = useMemo(() => getInitials(customer?.name), [customer?.name]);
@@ -75,6 +78,37 @@ export default function CustomerDetailsModal({
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const handleUpdateCustomerSubmit = async (args: {
+    payload: CustomerPayload;
+    profileImageFile?: File | null;
+  }) => {
+    const id = customer?._id;
+    if (!id) return;
+    try {
+      setUpdatingCustomer(true);
+      const formData = customerPayloadToFormData(args.payload, args.profileImageFile);
+      await handleUpdateCustomer(id, formData);
+      setEditOpen(false);
+      await onUpdated?.();
+      Swal.fire({
+        icon: "success",
+        title: "Updated",
+        text: "Customer information updated successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      console.error(error);
+      Swal.fire(
+        "Update failed",
+        error?.response?.data?.message ?? "Could not update customer. Try again.",
+        "error",
+      );
+    } finally {
+      setUpdatingCustomer(false);
     }
   };
 
@@ -121,8 +155,19 @@ export default function CustomerDetailsModal({
 
             <div>
               <div className="text-lg font-bold text-slate-900">{customer.name || "-"}</div>
-              <div className="text-sm text-slate-500">
-                {customer.companyName?.trim() ? customer.companyName : "Customer"}
+              <div className="text-sm text-slate-500">Created At:
+                {
+                  customer.createdAt
+                    ? new Date(customer.createdAt).toLocaleString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    })
+                    : ""
+                }
               </div>
             </div>
           </div>
@@ -220,13 +265,28 @@ export default function CustomerDetailsModal({
         <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-white px-6 py-5">
           <button
             type="button"
+            onClick={() => setEditOpen(true)}
+            className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
             onClick={onClose}
             className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
           >
             Close
           </button>
         </div>
+        <UpdateCustomerModal
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          customer={customer as CustomerPayload}
+          onUpdate={handleUpdateCustomerSubmit}
+          loading={updatingCustomer}
+        />
       </div>
+      
     </div>
   );
 }

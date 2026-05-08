@@ -146,8 +146,83 @@ export default function CreateInvoiceScreen() {
   const grandTotal = subTotal - discountTotal;
 
 
-  const handleSaveDraft = () => {
-    Swal.fire("Saved", "Invoice has been saved as draft.", "success");
+  const handleSaveDraft = async () => {
+    if (!customer.trim()) {
+      Swal.fire("Customer required", "Please select or enter customer.", "warning");
+      return;
+    }
+    if (!phone.trim()) {
+      Swal.fire("Phone required", "Please enter customer phone number.", "warning");
+      return;
+    }
+    if (!items.length) {
+      Swal.fire("No items", "Add at least one product in invoice.", "warning");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const draftPayload = {
+        customerName: customer.trim(),
+        customerPhone: phone.trim(),
+        invoiceDate,
+        dueDate,
+        salesPersonName: salesPerson,
+        notes: notes.trim(),
+        items: items.map((item) => ({
+          productName: item.productName,
+          qty: item.qty,
+          unitPrice: item.unitPrice,
+          discount: item.discount,
+        })),
+        subTotal,
+        discountTotal,
+        grandTotal,
+        status: "draft" as const,
+        mode: "Draft",
+        paymentStatus: "partial" as const,
+        pendingAmount: grandTotal,
+        paymentBreakdown: {
+          cash: 0,
+          upi: 0,
+          card: 0,
+          wallet: 0,
+          paidAmount: 0,
+          dueAmount: grandTotal,
+          changeAmount: 0,
+        },
+      };
+
+      if (invoiceId) {
+        await handleUpdateInvoice(invoiceId, draftPayload);
+      } else {
+        const response = await handleCreateInvoice({
+          ...draftPayload,
+          createdBy: {
+            m_staff_id: staff.m_staff_id,
+            m_staff_name: staff.m_staff_name,
+            m_staff_email: staff.m_staff_email,
+          },
+        });
+        const createdId = String(response?.invoice?._id ?? "");
+        const createdCode = String(response?.invoice?.invoiceCode ?? "");
+        if (createdId) setInvoiceId(createdId);
+        if (createdCode) setInvoiceNo(createdCode);
+      }
+
+      Swal.fire("Saved", "Invoice has been saved as draft.", "success").then(() => {
+        navigate(-1);
+      });
+    } catch (error: unknown) {
+      const err = error as {response?: {data?: {message?: string}}};
+      Swal.fire(
+        "Save failed",
+        err?.response?.data?.message ?? "Could not save draft. Try again.",
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSavePrint = () => {
@@ -206,9 +281,11 @@ export default function CreateInvoiceScreen() {
           subTotal,
           discountTotal,
           grandTotal,
+          status: "final",
           mode: payment.mode,
           paymentStatus: payment.paymentStatus,
           paymentBreakdown: payment.paymentBreakdown,
+          pendingAmount: payment.paymentBreakdown.dueAmount,
         });
 
         printThermalReceipt({
@@ -250,6 +327,7 @@ export default function CreateInvoiceScreen() {
           mode: payment.mode,
           paymentStatus: payment.paymentStatus,
           paymentBreakdown: payment.paymentBreakdown,
+          pendingAmount: payment.paymentBreakdown.dueAmount,
           createdBy: {
             m_staff_id: staff.m_staff_id,
             m_staff_name: staff.m_staff_name,

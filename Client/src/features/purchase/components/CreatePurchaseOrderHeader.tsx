@@ -31,8 +31,7 @@ export default function CreatePurchaseHeader({
         <div>
           <h1 className="text-lg font-semibold text-gray-900">
             {mode === "create" ? "Create Purchase Order" : mode === "edit" ? "Edit Purchase" : "View Purchase"}
-          </h1>
-          <p className="text-xs text-gray-500">WOO WOO ART HOUSE, Bhilai</p>
+          </h1> 
         </div>
         <div className="ml-3 flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
         {mode === "create" ? "PURODR- " : ""}

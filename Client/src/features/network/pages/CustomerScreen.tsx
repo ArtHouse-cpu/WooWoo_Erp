@@ -11,7 +11,6 @@ import LedgerModal from "@/features/network/components/LedgerModal";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import UpdateCustomerModal from "@/features/network/components/UpdateCustomerModal";
 import CustomerDetailsModal from "@/features/network/components/CustomerDetailsModal";
-import { useDebounce } from "@/hooks/useDebounce";
 import {
   customerPayloadToFormData,
   handleCreateCustomer,
@@ -46,7 +45,6 @@ export default function CustomerScreen() {
   const [openCreateCustomerModal, setOpenCreateCustomerModal] = useState(false);
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search.trim(), 300);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
@@ -88,7 +86,7 @@ export default function CustomerScreen() {
 
         // Update UI instantly + keep it consistent with backend
         setCustomers((prev) => prev.filter((c) => c._id !== id));
-        await fetchCustomers(debouncedSearch);
+        await fetchCustomers();
       } catch (error) {
         const err = error as { response?: { data?: { message?: string } } };
         Swal.fire({
@@ -209,10 +207,8 @@ export default function CustomerScreen() {
   };
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetchCustomers(debouncedSearch, controller.signal);
-    return () => controller.abort();
-  }, [debouncedSearch]);
+    void fetchCustomers();
+  }, []);
 
   const handleCreateCustomerSubmit = async (args: {
     payload: CustomerPayload;
@@ -243,7 +239,7 @@ export default function CustomerScreen() {
         });
       }
       setOpenCreateCustomerModal(false);
-      await fetchCustomers(debouncedSearch);
+      await fetchCustomers();
       Swal.fire("Customer created", "Customer saved successfully.", "success");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -292,7 +288,7 @@ export default function CustomerScreen() {
       }
       setEditOpen(false);
       setSelectedCustomer(null);
-      await fetchCustomers(debouncedSearch);
+      await fetchCustomers();
       Swal.fire("Updated", "Customer updated successfully.", "success");
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -311,13 +307,15 @@ export default function CustomerScreen() {
     () => [
       {
         header: "Customer",
+        accessorKey: "name",
         size: 260,
-        Cell: ({ row }: { row: any }) => {
-          const name = row.original.name;
+        Cell: ({ row, renderedCellValue }) => {
           const membershipType = row.original.membershipType;
           return (
             <div className="flex flex-col">
-              <span className="font-semibold text-slate-800">{name}</span>
+              <span className="font-semibold text-slate-800">
+                {renderedCellValue}
+              </span>
 
               <span className="text-xs text-slate-500">
                 Membership: {membershipType || "none"}
@@ -330,7 +328,7 @@ export default function CustomerScreen() {
         header: "Contact Info",
         id: "contactInfo",
         accessorFn: (row: CustomerRow) =>
-          row.mobile || row.whatsappNumber || row.email || "-",
+          `${row.mobile || ""} ${row.whatsappNumber || ""} ${row.email || ""}`.trim() || "-",
         size: 180,
       },
       {
@@ -350,26 +348,26 @@ export default function CustomerScreen() {
         },
         size: 140,
       },
-      {
-        header: "Date/Time",
-        id: "notes",
-        accessorFn: (row: CustomerRow) => {
-          const creator = row.createdBy?.m_staff_name ?? "";
-          const createdAt = row.createdAt ? new Date(row.createdAt) : null;
-          const parts: string[] = [];
-          if (createdAt && !Number.isNaN(createdAt.getTime())) {
-            parts.push(
-              `Created: ${createdAt.toLocaleDateString("en-IN")} ${createdAt.toLocaleTimeString(
-                "en-IN",
-                { hour: "2-digit", minute: "2-digit" },
-              )}`,
-            );
-          }
-          if (creator) parts.push(`By ${creator}`);
-          return parts.join(" • ") || "-";
-        },
-        size: 320,
-      },
+      // {
+      //   header: "Date/Time",
+      //   id: "notes",
+      //   accessorFn: (row: CustomerRow) => {
+      //     const creator = row.createdBy?.m_staff_name ?? "";
+      //     const createdAt = row.createdAt ? new Date(row.createdAt) : null;
+      //     const parts: string[] = [];
+      //     if (createdAt && !Number.isNaN(createdAt.getTime())) {
+      //       parts.push(
+      //         `Created: ${createdAt.toLocaleDateString("en-IN")} ${createdAt.toLocaleTimeString(
+      //           "en-IN",
+      //           { hour: "2-digit", minute: "2-digit" },
+      //         )}`,
+      //       );
+      //     }
+      //     if (creator) parts.push(`By ${creator}`);
+      //     return parts.join(" • ") || "-";
+      //   },
+      //   size: 320,
+      // },
       {
         header: "Ledger",
         accessorKey: "ledger",
@@ -427,7 +425,12 @@ export default function CustomerScreen() {
   const table = useMaterialReactTable<CustomerRow>({
     columns,
     data,
-    state: { isLoading: loadingCustomers },
+    state: {
+      isLoading: loadingCustomers,
+      globalFilter: search,
+    },
+    onGlobalFilterChange: setSearch,
+    enableGlobalFilter: true,
     muiTablePaperProps: {
       elevation: 0,
       style: {
@@ -456,14 +459,7 @@ export default function CustomerScreen() {
         </div>
 
         <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
-          <div className="w-full max-w-md">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search customers by name, company, phone etc..."
-              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-            />
-          </div>
+
           <button
             type="button"
             className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
@@ -505,7 +501,7 @@ export default function CustomerScreen() {
           setDetailsCustomer(null);
         }}
         onUpdated={async () => {
-          await fetchCustomers(debouncedSearch);
+          await fetchCustomers();
         }}
       />
 

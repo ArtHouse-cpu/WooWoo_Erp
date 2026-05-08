@@ -2,28 +2,28 @@ import { useState } from "react";
 import {
   ChevronDown,
   ShoppingCart,
-  BarChart3,
+  // BarChart3,
   Wallet,
   LayoutDashboard,
   Banknote,
   BookOpenText,
   Network,
-  BetweenHorizontalStart,
-  FileSpreadsheet,
-  BookAudio,
-  Megaphone,
+  // BetweenHorizontalStart,
+  // FileSpreadsheet,
+  // BookAudio,
+  // Megaphone,
   Handshake,
   LogOut,
 
   // Submenu Icons
   Receipt,
-  CreditCard,
+  // CreditCard,
   FileText,
-  Percent,
+  // Percent,
   Users,
   Package,
-  Mail,
-  MessageCircle,
+  // Mail,
+  // MessageCircle,
   ChevronLeft,
   ChevronRight,
   DollarSign,
@@ -79,21 +79,28 @@ export default function LeftSideBar() {
       });
     }
   };
-
-  // 🔥 CONFIG BASED MENU
   const menuConfig: any = [
     {
       key: "sales",
       label: "Sales",
       icon: Banknote,
       submenu: [
-        { name: "pos", label: "Pos", icon: Receipt, path: "/pos" },
-        { name: "creditnotes", label: "Credit Notes", icon: FileText, path: "/creditnotes" },
-        { name: "subscriptions", label: "Subscription", icon: DollarSign, path: "/subscriptions" },
-        { name: "invoices", label: "Invoices", icon: FileText, path: "/pos" },
+        { name: "pos", label: "Invoice", icon: Receipt, path: "/pos" },
+        {
+          name: "creditnotes",
+          label: "Credit Notes",
+          icon: FileText,
+          path: "/creditnotes",
+        },
+        {
+          name: "subscriptions",
+          label: "Subscription",
+          icon: DollarSign,
+          path: "/subscriptions",
+        },
+        // { name: "invoices", label: "Invoices", icon: FileText, path: "/pos" },
         // { name: "payments", label: "Payments", icon: CreditCard, path: "/payments" },
         // { name: "quotations", label: "Quotations", icon: Percent, path: "/quotations" },
-        
       ],
     },
     {
@@ -101,27 +108,38 @@ export default function LeftSideBar() {
       label: "Purchases",
       icon: ShoppingCart,
       submenu: [
-        { name: "purchase", label: "Purchase", icon: Package, path: "/purchase" },
-        { name: "purchaseOrder", label: "Purchase Order", icon: FileText, path: "/purchase-orders" },
-        { name: "debitNotes", label: "Debit Notes", icon: FileText, path: "/debit-notes" },
+        {
+          name: "purchase",
+          label: "Purchase",
+          icon: Package,
+          path: "/purchase",
+        },
+        {
+          name: "purchaseOrder",
+          label: "Purchase Order",
+          icon: FileText,
+          path: "/purchase-orders",
+        },
+        {
+          name: "debitNotes",
+          label: "Debit Notes",
+          icon: FileText,
+          path: "/debit-notes",
+        },
       ],
     },
     {
-      key: "Memberships",
-      label: "Memberships",
-      icon: Handshake,
-      submenu: [
-        { name: "Manage Plans", label: "Manage Plans", icon: Package, path: "/manage-plans" },
-        { name: "Members and Partners", label: "Members and Partners", icon: Users, path: "/members-and-partners" },
-      ],
-    },
-    {
-      key:"Inventory",
+      key: "Inventory",
       label: "Inventory",
       icon: Package,
       submenu: [
-        { name: "Inventory", label: "Inventory", icon: Package, path: "/inventory" },
-        {name: "Inventory Reports", label: "Inventory Reports", icon: FileSpreadsheet, path: "/inventory-reports" },
+        {
+          name: "Inventory",
+          label: "Inventory",
+          icon: Package,
+          path: "/inventory",
+        },
+        // {name: "Inventory Reports", label: "Inventory Reports", icon: FileSpreadsheet, path: "/inventory-reports" },
       ],
     },
     {
@@ -129,9 +147,24 @@ export default function LeftSideBar() {
       label: "Catalogue",
       icon: BookOpenText,
       submenu: [
-        { name: "products", label: "Products", icon: Package, path: "/products" },
-        { name: "services", label: "Services", icon: FileText, path: "/services" },
-        { name: "membership", label: "Membership", icon: Users, path: "/membership" },
+        {
+          name: "products",
+          label: "Products",
+          icon: Package,
+          path: "/products",
+        },
+        {
+          name: "services",
+          label: "Services",
+          icon: FileText,
+          path: "/services",
+        },
+        {
+          name: "Manage Plans",
+          label: "Manage Plans",
+          icon: Package,
+          path: "/manage-plans",
+        },
       ],
     },
     {
@@ -140,47 +173,52 @@ export default function LeftSideBar() {
       icon: Network,
       submenu: [
         { name: "vendor", label: "Vendors", icon: Users, path: "/vendors" },
-        { name: "customers", label: "Customers", icon: Users, path: "/customers" },
-        { name: "partners", label: "Partners", icon: Users, path: "/partners" },
-        { name: "guests", label: "Guests", icon: Users, path: "/guests" },
+        {
+          name: "customers",
+          label: "Customers",
+          icon: Users,
+          path: "/customers",
+        },
+        // { name: "partners", label: "Partners", icon: Users, path: "/partners" },
+        // { name: "guests", label: "Guests", icon: Users, path: "/guests" },
       ],
     },
-    {
-      key: "communication",
-      label: "Communication",
-      icon: BetweenHorizontalStart,
-      submenu: [
-        { name: "email", label: "Email", icon: Mail, path: "/comm/email" },
-        { name: "whatsapp", label: "WhatsApp", icon: MessageCircle, path: "/comm/whatsapp" },
-        { name: "text", label: "Text", icon: MessageCircle, path: "/comm/text" },
-      ],
-    },
-    {
-      key: "marketing",
-      label: "Marketing",
-      icon: Megaphone,
-      submenu: [
-        { name: "coupon", label: "Coupon", icon: Percent, path: "/marketing/coupon" },
-        { name: "giftcards", label: "Gift Cards", icon: CreditCard, path: "/marketing/giftcards" },
-        { name: "rewards", label: "Rewards", icon: Users, path: "/marketing/rewards" },
-        { name: "post", label: "Post", icon: FileText, path: "/marketing/post" },
-      ],
-    },
-    {
-      key: "reports",
-      label: "Reports",
-      icon: FileSpreadsheet,
-      submenu: [
-        { name: "sales", label: "Sales", icon: BarChart3, path: "/reports/sales" },
-        { name: "purchase", label: "Purchase", icon: BarChart3, path: "/reports/purchase" },
-        { name: "visitors", label: "Visitors", icon: Users, path: "/reports/visitors" },
-      ],
-    },
+    // {
+    //   key: "communication",
+    //   label: "Communication",
+    //   icon: BetweenHorizontalStart,
+    //   submenu: [
+    //     { name: "email", label: "Email", icon: Mail, path: "/comm/email" },
+    //     { name: "whatsapp", label: "WhatsApp", icon: MessageCircle, path: "/comm/whatsapp" },
+    //     { name: "text", label: "Text", icon: MessageCircle, path: "/comm/text" },
+    //   ],
+    // },
+    // {
+    //   key: "marketing",
+    //   label: "Marketing",
+    //   icon: Megaphone,
+    //   submenu: [
+    //     { name: "coupon", label: "Coupon", icon: Percent, path: "/marketing/coupon" },
+    //     { name: "giftcards", label: "Gift Cards", icon: CreditCard, path: "/marketing/giftcards" },
+    //     { name: "rewards", label: "Rewards", icon: Users, path: "/marketing/rewards" },
+    //     { name: "post", label: "Post", icon: FileText, path: "/marketing/post" },
+    //   ],
+    // },
+    // {
+    //   key: "reports",
+    //   label: "Reports",
+    //   icon: FileSpreadsheet,
+    //   submenu: [
+    //     { name: "sales", label: "Sales", icon: BarChart3, path: "/reports/sales" },
+    //     { name: "purchase", label: "Purchase", icon: BarChart3, path: "/reports/purchase" },
+    //     { name: "visitors", label: "Visitors", icon: Users, path: "/reports/visitors" },
+    //   ],
+    // },
   ];
 
   return (
     <div
-      className={`h-screen bg-white/90 backdrop-blur border-r border-gray-100 shadow-sm transition-all duration-300 ${
+      className={`h-screen flex flex-col bg-white/90 backdrop-blur border-r border-gray-100 shadow-sm transition-all duration-300 ${
         collapsed ? "w-16" : "w-64"
       }`}
     >
@@ -196,16 +234,11 @@ export default function LeftSideBar() {
           }`}
           onClick={() => setCollapsed(!collapsed)}
         >
-            {collapsed ? (
-              <ChevronRight size={18} />
-            ) : (
-              <ChevronLeft size={18} />
-            )}
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
       </div>
 
-      <div className="px-3 py-4 text-gray-700 space-y-2 overflow-y-auto h-[calc(100vh-112px)]">
-
+      <div className="flex-1 px-3 py-4 text-gray-700 space-y-2 overflow-y-auto">
         {/* HOME */}
         <button
           className={`flex items-center gap-3 w-full py-2.5 px-3 rounded-lg transition-all
@@ -276,11 +309,7 @@ export default function LeftSideBar() {
                             : "text-gray-600 hover:bg-gray-50 hover:text-black"
                         }`}
                         onClick={() =>
-                          handleSubmenuClick(
-                            menu.key,
-                            sub.name,
-                            sub.path
-                          )
+                          handleSubmenuClick(menu.key, sub.name, sub.path)
                         }
                       >
                         <SubIcon size={16} className="text-gray-400" />
@@ -294,41 +323,14 @@ export default function LeftSideBar() {
           );
         })}
 
-        {/* EXTRA ITEMS */}
-        <div className="mt-3">
-          <button className="flex items-center gap-3 w-full py-2.5 px-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-black transition-all">
-            <BarChart3 size={20} className="text-gray-500" />
-            {!collapsed && (
-              <span className="text-[15px] font-semibold">Analytics</span>
-            )}
-          </button>
-        </div>
-
         <div className="mt-2">
           <button
-            className="flex items-center gap-3 w-full py-2.5 px-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-black transition-all"
-            onClick={() => handleMenuClick("customers", "/customers")}
-          >
-            <Handshake size={20} className="text-gray-500" />
-            {!collapsed && (
-              <span className="text-[15px] font-semibold">Customers</span>
-            )}
-          </button>
-        </div>
-
-
-        <div className="mt-2">
-          <button className="flex items-center gap-3 w-full py-2.5 px-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-black transition-all">
-            <BookAudio size={20} className="text-gray-500" />
-            {!collapsed && (
-              <span className="text-[15px] font-semibold">Accounting</span>
-            )}
-          </button>
-        </div>
-
-        <div className="mt-2">
-          <button
-            className="flex items-center gap-3 w-full py-2.5 px-3 rounded-lg hover:bg-gray-50 text-gray-700 hover:text-black transition-all"
+            className={`flex items-center gap-3 w-full py-2.5 px-3 rounded-lg transition-all
+            ${
+              activeMenu === "wallet"
+                ? "bg-gray-100 border-l-4 border-blue-500 text-black shadow-sm"
+                : "text-gray-700 hover:bg-gray-50 hover:text-black"
+            }`}
             onClick={() => handleMenuClick("wallet", "/wallet")}
           >
             <Wallet size={20} className="text-gray-500" />
@@ -337,19 +339,22 @@ export default function LeftSideBar() {
             )}
           </button>
         </div>
+      </div>
 
-        {/* LOGOUT */}
-        <div className="mt-3">
-          <button
-            className="flex items-center gap-3 w-full py-2.5 px-3 rounded-lg hover:bg-red-50 text-red-500"
-            onClick={onLogout}
-          >
-            <LogOut size={20} />
-            {!collapsed && (
-              <span className="text-[15px] font-semibold">Logout</span>
-            )}
-          </button>
-        </div>
+      {/* LOGOUT - Always at bottom */}
+      <div className="p-3 border-t border-gray-100 bg-white/50 backdrop-blur-sm">
+        <button
+          className="flex items-center gap-3 w-full py-2.5 px-3 rounded-lg hover:bg-red-50 text-red-500 transition-colors group"
+          onClick={onLogout}
+        >
+          <LogOut
+            size={20}
+            className="group-hover:scale-110 transition-transform"
+          />
+          {!collapsed && (
+            <span className="text-[15px] font-semibold">Logout</span>
+          )}
+        </button>
       </div>
     </div>
   );
