@@ -119,6 +119,30 @@ export type CreateInvoicePayload = {
     changeAmount: number;
   };
   pendingAmount?: number;
+  coupon?: {
+    code: string;
+    discountAmount?: number;
+  } | null;
+  createdBy?: {
+    m_staff_id?: string | null;
+    m_staff_name?: string | null;
+    m_staff_email?: string | null;
+  };
+};
+
+export type CouponPayload = {
+  code: string;
+  title: string;
+  description?: string;
+  discountType: "percentage" | "flat";
+  discountValue: number;
+  minOrderAmount?: number;
+  maxDiscountAmount?: number | null;
+  startsAt?: string | null;
+  expiresAt: string;
+  usageLimit?: number | null;
+  perCustomerLimit?: number | null;
+  isActive?: boolean;
   createdBy?: {
     m_staff_id?: string | null;
     m_staff_name?: string | null;
@@ -164,6 +188,54 @@ export const handleDeleteInvoice = async (id: string) => {
     console.log("Error deleting invoice:", error);
     throw error;
   }
+};
+
+export const handleGetCoupons = async (
+  params?: { search?: string; status?: "all" | "active" | "inactive" },
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/coupon", {
+    params: {
+      search: params?.search?.trim() ?? "",
+      status: params?.status ?? "all",
+    },
+    signal,
+  });
+  return response.data;
+};
+
+export const handleCreateCoupon = async (payload: CouponPayload) => {
+  const response = await axiosInstance.post("/coupon", payload);
+  return response.data;
+};
+
+export const handleUpdateCoupon = async (id: string, payload: Partial<CouponPayload>) => {
+  const response = await axiosInstance.patch(`/coupon/${id}`, payload);
+  return response.data;
+};
+
+export const handleDeleteCoupon = async (id: string) => {
+  const response = await axiosInstance.delete(`/coupon/${id}`);
+  return response.data;
+};
+
+export const handleActivateCoupon = async (id: string) => {
+  const response = await axiosInstance.patch(`/coupon/${id}/activate`);
+  return response.data;
+};
+
+export const handleDeactivateCoupon = async (id: string) => {
+  const response = await axiosInstance.patch(`/coupon/${id}/deactivate`);
+  return response.data;
+};
+
+export const handleValidateCoupon = async (payload: {
+  code: string;
+  orderAmount: number;
+  customerPhone?: string;
+}) => {
+  const response = await axiosInstance.post("/coupon/validate", payload);
+  return response.data;
 };
 
 

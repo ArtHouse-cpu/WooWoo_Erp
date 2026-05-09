@@ -3,7 +3,7 @@ import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
-import {  Eye, Search, Edit, XCircle, Trash2, Download } from "lucide-react";
+import {  Eye, Search, Edit, XCircle, Trash2, Download,Ellipsis } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
@@ -382,7 +382,7 @@ export default function SubscriptionScreen() {
               onClick={() => setSelectedActionRow(row.original)}
               className="flex items-center gap-1 rounded-md bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-200"
             >
-              <Eye size={14} /> View
+              <Ellipsis  size={14} /> 
             </button>
           </div>
         ),

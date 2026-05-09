@@ -57,6 +57,13 @@ export type InvoicePdfInput = {
   subTotal?: number;
   grandTotal?: number;
   discountTotal?: number;
+  coupon?: {
+    code?: string;
+    title?: string;
+    discountType?: string;
+    discountValue?: number;
+    discountAmount?: number;
+  };
   /** Aggregate tax if API sends it */
   taxTotal?: number;
   /** Default GST % when line items omit tax */

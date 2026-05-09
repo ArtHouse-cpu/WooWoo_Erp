@@ -1,0 +1,321 @@
+import mongoose from 'mongoose';
+import Coupon from '../models/coupon.model.js';
+import Invoice from '../models/invoice.model.js';
+
+const normalizeCode = (value) => String(value ?? '').trim().toUpperCase();
+
+const calculateCouponDiscount = ({ coupon, orderAmount }) => {
+  const amount = Number(orderAmount ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+
+  if (coupon.discountType === 'flat') {
+    return Math.min(amount, Number(coupon.discountValue ?? 0));
+  }
+
+  const raw = (amount * Number(coupon.discountValue ?? 0)) / 100;
+  const maxCap = Number(coupon.maxDiscountAmount ?? 0);
+  if (maxCap > 0) {
+    return Math.min(raw, maxCap, amount);
+  }
+  return Math.min(raw, amount);
+};
+
+export const validateCouponForOrder = async ({
+  code,
+  orderAmount,
+  customerPhone,
+  ignoreInvoiceId = null,
+}) => {
+  const normalizedCode = normalizeCode(code);
+  if (!normalizedCode) {
+    return { ok: false, message: 'Coupon code is required.' };
+  }
+
+  const amount = Number(orderAmount ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, message: 'Order amount must be greater than 0.' };
+  }
+
+  const coupon = await Coupon.findOne({ code: normalizedCode });
+  if (!coupon) return { ok: false, message: 'Coupon not found.' };
+  if (!coupon.isActive) return { ok: false, message: 'Coupon is inactive.' };
+
+  const now = new Date();
+  if (coupon.startsAt && now < coupon.startsAt) {
+    return { ok: false, message: 'Coupon is not active yet.' };
+  }
+  if (coupon.expiresAt && now > coupon.expiresAt) {
+    return { ok: false, message: 'Coupon has expired.' };
+  }
+
+  const minOrder = Number(coupon.minOrderAmount ?? 0);
+  if (amount < minOrder) {
+    return {
+      ok: false,
+      message: `Minimum order amount for this coupon is ${minOrder}.`,
+    };
+  }
+
+  if (
+    Number.isFinite(Number(coupon.usageLimit)) &&
+    Number(coupon.usageLimit) > 0 &&
+    Number(coupon.usedCount ?? 0) >= Number(coupon.usageLimit)
+  ) {
+    return { ok: false, message: 'Coupon usage limit reached.' };
+  }
+
+  if (customerPhone && Number(coupon.perCustomerLimit ?? 0) > 0) {
+    const usageQuery = {
+      customerPhone: String(customerPhone).trim(),
+      status: { $ne: 'cancelled' },
+      'coupon.code': normalizedCode,
+    };
+    if (ignoreInvoiceId && mongoose.Types.ObjectId.isValid(String(ignoreInvoiceId))) {
+      usageQuery._id = { $ne: String(ignoreInvoiceId) };
+    }
+    const usedByCustomer = await Invoice.countDocuments(usageQuery);
+    if (usedByCustomer >= Number(coupon.perCustomerLimit)) {
+      return { ok: false, message: 'Coupon already used maximum times by this customer.' };
+    }
+  }
+
+  const discountAmount = calculateCouponDiscount({ coupon, orderAmount: amount });
+  if (discountAmount <= 0) {
+    return { ok: false, message: 'Coupon is not applicable on this order.' };
+  }
+
+  return {
+    ok: true,
+    coupon,
+    discountAmount,
+    normalizedCode,
+  };
+};
+
+export const createCoupon = async (req, res) => {
+  try {
+    const body = req.body ?? {};
+    const code = normalizeCode(body.code);
+    if (!code || !body.title || !body.discountType || body.discountValue === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Code, title, discount type and discount value are required.',
+      });
+    }
+    if (!['percentage', 'flat'].includes(String(body.discountType))) {
+      return res.status(400).json({
+        success: false,
+        message: "discountType must be 'percentage' or 'flat'.",
+      });
+    }
+
+    const existing = await Coupon.findOne({ code });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'Coupon code already exists.' });
+    }
+
+    const expiresAt = new Date(body.expiresAt);
+    if (Number.isNaN(expiresAt.getTime())) {
+      return res.status(400).json({ success: false, message: 'Valid expiry date is required.' });
+    }
+    const startsAt =
+      body.startsAt !== undefined && body.startsAt !== null && String(body.startsAt).trim()
+        ? new Date(body.startsAt)
+        : null;
+    if (startsAt && Number.isNaN(startsAt.getTime())) {
+      return res.status(400).json({ success: false, message: 'Invalid start date.' });
+    }
+    if (startsAt && startsAt > expiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'Start date must be before expiry date.',
+      });
+    }
+
+    const coupon = await Coupon.create({
+      code,
+      title: String(body.title).trim(),
+      description: String(body.description ?? '').trim(),
+      discountType: String(body.discountType),
+      discountValue: Number(body.discountValue),
+      minOrderAmount: Number(body.minOrderAmount ?? 0),
+      maxDiscountAmount:
+        body.maxDiscountAmount === null || body.maxDiscountAmount === undefined
+          ? null
+          : Number(body.maxDiscountAmount),
+      startsAt,
+      expiresAt,
+      usageLimit:
+        body.usageLimit === null || body.usageLimit === undefined
+          ? null
+          : Number(body.usageLimit),
+      perCustomerLimit:
+        body.perCustomerLimit === null || body.perCustomerLimit === undefined
+          ? null
+          : Number(body.perCustomerLimit),
+      isActive: Boolean(body.isActive ?? true),
+      createdBy: body.createdBy ?? undefined,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Coupon created successfully.',
+      coupon,
+    });
+  } catch (error) {
+    console.error('createCoupon error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to create coupon.' });
+  }
+};
+
+export const getCoupons = async (req, res) => {
+  try {
+    const { search = '', status = 'all' } = req.query;
+    const query = {};
+    const s = String(search).trim();
+    if (s) {
+      query.$or = [
+        { code: { $regex: s, $options: 'i' } },
+        { title: { $regex: s, $options: 'i' } },
+      ];
+    }
+    if (String(status).toLowerCase() === 'active') query.isActive = true;
+    if (String(status).toLowerCase() === 'inactive') query.isActive = false;
+
+    const coupons = await Coupon.find(query).sort({ createdAt: -1 });
+    return res.status(200).json({
+      success: true,
+      message: 'Coupons fetched successfully.',
+      coupons,
+    });
+  } catch (error) {
+    console.error('getCoupons error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch coupons.' });
+  }
+};
+
+export const updateCoupon = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid coupon id.' });
+    }
+    const body = req.body ?? {};
+    const patch = {};
+
+    if (body.code !== undefined) patch.code = normalizeCode(body.code);
+    if (body.title !== undefined) patch.title = String(body.title).trim();
+    if (body.description !== undefined) patch.description = String(body.description ?? '').trim();
+    if (body.discountType !== undefined) patch.discountType = String(body.discountType);
+    if (body.discountValue !== undefined) patch.discountValue = Number(body.discountValue);
+    if (body.minOrderAmount !== undefined) patch.minOrderAmount = Number(body.minOrderAmount);
+    if (body.maxDiscountAmount !== undefined) {
+      patch.maxDiscountAmount =
+        body.maxDiscountAmount === null ? null : Number(body.maxDiscountAmount);
+    }
+    if (body.startsAt !== undefined) {
+      patch.startsAt = body.startsAt ? new Date(body.startsAt) : null;
+    }
+    if (body.expiresAt !== undefined) patch.expiresAt = new Date(body.expiresAt);
+    if (body.usageLimit !== undefined) {
+      patch.usageLimit = body.usageLimit === null ? null : Number(body.usageLimit);
+    }
+    if (body.perCustomerLimit !== undefined) {
+      patch.perCustomerLimit =
+        body.perCustomerLimit === null ? null : Number(body.perCustomerLimit);
+    }
+    if (body.isActive !== undefined) patch.isActive = Boolean(body.isActive);
+
+    if (patch.code) {
+      const duplicate = await Coupon.findOne({ code: patch.code, _id: { $ne: id } });
+      if (duplicate) {
+        return res.status(409).json({ success: false, message: 'Coupon code already exists.' });
+      }
+    }
+
+    const coupon = await Coupon.findByIdAndUpdate(id, patch, {
+      new: true,
+      runValidators: true,
+    });
+    if (!coupon) return res.status(404).json({ success: false, message: 'Coupon not found.' });
+    return res.status(200).json({
+      success: true,
+      message: 'Coupon updated successfully.',
+      coupon,
+    });
+  } catch (error) {
+    console.error('updateCoupon error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update coupon.' });
+  }
+};
+
+export const deleteCoupon = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const coupon = await Coupon.findByIdAndDelete(id);
+    if (!coupon) return res.status(404).json({ success: false, message: 'Coupon not found.' });
+    return res.status(200).json({
+      success: true,
+      message: 'Coupon deleted successfully.',
+    });
+  } catch (error) {
+    console.error('deleteCoupon error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to delete coupon.' });
+  }
+};
+
+export const activateCoupon = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const coupon = await Coupon.findByIdAndUpdate(id, { isActive: true }, { new: true });
+    if (!coupon) return res.status(404).json({ success: false, message: 'Coupon not found.' });
+    return res.status(200).json({
+      success: true,
+      message: 'Coupon activated successfully.',
+      coupon,
+    });
+  } catch (error) {
+    console.error('activateCoupon error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to activate coupon.' });
+  }
+};
+
+export const deactivateCoupon = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const coupon = await Coupon.findByIdAndUpdate(id, { isActive: false }, { new: true });
+    if (!coupon) return res.status(404).json({ success: false, message: 'Coupon not found.' });
+    return res.status(200).json({
+      success: true,
+      message: 'Coupon deactivated successfully.',
+      coupon,
+    });
+  } catch (error) {
+    console.error('deactivateCoupon error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to deactivate coupon.' });
+  }
+};
+
+export const validateCoupon = async (req, res) => {
+  try {
+    const { code, orderAmount, customerPhone } = req.body ?? {};
+    const result = await validateCouponForOrder({ code, orderAmount, customerPhone });
+    if (!result.ok) {
+      return res.status(400).json({ success: false, message: result.message });
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Coupon is valid.',
+      coupon: {
+        code: result.coupon.code,
+        title: result.coupon.title,
+        discountType: result.coupon.discountType,
+        discountValue: result.coupon.discountValue,
+      },
+      discountAmount: result.discountAmount,
+    });
+  } catch (error) {
+    console.error('validateCoupon error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to validate coupon.' });
+  }
+};

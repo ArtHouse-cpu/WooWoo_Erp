@@ -246,6 +246,8 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw }) => {
 
   const grandTotal = Number(invoice.grandTotal ?? sumNet + sumTax);
   const discountTotal = Number(invoice.discountTotal ?? 0);
+  const couponDiscount = Number(invoice.coupon?.discountAmount ?? 0);
+  const itemLevelDiscount = Math.max(0, discountTotal - couponDiscount);
 
   const subTotalReported =
     typeof invoice.subTotal === "number"
@@ -539,6 +541,12 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw }) => {
               Savings / Discount applied: {formatRupee(discountTotal)}
             </div>
           )}
+          {couponDiscount > 0 && (
+            <div style={{ marginTop: "6px", color: TEXT_MUTED }}>
+              Coupon Discount ({invoice.coupon?.code ?? "COUPON"}):{" "}
+              {formatRupee(couponDiscount)}
+            </div>
+          )}
         </div>
         <div
           style={{
@@ -605,6 +613,24 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw }) => {
                 {formatRupee(sumTax)}
               </td>
             </tr>
+            {itemLevelDiscount > 0 && (
+              <tr>
+                <td style={{ ...cell, fontWeight: 600 }}>Item Discount</td>
+                <td style={{ ...cell, textAlign: "right" }}>
+                  - {formatRupee(itemLevelDiscount)}
+                </td>
+              </tr>
+            )}
+            {couponDiscount > 0 && (
+              <tr>
+                <td style={{ ...cell, fontWeight: 600 }}>
+                  Coupon Discount ({invoice.coupon?.code ?? "COUPON"})
+                </td>
+                <td style={{ ...cell, textAlign: "right" }}>
+                  - {formatRupee(couponDiscount)}
+                </td>
+              </tr>
+            )}
             <tr>
               <td
                 style={{

@@ -38,6 +38,7 @@ import {
   PaymentScreen,
   PosScreen,
   QuotationScreen,
+  CouponsScreen,
 } from "@/features/sales";
 import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
 import SubscriptionScreen from "@/features/sales/pages/SubscriptionScreen";
@@ -86,6 +87,7 @@ export const router = createBrowserRouter([
       { path: "/manage-plans", element: <ManagePlanScreen /> },
       { path: "/members-and-partners", element: <MembersAndPartnersScreen /> },
       { path: "/Vendor list", element: <VendorScreen /> },
+      { path: "/coupons", element: <CouponsScreen /> },
     ],
   },
   {

@@ -11,7 +11,6 @@ import {
   // BetweenHorizontalStart,
   // FileSpreadsheet,
   // BookAudio,
-  // Megaphone,
   // Handshake,
   LogOut,
 
@@ -19,7 +18,7 @@ import {
   Receipt,
   // CreditCard,
   FileText,
-  // Percent,
+  Percent,
   Users,
   Package,
   // Mail,
@@ -183,6 +182,7 @@ export default function LeftSideBar() {
         // { name: "guests", label: "Guests", icon: Users, path: "/guests" },
       ],
     },
+    
     // {
     //   key: "communication",
     //   label: "Communication",
@@ -196,13 +196,8 @@ export default function LeftSideBar() {
     // {
     //   key: "marketing",
     //   label: "Marketing",
-    //   icon: Megaphone,
-    //   submenu: [
+    //   icon:Percent ,
     //     { name: "coupon", label: "Coupon", icon: Percent, path: "/marketing/coupon" },
-    //     { name: "giftcards", label: "Gift Cards", icon: CreditCard, path: "/marketing/giftcards" },
-    //     { name: "rewards", label: "Rewards", icon: Users, path: "/marketing/rewards" },
-    //     { name: "post", label: "Post", icon: FileText, path: "/marketing/post" },
-    //   ],
     // },
     // {
     //   key: "reports",
@@ -336,6 +331,22 @@ export default function LeftSideBar() {
             <Wallet size={20} className="text-gray-500" />
             {!collapsed && (
               <span className="text-[15px] font-semibold">Wallet</span>
+            )}
+          </button>
+        </div>
+        <div className="mt-2">
+          <button
+            className={`flex items-center gap-3 w-full py-2.5 px-3 rounded-lg transition-all
+            ${
+              activeMenu === "coupons"
+                ? "bg-gray-100 border-l-4 border-blue-500 text-black shadow-sm"
+                : "text-gray-700 hover:bg-gray-50 hover:text-black"
+            }`}
+            onClick={() => handleMenuClick("coupons", "/coupons")}
+          >
+            <Percent size={20} className="text-gray-500" />
+            {!collapsed && (
+              <span className="text-[15px] font-semibold">Coupons</span>
             )}
           </button>
         </div>

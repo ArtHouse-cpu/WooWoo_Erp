@@ -5,7 +5,8 @@ import {
   handleCreateInvoice,
   handleGetCustomers,
   handleGetWallets,
-  handleGetWalletById
+  handleGetWalletById,
+  handleValidateCoupon,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -48,6 +49,10 @@ type Props = {
     customerName: string;
     customerPhone: string;
     notes: string;
+    coupon?: {
+      code: string;
+      discountAmount: number;
+    } | null;
   }) => Promise<void>;
 };
 
@@ -88,6 +93,9 @@ export default function CheckoutModal({
   const [membership, setMembership] = useState("");
   const [walletBalance, setWalletBalance] = useState(0);
   const [instructionNotes, setInstructionNotes] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponLabel, setCouponLabel] = useState("");
 
   const searchRef = useRef<HTMLDivElement>(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -111,6 +119,9 @@ export default function CheckoutModal({
       setCustomerSearch(initialCustomerPhone);
       setMembership(initialMembership);
       setInstructionNotes("");
+      setCouponCode("");
+      setCouponDiscount(0);
+      setCouponLabel("");
     }
   }, [
     open,
@@ -275,6 +286,7 @@ export default function CheckoutModal({
   );
 
   const finalAmount = Math.max(0, grandTotal - summary.membershipDiscount);
+  const finalPayable = Math.max(0, finalAmount - couponDiscount);
   const isPartialPayment = paymentStatus === "partial";
   const totalPaid = isMultiMode
     ? splitPayments.cash +
@@ -282,9 +294,9 @@ export default function CheckoutModal({
       splitPayments.card +
       splitPayments.wallet
     : cashGiven;
-  const change = Math.max(0, totalPaid - finalAmount);
-  const dueAmount = Math.max(0, finalAmount - totalPaid);
-  const remainingForFull = Math.max(0, finalAmount - totalPaid);
+  const change = Math.max(0, totalPaid - finalPayable);
+  const dueAmount = Math.max(0, finalPayable - totalPaid);
+  const remainingForFull = Math.max(0, finalPayable - totalPaid);
 
   const paymentBreakdown = useMemo(() => {
     if (isMultiMode) {
@@ -346,6 +358,11 @@ export default function CheckoutModal({
       return;
     }
 
+    if (couponCode.trim() && couponDiscount <= 0) {
+      Swal.fire("Invalid coupon", "Apply a valid coupon before checkout.", "warning");
+      return;
+    }
+
     const today = new Date().toISOString().split("T")[0];
     const normalizedMode = isMultiMode ? "MULTI" : paymentMode.toUpperCase();
     const paymentPayload = {
@@ -364,7 +381,13 @@ export default function CheckoutModal({
       paidAmount: totalPaid,
       dueAmount,
       changeAmount: change,
-      finalAmount,
+      finalAmount: finalPayable,
+      coupon: couponCode.trim()
+        ? {
+            code: couponCode.trim().toUpperCase(),
+            discountAmount: couponDiscount,
+          }
+        : null,
       customerName: customerName.trim(),
       customerPhone: customerSearch.trim(),
       notes: instructionNotes.trim(),
@@ -388,7 +411,13 @@ export default function CheckoutModal({
         0,
       ),
       discountTotal: items.reduce((sum, item) => sum + Number(item.discount || 0), 0),
-      grandTotal: finalAmount,
+      grandTotal: finalPayable,
+      coupon: couponCode.trim()
+        ? {
+            code: couponCode.trim().toUpperCase(),
+            discountAmount: couponDiscount,
+          }
+        : null,
       status: "final" as const,
       mode: paymentPayload.mode,
       paymentStatus: paymentPayload.paymentStatus,
@@ -423,11 +452,11 @@ export default function CheckoutModal({
           (sum, it) => sum + Number(it.qty) * Number(it.price),
           0
         ),
-        discountTotal: items.reduce(
-          (sum, it) => sum + Number(it.discount ?? 0),
-          0
-        ) + summary.membershipDiscount,
-        finalAmount: finalAmount,
+        discountTotal:
+          items.reduce((sum, it) => sum + Number(it.discount ?? 0), 0) +
+          summary.membershipDiscount +
+          couponDiscount,
+        finalAmount: finalPayable,
         totalDue: dueAmount,
         totalQty: totalQty,
       });
@@ -562,6 +591,63 @@ export default function CheckoutModal({
           </div>
 
           <div>
+            <div className="mb-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-3">
+              <label className="mb-1 block text-xs font-semibold text-violet-700">
+                Coupon Code
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  value={couponCode}
+                  onChange={(e) => {
+                    setCouponCode(e.target.value);
+                    if (!e.target.value.trim()) {
+                      setCouponDiscount(0);
+                      setCouponLabel("");
+                    }
+                  }}
+                  placeholder="e.g. SWIGGY50"
+                  className="flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-500"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const code = couponCode.trim();
+                    if (!code) {
+                      Swal.fire("Coupon required", "Enter coupon code first.", "warning");
+                      return;
+                    }
+                    try {
+                      const response = await handleValidateCoupon({
+                        code,
+                        orderAmount: finalAmount,
+                        customerPhone: customerSearch.trim() || undefined,
+                      });
+                      const discount = Number(response?.discountAmount ?? 0);
+                      setCouponDiscount(discount);
+                      setCouponCode(code.toUpperCase());
+                      setCouponLabel(String(response?.coupon?.title ?? "Coupon Applied"));
+                      Swal.fire("Coupon applied", `Discount ₹${discount}`, "success");
+                    } catch (error: any) {
+                      setCouponDiscount(0);
+                      setCouponLabel("");
+                      Swal.fire(
+                        "Coupon invalid",
+                        error?.response?.data?.message ?? "Coupon is not applicable.",
+                        "error",
+                      );
+                    }
+                  }}
+                  className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700"
+                >
+                  Apply
+                </button>
+              </div>
+              {couponDiscount > 0 && (
+                <div className="mt-2 text-xs text-violet-700">
+                  {couponLabel || "Coupon"} applied: - ₹{couponDiscount.toLocaleString("en-IN")}
+                </div>
+              )}
+            </div>
             <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               <div className="flex items-center justify-between">
                 <span className="font-medium">Available Wallet Balance</span>
@@ -634,7 +720,7 @@ export default function CheckoutModal({
                 ) : (
                   <div className="flex-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
                     Fully paid by {paymentMode}: ₹{" "}
-                    {finalAmount.toLocaleString("en-IN")}
+                    {finalPayable.toLocaleString("en-IN")}
                   </div>
                 )}
               </div>
@@ -839,7 +925,11 @@ export default function CheckoutModal({
             </div>
             <div className="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
               <span>Total Payable</span>
-              <span>₹ {finalAmount.toLocaleString("en-IN")}</span>
+              <span>₹ {finalPayable.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-violet-600">
+              <span>Coupon Discount</span>
+              <span>- ₹ {couponDiscount.toLocaleString("en-IN")}</span>
             </div>
             <div className="flex justify-between text-gray-600">
               <span>Total Paid</span>

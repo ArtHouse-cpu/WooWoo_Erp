@@ -1,9 +1,11 @@
 import Counter from '../models/counter.model.js';
 import Customer from '../models/customer.model.js';
+import Coupon from '../models/coupon.model.js';
 import Invoice from '../models/invoice.model.js';
 import Wallet from '../models/wallet.model.js';
 import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
 import { appendTransaction } from './wallet.controller.js';
+import { validateCouponForOrder } from './coupon.controller.js';
 
 const getStartOfToday = () => {
   const d = new Date();
@@ -74,6 +76,17 @@ const applyWalletDelta = async ({
   });
 };
 
+const applyCouponUsageDelta = async ({ code, delta }) => {
+  const normalizedCode = String(code ?? '').trim().toUpperCase();
+  if (!normalizedCode || !Number.isFinite(Number(delta)) || Number(delta) === 0) return;
+  await Coupon.updateOne(
+    { code: normalizedCode },
+    {
+      $inc: { usedCount: Number(delta) },
+    },
+  );
+};
+
 const createInvoice = async (req, res) => {
   try {
     const {
@@ -92,7 +105,8 @@ const createInvoice = async (req, res) => {
       paymentStatus,
       paymentBreakdown,
       createdBy,
-      pendingAmount
+      pendingAmount,
+      coupon,
     } = req.body;
 
     console.log(req.body);
@@ -173,6 +187,37 @@ const createInvoice = async (req, res) => {
       });
     }
 
+    const computedSubTotal = normalizedItems.reduce(
+      (sum, item) => sum + Number(item.qty ?? 0) * Number(item.unitPrice ?? 0),
+      0,
+    );
+    const itemDiscountTotal = normalizedItems.reduce(
+      (sum, item) => sum + Number(item.discount ?? 0),
+      0,
+    );
+
+    let appliedCoupon = null;
+    let couponDiscount = 0;
+    const preCouponAmount = Math.max(0, computedSubTotal - itemDiscountTotal);
+    if (coupon?.code) {
+      const couponValidation = await validateCouponForOrder({
+        code: coupon.code,
+        orderAmount: preCouponAmount,
+        customerPhone,
+      });
+      if (!couponValidation.ok) {
+        return res.status(400).json({
+          success: false,
+          message: couponValidation.message,
+        });
+      }
+      appliedCoupon = couponValidation.coupon;
+      couponDiscount = Number(couponValidation.discountAmount ?? 0);
+    }
+
+    const computedDiscountTotal = itemDiscountTotal + couponDiscount;
+    const computedGrandTotal = Math.max(0, computedSubTotal - computedDiscountTotal);
+
     const nextNumber = await getNextInvoiceNumber();
     const invoicePrefix = 'INVVWAH';
     const invoiceCode = `${invoicePrefix}-${nextNumber}`;
@@ -211,9 +256,18 @@ const createInvoice = async (req, res) => {
       notes: String(notes ?? '').trim(),
       status: status === 'draft' ? 'draft' : 'final',
       items: normalizedItems,
-      subTotal: Number(subTotal),
-      discountTotal: Number(discountTotal ?? 0),
-      grandTotal: Number(grandTotal),
+      subTotal: Number(subTotal ?? computedSubTotal),
+      discountTotal: Number(discountTotal ?? computedDiscountTotal),
+      coupon: appliedCoupon
+        ? {
+            code: appliedCoupon.code,
+            title: appliedCoupon.title,
+            discountType: appliedCoupon.discountType,
+            discountValue: Number(appliedCoupon.discountValue ?? 0),
+            discountAmount: couponDiscount,
+          }
+        : undefined,
+      grandTotal: Number(grandTotal ?? computedGrandTotal),
       mode: String(mode ?? 'Cash'),
       paymentStatus:
         status === 'draft'
@@ -241,6 +295,10 @@ const createInvoice = async (req, res) => {
         createdBy: actor,
         note: `Wallet used for invoice ${invoiceCode}`,
       });
+    }
+
+    if (appliedCoupon?.code && invoice.status !== 'cancelled') {
+      await applyCouponUsageDelta({ code: appliedCoupon.code, delta: 1 });
     }
 
     return res.status(201).json({
@@ -312,6 +370,10 @@ const deleteInvoice = async (req, res) => {
       }
     }
 
+    if (invoice.status !== 'cancelled' && invoice.coupon?.code) {
+      await applyCouponUsageDelta({ code: invoice.coupon.code, delta: -1 });
+    }
+
     const deletedInvoice = await Invoice.findOneAndDelete({ _id: id });
 
     return res.status(200).json({
@@ -352,6 +414,7 @@ const updateInvoice = async (req, res) => {
       paymentStatus,
       paymentBreakdown,
       createdBy,
+      coupon,
     } = req.body;
 
     const existingInvoice = await Invoice.findById(id);
@@ -430,6 +493,40 @@ const updateInvoice = async (req, res) => {
       };
     }
 
+    let nextCouponPatch;
+    if (coupon !== undefined) {
+      if (!coupon?.code) {
+        nextCouponPatch = {
+          code: null,
+          title: null,
+          discountType: null,
+          discountValue: 0,
+          discountAmount: 0,
+        };
+      } else {
+        const couponValidation = await validateCouponForOrder({
+          code: coupon.code,
+          orderAmount: Number(updateData.subTotal ?? existingInvoice.subTotal) - Number(updateData.discountTotal ?? existingInvoice.discountTotal ?? 0),
+          customerPhone: String(updateData.customerPhone ?? existingInvoice.customerPhone ?? '').trim(),
+          ignoreInvoiceId: id,
+        });
+        if (!couponValidation.ok) {
+          return res.status(400).json({
+            success: false,
+            message: couponValidation.message,
+          });
+        }
+        nextCouponPatch = {
+          code: couponValidation.coupon.code,
+          title: couponValidation.coupon.title,
+          discountType: couponValidation.coupon.discountType,
+          discountValue: Number(couponValidation.coupon.discountValue ?? 0),
+          discountAmount: Number(couponValidation.discountAmount ?? 0),
+        };
+      }
+      updateData.coupon = nextCouponPatch;
+    }
+
     const nextCustomerName =
       updateData.customerName ?? existingInvoice.customerName;
     const nextCustomerPhone =
@@ -441,6 +538,8 @@ const updateInvoice = async (req, res) => {
     );
     const walletDelta = nextWalletAmount - previousWalletAmount;
     const actor = buildCreatedBy(req, createdBy);
+    const previousCouponCode = String(existingInvoice.coupon?.code ?? '').trim().toUpperCase();
+    const nextCouponCode = String(updateData.coupon?.code ?? existingInvoice.coupon?.code ?? '').trim().toUpperCase();
 
     if (walletDelta !== 0) {
       const customer = await findCustomerForInvoice({
@@ -482,6 +581,17 @@ const updateInvoice = async (req, res) => {
       { $set: updateData },
       { new: true }
     );
+
+    if (existingInvoice.status !== 'cancelled' && previousCouponCode && previousCouponCode !== nextCouponCode) {
+      await applyCouponUsageDelta({ code: previousCouponCode, delta: -1 });
+    }
+    if (
+      (updateData.status ?? existingInvoice.status) !== 'cancelled' &&
+      nextCouponCode &&
+      previousCouponCode !== nextCouponCode
+    ) {
+      await applyCouponUsageDelta({ code: nextCouponCode, delta: 1 });
+    }
 
     return res.status(200).json({
       success: true,
@@ -528,6 +638,10 @@ const cancelInvoice = async (req, res) => {
           note: `Wallet refunded for cancelled invoice ${invoice.invoiceCode}`,
         });
       }
+    }
+
+    if (invoice.coupon?.code) {
+      await applyCouponUsageDelta({ code: invoice.coupon.code, delta: -1 });
     }
 
     const updatedInvoice = await Invoice.findByIdAndUpdate(

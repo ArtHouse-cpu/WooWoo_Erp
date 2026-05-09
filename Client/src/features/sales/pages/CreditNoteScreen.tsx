@@ -294,7 +294,7 @@ export default function CreditNoteScreen() {
               onClick={() => setSelectedActionRow(row.original)}
               className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
             >
-              Actions
+             <Eye size={16} />
             </button>
           </div>
         ),

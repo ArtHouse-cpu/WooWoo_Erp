@@ -101,6 +101,17 @@ const invoiceSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    coupon: {
+      code: { type: String, trim: true, uppercase: true, default: null },
+      title: { type: String, trim: true, default: null },
+      discountType: {
+        type: String,
+        enum: ['percentage', 'flat', null],
+        default: null,
+      },
+      discountValue: { type: Number, min: 0, default: 0 },
+      discountAmount: { type: Number, min: 0, default: 0 },
+    },
     grandTotal: {
       type: Number,
       required: true,

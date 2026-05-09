@@ -261,6 +261,11 @@ export default function CreateInvoiceScreen() {
       dueAmount: number;
       changeAmount: number;
     };
+    finalAmount: number;
+    coupon?: {
+      code: string;
+      discountAmount: number;
+    } | null;
   }) => {
     try {
       setSaving(true);
@@ -280,7 +285,8 @@ export default function CreateInvoiceScreen() {
           })),
           subTotal,
           discountTotal,
-          grandTotal,
+          grandTotal: payment.finalAmount,
+          coupon: payment.coupon ?? null,
           status: "final",
           mode: payment.mode,
           paymentStatus: payment.paymentStatus,
@@ -299,8 +305,8 @@ export default function CreateInvoiceScreen() {
             discount: item.discount,
           })),
           totalMRP: items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
-          discountTotal: discountTotal,
-          finalAmount: grandTotal,
+          discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
+          finalAmount: payment.finalAmount,
           totalDue: payment.paymentBreakdown.dueAmount,
           totalQty: items.reduce((sum, item) => sum + item.qty, 0),
         });
@@ -322,7 +328,8 @@ export default function CreateInvoiceScreen() {
           })),
           subTotal,
           discountTotal,
-          grandTotal,
+          grandTotal: payment.finalAmount,
+          coupon: payment.coupon ?? null,
           status: "final",
           mode: payment.mode,
           paymentStatus: payment.paymentStatus,
@@ -348,8 +355,8 @@ export default function CreateInvoiceScreen() {
             discount: item.discount,
           })),
           totalMRP: items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
-          discountTotal: discountTotal,
-          finalAmount: grandTotal,
+          discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
+          finalAmount: payment.finalAmount,
           totalDue: payment.paymentBreakdown.dueAmount,
           totalQty: items.reduce((sum, item) => sum + item.qty, 0),
         });

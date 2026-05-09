@@ -18,6 +18,7 @@ import purchaseReturnRoutes from "./routes/purchaseReturn.router.js";
 import vendorRoutes from "./routes/vendor.router.js";
 import inventoryRoutes from "./routes/Inventory.router.js";
 import walletRoutes from "./routes/wallet.router.js";
+import couponRoutes from "./routes/coupon.route.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -56,6 +57,7 @@ app.use("/purchaseReturn", purchaseReturnRoutes);
 app.use("/vendor", vendorRoutes);
 app.use("/inventory", inventoryRoutes);
 app.use("/wallet", walletRoutes);
+app.use("/coupon", couponRoutes);
 
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
