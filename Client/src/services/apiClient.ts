@@ -772,6 +772,30 @@ export const handleCreateProduct = async (formData: FormData) => {
   }
 };
 
+export const handleUpdateProduct = async (id: string, formData: FormData) => {
+  try {
+    const response = await axiosInstance.patch(`/product/${id}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.log("Error updating product:", error);
+    throw error;
+  }
+};
+
+export const handleDeleteProduct = async (id: string) => {
+  try {
+    const response = await axiosInstance.delete(`/product/${id}`);
+    return response.data;
+  } catch (error) {
+    console.log("Error deleting product:", error);
+    throw error;
+  }
+};
+
 export const handleGetCategories = async (signal?: AbortSignal) => {
   try {
     const response = await axiosInstance.get("/api/categories", { signal });

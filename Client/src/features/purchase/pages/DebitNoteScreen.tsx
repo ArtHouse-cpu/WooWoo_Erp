@@ -4,7 +4,7 @@ import {
   useMaterialReactTable,
   type MRT_Cell,
 } from "material-react-table";
-import { Edit, MoreHorizontal, SendHorizontal, XCircle } from "lucide-react";
+import { Download, Edit, MoreHorizontal, SendHorizontal, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { handleGetPurchaseReturns } from "@/services/apiClient";
 import Swal from "sweetalert2";
@@ -254,14 +254,13 @@ export default function DebitNoteScreen() {
                   alt="whatsapp"
                   className="h-4 w-4"
                 />
-                WhatsApp
               </button>
               <button
                 type="button"
                 onClick={() => void handleDownloadBill()}
                 className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
               >
-                Download
+                 <Download size={14} />
               </button>
             </div>
           );

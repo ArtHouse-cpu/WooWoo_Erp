@@ -3,7 +3,7 @@ import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
-import {  Eye, Search, Edit, XCircle, Trash2 } from "lucide-react";
+import {  Eye, Search, Edit, XCircle, Trash2, Download } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
@@ -530,13 +530,12 @@ export default function SubscriptionScreen() {
                   alt="whatsapp"
                   className="h-4 w-4"
                 />
-                WhatsApp
               </button>
               <button
                 onClick={handleDownloadInvoice}
                 className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
               >
-                Download
+                <Download size={14} />
               </button>
             </div>
           );

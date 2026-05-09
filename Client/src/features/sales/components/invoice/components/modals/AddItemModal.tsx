@@ -63,29 +63,30 @@ type Props = {
   onClose: () => void;
   onSubmit: (formData: FormData) => Promise<void>;
   loading: boolean;
+  initialData?: Partial<AddItemFormValues>;
 };
 
-export default function AddItemModal({ onClose, onSubmit, loading }: Props) {
+export default function AddItemModal({ onClose, onSubmit, loading, initialData }: Props) {
   const methods = useForm<AddItemFormValues>({
     resolver: zodResolver(schema) as any,
     defaultValues: {
-      type: "product",
-      productName: "",
-      serviceName: "",
-      sellingPrice: 0,
-      purchasePrice: 0,
-      stockQty: 0,
-      stockStatus: "in_stock",
-      primaryUnit: "",
-      itemCode: "",
-      barcode: "",
-      categoryId: "",
-      subCategoryId: "",
-      description: "",
-      discountType: "flat",
-      discountValue: 0,
-      variants: [],
-      images: [],
+      type: initialData?.type || "product",
+      productName: initialData?.productName || "",
+      serviceName: initialData?.serviceName || "",
+      sellingPrice: initialData?.sellingPrice || 0,
+      purchasePrice: initialData?.purchasePrice || 0,
+      stockQty: initialData?.stockQty || 0,
+      stockStatus: initialData?.stockStatus || "in_stock",
+      primaryUnit: initialData?.primaryUnit || "",
+      itemCode: initialData?.itemCode || "",
+      barcode: initialData?.barcode || "",
+      categoryId: initialData?.categoryId || "",
+      subCategoryId: initialData?.subCategoryId || "",
+      description: initialData?.description || "",
+      discountType: initialData?.discountType || "flat",
+      discountValue: initialData?.discountValue || 0,
+      variants: initialData?.variants || [],
+      images: initialData?.images || [],
     },
   });
 
@@ -143,10 +144,10 @@ export default function AddItemModal({ onClose, onSubmit, loading }: Props) {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-slate-900">
-                {itemType === "product" ? "Add New Product" : "Add New Service"}
+                {initialData ? (itemType === "product" ? "Edit Product" : "Edit Service") : (itemType === "product" ? "Add New Product" : "Add New Service")}
               </h2>
               <p className="mt-0.5 text-sm text-slate-500">
-                {itemType === "product" ? "Create a new tangible product for your inventory." : "Create a new service offering or digital product."}
+                {itemType === "product" ? "Manage tangible product details for your inventory." : "Manage service offering or digital product details."}
               </p>
             </div>
           </div>

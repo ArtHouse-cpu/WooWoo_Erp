@@ -12,7 +12,7 @@ import {
   // FileSpreadsheet,
   // BookAudio,
   // Megaphone,
-  Handshake,
+  // Handshake,
   LogOut,
 
   // Submenu Icons

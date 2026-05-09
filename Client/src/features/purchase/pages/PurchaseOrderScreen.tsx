@@ -13,6 +13,7 @@ import {
   Trash2,
   ArrowRightLeft,
   Eye,
+  Download,
 } from "lucide-react";
 import LedgerModal from "@/features/network/components/LedgerModal";
 import Swal from "sweetalert2";
@@ -557,14 +558,13 @@ export default function PurchaseOrderScreen() {
                   alt="whatsapp"
                   className="h-4 w-4"
                 />
-                WhatsApp
               </button>
               <button
                 type="button"
                 onClick={handleDownloadBill}
                 className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
               >
-                Download
+                 <Download size={14} />
               </button>
             </div>
           );
