@@ -191,16 +191,6 @@ export default function LeftSideBar() {
     //     { name: "text", label: "Text", icon: MessageCircle, path: "/comm/text" },
     //   ],
     // },
-    // {
-    //   key: "reports",
-    //   label: "Reports",
-    //   icon: FileSpreadsheet,
-    //   submenu: [
-    //     { name: "sales", label: "Sales", icon: BarChart3, path: "/reports/sales" },
-    //     { name: "purchase", label: "Purchase", icon: BarChart3, path: "/reports/purchase" },
-    //     { name: "visitors", label: "Visitors", icon: Users, path: "/reports/visitors" },
-    //   ],
-    // },
   ];
 
   return (
