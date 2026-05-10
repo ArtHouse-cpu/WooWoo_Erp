@@ -180,17 +180,6 @@ export default function LeftSideBar() {
         },
       ],
     },
-    
-    // {
-    //   key: "communication",
-    //   label: "Communication",
-    //   icon: BetweenHorizontalStart,
-    //   submenu: [
-    //     { name: "email", label: "Email", icon: Mail, path: "/comm/email" },
-    //     { name: "whatsapp", label: "WhatsApp", icon: MessageCircle, path: "/comm/whatsapp" },
-    //     { name: "text", label: "Text", icon: MessageCircle, path: "/comm/text" },
-    //   ],
-    // },
   ];
 
   return (
