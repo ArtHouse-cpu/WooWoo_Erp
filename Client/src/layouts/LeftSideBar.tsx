@@ -323,8 +323,6 @@ export default function LeftSideBar() {
           </button>
         </div>
       </div>
-
-      {/* LOGOUT - Always at bottom */}
       <div className="p-3 border-t border-gray-100 bg-white/50 backdrop-blur-sm">
         <button
           className="flex items-center gap-3 w-full py-2.5 px-3 rounded-lg hover:bg-red-50 text-red-500 transition-colors group"

@@ -46,6 +46,7 @@ export default function CreateInvoiceScreen() {
   const [invoiceNo, setInvoiceNo] = useState(getNextInvoiceNumber());
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
+  const [membership, setMembership] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(today);
   const [dueDate, setDueDate] = useState(today);
   const staff = useAppSelector((state) => state.user);
@@ -133,6 +134,13 @@ export default function CreateInvoiceScreen() {
 
   const removeItem = (id: number) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const updateItemQty = (id: number, newQty: number) => {
+    if (newQty < 1) return;
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, qty: newQty } : item)),
+    );
   };
 
   const subTotal = useMemo(
@@ -431,6 +439,7 @@ export default function CreateInvoiceScreen() {
       if (created?.name) {
         setCustomer(String(created.name));
         setPhone(String(created.mobile ?? ""));
+        setMembership(String(created.membershipType ?? ""));
       }
       setShowCreateCustomerModal(false);
       await fetchCustomers();
@@ -464,6 +473,7 @@ export default function CreateInvoiceScreen() {
       <InvoiceDetailsSection
         customer={customer}
         phone={phone}
+        membership={membership}
         customerOptions={customers}
         loadingCustomers={loadingCustomers}
         customerDropdownOpen={customerDropdownOpen}
@@ -474,10 +484,12 @@ export default function CreateInvoiceScreen() {
         onCustomerChange={(value) => {
           setCustomer(value);
           setPhone("");
+          setMembership("");
         }}
         onPickCustomer={(selectedCustomer) => {
           setCustomer(selectedCustomer.name);
           setPhone(selectedCustomer.mobile);
+          setMembership(selectedCustomer.membershipType ?? "");
           setCustomers([]);
           setCustomerDropdownOpen(false);
         }}
@@ -507,6 +519,7 @@ export default function CreateInvoiceScreen() {
         }}
         onAddItem={addItem}
         onRemoveItem={removeItem}
+        onUpdateItemQty={updateItemQty}
       />
 
       {/* <PaymentSection /> */}

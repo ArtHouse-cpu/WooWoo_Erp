@@ -5,11 +5,13 @@ type CustomerOption = {
   name: string;
   mobile: string;
   companyName?: string;
+  membershipType?: string;
 };
 
 type Props = {
   customer: string;
   phone: string;
+  membership?: string;
   customerOptions: CustomerOption[];
   loadingCustomers: boolean;
   customerDropdownOpen: boolean;
@@ -39,6 +41,7 @@ const inputStyle =
 export default function InvoiceDetailsSection({
   customer,
   phone,
+  membership,
   customerOptions,
   loadingCustomers,
   customerDropdownOpen,
@@ -103,6 +106,7 @@ export default function InvoiceDetailsSection({
                   <div className="text-xs text-gray-500">
                     {item.mobile}
                     {item.companyName ? ` • ${item.companyName}` : ""}
+                    {item.membershipType ? ` • ${item.membershipType.toUpperCase()}` : ""}
                   </div>
                 </div>
               </button>
@@ -116,9 +120,22 @@ export default function InvoiceDetailsSection({
           <p className="mt-2 text-xs text-gray-500">Loading customers...</p>
         )}
         <div>
-          <label className="mb-1 mt-3 block text-xs font-semibold text-gray-600">
-            {phoneLabel || "Customer Phone"}
-          </label>
+          <div className="mb-1 mt-3 flex items-center justify-between">
+            <label className="block text-xs font-semibold text-gray-600">
+              {phoneLabel || "Customer Phone"}
+            </label>
+            {membership && (
+              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                membership === "premium" ? "bg-purple-100 text-purple-700" :
+                membership === "pro" ? "bg-blue-100 text-blue-700" :
+                membership === "special" ? "bg-green-100 text-green-700" :
+                membership === "junior" ? "bg-yellow-100 text-yellow-700" :
+                "bg-gray-100 text-gray-700"
+              }`}>
+                {membership}
+              </span>
+            )}
+          </div>
           <div className="relative">
             <PhoneIcon size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input

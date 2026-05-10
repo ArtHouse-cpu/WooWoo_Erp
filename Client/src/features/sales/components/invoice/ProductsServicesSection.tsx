@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Minus } from "lucide-react";
 import type { InvoiceItem } from "./types";
 import { handleGetProducts, handleCreateProduct } from "@/services/apiClient";
 import CreateProductModal from "./Modal/CreateProductModal";
@@ -19,6 +19,7 @@ type Props = {
   onDraftChange: (field: keyof DraftItem, value: string) => void;
   onAddItem: () => void;
   onRemoveItem: (id: number) => void;
+  onUpdateItemQty: (id: number, newQty: number) => void;
 };
 
 const inputStyle =
@@ -30,6 +31,7 @@ export default function ProductsServicesSection({
   onDraftChange,
   onAddItem,
   onRemoveItem,
+  onUpdateItemQty,
 }: Props) {
   const [products, setProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -131,6 +133,12 @@ export default function ProductsServicesSection({
     }
   };
 
+  const updateDraftQty = (delta: number) => {
+    const current = Number(draft.qty) || 0;
+    const next = Math.max(1, current + delta);
+    onDraftChange("qty", String(next));
+  };
+
   return (
     <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -185,14 +193,31 @@ export default function ProductsServicesSection({
           )}
         </div>
 
-        <input
-          value={draft.qty}
-          onChange={(e) => onDraftChange("qty", e.target.value)}
-          type="number"
-          min={1}
-          placeholder="Qty"
-          className={`${inputStyle} md:col-span-2`}
-        />
+        <div className="md:col-span-2 flex items-center border rounded-md border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => updateDraftQty(-1)}
+            className="h-full px-2 bg-gray-50 hover:bg-gray-100 border-r border-gray-200 text-gray-600"
+          >
+            <Minus size={14} />
+          </button>
+          <input
+            value={draft.qty}
+            onChange={(e) => onDraftChange("qty", e.target.value)}
+            type="number"
+            min={1}
+            placeholder="Qty"
+            className="h-full w-full bg-white px-2 text-sm text-center text-gray-700 outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => updateDraftQty(1)}
+            className="h-full px-2 bg-gray-50 hover:bg-gray-100 border-l border-gray-200 text-gray-600"
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+
         <input
           value={draft.price}
           onChange={(e) => onDraftChange("price", e.target.value)}
@@ -214,8 +239,9 @@ export default function ProductsServicesSection({
           <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
             <tr>
               <th className="px-3 py-2 text-left">Product Name</th>
-              <th className="px-3 py-2 text-right">Qty</th>
+              <th className="px-3 py-2 text-center">Qty</th>
               <th className="px-3 py-2 text-right">Unit Price</th>
+              <th className="px-3 py-2 text-right">Discount</th>
               <th className="px-3 py-2 text-right">Total</th>
               <th className="px-3 py-2 text-center">Action</th>
             </tr>
@@ -233,7 +259,25 @@ export default function ProductsServicesSection({
                 return (
                   <tr key={item.id} className="border-t border-gray-100">
                     <td className="px-3 py-2 font-medium text-gray-800">{item.productName}</td>
-                    <td className="px-3 py-2 text-right">{item.qty}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onUpdateItemQty(item.id, item.qty - 1)}
+                          className="rounded-full border border-gray-200 p-1 text-gray-600 hover:bg-gray-50"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span className="w-8 text-center font-medium">{item.qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => onUpdateItemQty(item.id, item.qty + 1)}
+                          className="rounded-full border border-gray-200 p-1 text-gray-600 hover:bg-gray-50"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                    </td>
                     <td className="px-3 py-2 text-right">₹ {item.unitPrice.toFixed(2)}</td>
                     <td className="px-3 py-2 text-right">₹ {item.discount.toFixed(2)}</td>
                     <td className="px-3 py-2 text-right font-semibold">₹ {lineTotal.toFixed(2)}</td>
