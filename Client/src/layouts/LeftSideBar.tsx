@@ -192,12 +192,6 @@ export default function LeftSideBar() {
     //   ],
     // },
     // {
-    //   key: "marketing",
-    //   label: "Marketing",
-    //   icon:Percent ,
-    //     { name: "coupon", label: "Coupon", icon: Percent, path: "/marketing/coupon" },
-    // },
-    // {
     //   key: "reports",
     //   label: "Reports",
     //   icon: FileSpreadsheet,
