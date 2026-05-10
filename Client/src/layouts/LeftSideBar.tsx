@@ -178,8 +178,6 @@ export default function LeftSideBar() {
           icon: Users,
           path: "/customers",
         },
-        // { name: "partners", label: "Partners", icon: Users, path: "/partners" },
-        // { name: "guests", label: "Guests", icon: Users, path: "/guests" },
       ],
     },
     
@@ -334,6 +332,7 @@ export default function LeftSideBar() {
             )}
           </button>
         </div>
+        
         <div className="mt-2">
           <button
             className={`flex items-center gap-3 w-full py-2.5 px-3 rounded-lg transition-all
