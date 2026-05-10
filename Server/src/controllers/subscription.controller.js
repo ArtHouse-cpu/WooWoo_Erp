@@ -19,6 +19,10 @@ const getNextSubscriptionNumber = async () => {
 
 const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const isJuniorMembership = value => {
+  const v = String(value ?? '').trim().toLowerCase();
+  return v.includes('junior') || v.includes('junoir');
+};
 
 export const createSubscription = async (req, res) => {
   try {
@@ -42,6 +46,32 @@ export const createSubscription = async (req, res) => {
     };
 
     const createdBy = parsed.data.createdBy ?? staffFromReq;
+    const membershipType = String(parsed.data.membershipType ?? '').trim().toLowerCase();
+    const juniorMembership = isJuniorMembership(membershipType);
+
+    const activeSubscriptionQuery = {
+      customerPhone: parsed.data.customerPhone,
+      status: {$in: ['active', 'completed']},
+    };
+    const existingSubscriptions = await Subscription.find(activeSubscriptionQuery)
+      .select('membershipType endDate dueDate')
+      .lean();
+    const now = new Date();
+    const hasActiveNonJunior = existingSubscriptions.some(existing => {
+      const existingType = String(existing?.membershipType ?? '').trim().toLowerCase();
+      const end = existing?.endDate ?? existing?.dueDate;
+      const endDate = end ? new Date(end) : null;
+      const notExpired = !endDate || Number.isNaN(endDate.getTime()) || endDate >= now;
+      return notExpired && !isJuniorMembership(existingType);
+    });
+
+    if (!juniorMembership && hasActiveNonJunior) {
+      return res.status(409).json({
+        success: false,
+        message:
+          'Customer already has an active non-Junior membership. Only Junior memberships can be purchased additionally.',
+      });
+    }
 
     const subscription = await Subscription.create({
       subscriptionPrefix,
@@ -49,6 +79,9 @@ export const createSubscription = async (req, res) => {
       subscriptionCode,
       customerName: parsed.data.customerName,
       customerPhone: parsed.data.customerPhone,
+      membershipId: parsed.data.membershipId,
+      membershipPlanId: parsed.data.membershipPlanId,
+      membershipType: membershipType || 'general',
       invoiceDate: parsed.data.invoiceDate,
       dueDate: parsed.data.dueDate,
       startDate: parsed.data.startDate,
@@ -60,6 +93,7 @@ export const createSubscription = async (req, res) => {
       notes: parsed.data.notes,
       status: parsed.data.status,
       items: parsed.data.items,
+      students: parsed.data.students,
       subTotal: parsed.data.subTotal,
       discountTotal: parsed.data.discountTotal,
       grandTotal: parsed.data.grandTotal,
@@ -67,6 +101,15 @@ export const createSubscription = async (req, res) => {
       noOfInvoices: 0,
       nextInvoiceDate: parsed.data.startDate,
     });
+
+    const normalizedCustomerMembership = juniorMembership
+      ? 'junior'
+      : membershipType || 'general';
+    await Customer.findOneAndUpdate(
+      {mobile: parsed.data.customerPhone},
+      {$set: {membershipType: normalizedCustomerMembership}},
+      {new: false},
+    );
 
     try {
       const customer = await Customer.findOne({
@@ -185,6 +228,45 @@ export const updateSubscription = async (req, res) => {
       });
     }
 
+    if (parsed.data.customerPhone || parsed.data.membershipType || parsed.data.endDate) {
+      const existing = await Subscription.findById(id).lean();
+      if (!existing) {
+        return res.status(404).json({success: false, message: 'Subscription not found.'});
+      }
+
+      const nextCustomerPhone = parsed.data.customerPhone ?? existing.customerPhone;
+      const nextMembershipType = String(
+        parsed.data.membershipType ?? existing.membershipType ?? 'general',
+      ).toLowerCase();
+      const juniorMembership = isJuniorMembership(nextMembershipType);
+
+      if (!juniorMembership) {
+        const now = new Date();
+        const otherSubscriptions = await Subscription.find({
+          _id: {$ne: id},
+          customerPhone: nextCustomerPhone,
+          status: {$in: ['active', 'completed']},
+        })
+          .select('membershipType endDate dueDate')
+          .lean();
+        const hasActiveNonJunior = otherSubscriptions.some(other => {
+          const otherType = String(other?.membershipType ?? '').toLowerCase();
+          const end = other?.endDate ?? other?.dueDate;
+          const endDate = end ? new Date(end) : null;
+          const notExpired = !endDate || Number.isNaN(endDate.getTime()) || endDate >= now;
+          return notExpired && !isJuniorMembership(otherType);
+        });
+
+        if (hasActiveNonJunior) {
+          return res.status(409).json({
+            success: false,
+            message:
+              'Customer already has an active non-Junior membership. Only Junior memberships can be purchased additionally.',
+          });
+        }
+      }
+    }
+
     const subscription = await Subscription.findByIdAndUpdate(
       id,
       {$set: parsed.data},
@@ -193,6 +275,18 @@ export const updateSubscription = async (req, res) => {
 
     if (!subscription) {
       return res.status(404).json({success: false, message: 'Subscription not found.'});
+    }
+
+    if (parsed.data.customerPhone || parsed.data.membershipType) {
+      const membershipType = String(
+        parsed.data.membershipType ?? subscription.membershipType ?? 'general',
+      )
+        .trim()
+        .toLowerCase();
+      await Customer.findOneAndUpdate(
+        {mobile: parsed.data.customerPhone ?? subscription.customerPhone},
+        {$set: {membershipType: isJuniorMembership(membershipType) ? 'junior' : membershipType}},
+      );
     }
 
     return res.status(200).json({

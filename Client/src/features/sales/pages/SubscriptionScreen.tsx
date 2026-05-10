@@ -602,9 +602,6 @@ export default function SubscriptionScreen() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button className="rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700">
-            Document Settings
-          </button>
           <button
             className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
             onClick={() => navigate("/create-subscription")}

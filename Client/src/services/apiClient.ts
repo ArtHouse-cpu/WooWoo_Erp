@@ -303,9 +303,22 @@ export type CreateSubscriptionPayload = {
   customerPhone: string;
   invoiceDate: string;
   dueDate: string;
-  repeatType?: "monthly" | "yearly" | "lifetime";
+  membershipId?: string;
+  membershipPlanId?: string;
+  membershipType?: string;
+  repeatType?: "weekly" | "monthly" | "yearly" | "lifetime";
   repeatEvery?: number | null;
   repeatUnit?: "month" | "year" | null;
+  students?: Array<{
+    studentName: string;
+    schoolName?: string;
+    dob?: string | null;
+    classStd: string;
+    relation: string;
+    parentName: string;
+    studentId?: string;
+    studentIdUpload?: string;
+  }>;
   salesPersonName: string;
   notes: string;
   items: SubscriptionItemPayload[];
@@ -317,6 +330,18 @@ export type CreateSubscriptionPayload = {
     m_staff_id?: string | null;
     m_staff_name?: string | null;
     m_staff_email?: string | null;
+  };
+  subscriptionCode?: string;
+  mode?: string;
+  paymentStatus?: "full" | "partial";
+  paymentBreakdown?: {
+    cash: number;
+    upi: number;
+    card: number;
+    wallet?: number;
+    paidAmount: number;
+    dueAmount: number;
+    changeAmount: number;
   };
 };
 

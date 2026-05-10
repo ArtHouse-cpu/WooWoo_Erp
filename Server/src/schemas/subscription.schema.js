@@ -7,6 +7,11 @@ const getStartOfToday = () => {
 };
 
 const toNumber = value => Number(value);
+const normalizeMembershipType = value => String(value ?? '').trim().toLowerCase();
+const isJuniorMembership = value => {
+  const v = normalizeMembershipType(value);
+  return v.includes('junior') || v.includes('junoir');
+};
 
 const normalizeRepeat = ({repeatType, repeatEvery, repeatUnit}, errors, isPatch = false) => {
   const hasAnyRepeatField =
@@ -16,7 +21,7 @@ const normalizeRepeat = ({repeatType, repeatEvery, repeatUnit}, errors, isPatch 
     return {};
   }
 
-  const nextRepeatType = ['monthly', 'yearly', 'lifetime'].includes(repeatType)
+  const nextRepeatType = ['weekly', 'monthly', 'yearly', 'lifetime'].includes(repeatType)
     ? repeatType
     : 'monthly';
 
@@ -82,6 +87,44 @@ const normalizeItems = (items, errors) => {
   return normalized.map(({_idx, ...rest}) => rest);
 };
 
+const normalizeStudents = (students, errors, isJunior) => {
+  if (!isJunior) return [];
+  if (!Array.isArray(students) || students.length === 0) {
+    errors.push('At least one student is required for Junior membership.');
+    return [];
+  }
+
+  const allowedClassValues = new Set(['5', '6', '7', '8', '9', '10', '11', '12']);
+  return students.map((student, idx) => {
+    const classStd = String(student?.classStd ?? '').trim();
+    const normalized = {
+      studentName: String(student?.studentName ?? '').trim(),
+      schoolName: String(student?.schoolName ?? '').trim(),
+      dob: student?.dob ? new Date(student.dob) : null,
+      classStd,
+      relation: String(student?.relation ?? '').trim(),
+      parentName: String(student?.parentName ?? '').trim(),
+      studentId: String(student?.studentId ?? '').trim(),
+      studentIdUpload: String(student?.studentIdUpload ?? '').trim(),
+    };
+
+    if (!normalized.studentName) errors.push(`Student name is required at row ${idx + 1}.`);
+    if (!normalized.classStd || !allowedClassValues.has(normalized.classStd)) {
+      errors.push(`Class/STD must be between 5 and 12 at row ${idx + 1}.`);
+    }
+    if (!normalized.relation) errors.push(`Relation is required at row ${idx + 1}.`);
+    if (!normalized.parentName) errors.push(`Parent name is required at row ${idx + 1}.`);
+    if (!normalized.studentId && !normalized.studentIdUpload) {
+      errors.push(`Student ID or Photo Upload is required at row ${idx + 1}.`);
+    }
+    if (normalized.dob && Number.isNaN(normalized.dob.getTime())) {
+      errors.push(`Invalid DOB at row ${idx + 1}.`);
+    }
+
+    return normalized;
+  });
+};
+
 export function validateSubscriptionCreateBody(body) {
   const errors = [];
   const {
@@ -100,6 +143,10 @@ export function validateSubscriptionCreateBody(body) {
     repeatType,
     repeatEvery,
     repeatUnit,
+    membershipId,
+    membershipPlanId,
+    membershipType,
+    students,
   } = body ?? {};
 
   if (!customerName || !String(customerName).trim()) errors.push('Customer name is required.');
@@ -122,6 +169,9 @@ export function validateSubscriptionCreateBody(body) {
   }
 
   const normalizedItems = normalizeItems(items, errors);
+  const normalizedMembershipType = normalizeMembershipType(membershipType || membershipPlanId);
+  const isJunior = isJuniorMembership(normalizedMembershipType);
+  const normalizedStudents = normalizeStudents(students, errors, isJunior);
 
   const st = Number(subTotal);
   const dt = Number(discountTotal ?? 0);
@@ -142,6 +192,9 @@ export function validateSubscriptionCreateBody(body) {
     data: {
       customerName: String(customerName).trim(),
       customerPhone: String(customerPhone).trim(),
+      membershipId: String(membershipId ?? '').trim(),
+      membershipPlanId: String(membershipPlanId ?? '').trim(),
+      membershipType: normalizedMembershipType || 'general',
       invoiceDate: invoiceDateObj,
       dueDate: dueDateObj,
       startDate: invoiceDateObj,
@@ -149,6 +202,7 @@ export function validateSubscriptionCreateBody(body) {
       salesPersonName: String(salesPersonName).trim(),
       notes: String(notes ?? '').trim(),
       items: normalizedItems,
+      students: normalizedStudents,
       subTotal: st,
       discountTotal: dt,
       grandTotal: gt,
@@ -178,6 +232,10 @@ export function validateSubscriptionUpdateBody(body) {
     repeatType,
     repeatEvery,
     repeatUnit,
+    membershipId,
+    membershipPlanId,
+    membershipType,
+    students,
   } = body ?? {};
 
   if (customerName !== undefined) {
@@ -220,6 +278,18 @@ export function validateSubscriptionUpdateBody(body) {
 
   if (items !== undefined) {
     update.items = normalizeItems(items, errors);
+  }
+  if (membershipId !== undefined) update.membershipId = String(membershipId ?? '').trim();
+  if (membershipPlanId !== undefined) {
+    update.membershipPlanId = String(membershipPlanId ?? '').trim();
+  }
+  if (membershipType !== undefined) {
+    update.membershipType = normalizeMembershipType(membershipType || 'general');
+  }
+  if (students !== undefined) {
+    const currentMembershipType = update.membershipType ?? normalizeMembershipType(membershipType);
+    const isJunior = isJuniorMembership(currentMembershipType);
+    update.students = normalizeStudents(students, errors, isJunior);
   }
 
   if (subTotal !== undefined) {

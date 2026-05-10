@@ -11,11 +11,12 @@ import {
   handleUpdateSubscription,
   handleGetCustomers,
   type CustomerPayload,
+  type CreateSubscriptionPayload,
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import { printThermalReceipt } from "@/utils/printUtils";
-import { Printer, X } from "lucide-react";
+import { Camera, Printer, X } from "lucide-react";
 
 const today = new Date().toISOString().split("T")[0];
 const SUBSCRIPTION_SEQ_KEY = "wooerp-subscription-seq";
@@ -43,6 +44,67 @@ type MembershipOption = {
   period: string;
 };
 
+type StudentForm = {
+  studentName: string;
+  schoolName: string;
+  dob: string;
+  classStd: string;
+  relation: string;
+  parentName: string;
+  studentIdUpload: string;
+};
+
+const createEmptyStudent = (): StudentForm => ({
+  studentName: "",
+  schoolName: "",
+  dob: "",
+  classStd: "",
+  relation: "",
+  parentName: "",
+  studentIdUpload: "",
+});
+
+const isJuniorPlan = (plan?: Pick<MembershipOption, "planId" | "displayName"> | null) => {
+  const text = `${plan?.planId ?? ""} ${plan?.displayName ?? ""}`.toLowerCase();
+  return text.includes("junior") || text.includes("junoir");
+};
+
+const getCustomerMembershipType = (plan?: Pick<MembershipOption, "planId" | "displayName"> | null) => {
+  const raw = `${plan?.planId ?? ""} ${plan?.displayName ?? ""}`.toLowerCase();
+  if (raw.includes("junior") || raw.includes("junoir")) return "junior";
+  if (raw.includes("premium")) return "premium";
+  if (raw.includes("special")) return "special";
+  if (raw.includes("pro")) return "pro";
+  return "general";
+};
+
+const parseDurationToDays = (periodRaw: string): number => {
+  const period = String(periodRaw ?? "").trim().toLowerCase();
+  if (!period || period === "monthly" || period === "month") return 30;
+  if (period === "weekly" || period === "week") return 7;
+  if (period === "yearly" || period === "year") return 365;
+  if (period.includes("quarter")) return 90;
+  if (period.includes("half")) return 182;
+  if (period.includes("lifetime")) return 3650;
+
+  const numericMatch = period.match(/(\d+)/);
+  const value = numericMatch ? Number(numericMatch[1]) : NaN;
+  if (!Number.isFinite(value) || value <= 0) return 30;
+  if (period.includes("day")) return value;
+  if (period.includes("week")) return value * 7;
+  if (period.includes("year")) return value * 365;
+  return value * 30;
+};
+
+const computeEndDateFromPeriod = (startDateValue: string, periodRaw: string) => {
+  if (!startDateValue) return today;
+  const start = new Date(startDateValue);
+  if (Number.isNaN(start.getTime())) return startDateValue;
+  const days = parseDurationToDays(periodRaw);
+  start.setDate(start.getDate() + Math.max(days - 1, 0));
+  return start.toISOString().split("T")[0];
+};
+
 export default function CreateSubscriptionScreen() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -64,7 +126,13 @@ export default function CreateSubscriptionScreen() {
   const [openCheckout, setOpenCheckout] = useState(false);
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<
-    Array<{ _id: string; name: string; mobile: string; companyName?: string }>
+    Array<{
+      _id: string;
+      name: string;
+      mobile: string;
+      companyName?: string;
+      membershipType?: string;
+    }>
   >([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(true);
@@ -73,6 +141,8 @@ export default function CreateSubscriptionScreen() {
   const [memberships, setMemberships] = useState<MembershipOption[]>([]);
   const [loadingMemberships, setLoadingMemberships] = useState(false);
   const [selectedMembershipId, setSelectedMembershipId] = useState("");
+  const [students, setStudents] = useState<StudentForm[]>([createEmptyStudent()]);
+  const [endDateManuallyEdited, setEndDateManuallyEdited] = useState(false);
 
   useEffect(() => {
     type Line = {
@@ -94,6 +164,8 @@ export default function CreateSubscriptionScreen() {
       repeatUnit?: string | null;
       notes?: string;
       items?: Line[];
+      membershipId?: string;
+      students?: StudentForm[];
     };
     const state = location.state as {
       mode?: Mode;
@@ -126,6 +198,20 @@ export default function CreateSubscriptionScreen() {
         setRepeatType("monthly");
       }
       setNotes(doc.notes || "");
+      if (doc.membershipId) setSelectedMembershipId(String(doc.membershipId));
+      if (Array.isArray(doc.students) && doc.students.length > 0) {
+        setStudents(
+          doc.students.map((s) => ({
+            studentName: String(s.studentName ?? ""),
+            schoolName: String(s.schoolName ?? ""),
+            dob: s.dob ? String(s.dob).split("T")[0] : "",
+            classStd: String(s.classStd ?? ""),
+            relation: String(s.relation ?? ""),
+            parentName: String(s.parentName ?? ""),
+            studentIdUpload: String(s.studentIdUpload ?? ""),
+          })),
+        );
+      }
     };
 
     if (state?.subscription) {
@@ -136,20 +222,42 @@ export default function CreateSubscriptionScreen() {
     () => memberships.find((m) => m._id === selectedMembershipId) ?? null,
     [memberships, selectedMembershipId],
   );
+  const selectedCustomer = useMemo(
+    () => customers.find((c) => c._id === selectedCustomerId) ?? null,
+    [customers, selectedCustomerId],
+  );
+  const juniorSelected = isJuniorPlan(selectedMembership);
   const subTotal = selectedMembership?.amount ?? 0;
   const discountTotal = 0;
   const grandTotal = subTotal;
 
-  const buildPayload = (status: "draft" | "active") => {
+  useEffect(() => {
+    if (!selectedMembership || endDateManuallyEdited) return;
+    const computedEndDate = computeEndDateFromPeriod(startDate, selectedMembership.period);
+    setEndDate(computedEndDate);
+  }, [selectedMembership, startDate, endDateManuallyEdited]);
+
+  useEffect(() => {
+    if (!juniorSelected) {
+      setStudents([createEmptyStudent()]);
+    }
+  }, [juniorSelected]);
+
+  const buildPayload = (status: "draft" | "active"): CreateSubscriptionPayload => {
     const repeatUnit: "month" | "year" | null =
       repeatType === "yearly" ? "year" : "month";
     const repeatEvery = repeatType === "weekly" ? 1 : 1;
 
+    const membershipTypeRaw =
+      selectedMembership?.planId || selectedMembership?.displayName || "general";
     return {
       customerName: customer.trim(),
       customerPhone: phone.trim(),
       invoiceDate: startDate,
       dueDate: endDate,
+      membershipId: selectedMembership?._id ?? "",
+      membershipPlanId: selectedMembership?.planId ?? "",
+      membershipType: membershipTypeRaw,
       repeatType,
       repeatEvery,
       repeatUnit,
@@ -174,6 +282,12 @@ export default function CreateSubscriptionScreen() {
         m_staff_name: staff.m_staff_name,
         m_staff_email: staff.m_staff_email,
       },
+      students: juniorSelected
+        ? students.map((student) => ({
+            ...student,
+            dob: student.dob || null,
+          }))
+        : [],
     };
   };
 
@@ -209,6 +323,59 @@ export default function CreateSubscriptionScreen() {
         "warning",
       );
       return false;
+    }
+    const currentCustomerMembership = String(
+      selectedCustomer?.membershipType ?? "",
+    ).toLowerCase();
+    const customerHasNonJuniorMembership =
+      Boolean(currentCustomerMembership) &&
+      currentCustomerMembership !== "none" &&
+      currentCustomerMembership !== "junior";
+    if (!juniorSelected && customerHasNonJuniorMembership) {
+      Swal.fire(
+        "Membership rule",
+        "Customer already has a non-Junior membership. Additional purchase is allowed only for Junior membership.",
+        "warning",
+      );
+      return false;
+    }
+    if (juniorSelected) {
+      if (students.length === 0) {
+        Swal.fire(
+          "Student details required",
+          "Please add at least one student for Junior membership.",
+          "warning",
+        );
+        return false;
+      }
+      for (let i = 0; i < students.length; i += 1) {
+        const s = students[i];
+        const classNumber = Number(s.classStd);
+        if (!s.studentName.trim() || !s.schoolName.trim() || !s.classStd.trim()) {
+          Swal.fire(
+            "Incomplete student details",
+            `Please fill student name, school name and class for student ${i + 1}.`,
+            "warning",
+          );
+          return false;
+        }
+        if (!Number.isFinite(classNumber) || classNumber < 5 || classNumber > 12) {
+          Swal.fire(
+            "Invalid class",
+            `Junior membership is only valid for class 5 to 12 (student ${i + 1}).`,
+            "warning",
+          );
+          return false;
+        }
+        if (!s.relation.trim() || !s.parentName.trim()) {
+          Swal.fire(
+            "Incomplete student details",
+            `Please fill relation and parent name for student ${i + 1}.`,
+            "warning",
+          );
+          return false;
+        }
+      }
     }
     return true;
   };
@@ -329,7 +496,7 @@ export default function CreateSubscriptionScreen() {
   }) => {
     try {
       setSaving(true);
-      const payload = {
+      const payload: CreateSubscriptionPayload = {
         ...buildPayload("active"),
         subscriptionCode: subscriptionNo,
         mode: payment.mode,
@@ -337,13 +504,10 @@ export default function CreateSubscriptionScreen() {
         paymentBreakdown: payment.paymentBreakdown,
       };
       if (mode === "edit" && subscriptionId) {
-        await handleUpdateSubscription(
-          subscriptionId,
-          payload as Parameters<typeof handleUpdateSubscription>[1],
-        );
+        await handleUpdateSubscription(subscriptionId, payload);
         if (selectedCustomerId && selectedMembership) {
           await handleUpdateCustomer(selectedCustomerId, {
-            membershipType: selectedMembership.planId || selectedMembership.displayName,
+            membershipType: getCustomerMembershipType(selectedMembership),
           });
         }
         printThermalReceipt({
@@ -369,10 +533,10 @@ export default function CreateSubscriptionScreen() {
         );
         return;
       }
-      const response = await handleCreateSubscription(payload as any);
+      const response = await handleCreateSubscription(payload);
       if (selectedCustomerId && selectedMembership) {
         await handleUpdateCustomer(selectedCustomerId, {
-          membershipType: selectedMembership.planId || selectedMembership.displayName,
+          membershipType: getCustomerMembershipType(selectedMembership),
         });
       }
       const savedCode = String(
@@ -411,6 +575,27 @@ export default function CreateSubscriptionScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const updateStudent = (
+    index: number,
+    field: keyof StudentForm,
+    value: string,
+  ) => {
+    setStudents((prev) =>
+      prev.map((student, i) => (i === index ? { ...student, [field]: value } : student)),
+    );
+  };
+
+  const addStudent = () => {
+    setStudents((prev) => [...prev, createEmptyStudent()]);
+  };
+
+  const removeStudent = (index: number) => {
+    setStudents((prev) => {
+      if (prev.length === 1) return prev;
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   return (
@@ -525,7 +710,10 @@ export default function CreateSubscriptionScreen() {
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setEndDateManuallyEdited(false);
+                }}
                 className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
               />
             </div>
@@ -537,23 +725,12 @@ export default function CreateSubscriptionScreen() {
                 type="date"
                 value={endDate}
                 min={startDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setEndDateManuallyEdited(true);
+                }}
                 className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-600">
-                Repeat Type
-              </label>
-              <select
-                value={repeatType}
-                onChange={(e) => setRepeatType(e.target.value as RepeatType)}
-                className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-              >
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
-              </select>
             </div>
           </div>
 
@@ -563,7 +740,10 @@ export default function CreateSubscriptionScreen() {
             </label>
             <select
               value={selectedMembershipId}
-              onChange={(e) => setSelectedMembershipId(e.target.value)}
+              onChange={(e) => {
+                setSelectedMembershipId(e.target.value);
+                setEndDateManuallyEdited(false);
+              }}
               className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
             >
               <option value="">
@@ -578,6 +758,137 @@ export default function CreateSubscriptionScreen() {
               ))}
             </select>
           </div>
+
+          {juniorSelected && (
+            <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-orange-800">
+                  Junior Student Details (Class 5 to 12)
+                </h3>
+                <button
+                  type="button"
+                  onClick={addStudent}
+                  className="rounded-md bg-orange-600 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-700"
+                >
+                  + Add More Student
+                </button>
+              </div>
+
+              {students.map((student, index) => (
+                <div
+                  key={`student-${index}`}
+                  className="space-y-3 rounded-md border border-orange-200 bg-white p-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-700">
+                      Student {index + 1}
+                    </p>
+                    {students.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeStudent(index)}
+                        className="text-xs font-semibold text-red-600 hover:text-red-700"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <input
+                      value={student.studentName}
+                      onChange={(e) =>
+                        updateStudent(index, "studentName", e.target.value)
+                      }
+                      placeholder="Student Name"
+                      className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                    />
+                    <input
+                      value={student.schoolName}
+                      onChange={(e) =>
+                        updateStudent(index, "schoolName", e.target.value)
+                      }
+                      placeholder="School Name"
+                      className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                    />
+                    <div className="flex flex-col">
+                      <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
+                        DOB
+                      </label>
+                      <input
+                        type="date"
+                        value={student.dob}
+                        onChange={(e) => updateStudent(index, "dob", e.target.value)}
+                        className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <input
+                      type="number"
+                      min={5}
+                      max={12}
+                      value={student.classStd}
+                      onChange={(e) =>
+                        updateStudent(index, "classStd", e.target.value)
+                      }
+                      placeholder="Class / STD (5-12)"
+                      className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                    />
+                    <input
+                      value={student.relation}
+                      onChange={(e) =>
+                        updateStudent(index, "relation", e.target.value)
+                      }
+                      placeholder="Relation"
+                      className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                    />
+                    <input
+                      value={student.parentName}
+                      onChange={(e) =>
+                        updateStudent(index, "parentName", e.target.value)
+                      }
+                      placeholder="Parent Name"
+                      className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                    />
+                    <div className="md:col-span-2">
+                      <label className="mb-1 block text-xs font-semibold text-gray-600">
+                        Student ID Photo
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={student.studentIdUpload}
+                          onChange={(e) =>
+                            updateStudent(index, "studentIdUpload", e.target.value)
+                          }
+                          placeholder="Student ID Photo (URL or Upload)"
+                          className="h-10 flex-1 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          className="flex h-10 items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3 text-gray-600 hover:bg-gray-100"
+                          onClick={() => {
+                            const input = document.createElement("input");
+                            input.type = "file";
+                            input.accept = "image/*";
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (file) {
+                                // For now we keep the filename or a placeholder if we don't have a real upload logic
+                                // Ideally this would trigger an upload to Cloudinary and set the URL
+                                updateStudent(index, "studentIdUpload", file.name);
+                              }
+                            };
+                            input.click();
+                          }}
+                        >
+                          <Camera size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-gray-600">

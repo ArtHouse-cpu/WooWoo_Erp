@@ -32,6 +32,20 @@ const subscriptionItemSchema = new mongoose.Schema(
   {_id: false},
 );
 
+const juniorStudentSchema = new mongoose.Schema(
+  {
+    studentName: {type: String, required: true, trim: true},
+    schoolName: {type: String, default: '', trim: true},
+    dob: {type: Date, default: null},
+    classStd: {type: String, required: true, trim: true},
+    relation: {type: String, required: true, trim: true},
+    parentName: {type: String, required: true, trim: true},
+    studentId: {type: String, default: '', trim: true},
+    studentIdUpload: {type: String, default: '', trim: true},
+  },
+  {_id: false},
+);
+
 const subscriptionSchema = new mongoose.Schema(
   {
     subscriptionPrefix: {
@@ -63,6 +77,25 @@ const subscriptionSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    membershipId: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    membershipPlanId: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    membershipType: {
+      type: String,
+      default: 'general',
+      trim: true,
+      lowercase: true,
+      index: true,
+    },
     invoiceDate: {
       type: Date,
       required: true,
@@ -83,7 +116,7 @@ const subscriptionSchema = new mongoose.Schema(
     },
     repeatType: {
       type: String,
-      enum: ['monthly', 'yearly', 'lifetime'],
+      enum: ['weekly', 'monthly', 'yearly', 'lifetime'],
       default: 'monthly',
     },
     repeatEvery: {
@@ -122,6 +155,10 @@ const subscriptionSchema = new mongoose.Schema(
     },
     items: {
       type: [subscriptionItemSchema],
+      default: [],
+    },
+    students: {
+      type: [juniorStudentSchema],
       default: [],
     },
     subTotal: {
