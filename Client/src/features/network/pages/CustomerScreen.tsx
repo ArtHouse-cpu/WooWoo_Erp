@@ -16,6 +16,7 @@ import {
   handleCreateCustomer,
   handleDeleteCustomer,
   handleGetCustomers,
+  handleGetInvoices,
   handleGetSubscriptions,
   handleGetWallets,
   handleUpdateCustomer,
@@ -40,6 +41,7 @@ type CustomerRow = {
   closingBalance?: number;
   walletAmount?: number;
   profileImage?: string;
+  dueAmount?: number;
 };
 export default function CustomerScreen() {
   const [openCreateCustomerModal, setOpenCreateCustomerModal] = useState(false);
@@ -101,9 +103,10 @@ export default function CustomerScreen() {
   const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
     try {
       setLoadingCustomers(true);
-      const [customerResponse, walletResponse] = await Promise.allSettled([
+      const [customerResponse, walletResponse, invoiceResponse] = await Promise.allSettled([
         handleGetCustomers(searchText, signal),
         handleGetWallets({ search: searchText }, signal),
+        handleGetInvoices(searchText, signal),
       ]);
       const subscriptionResponse = await handleGetSubscriptions(
         searchText,
@@ -185,6 +188,31 @@ export default function CustomerScreen() {
         {},
       );
 
+      const invoiceItems =
+        invoiceResponse.status === "fulfilled" &&
+        Array.isArray(invoiceResponse.value?.invoices)
+          ? invoiceResponse.value.invoices
+          : [];
+      const dueLookup = invoiceItems.reduce(
+        (acc: Record<string, number>, invoice: any) => {
+          const dueAmount = Number(
+            invoice?.pendingAmount ?? invoice?.paymentBreakdown?.dueAmount ?? 0,
+          );
+          if (dueAmount <= 0) return acc;
+          const keys = [
+            invoice?.customerPhone,
+            invoice?.customerName,
+          ]
+            .map((value) => String(value ?? "").trim())
+            .filter(Boolean);
+          keys.forEach((key) => {
+            acc[key] = (acc[key] || 0) + dueAmount;
+          });
+          return acc;
+        },
+        {},
+      );
+
 
       setCustomers(
         customerList.map((customer: CustomerRow) => {
@@ -196,7 +224,11 @@ export default function CustomerScreen() {
             nextWalletMap[String(customer?._id ?? "").trim()] ??
             nextWalletMap[String(customer?.mobile ?? "").trim()] ??
             Number(customer?.walletAmount ?? customer?.closingBalance ?? 0);
-          return { ...customer, membershipType, walletAmount };
+          const dueAmount =
+            dueLookup[String(customer?.mobile ?? "").trim()] ??
+            dueLookup[String(customer?.name ?? "").trim()] ??
+            0;
+          return { ...customer, membershipType, walletAmount, dueAmount };
         }),
       );
     } catch {
@@ -342,6 +374,21 @@ export default function CustomerScreen() {
           const value = Number(cell.getValue() ?? 0);
           return (
             <span className="tabular-nums">
+              ₹ {value.toLocaleString("en-IN")}
+            </span>
+          );
+        },
+        size: 140,
+      },
+      {
+        header: "Due Amount",
+        id: "dueAmount",
+        accessorFn: (row: CustomerRow) => row.dueAmount || 0,
+        Cell: ({ cell }) => {
+          const value = Number(cell.getValue() ?? 0);
+          if (value <= 0) return "-";
+          return (
+            <span className="font-semibold text-amber-700 tabular-nums">
               ₹ {value.toLocaleString("en-IN")}
             </span>
           );

@@ -11,25 +11,23 @@ import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
   handleCreateCustomer,
-  handleCreateInvoice,
-  handleUpdateInvoice,
   handleGetCustomers,
+  handleCreateQuotation,
+  handleUpdateQuotation,
   type CustomerPayload,
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
-import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
-import { printThermalReceipt } from "@/utils/printUtils";
 
 const today = new Date().toISOString().split("T")[0];
-const INVOICE_SEQ_KEY = "wooerp-invoice-seq";
+const QUOT_SEQ_KEY = "wooerp-quotation-seq";
 
-const getNextInvoiceNumber = (): string => {
-  const fallback = 10975;
+const getNextQuotationNumber = (): string => {
+  const fallback = 1000;
   try {
-    const currentRaw = localStorage.getItem(INVOICE_SEQ_KEY);
+    const currentRaw = localStorage.getItem(QUOT_SEQ_KEY);
     const current = currentRaw ? Number(currentRaw) : fallback;
     const next = Number.isFinite(current) ? current + 1 : fallback + 1;
-    localStorage.setItem(INVOICE_SEQ_KEY, String(next));
+    localStorage.setItem(QUOT_SEQ_KEY, String(next));
     return String(next);
   } catch {
     return String(fallback + 1);
@@ -38,22 +36,21 @@ const getNextInvoiceNumber = (): string => {
 
 type Mode = "create" | "edit" | "view";
 
-export default function CreateInvoiceScreen() {
+export default function CreateQuotationScreen() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<Mode>("create");
-  const [invoiceId, setInvoiceId] = useState<string | null>(null);
-  const [invoiceNo, setInvoiceNo] = useState(getNextInvoiceNumber());
+  const [quotationId, setQuotationId] = useState<string | null>(null);
+  const [quotationNo, setQuotationNo] = useState(getNextQuotationNumber());
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
   const [membership, setMembership] = useState("");
-  const [invoiceDate, setInvoiceDate] = useState(today);
+  const [quotationDate, setQuotationDate] = useState(today);
   const [dueDate, setDueDate] = useState(today);
   const staff = useAppSelector((state) => state.user);
   const staffName = useAppSelector((state) => state.user.m_staff_name);
   const salesPerson = staffName ?? "Not Assigned";
   const [notes, setNotes] = useState("");
-  const [openCheckout, setOpenCheckout] = useState(false);
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<
     Array<{ _id: string; name: string; mobile: string; companyName?: string }>
@@ -71,19 +68,19 @@ export default function CreateInvoiceScreen() {
   const [items, setItems] = useState<InvoiceItem[]>([]);
 
   useEffect(() => {
-    const state = location.state as { invoice?: any; mode?: Mode } | null;
-    if (state?.mode && state?.invoice) {
+    const state = location.state as { quotation?: any; mode?: Mode } | null;
+    if (state?.mode && state?.quotation) {
         setMode(state.mode);
-        const inv = state.invoice;
-        setInvoiceId(inv._id);
-        if (inv.invoiceCode) setInvoiceNo(inv.invoiceCode);
-        setCustomer(inv.customerName || "");
-        setPhone(inv.customerPhone || "");
-        if (inv.invoiceDate) setInvoiceDate(new Date(inv.invoiceDate).toISOString().split("T")[0]);
-        if (inv.dueDate) setDueDate(new Date(inv.dueDate).toISOString().split("T")[0]);
-        setNotes(inv.notes || "");
-        if (Array.isArray(inv.items)) {
-            setItems(inv.items.map((item: any, idx: number) => ({
+        const quot = state.quotation;
+        setQuotationId(quot._id);
+        if (quot.quotationCode) setQuotationNo(quot.quotationCode);
+        setCustomer(quot.customerName || "");
+        setPhone(quot.customerPhone || "");
+        if (quot.quotationDate) setQuotationDate(new Date(quot.quotationDate).toISOString().split("T")[0]);
+        if (quot.dueDate) setDueDate(new Date(quot.dueDate).toISOString().split("T")[0]);
+        setNotes(quot.notes || "");
+        if (Array.isArray(quot.items)) {
+            setItems(quot.items.map((item: any, idx: number) => ({
                 id: idx + 1,
                 productName: item.productName || "",
                 qty: item.qty || 1,
@@ -177,10 +174,10 @@ export default function CreateInvoiceScreen() {
 
     try {
       setSaving(true);
-      const draftPayload = {
+      const payload = {
         customerName: customer.trim(),
         customerPhone: phone.trim(),
-        invoiceDate,
+        quotationDate,
         dueDate,
         salesPersonName: salesPerson,
         notes: notes.trim(),
@@ -194,45 +191,36 @@ export default function CreateInvoiceScreen() {
         discountTotal,
         grandTotal,
         status: "draft" as const,
-        mode: "Draft",
-        paymentStatus: "partial" as const,
-        pendingAmount: grandTotal,
-        paymentBreakdown: {
-          cash: 0,
-          upi: 0,
-          card: 0,
-          wallet: 0,
-          paidAmount: 0,
-          dueAmount: grandTotal,
-          changeAmount: 0,
-        },
       };
 
-      if (invoiceId) {
-        await handleUpdateInvoice(invoiceId, draftPayload);
+      if (quotationId) {
+        await handleUpdateQuotation(quotationId, payload);
+        Swal.fire("Saved", "Quotation has been updated.", "success").then(() => {
+          navigate(-1);
+        });
       } else {
-        const response = await handleCreateInvoice({
-          ...draftPayload,
+        const response = await handleCreateQuotation({
+          ...payload,
           createdBy: {
             m_staff_id: staff.m_staff_id,
             m_staff_name: staff.m_staff_name,
             m_staff_email: staff.m_staff_email,
           },
         });
-        const createdId = String(response?.invoice?._id ?? "");
-        const createdCode = String(response?.invoice?.invoiceCode ?? "");
-        if (createdId) setInvoiceId(createdId);
-        if (createdCode) setInvoiceNo(createdCode);
+        const createdId = String(response?.quotation?._id ?? "");
+        const createdCode = String(response?.quotation?.quotationCode ?? "");
+        if (createdId) setQuotationId(createdId);
+        if (createdCode) setQuotationNo(createdCode);
+        
+        Swal.fire("Saved", "Quotation has been saved.", "success").then(() => {
+          navigate(-1);
+        });
       }
-
-      Swal.fire("Saved", "Invoice has been saved as draft.", "success").then(() => {
-        navigate(-1);
-      });
     } catch (error: unknown) {
       const err = error as {response?: {data?: {message?: string}}};
       Swal.fire(
         "Save failed",
-        err?.response?.data?.message ?? "Could not save draft. Try again.",
+        err?.response?.data?.message ?? "Could not save quotation. Try again.",
         "error",
       );
     } finally {
@@ -241,159 +229,7 @@ export default function CreateInvoiceScreen() {
   };
 
   const handleSavePrint = () => {
-    Swal.fire("Saved", "Invoice saved. Print flow can be connected next.", "success");
-  };
-
-  const validateBeforeCheckout = () => {
-    if (!customer.trim()) {
-      Swal.fire("Customer required", "Please select or enter customer.", "warning");
-      return false;
-    }
-    if (!phone.trim()) {
-      Swal.fire("Phone required", "Please enter customer phone number.", "warning");
-      return false;
-    }
-    if (dueDate < today) {
-      Swal.fire("Invalid due date", "Due date cannot be before today.", "warning");
-      return false;
-    }
-    if (!items.length) {
-      Swal.fire("No items", "Add at least one product in invoice.", "warning");
-      return false;
-    }
-    return true;
-  };
-
-  const handleSave = async (payment: {
-    mode: string;
-    paymentStatus: "full" | "partial";
-    paymentBreakdown: {
-      cash: number;
-      upi: number;
-      card: number;
-      wallet: number;
-      paidAmount: number;
-      dueAmount: number;
-      changeAmount: number;
-    };
-    finalAmount: number;
-    coupon?: {
-      code: string;
-      discountAmount: number;
-    } | null;
-  }) => {
-    try {
-      setSaving(true);
-      if (mode === "edit" && invoiceId) {
-        await handleUpdateInvoice(invoiceId, {
-          customerName: customer.trim(),
-          customerPhone: phone.trim(),
-          invoiceDate,
-          dueDate,
-          salesPersonName: salesPerson,
-          notes: notes.trim(),
-          items: items.map((item) => ({
-            productName: item.productName,
-            qty: item.qty,
-            unitPrice: item.unitPrice,
-            discount: item.discount,
-          })),
-          subTotal,
-          discountTotal,
-          grandTotal: payment.finalAmount,
-          coupon: payment.coupon ?? null,
-          status: "final",
-          mode: payment.mode,
-          paymentStatus: payment.paymentStatus,
-          paymentBreakdown: payment.paymentBreakdown,
-          pendingAmount: payment.paymentBreakdown.dueAmount,
-        });
-
-        printThermalReceipt({
-          invoiceNo: invoiceNo,
-          customerName: customer.trim(),
-          customerPhone: phone.trim(),
-          items: items.map((item) => ({
-            name: item.productName,
-            qty: item.qty,
-            price: item.unitPrice,
-            discount: item.discount,
-          })),
-          totalMRP: items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
-          discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
-          finalAmount: payment.finalAmount,
-          totalDue: payment.paymentBreakdown.dueAmount,
-          totalQty: items.reduce((sum, item) => sum + item.qty, 0),
-        });
-
-        Swal.fire("Invoice Updated", "Invoice updated successfully.", "success").then(() => navigate(-1));
-      } else {
-        const response = await handleCreateInvoice({
-          customerName: customer.trim(),
-          customerPhone: phone.trim(),
-          invoiceDate,
-          dueDate,
-          salesPersonName: salesPerson,
-          notes: notes.trim(),
-          items: items.map((item) => ({
-            productName: item.productName,
-            qty: item.qty,
-            unitPrice: item.unitPrice,
-            discount: item.discount,
-          })),
-          subTotal,
-          discountTotal,
-          grandTotal: payment.finalAmount,
-          coupon: payment.coupon ?? null,
-          status: "final",
-          mode: payment.mode,
-          paymentStatus: payment.paymentStatus,
-          paymentBreakdown: payment.paymentBreakdown,
-          pendingAmount: payment.paymentBreakdown.dueAmount,
-          createdBy: {
-            m_staff_id: staff.m_staff_id,
-            m_staff_name: staff.m_staff_name,
-            m_staff_email: staff.m_staff_email,
-          },
-        });
-
-        const savedCode = response?.invoice?.invoiceCode || invoiceNo;
-
-        printThermalReceipt({
-          invoiceNo: savedCode,
-          customerName: customer.trim(),
-          customerPhone: phone.trim(),
-          items: items.map((item) => ({
-            name: item.productName,
-            qty: item.qty,
-            price: item.unitPrice,
-            discount: item.discount,
-          })),
-          totalMRP: items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
-          discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
-          finalAmount: payment.finalAmount,
-          totalDue: payment.paymentBreakdown.dueAmount,
-          totalQty: items.reduce((sum, item) => sum + item.qty, 0),
-        });
-
-        Swal.fire(
-          "Invoice Saved",
-          response?.invoice?.invoiceCode
-            ? `Invoice ${response.invoice.invoiceCode} saved successfully.`
-            : "Invoice saved successfully.",
-          "success",
-        ).then(() => navigate(-1));
-      }
-    } catch (error: unknown) {
-      const err = error as {response?: {data?: {message?: string}}};
-      Swal.fire(
-        "Save failed",
-        err?.response?.data?.message ?? "Could not save invoice. Try again.",
-        "error",
-      );
-    } finally {
-      setSaving(false);
-    }
+    Swal.fire("Saved", "Quotation saved. Print flow can be connected next.", "success");
   };
 
   const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
@@ -466,13 +302,11 @@ export default function CreateInvoiceScreen() {
   return (
     <div className="space-y-4 p-2">
       <CreateInvoiceHeader
-        invoiceNo={invoiceNo}
+        invoiceNo={quotationNo}
         onBack={() => navigate(-1)}
         onSaveDraft={handleSaveDraft}
         onSavePrint={handleSavePrint}
-        onSave={() => {
-          if (validateBeforeCheckout()) setOpenCheckout(true);
-        }}
+        onSave={handleSaveDraft}
         isSaving={saving}
         mode={mode}
       />
@@ -484,7 +318,7 @@ export default function CreateInvoiceScreen() {
         customerOptions={customers}
         loadingCustomers={loadingCustomers}
         customerDropdownOpen={customerDropdownOpen}
-        invoiceDate={invoiceDate}
+        invoiceDate={quotationDate}
         dueDate={dueDate}
         dueDateMin={today}
         salesPerson={salesPerson}
@@ -504,7 +338,7 @@ export default function CreateInvoiceScreen() {
         onOpenCustomerDropdown={() => setCustomerDropdownOpen(true)}
         onCloseCustomerDropdown={() => setCustomerDropdownOpen(false)}
         onPhoneChange={setPhone}
-        onInvoiceDateChange={setInvoiceDate}
+        onInvoiceDateChange={setQuotationDate}
         onDueDateChange={setDueDate}
       />
       {showCreateCustomerModal && (
@@ -540,34 +374,13 @@ export default function CreateInvoiceScreen() {
           grandTotal={grandTotal}
           onSave={
             mode !== "view"
-              ? () => {
-                  if (validateBeforeCheckout()) setOpenCheckout(true);
-                }
+              ? handleSaveDraft
               : () => {}
           }
           isSaving={saving}
         />
       </div>
       </div>
-      <CheckoutModal
-        open={openCheckout}
-        grandTotal={grandTotal}
-        items={items.map((item) => ({
-          id: item.id,
-          name: item.productName,
-          qty: item.qty,
-          price: item.unitPrice,
-          discount: item.discount,
-        }))}
-        initialCustomerName={customer}
-        initialCustomerPhone={phone}
-        initialMembership=""
-        onClose={() => setOpenCheckout(false)}
-        onConfirmPayment={async (payment) => {
-          setOpenCheckout(false);
-          await handleSave(payment);
-        }}
-      />
     </div>
   );
 }

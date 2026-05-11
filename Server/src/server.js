@@ -9,6 +9,7 @@ import customerRoutes from "./routes/customer.route.js";
 import productRoutes from "./routes/product.route.js";
 import categoryRoutes from "./routes/category.route.js";
 import subCategoryRoutes from "./routes/subCategory.route.js";
+import quotationRoutes from "./routes/quotation.route.js";
 import returnsalesRoutes from "./routes/returnSales.router.js";
 import subscriptionRoutes from "./routes/subscription.route.js";
 import membershipRoutes from "./routes/membership.routes.js";
@@ -44,6 +45,7 @@ app.use(express.json());
 
 app.use("/auth", authRoutes);
 app.use("/invoice", invoiceRoutes);
+app.use("/quotation", quotationRoutes);
 app.use("/customer", customerRoutes);
 app.use("/product", productRoutes);
 app.use("/api/categories", categoryRoutes);

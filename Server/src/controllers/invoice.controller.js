@@ -415,6 +415,7 @@ const updateInvoice = async (req, res) => {
       paymentBreakdown,
       createdBy,
       coupon,
+      newPayment,
     } = req.body;
 
     const existingInvoice = await Invoice.findById(id);
@@ -576,9 +577,14 @@ const updateInvoice = async (req, res) => {
       });
     }
 
+    const updateQuery = { $set: updateData };
+    if (newPayment) {
+      updateQuery.$push = { paymentHistory: newPayment };
+    }
+
     const updatedInvoice = await Invoice.findByIdAndUpdate(
       id,
-      { $set: updateData },
+      updateQuery,
       { new: true }
     );
 

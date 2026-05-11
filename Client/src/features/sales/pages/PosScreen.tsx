@@ -20,6 +20,7 @@ import { axiosInstance } from "@/services/axiosInstance";
 import Swal from "sweetalert2";
 import { handleCancelInvoice, handleDeleteInvoice } from "@/services/apiClient";
 import CreatePosScreen from "./CreatePosScreen";
+import DuePaymentModal from "../components/invoice/Modal/DuePaymentModal";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
   buildWoowooInvoiceWhatsAppMessage,
@@ -66,6 +67,8 @@ export default function PosScreen() {
     null,
   );
   const [posModalOpen, setPosModalOpen] = useState(false);
+  const [dueModalOpen, setDueModalOpen] = useState(false);
+  const [selectedDueRow, setSelectedDueRow] = useState<PosRow | null>(null);
 
   const handleAction = async (
     action: "view" | "edit" | "cancel" | "delete" | "Credit Note",
@@ -283,12 +286,19 @@ export default function PosScreen() {
 
           if (dueAmount > 0) {
             return (
-              <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedDueRow(row.original);
+                  setDueModalOpen(true);
+                }}
+                className="px-2.5 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
+              >
                 {`Due ₹ ${dueAmount.toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}`}
-              </span>
+              </button>
             );
           }
 
@@ -795,6 +805,16 @@ export default function PosScreen() {
       <CreatePosScreen
         open={posModalOpen}
         onClose={() => setPosModalOpen(false)}
+      />
+
+      <DuePaymentModal
+        open={dueModalOpen}
+        onClose={() => {
+          setDueModalOpen(false);
+          setSelectedDueRow(null);
+        }}
+        invoice={selectedDueRow}
+        onSuccess={fetchInvoices}
       />
     </div>
   );

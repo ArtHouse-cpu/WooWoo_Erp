@@ -8,6 +8,7 @@ import {
 
 type Props = {
   invoice: InvoicePdfInput | null | undefined;
+  documentType?: string;
 };
 
 /** Reference-style accent (invoice totals / highlights) */
@@ -203,7 +204,7 @@ function computeInvoiceLines(
   });
 }
 
-export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw }) => {
+export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType = "INVOICE" }) => {
   const invoice = raw ?? {};
 
   const invoiceNo =
@@ -330,7 +331,7 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw }) => {
             lineHeight: 1,
           }}
         >
-          INVOICE
+          {documentType}
         </div>
       </div>
 
@@ -349,7 +350,7 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw }) => {
         }}
       >
         <span>Customer</span>
-        <span>INVOICE NO — {invoiceNo}</span>
+        <span>{documentType} NO — {invoiceNo}</span>
       </div>
 
       {/* Customer + billing */}

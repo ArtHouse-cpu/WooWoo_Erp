@@ -101,7 +101,7 @@ function cleanupDom(root: Root | null, container: HTMLDivElement): void {
   }
 }
 
-async function createInvoicePdf(invoice: InvoicePdfInput): Promise<jsPDF> {
+async function createInvoicePdf(invoice: InvoicePdfInput, documentType: string = "INVOICE"): Promise<jsPDF> {
   const container = document.createElement("div");
   container.setAttribute("aria-hidden", "true");
   container.style.position = "absolute";
@@ -116,7 +116,7 @@ async function createInvoicePdf(invoice: InvoicePdfInput): Promise<jsPDF> {
 
   try {
     flushSync(() => {
-      root!.render(<A4InvoiceTemplate invoice={invoice} />);
+      root!.render(<A4InvoiceTemplate invoice={invoice} documentType={documentType} />);
     });
   } catch (renderError) {
     console.error("Invoice PDF render failed:", renderError);
@@ -173,17 +173,18 @@ async function createInvoicePdf(invoice: InvoicePdfInput): Promise<jsPDF> {
   }
 }
 
-export async function downloadInvoicePdf(invoice: unknown): Promise<void> {
+export async function downloadInvoicePdf(invoice: unknown, documentType: string = "INVOICE"): Promise<void> {
   assertInvoiceForPdf(invoice);
-  const pdf = await createInvoicePdf(invoice);
+  const pdf = await createInvoicePdf(invoice, documentType);
   pdf.save(invoicePdfBasename(invoice));
 }
 
 export async function getInvoicePdfBlob(
   invoice: unknown,
+  documentType: string = "INVOICE"
 ): Promise<{ blob: Blob; filename: string }> {
   assertInvoiceForPdf(invoice);
-  const pdf = await createInvoicePdf(invoice);
+  const pdf = await createInvoicePdf(invoice, documentType);
   const filename = invoicePdfBasename(invoice);
   return { blob: pdf.output("blob"), filename };
 }

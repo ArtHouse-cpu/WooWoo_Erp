@@ -40,6 +40,7 @@ import {
   QuotationScreen,
   CouponsScreen,
 } from "@/features/sales";
+import CreateQuotationScreen from "@/features/sales/pages/CreateQuotationScreen";
 import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
 import SubscriptionScreen from "@/features/sales/pages/SubscriptionScreen";
 import PurchaseScreen from "@/features/purchase/pages/PurchaseScreen";
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
       { path: "/payments", element: <PaymentScreen /> },
       { path: "/wallet", element: <WalletScreen /> },
       { path: "/quotations", element: <QuotationScreen /> },
+      { path: "/create-quotation", element: <CreateQuotationScreen /> },
       { path: "/creditnotes", element: <CreditNoteScreen /> },
       { path: "/create-pos", element: <CreatePosScreen /> },
       { path: "/create-invoice", element: <CreateInvoiceScreen /> },

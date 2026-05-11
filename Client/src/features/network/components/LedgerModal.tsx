@@ -4,6 +4,7 @@ import {
   handleGetWalletById,
   handleGetWallets,
   handleGetPurchases,
+  handleGetInvoices,
 } from "@/services/apiClient";
 
 function toAmount(...values: unknown[]) {
@@ -54,11 +55,33 @@ type PurchaseLine = {
   lineTotal: number;
 };
 
+type InvoiceLine = {
+  invoiceId: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  totalAmount: number;
+  paidAmount: number;
+  dueAmount: number;
+  status: string;
+};
+
+type PaymentHistoryLine = {
+  id: string;
+  invoiceNumber: string;
+  date: string;
+  amount: number;
+  mode: string;
+  receivedBy: string;
+};
+
 export default function LedgerModal({ onClose, customer, vendor }: Props) {
   const [loading, setLoading] = useState(false);
   const [walletRecord, setWalletRecord] = useState<any>(null);
   const [purchaseLines, setPurchaseLines] = useState<PurchaseLine[]>([]);
   const [loadingPurchases, setLoadingPurchases] = useState(false);
+  const [invoiceLines, setInvoiceLines] = useState<InvoiceLine[]>([]);
+  const [paymentLines, setPaymentLines] = useState<PaymentHistoryLine[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
 
   useEffect(() => {
     const loadWallet = async () => {
@@ -181,6 +204,91 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
     return () => controller.abort();
   }, [vendor?._id, vendor?.name, vendor?.mobile]);
 
+  useEffect(() => {
+    const customerPhone = String(customer?.mobile ?? "").trim();
+    const customerName = String(customer?.name ?? "").trim();
+
+    if (!customerPhone && !customerName) {
+      setInvoiceLines([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const run = async () => {
+      try {
+        setLoadingInvoices(true);
+        // We fetch using customerPhone as search query
+        const res = await handleGetInvoices(customerPhone || customerName, controller.signal);
+        const r = res as any;
+        const invoices = Array.isArray(r?.invoices) ? r.invoices : Array.isArray(r) ? r : [];
+
+        const targetMobile = customerPhone.replace(/\D/g, "");
+        const targetName = customerName.toLowerCase();
+
+        const filtered = invoices.filter((inv: any) => {
+          const name = String(inv?.customerName ?? "").toLowerCase();
+          const phone = String(inv?.customerPhone ?? "").replace(/\D/g, "");
+          if (targetMobile && phone && phone.endsWith(targetMobile.slice(-10))) return true;
+          if (targetName && name && name === targetName) return true;
+          return false;
+        });
+
+        const lines: InvoiceLine[] = filtered.map((inv: any) => ({
+          invoiceId: String(inv?._id ?? ""),
+          invoiceNumber: String(inv?.bill ?? inv?.invoiceNumber ?? "-"),
+          invoiceDate: String(inv?.invoiceDate ?? inv?.createdAt ?? ""),
+          totalAmount: Number(inv?.amount ?? inv?.grandTotal ?? 0),
+          paidAmount: Number(
+            inv?.paymentBreakdown?.paidAmount ?? 
+            (Number(inv?.amount ?? 0) - Number(inv?.dueAmount ?? inv?.pendingAmount ?? 0))
+          ),
+          dueAmount: Number(inv?.dueAmount ?? inv?.pendingAmount ?? inv?.paymentBreakdown?.dueAmount ?? 0),
+          status: String(inv?.paymentStatus ?? inv?.status ?? "pending"),
+        }));
+
+        const payments: PaymentHistoryLine[] = [];
+        filtered.forEach((inv: any) => {
+          const invNum = String(inv?.bill ?? inv?.invoiceNumber ?? "-");
+          if (Array.isArray(inv.paymentHistory)) {
+            inv.paymentHistory.forEach((p: any, idx: number) => {
+              payments.push({
+                id: `${invNum}-${idx}-${p._id || Math.random()}`,
+                invoiceNumber: invNum,
+                date: String(p.date ?? ""),
+                amount: Number(p.amount ?? 0),
+                mode: String(p.mode ?? ""),
+                receivedBy: String(p.receivedBy ?? "Unknown"),
+              });
+            });
+          }
+        });
+
+        lines.sort((a, b) => {
+          const da = new Date(a.invoiceDate).getTime();
+          const db = new Date(b.invoiceDate).getTime();
+          return (Number.isNaN(db) ? 0 : db) - (Number.isNaN(da) ? 0 : da);
+        });
+
+        payments.sort((a, b) => {
+          const da = new Date(a.date).getTime();
+          const db = new Date(b.date).getTime();
+          return (Number.isNaN(db) ? 0 : db) - (Number.isNaN(da) ? 0 : da);
+        });
+
+        setInvoiceLines(lines.slice(0, 200));
+        setPaymentLines(payments.slice(0, 200));
+      } catch {
+        setInvoiceLines([]);
+        setPaymentLines([]);
+      } finally {
+        setLoadingInvoices(false);
+      }
+    };
+
+    void run();
+    return () => controller.abort();
+  }, [customer?.mobile, customer?.name]);
+
   const transactions = useMemo(() => {
     return Array.isArray(walletRecord?.transactions) ? walletRecord.transactions : [];
   }, [walletRecord]);
@@ -197,6 +305,16 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
   const purchaseTotal = useMemo(
     () => purchaseLines.reduce((s, r) => s + toAmount(r.lineTotal), 0),
     [purchaseLines],
+  );
+
+  const invoiceTotal = useMemo(
+    () => invoiceLines.reduce((s, r) => s + r.totalAmount, 0),
+    [invoiceLines],
+  );
+  
+  const totalPaid = useMemo(
+    () => invoiceLines.reduce((s, r) => s + r.paidAmount, 0),
+    [invoiceLines],
   );
 
   return (
@@ -283,6 +401,108 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {!!customer && (
+          <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-gray-900">
+                  Sales & Payments
+                </div>
+                <div className="text-xs text-gray-600">
+                  {customer.name ? customer.name + " • " : ""}
+                  {customer.mobile ?? ""}
+                </div>
+              </div>
+              <div className="text-sm font-semibold text-gray-900 flex gap-4">
+                <span className="text-blue-700">Total Billed: {money(invoiceTotal)}</span>
+                <span className="text-green-700">Total Received: {money(totalPaid)}</span>
+                <span className="text-amber-700">Total Due: {money(invoiceTotal - totalPaid)}</span>
+              </div>
+            </div>
+
+            <div className="mt-4 border border-gray-300 rounded-lg overflow-hidden bg-white">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 text-gray-600">
+                  <tr>
+                    <th className="p-3 text-left">Date</th>
+                    <th className="p-3 text-left">Invoice #</th>
+                    <th className="p-3 text-left">Status</th>
+                    <th className="p-3 text-right">Total Amount</th>
+                    <th className="p-3 text-right">Amount Received</th>
+                    <th className="p-3 text-right">Due Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoiceLines.map((r) => (
+                    <tr key={r.invoiceId} className="border-t border-gray-200">
+                      <td className="p-3">
+                        {r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString("en-IN") : "-"}
+                      </td>
+                      <td className="p-3 font-medium">{r.invoiceNumber}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          r.status.toLowerCase() === 'full' || r.status.toLowerCase() === 'paid' ? 'bg-green-100 text-green-700' : 
+                          r.status.toLowerCase() === 'partial' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-semibold">{money(r.totalAmount)}</td>
+                      <td className="p-3 text-right text-green-600 font-medium">{money(r.paidAmount)}</td>
+                      <td className="p-3 text-right text-amber-600 font-medium">{money(r.dueAmount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {!loadingInvoices && invoiceLines.length === 0 && (
+                <div className="py-8 text-center text-gray-500 font-medium">
+                  No sales invoices found for this customer.
+                </div>
+              )}
+              {loadingInvoices && (
+                <div className="py-8 text-center text-gray-500 font-medium">
+                  Loading invoices...
+                </div>
+              )}
+            </div>
+            
+            {/* Payment History Sub-table */}
+            {paymentLines.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">Recent Invoice Payments</h4>
+                <div className="border border-gray-300 rounded-lg overflow-hidden bg-white">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100 text-gray-600">
+                      <tr>
+                        <th className="p-3 text-left">Date</th>
+                        <th className="p-3 text-left">Invoice #</th>
+                        <th className="p-3 text-left">Mode</th>
+                        <th className="p-3 text-left">Collected By</th>
+                        <th className="p-3 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paymentLines.map((p) => (
+                        <tr key={p.id} className="border-t border-gray-200">
+                          <td className="p-3">
+                            {p.date ? new Date(p.date).toLocaleString("en-IN") : "-"}
+                          </td>
+                          <td className="p-3 font-medium">{p.invoiceNumber}</td>
+                          <td className="p-3 uppercase text-xs font-semibold">{p.mode}</td>
+                          <td className="p-3 text-gray-600">{p.receivedBy}</td>
+                          <td className="p-3 text-right text-green-700 font-semibold">{money(p.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            
           </div>
         )}
 

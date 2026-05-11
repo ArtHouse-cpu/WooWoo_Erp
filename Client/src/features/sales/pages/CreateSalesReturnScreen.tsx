@@ -211,6 +211,20 @@ export default function CreateSalesReturnScreen() {
     setItems((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const updateItemQty = (id: number, newQty: number) => {
+    if (newQty < 1) return;
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, qty: newQty } : item)),
+    );
+  };
+
+  const updateItemDiscount = (id: number, newDiscount: number) => {
+    if (newDiscount < 0) return;
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, discount: newDiscount } : item)),
+    );
+  };
+
   const subTotal = useMemo(
     () => items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
     [items],
@@ -490,6 +504,8 @@ export default function CreateSalesReturnScreen() {
         }}
         onAddItem={addItem}
         onRemoveItem={removeItem}
+        onUpdateItemQty={updateItemQty}
+        onUpdateItemDiscount={updateItemDiscount}
       />
 
       {/* <PaymentSection /> */}

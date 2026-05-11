@@ -9,7 +9,7 @@ import {
   BookOpenText,
   Network,
   // BetweenHorizontalStart,
-  // FileSpreadsheet,
+   FileSpreadsheet,
   // BookAudio,
   // Handshake,
   LogOut,
@@ -306,6 +306,22 @@ export default function LeftSideBar() {
           </button>
         </div>
         
+        <div className="mt-2">
+          <button
+            className={`flex items-center gap-3 w-full py-2.5 px-3 rounded-lg transition-all
+            ${
+              activeMenu === "Quotations"
+                ? "bg-gray-100 border-l-4 border-blue-500 text-black shadow-sm"
+                : "text-gray-700 hover:bg-gray-50 hover:text-black"
+            }`}
+            onClick={() => handleMenuClick("Quotations", "/Quotations")}
+          >
+            <FileSpreadsheet size={20} className="text-gray-500" />
+            {!collapsed && (
+              <span className="text-[15px] font-semibold">Quotations</span>
+            )}
+          </button>
+        </div>
         <div className="mt-2">
           <button
             className={`flex items-center gap-3 w-full py-2.5 px-3 rounded-lg transition-all

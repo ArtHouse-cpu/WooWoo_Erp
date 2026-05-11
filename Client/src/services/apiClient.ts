@@ -128,6 +128,12 @@ export type CreateInvoicePayload = {
     m_staff_name?: string | null;
     m_staff_email?: string | null;
   };
+  newPayment?: {
+    date: string;
+    amount: number;
+    mode: string;
+    receivedBy: string;
+  };
 };
 
 export type CouponPayload = {
@@ -160,6 +166,19 @@ export const handleCreateInvoice = async (payload: CreateInvoicePayload) => {
   }
 };
 
+export const handleGetInvoices = async (search = "", signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/invoice", {
+      params: { search: search.trim() },
+      signal,
+    });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching invoices:", error);
+    throw error;
+  }
+};
+
 export const handleUpdateInvoice = async (id: string, payload: Partial<CreateInvoicePayload>) => {
   try {
     const response = await axiosInstance.patch(`/invoice/${id}`, payload);
@@ -186,6 +205,87 @@ export const handleDeleteInvoice = async (id: string) => {
     return response.data;
   } catch (error) {
     console.log("Error deleting invoice:", error);
+    throw error;
+  }
+};
+
+export type CreateQuotationPayload = {
+  customerName: string;
+  customerPhone: string;
+  quotationDate: string;
+  dueDate: string;
+  salesPersonName: string;
+  notes: string;
+  items: {
+    productName: string;
+    qty: number;
+    unitPrice: number;
+    discount: number;
+  }[];
+  subTotal: number;
+  discountTotal: number;
+  grandTotal: number;
+  status?: "draft" | "sent" | "accepted" | "rejected";
+  coupon?: {
+    code: string;
+    discountAmount?: number;
+  } | null;
+  createdBy?: {
+    m_staff_id?: string | null;
+    m_staff_name?: string | null;
+    m_staff_email?: string | null;
+  };
+};
+
+export const handleCreateQuotation = async (payload: CreateQuotationPayload) => {
+  try {
+    const response = await axiosInstance.post("/quotation", payload);
+    return response.data;
+  } catch (error) {
+    console.log("Error creating quotation:", error);
+    throw error;
+  }
+};
+
+export const handleGetQuotations = async (search = "", signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/quotation", {
+      params: { search: search.trim() },
+      signal,
+    });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching quotations:", error);
+    throw error;
+  }
+};
+
+export const handleUpdateQuotation = async (id: string, payload: Partial<CreateQuotationPayload>) => {
+  try {
+    const response = await axiosInstance.patch(`/quotation/${id}`, payload);
+    return response.data;
+  } catch (error) {
+    console.log("Error updating quotation:", error);
+    throw error;
+  }
+};
+
+export const handleUpdateQuotationStatus = async (id: string, status: string) => {
+  try {
+    const response = await axiosInstance.patch(`/quotation/${id}/status`, { status });
+    return response.data;
+  } catch (error) {
+    console.log("Error updating quotation status:", error);
+    throw error;
+  }
+};
+
+export const handleDeleteQuotation = async (id: string) => {
+  try {
+    const response = await axiosInstance.delete(`/quotation/${id}`);
+    return response.data;
+  } catch (error) {
+    console.log("Error deleting quotation:", error);
     throw error;
   }
 };

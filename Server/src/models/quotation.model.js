@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const invoiceItemSchema = new mongoose.Schema(
+const quotationItemSchema = new mongoose.Schema(
   {
     productName: {
       type: String,
@@ -32,21 +32,21 @@ const invoiceItemSchema = new mongoose.Schema(
   {_id: false},
 );
 
-const invoiceSchema = new mongoose.Schema(
+const quotationSchema = new mongoose.Schema(
   {
-    invoicePrefix: {
+    quotationPrefix: {
       type: String,
       required: true,
-      default: 'INVVWAH',
+      default: 'QUOTVWAH',
       trim: true,
     },
-    invoiceNumber: {
+    quotationNumber: {
       type: Number,
       required: true,
       unique: true,
       index: true,
     },
-    invoiceCode: {
+    quotationCode: {
       type: String,
       required: true,
       unique: true,
@@ -63,7 +63,7 @@ const invoiceSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    invoiceDate: {
+    quotationDate: {
       type: Date,
       required: true,
     },
@@ -83,11 +83,11 @@ const invoiceSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['draft', 'final', 'cancelled'],
-      default: 'final',
+      enum: ['draft', 'sent', 'accepted', 'rejected'],
+      default: 'draft',
     },
     items: {
-      type: [invoiceItemSchema],
+      type: [quotationItemSchema],
       default: [],
     },
     subTotal: {
@@ -117,33 +117,6 @@ const invoiceSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    mode: {
-      type: String,
-      trim: true,
-      default: 'Cash',
-    },
-    paymentStatus: {
-      type: String,
-      enum: ['full', 'partial'],
-      default: 'full',
-    },
-    paymentBreakdown: {
-      cash: {type: Number, min: 0, default: 0},
-      upi: {type: Number, min: 0, default: 0},
-      card: {type: Number, min: 0, default: 0},
-      wallet: {type: Number, min: 0, default: 0},
-      paidAmount: {type: Number, min: 0, default: 0},
-      dueAmount: {type: Number, min: 0, default: 0},
-      changeAmount: {type: Number, min: 0, default: 0},
-    },
-    paymentHistory: [
-      {
-        date: { type: Date, default: Date.now },
-        amount: { type: Number, required: true },
-        mode: { type: String, required: true },
-        receivedBy: { type: String, default: null }
-      }
-    ],
     createdBy: {
       m_staff_id: {type: String, default: null},
       m_staff_name: {type: String, default: null},
@@ -153,5 +126,5 @@ const invoiceSchema = new mongoose.Schema(
   {timestamps: true},
 );
 
-const Invoice = mongoose.model('Invoice', invoiceSchema);
-export default Invoice;
+const Quotation = mongoose.model('Quotation', quotationSchema);
+export default Quotation;

@@ -20,6 +20,7 @@ type Props = {
   onAddItem: () => void;
   onRemoveItem: (id: number) => void;
   onUpdateItemQty: (id: number, newQty: number) => void;
+  onUpdateItemDiscount: (id: number, newDiscount: number) => void;
 };
 
 const inputStyle =
@@ -32,6 +33,7 @@ export default function ProductsServicesSection({
   onAddItem,
   onRemoveItem,
   onUpdateItemQty,
+  onUpdateItemDiscount,
 }: Props) {
   const [products, setProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -84,8 +86,22 @@ export default function ProductsServicesSection({
       Swal.fire("Out of stock", `${product.productName} is currently out of stock.`, "warning");
       return;
     }
+
+    const qty = Number(draft.qty || 1);
+    const sellingPrice = Number(product.sellingPrice ?? 0);
+    const dValue = Number(product.discountValue ?? 0);
+    const dType = product.discountType ?? "flat";
+
+    let calculatedDiscount = 0;
+    if (dType === "percentage") {
+      calculatedDiscount = (sellingPrice * qty * dValue) / 100;
+    } else {
+      calculatedDiscount = dValue * qty;
+    }
+
     onDraftChange("name", product.productName);
-    onDraftChange("price", String(product.sellingPrice ?? 0));
+    onDraftChange("price", String(sellingPrice));
+    onDraftChange("discount", String(calculatedDiscount));
     onDraftChange("image", product.imageUrl || (product.images && product.images[0]) || "");
     setDropdownOpen(false);
   };
@@ -120,8 +136,21 @@ export default function ProductsServicesSection({
       const response = await handleCreateProduct(formData);
       const prod = response?.product;
       if (prod) {
+        const qty = Number(draft.qty || 1);
+        const sellingPrice = Number(prod.sellingPrice ?? 0);
+        const dValue = Number(prod.discountValue ?? 0);
+        const dType = prod.discountType ?? "flat";
+
+        let calculatedDiscount = 0;
+        if (dType === "percentage") {
+          calculatedDiscount = (sellingPrice * qty * dValue) / 100;
+        } else {
+          calculatedDiscount = dValue * qty;
+        }
+
         onDraftChange("name", prod.productName);
-        onDraftChange("price", String(prod.sellingPrice ?? 0));
+        onDraftChange("price", String(sellingPrice));
+        onDraftChange("discount", String(calculatedDiscount));
         onDraftChange("image", prod.imageUrl || (prod.images && prod.images[0]) || "");
       }
       setShowCreateModal(false);
@@ -226,13 +255,22 @@ export default function ProductsServicesSection({
           placeholder="Unit Price"
           className={`${inputStyle} md:col-span-2`}
         />
+        <input
+          value={draft.discount}
+          onChange={(e) => onDraftChange("discount", e.target.value)}
+          type="number"
+          min={0}
+          placeholder="Discount"
+          className={`${inputStyle} md:col-span-2`}
+        />
         <button
           onClick={handleAddToBill}
-          className="inline-flex h-10 items-center justify-center gap-1 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white md:col-span-4 lg:col-span-2"
+          className="inline-flex h-10 items-center justify-center gap-1 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white md:col-span-2"
         >
-          <Plus size={14} /> Add to Bill
+          <Plus size={14} /> Add
         </button>
       </div>
+
 
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="min-w-full text-sm">
@@ -279,7 +317,17 @@ export default function ProductsServicesSection({
                       </div>
                     </td>
                     <td className="px-3 py-2 text-right">₹ {item.unitPrice.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-right">₹ {item.discount.toFixed(2)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex justify-end">
+                        <input
+                          type="number"
+                          min={0}
+                          value={item.discount}
+                          onChange={(e) => onUpdateItemDiscount(item.id, Number(e.target.value))}
+                          className="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </td>
                     <td className="px-3 py-2 text-right font-semibold">₹ {lineTotal.toFixed(2)}</td>
                     <td className="px-3 py-2 text-center">
                       <button
