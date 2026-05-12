@@ -94,7 +94,6 @@ const normalizeStudents = (students, errors, isJunior) => {
     return [];
   }
 
-  const allowedClassValues = new Set(['5', '6', '7', '8', '9', '10', '11', '12']);
   return students.map((student, idx) => {
     const classStd = String(student?.classStd ?? '').trim();
     const normalized = {
@@ -109,8 +108,8 @@ const normalizeStudents = (students, errors, isJunior) => {
     };
 
     if (!normalized.studentName) errors.push(`Student name is required at row ${idx + 1}.`);
-    if (!normalized.classStd || !allowedClassValues.has(normalized.classStd)) {
-      errors.push(`Class/STD must be between 5 and 12 at row ${idx + 1}.`);
+    if (!normalized.classStd ) {
+      errors.push(`Class/STD must be less than or equal to class 12 at row ${idx + 1}.`);
     }
     if (!normalized.relation) errors.push(`Relation is required at row ${idx + 1}.`);
     if (!normalized.parentName) errors.push(`Parent name is required at row ${idx + 1}.`);

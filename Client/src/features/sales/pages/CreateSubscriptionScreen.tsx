@@ -48,20 +48,24 @@ type StudentForm = {
   studentName: string;
   schoolName: string;
   dob: string;
+  gender: string;
   classStd: string;
   relation: string;
   parentName: string;
   studentIdUpload: string;
+  formImageUpload: string;
 };
 
 const createEmptyStudent = (): StudentForm => ({
   studentName: "",
   schoolName: "",
   dob: "",
+  gender: "",
   classStd: "",
   relation: "",
   parentName: "",
   studentIdUpload: "",
+  formImageUpload: "",
 });
 
 const isJuniorPlan = (plan?: Pick<MembershipOption, "planId" | "displayName"> | null) => {
@@ -205,10 +209,12 @@ export default function CreateSubscriptionScreen() {
             studentName: String(s.studentName ?? ""),
             schoolName: String(s.schoolName ?? ""),
             dob: s.dob ? String(s.dob).split("T")[0] : "",
+            gender: String(s.gender ?? ""),
             classStd: String(s.classStd ?? ""),
             relation: String(s.relation ?? ""),
             parentName: String(s.parentName ?? ""),
             studentIdUpload: String(s.studentIdUpload ?? ""),
+            formImageUpload: String(s.formImageUpload ?? ""),
           })),
         );
       }
@@ -359,10 +365,10 @@ export default function CreateSubscriptionScreen() {
           );
           return false;
         }
-        if (!Number.isFinite(classNumber) || classNumber < 5 || classNumber > 12) {
+        if (!Number.isFinite(classNumber) || classNumber > 12) {
           Swal.fire(
             "Invalid class",
-            `Junior membership is only valid for class 5 to 12 (student ${i + 1}).`,
+            `Junior membership is only valid for class 12 and below (student ${i + 1}).`,
             "warning",
           );
           return false;
@@ -763,7 +769,7 @@ export default function CreateSubscriptionScreen() {
             <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-orange-800">
-                  Junior Student Details (Class 5 to 12)
+                  Junior Student Details
                 </h3>
                 <button
                   type="button"
@@ -821,17 +827,34 @@ export default function CreateSubscriptionScreen() {
                         className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
                       />
                     </div>
-                    <input
-                      type="number"
-                      min={5}
-                      max={12}
-                      value={student.classStd}
-                      onChange={(e) =>
-                        updateStudent(index, "classStd", e.target.value)
-                      }
-                      placeholder="Class / STD (5-12)"
-                      className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                    />
+                    <div className="flex flex-col">
+                      <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
+                        Gender
+                      </label>
+                      <select
+                        value={student.gender}
+                        onChange={(e) => updateStudent(index, "gender", e.target.value)}
+                        className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                      >
+                        <option value="">Select Gender</option>
+                        <option value="Boy">Boy</option>
+                        <option value="Girl">Girl</option>
+                      </select>
+                    </div>
+                    <div className="flex flex-col">
+                      <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
+                        Class / STD
+                      </label>
+                      <input
+                        type="number"
+                        value={student.classStd}
+                        onChange={(e) =>
+                          updateStudent(index, "classStd", e.target.value)
+                        }
+                        placeholder="Class / STD"
+                        className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
                     <input
                       value={student.relation}
                       onChange={(e) =>
@@ -848,7 +871,7 @@ export default function CreateSubscriptionScreen() {
                       placeholder="Parent Name"
                       className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
                     />
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-1">
                       <label className="mb-1 block text-xs font-semibold text-gray-600">
                         Student ID Photo
                       </label>
@@ -859,7 +882,7 @@ export default function CreateSubscriptionScreen() {
                           onChange={(e) =>
                             updateStudent(index, "studentIdUpload", e.target.value)
                           }
-                          placeholder="Student ID Photo (URL or Upload)"
+                          placeholder="ID Photo (URL/Upload)"
                           className="h-10 flex-1 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
                         />
                         <button
@@ -872,9 +895,41 @@ export default function CreateSubscriptionScreen() {
                             input.onchange = (e) => {
                               const file = (e.target as HTMLInputElement).files?.[0];
                               if (file) {
-                                // For now we keep the filename or a placeholder if we don't have a real upload logic
-                                // Ideally this would trigger an upload to Cloudinary and set the URL
                                 updateStudent(index, "studentIdUpload", file.name);
+                              }
+                            };
+                            input.click();
+                          }}
+                        >
+                          <Camera size={18} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="mb-1 block text-xs font-semibold text-gray-600">
+                        Form Image
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={student.formImageUpload}
+                          onChange={(e) =>
+                            updateStudent(index, "formImageUpload", e.target.value)
+                          }
+                          placeholder="Form Image (URL/Upload)"
+                          className="h-10 flex-1 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          className="flex h-10 items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3 text-gray-600 hover:bg-gray-100"
+                          onClick={() => {
+                            const input = document.createElement("input");
+                            input.type = "file";
+                            input.accept = "image/*";
+                            input.onchange = (e) => {
+                              const file = (e.target as HTMLInputElement).files?.[0];
+                              if (file) {
+                                updateStudent(index, "formImageUpload", file.name);
                               }
                             };
                             input.click();

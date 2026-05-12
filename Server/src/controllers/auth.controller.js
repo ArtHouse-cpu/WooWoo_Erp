@@ -302,12 +302,8 @@ const updateUser = async (req, res) => {
     delete updateData.passwordHash;
     delete updateData.m_staff_id;
 
-    // If email or phone is updated, check if we need normalizations?
-    // We'll trust frontend for now or handle them conditionally:
     if (updateData.email) updateData.email = String(updateData.email).trim().toLowerCase();
     
-    // mobile might map to phoneNumber or just store in AlternateMobile
-    // If the frontend sends 'mobile' maybe we map it to phoneNumber or let it be. Let's map it if they send mobile.
     if (updateData.mobile) {
       const phoneNorm = normalizePhone(updateData.mobile);
       if (phoneNorm) updateData.phoneNumber = phoneNorm;
@@ -349,4 +345,55 @@ const updateUser = async (req, res) => {
   }
 };
 
-export {healthCheck, register, login, logout, requestOtp, verifyOtp, updateUser};
+const forgotPassword = async (req, res) => {
+  try {
+    const { identifier, email, phone, phoneNumber, newPassword } = req.body;
+    
+    const target = identifier || email || phone || phoneNumber;
+
+    if (!target || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide either email or phone, along with newPassword.',
+      });
+    }
+
+    // Check if target is email or phone
+    const query = target.includes('@')
+      ? { email: target.toLowerCase() }
+      : { phoneNumber: normalizePhone(target) };
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user password
+    const user = await User.findOneAndUpdate(
+      query,
+      { $set: { passwordHash: hashedPassword } },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Password updated successfully.',
+      user: toPlainUser(user),
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to reset password.',
+    });
+  }
+};
+
+export {healthCheck, register, login, logout, requestOtp, verifyOtp, updateUser, forgotPassword};

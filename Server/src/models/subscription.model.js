@@ -37,11 +37,13 @@ const juniorStudentSchema = new mongoose.Schema(
     studentName: {type: String, required: true, trim: true},
     schoolName: {type: String, default: '', trim: true},
     dob: {type: Date, default: null},
+    gender: {type: String, default: '', trim: true},
     classStd: {type: String, required: true, trim: true},
     relation: {type: String, required: true, trim: true},
     parentName: {type: String, required: true, trim: true},
     studentId: {type: String, default: '', trim: true},
     studentIdUpload: {type: String, default: '', trim: true},
+    formImageUpload: {type: String, default: '', trim: true},
   },
   {_id: false},
 );

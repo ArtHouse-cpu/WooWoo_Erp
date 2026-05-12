@@ -17,6 +17,7 @@ import {
   type CustomerPayload,
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
+import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 
 const today = new Date().toISOString().split("T")[0];
 const QUOT_SEQ_KEY = "wooerp-quotation-seq";
@@ -59,6 +60,7 @@ export default function CreateQuotationScreen() {
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(true);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   const [draftName, setDraftName] = useState("");
   const [draftQty, setDraftQty] = useState("1");
@@ -158,12 +160,15 @@ export default function CreateQuotationScreen() {
   const grandTotal = subTotal - discountTotal;
 
 
-  const handleSaveDraft = async () => {
-    if (!customer.trim()) {
+  const handleSaveDraft = async (paymentPayload?: any) => {
+    const finalCustomer = paymentPayload?.customerName?.trim() || customer.trim();
+    const finalPhone = paymentPayload?.customerPhone?.trim() || phone.trim();
+
+    if (!finalCustomer) {
       Swal.fire("Customer required", "Please select or enter customer.", "warning");
       return;
     }
-    if (!phone.trim()) {
+    if (!finalPhone) {
       Swal.fire("Phone required", "Please enter customer phone number.", "warning");
       return;
     }
@@ -174,13 +179,13 @@ export default function CreateQuotationScreen() {
 
     try {
       setSaving(true);
-      const payload = {
-        customerName: customer.trim(),
-        customerPhone: phone.trim(),
+      const payload: any = {
+        customerName: finalCustomer,
+        customerPhone: finalPhone,
         quotationDate,
         dueDate,
         salesPersonName: salesPerson,
-        notes: notes.trim(),
+        notes: (paymentPayload?.notes || notes).trim(),
         items: items.map((item) => ({
           productName: item.productName,
           qty: item.qty,
@@ -189,9 +194,16 @@ export default function CreateQuotationScreen() {
         })),
         subTotal,
         discountTotal,
-        grandTotal,
+        grandTotal: paymentPayload?.finalAmount ?? grandTotal,
         status: "draft" as const,
       };
+
+      if (paymentPayload) {
+        payload.mode = paymentPayload.mode;
+        payload.paymentStatus = paymentPayload.paymentStatus;
+        payload.paymentBreakdown = paymentPayload.paymentBreakdown;
+        if (paymentPayload.coupon) payload.coupon = paymentPayload.coupon;
+      }
 
       if (quotationId) {
         await handleUpdateQuotation(quotationId, payload);
@@ -304,9 +316,9 @@ export default function CreateQuotationScreen() {
       <CreateInvoiceHeader
         invoiceNo={quotationNo}
         onBack={() => navigate(-1)}
-        onSaveDraft={handleSaveDraft}
+        onSaveDraft={() => handleSaveDraft()}
         onSavePrint={handleSavePrint}
-        onSave={handleSaveDraft}
+        onSave={() => setCheckoutOpen(true)}
         isSaving={saving}
         mode={mode}
       />
@@ -374,12 +386,32 @@ export default function CreateQuotationScreen() {
           grandTotal={grandTotal}
           onSave={
             mode !== "view"
-              ? handleSaveDraft
+              ? () => setCheckoutOpen(true)
               : () => {}
           }
           isSaving={saving}
         />
       </div>
+
+      <CheckoutModal
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        grandTotal={grandTotal}
+        items={items.map((it) => ({
+          name: it.productName,
+          qty: it.qty,
+          price: it.unitPrice,
+          discount: it.discount,
+          image: it.image,
+        }))}
+        initialCustomerName={customer}
+        initialCustomerPhone={phone}
+        initialMembership={membership}
+        onConfirmPayment={async (paymentPayload) => {
+          await handleSaveDraft(paymentPayload);
+          setCheckoutOpen(false);
+        }}
+      />
       </div>
     </div>
   );
