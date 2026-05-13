@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import User from '../models/auth.model.js';
 import Counter from '../models/counter.model.js';
-import {checkOtp, sendOtpSms} from '../utils/otp.services.js';
+import {checkOtp, sendOtpSms, sendOtpEmail} from '../utils/otp.services.js';
 import {createTokenAndSetCookie} from '../utils/token.utils.js';
 
 const SALT_ROUNDS = 10;
@@ -319,7 +319,7 @@ const updateUser = async (req, res) => {
     }
 
     const user = await User.findOneAndUpdate(
-      { phoneNumber: norm },
+      { email: updateData.email, phoneNumber: norm },
       { $set: updateData },
       { new: true, runValidators: true }
     );
@@ -345,16 +345,60 @@ const updateUser = async (req, res) => {
   }
 };
 
+
+
+const requestEmailOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !isEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid email address is required.',
+      });
+    }
+
+    const user = await User.findOne({ email: String(email).trim().toLowerCase() });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with this email.',
+      });
+    }
+
+    await sendOtpEmail(email);
+
+    res.status(200).json({
+      message: 'OTP sent to email successfully.',
+      success: true,
+    });
+  } catch (error) {
+    console.error('requestEmailOtp error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Could not send OTP to email.',
+    });
+  }
+};
+
 const forgotPassword = async (req, res) => {
   try {
-    const { identifier, email, phone, phoneNumber, newPassword } = req.body;
+    const { identifier, email, phone, phoneNumber, otp, newPassword } = req.body;
     
     const target = identifier || email || phone || phoneNumber;
 
-    if (!target || !newPassword) {
+    if (!target || !otp || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide either email or phone, along with newPassword.',
+        message: 'Please provide email/phone, OTP, and newPassword.',
+      });
+    }
+
+    // Verify OTP
+    const isValidOtp = checkOtp(target, otp);
+    if (!isValidOtp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP.',
       });
     }
 
@@ -396,4 +440,4 @@ const forgotPassword = async (req, res) => {
   }
 };
 
-export {healthCheck, register, login, logout, requestOtp, verifyOtp, updateUser, forgotPassword};
+export {healthCheck, register, login, logout, requestOtp, requestEmailOtp, verifyOtp, updateUser, forgotPassword};

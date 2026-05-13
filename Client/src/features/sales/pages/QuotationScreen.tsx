@@ -8,7 +8,6 @@ import {
   Edit,
   Trash2,
   Download,
-  Search,
   XCircle,
   Ellipsis,
 } from "lucide-react";

@@ -9,18 +9,9 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import type { MembershipPlanPayload } from "@/services/apiClient";
+import { handleGetCategories, type MembershipPlanPayload } from "@/services/apiClient";
 
-type UsageKey =
-  | "links"
-  | "galleryMedia"
-  | "services"
-  | "store"
-  | "academy"
-  | "work"
-  | "events";
-
-type UsageLimits = Record<UsageKey, { min: number; max: number }>;
+type UsageLimits = Record<string, { min: number; max: number }>;
 
 type PlanFormState = Required<
   Pick<
@@ -93,25 +84,7 @@ function InputField({
   );
 }
 
-const usageLabels: Record<UsageKey, { title: string; short: string }> = {
-  links: { title: "Links", short: "L" },
-  galleryMedia: { title: "Gallery Media", short: "G" },
-  services: { title: "Services", short: "S" },
-  store: { title: "Store", short: "S" },
-  academy: { title: "Academy", short: "A" },
-  work: { title: "Work", short: "W" },
-  events: { title: "Events", short: "E" },
-};
 
-const defaultUsageLimits: UsageLimits = {
-  links: { min: 0, max: 9999 },
-  galleryMedia: { min: 0, max: 9999 },
-  services: { min: 0, max: 9999 },
-  store: { min: 0, max: 9999 },
-  academy: { min: 0, max: 9999 },
-  work: { min: 0, max: 9999 },
-  events: { min: 0, max: 9999 },
-};
 
 const initialState: PlanFormState = {
   planId: "",
@@ -126,7 +99,7 @@ const initialState: PlanFormState = {
     discountType: "Percentage",
     discountPercent: 0,
   },
-  usageLimits: defaultUsageLimits,
+  usageLimits: {},
   insightsLevel: "Basic",
   status: "Active",
   internalNotes: "",
@@ -145,6 +118,20 @@ export default function AddnewPlansModal({
   initialPlan,
 }: Props) {
   const [form, setForm] = useState<PlanFormState>(initialState);
+  const [categories, setCategories] = useState<{ _id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    handleGetCategories(controller.signal)
+      .then((res) => {
+        if (res && Array.isArray(res.categories)) {
+          setCategories(res.categories);
+        }
+      })
+      .catch((err) => console.log("Error fetching categories:", err));
+    return () => controller.abort();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -207,13 +194,13 @@ export default function AddnewPlansModal({
     form.pricing.discountPercent,
   ]);
 
-  const setUsage = (key: UsageKey, field: "min" | "max", value: number) => {
+  const setUsage = (key: string, field: "min" | "max", value: number) => {
     setForm((prev) => ({
       ...prev,
       usageLimits: {
         ...prev.usageLimits,
         [key]: {
-          ...prev.usageLimits[key],
+          ...(prev.usageLimits[key] || { min: 0, max: 9999 }),
           [field]: Math.max(0, value),
         },
       },
@@ -499,53 +486,60 @@ export default function AddnewPlansModal({
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {(Object.keys(usageLabels) as UsageKey[]).map((key) => (
-                    <div
-                      key={key}
-                      className="rounded-2xl border border-orange-200 bg-orange-50 p-4"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-700 font-semibold">
-                          {usageLabels[key].short}
+                  {categories.map((category) => {
+                    const key = category.name; // Use name as key to match usage check
+                    const title = category.name;
+                    const short = title.substring(0, 1).toUpperCase();
+                    const limit = form.usageLimits[key] || { min: 0, max: 9999 };
+
+                    return (
+                      <div
+                        key={key}
+                        className="rounded-2xl border border-orange-200 bg-orange-50 p-4"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-700 font-semibold">
+                            {short}
+                          </div>
+                          <div className="text-sm font-semibold text-slate-900">
+                            {title}
+                          </div>
                         </div>
-                        <div className="text-sm font-semibold text-slate-900">
-                          {usageLabels[key].title}
+                        <div className="mt-4 grid grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-xs text-slate-500">Min</div>
+                            <input
+                              type="number"
+                              value={limit.min}
+                              onChange={(e) =>
+                                setUsage(
+                                  key,
+                                  "min",
+                                  Number(e.target.value || 0),
+                                )
+                              }
+                              className="mt-1 w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-orange-200/50"
+                            />
+                          </div>
+                          <div>
+                            <div className="text-xs text-slate-500">Max</div>
+                            <input
+                              type="number"
+                              value={limit.max}
+                              onChange={(e) =>
+                                setUsage(
+                                  key,
+                                  "max",
+                                  Number(e.target.value || 0),
+                                )
+                              }
+                              className="mt-1 w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-orange-200/50"
+                            />
+                          </div>
                         </div>
                       </div>
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-                        <div>
-                          <div className="text-xs text-slate-500">Min</div>
-                          <input
-                            type="number"
-                            value={form.usageLimits[key].min}
-                            onChange={(e) =>
-                              setUsage(
-                                key,
-                                "min",
-                                Number(e.target.value || 0),
-                              )
-                            }
-                            className="mt-1 w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-orange-200/50"
-                          />
-                        </div>
-                        <div>
-                          <div className="text-xs text-slate-500">Max</div>
-                          <input
-                            type="number"
-                            value={form.usageLimits[key].max}
-                            onChange={(e) =>
-                              setUsage(
-                                key,
-                                "max",
-                                Number(e.target.value || 0),
-                              )
-                            }
-                            className="mt-1 w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-orange-200/50"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
 

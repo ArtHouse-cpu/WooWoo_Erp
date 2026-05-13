@@ -88,6 +88,32 @@ export const handleUpdateUser = async (mobile: string, payload: any) => {
   }
 };
 
+export const handleRequestEmailOtp = async (email: string) => {
+  try {
+    const response = await axiosInstance.post("/auth/request-email-otp", {
+      email,
+    });
+    return response.data;
+  } catch (error) {
+    console.log("Error requesting email otp:", error);
+    throw error;
+  }
+};
+
+export const handleResetPassword = async (payload: {
+  identifier: string;
+  otp: string;
+  newPassword: string;
+}) => {
+  try {
+    const response = await axiosInstance.patch("/auth/forgot-password", payload);
+    return response.data;
+  } catch (error) {
+    console.log("Error resetting password:", error);
+    throw error;
+  }
+};
+
 export type CreateInvoiceItemPayload = {
   productName: string;
   qty: number;
