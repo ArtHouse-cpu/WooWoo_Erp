@@ -47,7 +47,7 @@ const productSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
-    categoryId: {
+    subCategory: {
       type: String,
       trim: true,
       default: '',

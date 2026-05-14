@@ -40,8 +40,8 @@ export const createProduct = async (req, res) => {
       purchasePrice,
       itemCode,
       barCode,
-      categoryId,
       category,
+      subCategory,
       stockQty,
       stockStatus,
       primaryUnit,
@@ -50,6 +50,7 @@ export const createProduct = async (req, res) => {
       discountValue,
       variants,
     } = req.body;
+    console.log("product controller",req.body);
 
     const itemType = type === "service" ? "service" : "product";
     const resolvedName = itemType === "service" ? serviceName || productName : productName;
@@ -106,8 +107,8 @@ export const createProduct = async (req, res) => {
       purchasePrice: purchasePrice ? Number(purchasePrice) : 0,
       itemCode,
       barCode,
-      categoryId,
       category,
+      subCategory,
       stockQty: itemType === "product" ? Number(stockQty || 0) : 0,
       stockStatus: itemType === "product" ? stockStatus || "in_stock" : "in_stock",
       primaryUnit: itemType === "service" ? primaryUnit || "" : "",
@@ -193,8 +194,8 @@ export const updateProduct = async (req, res) => {
       purchasePrice,
       itemCode,
       barCode,
-      categoryId,
       category,
+      subCategory,
       stockQty,
       stockStatus,
       primaryUnit,
@@ -245,8 +246,8 @@ export const updateProduct = async (req, res) => {
 
     existingProduct.itemCode = itemCode ?? existingProduct.itemCode;
     existingProduct.barCode = barCode ?? existingProduct.barCode;
-    existingProduct.categoryId = categoryId ?? existingProduct.categoryId;
     existingProduct.category = category ?? existingProduct.category;
+    existingProduct.subCategory = category ?? existingProduct.subCategory;
     existingProduct.stockStatus = stockStatus ?? existingProduct.stockStatus;
     existingProduct.primaryUnit = primaryUnit ?? existingProduct.primaryUnit;
     existingProduct.description = description ?? existingProduct.description;

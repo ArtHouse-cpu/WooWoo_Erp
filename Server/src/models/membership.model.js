@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 const usageLimitSchema = new mongoose.Schema(
   {
-    min: { type: Number, default: 0 },
-    max: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    cashback: { type: Number, default: 0 },
   },
   { _id: false },
 );
@@ -34,13 +34,9 @@ const membershipSchema = new mongoose.Schema(
     },
 
     usageLimits: {
-      links: { type: usageLimitSchema, default: () => ({}) },
-      galleryMedia: { type: usageLimitSchema, default: () => ({}) },
-      services: { type: usageLimitSchema, default: () => ({}) },
-      store: { type: usageLimitSchema, default: () => ({}) },
-      academy: { type: usageLimitSchema, default: () => ({}) },
-      work: { type: usageLimitSchema, default: () => ({}) },
-      events: { type: usageLimitSchema, default: () => ({}) },
+      type: Map,
+      of: usageLimitSchema,
+      default: {},
     },
 
     insightsLevel: { type: String, default: "Basic", trim: true },

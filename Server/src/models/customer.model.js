@@ -82,6 +82,11 @@ const customerSchema = new mongoose.Schema(
       enum: ["none","pro", "premium", "special", "junior", "general"],
       default: "none",
     },
+    membershipPlanId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Membership",
+      default: null,
+    },
 
     // =========================
     // PERSONAL INFO
