@@ -511,6 +511,7 @@ export type CustomerPayload = {
   name: string;
   mobile: string;
   membershipType?: string|null;
+  membershipPlanId?: string|null;
   email?: string;
   gstin?: string;
   companyName?: string;
@@ -554,6 +555,11 @@ export function customerPayloadToFormData(
       fd.append(key, String(value));
       continue;
     }
+  }
+
+  // Ensure membershipPlanId is appended if present
+  if (payload.membershipPlanId) {
+    fd.append("membershipPlanId", payload.membershipPlanId);
   }
 
   if (profileImageFile) {
@@ -631,6 +637,8 @@ export type WalletTransactionPayload = {
   amount: number;
   note?: string;
   minimumBalance?: number;
+  referenceType?: string;
+  referenceId?: string;
   customerId?: string;
   customerName?: string;
   customerPhone?: string;
@@ -729,6 +737,7 @@ export const handleDeleteWallet = async (id: string) => {
 };
 
 export type MembershipPlanPayload = {
+  _id?: string;
   planId: string;
   displayName: string;
   priority?: number;
@@ -744,8 +753,8 @@ export type MembershipPlanPayload = {
   usageLimits?: Record<
     string,
     {
-      min?: number;
-      max?: number;
+      discount?: number;
+      cashback?: number;
     }
   >;
   insightsLevel?: string;

@@ -26,7 +26,9 @@ const baseSchema = z.object({
   primaryUnit: z.string().optional().default(""),
   itemCode: z.string().optional().default(""),
   barcode: z.string().optional().default(""),
+  category: z.string().optional().default(""),
   categoryId: z.string().optional().default(""),
+  subCategory: z.string().optional().default(""),
   subCategoryId: z.string().optional().default(""),
   description: z.string().optional().default(""),
   discountType: z.enum(["flat", "percentage"]).default("flat"),
@@ -80,8 +82,10 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
       primaryUnit: initialData?.primaryUnit || "",
       itemCode: initialData?.itemCode || "",
       barcode: initialData?.barcode || "",
-      categoryId: initialData?.categoryId || "",
-      subCategoryId: initialData?.subCategoryId || "",
+      category: initialData?.category || "",
+      categoryId: (initialData as any)?.categoryId || "",
+      subCategory: initialData?.subCategory || "",
+      subCategoryId: (initialData as any)?.subCategoryId || "",
       description: initialData?.description || "",
       discountType: initialData?.discountType || "flat",
       discountValue: initialData?.discountValue || 0,
@@ -119,8 +123,8 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
     payload.append("primaryUnit", values.primaryUnit);
     payload.append("itemCode", values.itemCode);
     payload.append("barCode", values.barcode);
-    payload.append("categoryId", values.categoryId);
-    payload.append("subCategoryId", values.subCategoryId);
+    payload.append("category", values.category);
+    payload.append("subCategory", values.subCategory);
     payload.append("description", values.description);
     payload.append("discountType", values.discountType);
     payload.append("discountValue", String(values.discountValue));
@@ -131,6 +135,7 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
     onClose();
     Swal.fire("Saved", "Item created successfully.", "success");
   });
+  console.log("formState", formState);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 sm:p-6 backdrop-blur-sm transition-opacity">

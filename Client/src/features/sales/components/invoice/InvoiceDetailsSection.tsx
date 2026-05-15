@@ -6,6 +6,7 @@ type CustomerOption = {
   mobile: string;
   companyName?: string;
   membershipType?: string;
+  membershipPlanId?: string;
 };
 
 type Props = {

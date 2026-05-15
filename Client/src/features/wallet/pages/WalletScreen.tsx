@@ -345,69 +345,268 @@ if (action === "set_minimum") {
     }
   };
 
-  const handleViewHistory = async (row: WalletRow) => {
-    const rawTransactions = Array.isArray(row.raw?.transactions)
-      ? row.raw.transactions
-      : [];
-    const historyHtml =
-      rawTransactions.length > 0
-        ? rawTransactions
-            .map((entry: any) => {
-              const amount = toAmount(entry?.amount, entry?.value);
-              const type = String(entry?.type ?? entry?.mode ?? "entry").toUpperCase();
-              const note = String(entry?.note ?? entry?.remark ?? "-");
-              const staffName = entry?.createdBy?.m_staff_name ?? entry?.staffName ?? "System";
-              const dateObj = entry?.createdAt || entry?.date ? new Date(entry.createdAt || entry.date) : null;
-              const dateStr = dateObj && !isNaN(dateObj.getTime()) ? dateObj.toLocaleString('en-IN', {
-                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-              }) : "";
-              
-              const isCredit = type === "CREDIT" || type === "ADD";
-              const typeBadgeClass = isCredit 
-                ? "bg-green-100 text-green-700" 
-                : "bg-red-100 text-red-700";
-              const amountColorClass = isCredit ? "text-green-600" : "text-red-600";
-              const amountPrefix = isCredit ? "+" : "-";
+ const handleViewHistory = async (row: WalletRow) => {
+  const rawTransactions = Array.isArray(row.raw?.transactions)
+    ? row.raw.transactions
+    : [];
 
-              return `
-                <div class="flex flex-col gap-2 p-3 mb-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors">
-                  <div class="flex justify-between items-center">
-                    <div class="flex items-center gap-2">
-                      <span class="px-2 py-1 rounded text-[10px] font-bold ${typeBadgeClass}">${type}</span>
-                      <span class="text-sm font-medium text-slate-700 truncate max-w-[150px] sm:max-w-[250px]">${note}</span>
+  const totalCredit = rawTransactions.reduce((sum: number, t: any) => {
+    const type = String(t?.type ?? t?.mode ?? "").toUpperCase();
+    const amount = toAmount(t?.amount, t?.value);
+
+    return type === "CREDIT" || type === "ADD"
+      ? sum + amount
+      : sum;
+  }, 0);
+
+  const totalDebit = rawTransactions.reduce((sum: number, t: any) => {
+    const type = String(t?.type ?? t?.mode ?? "").toUpperCase();
+    const amount = toAmount(t?.amount, t?.value);
+
+    return type === "DEBIT" || type === "REMOVE"
+      ? sum + amount
+      : sum;
+  }, 0);
+
+  const historyHtml =
+    rawTransactions.length > 0
+      ? rawTransactions
+          .map((entry: any, index: number) => {
+            const amount = toAmount(entry?.amount, entry?.value);
+
+            const type = String(
+              entry?.type ?? entry?.mode ?? "ENTRY"
+            ).toUpperCase();
+
+            const note = String(
+              entry?.note ?? entry?.remark ?? "No remarks"
+            );
+
+            const staffName =
+              entry?.createdBy?.m_staff_name ??
+              entry?.staffName ??
+              "System";
+
+            const dateObj =
+              entry?.createdAt || entry?.date
+                ? new Date(entry.createdAt || entry.date)
+                : null;
+
+            const dateStr =
+              dateObj && !isNaN(dateObj.getTime())
+                ? dateObj.toLocaleString("en-IN", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "";
+
+            const isCredit =
+              type === "CREDIT" || type === "ADD";
+
+            const amountColor = isCredit
+              ? "text-emerald-600"
+              : "text-rose-600";
+
+            const badgeClass = isCredit
+              ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+              : "bg-rose-100 text-rose-700 border border-rose-200";
+
+            const iconBg = isCredit
+              ? "bg-emerald-100 text-emerald-600"
+              : "bg-rose-100 text-rose-600";
+
+            return `
+              <div class="relative pl-6">
+                
+                ${
+                  index !== rawTransactions.length - 1
+                    ? `<div class="absolute left-[11px] top-8 h-full w-[2px] bg-slate-200"></div>`
+                    : ""
+                }
+
+                <div class="absolute left-0 top-5 w-5 h-5 rounded-full ${iconBg} flex items-center justify-center shadow-sm">
+                  ${
+                    isCredit
+                      ? `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                          <path d="M12 5v14"/>
+                          <path d="M5 12h14"/>
+                        </svg>
+                      `
+                      : `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                          <path d="M5 12h14"/>
+                        </svg>
+                      `
+                  }
+                </div>
+
+                <div class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all duration-200">
+
+                  <div class="flex items-start justify-between gap-3">
+
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2 flex-wrap">
+
+                        <span class="px-2.5 py-1 text-[11px] font-semibold rounded-full ${badgeClass}">
+                          ${type}
+                        </span>
+
+                        <p class="text-sm font-medium text-slate-700 break-words">
+                          ${note}
+                        </p>
+
+                      </div>
+
+                      <div class="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-500">
+
+                        <div class="flex items-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path d="M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5Z"/>
+                            <path d="M20 21a8 8 0 1 0-16 0"/>
+                          </svg>
+
+                          <span class="font-medium text-slate-600">
+                            ${staffName}
+                          </span>
+                        </div>
+
+                        ${
+                          dateStr
+                            ? `
+                            <div class="flex items-center gap-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 6v6l4 2"/>
+                              </svg>
+
+                              <span>${dateStr}</span>
+                            </div>
+                          `
+                            : ""
+                        }
+
+                      </div>
                     </div>
-                    <strong class="text-base whitespace-nowrap ${amountColorClass}">${amountPrefix}₹ ${amount.toLocaleString("en-IN")}</strong>
-                  </div>
-                  <div class="flex justify-between items-center text-xs text-slate-500">
-                    <div class="flex items-center gap-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                      <span class="font-medium text-slate-600">${staffName}</span>
+
+                    <div class="text-right shrink-0">
+                      <p class="text-lg font-bold ${amountColor}">
+                        ${isCredit ? "+" : "-"}₹${amount.toLocaleString(
+              "en-IN"
+            )}
+                      </p>
                     </div>
-                    ${dateStr ? `
-                    <div class="flex items-center gap-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
-                      <span>${dateStr}</span>
-                    </div>
-                    ` : ''}
+
                   </div>
                 </div>
-              `;
-            })
-            .join("")
-        : "<div class='p-6 text-center text-slate-500 bg-slate-50 rounded-lg border border-slate-200 shadow-sm'>No wallet history available from the current API response.</div>";
+              </div>
+            `;
+          })
+          .join("")
+      : `
+        <div class="flex flex-col items-center justify-center py-12 text-center">
+          <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2">
+              <path d="M3 3h18v18H3z"/>
+              <path d="M8 12h8"/>
+            </svg>
+          </div>
 
-    await Swal.fire({
-      title: `<div class="text-left"><span class="text-lg font-bold text-slate-800">${row.customerName}</span><div class="text-sm font-normal text-slate-500">Wallet History</div></div>`,
-      html: `<div style="text-align:left;max-height:400px;overflow-y:auto;padding-right:4px;" class="custom-scrollbar mt-4">${historyHtml}</div>`,
-      width: 600,
-      showConfirmButton: true,
-      confirmButtonText: 'Close',
-      confirmButtonColor: '#3b82f6',
-      customClass: {
-        popup: 'rounded-2xl',
-      }
-    });
-  };
+          <h3 class="text-base font-semibold text-slate-700">
+            No Wallet History
+          </h3>
+
+          <p class="text-sm text-slate-500 mt-1">
+            No transactions found for this customer.
+          </p>
+        </div>
+      `;
+
+  await Swal.fire({
+    width: 720,
+
+    showConfirmButton: false,
+
+    background: "#f8fafc",
+
+    customClass: {
+      popup: "rounded-[28px] overflow-hidden",
+      htmlContainer: "!p-0",
+    },
+
+    html: `
+      <div class="flex flex-col h-full max-h-[85vh]">
+
+        <!-- Header -->
+        <div class="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-5">
+
+          <div class="flex items-center justify-between">
+
+            <div>
+              <h2 class="text-xl font-bold text-slate-800">
+                ${row.customerName}
+              </h2>
+
+              <p class="text-sm text-slate-500 mt-1">
+                Wallet Transaction History
+              </p>
+            </div>
+
+            <button id="close-wallet-history"
+              class="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center transition">
+              ✕
+            </button>
+
+          </div>
+
+          <!-- Summary -->
+          <div class="grid grid-cols-2 gap-3 mt-5">
+
+            <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+              <p class="text-xs font-medium text-emerald-600 uppercase">
+                Total Credit
+              </p>
+
+              <h3 class="text-2xl font-bold text-emerald-700 mt-1">
+                ₹${totalCredit.toLocaleString("en-IN")}
+              </h3>
+            </div>
+
+            <div class="rounded-2xl bg-rose-50 border border-rose-100 p-4">
+              <p class="text-xs font-medium text-rose-600 uppercase">
+                Total Debit
+              </p>
+
+              <h3 class="text-2xl font-bold text-rose-700 mt-1">
+                ₹${totalDebit.toLocaleString("en-IN")}
+              </h3>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="overflow-y-auto px-6 py-5 custom-scrollbar bg-slate-50">
+          ${historyHtml}
+        </div>
+
+      </div>
+    `,
+
+    didOpen: () => {
+      const closeBtn = document.getElementById(
+        "close-wallet-history"
+      );
+
+      closeBtn?.addEventListener("click", () => {
+        Swal.close();
+      });
+    },
+  });
+};
 
   const data = useMemo(() => walletRows, [walletRows]);
   const totalWallet = useMemo(

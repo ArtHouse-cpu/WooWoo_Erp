@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { handleGetCategories, type MembershipPlanPayload } from "@/services/apiClient";
 
-type UsageLimits = Record<string, { min: number; max: number }>;
+type UsageLimits = Record<string, { discount: number; cashback: number }>;
 
 type PlanFormState = Required<
   Pick<
@@ -194,13 +194,13 @@ export default function AddnewPlansModal({
     form.pricing.discountPercent,
   ]);
 
-  const setUsage = (key: string, field: "min" | "max", value: number) => {
+  const setUsage = (key: string, field: "discount" | "cashback", value: number) => {
     setForm((prev) => ({
       ...prev,
       usageLimits: {
         ...prev.usageLimits,
         [key]: {
-          ...(prev.usageLimits[key] || { min: 0, max: 9999 }),
+          ...(prev.usageLimits[key] || { discount: 0, cashback: 0 }),
           [field]: Math.max(0, value),
         },
       },
@@ -490,7 +490,7 @@ export default function AddnewPlansModal({
                     const key = category.name; // Use name as key to match usage check
                     const title = category.name;
                     const short = title.substring(0, 1).toUpperCase();
-                    const limit = form.usageLimits[key] || { min: 0, max: 9999 };
+                    const limit = form.usageLimits[key] || { discount: 0, cashback: 0 };
 
                     return (
                       <div
@@ -507,14 +507,14 @@ export default function AddnewPlansModal({
                         </div>
                         <div className="mt-4 grid grid-cols-2 gap-3">
                           <div>
-                            <div className="text-xs text-slate-500">Min</div>
+                            <div className="text-xs text-slate-500">Discount (%)</div>
                             <input
                               type="number"
-                              value={limit.min}
+                              value={limit.discount || 0}
                               onChange={(e) =>
                                 setUsage(
                                   key,
-                                  "min",
+                                  "discount",
                                   Number(e.target.value || 0),
                                 )
                               }
@@ -522,14 +522,14 @@ export default function AddnewPlansModal({
                             />
                           </div>
                           <div>
-                            <div className="text-xs text-slate-500">Max</div>
+                            <div className="text-xs text-slate-500">Cashback (%)</div>
                             <input
                               type="number"
-                              value={limit.max}
+                              value={limit.cashback || 0}
                               onChange={(e) =>
                                 setUsage(
                                   key,
-                                  "max",
+                                  "cashback",
                                   Number(e.target.value || 0),
                                 )
                               }

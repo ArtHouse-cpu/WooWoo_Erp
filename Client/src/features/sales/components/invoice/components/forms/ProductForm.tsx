@@ -33,9 +33,15 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
         </div>
         <CategorySelect
           categoryValue={watch("categoryId")}
-          onCategoryChange={(id) => setValue("categoryId", id)}
+          onCategoryChange={(id, name) => {
+            setValue("categoryId", id);
+            setValue("category", name);
+          }}
           subCategoryValue={watch("subCategoryId")}
-          onSubCategoryChange={(id) => setValue("subCategoryId", id)}
+          onSubCategoryChange={(id, name) => {
+            setValue("subCategoryId", id);
+            setValue("subCategory", name);
+          }}
         />
       </div>
 

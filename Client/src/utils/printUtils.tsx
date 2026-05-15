@@ -9,6 +9,7 @@ export const printThermalReceipt = (data: {
   items: Array<{ name: string; qty: number; price: number; discount: number }>;
   totalMRP: number;
   discountTotal: number;
+  cashbackAmount?: number;
   finalAmount: number;
   totalDue: number;
   totalQty: number;
@@ -32,6 +33,7 @@ export const printThermalReceipt = (data: {
       items={data.items}
       totalMRP={data.totalMRP}
       discountTotal={data.discountTotal}
+      cashbackAmount={data.cashbackAmount}
       finalAmount={data.finalAmount}
       totalDue={data.totalDue}
       totalQty={data.totalQty}

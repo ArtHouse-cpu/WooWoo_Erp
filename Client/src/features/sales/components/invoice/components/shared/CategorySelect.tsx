@@ -25,9 +25,9 @@ type SelectOption = {
 
 type Props = {
   categoryValue: string;
-  onCategoryChange: (categoryId: string) => void;
+  onCategoryChange: (categoryId: string, categoryName: string) => void;
   subCategoryValue?: string;
-  onSubCategoryChange?: (subCategoryId: string) => void;
+  onSubCategoryChange?: (subCategoryId: string, subCategoryName: string) => void;
   disabled?: boolean;
 };
 
@@ -200,8 +200,8 @@ export default function CategorySelect({
       const created = Array.isArray(res?.categories) ? res.categories[0] : null;
       if (created?._id) {
         setCategories((prev) => [...prev, created]);
-        onCategoryChange(created._id);
-        onSubCategoryChange?.("");
+        onCategoryChange(created._id, created.name);
+        onSubCategoryChange?.("", "");
         return true;
       }
       return false;
@@ -230,7 +230,7 @@ export default function CategorySelect({
 
       if (created?._id) {
         setSubCategories((prev) => [...prev, created]);
-        onSubCategoryChange?.(created._id);
+        onSubCategoryChange?.(created._id, created.name);
         return true;
       }
       return false;
@@ -251,8 +251,9 @@ export default function CategorySelect({
         canCreate
         isCreating={isCreatingCategory}
         onChange={(id) => {
-          onCategoryChange(id);
-          onSubCategoryChange?.("");
+          const name = categories.find((c) => c._id === id)?.name || "";
+          onCategoryChange(id, name);
+          onSubCategoryChange?.("", "");
         }}
         onCreate={createCategory}
       />
@@ -265,7 +266,10 @@ export default function CategorySelect({
         disabled={disabled || !categoryValue}
         canCreate={!!categoryValue}
         isCreating={isCreatingSubCategory}
-        onChange={(id) => onSubCategoryChange?.(id)}
+        onChange={(id) => {
+          const name = subCategories.find((s) => s._id === id)?.name || "";
+          onSubCategoryChange?.(id, name);
+        }}
         onCreate={createSubCategory}
       />
       </span>

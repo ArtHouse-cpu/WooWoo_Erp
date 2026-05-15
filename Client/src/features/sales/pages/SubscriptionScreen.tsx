@@ -23,7 +23,8 @@ type SubscriptionStatus =
   | "completed"
   | "expired"
   | "error"
-  | "cancelled";
+  | "cancelled"
+  | "inactive";
 
 type SubscriptionRow = {
   id: number;
@@ -46,6 +47,7 @@ type SubscriptionRow = {
 const tabs: Array<SubscriptionStatus | "all"> = [
   "all",
   "active",
+  "inactive",
   "expired",
   "cancelled",
 ];
@@ -62,7 +64,7 @@ export default function SubscriptionScreen() {
   const [activeTab, setActiveTab] = useState<SubscriptionStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [memberships, setMemberships] = useState<
-    Array<{ planId: string; displayName: string }>
+    Array<{ planId: string; displayName: string; status: string }>
   >([]);
   const [subscriptionTypeFilter, setSubscriptionTypeFilter] = useState("all");
   const [expiryFilter, setExpiryFilter] = useState("all");
@@ -74,13 +76,14 @@ export default function SubscriptionScreen() {
   useEffect(() => {
     const fetchMemberships = async () => {
       try {
-        const response = await handleGetMemberships({ status: "Active" });
+        const response = await handleGetMemberships({ status: "All" });
         const list = Array.isArray(response?.memberships) ? response.memberships : [];
         setMemberships(
           list
             .map((membership: any) => ({
               planId: String(membership?.planId ?? "").trim().toLowerCase(),
               displayName: String(membership?.displayName ?? "").trim(),
+              status: String(membership?.status ?? "Active"),
             }))
             .filter((membership: { planId: string; displayName: string }) =>
               Boolean(membership.planId && membership.displayName),
@@ -162,50 +165,71 @@ export default function SubscriptionScreen() {
   const fetchSubscriptions = async () => {
     setLoading(true);
     try {
-      const response = await handleGetSubscriptions(search.trim(), 200);
+      const [response, membershipRes] = await Promise.all([
+        handleGetSubscriptions(search.trim(), 200),
+        handleGetMemberships({ status: "All" }),
+      ]);
+
+      const membershipList = Array.isArray(membershipRes?.memberships) 
+        ? membershipRes.memberships.map((m: any) => ({
+            planId: String(m?.planId ?? "").trim().toLowerCase(),
+            status: String(m?.status ?? "Active")
+          }))
+        : [];
+
       const subscriptions = Array.isArray(response?.subscriptions)
         ? response.subscriptions
         : [];
 
       const rows: SubscriptionRow[] = subscriptions.map(
-        (subscription: any, index: number) => ({
-          id: index + 1,
-          amount: Number(subscription?.grandTotal ?? subscription?.amount ?? 0),
-          subscriptionCode: String(
-            subscription?.subscriptionCode ??
-            `SUB-${subscription?.subscriptionNumber ?? index + 1001}`,
-          ),
-          customer: String(
-            subscription?.customerName ?? subscription?.name ?? "",
-          ),
-          phone: String(
-            subscription?.customerPhone ?? subscription?.mobile ?? subscription?.phone ?? "",
-          ),
-          period: `${formatDate(subscription?.startDate ?? subscription?.invoiceDate ?? subscription?.createdAt)} - ${formatDate(subscription?.endDate ?? subscription?.dueDate ?? subscription?.createdAt)}`,
-          repeatUnit: String(
-            subscription?.repeatUnit ?? "1 year",
-          ),
-          repeatEvery: String(
-            subscription?.repeatEvery ?? "1",
-          ),
-          invoiceCount: Number(
-            subscription?.invoiceCount ?? subscription?.noOfInvoices ?? 0,
-          ),
-          upcomingOn: formatDate(
-            subscription?.upcomingDate ??
-            subscription?.nextInvoiceDate ??
-            subscription?.createdAt,
-          ),
-          upcomingTime: formatDateTime(
-            subscription?.upcomingDate ??
-            subscription?.nextInvoiceDate ??
-            subscription?.createdAt,
-          ),
-          status: toStatus(subscription?.status),
-          subscriptionType: String(subscription?.membershipType || subscription?.items?.[0]?.productName || "general").toLowerCase(),
-          _id: String(subscription?._id ?? ""),
-          raw: subscription,
-        }),
+        (subscription: any, index: number) => {
+          const planId = String(subscription?.membershipPlanId || subscription?.membershipType || "").trim().toLowerCase();
+          const matchedPlan = membershipList.find((m: any) => m.planId === planId);
+          
+          let status = toStatus(subscription?.status);
+          if (matchedPlan?.status === "Inactive") {
+            status = "inactive";
+          }
+
+          return {
+            id: index + 1,
+            amount: Number(subscription?.grandTotal ?? subscription?.amount ?? 0),
+            subscriptionCode: String(
+              subscription?.subscriptionCode ??
+              `SUB-${subscription?.subscriptionNumber ?? index + 1001}`,
+            ),
+            customer: String(
+              subscription?.customerName ?? subscription?.name ?? "",
+            ),
+            phone: String(
+              subscription?.customerPhone ?? subscription?.mobile ?? subscription?.phone ?? "",
+            ),
+            period: `${formatDate(subscription?.startDate ?? subscription?.invoiceDate ?? subscription?.createdAt)} - ${formatDate(subscription?.endDate ?? subscription?.dueDate ?? subscription?.createdAt)}`,
+            repeatUnit: String(
+              subscription?.repeatUnit ?? "1 year",
+            ),
+            repeatEvery: String(
+              subscription?.repeatEvery ?? "1",
+            ),
+            invoiceCount: Number(
+              subscription?.invoiceCount ?? subscription?.noOfInvoices ?? 0,
+            ),
+            upcomingOn: formatDate(
+              subscription?.upcomingDate ??
+              subscription?.nextInvoiceDate ??
+              subscription?.createdAt,
+            ),
+            upcomingTime: formatDateTime(
+              subscription?.upcomingDate ??
+              subscription?.nextInvoiceDate ??
+              subscription?.createdAt,
+            ),
+            status,
+            subscriptionType: String(subscription?.membershipType || subscription?.items?.[0]?.productName || "general").toLowerCase(),
+            _id: String(subscription?._id ?? ""),
+            raw: subscription,
+          };
+        },
       );
 
       setData(rows);
@@ -304,11 +328,13 @@ export default function SubscriptionScreen() {
               ? "bg-yellow-100 text-yellow-700"
               : value === "active"
                 ? "bg-green-100 text-green-700"
-                : value === "expired"
-                  ? "bg-slate-100 text-slate-700"
-                  : value === "error"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-gray-100 text-gray-700";
+                : value === "inactive"
+                  ? "bg-amber-100 text-amber-700 border border-amber-200"
+                  : value === "expired"
+                    ? "bg-slate-100 text-slate-700"
+                    : value === "error"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-gray-100 text-gray-700";
           return (
             <span
               className={`px-2.5 py-1 text-xs font-semibold rounded-md ${badgeClass}`}

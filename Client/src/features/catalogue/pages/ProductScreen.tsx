@@ -16,8 +16,6 @@ import {
 import CategoryListModal from "@/features/catalogue/components/CategoryListModal";
 import {
   handleGetProducts,
-  handleGetCategories,
-  handleGetSubCategories,
   handleCreateProduct,
   handleUpdateProduct,
   handleDeleteProduct,
@@ -27,9 +25,8 @@ import CreateProductModal from "@/features/sales/components/invoice/Modal/Create
 type ProductRow = {
   _id?: string;
   productName?: string;
-  categoryId?: string;
-  categoryName?: string;
-  subCategoryName?: string;
+  category?: string;
+  subCategory?: string;
   sellingPrice?: number;
   purchasePrice?: number;
   stockQty?: number;
@@ -39,8 +36,6 @@ type ProductRow = {
 export default function ProductScreen() {
   const [openCategoryListModal, setOpenCategoryListModal] = useState(false);
   const [products, setProducts] = useState<ProductRow[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [subCategories, setSubCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editProduct, setEditProduct] = useState<any | null>(null);
@@ -48,46 +43,15 @@ export default function ProductScreen() {
   const fetchData = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const [prodRes, catRes, subCatRes] = await Promise.all([
-        handleGetProducts("", signal),
-        handleGetCategories(signal),
-        handleGetSubCategories(signal),
-      ]);
-
+      const prodRes = await handleGetProducts("", signal);
+      
       const productList = Array.isArray(prodRes?.products)
         ? prodRes.products
         : Array.isArray(prodRes)
           ? prodRes
           : [];
 
-      const cats = catRes?.categories || catRes?.data || catRes || [];
-      const subCats = subCatRes?.subCategories || subCatRes?.data || subCatRes || [];
-      // console.log("cats", cats);
-      console.log("subCats ye h:", subCats);
-
-      setCategories(cats);
-      setSubCategories(subCats);
-      //Look up 
-      const enrichedProducts = productList.map((p: any) => {
-        const subCat = subCats.find(
-          (sc: any) => sc._id === p.subCategoryId
-        );
-        // console.log("product p:", p);
-        // console.log("subCat", subCat);
-
-        const cat = subCat
-          ? cats.find((c: any) => c._id === subCat.categoryId)
-          : cats.find((c: any) => c._id === p.categoryId);
-
-        return {
-          ...p,
-          categoryName: cat?.name || "N/A",
-          subCategoryName: subCat?.name || "N/A",
-        };
-      });
-      console.log("enrichedProducts", enrichedProducts);
-
-      setProducts(enrichedProducts);
+      setProducts(productList);
     } catch (error) {
       console.error("Error fetching data:", error);
       setProducts([]);
@@ -171,21 +135,21 @@ export default function ProductScreen() {
         ),
       },
       {
-        accessorKey: "categoryName",
+        accessorKey: "category",
         header: "Category",
         size: 150,
         Cell: ({ cell }: { cell: any }) => (
           <span className=" text-slate-800">{cell.getValue()}</span>
         ),
       },
-      // {
-      //   accessorKey: "subCategoryName",
-      //   header: "Sub Category",
-      //   size: 150,
-      //   Cell: ({ cell }: { cell: any }) => (
-      //     <span className="text-slate-600">{cell.getValue()}</span>
-      //   ),
-      // },
+      {
+        accessorKey: "subCategory",
+        header: "Sub Category",
+        size: 150,
+        Cell: ({ cell }: { cell: any }) => (
+          <span className="text-slate-600">{cell.getValue()}</span>
+        ),
+      },
       {
         accessorKey: "sellingPrice",
         header: "Selling Price",
@@ -265,7 +229,7 @@ export default function ProductScreen() {
     },
     {
       title: "No of Categories",
-      value: categories.length || new Set(products.map((p) => p.categoryId).filter(Boolean)).size,
+      value: new Set(products.map((p) => p.category).filter(Boolean)).size,
       icon: <LayoutList size={22} className="text-gray-500" />,
     },
 

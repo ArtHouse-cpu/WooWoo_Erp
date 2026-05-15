@@ -11,7 +11,9 @@ export type InvoiceItem = {
   qty: number;
   unitPrice: number;
   discount: number;
+  cashback: number;
   image?: string;
+  category?: string;
 };
 
 /** API / POS raw invoice shape used by PDF and print templates */

@@ -11,6 +11,8 @@ type DraftItem = {
   price: string;
   discount: string;
   image?: string;
+  category?: string;
+  cashback: string;
 };
 
 type Props = {
@@ -21,6 +23,10 @@ type Props = {
   onRemoveItem: (id: number) => void;
   onUpdateItemQty: (id: number, newQty: number) => void;
   onUpdateItemDiscount: (id: number, newDiscount: number) => void;
+  onUpdateItemCashback: (id: number, newCashback: number) => void;
+  membershipType?: string;
+  membershipPlans?: any[];
+  membershipPlanId?: string | null;
 };
 
 const inputStyle =
@@ -34,6 +40,10 @@ export default function ProductsServicesSection({
   onRemoveItem,
   onUpdateItemQty,
   onUpdateItemDiscount,
+  onUpdateItemCashback,
+  membershipType = "none",
+  membershipPlans = [],
+  membershipPlanId = null,
 }: Props) {
   const [products, setProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -89,20 +99,41 @@ export default function ProductsServicesSection({
 
     const qty = Number(draft.qty || 1);
     const sellingPrice = Number(product.sellingPrice ?? 0);
-    const dValue = Number(product.discountValue ?? 0);
-    const dType = product.discountType ?? "flat";
+    const category = product.category || "General";
 
     let calculatedDiscount = 0;
-    if (dType === "percentage") {
-      calculatedDiscount = (sellingPrice * qty * dValue) / 100;
+    let calculatedCashback = 0;
+    const plan = membershipPlans.find(p => 
+        (membershipPlanId && p._id === membershipPlanId) ||
+        p.planId?.toLowerCase() === membershipType.toLowerCase() ||
+        p.planType?.toLowerCase() === membershipType.toLowerCase() || 
+        p.displayName?.toLowerCase() === membershipType.toLowerCase()
+    );
+
+    if (plan && plan.usageLimits && (plan.usageLimits[category] || plan.usageLimits["General"])) {
+        const limit = plan.usageLimits[category] || plan.usageLimits["General"];
+        if (limit.discount) {
+            calculatedDiscount = (sellingPrice * qty * limit.discount) / 100;
+        }
+        if (limit.cashback) {
+            calculatedCashback = (sellingPrice * qty * limit.cashback) / 100;
+        }
     } else {
-      calculatedDiscount = dValue * qty;
+        const dValue = Number(product.discountValue ?? 0);
+        const dType = product.discountType ?? "flat";
+        if (dType === "percentage") {
+            calculatedDiscount = (sellingPrice * qty * dValue) / 100;
+        } else {
+            calculatedDiscount = dValue * qty;
+        }
     }
 
     onDraftChange("name", product.productName);
     onDraftChange("price", String(sellingPrice));
     onDraftChange("discount", String(calculatedDiscount));
+    onDraftChange("cashback", String(calculatedCashback));
     onDraftChange("image", product.imageUrl || (product.images && product.images[0]) || "");
+    onDraftChange("category", category);
     setDropdownOpen(false);
   };
 
@@ -138,20 +169,41 @@ export default function ProductsServicesSection({
       if (prod) {
         const qty = Number(draft.qty || 1);
         const sellingPrice = Number(prod.sellingPrice ?? 0);
-        const dValue = Number(prod.discountValue ?? 0);
-        const dType = prod.discountType ?? "flat";
+        const category = prod.category || "General";
 
         let calculatedDiscount = 0;
-        if (dType === "percentage") {
-          calculatedDiscount = (sellingPrice * qty * dValue) / 100;
+        let calculatedCashback = 0;
+        const plan = membershipPlans.find(p => 
+            (membershipPlanId && p._id === membershipPlanId) ||
+            p.planId?.toLowerCase() === membershipType.toLowerCase() ||
+            p.planType?.toLowerCase() === membershipType.toLowerCase() || 
+            p.displayName?.toLowerCase() === membershipType.toLowerCase()
+        );
+
+        if (plan && plan.usageLimits && (plan.usageLimits[category] || plan.usageLimits["General"])) {
+            const limit = plan.usageLimits[category] || plan.usageLimits["General"];
+            if (limit.discount) {
+                calculatedDiscount = (sellingPrice * qty * limit.discount) / 100;
+            }
+            if (limit.cashback) {
+                calculatedCashback = (sellingPrice * qty * limit.cashback) / 100;
+            }
         } else {
-          calculatedDiscount = dValue * qty;
+            const dValue = Number(prod.discountValue ?? 0);
+            const dType = prod.discountType ?? "flat";
+            if (dType === "percentage") {
+                calculatedDiscount = (sellingPrice * qty * dValue) / 100;
+            } else {
+                calculatedDiscount = dValue * qty;
+            }
         }
 
         onDraftChange("name", prod.productName);
         onDraftChange("price", String(sellingPrice));
         onDraftChange("discount", String(calculatedDiscount));
+        onDraftChange("cashback", String(calculatedCashback));
         onDraftChange("image", prod.imageUrl || (prod.images && prod.images[0]) || "");
+        onDraftChange("category", category);
       }
       setShowCreateModal(false);
       Swal.fire("Product created", "Product has been successfully added.", "success");
@@ -261,7 +313,15 @@ export default function ProductsServicesSection({
           type="number"
           min={0}
           placeholder="Discount"
-          className={`${inputStyle} md:col-span-2`}
+          className={`${inputStyle} md:col-span-1`}
+        />
+        <input
+          value={draft.cashback}
+          onChange={(e) => onDraftChange("cashback", e.target.value)}
+          type="number"
+          min={0}
+          placeholder="Cashback"
+          className={`${inputStyle} md:col-span-1`}
         />
         <button
           onClick={handleAddToBill}
@@ -280,6 +340,7 @@ export default function ProductsServicesSection({
               <th className="px-3 py-2 text-center">Qty</th>
               <th className="px-3 py-2 text-right">Unit Price</th>
               <th className="px-3 py-2 text-right">Discount</th>
+              <th className="px-3 py-2 text-right">Cashback</th>
               <th className="px-3 py-2 text-right">Total</th>
               <th className="px-3 py-2 text-center">Action</th>
             </tr>
@@ -324,6 +385,17 @@ export default function ProductsServicesSection({
                           min={0}
                           value={item.discount}
                           onChange={(e) => onUpdateItemDiscount(item.id, Number(e.target.value))}
+                          className="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex justify-end">
+                        <input
+                          type="number"
+                          min={0}
+                          value={item.cashback}
+                          onChange={(e) => onUpdateItemCashback(item.id, Number(e.target.value))}
                           className="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500"
                         />
                       </div>

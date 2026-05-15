@@ -7,21 +7,25 @@ import {
   Wallet as WalletIcon,
   User,
   FileText,
-  Split,
   Loader2,
+  Tag,
 } from "lucide-react";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import Swal from "sweetalert2";
 import {
   handleCreateInvoice,
   handleGetCustomers,
   handleGetWallets,
   handleGetWalletById,
+  handleGetMemberships,
   handleValidateCoupon,
+  type MembershipPlanPayload,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
 import { printThermalReceipt } from "@/utils/printUtils";
+import { summarizeMembershipForCart } from "../../../utils/membershipInvoiceUtils";
+import { creditWalletCashback } from "../../../utils/walletCashback";
 
 type CheckoutItem = {
   id?: number;
@@ -29,7 +33,9 @@ type CheckoutItem = {
   qty: number;
   price: number;
   discount?: number;
+  cashback?: number;
   image?: string;
+  category?: string;
 };
 
 type Props = {
@@ -41,6 +47,11 @@ type Props = {
   initialCustomerName?: string;
   initialCustomerPhone?: string;
   initialMembership?: string;
+  initialMembershipPlanId?: string | null;
+  initialCustomerId?: string | null;
+  initialMembershipDiscount?: number;
+  initialCashbackTotal?: number;
+  membershipPlans?: MembershipPlanPayload[];
   onConfirmPayment?: (payload: {
     mode: string;
     paymentStatus: "full" | "partial";
@@ -64,8 +75,13 @@ type Props = {
       code: string;
       discountAmount: number;
     } | null;
+    cashbackTotal: number;
+    membershipDiscount: number;
+    customerId?: string | null;
   }) => Promise<void>;
 };
+
+const DEFAULT_MEMBERSHIP_PLANS: MembershipPlanPayload[] = [];
 
 const PAYMENT_METHOD_OPTIONS: {
   value: string;
@@ -85,6 +101,119 @@ function formatInr(value: number) {
   })}`;
 }
 
+type SummaryTone = "default" | "muted" | "discount" | "cashback" | "total" | "due" | "change";
+
+function SummaryLine({
+  label,
+  value,
+  tone = "default",
+  className = "",
+}: {
+  label: string;
+  value: string;
+  tone?: SummaryTone;
+  className?: string;
+}) {
+  const valueCls: Record<SummaryTone, string> = {
+    default: "text-slate-800",
+    muted: "text-slate-400",
+    discount: "text-indigo-600 font-semibold",
+    cashback: "text-emerald-600 font-semibold",
+    total: "text-slate-900 font-bold text-base",
+    due: "text-amber-600 font-semibold",
+    change: "text-emerald-600 font-bold",
+  };
+
+  return (
+    <div className={`flex items-center justify-between gap-3 text-xs ${className}`}>
+      <span className="text-slate-500 font-medium">{label}</span>
+      <span className={`tabular-nums ${valueCls[tone]}`}>{value}</span>
+    </div>
+  );
+}
+
+function SectionCard({
+  title,
+  icon: Icon,
+  children,
+  className = "",
+  headerAction,
+}: {
+  title: string;
+  icon?: any;
+  children: ReactNode;
+  className?: string;
+  headerAction?: ReactNode;
+}) {
+  return (
+    <section className={`rounded-xl border border-slate-200 bg-white p-5 ${className}`}>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="h-4 w-4 text-slate-400" />}
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            {title}
+          </h3>
+        </div>
+        {headerAction}
+      </div>
+      <div>{children}</div>
+    </section>
+  );
+}
+
+function PaymentModeButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: any;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-colors ${
+        active
+          ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+          : "border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200 hover:bg-white"
+      }`}
+    >
+      <Icon className={`h-5 w-5 ${active ? "text-indigo-600" : "text-slate-400"}`} />
+      <span className="text-[11px] font-bold uppercase tracking-wider">{label}</span>
+    </button>
+  );
+}
+
+function Badge({ 
+  children, 
+  variant = "default",
+  className = "" 
+}: { 
+  children: ReactNode; 
+  variant?: "default" | "indigo" | "emerald" | "amber" | "rose" | "purple" | "slate";
+  className?: string;
+}) {
+  const variants = {
+    default: "bg-slate-100 text-slate-600",
+    indigo: "bg-indigo-50 text-indigo-700",
+    emerald: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    rose: "bg-rose-50 text-rose-700",
+    purple: "bg-purple-50 text-purple-700",
+    slate: "bg-slate-900 text-white",
+  };
+
+  return (
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${variants[variant]} ${className}`}>
+      {children}
+    </span>
+  );
+}
+
 export default function CheckoutModal({
   open,
   onClose,
@@ -94,6 +223,11 @@ export default function CheckoutModal({
   initialCustomerName = "",
   initialCustomerPhone = "",
   initialMembership = "",
+  initialMembershipPlanId = null,
+  initialCustomerId = null,
+  initialMembershipDiscount = 0,
+  initialCashbackTotal = 0,
+  membershipPlans = DEFAULT_MEMBERSHIP_PLANS,
   onConfirmPayment,
 }: Props) {
   const [paymentMode, setPaymentMode] = useState("Cash");
@@ -107,9 +241,6 @@ export default function CheckoutModal({
     upi: 0,
     card: 0,
     wallet: 0,
-  });
-  const [summary, setSummary] = useState({
-    membershipDiscount: 0,
   });
 
   const [customerSearch, setCustomerSearch] = useState("");
@@ -125,6 +256,10 @@ export default function CheckoutModal({
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponLabel, setCouponLabel] = useState("");
+
+  const [resolvedMembershipPlans, setResolvedMembershipPlans] = useState<
+    MembershipPlanPayload[]
+  >(membershipPlans);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -142,11 +277,39 @@ export default function CheckoutModal({
   };
 
   useEffect(() => {
+    setResolvedMembershipPlans(membershipPlans ?? []);
+  }, [membershipPlans]);
+
+  useEffect(() => {
+    if (!open) return;
+    const ac = new AbortController();
+    void handleGetMemberships({ status: "Active" }, ac.signal)
+      .then((res) => {
+        const list = res?.memberships;
+        if (Array.isArray(list) && list.length > 0) {
+          setResolvedMembershipPlans(list as MembershipPlanPayload[]);
+        }
+      })
+      .catch(() => {});
+    return () => ac.abort();
+  }, [open]);
+
+  useEffect(() => {
     if (open) {
-      setCashGiven(grandTotal - summary.membershipDiscount);
       setCustomerName(initialCustomerName);
       setCustomerSearch(initialCustomerPhone);
       setMembership(initialMembership);
+      setSelectedCustomer(
+        initialCustomerId
+          ? {
+              _id: initialCustomerId,
+              name: initialCustomerName,
+              mobile: initialCustomerPhone,
+              membershipType: initialMembership,
+              membershipPlanId: initialMembershipPlanId,
+            }
+          : null,
+      );
       setInstructionNotes("");
       setCouponCode("");
       setCouponDiscount(0);
@@ -154,15 +317,74 @@ export default function CheckoutModal({
     }
   }, [
     open,
-    grandTotal,
-    summary.membershipDiscount,
     initialCustomerName,
     initialCustomerPhone,
     initialMembership,
+    initialCustomerId,
+    initialMembershipPlanId,
   ]);
 
+  const summary = useMemo(() => {
+    const mType =
+      selectedCustomer?.membershipType || initialMembership || membership;
+    const mId =
+      selectedCustomer?.membershipPlanId ?? initialMembershipPlanId ?? null;
+    return summarizeMembershipForCart(
+      resolvedMembershipPlans,
+      mType,
+      mId,
+      items.map((item) => ({
+        price: Number(item.price || 0),
+        qty: Number(item.qty || 0),
+        category: item.category,
+        discount: Number(item.discount ?? 0),
+        cashback: Number(item.cashback ?? 0),
+      })),
+    );
+  }, [
+    items,
+    selectedCustomer,
+    initialMembership,
+    initialMembershipPlanId,
+    membership,
+    resolvedMembershipPlans,
+  ]);
+
+  const lineDiscountsTotal = useMemo(
+    () => items.reduce((sum, item) => sum + Number(item.discount ?? 0), 0),
+    [items],
+  );
+
+  const lineCashbackTotal = useMemo(
+    () => items.reduce((sum, item) => sum + Number(item.cashback ?? 0), 0),
+    [items],
+  );
+
+  const displayMembershipDiscount =
+    initialMembershipDiscount > 0
+      ? initialMembershipDiscount
+      : lineDiscountsTotal > 0
+        ? lineDiscountsTotal
+        : summary.membershipDiscount;
+
+  const displayCashbackTotal =
+    initialCashbackTotal > 0
+      ? initialCashbackTotal
+      : lineCashbackTotal > 0
+        ? lineCashbackTotal
+        : summary.cashbackTotal;
+
+  const itemsSubtotal = useMemo(
+    () =>
+      items.reduce(
+        (acc, item) => acc + Number(item.qty || 0) * Number(item.price || 0),
+        0,
+      ),
+    [items],
+  );
+
   useEffect(() => {
-    const payable = Math.max(0, grandTotal - summary.membershipDiscount);
+    const payable = Math.max(0, grandTotal - couponDiscount);
 
     if (paymentStatus === "full") {
       if (isMultiMode) {
@@ -171,7 +393,7 @@ export default function CheckoutModal({
         setCashGiven(payable);
       }
     }
-  }, [paymentStatus, isMultiMode, grandTotal, summary.membershipDiscount]);
+  }, [paymentStatus, isMultiMode, grandTotal, couponDiscount]);
 
   useEffect(() => {
     const term = debouncedCustomerSearch;
@@ -303,10 +525,6 @@ export default function CheckoutModal({
         }
       })();
     }
-
-    setSummary({
-      membershipDiscount: Number(customer.membershipDiscount || 0),
-    });
   };
 
   const totalQty = useMemo(
@@ -314,8 +532,7 @@ export default function CheckoutModal({
     [items],
   );
 
-  const finalAmount = Math.max(0, grandTotal - summary.membershipDiscount);
-  const finalPayable = Math.max(0, finalAmount - couponDiscount);
+  const finalPayable = Math.max(0, grandTotal - couponDiscount);
   const isPartialPayment = paymentStatus === "partial";
   const totalPaid = isMultiMode
     ? splitPayments.cash +
@@ -327,33 +544,6 @@ export default function CheckoutModal({
   const dueAmount = Math.max(0, finalPayable - totalPaid);
   const remainingForFull = Math.max(0, finalPayable - totalPaid);
 
-  const paymentBreakdown = useMemo(() => {
-    if (isMultiMode) {
-      return [
-        { label: "Cash", amount: splitPayments.cash },
-        { label: "UPI", amount: splitPayments.upi },
-        { label: "Card", amount: splitPayments.card },
-        { label: "Wallet", amount: splitPayments.wallet },
-      ].filter((entry) => entry.amount > 0);
-    }
-
-    if (cashGiven <= 0) return [];
-    return [{ label: paymentMode, amount: cashGiven }];
-  }, [isMultiMode, splitPayments, paymentMode, cashGiven]);
-
-  const membershipTone =
-    membership === "premium"
-      ? "border-purple-200 bg-purple-50 text-purple-800"
-      : membership === "pro"
-        ? "border-blue-200 bg-blue-50 text-blue-800"
-        : membership === "special"
-          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-          : membership === "junior"
-            ? "border-amber-200 bg-amber-50 text-amber-900"
-            : "border-gray-200 bg-gray-100 text-gray-700";
-
-  const inputBaseClass =
-    "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none ring-violet-500/0 transition placeholder:text-gray-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-400/25";
 
   const handleSaveAndPrint = async () => {
     if (!customerName.trim()) {
@@ -434,6 +624,10 @@ export default function CheckoutModal({
       customerName: customerName.trim(),
       customerPhone: customerSearch.trim(),
       notes: instructionNotes.trim(),
+      cashbackTotal: displayCashbackTotal,
+      membershipDiscount: displayMembershipDiscount,
+      customerId:
+        selectedCustomer?._id ?? initialCustomerId ?? null,
     };
     const payload = {
       customerName: customerName.trim(),
@@ -481,6 +675,27 @@ export default function CheckoutModal({
       const response = await handleCreateInvoice(payload);
       const invoiceCode = response?.invoice?.invoiceCode ?? "N/A";
 
+      if (displayCashbackTotal > 0) {
+        try {
+          await creditWalletCashback({
+            customerId:
+              selectedCustomer?._id ?? initialCustomerId ?? null,
+            customerPhone: customerSearch.trim(),
+            customerName: customerName.trim(),
+            amount: displayCashbackTotal,
+            note: `Membership cashback for Invoice #${invoiceCode}`,
+            referenceId: invoiceCode,
+            createdBy: {
+              m_staff_id: staff.m_staff_id,
+              m_staff_name: staff.m_staff_name,
+              m_staff_email: staff.m_staff_email,
+            },
+          });
+        } catch (e) {
+          console.error("Failed to credit cashback to wallet", e);
+        }
+      }
+
       printThermalReceipt({
         invoiceNo: invoiceCode,
         customerName: customerName,
@@ -496,9 +711,8 @@ export default function CheckoutModal({
           0
         ),
         discountTotal:
-          items.reduce((sum, it) => sum + Number(it.discount ?? 0), 0) +
-          summary.membershipDiscount +
-          couponDiscount,
+          lineDiscountsTotal + couponDiscount,
+        cashbackAmount: displayCashbackTotal,
         finalAmount: finalPayable,
         totalDue: dueAmount,
         totalQty: totalQty,
@@ -530,154 +744,131 @@ export default function CheckoutModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="checkout-title"
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-3 backdrop-blur-[2px] sm:p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
       onMouseDown={(e) => {
         if (e.currentTarget === e.target) onClose();
       }}
     >
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200/90 bg-white shadow-[0_25px_50px_-12px_rgba(15,23,42,0.35)]">
-        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-100 bg-gradient-to-br from-slate-50 to-white px-5 py-4 sm:px-6">
-          <div>
+      <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div className="flex items-center gap-3">
             <h2
               id="checkout-title"
-              className="text-lg font-semibold tracking-tight text-gray-900 sm:text-xl"
+              className="text-lg font-bold text-slate-900"
             >
               Checkout
             </h2>
-            <p className="mt-1 text-xs text-gray-500">
-              {items.length} line items · {totalQty} units
-            </p>
+            <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+              <Badge variant="indigo">{items.length} items</Badge>
+              <span className="text-xs font-medium text-slate-400">
+                {totalQty} units
+              </span>
+            </div>
           </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
             aria-label="Close checkout"
           >
-            <X className="h-5 w-5" strokeWidth={2} aria-hidden />
+            <X className="h-5 w-5" />
           </button>
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-          <aside className="flex max-h-[min(40vh,320px)] flex-col border-b border-gray-100 bg-slate-50/70 lg:max-h-none lg:w-[min(100%,380px)] lg:shrink-0 lg:border-b-0 lg:border-r lg:border-gray-100">
-            <div className="flex items-center gap-2 border-b border-gray-100/90 px-4 py-3">
-              <FileText className="h-4 w-4 shrink-0 text-gray-400" aria-hidden />
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                Order summary
-              </span>
-              <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-[10px] font-medium capitalize text-gray-600 ring-1 ring-gray-200/80">
-                {paymentStatus === "full" ? "Fully paid" : "Partial"}
-                {isMultiMode ? " · Split" : ""}
+          <aside className="flex max-h-[min(40vh,380px)] flex-col border-b border-slate-100 bg-slate-50/30 lg:max-h-none lg:w-[320px] lg:shrink-0 lg:border-b-0 lg:border-r">
+            <div className="flex items-center gap-2 border-b border-slate-100 px-6 py-4">
+              <FileText className="h-4 w-4 text-slate-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Order Summary
               </span>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm tabular-nums">
-              <ul className="space-y-2.5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+              <ul className="divide-y divide-slate-100">
                 {items.map((item, i) => {
                   const lineTotal =
-                    Number(item.qty || 0) * Number(item.price || 0) -
-                    Number(item.discount || 0);
+                    Number(item.qty || 0) * Number(item.price || 0)
 
                   return (
-                    <li
-                      key={item.id ?? i}
-                      className="flex justify-between gap-3 border-b border-gray-200/70 pb-2.5 last:border-0 last:pb-0"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate font-medium text-gray-900">{item.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {Number(item.qty)} × {formatInr(Number(item.price || 0))}
+                    <li key={item.id ?? i} className="py-3 first:pt-0">
+                      <div className="flex justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-900">
+                            {item.name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {Number(item.qty)} × {formatInr(Number(item.price || 0))}
+                          </p>
                         </div>
+                        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
+                          {formatInr(lineTotal)}
+                        </p>
                       </div>
-                      <div className="shrink-0 font-medium text-gray-800">
-                        {formatInr(lineTotal)}
-                      </div>
+
+                      {/* {Number(item.discount ?? 0) > 0 && (
+                        <p className="mt-0.5 text-[11px] font-medium text-indigo-600">
+                          Discount: −{formatInr(Number(item.discount ?? 0))}
+                        </p>
+                      )} */}
                     </li>
                   );
                 })}
               </ul>
 
-              <div className="mt-5 space-y-2 border-t border-gray-200/90 pt-4 text-xs">
-                <div className="flex justify-between text-gray-600">
-                  <span>Lines / qty</span>
-                  <span className="font-medium text-gray-800">
-                    {items.length} / {totalQty}
-                  </span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Bill total</span>
-                  <span className="font-medium text-gray-800">{formatInr(grandTotal)}</span>
-                </div>
-                <div className="flex justify-between text-sky-700">
-                  <span>Membership discount</span>
-                  <span className="font-medium">
-                    − {formatInr(summary.membershipDiscount)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Subtotal before coupon</span>
-                  <span className="font-medium text-gray-900">{formatInr(finalAmount)}</span>
-                </div>
-                {couponDiscount > 0 ? (
-                  <div className="flex justify-between text-violet-700">
-                    <span>Coupon discount</span>
-                    <span className="font-medium">− {formatInr(couponDiscount)}</span>
+              <div className="mt-6 space-y-3 border-t border-slate-100 pt-4">
+                <SummaryLine label="Subtotal" value={formatInr(itemsSubtotal)} />
+                {displayMembershipDiscount > 0 && (
+                  <SummaryLine 
+                    label="Membership Discount" 
+                    value={`− ${formatInr(displayMembershipDiscount)}`} 
+                    tone="discount" 
+                  />
+                )}
+                {couponDiscount > 0 && (
+                  <SummaryLine 
+                    label="Coupon Discount" 
+                    value={`− ${formatInr(couponDiscount)}`} 
+                    className="text-violet-600"
+                  />
+                )}
+                
+                <div className="rounded-xl bg-green-400 p-4 text-white">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-white-400 uppercase tracking-wider">Payable</span>
+                    <span className="text-lg font-bold tabular-nums">{formatInr(finalPayable)}</span>
                   </div>
-                ) : null}
-                <div className="flex justify-between border-t border-dashed border-gray-200 pt-3 text-base font-semibold text-gray-900">
-                  <span>Total payable</span>
-                  <span>{formatInr(finalPayable)}</span>
                 </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Total paid</span>
-                  <span className="font-medium text-gray-900">{formatInr(totalPaid)}</span>
+
+                <div className="space-y-2 pt-2">
+                  <SummaryLine label="Paid" value={formatInr(totalPaid)} tone="total" />
+                  <SummaryLine label="Due" value={formatInr(dueAmount)} tone="due" />
+                  <SummaryLine label="Change" value={formatInr(change)} tone="change" />
                 </div>
-                <div className="rounded-xl border border-dashed border-gray-300 bg-white/90 p-2.5">
-                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                    Payment breakdown
+
+                {displayCashbackTotal > 0 && (
+                  <div className="mt-4 rounded-lg bg-emerald-50 p-3 text-center">
+                    <p className="text-[11px] font-bold text-emerald-700">
+                      +{formatInr(displayCashbackTotal)} cashback will be credited
+                    </p>
                   </div>
-                  {paymentBreakdown.length > 0 ? (
-                    paymentBreakdown.map((entry) => (
-                      <div
-                        key={entry.label}
-                        className="flex justify-between text-[11px] text-gray-700"
-                      >
-                        <span>{entry.label}</span>
-                        <span className="tabular-nums">{formatInr(entry.amount)}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-[11px] text-gray-500">No payment entered yet.</div>
-                  )}
-                </div>
-                <div className="flex justify-between text-amber-700">
-                  <span>Due</span>
-                  <span className="font-semibold">{formatInr(dueAmount)}</span>
-                </div>
-                <div className="flex justify-between text-sm font-bold text-gray-900">
-                  <span>Change</span>
-                  <span className="text-emerald-600 tabular-nums">{formatInr(change)}</span>
-                </div>
+                )}
               </div>
             </div>
           </aside>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 text-sm sm:px-6">
-            <div className="space-y-6">
-              <section className="rounded-xl border border-gray-200/90 bg-white p-4 shadow-sm">
-                <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  <User className="h-3.5 w-3.5" aria-hidden />
-                  Customer
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-12 sm:items-end">
-                  <div className="relative sm:col-span-5" ref={searchRef}>
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600">
-                      Mobile search
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 [scrollbar-width:thin]">
+            <div className="mx-auto max-w-3xl space-y-6">
+              <SectionCard title="Customer Information" icon={User}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="relative" ref={searchRef}>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">
+                      Mobile Number
                     </label>
                     <input
                       placeholder="Search or enter mobile..."
-                      className={inputBaseClass}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
                       autoComplete="tel"
                       value={customerSearch}
                       onChange={(e) => {
@@ -685,68 +876,68 @@ export default function CheckoutModal({
                         setShowDropdown(true);
                         if (selectedCustomer) {
                           setSelectedCustomer(null);
-                          setSummary({ membershipDiscount: 0 });
                           setWalletBalance(0);
                           setSplitPayments({ cash: 0, upi: 0, card: 0, wallet: 0 });
                         }
                       }}
                       onFocus={() => setShowDropdown(true)}
                     />
-
                     {showDropdown && (loadingCustomers || customers.length > 0) && (
-                        <div className="absolute z-20 mt-1.5 max-h-48 w-full overflow-auto rounded-xl border border-gray-100 bg-white py-1 shadow-lg ring-1 ring-black/5">
-                          {loadingCustomers ? (
-                            <div className="flex items-center gap-2 px-3 py-3 text-gray-500">
-                              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-                              <span className="text-xs">Searching…</span>
-                            </div>
-                          ) : (
-                            customers.map((c) => (
-                              <button
-                                key={c._id}
-                                type="button"
-                                onClick={() => handleSelectCustomer(c)}
-                                className="flex w-full flex-col items-start border-b border-gray-50 px-3 py-2 text-left transition-colors hover:bg-violet-50 last:border-0"
-                              >
-                                <span className="text-sm font-medium text-gray-900">{c.name}</span>
-                                <span className="text-xs text-gray-500">
-                                  {c.mobile} · Wallet {formatInr(Number(c.walletAmount ?? 0))}
-                                </span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      )}
+                      <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-xl">
+                        {loadingCustomers ? (
+                          <div className="p-4 text-center text-xs text-slate-400">Searching...</div>
+                        ) : (
+                          customers.map((c) => (
+                            <button
+                              key={c._id}
+                              type="button"
+                              onClick={() => handleSelectCustomer(c)}
+                              className="flex w-full flex-col p-3 text-left hover:bg-slate-50 border-b border-slate-50 last:border-0"
+                            >
+                              <span className="text-sm font-semibold">{c.name}</span>
+                              <span className="text-xs text-slate-500">{c.mobile}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="sm:col-span-4">
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600">
-                      Name on invoice
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">
+                      Customer Name
                     </label>
                     <input
-                      placeholder="Customer name"
-                      className={inputBaseClass}
+                      placeholder="Enter billing name"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                     />
                   </div>
+                </div>
 
-                  <div className="flex sm:col-span-3 sm:justify-end">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold tracking-wide ${membershipTone}`}
-                    >
-                      <span className="text-[10px] font-normal opacity-80">Member</span>
-                      <span className="uppercase">{membership || "general"}</span>
+                <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-50 pt-4">
+                  <Badge variant={membership ? "indigo" : "default"}>
+                    {membership || "General Customer"}
+                  </Badge>
+                  {displayMembershipDiscount > 0 && (
+                    <span className="text-[11px] font-medium text-indigo-600">
+                      Membership discount applied
                     </span>
+                  )}
+                  <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-amber-600">
+                    <WalletIcon className="h-4 w-4" />
+                    <span>Balance: {formatInr(walletBalance)}</span>
                   </div>
                 </div>
-              </section>
+              </SectionCard>
 
-              <section className="rounded-xl border border-violet-200/80 bg-gradient-to-br from-violet-50/90 to-white p-4 shadow-sm">
-                <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-violet-800">
-                  Coupon
+              <section className="rounded-xl border border-dashed border-slate-300 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Tag className="h-4 w-4 text-slate-400" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Coupon</h3>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                <div className="flex gap-2">
                   <input
                     value={couponCode}
                     onChange={(e) => {
@@ -756,310 +947,180 @@ export default function CheckoutModal({
                         setCouponLabel("");
                       }
                     }}
-                    placeholder="e.g. SWIGGY50"
-                    className={`${inputBaseClass} sm:flex-1 sm:min-w-0 border-violet-200/70`}
+                    placeholder="Enter code"
+                    className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium focus:border-indigo-600 outline-none transition-all"
                   />
                   <button
                     type="button"
                     onClick={async () => {
                       const code = couponCode.trim();
-                      if (!code) {
-                        Swal.fire("Coupon required", "Enter coupon code first.", "warning");
-                        return;
-                      }
+                      if (!code) return;
                       try {
                         const response = await handleValidateCoupon({
                           code,
-                          orderAmount: finalAmount,
+                          orderAmount: grandTotal,
                           customerPhone: customerSearch.trim() || undefined,
                         });
                         const discount = Number(response?.discountAmount ?? 0);
                         setCouponDiscount(discount);
                         setCouponCode(code.toUpperCase());
                         setCouponLabel(String(response?.coupon?.title ?? "Coupon Applied"));
-                        Swal.fire("Coupon applied", `Discount ₹${discount}`, "success");
+                        Swal.fire("Success", "Coupon applied", "success");
                       } catch (error: any) {
                         setCouponDiscount(0);
                         setCouponLabel("");
-                        Swal.fire(
-                          "Coupon invalid",
-                          error?.response?.data?.message ?? "Coupon is not applicable.",
-                          "error",
-                        );
+                        Swal.fire("Error", "Invalid coupon", "error");
                       }
                     }}
-                    className="shrink-0 rounded-lg bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.99]"
+                    className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-colors"
                   >
                     Apply
                   </button>
                 </div>
-                {couponDiscount > 0 ? (
-                  <p className="mt-3 text-xs text-violet-800">
-                    <span className="font-medium">{couponLabel || "Coupon"}</span> · −{" "}
-                    {formatInr(couponDiscount)}
+                {couponDiscount > 0 && (
+                  <p className="mt-2 text-xs font-medium text-indigo-600">
+                    {couponLabel}: −{formatInr(couponDiscount)}
                   </p>
-                ) : null}
+                )}
               </section>
 
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-xs text-amber-950 shadow-sm">
-                <div className="flex items-center gap-2 font-medium">
-                  <WalletIcon className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
-                  Wallet balance
-                </div>
-                <span className="text-sm font-semibold tabular-nums">{formatInr(walletBalance)}</span>
-              </div>
-
-              <section className="rounded-xl border border-gray-200/90 bg-white p-4 shadow-sm">
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                    Payment
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div
-                      className="inline-flex rounded-lg border border-gray-200 bg-gray-50/80 p-0.5"
-                      role="group"
-                      aria-label="Payment settlement"
-                    >
+              <SectionCard 
+                title="Payment" 
+                icon={Banknote}
+                headerAction={
+                  <div className="flex items-center gap-2">
+                    <div className="flex rounded-lg bg-slate-100 p-1">
                       <button
                         type="button"
                         onClick={() => setPaymentStatus("full")}
-                        className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                          paymentStatus === "full"
-                            ? "bg-white text-gray-900 shadow-sm"
-                            : "text-gray-500 hover:text-gray-800"
+                        className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                          paymentStatus === "full" ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"
                         }`}
                       >
-                        Fully paid
+                        Full
                       </button>
                       <button
                         type="button"
                         onClick={() => setPaymentStatus("partial")}
-                        className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                          paymentStatus === "partial"
-                            ? "bg-white text-gray-900 shadow-sm"
-                            : "text-gray-500 hover:text-gray-800"
+                        className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                          paymentStatus === "partial" ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"
                         }`}
                       >
                         Partial
                       </button>
                     </div>
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-1.5">
+                    <label className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={isMultiMode}
                         onChange={(e) => setIsMultiMode(e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600"
                       />
-                      <span className="flex items-center gap-1.5 text-xs font-medium text-gray-700">
-                        <Split className="h-3.5 w-3.5 text-gray-400" aria-hidden />
-                        Split payment
-                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Split</span>
                     </label>
                   </div>
-                </div>
-
+                }
+              >
                 {!isMultiMode ? (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {PAYMENT_METHOD_OPTIONS.map(({ value, label, Icon }) => {
-                        const active = paymentMode === value;
-                        return (
-                          <button
-                            key={value}
-                            type="button"
-                            onClick={() => setPaymentMode(value)}
-                            className={`flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-center transition ${
-                              active
-                                ? "border-violet-500 bg-violet-50 text-violet-900 ring-1 ring-violet-500/30"
-                                : "border-gray-200 bg-gray-50/50 text-gray-600 hover:border-gray-300 hover:bg-white"
-                            }`}
-                          >
-                            <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-                            <span className="text-[11px] font-semibold">{label}</span>
-                          </button>
-                        );
-                      })}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {PAYMENT_METHOD_OPTIONS.map(({ value, label, Icon }) => (
+                        <PaymentModeButton
+                          key={value}
+                          active={paymentMode === value}
+                          onClick={() => setPaymentMode(value)}
+                          icon={Icon}
+                          label={label}
+                        />
+                      ))}
                     </div>
 
-                    {isPartialPayment ? (
-                      <div>
-                        <label className="mb-1.5 block text-xs font-medium text-gray-600">
-                          Amount received
-                        </label>
+                    {isPartialPayment && (
+                      <div className="rounded-lg bg-slate-50 p-4">
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Amount Received</label>
                         <input
                           type="number"
                           value={cashGiven}
                           onChange={(e) => setCashGiven(Number(e.target.value) || 0)}
-                          className={inputBaseClass}
-                          placeholder="Enter paid amount"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-lg font-bold focus:border-indigo-600 outline-none"
+                          placeholder="0.00"
                         />
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-emerald-200/90 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-900">
-                        <span className="font-medium">{paymentMode}</span> covers the full bill:{" "}
-                        <span className="tabular-nums font-semibold">{formatInr(finalPayable)}</span>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-4 rounded-xl border border-sky-200/70 bg-sky-50/40 p-4">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600">
-                          Cash
-                        </label>
-                        <input
-                          type="number"
-                          value={splitPayments.cash}
-                          onChange={(e) =>
-                            setSplitAmount("cash", Number(e.target.value) || 0)
-                          }
-                          className={inputBaseClass}
-                          placeholder="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600">
-                          UPI
-                        </label>
-                        <input
-                          type="number"
-                          value={splitPayments.upi}
-                          onChange={(e) =>
-                            setSplitAmount("upi", Number(e.target.value) || 0)
-                          }
-                          className={inputBaseClass}
-                          placeholder="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600">
-                          Wallet
-                        </label>
-                        <input
-                          type="number"
-                          value={splitPayments.wallet}
-                          onChange={(e) =>
-                            setSplitAmount("wallet", Number(e.target.value) || 0)
-                          }
-                          className={inputBaseClass}
-                          placeholder="0"
-                        />
-                        <p className="mt-1 text-[11px] text-gray-500">
-                          Max {formatInr(walletBalance)}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-gray-600">
-                          Card
-                        </label>
-                        <input
-                          type="number"
-                          value={splitPayments.card}
-                          onChange={(e) =>
-                            setSplitAmount("card", Number(e.target.value) || 0)
-                          }
-                          className={inputBaseClass}
-                          placeholder="0"
-                        />
-                      </div>
+                  <div className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      {["cash", "upi", "wallet", "card"].map((key) => (
+                        <div key={key}>
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                            {key}
+                          </label>
+                          <input
+                            type="number"
+                            value={splitPayments[key as keyof typeof splitPayments]}
+                            onChange={(e) => setSplitAmount(key as any, Number(e.target.value) || 0)}
+                            className="w-full rounded-lg border border-slate-100 px-3 py-2 text-sm font-bold focus:border-indigo-600 outline-none"
+                          />
+                        </div>
+                      ))}
                     </div>
-
                     <div className="flex flex-wrap gap-2">
-                      {[
-                        ["cash", "Cash"] as const,
-                        ["upi", "UPI"] as const,
-                        ["wallet", "Wallet"] as const,
-                        ["card", "Card"] as const,
-                      ].map(([key, label]) => (
+                      {["Cash", "UPI", "Wallet", "Card"].map((label) => (
                         <button
-                          key={key}
+                          key={label}
                           type="button"
                           onClick={() => {
-                            if (key === "wallet") {
-                              setSplitAmount(
-                                "wallet",
-                                Math.min(
-                                  walletBalance,
-                                  splitPayments.wallet + remainingForFull,
-                                ),
-                              );
-                            } else if (key === "cash") {
-                              setSplitAmount(
-                                "cash",
-                                splitPayments.cash + remainingForFull,
-                              );
-                            } else if (key === "upi") {
-                              setSplitAmount(
-                                "upi",
-                                splitPayments.upi + remainingForFull,
-                              );
-                            } else {
-                              setSplitAmount(
-                                "card",
-                                splitPayments.card + remainingForFull,
-                              );
-                            }
+                            const key = label.toLowerCase() as any;
+                            const val = key === "wallet" 
+                              ? Math.min(walletBalance, (splitPayments as any).wallet + remainingForFull)
+                              : (splitPayments as any)[key] + remainingForFull;
+                            setSplitAmount(key, val);
                           }}
-                          className="rounded-lg border border-white/60 bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:bg-white"
+                          className="text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-indigo-600 transition-colors"
                         >
-                          Add remainder to {label}
+                          + Add rest to {label}
                         </button>
                       ))}
                     </div>
+                    <div className="rounded-xl bg-slate-50 p-4 space-y-2 text-xs font-semibold">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Total Payable</span>
+                        <span>{formatInr(finalPayable)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Total Allocated</span>
+                        <span className="text-indigo-600">{formatInr(totalPaid)}</span>
+                      </div>
+                      <div className="flex justify-between border-t border-slate-200 pt-2 text-sm font-bold">
+                        <span>Remaining</span>
+                        <span className={remainingForFull > 0 ? "text-amber-600" : "text-emerald-600"}>
+                          {formatInr(remainingForFull)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
+              </SectionCard>
 
-                {isMultiMode ? (
-                  <div className="mt-4 rounded-xl border border-sky-200/80 bg-sky-50/60 px-3 py-2.5 text-xs text-sky-950">
-                    <div className="flex justify-between">
-                      <span className="font-medium">Split paid</span>
-                      <span className="tabular-nums font-semibold">
-                        {formatInr(totalPaid)}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex justify-between text-sky-800/90">
-                      <span>Remaining</span>
-                      <span className="tabular-nums">{formatInr(remainingForFull)}</span>
-                    </div>
-                    <div className="mt-1 flex justify-between">
-                      <span>Wallet in split</span>
-                      <span className="tabular-nums">{formatInr(splitPayments.wallet)}</span>
-                    </div>
-                    {paymentStatus === "full" && dueAmount > 0 ? (
-                      <div className="mt-2 rounded-lg border border-amber-300/80 bg-amber-50 px-2 py-1.5 text-amber-800">
-                        For a fully paid bill, remaining due must be zero.
-                      </div>
-                    ) : null}
-                    {splitPayments.wallet > walletBalance ? (
-                      <div className="mt-2 rounded-lg border border-amber-300/80 bg-amber-50 px-2 py-1.5 text-amber-800">
-                        Wallet amount cannot exceed the available balance.
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </section>
-
-              <section>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Invoice notes
-                </label>
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Notes</label>
                 <textarea
-                  placeholder="Special instructions — visible on the invoice"
-                  rows={4}
-                  className={`${inputBaseClass} min-h-[88px] resize-none`}
+                  placeholder="Additional instructions..."
+                  rows={2}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium focus:border-indigo-600 outline-none resize-none"
                   value={instructionNotes}
                   onChange={(e) => setInstructionNotes(e.target.value)}
                 />
-              </section>
+              </div>
             </div>
           </div>
         </div>
 
-        <footer className="flex shrink-0 flex-col gap-3 border-t border-gray-100 bg-gray-50/90 px-4 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-6">
+        <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-white px-6 py-4">
           <button
             type="button"
-            className="rounded-lg border border-transparent bg-gray-200/90 px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-300/90 sm:order-1"
+            className="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
           >
             Save & New
           </button>
@@ -1069,14 +1130,14 @@ export default function CheckoutModal({
               void handleSaveAndPrint();
             }}
             disabled={saving}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-60"
+            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-all"
           >
             {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Printer className="h-4 w-4" aria-hidden />
+              <Printer className="h-4 w-4" />
             )}
-            {saving ? "Saving…" : "Save & print"}
+            <span>{saving ? "Saving..." : "Complete & Print"}</span>
           </button>
         </footer>
       </div>

@@ -1,13 +1,44 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, Printer, ShoppingCart, Trash2 } from "lucide-react";
+import { X, Printer, ShoppingCart, Trash2, User } from "lucide-react";
 import Swal from "sweetalert2";
 import {
   handleCreateProduct,
   handleGetProducts,
+  handleCreateCustomer,
+  handleCreateInvoice,
+  handleGetCustomers,
+  handleGetMemberships,
+  type CustomerPayload,
+  type MembershipPlanPayload,
 } from "@/services/apiClient";
 import CreateProductModal from "../components/invoice/Modal/CreateProductModal";
+import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import { useDebounce } from "@/hooks/useDebounce";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
+import { useAppSelector } from "@/store/hooks";
+import {
+  membershipBenefitsForLine,
+  resolveMembershipPlan,
+  toMembershipPlanId,
+} from "../utils/membershipInvoiceUtils";
+import { creditWalletCashback } from "../utils/walletCashback";
+import { printThermalReceipt } from "@/utils/printUtils";
+
+const todayStr = new Date().toISOString().split("T")[0];
+const INVOICE_SEQ_KEY = "wooerp-invoice-seq";
+
+const getNextInvoiceNumber = (): string => {
+  const fallback = 10975;
+  try {
+    const currentRaw = localStorage.getItem(INVOICE_SEQ_KEY);
+    const current = currentRaw ? Number(currentRaw) : fallback;
+    const next = Number.isFinite(current) ? current + 1 : fallback + 1;
+    localStorage.setItem(INVOICE_SEQ_KEY, String(next));
+    return String(next);
+  } catch {
+    return String(fallback + 1);
+  }
+};
 
 type PosItem = {
   id: number;
@@ -15,6 +46,8 @@ type PosItem = {
   qty: number;
   price: number;
   discount: number;
+  cashback: number;
+  category?: string;
   stockQty?: number;
   image?: string;
 };
@@ -43,15 +76,69 @@ export default function CreatePosScreen({
   const [draftQty, setDraftQty] = useState("1");
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
 
+  const [customer, setCustomer] = useState("");
+  const [phone, setPhone] = useState("");
+  const [membership, setMembership] = useState("none");
+  const [membershipPlanId, setMembershipPlanId] = useState<string | null>(null);
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [membershipPlans, setMembershipPlans] = useState<MembershipPlanPayload[]>([]);
+  const [saving, setSaving] = useState(false);
+  const staff = useAppSelector((state) => state.user);
+  const [invoiceNo] = useState(getNextInvoiceNumber());
+
   const [items, setItems] = useState<PosItem[]>([]);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    handleGetMemberships({ status: "Active" }, ac.signal)
+      .then((res) => setMembershipPlans(res.memberships || []))
+      .catch(() => setMembershipPlans([]));
+    return () => ac.abort();
+  }, []);
+
+  const getMembershipBenefitsForItem = (
+    price: number,
+    qty: number,
+    category: string,
+    mType: string,
+    mId?: string | null,
+  ) => {
+    const plan = resolveMembershipPlan(membershipPlans, mType, mId);
+    return membershipBenefitsForLine(price, qty, category, plan);
+  };
 
   const handleChange = (
     id: number,
-    field: keyof Pick<PosItem, "qty" | "price" | "discount">,
+    field: keyof Pick<PosItem, "qty" | "price" | "discount" | "cashback">,
     value: string | number,
   ) => {
     setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, [field]: Number(value) } : it)),
+      prev.map((it) => {
+        if (it.id === id) {
+          const updated = { ...it, [field]: Number(value) };
+          if (field === "qty" || field === "price") {
+            const benefits = getMembershipBenefitsForItem(
+              updated.price,
+              updated.qty,
+              updated.category || "General",
+              membership,
+              membershipPlanId,
+            );
+            return {
+              ...updated,
+              discount: benefits.discount || updated.discount,
+              cashback: benefits.cashback || updated.cashback,
+            };
+          }
+          return updated;
+        }
+        return it;
+      }),
     );
   };
 
@@ -73,6 +160,15 @@ export default function CreatePosScreen({
     }
 
     const price = Number(selectedProduct?.sellingPrice ?? 0);
+    const category = selectedProduct?.category || "General";
+    const benefits = getMembershipBenefitsForItem(
+      price,
+      qty,
+      category,
+      membership,
+      membershipPlanId,
+    );
+
     setItems((prev) => [
       ...prev,
       {
@@ -80,7 +176,9 @@ export default function CreatePosScreen({
         name,
         qty,
         price,
-        discount: 0,
+        discount: benefits.discount || 0,
+        cashback: benefits.cashback || 0,
+        category,
         stockQty: Number(selectedProduct?.stockQty ?? 0),
         image: selectedProduct?.imageUrl || (selectedProduct?.images && selectedProduct?.images[0]) || "",
       },
@@ -108,10 +206,172 @@ export default function CreatePosScreen({
     return item.qty * item.price - item.discount;
   };
 
-  const grandTotal = useMemo(
-    () => items.reduce((acc, item) => acc + calculateTotal(item), 0),
+  const discountTotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.discount, 0),
     [items],
   );
+
+  const cashbackTotal = useMemo(
+    () => items.reduce((sum, item) => sum + (item.cashback || 0), 0),
+    [items],
+  );
+
+  const subTotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.qty * item.price, 0),
+    [items],
+  );
+
+  const grandTotal = subTotal - discountTotal;
+
+  const creditCashbackForInvoice = async (
+    amount: number,
+    invoiceCode: string,
+    paymentCustomerId?: string | null,
+  ) => {
+    if (amount <= 0) return;
+    try {
+      await creditWalletCashback({
+        customerId: paymentCustomerId ?? customerId,
+        customerPhone: phone.trim(),
+        customerName: customer.trim(),
+        amount,
+        note: `Membership cashback for Invoice #${invoiceCode} via POS`,
+        referenceId: invoiceCode,
+        createdBy: {
+          m_staff_id: staff.m_staff_id,
+          m_staff_name: staff.m_staff_name,
+          m_staff_email: staff.m_staff_email,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to credit cashback to wallet", err);
+    }
+  };
+
+  const handleSave = async (payment: any) => {
+    try {
+      setSaving(true);
+      const response = await handleCreateInvoice({
+        customerName: customer.trim() || "Walk-in Customer",
+        customerPhone: phone.trim(),
+        invoiceDate: todayStr,
+        dueDate: todayStr,
+        salesPersonName: staff.m_staff_name || "POS",
+        notes: "POS Transaction",
+        items: items.map((item) => ({
+          productName: item.name,
+          qty: item.qty,
+          unitPrice: item.price,
+          discount: item.discount,
+        })),
+        subTotal,
+        discountTotal,
+        grandTotal: payment.finalAmount,
+        coupon: payment.coupon ?? null,
+        status: "final",
+        mode: payment.mode,
+        paymentStatus: payment.paymentStatus,
+        paymentBreakdown: payment.paymentBreakdown,
+        pendingAmount: payment.paymentBreakdown.dueAmount,
+        createdBy: {
+          m_staff_id: staff.m_staff_id,
+          m_staff_name: staff.m_staff_name,
+          m_staff_email: staff.m_staff_email,
+        },
+      });
+
+      const savedCode = response?.invoice?.invoiceCode || invoiceNo;
+
+      await creditCashbackForInvoice(
+        payment.cashbackTotal,
+        savedCode,
+        payment.customerId,
+      );
+
+      printThermalReceipt({
+        invoiceNo: savedCode,
+        customerName: customer.trim() || "Walk-in Customer",
+        customerPhone: phone.trim(),
+        items: items.map((item) => ({
+          name: item.name,
+          qty: item.qty,
+          price: item.price,
+          discount: item.discount,
+        })),
+        totalMRP: subTotal,
+        discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
+        cashbackAmount: payment.cashbackTotal,
+        finalAmount: payment.finalAmount,
+        totalDue: payment.paymentBreakdown.dueAmount,
+        totalQty: items.reduce((sum, item) => sum + item.qty, 0),
+      });
+
+      Swal.fire("Success", "POS Transaction completed.", "success");
+      setItems([]);
+      setOpenCheckout(false);
+    } catch (error: any) {
+      Swal.fire("Error", "Could not complete transaction.", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
+    try {
+      setLoadingCustomers(true);
+      const response = await handleGetCustomers(searchText, signal);
+      setCustomers(Array.isArray(response?.customers) ? response.customers : []);
+    } catch {
+      setCustomers([]);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
+
+  const debouncedCustomer = useDebounce(customer.trim(), 250);
+
+  useEffect(() => {
+    if (!customerDropdownOpen) return;
+    const term = debouncedCustomer;
+    if (!term) {
+      setCustomers([]);
+      setLoadingCustomers(false);
+      return;
+    }
+    const controller = new AbortController();
+    fetchCustomers(term, controller.signal);
+    return () => controller.abort();
+  }, [debouncedCustomer, customerDropdownOpen]);
+
+  const handleCreateCustomerSubmit = async (args: {
+    payload: CustomerPayload;
+  }) => {
+    try {
+      setCreatingCustomer(true);
+      const response = await handleCreateCustomer({
+        ...args.payload,
+        createdBy: {
+          m_staff_id: staff.m_staff_id,
+          m_staff_name: staff.m_staff_name,
+          m_staff_email: staff.m_staff_email,
+        },
+      });
+      const created = response?.customer;
+      if (created?.name) {
+        setCustomer(String(created.name));
+        setPhone(String(created.mobile ?? ""));
+        setMembership(String(created.membershipType ?? "none"));
+        setMembershipPlanId(toMembershipPlanId(created.membershipPlanId));
+        setCustomerId(created._id ?? null);
+      }
+      setShowCreateCustomerModal(false);
+      Swal.fire("Success", "Customer created.", "success");
+    } catch {
+      Swal.fire("Error", "Could not create customer.", "error");
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
 
   const submitNewProduct = async (formData: FormData) => {
     try {
@@ -180,6 +440,100 @@ export default function CreatePosScreen({
             >
               <X />
             </button>
+          </div>
+
+          {/* Customer Section */}
+          <div className="mt-4 flex flex-col gap-2 rounded-xl bg-slate-50 p-4 border border-slate-100">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider">Customer Details</h3>
+              <button
+                type="button"
+                onClick={() => setShowCreateCustomerModal(true)}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-700"
+              >
+                + Create New Customer
+              </button>
+            </div>
+            
+            <div className="relative mt-2">
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    value={customer}
+                    onChange={(e) => {
+                      setCustomer(e.target.value);
+                      setCustomerDropdownOpen(true);
+                      if (!e.target.value) {
+                          setPhone("");
+                          setMembership("none");
+                          setMembershipPlanId(null);
+                          setCustomerId(null);
+                      }
+                    }}
+                    placeholder="Search customer by name or phone..."
+                    className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all"
+                  />
+                  
+                  {customerDropdownOpen && customers.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-[60] mt-1 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                      {customers.map((c) => (
+                        <button
+                          key={c._id}
+                          type="button"
+                          onClick={() => {
+                            const mType = c.membershipType ?? "none";
+                            const mId = toMembershipPlanId(c.membershipPlanId);
+                            setCustomer(c.name);
+                            setPhone(c.mobile);
+                            setMembership(mType);
+                            setMembershipPlanId(mId);
+                            setCustomerId(c._id);
+                            setCustomers([]);
+                            setCustomerDropdownOpen(false);
+
+                            // Auto-apply discounts to existing items
+                            setItems(prev => prev.map(item => {
+                              const benefits = getMembershipBenefitsForItem(item.price, item.qty, item.category || "General", mType, mId);
+                              return {
+                                  ...item,
+                                  discount: benefits.discount || 0,
+                                  cashback: benefits.cashback || 0
+                              };
+                            }));
+                          }}
+                          className="flex w-full items-center justify-between px-4 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0"
+                        >
+                          <div className="text-left">
+                            <div className="text-sm font-bold text-slate-700">{c.name}</div>
+                            <div className="text-xs text-slate-500">{c.mobile}</div>
+                          </div>
+                          {c.membershipType && c.membershipType !== "none" && (
+                            <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-600 uppercase">
+                              {c.membershipType}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                {customer && (
+                  <div className="flex items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50/50 px-4 py-2">
+                    <div className="text-xs">
+                      <div className="font-bold text-indigo-900">{customer}</div>
+                      <div className="text-indigo-600 font-medium">{phone}</div>
+                    </div>
+                    {membership !== "none" && (
+                      <div className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white uppercase">
+                        {membership}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Search Section */}
@@ -398,18 +752,33 @@ export default function CreatePosScreen({
               loading={creating}
             />
           )}
+          {showCreateCustomerModal && (
+            <CreateCustomerModal
+              onClose={() => setShowCreateCustomerModal(false)}
+              onSubmit={handleCreateCustomerSubmit}
+              loading={creatingCustomer}
+            />
+          )}
           <CheckoutModal
             open={openCheckout}
-            onClose={() => setOpenCheckout(false)}
             grandTotal={grandTotal}
-            items={items}
-            onSaved={() => {
-              setItems([]);
-              setSearchText("");
-              setDraftQty("1");
-              setSelectedProduct(null);
-              setProducts([]);
+            items={items.map(it => ({
+              ...it,
+              productName: it.name,
+              unitPrice: it.price
+            }))}
+            initialCustomerName={customer}
+            initialCustomerPhone={phone}
+            initialCustomerId={customerId}
+            initialMembership={membership}
+            initialMembershipPlanId={membershipPlanId}
+            initialMembershipDiscount={discountTotal}
+            initialCashbackTotal={cashbackTotal}
+            membershipPlans={membershipPlans}
+            onClose={() => setOpenCheckout(false)}
+            onConfirmPayment={async (payment) => {
               setOpenCheckout(false);
+              await handleSave(payment);
             }}
           />
         </div>

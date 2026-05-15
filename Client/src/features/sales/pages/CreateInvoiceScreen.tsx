@@ -14,11 +14,19 @@ import {
   handleCreateInvoice,
   handleUpdateInvoice,
   handleGetCustomers,
+  handleGetMemberships,
   type CustomerPayload,
+  type MembershipPlanPayload,
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import { printThermalReceipt } from "@/utils/printUtils";
+import {
+  membershipBenefitsForLine,
+  resolveMembershipPlan,
+  toMembershipPlanId,
+} from "../utils/membershipInvoiceUtils";
+import { creditWalletCashback } from "../utils/walletCashback";
 
 const today = new Date().toISOString().split("T")[0];
 const INVOICE_SEQ_KEY = "wooerp-invoice-seq";
@@ -46,7 +54,9 @@ export default function CreateInvoiceScreen() {
   const [invoiceNo, setInvoiceNo] = useState(getNextInvoiceNumber());
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
-  const [membership, setMembership] = useState("");
+  const [membership, setMembership] = useState("none");
+  const [membershipPlanId, setMembershipPlanId] = useState<string | null>(null);
+  const [customerId, setCustomerId] = useState<string | null>(null);
   const [invoiceDate, setInvoiceDate] = useState(today);
   const [dueDate, setDueDate] = useState(today);
   const staff = useAppSelector((state) => state.user);
@@ -56,7 +66,7 @@ export default function CreateInvoiceScreen() {
   const [openCheckout, setOpenCheckout] = useState(false);
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<
-    Array<{ _id: string; name: string; mobile: string; companyName?: string }>
+    Array<{ _id: string; name: string; mobile: string; companyName?: string; membershipType?: string; membershipPlanId?: string }>
   >([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(true);
@@ -68,7 +78,18 @@ export default function CreateInvoiceScreen() {
   const [draftPrice, setDraftPrice] = useState("0");
   const [draftDiscount, setDraftDiscount] = useState("0");
   const [draftImage, setDraftImage] = useState("");
+  const [draftCategory, setDraftCategory] = useState("General");
+  const [draftCashback, setDraftCashback] = useState("0");
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [membershipPlans, setMembershipPlans] = useState<MembershipPlanPayload[]>([]);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    handleGetMemberships({ status: "Active" }, ac.signal)
+      .then((res) => setMembershipPlans(res.memberships || []))
+      .catch(() => setMembershipPlans([]));
+    return () => ac.abort();
+  }, []);
 
   useEffect(() => {
     const state = location.state as { invoice?: any; mode?: Mode } | null;
@@ -89,7 +110,9 @@ export default function CreateInvoiceScreen() {
                 qty: item.qty || 1,
                 unitPrice: item.unitPrice || 0,
                 discount: item.discount || 0,
+                cashback: item.cashback || 0,
                 image: item.image || item.imageUrl || "",
+                category: item.category || "General"
             })));
         }
     }
@@ -100,6 +123,19 @@ export default function CreateInvoiceScreen() {
     price: draftPrice,
     discount: draftDiscount,
     image: draftImage,
+    category: draftCategory,
+    cashback: draftCashback,
+  };
+
+  const getMembershipBenefitsForItem = (
+    price: number,
+    qty: number,
+    category: string,
+    mType: string,
+    mId?: string | null,
+  ) => {
+    const plan = resolveMembershipPlan(membershipPlans, mType, mId);
+    return membershipBenefitsForLine(price, qty, category, plan);
   };
 
   const addItem = () => {
@@ -110,8 +146,9 @@ export default function CreateInvoiceScreen() {
     const qty = Number(draftQty);
     const price = Number(draftPrice);
     const discount = Number(draftDiscount);
-    if (qty <= 0 || price < 0 || discount < 0) {
-      Swal.fire("Invalid values", "Check quantity, price and discount.", "error");
+    const cashback = Number(draftCashback);
+    if (qty <= 0 || price < 0 || discount < 0 || cashback < 0) {
+      Swal.fire("Invalid values", "Check quantity, price, discount and cashback.", "error");
       return;
     }
     setItems((prev) => [
@@ -122,14 +159,18 @@ export default function CreateInvoiceScreen() {
         qty,
         unitPrice: price,
         discount,
+        cashback,
         image: draftImage,
+        category: draftCategory,
       },
     ]);
     setDraftName("");
     setDraftQty("1");
     setDraftPrice("0");
     setDraftDiscount("0");
+    setDraftCashback("0");
     setDraftImage("");
+    setDraftCategory("General");
   };
 
   const removeItem = (id: number) => {
@@ -139,7 +180,18 @@ export default function CreateInvoiceScreen() {
   const updateItemQty = (id: number, newQty: number) => {
     if (newQty < 1) return;
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, qty: newQty } : item)),
+      prev.map((item) => {
+        if (item.id === id) {
+          const benefits = getMembershipBenefitsForItem(item.unitPrice, newQty, item.category || "General", membership, membershipPlanId);
+          return { 
+            ...item, 
+            qty: newQty, 
+            discount: benefits.discount || item.discount,
+            cashback: benefits.cashback || item.cashback
+          };
+        }
+        return item;
+      }),
     );
   };
 
@@ -147,6 +199,13 @@ export default function CreateInvoiceScreen() {
     if (newDiscount < 0) return;
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, discount: newDiscount } : item)),
+    );
+  };
+
+  const updateItemCashback = (id: number, newCashback: number) => {
+    if (newCashback < 0) return;
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, cashback: newCashback } : item)),
     );
   };
 
@@ -158,7 +217,50 @@ export default function CreateInvoiceScreen() {
     () => items.reduce((sum, item) => sum + item.discount, 0),
     [items],
   );
+  const cashbackTotal = useMemo(
+    () => items.reduce((sum, item) => sum + (item.cashback || 0), 0),
+    [items],
+  );
   const grandTotal = subTotal - discountTotal;
+ 
+  const checkoutItems = useMemo(
+    () =>
+      items.map((item) => ({
+        id: item.id,
+        name: item.productName,
+        qty: item.qty,
+        price: item.unitPrice,
+        discount: item.discount,
+        cashback: item.cashback,
+        category: item.category,
+      })),
+    [items],
+  );
+
+  const creditCashbackForInvoice = async (
+    amount: number,
+    invoiceCode: string,
+    paymentCustomerId?: string | null,
+  ) => {
+    if (amount <= 0) return;
+    try {
+      await creditWalletCashback({
+        customerId: paymentCustomerId ?? customerId,
+        customerPhone: phone.trim(),
+        customerName: customer.trim(),
+        amount,
+        note: `Membership cashback for Invoice #${invoiceCode} via Invoice`,
+        referenceId: invoiceCode,
+        createdBy: {
+          m_staff_id: staff.m_staff_id,
+          m_staff_name: staff.m_staff_name,
+          m_staff_email: staff.m_staff_email,
+        },
+      });
+    } catch (err) {
+      console.error("Failed to credit cashback to wallet", err);
+    }
+  };
 
 
   const handleSaveDraft = async () => {
@@ -264,6 +366,7 @@ export default function CreateInvoiceScreen() {
     return true;
   };
 
+
   const handleSave = async (payment: {
     mode: string;
     paymentStatus: "full" | "partial";
@@ -281,6 +384,9 @@ export default function CreateInvoiceScreen() {
       code: string;
       discountAmount: number;
     } | null;
+    cashbackTotal: number;
+    membershipDiscount?: number;
+    customerId?: string | null;
   }) => {
     try {
       setSaving(true);
@@ -309,6 +415,12 @@ export default function CreateInvoiceScreen() {
           pendingAmount: payment.paymentBreakdown.dueAmount,
         });
 
+        await creditCashbackForInvoice(
+          payment.cashbackTotal,
+          invoiceNo,
+          payment.customerId,
+        );
+
         printThermalReceipt({
           invoiceNo: invoiceNo,
           customerName: customer.trim(),
@@ -321,6 +433,7 @@ export default function CreateInvoiceScreen() {
           })),
           totalMRP: items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
           discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
+          cashbackAmount: payment.cashbackTotal,
           finalAmount: payment.finalAmount,
           totalDue: payment.paymentBreakdown.dueAmount,
           totalQty: items.reduce((sum, item) => sum + item.qty, 0),
@@ -359,6 +472,12 @@ export default function CreateInvoiceScreen() {
 
         const savedCode = response?.invoice?.invoiceCode || invoiceNo;
 
+        await creditCashbackForInvoice(
+          payment.cashbackTotal,
+          savedCode,
+          payment.customerId,
+        );
+
         printThermalReceipt({
           invoiceNo: savedCode,
           customerName: customer.trim(),
@@ -371,6 +490,7 @@ export default function CreateInvoiceScreen() {
           })),
           totalMRP: items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
           discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
+          cashbackAmount: payment.cashbackTotal,
           finalAmount: payment.finalAmount,
           totalDue: payment.paymentBreakdown.dueAmount,
           totalQty: items.reduce((sum, item) => sum + item.qty, 0),
@@ -446,7 +566,9 @@ export default function CreateInvoiceScreen() {
       if (created?.name) {
         setCustomer(String(created.name));
         setPhone(String(created.mobile ?? ""));
-        setMembership(String(created.membershipType ?? ""));
+        setMembership(String(created.membershipType ?? "none"));
+        setMembershipPlanId(toMembershipPlanId(created.membershipPlanId));
+        setCustomerId(created._id ?? null);
       }
       setShowCreateCustomerModal(false);
       await fetchCustomers();
@@ -491,14 +613,30 @@ export default function CreateInvoiceScreen() {
         onCustomerChange={(value) => {
           setCustomer(value);
           setPhone("");
-          setMembership("");
+          setMembership("none");
+          setMembershipPlanId(null);
+          setCustomerId(null);
         }}
         onPickCustomer={(selectedCustomer) => {
+          const mType = selectedCustomer.membershipType ?? "none";
+          const mId = toMembershipPlanId(selectedCustomer.membershipPlanId);
           setCustomer(selectedCustomer.name);
           setPhone(selectedCustomer.mobile);
-          setMembership(selectedCustomer.membershipType ?? "");
+          setMembership(mType);
+          setMembershipPlanId(mId);
+          setCustomerId(selectedCustomer._id);
           setCustomers([]);
           setCustomerDropdownOpen(false);
+
+          // Auto-apply discounts to existing items
+          setItems(prev => prev.map(item => {
+            const benefits = getMembershipBenefitsForItem(item.unitPrice, item.qty, item.category || "General", mType, mId);
+            return {
+                ...item,
+                discount: benefits.discount,
+                cashback: benefits.cashback
+            };
+          }));
         }}
         onOpenCreateCustomer={() => setShowCreateCustomerModal(true)}
         onOpenCustomerDropdown={() => setCustomerDropdownOpen(true)}
@@ -517,17 +655,28 @@ export default function CreateInvoiceScreen() {
       <ProductsServicesSection
         draft={draft}
         items={items}
+        membershipType={membership}
+        membershipPlans={membershipPlans}
+        membershipPlanId={membershipPlanId}
         onDraftChange={(field, value) => {
           if (field === "name") setDraftName(value);
           if (field === "qty") setDraftQty(value);
           if (field === "price") setDraftPrice(value);
           if (field === "discount") setDraftDiscount(value);
           if (field === "image") setDraftImage(value);
+          if (field === "category") {
+            // Re-calculate discount based on membership when category is selected
+            const benefits = getMembershipBenefitsForItem(Number(draftPrice), Number(draftQty), value, membership, membershipPlanId);
+            if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
+            if (benefits.cashback > 0) setDraftCashback(String(benefits.cashback));
+          }
+          if (field === "cashback") setDraftCashback(value);
         }}
         onAddItem={addItem}
         onRemoveItem={removeItem}
         onUpdateItemQty={updateItemQty}
         onUpdateItemDiscount={updateItemDiscount}
+        onUpdateItemCashback={updateItemCashback}
       />
 
       {/* <PaymentSection /> */}
@@ -537,6 +686,7 @@ export default function CreateInvoiceScreen() {
         <InvoiceSummaryCard
           subTotal={subTotal}
           discountTotal={discountTotal}
+          cashbackTotal={cashbackTotal}
           grandTotal={grandTotal}
           onSave={
             mode !== "view"
@@ -552,16 +702,15 @@ export default function CreateInvoiceScreen() {
       <CheckoutModal
         open={openCheckout}
         grandTotal={grandTotal}
-        items={items.map((item) => ({
-          id: item.id,
-          name: item.productName,
-          qty: item.qty,
-          price: item.unitPrice,
-          discount: item.discount,
-        }))}
+        items={checkoutItems}
         initialCustomerName={customer}
         initialCustomerPhone={phone}
-        initialMembership=""
+        initialCustomerId={customerId}
+        initialMembership={membership}
+        initialMembershipPlanId={membershipPlanId}
+        initialMembershipDiscount={discountTotal}
+        initialCashbackTotal={cashbackTotal}
+        membershipPlans={membershipPlans}
         onClose={() => setOpenCheckout(false)}
         onConfirmPayment={async (payment) => {
           setOpenCheckout(false);

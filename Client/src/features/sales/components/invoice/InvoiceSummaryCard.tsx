@@ -1,6 +1,7 @@
 type Props = {
   subTotal: number;
   discountTotal: number;
+  cashbackTotal?: number;
   grandTotal: number;
   onSave: () => void;
   isSaving?: boolean;
@@ -9,6 +10,7 @@ type Props = {
 export default function InvoiceSummaryCard({
   subTotal,
   discountTotal,
+  cashbackTotal = 0,
   grandTotal,
   onSave,
   isSaving = false,
@@ -25,10 +27,16 @@ export default function InvoiceSummaryCard({
           <span>Discount</span>
           <span>- ₹ {discountTotal.toFixed(2)}</span>
         </div>
+        {cashbackTotal > 0 && (
+          <div className="flex items-center justify-between text-emerald-600 font-medium">
+            <span>Cashback (Credit to Wallet)</span>
+            <span>+ ₹ {cashbackTotal.toFixed(2)}</span>
+          </div>
+        )}
         <div className="my-2 border-t border-dashed border-gray-200" />
         <div className="flex items-center justify-between text-base font-semibold text-gray-900">
           <span>Grand Total</span>
-          <span>₹ {grandTotal.toFixed(2)}</span>
+          <span>₹ {grandTotal.toFixed(2)}</span>  
         </div>
       </div>
       <button

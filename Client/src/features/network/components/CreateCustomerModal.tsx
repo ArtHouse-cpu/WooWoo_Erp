@@ -13,7 +13,8 @@ import {
   Wallet,
   Contact2,
 } from "lucide-react";
-import { type CustomerPayload } from "@/services/apiClient";
+import { type CustomerPayload, handleGetMemberships } from "@/services/apiClient";
+import { useEffect } from "react";
 
 type Props = {
   onClose: () => void;
@@ -85,6 +86,7 @@ const initialState: FormState = {
   name: "",
   mobile: "",
   membershipType: "none",
+  membershipPlanId: null,
   email: "",
   gstin: "",
   companyName: "",
@@ -114,7 +116,12 @@ export default function CreateCustomerModal({
   loading,
 }: Props) {
   const [form, setForm] = useState<FormState>(initialState);
+  const [membershipPlans, setMembershipPlans] = useState<any[]>([]);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    handleGetMemberships().then(res => setMembershipPlans(res.memberships || []));
+  }, []);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const initials = useMemo(() => {
@@ -151,6 +158,7 @@ export default function CreateCustomerModal({
         form.membershipType && form.membershipType !== "none"
           ? form.membershipType.trim()
           : "",
+      membershipPlanId: form.membershipPlanId,
       name: form.name.trim(),
       mobile: form.mobile.trim(),
       email: form.email.trim(),
@@ -336,6 +344,31 @@ export default function CreateCustomerModal({
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Membership Plan
+                    </label>
+                    <select
+                      value={form.membershipPlanId || ""}
+                      onChange={(e) => {
+                          const planId = e.target.value;
+                          const selectedPlan = membershipPlans.find(p => p._id === planId);
+                          setForm(prev => ({
+                              ...prev,
+                              membershipPlanId: planId || null,
+                              membershipType: selectedPlan ? (selectedPlan.displayName || selectedPlan.planType) : "none"
+                          }));
+                      }}
+                      className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    >
+                      <option value="">None</option>
+                      {membershipPlans.map(plan => (
+                          <option key={plan._id} value={plan._id}>
+                              {plan.displayName || plan.planType}
+                          </option>
+                      ))}
                     </select>
                   </div>
                 </div>

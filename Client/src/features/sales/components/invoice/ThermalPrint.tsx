@@ -15,6 +15,7 @@ export type ThermalPrintProps = {
   }>;
   totalMRP: number;
   discountTotal: number;
+  cashbackAmount?: number;
   finalAmount: number;
   totalDue: number;
   totalQty: number;
@@ -29,6 +30,7 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
   items,
   totalMRP,
   discountTotal,
+  cashbackAmount = 0,
   finalAmount,
   totalDue,
   totalQty,
@@ -143,6 +145,12 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
           <span style={{ fontWeight: "bold" }}>DISCOUNT:</span>
           <span>₹{discountTotal.toFixed(2)}</span>
         </div>
+        {cashbackAmount > 0 ? (
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontWeight: "bold" }}>CASHBACK:</span>
+            <span>₹{cashbackAmount.toFixed(2)}</span>
+          </div>
+        ) : null}
       </div>
 
       <div style={{ borderBottom: "1px dashed #000", margin: "5px 0" }}></div>
