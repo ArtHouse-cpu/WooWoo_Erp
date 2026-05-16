@@ -1,6 +1,39 @@
 import mongoose from "mongoose";
 import PurchaseOrder from "../models/purchaseOrder.model.js";  
-import { v2 as cloudinary } from "cloudinary"; 
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import {fileURLToPath} from 'url';
+import { uploadOnCloudinary } from '../utils/cloudinary.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const localUploadsDir = path.resolve(__dirname, '../../uploads/purchaseOrder');
+const tmpUploadsDir = path.join('/tmp', 'uploads', 'purchaseOrder');
+
+let uploadsDir = localUploadsDir;
+try {
+  fs.mkdirSync(localUploadsDir, {recursive: true});
+} catch (error) {
+  fs.mkdirSync(tmpUploadsDir, {recursive: true});
+  uploadsDir = tmpUploadsDir;
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + file.originalname.replace(/\s+/g, '');
+    cb(null, uniqueName);
+  },
+});
+
+export const uploadPurchaseOrderAttachments = multer({
+  storage,
+  limits: {fileSize: 5 * 1024 * 1024}, // 5MB
+}); 
 
 export const createPurchaseOrder = async (req, res) => {
   try {
@@ -32,8 +65,17 @@ export const createPurchaseOrder = async (req, res) => {
       });
     }
 
-    const normalizedItems = Array.isArray(items)
-      ? items.map((item) => {
+    let itemsList = items;
+    if (typeof items === 'string') {
+      try {
+        itemsList = JSON.parse(items);
+      } catch (e) {
+        itemsList = [];
+      }
+    }
+
+    const normalizedItems = Array.isArray(itemsList)
+      ? itemsList.map((item) => {
           const qty = Number(item.qty);
           const unitPrice = Number(item.unitPrice);
           const discount = Number(item.discount ?? 0);
@@ -84,6 +126,13 @@ export const createPurchaseOrder = async (req, res) => {
 
   supplierContact: String(supplierContact ?? "").trim(),
 });
+
+    if (req.files && req.files.length > 0) {
+      const uploadPromises = req.files.map(file => uploadOnCloudinary(file.path));
+      const cloudinaryUrls = await Promise.all(uploadPromises);
+      purchaseOrder.attachments = cloudinaryUrls.filter(url => url !== null);
+      await purchaseOrder.save();
+    }
 console.log("purchase order insert",purchaseOrder);
 
     return res.status(201).json({ success: true, purchaseOrder });
@@ -128,8 +177,17 @@ export const updatePurchaseOrder = async (req, res) => {
     if (updateData.invoiceDate) updateData.invoiceDate = new Date(updateData.invoiceDate);
     if (updateData.vendorDate) updateData.vendorDate = new Date(updateData.vendorDate);
 
-    if (Array.isArray(updateData.items)) {
-      updateData.items = updateData.items.map((item) => {
+    let itemsList = updateData.items;
+    if (typeof itemsList === 'string') {
+      try {
+        itemsList = JSON.parse(itemsList);
+      } catch (e) {
+        itemsList = undefined;
+      }
+    }
+
+    if (Array.isArray(itemsList)) {
+      updateData.items = itemsList.map((item) => {
         const qty = Number(item.qty);
         const unitPrice = Number(item.unitPrice);
         const discount = Number(item.discount ?? 0);
@@ -141,6 +199,15 @@ export const updatePurchaseOrder = async (req, res) => {
           lineTotal: qty * unitPrice - discount,
         };
       });
+    }
+
+    if (req.files && req.files.length > 0) {
+      const uploadPromises = req.files.map(file => uploadOnCloudinary(file.path));
+      const cloudinaryUrls = await Promise.all(uploadPromises);
+      const validUrls = cloudinaryUrls.filter(url => url !== null);
+      
+      if (!updateData.$push) updateData.$push = {};
+      updateData.$push.attachments = { $each: validUrls };
     }
 
     const purchaseOrder = await PurchaseOrder.findByIdAndUpdate(

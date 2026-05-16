@@ -1,11 +1,12 @@
 type Props = {
   notes: string;
   onChange: (value: string) => void;
+  className?: string;
 };
 
-export default function NotesSection({notes, onChange}: Props) {
+export default function NotesSection({notes, onChange, className}: Props) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:col-span-8">
+    <div className={className || "rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:col-span-8"}>
       <label className="mb-1 block text-xs font-semibold text-gray-600">Notes</label>
       <textarea
         rows={5}

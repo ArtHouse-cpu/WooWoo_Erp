@@ -13,6 +13,7 @@ export const printThermalReceipt = (data: {
   finalAmount: number;
   totalDue: number;
   totalQty: number;
+  extraCharges?: Array<{ label: string; amount: number }>;
 }) => {
   const printWindow = window.open("", "_blank", "width=850,height=700");
   if (!printWindow) return;
@@ -37,6 +38,7 @@ export const printThermalReceipt = (data: {
       finalAmount={data.finalAmount}
       totalDue={data.totalDue}
       totalQty={data.totalQty}
+      extraCharges={data.extraCharges}
     />
   );
 

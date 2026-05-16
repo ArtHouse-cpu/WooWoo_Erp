@@ -27,6 +27,7 @@ import {
   CreatePurchaseScreen,
   DebitNoteScreen,
   InventoryScreen,
+  InventoryTimelineScreen,
   PurchaseOrderScreen,
 } from "@/features/purchase";
 import {
@@ -73,6 +74,7 @@ export const router = createBrowserRouter([
       { path: "/create-purchase-return", element: <CreatePurchaseReturnScreen /> },
       
       { path: "/inventory", element: <InventoryScreen /> },
+      { path: "/inventory-timeline", element: <InventoryTimelineScreen /> },
       { path: "/debit-notes", element: <DebitNoteScreen /> },
       { path: "/pos", element: <PosScreen /> },
       { path: "/subscriptions", element: <SubscriptionScreen /> },

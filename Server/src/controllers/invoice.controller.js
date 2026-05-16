@@ -107,6 +107,7 @@ const createInvoice = async (req, res) => {
       createdBy,
       pendingAmount,
       coupon,
+      extraCharges,
     } = req.body;
 
     console.log(req.body);
@@ -215,8 +216,12 @@ const createInvoice = async (req, res) => {
       couponDiscount = Number(couponValidation.discountAmount ?? 0);
     }
 
+    const extraChargesTotal = Array.isArray(extraCharges) 
+      ? extraCharges.reduce((sum, c) => sum + Number(c.amount ?? 0), 0)
+      : 0;
+
     const computedDiscountTotal = itemDiscountTotal + couponDiscount;
-    const computedGrandTotal = Math.max(0, computedSubTotal - computedDiscountTotal);
+    const computedGrandTotal = Math.max(0, computedSubTotal - computedDiscountTotal + extraChargesTotal);
 
     const nextNumber = await getNextInvoiceNumber();
     const invoicePrefix = 'INVVWAH';
@@ -268,6 +273,7 @@ const createInvoice = async (req, res) => {
           }
         : undefined,
       grandTotal: Number(grandTotal ?? computedGrandTotal),
+      extraCharges: Array.isArray(extraCharges) ? extraCharges : [],
       mode: String(mode ?? 'Cash'),
       paymentStatus:
         status === 'draft'
@@ -416,6 +422,7 @@ const updateInvoice = async (req, res) => {
       createdBy,
       coupon,
       newPayment,
+      extraCharges,
     } = req.body;
 
     const existingInvoice = await Invoice.findById(id);
@@ -478,6 +485,7 @@ const updateInvoice = async (req, res) => {
     if (normalizedItems !== undefined) updateData.items = normalizedItems;
     if (subTotal !== undefined) updateData.subTotal = Number(subTotal);
     if (discountTotal !== undefined) updateData.discountTotal = Number(discountTotal);
+    if (extraCharges !== undefined) updateData.extraCharges = Array.isArray(extraCharges) ? extraCharges : [];
     if (grandTotal !== undefined) updateData.grandTotal = Number(grandTotal);
     if (status !== undefined) updateData.status = status;
     if (mode !== undefined) updateData.mode = String(mode);
@@ -505,9 +513,13 @@ const updateInvoice = async (req, res) => {
           discountAmount: 0,
         };
       } else {
+        const extraChargesTotal = Array.isArray(updateData.extraCharges ?? existingInvoice.extraCharges)
+          ? (updateData.extraCharges ?? existingInvoice.extraCharges).reduce((sum, c) => sum + Number(c.amount ?? 0), 0)
+          : 0;
+
         const couponValidation = await validateCouponForOrder({
           code: coupon.code,
-          orderAmount: Number(updateData.subTotal ?? existingInvoice.subTotal) - Number(updateData.discountTotal ?? existingInvoice.discountTotal ?? 0),
+          orderAmount: Number(updateData.subTotal ?? existingInvoice.subTotal) - Number(updateData.discountTotal ?? existingInvoice.discountTotal ?? 0) + extraChargesTotal,
           customerPhone: String(updateData.customerPhone ?? existingInvoice.customerPhone ?? '').trim(),
           ignoreInvoiceId: id,
         });

@@ -127,6 +127,9 @@ const purchaseSchema = new mongoose.Schema(
     supplierDate: {
       type: Date,
     },
+    attachments: [{
+      type: String
+    }],
   },
   {
     timestamps: true,

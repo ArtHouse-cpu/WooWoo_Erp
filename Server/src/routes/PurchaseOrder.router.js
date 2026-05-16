@@ -6,14 +6,15 @@ import {
   getPurchaseOrderById,
   updatePurchaseOrder,
   deletePurchaseOrder,
+  uploadPurchaseOrderAttachments,
 } from '../controllers/purchaseOrder.controller.js';
 
 const router = express.Router();
 
-router.post('/', authenticateUser, createPurchaseOrder);
+router.post('/', authenticateUser, uploadPurchaseOrderAttachments.array('attachments'), createPurchaseOrder);
 router.get('/', authenticateUser, getPurchasesOrder);
 router.get('/:id', authenticateUser, getPurchaseOrderById);
-router.patch('/:id', authenticateUser, updatePurchaseOrder);
+router.patch('/:id', authenticateUser, uploadPurchaseOrderAttachments.array('attachments'), updatePurchaseOrder);
 router.delete('/:id', authenticateUser, deletePurchaseOrder);
 
 export default router;

@@ -144,6 +144,7 @@ export type CreateInvoicePayload = {
     dueAmount: number;
     changeAmount: number;
   };
+  extraCharges?: Array<{ label: string; amount: number }>;
   pendingAmount?: number;
   coupon?: {
     code: string;
@@ -819,7 +820,29 @@ export type PurchasePayload = {
   status?: "draft" | "pending" | "paid" | "partial" | "cancelled";
   items?: PurchaseItemPayload[];
   notes?: string;
+  attachments?: string[];
 };
+
+export function purchasePayloadToFormData(
+  payload: Partial<PurchasePayload>,
+  attachmentFiles?: File[],
+) {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined || value === null) continue;
+    if (key === "items") {
+      fd.append(key, JSON.stringify(value));
+      continue;
+    }
+    fd.append(key, String(value));
+  }
+  if (attachmentFiles) {
+    attachmentFiles.forEach((file) => {
+      fd.append("attachments", file);
+    });
+  }
+  return fd;
+}
 
 export type PurchaseReturnPayload = PurchasePayload;
 
@@ -833,13 +856,20 @@ export const handleGetPurchaseById = async (id: string, signal?: AbortSignal) =>
   return response.data;
 };
 
-export const handleCreatePurchase = async (payload: PurchasePayload) => {
-  const response = await axiosInstance.post("/purchase", payload);
+export const handleCreatePurchase = async (payload: PurchasePayload | FormData) => {
+  const response = await axiosInstance.post("/purchase", payload, payload instanceof FormData ? {
+    headers: { "Content-Type": "multipart/form-data" }
+  } : undefined);
   return response.data;
 };
 
-export const handleUpdatePurchase = async (id: string, payload: Partial<PurchasePayload>) => {
-  const response = await axiosInstance.patch(`/purchase/${id}`, payload);
+export const handleUpdatePurchase = async (
+  id: string,
+  payload: Partial<PurchasePayload> | FormData,
+) => {
+  const response = await axiosInstance.patch(`/purchase/${id}`, payload, payload instanceof FormData ? {
+    headers: { "Content-Type": "multipart/form-data" }
+  } : undefined);
   return response.data;
 };
 
@@ -912,6 +942,7 @@ export type PurchaseOrderPayload = {
   status?: "draft" | "pending" | "paid" | "partial" | "cancelled";
   items?: PurchaseItemPayload[];
   notes?: string;
+  attachments?: string[];
   purchaser?: string;
 };
 
@@ -925,13 +956,20 @@ export const handleGetPurchaseOrderById = async (id: string, signal?: AbortSigna
   return response.data;
 };
 
-export const handleCreatePurchaseOrder = async (payload: PurchasePayload) => {
-  const response = await axiosInstance.post("/purchaseOrder", payload);
+export const handleCreatePurchaseOrder = async (payload: PurchasePayload | FormData) => {
+  const response = await axiosInstance.post("/purchaseOrder", payload, payload instanceof FormData ? {
+    headers: { "Content-Type": "multipart/form-data" }
+  } : undefined);
   return response.data;
 };
 
-export const handleUpdatePurchaseOrder = async (id: string, payload: Partial<PurchasePayload>) => {
-  const response = await axiosInstance.patch(`/purchaseOrder/${id}`, payload);
+export const handleUpdatePurchaseOrder = async (
+  id: string,
+  payload: Partial<PurchasePayload> | FormData,
+) => {
+  const response = await axiosInstance.patch(`/purchaseOrder/${id}`, payload, payload instanceof FormData ? {
+    headers: { "Content-Type": "multipart/form-data" }
+  } : undefined);
   return response.data;
 };
 
@@ -1067,3 +1105,34 @@ export const handleCreateSubCategory = async (payload: { name: string; categoryI
     throw error;
   }
 };
+
+export const handleGetMyCompanies = async (signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/company", { signal });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching companies:", error);
+    throw error;
+  }
+};
+
+export const handleCreateCompany = async (payload: { name: string; branch: string; logo?: string }) => {
+  try {
+    const response = await axiosInstance.post("/company", payload);
+    return response.data;
+  } catch (error) {
+    console.log("Error creating company:", error);
+    throw error;
+  }
+};
+
+export const handleSwitchCompany = async (companyId: string) => {
+  try {
+    const response = await axiosInstance.patch("/company/switch", { companyId });
+    return response.data;
+  } catch (error) {
+    console.log("Error switching company:", error);
+    throw error;
+  }
+};
+

@@ -40,6 +40,16 @@ export type UserState = {
   dob: string | null;
   membershipType: string | null;
   createdAt: string | null;
+  activeCompanyId: string | null;
+  companies: Array<{
+    id: string;
+    _id?: string;
+    name: string;
+    description?: string;
+    logo?: string;
+    branch?: string;
+    active?: boolean;
+  }>;
   loading: boolean;
   error: boolean;
 };
@@ -65,6 +75,8 @@ type LoginPayload = {
   gender?: string | null;
   dob?: string | null;
   membershipType?: string | null;
+  companies?: any[];
+  activeCompany?: string | null;
   createdAt?: string | null;
 };
 
@@ -90,6 +102,8 @@ const initialState: UserState = {
   dob: null,
   membershipType: null,
   createdAt: null,
+  activeCompanyId: null,
+  companies: [],
   loading: false,
   error: false,
 };
@@ -126,10 +140,50 @@ export const userSlice = createSlice({
       state.dob = action.payload.dob ?? null;
       state.membershipType = action.payload.membershipType ?? null;
       state.createdAt = action.payload.createdAt ?? null;
+      
+      if (action.payload.companies) {
+        state.companies = action.payload.companies.map(c => ({
+            ...c,
+            id: c._id || c.id
+        }));
+      }
+      
+      if (action.payload.activeCompany) {
+        state.activeCompanyId = action.payload.activeCompany;
+        const active = (state.companies || []).find(c => c.id === state.activeCompanyId);
+        if (active) {
+            state.companyName = active.name;
+            state.m_staff_branch = active.branch || null;
+        }
+      }
     },
     loginFailure: (state) => {
       state.loading = false;
       state.error = true;
+    },
+    addCompany: (state, action: PayloadAction<{ name: string; branch: string }>) => {
+      const newCompany = {
+        id: String(state.companies.length + 1),
+        name: action.payload.name,
+        branch: action.payload.branch,
+        active: false
+      };
+      state.companies.push(newCompany);
+    },
+    setCompanies: (state, action: PayloadAction<UserState['companies']>) => {
+      state.companies = action.payload;
+    },
+    setActiveCompany: (state, action: PayloadAction<string>) => {
+      state.activeCompanyId = action.payload;
+      const company = (state.companies || []).find(c => c.id === action.payload || c._id === action.payload);
+      if (company) {
+        state.companyName = company.name;
+        state.m_staff_branch = company.branch || null;
+        state.companies = state.companies.map(c => ({
+          ...c,
+          active: (c.id === action.payload || c._id === action.payload)
+        }));
+      }
     },
     logout: (state) => {
       state.m_staff_id = null;
@@ -153,11 +207,13 @@ export const userSlice = createSlice({
       state.dob = null;
       state.membershipType = null;
       state.createdAt = null;
+      state.activeCompanyId = null;
+      state.companies = [];
       state.loading = false;
       state.error = false;
     },
   },
 });
 
-export const {loginStart, loginSuccess, loginFailure, logout} = userSlice.actions;
+export const {loginStart, loginSuccess, loginFailure, logout, setCompanies, setActiveCompany, addCompany} = userSlice.actions;
 export default userSlice.reducer;

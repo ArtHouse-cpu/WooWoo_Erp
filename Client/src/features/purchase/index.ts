@@ -4,3 +4,4 @@ export { default as CreatePurchaseScreen } from "./pages/CreatePurchaseScreen";
 export { default as CreatePurchaseReturnScreen } from "./pages/CreatePurchaseReturnScreen";
 export { default as InventoryScreen } from "./pages/InventoryScreen";
 export { default as DebitNoteScreen } from "./pages/DebitNoteScreen";
+export { default as InventoryTimelineScreen } from "./pages/InventoryTimelineScreen";

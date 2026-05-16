@@ -50,6 +50,16 @@ const userSchema = new mongoose.Schema(
     gender: { type: String, trim: true },
     whatsappNumber: { type: String, trim: true },
     AlternateMobile: { type: String, trim: true },
+    companies: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Company',
+      },
+    ],
+    activeCompany: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Company',
+    },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },

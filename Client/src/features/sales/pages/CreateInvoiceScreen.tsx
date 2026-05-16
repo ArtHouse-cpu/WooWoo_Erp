@@ -63,6 +63,7 @@ export default function CreateInvoiceScreen() {
   const staffName = useAppSelector((state) => state.user.m_staff_name);
   const salesPerson = staffName ?? "Not Assigned";
   const [notes, setNotes] = useState("");
+  const [extraCharges, setExtraCharges] = useState<Array<{ label: string; amount: number }>>([]);
   const [openCheckout, setOpenCheckout] = useState(false);
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<
@@ -115,6 +116,7 @@ export default function CreateInvoiceScreen() {
                 category: item.category || "General"
             })));
         }
+        if (inv.extraCharges) setExtraCharges(inv.extraCharges);
     }
   }, [location.state]);
   const draft = {
@@ -221,7 +223,8 @@ export default function CreateInvoiceScreen() {
     () => items.reduce((sum, item) => sum + (item.cashback || 0), 0),
     [items],
   );
-  const grandTotal = subTotal - discountTotal;
+  const extraChargesTotal = extraCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+  const grandTotal = subTotal - discountTotal + extraChargesTotal;
  
   const checkoutItems = useMemo(
     () =>
@@ -294,6 +297,7 @@ export default function CreateInvoiceScreen() {
         })),
         subTotal,
         discountTotal,
+        extraCharges,
         grandTotal,
         status: "draft" as const,
         mode: "Draft",
@@ -386,6 +390,7 @@ export default function CreateInvoiceScreen() {
     } | null;
     cashbackTotal: number;
     membershipDiscount?: number;
+    extraCharges: Array<{ label: string; amount: number }>;
     customerId?: string | null;
   }) => {
     try {
@@ -406,6 +411,7 @@ export default function CreateInvoiceScreen() {
           })),
           subTotal,
           discountTotal,
+          extraCharges,
           grandTotal: payment.finalAmount,
           coupon: payment.coupon ?? null,
           status: "final",
@@ -437,6 +443,7 @@ export default function CreateInvoiceScreen() {
           finalAmount: payment.finalAmount,
           totalDue: payment.paymentBreakdown.dueAmount,
           totalQty: items.reduce((sum, item) => sum + item.qty, 0),
+          extraCharges: payment.extraCharges,
         });
 
         Swal.fire("Invoice Updated", "Invoice updated successfully.", "success").then(() => navigate(-1));
@@ -456,6 +463,7 @@ export default function CreateInvoiceScreen() {
           })),
           subTotal,
           discountTotal,
+          extraCharges,
           grandTotal: payment.finalAmount,
           coupon: payment.coupon ?? null,
           status: "final",
@@ -494,6 +502,7 @@ export default function CreateInvoiceScreen() {
           finalAmount: payment.finalAmount,
           totalDue: payment.paymentBreakdown.dueAmount,
           totalQty: items.reduce((sum, item) => sum + item.qty, 0),
+          extraCharges: payment.extraCharges,
         });
 
         Swal.fire(
@@ -687,6 +696,8 @@ export default function CreateInvoiceScreen() {
           subTotal={subTotal}
           discountTotal={discountTotal}
           cashbackTotal={cashbackTotal}
+          extraCharges={extraCharges}
+          onExtraChargesChange={setExtraCharges}
           grandTotal={grandTotal}
           onSave={
             mode !== "view"
@@ -710,6 +721,7 @@ export default function CreateInvoiceScreen() {
         initialMembershipPlanId={membershipPlanId}
         initialMembershipDiscount={discountTotal}
         initialCashbackTotal={cashbackTotal}
+        extraCharges={extraCharges}
         membershipPlans={membershipPlans}
         onClose={() => setOpenCheckout(false)}
         onConfirmPayment={async (payment) => {

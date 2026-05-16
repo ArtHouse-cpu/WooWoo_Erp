@@ -609,11 +609,19 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
               </td>
             </tr>
             <tr>
-              <td style={{ ...cell, fontWeight: 600 }}>Taxes & charges</td>
+              <td style={{ ...cell, fontWeight: 600 }}>Taxes</td>
               <td style={{ ...cell, textAlign: "right" }}>
                 {formatRupee(sumTax)}
               </td>
             </tr>
+            {Array.isArray(invoice.extraCharges) && invoice.extraCharges.map((c: { label: string; amount: number }, i: number) => (
+              <tr key={i}>
+                <td style={{ ...cell, fontWeight: 600 }}>{c.label || "Extra Charge"}</td>
+                <td style={{ ...cell, textAlign: "right" }}>
+                  {formatRupee(Number(c.amount || 0))}
+                </td>
+              </tr>
+            ))}
             {itemLevelDiscount > 0 && (
               <tr>
                 <td style={{ ...cell, fontWeight: 600 }}>Item Discount</td>

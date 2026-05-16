@@ -51,6 +51,7 @@ type Props = {
   initialCustomerId?: string | null;
   initialMembershipDiscount?: number;
   initialCashbackTotal?: number;
+  extraCharges?: Array<{ label: string; amount: number }>;
   membershipPlans?: MembershipPlanPayload[];
   onConfirmPayment?: (payload: {
     mode: string;
@@ -77,6 +78,7 @@ type Props = {
     } | null;
     cashbackTotal: number;
     membershipDiscount: number;
+    extraCharges: Array<{ label: string; amount: number }>;
     customerId?: string | null;
   }) => Promise<void>;
 };
@@ -227,6 +229,7 @@ export default function CheckoutModal({
   initialCustomerId = null,
   initialMembershipDiscount = 0,
   initialCashbackTotal = 0,
+  extraCharges = [],
   membershipPlans = DEFAULT_MEMBERSHIP_PLANS,
   onConfirmPayment,
 }: Props) {
@@ -626,6 +629,7 @@ export default function CheckoutModal({
       notes: instructionNotes.trim(),
       cashbackTotal: displayCashbackTotal,
       membershipDiscount: displayMembershipDiscount,
+      extraCharges: extraCharges,
       customerId:
         selectedCustomer?._id ?? initialCustomerId ?? null,
     };
@@ -648,6 +652,7 @@ export default function CheckoutModal({
         0,
       ),
       discountTotal: items.reduce((sum, item) => sum + Number(item.discount || 0), 0),
+      extraCharges: extraCharges,
       grandTotal: finalPayable,
       coupon: couponCode.trim()
         ? {
@@ -833,6 +838,13 @@ export default function CheckoutModal({
                     className="text-violet-600"
                   />
                 )}
+                {extraCharges.map((c, i) => (
+                  <SummaryLine 
+                    key={i}
+                    label={c.label || "Extra Charge"} 
+                    value={`+ ${formatInr(Number(c.amount || 0))}`} 
+                  />
+                ))}
                 
                 <div className="rounded-xl bg-green-400 p-4 text-white">
                   <div className="flex items-center justify-between">

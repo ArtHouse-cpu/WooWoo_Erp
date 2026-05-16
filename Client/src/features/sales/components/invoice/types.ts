@@ -59,6 +59,7 @@ export type InvoicePdfInput = {
   subTotal?: number;
   grandTotal?: number;
   discountTotal?: number;
+  extraCharges?: Array<{ label: string; amount: number }>;
   coupon?: {
     code?: string;
     title?: string;

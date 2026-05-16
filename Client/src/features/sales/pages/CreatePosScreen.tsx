@@ -90,6 +90,7 @@ export default function CreatePosScreen({
   const [saving, setSaving] = useState(false);
   const staff = useAppSelector((state) => state.user);
   const [invoiceNo] = useState(getNextInvoiceNumber());
+  const [extraCharges, setExtraCharges] = useState<Array<{ label: string; amount: number }>>([]);
 
   const [items, setItems] = useState<PosItem[]>([]);
 
@@ -221,7 +222,8 @@ export default function CreatePosScreen({
     [items],
   );
 
-  const grandTotal = subTotal - discountTotal;
+  const extraChargesTotal = extraCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+  const grandTotal = subTotal - discountTotal + extraChargesTotal;
 
   const creditCashbackForInvoice = async (
     amount: number,
@@ -266,6 +268,7 @@ export default function CreatePosScreen({
         })),
         subTotal,
         discountTotal,
+        extraCharges,
         grandTotal: payment.finalAmount,
         coupon: payment.coupon ?? null,
         status: "final",
@@ -304,6 +307,7 @@ export default function CreatePosScreen({
         finalAmount: payment.finalAmount,
         totalDue: payment.paymentBreakdown.dueAmount,
         totalQty: items.reduce((sum, item) => sum + item.qty, 0),
+        extraCharges: payment.extraCharges,
       });
 
       Swal.fire("Success", "POS Transaction completed.", "success");
@@ -734,6 +738,61 @@ export default function CreatePosScreen({
               </div>
             </div>
 
+            {/* Extra Charges Section */}
+            <div className="border-t pt-3">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Extra Charges</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setExtraCharges([...extraCharges, { label: "New Charge", amount: 0 }])}
+                    className="text-[10px] font-bold text-indigo-600 hover:underline"
+                  >
+                    + ADD CHARGE
+                  </button>
+                </div>
+                
+                {extraCharges.map((charge, idx) => (
+                  <div key={idx} className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                    <input 
+                      type="text"
+                      value={charge.label}
+                      onChange={(e) => {
+                        const next = [...extraCharges];
+                        next[idx].label = e.target.value;
+                        setExtraCharges(next);
+                      }}
+                      className="flex-1 bg-transparent border-none focus:ring-0 text-xs font-medium text-slate-600 outline-none"
+                    />
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-400 text-xs">₹</span>
+                      <input 
+                        type="number"
+                        value={charge.amount || ""}
+                        onChange={(e) => {
+                          const next = [...extraCharges];
+                          next[idx].amount = Number(e.target.value);
+                          setExtraCharges(next);
+                        }}
+                        className="w-20 bg-transparent border-b border-slate-200 focus:border-indigo-600 outline-none text-right text-xs font-bold text-slate-700"
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          const next = [...extraCharges];
+                          next.splice(idx, 1);
+                          setExtraCharges(next);
+                        }}
+                        className="text-slate-300 hover:text-red-500 text-sm ml-1"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Bottom Row (Checkout CTA) */}
             <div className="flex justify-end">
               <button
@@ -781,6 +840,7 @@ export default function CreatePosScreen({
             initialMembershipPlanId={membershipPlanId}
             initialMembershipDiscount={discountTotal}
             initialCashbackTotal={cashbackTotal}
+            extraCharges={extraCharges}
             membershipPlans={membershipPlans}
             onClose={() => setOpenCheckout(false)}
             onConfirmPayment={async (payment) => {

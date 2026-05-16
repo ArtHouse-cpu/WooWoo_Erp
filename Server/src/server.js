@@ -20,6 +20,7 @@ import vendorRoutes from "./routes/vendor.router.js";
 import inventoryRoutes from "./routes/Inventory.router.js";
 import walletRoutes from "./routes/wallet.router.js";
 import couponRoutes from "./routes/coupon.route.js";
+import companyRoutes from "./routes/company.route.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -60,6 +61,7 @@ app.use("/vendor", vendorRoutes);
 app.use("/inventory", inventoryRoutes);
 app.use("/wallet", walletRoutes);
 app.use("/coupon", couponRoutes);
+app.use("/company", companyRoutes);
 
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));

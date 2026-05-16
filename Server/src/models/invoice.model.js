@@ -117,6 +117,12 @@ const invoiceSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    extraCharges: [
+      {
+        label: { type: String, trim: true },
+        amount: { type: Number, default: 0 }
+      }
+    ],
     mode: {
       type: String,
       trim: true,

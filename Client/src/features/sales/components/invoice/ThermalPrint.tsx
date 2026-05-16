@@ -19,6 +19,7 @@ export type ThermalPrintProps = {
   finalAmount: number;
   totalDue: number;
   totalQty: number;
+  extraCharges?: Array<{ label: string; amount: number }>;
 };
 
 export const ThermalPrint: React.FC<ThermalPrintProps> = ({
@@ -34,6 +35,7 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
   finalAmount,
   totalDue,
   totalQty,
+  extraCharges = [],
 }) => {
   return (
     <div
@@ -145,12 +147,18 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
           <span style={{ fontWeight: "bold" }}>DISCOUNT:</span>
           <span>₹{discountTotal.toFixed(2)}</span>
         </div>
-        {cashbackAmount > 0 ? (
+        {cashbackAmount > 0 && (
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span style={{ fontWeight: "bold" }}>CASHBACK:</span>
             <span>₹{cashbackAmount.toFixed(2)}</span>
           </div>
-        ) : null}
+        )}
+        {extraCharges.map((c: { label: string; amount: number }, i: number) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontWeight: "bold" }}>{(c.label || "Extra Charge").toUpperCase()}:</span>
+            <span>₹{Number(c.amount || 0).toFixed(2)}</span>
+          </div>
+        ))}
       </div>
 
       <div style={{ borderBottom: "1px dashed #000", margin: "5px 0" }}></div>

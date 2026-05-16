@@ -14,7 +14,8 @@ import {
   ArrowRightLeft,
   Eye,
   Download,
-  Ellipsis
+  Ellipsis,
+  FileText
 } from "lucide-react";
 import LedgerModal from "@/features/network/components/LedgerModal";
 import { useNavigate } from "react-router-dom";
@@ -568,6 +569,34 @@ export default function PurchaseScreen() {
             </div>
           );
         },
+      },
+      {
+        accessorKey: "attachments",
+        header: "Attachment",
+        enableSorting: false,
+        enableHiding: false,
+        Cell: ({ row }: { row: { original: PurchaseListRow } }) => {
+          const attachments = (row.original.raw.attachments as string[]) || [];
+          if (attachments.length === 0) return <span className="text-xs text-gray-400">No docs</span>;
+
+          return (
+            <div className="flex items-center gap-1.5">
+              {attachments.map((url, idx) => (
+                <a
+                  key={idx}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 text-blue-600 shadow-sm transition-all hover:bg-blue-600 hover:text-white"
+                  title={`View Document ${idx + 1}`}
+                >
+                  <FileText size={16} />
+                </a>
+              ))}
+            </div>
+          );
+        },
+        size: 120,
       },
     ],
     [],

@@ -176,7 +176,10 @@ const login = async (req, res) => {
         ? {email: parsed.value}
         : {phoneNumber: parsed.value};
 
-    const user = await User.findOne(query).select('+passwordHash');
+    const user = await User.findOne(query)
+      .select('+passwordHash')
+      .populate('companies');
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -213,6 +216,7 @@ const login = async (req, res) => {
     });
   }
 };
+
 
 const requestOtp = async (req, res) => {
   try {
@@ -265,7 +269,7 @@ const verifyOtp = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({phoneNumber: normalized});
+    const user = await User.findOne({phoneNumber: normalized}).populate('companies');
     if (!user) {
       return res.status(404).json({
         success: false,

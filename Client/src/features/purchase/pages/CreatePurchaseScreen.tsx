@@ -8,6 +8,7 @@ import {
   handleCreateVendor,
   handleGetVendors,
   handleUpdatePurchase,
+  purchasePayloadToFormData,
   type PurchasePayload,
   type VendorPayload,
 } from "@/services/apiClient";
@@ -19,6 +20,7 @@ import InvoiceDetailsSection from "@/features/sales/components/invoice/InvoiceDe
 import AddVendorModal from "../Modal/AddVendorModal";
 import type { InvoiceItem } from "@/features/sales/components/invoice/types";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
+import FileAttachmentSection from "../components/FileAttachmentSection";
 
 const today = new Date().toISOString().split("T")[0];
 const PURCHASE_SEQ_KEY = "wooerp-purchase-seq";
@@ -54,6 +56,7 @@ export default function CreatePurchaseScreen() {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [openCheckout, setOpenCheckout] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   const [vendors, setVendors] = useState<VendorOption[]>([]);
   const [allVendors, setAllVendors] = useState<VendorOption[]>([]);
@@ -232,15 +235,19 @@ export default function CreatePurchaseScreen() {
         })),
       };
 
+      const finalPayload = attachments.length > 0 
+        ? purchasePayloadToFormData(payload, attachments)
+        : payload;
+
       if (mode === "edit" && purchaseId) {
-        await handleUpdatePurchase(purchaseId, payload);
+        await handleUpdatePurchase(purchaseId, finalPayload as any);
         Swal.fire("Purchase Updated", "Purchase updated successfully.", "success").then(() =>
           navigate(-1),
         );
         return;
       }
 
-      await handleCreatePurchase(payload);
+      await handleCreatePurchase(finalPayload);
       Swal.fire("Purchase Saved", "Purchase saved successfully.", "success").then(() =>
         navigate(-1),
       );
@@ -358,7 +365,10 @@ export default function CreatePurchaseScreen() {
         />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <NotesSection notes={notes} onChange={setNotes} />
+          <div className="lg:col-span-8 space-y-4">
+            <NotesSection notes={notes} onChange={setNotes} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm" />
+            <FileAttachmentSection files={attachments} onFilesChange={setAttachments} />
+          </div>
           <PurchaseSummaryCard
             subTotal={subTotal}
             discountTotal={discountTotal}
