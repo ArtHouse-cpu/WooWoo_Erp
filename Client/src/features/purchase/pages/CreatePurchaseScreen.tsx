@@ -18,7 +18,7 @@ import PurchaseSummaryCard from "../components/PurchaseSummaryCard";
 import NotesSection from "@/features/sales/components/invoice/NotesSection";
 import InvoiceDetailsSection from "@/features/sales/components/invoice/InvoiceDetailsSection";
 import AddVendorModal from "../Modal/AddVendorModal";
-import type { InvoiceItem } from "@/features/sales/components/invoice/types";
+import type { InvoiceItem } from "../components/types";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
 import FileAttachmentSection from "../components/FileAttachmentSection";
 

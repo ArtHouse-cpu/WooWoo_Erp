@@ -18,7 +18,6 @@ export const CompanySelectorModal = ({ open, onClose }: CompanySelectorModalProp
   const dispatch = useAppDispatch();
   const { companies, activeCompanyId } = useAppSelector((state) => state.user);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(false);
 
   const filteredCompanies = (companies || []).filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
@@ -32,7 +31,6 @@ export const CompanySelectorModal = ({ open, onClose }: CompanySelectorModalProp
 
   const fetchCompanies = async () => {
     try {
-      setLoading(true);
       const response = await handleGetMyCompanies();
       if (response?.companies) {
         // Map backend _id to id if needed, or just use _id
@@ -47,8 +45,6 @@ export const CompanySelectorModal = ({ open, onClose }: CompanySelectorModalProp
       }
     } catch (error) {
       console.error("Failed to fetch companies:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
