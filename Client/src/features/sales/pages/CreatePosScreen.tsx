@@ -475,9 +475,12 @@ export default function CreatePosScreen({
                     className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all"
                   />
                   
-                  {customerDropdownOpen && customers.length > 0 && (
+                  {customerDropdownOpen && (loadingCustomers || customers.length > 0) && (
                     <div className="absolute top-full left-0 right-0 z-[60] mt-1 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-                      {customers.map((c) => (
+                      {loadingCustomers ? (
+                        <div className="px-4 py-3 text-sm text-slate-500">Searching customers...</div>
+                      ) : (
+                        customers.map((c) => (
                         <button
                           key={c._id}
                           type="button"
@@ -514,7 +517,7 @@ export default function CreatePosScreen({
                             </span>
                           )}
                         </button>
-                      ))}
+                      )))}
                     </div>
                   )}
                 </div>
@@ -736,11 +739,15 @@ export default function CreatePosScreen({
               <button
                 type="button"
                 onClick={openCheckoutModal}
-                disabled={items.length === 0}
+                disabled={items.length === 0 || saving}
                 className="bg-green-600 text-white px-8 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-green-700 transition shadow-sm disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600"
               >
-                <ShoppingCart size={18} />
-                Checkout
+                {saving ? "Processing..." : (
+                  <>
+                    <ShoppingCart size={18} />
+                    Checkout
+                  </>
+                )}
               </button>
             </div>
           </div>

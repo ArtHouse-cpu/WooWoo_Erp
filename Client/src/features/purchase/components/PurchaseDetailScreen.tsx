@@ -156,7 +156,7 @@ export default function PurchaseDetailSection({
         </div>
       )}
       <div className={showDueDate ? "lg:col-span-4" : "lg:col-span-6"}>
-        <label className="mb-1 block text-xs font-semibold text-gray-600">Sales Person</label>
+        <label className="mb-1 block text-xs font-semibold text-gray-600">Created By</label>
         <input
           value={salesPerson}
           readOnly

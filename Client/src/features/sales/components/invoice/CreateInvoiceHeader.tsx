@@ -8,6 +8,8 @@ type Props = {
   onSave?: () => void;
   isSaving?: boolean;
   mode?: "create" | "edit" | "view";
+  title?: string;
+  prefix?: string;
 };
 
 export default function CreateInvoiceHeader({
@@ -18,6 +20,8 @@ export default function CreateInvoiceHeader({
   onSave,
   isSaving = false,
   mode = "create",
+  title,
+  prefix = "INVVWAH- ",
 }: Props) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
@@ -30,11 +34,11 @@ export default function CreateInvoiceHeader({
         </button>
         <div>
           <h1 className="text-lg font-semibold text-gray-900">
-            {mode === "create" ? "Create Invoice" : mode === "edit" ? "Edit Invoice" : "View Invoice"}
+            {title || (mode === "create" ? "Create Invoice" : mode === "edit" ? "Edit Invoice" : "View Invoice")}
           </h1>
         </div>
         <div className="ml-3 flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
-          {mode === "create" ? "INVVWAH- " : ""}
+          {mode === "create" ? prefix : ""}
           <span className="font-semibold">{invoiceNo}</span>
         </div>
       </div>

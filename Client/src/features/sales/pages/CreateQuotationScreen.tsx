@@ -66,6 +66,7 @@ export default function CreateQuotationScreen() {
   const [draftQty, setDraftQty] = useState("1");
   const [draftPrice, setDraftPrice] = useState("0");
   const [draftDiscount, setDraftDiscount] = useState("0");
+  const [draftCashback, setDraftCashback] = useState("0");
   const [draftImage, setDraftImage] = useState("");
   const [items, setItems] = useState<InvoiceItem[]>([]);
 
@@ -88,6 +89,7 @@ export default function CreateQuotationScreen() {
                 qty: item.qty || 1,
                 unitPrice: item.unitPrice || 0,
                 discount: item.discount || 0,
+                cashback: item.cashback || 0,
                 image: item.image || item.imageUrl || "",
             })));
         }
@@ -98,6 +100,7 @@ export default function CreateQuotationScreen() {
     qty: draftQty,
     price: draftPrice,
     discount: draftDiscount,
+    cashback: draftCashback,
     image: draftImage,
   };
 
@@ -109,8 +112,9 @@ export default function CreateQuotationScreen() {
     const qty = Number(draftQty);
     const price = Number(draftPrice);
     const discount = Number(draftDiscount);
-    if (qty <= 0 || price < 0 || discount < 0) {
-      Swal.fire("Invalid values", "Check quantity, price and discount.", "error");
+    const cashback = Number(draftCashback);
+    if (qty <= 0 || price < 0 || discount < 0 || cashback < 0) {
+      Swal.fire("Invalid values", "Check quantity, price, discount and cashback.", "error");
       return;
     }
     setItems((prev) => [
@@ -121,6 +125,7 @@ export default function CreateQuotationScreen() {
         qty,
         unitPrice: price,
         discount,
+        cashback,
         image: draftImage,
       },
     ]);
@@ -128,6 +133,7 @@ export default function CreateQuotationScreen() {
     setDraftQty("1");
     setDraftPrice("0");
     setDraftDiscount("0");
+    setDraftCashback("0");
     setDraftImage("");
   };
 
@@ -146,6 +152,12 @@ export default function CreateQuotationScreen() {
     if (newDiscount < 0) return;
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, discount: newDiscount } : item)),
+    );
+  };
+  const updateItemCashback = (id: number, newCashback: number) => {
+    if (newCashback < 0) return;
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, cashback: newCashback } : item)),
     );
   };
 
@@ -173,7 +185,7 @@ export default function CreateQuotationScreen() {
       return;
     }
     if (!items.length) {
-      Swal.fire("No items", "Add at least one product in invoice.", "warning");
+      Swal.fire("No items", "Add at least one product in quotation.", "warning");
       return;
     }
 
@@ -191,6 +203,7 @@ export default function CreateQuotationScreen() {
           qty: item.qty,
           unitPrice: item.unitPrice,
           discount: item.discount,
+          cashback: item.cashback,
         })),
         subTotal,
         discountTotal,
@@ -314,6 +327,8 @@ export default function CreateQuotationScreen() {
   return (
     <div className="space-y-4 p-2">
       <CreateInvoiceHeader
+        title={mode === "create" ? "Create Quotation" : mode === "edit" ? "Edit Quotation" : "View Quotation"}
+        prefix="QUOT- "
         invoiceNo={quotationNo}
         onBack={() => navigate(-1)}
         onSaveDraft={() => handleSaveDraft()}
@@ -368,12 +383,14 @@ export default function CreateQuotationScreen() {
           if (field === "qty") setDraftQty(value);
           if (field === "price") setDraftPrice(value);
           if (field === "discount") setDraftDiscount(value);
+          if (field === "cashback") setDraftCashback(value);
           if (field === "image") setDraftImage(value);
         }}
         onAddItem={addItem}
         onRemoveItem={removeItem}
         onUpdateItemQty={updateItemQty}
         onUpdateItemDiscount={updateItemDiscount}
+        onUpdateItemCashback={updateItemCashback}
       />
 
       {/* <PaymentSection /> */}
@@ -402,6 +419,7 @@ export default function CreateQuotationScreen() {
           qty: it.qty,
           price: it.unitPrice,
           discount: it.discount,
+          cashback: it.cashback,
           image: it.image,
         }))}
         initialCustomerName={customer}
