@@ -14,6 +14,8 @@ type CustomerDetails = CustomerPayload & {
   createdBy?: { m_staff_name?: string | null };
   closingBalance?: number;
   walletAmount?: number;
+  membershipStartDate?: string;
+  membershipEndDate?: string;
 };
 
 type Props = {
@@ -223,36 +225,93 @@ export default function CustomerDetailsModal({
             </div>
 
             <div className="lg:col-span-12">
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-3 text-sm font-semibold text-slate-800">Wallet</div>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-green-700">
-                      Available Balance
-                    </div>
-                    <div className="mt-2 text-2xl font-semibold text-green-800">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+                {/* Heading */}
+                <div className="mb-5">
+                  <h2 className="text-base font-semibold text-slate-800">
+                    Wallet & Membership
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+                  {/* Wallet Card */}
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                      Wallet Balance
+                    </p>
+
+                    <h3 className="mt-3 text-3xl font-bold text-slate-800">
                       ₹{" "}
                       {Number(
-                        customer.walletAmount ?? customer.closingBalance ?? 0,
+                        customer.walletAmount ?? customer.closingBalance ?? 0
                       ).toLocaleString("en-IN")}
-                    </div>
+                    </h3>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Membership
+
+                  {/* Membership Card */}
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+
+                    {/* Top */}
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                        Membership
+                      </p>
+
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${customer.membershipEndDate &&
+                          new Date(customer.membershipEndDate) > new Date()
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-600"
+                          }`}
+                      >
+                        {customer.membershipEndDate &&
+                          new Date(customer.membershipEndDate) > new Date()
+                          ? "Active"
+                          : "Expired"}
+                      </span>
                     </div>
-                    <div className="mt-2 text-lg font-semibold text-slate-800">
-                      {customer.membershipType?.trim() || "General"}
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Last Updated
-                    </div>
-                    <div className="mt-2 text-lg font-semibold text-slate-800">
-                      {customer.createdAt
-                        ? new Date(customer.createdAt).toLocaleDateString("en-IN")
-                        : "-"}
+
+                    {/* Membership Name */}
+                    <h3 className="mt-3 text-xl font-semibold text-slate-800 capitalize">
+                      {customer.membershipType?.trim() || "No Membership"}
+                    </h3>
+
+                    {/* Dates */}
+                    <div className="mt-4 space-y-2 text-sm">
+
+                      {customer.membershipStartDate && (
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span>Start Date</span>
+
+                          <span className="font-medium text-slate-800">
+                            {new Date(
+                              customer.membershipStartDate
+                            ).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      )}
+
+                      {customer.membershipEndDate && (
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span>Expiry Date</span>
+
+                          <span className="font-medium text-slate-800">
+                            {new Date(
+                              customer.membershipEndDate
+                            ).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -286,7 +345,7 @@ export default function CustomerDetailsModal({
           loading={updatingCustomer}
         />
       </div>
-      
+
     </div>
   );
 }

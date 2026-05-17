@@ -516,6 +516,7 @@ export default function CreateSubscriptionScreen() {
             membershipType: getCustomerMembershipType(selectedMembership),
           });
         }
+        // console.log("Updated", payload);
         printThermalReceipt({
           invoiceNo: subscriptionNo,
           customerName: customer.trim(),

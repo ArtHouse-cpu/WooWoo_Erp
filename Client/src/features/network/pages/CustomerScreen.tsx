@@ -29,6 +29,8 @@ type CustomerRow = {
   name?: string;
   mobile?: string;
   membershipType?: string;
+  membershipStartDate?: string;
+  membershipEndDate?: string;
   whatsappNumber?: string;
   email?: string;
   companyName?: string;
@@ -163,7 +165,7 @@ export default function CustomerScreen() {
         ? subscriptionResponse.subscriptions
         : [];
       const membershipLookup = subscriptions.reduce(
-        (acc: Record<string, string>, subscription: any) => {
+        (acc: Record<string, { type: string; startDate?: string; endDate?: string }>, subscription: any) => {
           const membershipType = String(
             subscription?.membershipType ??
               subscription?.membershipName ??
@@ -181,7 +183,13 @@ export default function CustomerScreen() {
             .map((value) => String(value ?? "").trim())
             .filter(Boolean);
           keys.forEach((key) => {
-            if (!acc[key]) acc[key] = membershipType;
+            if (!acc[key]) {
+              acc[key] = {
+                type: membershipType,
+                startDate: subscription?.startDate,
+                endDate: subscription?.endDate || subscription?.dueDate,
+              };
+            }
           });
           return acc;
         },
@@ -216,10 +224,10 @@ export default function CustomerScreen() {
 
       setCustomers(
         customerList.map((customer: CustomerRow) => {
-          const membershipType =
+          const membershipInfo =
             membershipLookup[String(customer?._id ?? "").trim()] ??
             membershipLookup[String(customer?.mobile ?? "").trim()] ??
-            "none";
+            { type: "none" };
           const walletAmount =
             nextWalletMap[String(customer?._id ?? "").trim()] ??
             nextWalletMap[String(customer?.mobile ?? "").trim()] ??
@@ -228,7 +236,14 @@ export default function CustomerScreen() {
             dueLookup[String(customer?.mobile ?? "").trim()] ??
             dueLookup[String(customer?.name ?? "").trim()] ??
             0;
-          return { ...customer, membershipType, walletAmount, dueAmount };
+          return {
+            ...customer,
+            membershipType: membershipInfo.type,
+            membershipStartDate: membershipInfo.startDate,
+            membershipEndDate: membershipInfo.endDate,
+            walletAmount,
+            dueAmount,
+          };
         }),
       );
     } catch {
