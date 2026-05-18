@@ -56,9 +56,16 @@ export const updateCategories = async (req, res) => {
     const { categories } = req.body;
 
     const updates = await Promise.all(
-      categories.map((cat) =>
-        Category.findByIdAndUpdate(cat._id, { name: cat.name }, { new: true })
-      )
+      categories.map(async (cat) => {
+        const oldCat = await Category.findById(cat._id);
+        const updatedCat = await Category.findByIdAndUpdate(cat._id, { name: cat.name }, { new: true });
+        
+        if (oldCat && oldCat.name !== cat.name) {
+          // Sync all products using the old category name to the new name
+          await Product.updateMany({ category: oldCat.name }, { category: cat.name });
+        }
+        return updatedCat;
+      })
     );
 
     return res.status(200).json({ success: true, categories: updates });
@@ -73,12 +80,22 @@ export const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const isUsed = await Product.findOne({ category: id });
+    const categoryDoc = await Category.findById(id);
+    if (!categoryDoc) {
+      return res.status(404).json({ success: false, message: "Category not found" });
+    }
+
+    const isUsed = await Product.findOne({
+      $or: [
+        { category: id },
+        { category: categoryDoc.name }
+      ]
+    });
 
     if (isUsed) {
       return res.status(400).json({
         success: false,
-        message: "Category is used in products",
+        message: `Category "${categoryDoc.name}" is used in products and cannot be deleted`,
       });
     }
 

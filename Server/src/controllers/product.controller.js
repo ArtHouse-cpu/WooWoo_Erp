@@ -35,6 +35,7 @@ export const createProduct = async (req, res) => {
     const {
       type,
       productName,
+      brandName,
       serviceName,
       sellingPrice,
       purchasePrice,
@@ -102,6 +103,7 @@ export const createProduct = async (req, res) => {
       type: itemType,
       itemType,
       productName: resolvedName,
+      brandName: brandName || "",
       serviceName: itemType === "service" ? resolvedName : "",
       sellingPrice: parsedSellingPrice,
       purchasePrice: purchasePrice ? Number(purchasePrice) : 0,
@@ -189,6 +191,7 @@ export const updateProduct = async (req, res) => {
     const {
       type,
       productName,
+      brandName,
       serviceName,
       sellingPrice,
       purchasePrice,
@@ -246,8 +249,9 @@ export const updateProduct = async (req, res) => {
 
     existingProduct.itemCode = itemCode ?? existingProduct.itemCode;
     existingProduct.barCode = barCode ?? existingProduct.barCode;
+    existingProduct.brandName = brandName ?? existingProduct.brandName;
     existingProduct.category = category ?? existingProduct.category;
-    existingProduct.subCategory = category ?? existingProduct.subCategory;
+    existingProduct.subCategory = subCategory ?? existingProduct.subCategory;
     existingProduct.stockStatus = stockStatus ?? existingProduct.stockStatus;
     existingProduct.primaryUnit = primaryUnit ?? existingProduct.primaryUnit;
     existingProduct.description = description ?? existingProduct.description;

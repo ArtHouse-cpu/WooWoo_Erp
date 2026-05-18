@@ -18,6 +18,7 @@ const variantSchema = z.object({
 const baseSchema = z.object({
   type: z.enum(["product", "service"]),
   productName: z.string().optional().default(""),
+  brandName: z.string().optional().default(""),
   serviceName: z.string().optional().default(""),
   sellingPrice: z.number().gt(0, "Selling price must be greater than 0"),
   purchasePrice: z.number().min(0).default(0),
@@ -74,6 +75,7 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
     defaultValues: {
       type: initialData?.type || "product",
       productName: initialData?.productName || "",
+      brandName: (initialData as any)?.brandName || "",
       serviceName: initialData?.serviceName || "",
       sellingPrice: initialData?.sellingPrice || 0,
       purchasePrice: initialData?.purchasePrice || 0,
@@ -115,6 +117,7 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
     const payload = new FormData();
     payload.append("type", values.type);
     payload.append("productName", values.type === "product" ? values.productName : values.serviceName);
+    payload.append("brandName", values.brandName || "");
     payload.append("serviceName", values.serviceName);
     payload.append("sellingPrice", String(values.sellingPrice));
     payload.append("purchasePrice", String(values.purchasePrice));

@@ -179,13 +179,13 @@ export default function AddnewPlansModal({
         ? (amount * discountValue) / 100
         : discountValue;
 
-    const taxAmount = (amount * taxPercent) / 100;
-    const base = amount;
+    const base = amount / (1 + taxPercent / 100);
+    const taxAmount = amount - base;
     return {
       baseAmount: base,
       taxAmount,
       discountAmount,
-      grossAmount: Math.max(0, base + taxAmount - discountAmount),
+      grossAmount: Math.max(0, amount - discountAmount),
     };
   }, [
     form.pricing.amount,
@@ -416,7 +416,7 @@ export default function AddnewPlansModal({
                 <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-slate-700">
                   <span className="font-semibold">Calculated:</span>{" "}
                   <span className="text-slate-600">
-                    Base Amount: ₹{computed.baseAmount.toFixed(2)} | Tax Amount: ₹
+                    Base Amount (Excl. GST): ₹{computed.baseAmount.toFixed(2)} | GST Portion: ₹
                     {computed.taxAmount.toFixed(2)}
                   </span>
                 </div>

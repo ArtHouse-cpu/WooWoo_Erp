@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import CategoryListModal from "@/features/catalogue/components/CategoryListModal";
+import CategorySidebar from "@/features/catalogue/components/CategorySidebar";
 import {
   handleGetProducts,
   handleCreateProduct,
@@ -38,6 +39,7 @@ export default function ProductScreen() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCategorySidebar, setShowCategorySidebar] = useState(false);
   const [editProduct, setEditProduct] = useState<any | null>(null);
 
   const fetchData = async (signal?: AbortSignal) => {
@@ -263,11 +265,25 @@ export default function ProductScreen() {
           )}
           <button
               type="button"
+              onClick={() => setShowCategorySidebar(true)}
+            className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
+            >
+              + Add Category
+            </button>
+          <button
+              type="button"
               onClick={() => setShowCreateModal(true)}
             className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
             >
               + Add Product
             </button>
+          {showCategorySidebar && (
+            <CategorySidebar
+              isOpen={showCategorySidebar}
+              onClose={() => setShowCategorySidebar(false)}
+              onRefreshProducts={fetchData}
+            />
+          )}
           {showCreateModal && (
             <CreateProductModal
               onClose={() => {

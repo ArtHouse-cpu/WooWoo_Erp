@@ -63,6 +63,7 @@ type InvoiceLine = {
   paidAmount: number;
   dueAmount: number;
   status: string;
+  walletAmount?: number;
 };
 
 type PaymentHistoryLine = {
@@ -244,6 +245,7 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
           ),
           dueAmount: Number(inv?.dueAmount ?? inv?.pendingAmount ?? inv?.paymentBreakdown?.dueAmount ?? 0),
           status: String(inv?.paymentStatus ?? inv?.status ?? "pending"),
+          walletAmount: Number(inv?.paymentBreakdown?.wallet ?? 0),
         }));
 
         const payments: PaymentHistoryLine[] = [];
@@ -317,6 +319,11 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
     [invoiceLines],
   );
 
+  const totalWalletAdjusted = useMemo(
+    () => invoiceLines.reduce((s, r) => s + (r.walletAmount ?? 0), 0),
+    [invoiceLines],
+  );
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 relative animate-fadeIn overflow-y-auto max-h-[90vh]">
@@ -335,11 +342,11 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
 
         <div className="flex gap-2">
           <button className="px-4 py-2 rounded-lg bg-green-100 font-medium flex items-center gap-2 cursor-pointer text-green-800">
-            <Share size={18} /> Share
+            <Share size={18} />
           </button>
 
           <button className="px-4 py-2 rounded-lg bg-purple-100 text-purple-700 font-medium flex items-center gap-2 cursor-pointer">
-            <FileText size={18} /> View Statement
+            <FileText size={18} />
           </button>
         </div>
 
@@ -411,15 +418,12 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
                 <div className="text-sm font-semibold text-gray-900">
                   Sales & Payments
                 </div>
-                <div className="text-xs text-gray-600">
-                  {customer.name ? customer.name + " • " : ""}
-                  {customer.mobile ?? ""}
-                </div>
               </div>
               <div className="text-sm font-semibold text-gray-900 flex gap-4">
                 <span className="text-blue-700">Total Billed: {money(invoiceTotal)}</span>
                 <span className="text-green-700">Total Received: {money(totalPaid)}</span>
-                <span className="text-amber-700">Total Due: {money(invoiceTotal - totalPaid)}</span>
+                <span className="text-green-700">Total Wallet Adjusted: {money(totalWalletAdjusted)}</span>
+                <span className="text-amber-700">Total Due: {money(invoiceTotal - totalPaid - totalWalletAdjusted)}</span>
               </div>
             </div>
 

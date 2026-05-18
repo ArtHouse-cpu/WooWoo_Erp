@@ -138,7 +138,7 @@ export default function LeftSideBar() {
           icon: Package,
           path: "/inventory",
         },
-        {name: "Inventory Timeline", label: "Inventory Timeline", icon: FileSpreadsheet, path: "/inventory-timeline" },
+        {name: "Inventory Timeline", label: "Timeline", icon: FileSpreadsheet, path: "/inventory-timeline" },
       ],
     },
     {

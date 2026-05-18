@@ -22,6 +22,11 @@ const productSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    brandName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     serviceName: {
       type: String,
       trim: true,

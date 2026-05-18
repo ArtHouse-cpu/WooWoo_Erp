@@ -1106,6 +1106,48 @@ export const handleCreateSubCategory = async (payload: { name: string; categoryI
   }
 };
 
+export const handleUpdateCategory = async (id: string, name: string) => {
+  try {
+    const response = await axiosInstance.patch("/api/categories", {
+      categories: [{ _id: id, name }]
+    });
+    return response.data;
+  } catch (error) {
+    console.log("Error updating category:", error);
+    throw error;
+  }
+};
+
+export const handleDeleteCategory = async (id: string) => {
+  try {
+    const response = await axiosInstance.delete(`/api/categories/${id}`);
+    return response.data;
+  } catch (error) {
+    console.log("Error deleting category:", error);
+    throw error;
+  }
+};
+
+export const handleUpdateSubCategory = async (id: string, name: string, categoryId?: string) => {
+  try {
+    const response = await axiosInstance.patch(`/api/subCategories/${id}`, { name, categoryId });
+    return response.data;
+  } catch (error) {
+    console.log("Error updating subcategory:", error);
+    throw error;
+  }
+};
+
+export const handleDeleteSubCategory = async (id: string) => {
+  try {
+    const response = await axiosInstance.delete(`/api/subCategories/${id}`);
+    return response.data;
+  } catch (error) {
+    console.log("Error deleting subcategory:", error);
+    throw error;
+  }
+};
+
 export const handleGetMyCompanies = async (signal?: AbortSignal) => {
   try {
     const response = await axiosInstance.get("/company", { signal });

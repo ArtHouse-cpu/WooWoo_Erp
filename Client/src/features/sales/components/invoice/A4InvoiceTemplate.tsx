@@ -259,7 +259,30 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
   const amountInWords =
     `${rupeesToWords(amountWordsBase)} Rupees Only`.replace(/\s+/g, " ");
 
-  const paymentMode = invoice.mode || "—";
+  const paymentBreakdown = invoice.paymentBreakdown || {};
+  const cashPaid = Number(paymentBreakdown.cash || 0);
+  const upiPaid = Number(paymentBreakdown.upi || 0);
+  const cardPaid = Number(paymentBreakdown.card || 0);
+  const walletPaid = Number(paymentBreakdown.wallet || 0);
+
+  const rawMode = String(invoice.paymentMode ?? invoice.mode ?? "—").trim().toUpperCase();
+  let paymentModeDisplay = "—";
+
+  if (rawMode === "MULTI") {
+    const parts: string[] = [];
+    if (cashPaid > 0) parts.push(`Cash: ₹${cashPaid.toFixed(2)}`);
+    if (upiPaid > 0) parts.push(`UPI: ₹${upiPaid.toFixed(2)}`);
+    if (cardPaid > 0) parts.push(`Card: ₹${cardPaid.toFixed(2)}`);
+    if (walletPaid > 0) parts.push(`Wallet: ₹${walletPaid.toFixed(2)}`);
+    paymentModeDisplay = parts.join(", ") || "Multi-mode";
+  } else if (rawMode && rawMode !== "—") {
+    if (rawMode === "UPI") {
+      paymentModeDisplay = "UPI";
+    } else {
+      paymentModeDisplay = rawMode.charAt(0).toUpperCase() + rawMode.slice(1).toLowerCase();
+    }
+  }
+
   const salesPerson = invoice.salesPersonName || "—";
 
   const showBillPeriod =
@@ -399,7 +422,7 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
           <RowKV label="Account Number" value={String(accountNumber)} />
           <RowKV label="Bill Number" value={String(billNumber)} />
           <RowKV label="Due Date" value={dueDate} />
-          <RowKV label="Payment" value={paymentMode} />
+          <RowKV label="Payment Mode" value={paymentModeDisplay} />
           <RowKV label="Sales Person" value={salesPerson} />
         </div>
       </div>
@@ -704,6 +727,7 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
             <RowKV label="Account Number" value={String(accountNumber)} compact />
             <RowKV label="Bill Number" value={String(billNumber)} compact />
             <RowKV label="Due Date" value={dueDate} compact />
+            <RowKV label="Payment Mode" value={paymentModeDisplay} compact />
           </div>
         </div>
         <div

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Customer from '../models/customer.model.js';
+import Wallet from '../models/wallet.model.js';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
@@ -188,11 +189,43 @@ const createCustomer = async (req, res) => {
         m_staff_email: req.user?.m_staff_email ?? null,
       },
     });
-// console.log("uses request",req.user);
+
+    // Automatically create a wallet for the customer and credit ₹25 joining bonus
+    await Wallet.create({
+      customerId: customer._id,
+      customerName: customer.name,
+      customerPhone: customer.mobile,
+      walletAmount: 25,
+      transactions: [{
+        type: "credit",
+        amount: 25,
+        note: "Joining Bonus",
+        referenceType: "JoiningBonus",
+        closingBalance: 25,
+        createdBy: {
+          m_staff_id: req.user?.userId ?? null,
+          m_staff_name: req.user?.m_staff_name ?? req.user?.name ?? null,
+          m_staff_email: req.user?.m_staff_email ?? req.user?.email ?? null,
+        }
+      }]
+    });
+
+    // Sync walletAmount and closingBalance in the Customer document
+    const updatedCustomer = await Customer.findByIdAndUpdate(
+      customer._id,
+      {
+        $set: {
+          walletAmount: 25,
+          closingBalance: 25,
+        },
+      },
+      { new: true }
+    );
+
     return res.status(201).json({
       success: true,
-      message: 'Customer created successfully.',
-      customer,
+      message: 'Customer created successfully with ₹25 Joining Bonus credited to wallet.',
+      customer: updatedCustomer,
     });
   } catch (error) {
     console.error('createCustomer error:', error);

@@ -26,10 +26,14 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Product Name *</label>
           <input {...register("productName")} className="w-full rounded-lg border border-gray-300 p-2.5 text-sm" autoFocus />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Brand Name</label>
+          <input {...register("brandName")} placeholder="e.g. Nike, Apple" className="w-full rounded-lg border border-gray-300 p-2.5 text-sm" />
         </div>
         <CategorySelect
           categoryValue={watch("categoryId")}

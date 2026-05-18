@@ -72,6 +72,7 @@ export type InvoicePdfInput = {
   /** Default GST % when line items omit tax */
   taxPercent?: number;
   mode?: string;
+  paymentMode?: string;
   status?: string;
   /** Authorized signatory image URL if stored */
   signatureUrl?: string;

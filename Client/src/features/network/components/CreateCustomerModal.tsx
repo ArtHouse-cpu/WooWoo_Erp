@@ -13,8 +13,7 @@ import {
   Wallet,
   Contact2,
 } from "lucide-react";
-import { type CustomerPayload, handleGetMemberships } from "@/services/apiClient";
-import { useEffect } from "react";
+import { type CustomerPayload } from "@/services/apiClient";
 
 type Props = {
   onClose: () => void;
@@ -116,12 +115,7 @@ export default function CreateCustomerModal({
   loading,
 }: Props) {
   const [form, setForm] = useState<FormState>(initialState);
-  const [membershipPlans, setMembershipPlans] = useState<any[]>([]);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
-
-  useEffect(() => {
-    handleGetMemberships().then(res => setMembershipPlans(res.memberships || []));
-  }, []);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const initials = useMemo(() => {
@@ -298,6 +292,22 @@ export default function CreateCustomerModal({
                     required
                     maxLength={10}
                   />
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Gender <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={form.gender}
+                      onChange={(e) => update("gender", e.target.value)}
+                      required
+                      className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    >
+                      <option value="Not Specified">Not Specified</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
                   <InputField
                     label="Email"
                     value={form.email}
@@ -330,23 +340,8 @@ export default function CreateCustomerModal({
                     type="date"
                   />
 
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Gender <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={form.gender}
-                      onChange={(e) => update("gender", e.target.value)}
-                      required
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                    >
-                      <option value="Not Specified">Not Specified</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div>
+                  
+                  {/* <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">
                       Membership Plan
                     </label>
@@ -370,7 +365,7 @@ export default function CreateCustomerModal({
                           </option>
                       ))}
                     </select>
-                  </div>
+                  </div> */}
                 </div>
               </section>
 
