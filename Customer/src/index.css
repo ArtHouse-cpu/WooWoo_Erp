@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-blue: #2f6fed;
+  --color-brand-orange: #f08a3c;
+  --color-ink: #111827;
+  --color-muted: #6b7280;
+  --color-surface: #f3f4f6;
+  --color-card: #ffffff;
+  --shadow-card: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background: #fff;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer utilities {
+  .brush-bg {
+    background-color: #ffffff;
+    background-image:
+      radial-gradient(ellipse 70% 48% at -5% -5%, rgba(140, 185, 255, 0.45), transparent 58%),
+      radial-gradient(ellipse 55% 42% at 105% 42%, rgba(255, 175, 145, 0.38), transparent 55%);
+    background-repeat: no-repeat;
+  }
+
+  .auth-card {
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(16px);
+    box-shadow: var(--shadow-card);
+  }
+}

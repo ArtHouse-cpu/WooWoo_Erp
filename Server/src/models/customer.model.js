@@ -88,6 +88,24 @@ const customerSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Portal onboarding (default true so existing CRM customers skip)
+    profileSetupCompleted: {
+      type: Boolean,
+      default: true,
+    },
+    onboardingCompleted: {
+      type: Boolean,
+      default: true,
+    },
+    accountCreatedWhatsAppSent: {
+      type: Boolean,
+      default: false,
+    },
+    welcomeBonusCredited: {
+      type: Boolean,
+      default: false,
+    },
+
     // =========================
     // PERSONAL INFO
     // =========================
@@ -191,6 +209,68 @@ const customerSchema = new mongoose.Schema(
     },
 
     // =========================
+    // CUSTOMER AUTH (portal)
+    // =========================
+    customerId: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    countryCode: {
+      type: String,
+      default: "+91",
+      trim: true,
+    },
+    password: {
+      type: String,
+      select: false,
+      default: null,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    mobileVerified: {
+      type: Boolean,
+      default: false,
+    },
+    status: {
+      type: String,
+      enum: ["active", "inactive", "blocked"],
+      default: "active",
+    },
+    rewardPoints: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    lastLogin: {
+      type: Date,
+      default: null,
+    },
+    deviceInfo: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+    loginType: {
+      type: String,
+      enum: ["password", "otp", "both", ""],
+      default: "",
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // =========================
     // CREATED BY
     // =========================
     createdBy: {
@@ -208,7 +288,23 @@ const customerSchema = new mongoose.Schema(
 // INDEXES (IMPORTANT)
 // =========================
 customerSchema.index({ name: 1 });
-customerSchema.index({ mobile: 1 }, { unique: true }); // prevent duplicate
+customerSchema.index({ mobile: 1 }, { unique: true });
+customerSchema.index({ customerId: 1 }, { unique: true, sparse: true });
+customerSchema.index(
+  { email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { email: { $type: "string", $gt: "" } },
+  },
+);
+
+customerSchema.methods.toSafeObject = function toSafeObject() {
+  const obj = this.toObject({ virtuals: true });
+  delete obj.password;
+  delete obj.__v;
+  obj.walletBalance = obj.walletAmount ?? 0;
+  return obj;
+};
 
 // =========================
 // MODEL
