@@ -21,6 +21,13 @@ import PaymentResultPage from './app/payment/PaymentResultPage';
 import PrivacyPolicyPage from './app/legal/PrivacyPolicyPage';
 import TermsOfUsePage from './app/legal/TermsOfUsePage';
 import MembershipTermsPage from './app/legal/MembershipTermsPage';
+import LegalIndexPage from './app/legal/LegalIndexPage';
+import ServicesTermsPage from './app/legal/ServicesTermsPage';
+import EventsTermsPage from './app/legal/EventsTermsPage';
+import CafeTermsPage from './app/legal/CafeTermsPage';
+import SpaceTermsPage from './app/legal/SpaceTermsPage';
+import CommunityGuidelinesPage from './app/legal/CommunityGuidelinesPage';
+import RefundTermsPage from './app/legal/RefundTermsPage';
 import {useAuthStore} from './store/authStore';
 import {getPostAuthPath} from './utils/onboarding';
 
@@ -75,10 +82,17 @@ export default function App() {
 
             <Route path="/" element={<RootRedirect />} />
             <Route path="/payment/result" element={<PaymentResultPage />} />
+            <Route path="/legal" element={<LegalIndexPage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />
             <Route path="/Privacy" element={<PrivacyPolicyPage />} />
             <Route path="/terms" element={<TermsOfUsePage />} />
             <Route path="/membershipterms" element={<MembershipTermsPage />} />
+            <Route path="/serviceterms" element={<ServicesTermsPage />} />
+            <Route path="/eventsterms" element={<EventsTermsPage />} />
+            <Route path="/cafeterms" element={<CafeTermsPage />} />
+            <Route path="/spaceterms" element={<SpaceTermsPage />} />
+            <Route path="/communityguidelines" element={<CommunityGuidelinesPage />} />
+            <Route path="/refundterms" element={<RefundTermsPage />} />
             <Route path="*" element={<RootRedirect />} />
           </Routes>
         </AuthBootstrap>

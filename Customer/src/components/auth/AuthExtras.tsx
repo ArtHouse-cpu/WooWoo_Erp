@@ -12,13 +12,17 @@ export function LegalNote({className = ''}: {className?: string}) {
       <Link to="/privacy" className="font-medium text-[#3B82F6] underline-offset-2 hover:underline">
         Privacy Policy
       </Link>
-      {' '}
-      and{' '}
+      ,{' '}
       <Link
         to="/membershipterms"
         className="font-medium text-[#3B82F6] underline-offset-2 hover:underline"
       >
         Membership Terms
+      </Link>
+      {' '}
+      and other{' '}
+      <Link to="/legal" className="font-medium text-[#3B82F6] underline-offset-2 hover:underline">
+        policies
       </Link>
       .
     </p>

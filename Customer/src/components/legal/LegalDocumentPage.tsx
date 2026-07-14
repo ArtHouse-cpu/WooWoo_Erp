@@ -1,9 +1,18 @@
 import {Link} from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 
-export type LegalDocKey = 'privacy' | 'terms' | 'membership';
+export type LegalDocKey =
+  | 'privacy'
+  | 'terms'
+  | 'membership'
+  | 'services'
+  | 'events'
+  | 'cafe'
+  | 'space'
+  | 'community'
+  | 'returns';
 
-const DOCS: Record<
+export const LEGAL_DOCS: Record<
   LegalDocKey,
   {path: string; title: string; short: string}
 > = {
@@ -14,6 +23,20 @@ const DOCS: Record<
     title: 'Membership Terms',
     short: 'Membership',
   },
+  services: {path: '/serviceterms', title: 'Services Terms', short: 'Services'},
+  events: {path: '/eventsterms', title: 'Events Terms', short: 'Events'},
+  cafe: {path: '/cafeterms', title: 'WOOFOO Café Terms', short: 'Café'},
+  space: {path: '/spaceterms', title: 'Space Terms', short: 'Space'},
+  community: {
+    path: '/communityguidelines',
+    title: 'Community Guidelines',
+    short: 'Community',
+  },
+  returns: {
+    path: '/refundterms',
+    title: 'Return, Refund & Cancellation Terms',
+    short: 'Returns',
+  },
 };
 
 type LegalDocumentPageProps = {
@@ -22,6 +45,7 @@ type LegalDocumentPageProps = {
 };
 
 export function LegalDocumentPage({doc, markdown}: LegalDocumentPageProps) {
+  const meta = LEGAL_DOCS[doc];
 
   return (
     <div className="min-h-dvh bg-[#F4F7FB] text-[#111827]">
@@ -30,29 +54,38 @@ export function LegalDocumentPage({doc, markdown}: LegalDocumentPageProps) {
         <div className="pointer-events-none absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-[#F59E0B]/20 blur-3xl" />
         <div className="relative mx-auto max-w-3xl px-5 pb-8 pt-6 sm:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link to="/login" className="text-[12px] font-medium text-white/70 hover:text-white">
-              ← Back
+            <Link to="/legal" className="text-[12px] font-medium text-white/70 hover:text-white">
+              ← All policies
             </Link>
-            <nav className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wide">
-              {(Object.keys(DOCS) as LegalDocKey[]).map(key => {
-                const item = DOCS[key];
-                const active = key === doc;
-                return (
-                  <Link
-                    key={key}
-                    to={item.path}
-                    className={`rounded-full px-3 py-1.5 transition ${
-                      active
-                        ? 'bg-white text-[#0B1F33]'
-                        : 'bg-white/10 text-white/80 hover:bg-white/20'
-                    }`}
-                  >
-                    {item.short}
-                  </Link>
-                );
-              })}
-            </nav>
+            <Link to="/login" className="text-[12px] font-medium text-white/70 hover:text-white">
+              back
+            </Link>
           </div>
+          <nav className="mt-4 flex max-h-24 flex-wrap gap-1.5 overflow-y-auto text-[10px] font-semibold uppercase tracking-wide sm:max-h-none sm:text-[11px]">
+            {(Object.keys(LEGAL_DOCS) as LegalDocKey[]).map(key => {
+              const item = LEGAL_DOCS[key];
+              const active = key === doc;
+              return (
+                <Link
+                  key={key}
+                  to={item.path}
+                  className={`rounded-full px-2.5 py-1 transition ${
+                    active
+                      ? 'bg-white text-[#0B1F33]'
+                      : 'bg-white/10 text-white/80 hover:bg-white/20'
+                  }`}
+                >
+                  {item.short}
+                </Link>
+              );
+            })}
+          </nav>
+          <h1 className="mt-2 text-[18px] font-semibold tracking-wide text-[#93C5FD] sm:text-[20px]">
+            {meta.title}
+          </h1>
+          <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-white/70">
+            A venture of JHA SONS AND ARRAY LLP · Updated on 14th July 2026
+          </p>
         </div>
       </div>
 
@@ -107,15 +140,9 @@ export function LegalDocumentPage({doc, markdown}: LegalDocumentPageProps) {
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3 text-[12px] text-[#64748B]">
           <p>© {new Date().getFullYear()} JHA SONS AND ARRAY LLP · WOOWOO ART HOUSE®</p>
-          <div className="flex flex-wrap gap-3">
-            {(Object.keys(DOCS) as LegalDocKey[])
-              .filter(key => key !== doc)
-              .map(key => (
-                <Link key={key} to={DOCS[key].path} className="font-medium text-[#2563EB] hover:underline">
-                  {DOCS[key].title}
-                </Link>
-              ))}
-          </div>
+          <Link to="/legal" className="font-medium text-[#2563EB] hover:underline">
+            View all policies
+          </Link>
         </div>
       </article>
     </div>
