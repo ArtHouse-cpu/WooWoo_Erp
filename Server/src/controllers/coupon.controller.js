@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Coupon from '../models/coupon.model.js';
 import Invoice from '../models/invoice.model.js';
+import Customer from '../models/customer.model.js';
 
 const normalizeCode = (value) => String(value ?? '').trim().toUpperCase();
 
@@ -65,16 +66,29 @@ export const validateCouponForOrder = async ({
   }
 
   if (customerPhone && Number(coupon.perCustomerLimit ?? 0) > 0) {
+    const phone = String(customerPhone).trim();
     const usageQuery = {
-      customerPhone: String(customerPhone).trim(),
+      customerPhone: phone,
       status: { $ne: 'cancelled' },
       'coupon.code': normalizedCode,
     };
     if (ignoreInvoiceId && mongoose.Types.ObjectId.isValid(String(ignoreInvoiceId))) {
       usageQuery._id = { $ne: String(ignoreInvoiceId) };
     }
-    const usedByCustomer = await Invoice.countDocuments(usageQuery);
-    if (usedByCustomer >= Number(coupon.perCustomerLimit)) {
+    const invoiceUses = await Invoice.countDocuments(usageQuery);
+
+    // Also count membership checkout redemptions stored on the customer profile
+    const customerDoc = await Customer.findOne(
+      { mobile: phone, isDeleted: { $ne: true } },
+      { couponUsages: 1 },
+    ).lean();
+    const membershipUses = Array.isArray(customerDoc?.couponUsages)
+      ? customerDoc.couponUsages.filter(
+          u => String(u?.code || '').trim().toUpperCase() === normalizedCode,
+        ).length
+      : 0;
+
+    if (invoiceUses + membershipUses >= Number(coupon.perCustomerLimit)) {
       return { ok: false, message: 'Coupon already used maximum times by this customer.' };
     }
   }

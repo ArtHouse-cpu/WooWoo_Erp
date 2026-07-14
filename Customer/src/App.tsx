@@ -17,6 +17,10 @@ import ProfilePage from './app/auth/ProfilePage';
 import CreateAccountOnboardingPage from './app/onboarding/CreateAccountOnboardingPage';
 import MembershipOnboardingPage from './app/onboarding/MembershipOnboardingPage';
 import HomePage from './app/home/HomePage';
+import PaymentResultPage from './app/payment/PaymentResultPage';
+import PrivacyPolicyPage from './app/legal/PrivacyPolicyPage';
+import TermsOfUsePage from './app/legal/TermsOfUsePage';
+import MembershipTermsPage from './app/legal/MembershipTermsPage';
 import {useAuthStore} from './store/authStore';
 import {getPostAuthPath} from './utils/onboarding';
 
@@ -65,31 +69,21 @@ export default function App() {
               <Route element={<AppRoute />}>
                 <Route path="/home" element={<HomePage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/membership" element={<MembershipOnboardingPage />} />
               </Route>
             </Route>
 
             <Route path="/" element={<RootRedirect />} />
-            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/payment/result" element={<PaymentResultPage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/Privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsOfUsePage />} />
+            <Route path="/membershipterms" element={<MembershipTermsPage />} />
             <Route path="*" element={<RootRedirect />} />
           </Routes>
         </AuthBootstrap>
         <Toaster richColors position="top-center" />
       </BrowserRouter>
     </QueryClientProvider>
-  );
-}
-
-function TermsPage() {
-  return (
-    <div className="mx-auto max-w-2xl px-6 py-16">
-      <h1 className="text-3xl font-bold">Terms & Privacy Policy</h1>
-      <p className="mt-4 text-slate-600">
-        Woo Woo Art House respects your privacy. By using the customer portal you agree to our
-        membership, order, and communication policies. Full legal documents will be published here.
-      </p>
-      <a href="/login" className="mt-6 inline-block font-semibold text-brand-blue">
-        Back to login
-      </a>
-    </div>
   );
 }

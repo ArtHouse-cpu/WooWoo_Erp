@@ -1,0 +1,31 @@
+{
+  "domain": "woowooarthouse.in",
+  "apps": {
+    "customer": {
+      "folder": "Customer",
+      "domains": ["woowooarthouse.in", "www.woowooarthouse.in"],
+      "vercelRootDirectory": "Customer",
+      "framework": "vite",
+      "notes": "Public customer portal + membership checkout"
+    },
+    "admin": {
+      "folder": "Client",
+      "domains": ["admin.woowooarthouse.in"],
+      "vercelRootDirectory": "Client",
+      "framework": "vite",
+      "notes": "ERP / admin panel. Also reachable via redirect from https://woowooarthouse.in/admin"
+    },
+    "api": {
+      "folder": "Server",
+      "domains": ["api.woowooarthouse.in"],
+      "optionalCurrent": "https://woo-woo-erp.vercel.app",
+      "notes": "Express API. Point Customer VITE_API_BASE_URL and Client VITE_API_URL here."
+    }
+  },
+  "dns": {
+    "apex_A": "Use Vercel recommended A record when adding woowooarthouse.in",
+    "www_CNAME": "cname.vercel-dns.com",
+    "admin_CNAME": "cname.vercel-dns.com",
+    "api_CNAME": "cname.vercel-dns.com (if API also on Vercel)"
+  }
+}

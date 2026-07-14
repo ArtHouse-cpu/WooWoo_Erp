@@ -6,7 +6,19 @@ export function LegalNote({className = ''}: {className?: string}) {
     <p className={`text-center text-[12px] leading-5 text-[#9CA3AF] ${className}`}>
       By continuing, you agree to our{' '}
       <Link to="/terms" className="font-medium text-[#3B82F6] underline-offset-2 hover:underline">
-        Terms & Privacy Policy
+        Terms of Use
+      </Link>
+      ,{' '}
+      <Link to="/privacy" className="font-medium text-[#3B82F6] underline-offset-2 hover:underline">
+        Privacy Policy
+      </Link>
+      {' '}
+      and{' '}
+      <Link
+        to="/membershipterms"
+        className="font-medium text-[#3B82F6] underline-offset-2 hover:underline"
+      >
+        Membership Terms
       </Link>
       .
     </p>

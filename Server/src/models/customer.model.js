@@ -88,6 +88,37 @@ const customerSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Last membership purchase pricing (portal checkout)
+    membershipPurchase: {
+      orderAmount: { type: Number, default: null },
+      discountAmount: { type: Number, default: 0 },
+      paidAmount: { type: Number, default: null },
+      couponCode: { type: String, default: null, uppercase: true, trim: true },
+      purchasedAt: { type: Date, default: null },
+      paymentOrderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PaymentOrder",
+        default: null,
+      },
+      txnid: { type: String, default: null, trim: true },
+    },
+
+    // Coupon redemptions from membership (and future portal) checkouts
+    couponUsages: [
+      {
+        code: { type: String, required: true, uppercase: true, trim: true },
+        discountAmount: { type: Number, default: 0 },
+        orderAmount: { type: Number, default: 0 },
+        membershipType: { type: String, default: null },
+        source: {
+          type: String,
+          enum: ["membership", "invoice", "other"],
+          default: "membership",
+        },
+        usedAt: { type: Date, default: Date.now },
+      },
+    ],
+
     // Portal onboarding (default true so existing CRM customers skip)
     profileSetupCompleted: {
       type: Boolean,

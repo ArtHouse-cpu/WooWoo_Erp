@@ -14,6 +14,13 @@ import {
   deleteProfile,
   activateMembership,
 } from '../controllers/auth.controller.js';
+import {validateCoupon} from '../controllers/coupon.controller.js';
+import {
+  initiatePayment,
+  payuSuccess,
+  payuFailure,
+  paymentStatus,
+} from '../controllers/payment.controller.js';
 import {validateRequest} from '../middlewares/validateRequest.js';
 import {
   authenticateCustomer,
@@ -33,6 +40,8 @@ import {
   resetPasswordSchema,
   updateProfileSchema,
   activateMembershipSchema,
+  validateMembershipCouponSchema,
+  initiatePaymentSchema,
 } from '../validators/auth.validators.js';
 
 const router = express.Router();
@@ -77,6 +86,10 @@ router.post(
 router.post('/refresh-token', refreshToken);
 router.post('/logout', logout);
 
+// PayU browser callbacks (no auth — PayU server redirect POST)
+router.post('/payments/payu/success', payuSuccess);
+router.post('/payments/payu/failure', payuFailure);
+
 router.get('/me', authenticateCustomer, authorizeCustomer('active'), me);
 router.put(
   '/profile',
@@ -90,6 +103,26 @@ router.delete(
   authenticateCustomer,
   authorizeCustomer('active'),
   deleteProfile,
+);
+router.post(
+  '/coupon/validate',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  validateRequest(validateMembershipCouponSchema),
+  validateCoupon,
+);
+router.post(
+  '/payments/payu/initiate',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  validateRequest(initiatePaymentSchema),
+  initiatePayment,
+);
+router.get(
+  '/payments/:txnid',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  paymentStatus,
 );
 router.post(
   '/membership/activate',

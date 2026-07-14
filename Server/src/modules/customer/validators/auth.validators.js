@@ -121,4 +121,15 @@ export const updateProfileSchema = z.object({
 
 export const activateMembershipSchema = z.object({
   membershipType: z.enum(['general', 'special', 'junior', 'premium', 'pro']),
+  couponCode: z.string().trim().max(40).optional(),
+});
+
+export const validateMembershipCouponSchema = z.object({
+  code: z.string().trim().min(1).max(40),
+  membershipType: z.enum(['general', 'special', 'junior', 'premium', 'pro']),
+});
+
+export const initiatePaymentSchema = z.object({
+  membershipType: z.enum(['general', 'special', 'junior', 'premium', 'pro']),
+  couponCode: z.string().trim().max(40).optional(),
 });

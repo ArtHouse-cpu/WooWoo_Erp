@@ -64,6 +64,53 @@ export const authApi = {
 
   deleteProfile: () => api.delete<ApiResponse>('/profile'),
 
-  activateMembership: (payload: {membershipType: NonNullable<Customer['membershipType']>}) =>
-    api.post<ApiResponse<Customer>>('/membership/activate', payload),
+  validateCoupon: (payload: {code: string; membershipType: NonNullable<Customer['membershipType']>}) =>
+    api.post<
+      ApiResponse<{
+        code: string;
+        title: string;
+        discountType: 'percentage' | 'flat';
+        discountValue: number;
+        orderAmount: number;
+        discountAmount: number;
+        payableAmount: number;
+      }>
+    >('/coupon/validate', payload),
+
+  activateMembership: (payload: {
+    membershipType: NonNullable<Customer['membershipType']>;
+    couponCode?: string;
+  }) => api.post<ApiResponse<Customer>>('/membership/activate', payload),
+
+  initiatePayuPayment: (payload: {
+    membershipType: NonNullable<Customer['membershipType']>;
+    couponCode?: string;
+  }) =>
+    api.post<
+      ApiResponse<{
+        mode: 'payu' | 'free';
+        activated?: boolean;
+        customer?: Customer;
+        paymentUrl?: string;
+        params?: Record<string, string>;
+        txnid?: string;
+        orderId?: string;
+        pricing?: {
+          orderAmount: number;
+          discountAmount: number;
+          paidAmount: number;
+          couponCode?: string | null;
+        };
+      }>
+    >('/payments/payu/initiate', payload),
+
+  getPaymentStatus: (txnid: string) =>
+    api.get<
+      ApiResponse<{
+        txnid: string;
+        status: string;
+        membershipType: string;
+        paidAmount: number;
+      }>
+    >(`/payments/${txnid}`),
 };

@@ -8,6 +8,10 @@ import {
   verifyOtpCode,
 } from './otp.service.js';
 import {sendMembershipPurchaseWhatsApp, sendAccountCreatedWhatsApp} from './whatsapp.service.js';
+import {validateMembershipCoupon} from './coupon.service.js';
+import Coupon from '../../../models/coupon.model.js';
+import PaymentOrder from '../models/paymentOrder.model.js';
+import {getMembershipOrderAmount} from '../constants/membershipPlans.js';
 import {
   generateAccessToken,
   createRefreshToken,
@@ -601,13 +605,14 @@ const MEMBERSHIP_META = {
 };
 
 /**
- * Activate a paid membership, credit welcome cashback, send WhatsApp template.
+ * Activate a membership after PayU success (or free / ₹0 after coupon).
+ * Paid plans require a successful PaymentOrder unless skipPaymentCheck + paymentOrderId path.
  */
 export const activateMembership = async (customerId, payload = {}) => {
-  const membershipType = String(payload.membershipType || '').toLowerCase();
+  let membershipType = String(payload.membershipType || '').toLowerCase();
   const meta = MEMBERSHIP_META[membershipType];
 
-  if (!meta || membershipType === 'none') {
+  if ((!meta || membershipType === 'none') && !payload.paymentOrderId) {
     const error = new Error('Select a valid membership plan');
     error.status = 400;
     throw error;
@@ -617,6 +622,106 @@ export const activateMembership = async (customerId, payload = {}) => {
   if (!customer) {
     const error = new Error('Customer not found');
     error.status = 404;
+    throw error;
+  }
+
+  let orderAmount = null;
+  let discountAmount = 0;
+  let couponCode = null;
+  let paidAmount = 0;
+  let paymentOrder = null;
+  let couponSnapshot = null;
+
+  if (payload.paymentOrderId) {
+    paymentOrder = await PaymentOrder.findById(payload.paymentOrderId);
+    if (!paymentOrder || String(paymentOrder.customer) !== String(customerId)) {
+      const error = new Error('Payment order not found');
+      error.status = 404;
+      throw error;
+    }
+    if (paymentOrder.status !== 'success') {
+      const error = new Error('Payment is not successful yet');
+      error.status = 400;
+      throw error;
+    }
+
+    // Idempotent: already activated for this payment
+    if (
+      customer.membershipPurchase?.paymentOrderId &&
+      String(customer.membershipPurchase.paymentOrderId) === String(paymentOrder._id)
+    ) {
+      return {
+        customer: customer.toSafeObject(),
+        cashback: 0,
+        pricing: {
+          orderAmount: paymentOrder.orderAmount,
+          discountAmount: paymentOrder.discountAmount,
+          paidAmount: paymentOrder.paidAmount,
+          coupon: paymentOrder.couponCode
+            ? {code: paymentOrder.couponCode}
+            : null,
+        },
+        whatsapp: null,
+        alreadyActivated: true,
+      };
+    }
+
+    membershipType = paymentOrder.membershipType;
+    orderAmount = paymentOrder.orderAmount;
+    discountAmount = paymentOrder.discountAmount;
+    paidAmount = paymentOrder.paidAmount;
+    couponCode = paymentOrder.couponCode || null;
+    if (couponCode) {
+      couponSnapshot = {code: couponCode, discountAmount};
+    }
+  } else {
+    if (!meta || membershipType === 'none') {
+      const error = new Error('Select a valid membership plan');
+      error.status = 400;
+      throw error;
+    }
+
+    orderAmount = getMembershipOrderAmount(membershipType);
+    if (orderAmount == null) {
+      const error = new Error('Select a valid membership plan');
+      error.status = 400;
+      throw error;
+    }
+
+    const rawCoupon = String(payload.couponCode || '').trim();
+    if (rawCoupon) {
+      const validated = await validateMembershipCoupon({
+        code: rawCoupon,
+        membershipType,
+        customerPhone: customer.mobile,
+      });
+      discountAmount = validated.discountAmount;
+      couponCode = validated.code;
+      couponSnapshot = {
+        code: validated.code,
+        title: validated.title,
+        discountType: validated.discountType,
+        discountValue: validated.discountValue,
+        discountAmount: validated.discountAmount,
+      };
+    }
+
+    paidAmount = Math.max(0, Math.round((orderAmount - discountAmount) * 100) / 100);
+
+    // Paid activation must go through PayU (unless internal free checkout path)
+    if (paidAmount > 0 && !payload.skipPaymentCheck) {
+      const error = new Error(
+        'Payment required. Use PayU checkout to buy this membership.',
+      );
+      error.status = 402;
+      throw error;
+    }
+  }
+
+  const planMeta = MEMBERSHIP_META[membershipType];
+  if (!planMeta) {
+    const error = new Error('Select a valid membership plan');
+    error.status = 400;
     throw error;
   }
 
@@ -633,7 +738,61 @@ export const activateMembership = async (customerId, payload = {}) => {
   customer.onboardingCompleted = true;
   customer.profileSetupCompleted = true;
   customer.walletAmount = Number(customer.walletAmount || 0) + safeCashback;
+  customer.membershipPurchase = {
+    orderAmount,
+    discountAmount,
+    paidAmount,
+    couponCode,
+    purchasedAt: new Date(),
+    paymentOrderId: paymentOrder?._id || null,
+    txnid: paymentOrder?.txnid || null,
+  };
+
+  if (couponCode) {
+    if (!Array.isArray(customer.couponUsages)) customer.couponUsages = [];
+    const alreadyLogged = customer.couponUsages.some(
+      u =>
+        String(u.code) === String(couponCode) &&
+        paymentOrder &&
+        customer.membershipPurchase?.txnid === paymentOrder.txnid,
+    );
+    // Always push once per activation attempt; rely on paymentOrder idempotency above
+    if (!alreadyLogged) {
+      customer.couponUsages.push({
+        code: couponCode,
+        discountAmount,
+        orderAmount,
+        membershipType,
+        source: 'membership',
+        usedAt: new Date(),
+      });
+    }
+  }
+
   await customer.save();
+
+  if (couponCode && paymentOrder) {
+    // increment after payment success
+    const usageFilter = {code: couponCode, isActive: true};
+    const couponDoc = await Coupon.findOne({code: couponCode});
+    if (couponDoc) {
+      const limit = Number(couponDoc.usageLimit);
+      if (Number.isFinite(limit) && limit > 0) {
+        usageFilter.usedCount = {$lt: limit};
+      }
+      await Coupon.findOneAndUpdate(usageFilter, {$inc: {usedCount: 1}});
+    }
+  } else if (couponCode && !paymentOrder) {
+    const usageFilter = {code: couponCode, isActive: true};
+    const couponDoc = await Coupon.findOne({code: couponCode});
+    if (couponDoc) {
+      const limit = Number(couponDoc.usageLimit);
+      if (Number.isFinite(limit) && limit > 0) {
+        usageFilter.usedCount = {$lt: limit};
+      }
+      await Coupon.findOneAndUpdate(usageFilter, {$inc: {usedCount: 1}});
+    }
+  }
 
   const cashbackLabel = `₹${safeCashback}`;
   let whatsapp = null;
@@ -641,8 +800,8 @@ export const activateMembership = async (customerId, payload = {}) => {
     whatsapp = await sendMembershipPurchaseWhatsApp({
       to: customer.mobile,
       name: customer.name || 'Member',
-      membershipLabel: meta.label,
-      validity: meta.validity,
+      membershipLabel: planMeta.label,
+      validity: planMeta.validity,
       cashbackLabel,
     });
   } catch (err) {
@@ -653,6 +812,12 @@ export const activateMembership = async (customerId, payload = {}) => {
   return {
     customer: customer.toSafeObject(),
     cashback: safeCashback,
+    pricing: {
+      orderAmount,
+      discountAmount,
+      paidAmount,
+      coupon: couponSnapshot,
+    },
     whatsapp,
   };
 };

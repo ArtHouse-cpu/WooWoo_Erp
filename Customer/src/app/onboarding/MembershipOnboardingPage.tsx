@@ -1,4 +1,4 @@
-import {useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import Swal from 'sweetalert2';
 import {
@@ -31,6 +31,7 @@ import {authApi} from '../../services/auth.service';
 import {getErrorMessage} from '../../services/axios';
 import {useAuthStore} from '../../store/authStore';
 import {useIsDesktop} from '../../hooks/useIsDesktop';
+import {redirectToPayu} from '../../utils/payuCheckout';
 
 function PlanIcon({id, className}: {id: MembershipPlanId; className?: string}) {
   if (id === 'general') return <User className={className} strokeWidth={2} />;
@@ -160,17 +161,63 @@ function CheckoutSheet({
   planId: MembershipPlanId;
   open: boolean;
   onClose: () => void;
-  onPay: (coupon?: string) => void;
+  onPay: (couponCode?: string, payableAmount?: number) => void;
   loading: boolean;
 }) {
   const plan = getMembershipPlan(planId);
   const [coupon, setCoupon] = useState('');
-  const [applied, setApplied] = useState(false);
+  const [applied, setApplied] = useState<{
+    code: string;
+    title: string;
+    discountAmount: number;
+    payableAmount: number;
+  } | null>(null);
+  const [validating, setValidating] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setCoupon('');
+    setApplied(null);
+    setValidating(false);
+  }, [open, planId]);
 
   if (!open) return null;
 
-  const discount = applied ? Math.round(plan.price * 0.1) : 0;
-  const total = Math.max(0, plan.price - discount);
+  const discount = applied?.discountAmount ?? 0;
+  const total = applied?.payableAmount ?? plan.price;
+
+  const applyCoupon = async () => {
+    const code = coupon.trim();
+    if (!code) {
+      toast.error('Enter a coupon code');
+      return;
+    }
+    setValidating(true);
+    try {
+      const {data} = await authApi.validateCoupon({
+        code,
+        membershipType: plan.id,
+      });
+      if (!data.data) {
+        toast.error(data.message || 'Invalid coupon');
+        setApplied(null);
+        return;
+      }
+      setApplied({
+        code: data.data.code,
+        title: data.data.title,
+        discountAmount: data.data.discountAmount,
+        payableAmount: data.data.payableAmount,
+      });
+      setCoupon(data.data.code);
+      toast.success(data.message || 'Coupon applied');
+    } catch (error) {
+      setApplied(null);
+      toast.error(getErrorMessage(error, 'Invalid coupon'));
+    } finally {
+      setValidating(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
@@ -228,7 +275,7 @@ function CheckoutSheet({
             </div>
             {applied ? (
               <div className="flex justify-between text-[#16A34A]">
-                <span>Coupon (10%)</span>
+                <span>Coupon ({applied.code})</span>
                 <span>- ₹ {discount}</span>
               </div>
             ) : null}
@@ -246,26 +293,29 @@ function CheckoutSheet({
               value={coupon}
               onChange={e => {
                 setCoupon(e.target.value);
-                setApplied(false);
+                setApplied(null);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void applyCoupon();
+                }
               }}
               placeholder="Enter coupon code"
               className="w-full border-0 bg-transparent text-[13px] outline-none placeholder:text-[#9CA3AF]"
             />
             <button
               type="button"
-              onClick={() => {
-                if (!coupon.trim()) {
-                  toast.error('Enter a coupon code');
-                  return;
-                }
-                setApplied(true);
-                toast.success('Coupon applied');
-              }}
-              className="shrink-0 text-[12px] font-semibold text-[#6B7280]"
+              disabled={validating}
+              onClick={() => void applyCoupon()}
+              className="shrink-0 text-[12px] font-semibold text-[#6B7280] disabled:opacity-50"
             >
-              Apply
+              {validating ? '...' : 'Apply'}
             </button>
           </div>
+          {applied?.title ? (
+            <p className="mt-1.5 text-[11px] text-[#16A34A]">{applied.title} applied</p>
+          ) : null}
 
           <div className="mt-3 flex max-h-11 items-center gap-2 rounded-[10px] bg-[#EFF6FF] px-2.5 py-1.5">
             <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[#2563EB]" strokeWidth={2} />
@@ -283,7 +333,7 @@ function CheckoutSheet({
           <Button
             type="button"
             loading={loading}
-            onClick={() => onPay(applied ? coupon : undefined)}
+            onClick={() => onPay(applied?.code, total)}
             className="relative mt-4 w-full rounded-[14px] bg-[#111111] py-4 text-[14px] font-semibold hover:bg-black"
           >
             <Lock className="absolute left-5 top-1/2 h-4 w-4 -translate-y-1/2" />
@@ -307,7 +357,10 @@ export default function MembershipOnboardingPage() {
 
   const selectedPlan = useMemo(() => getMembershipPlan(selected), [selected]);
 
-  const finishOnboarding = async (membershipType: MembershipPlanId | 'none') => {
+  const finishOnboarding = async (
+    membershipType: MembershipPlanId | 'none',
+    couponCode?: string,
+  ) => {
     setLoading(true);
     try {
       if (membershipType === 'none') {
@@ -322,18 +375,40 @@ export default function MembershipOnboardingPage() {
           timer: 1600,
           showConfirmButton: false,
         });
-      } else {
-        const {data} = await authApi.activateMembership({membershipType});
-        if (data.data) setCustomer(data.data);
+        navigate('/home', {replace: true});
+        return;
+      }
+
+      const {data} = await authApi.initiatePayuPayment({
+        membershipType,
+        ...(couponCode ? {couponCode} : {}),
+      });
+
+      const payload = data.data;
+      if (!payload) {
+        throw new Error(data.message || 'Could not start payment');
+      }
+
+      // Fully discounted — already activated server-side
+      if (payload.mode === 'free' && payload.activated) {
+        if (payload.customer) setCustomer(payload.customer);
         await Swal.fire({
           icon: 'success',
           title: 'Membership activated',
-          text: data.message || 'Confirmation sent on WhatsApp',
+          text: data.message || 'No payment due',
           timer: 2000,
           showConfirmButton: false,
         });
+        navigate('/home', {replace: true});
+        return;
       }
-      navigate('/home', {replace: true});
+
+      if (payload.mode === 'payu' && payload.paymentUrl && payload.params) {
+        redirectToPayu(payload.paymentUrl, payload.params);
+        return;
+      }
+
+      throw new Error('Unexpected payment response');
     } catch (error) {
       await Swal.fire({
         icon: 'error',
@@ -361,21 +436,24 @@ export default function MembershipOnboardingPage() {
 
   const onContinue = () => setCheckoutOpen(true);
 
-  const onPay = async () => {
+  const onPay = async (couponCode?: string, payableAmount?: number) => {
     const plan = getMembershipPlan(selected);
+    const amount = payableAmount ?? plan.price;
     const result = await Swal.fire({
-      title: `Pay ₹ ${plan.price}?`,
-      text: `Confirm purchase of ${plan.title} membership.`,
+      title: `Pay ₹ ${amount}?`,
+      text: couponCode
+        ? `Confirm purchase of ${plan.title} with coupon ${couponCode}.`
+        : `Confirm purchase of ${plan.title} membership.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: `Pay ₹ ${plan.price}`,
+      confirmButtonText: `Pay ₹ ${amount}`,
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#111111',
       cancelButtonColor: '#9CA3AF',
     });
     if (!result.isConfirmed) return;
     setCheckoutOpen(false);
-    await finishOnboarding(selected);
+    await finishOnboarding(selected, couponCode);
   };
 
   return (
