@@ -22,7 +22,6 @@ type LegalDocumentPageProps = {
 };
 
 export function LegalDocumentPage({doc, markdown}: LegalDocumentPageProps) {
-  const meta = DOCS[doc];
 
   return (
     <div className="min-h-dvh bg-[#F4F7FB] text-[#111827]">
