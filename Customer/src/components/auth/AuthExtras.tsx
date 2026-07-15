@@ -8,12 +8,16 @@ const WhatsAppIcon = ({className = ''}: {className?: string}) => (
 
 export function LegalNote({className = ''}: {className?: string}) {
   return (
-    <p className={`text-center text-[12px] leading-5 text-[#9CA3AF] ${className}`}>
-      You agree to our{' '}
+       <p className={`text-center text-[12px] leading-5 text-[#9CA3AF] ${className}`}>
+      By continuing, you agree to our{' '}
       <Link to="/terms" className="font-medium text-[#3B82F6] underline-offset-2 hover:underline">
-        terms
-      </Link>{' '}
-      and{' '}
+        terms 
+      </Link>
+      
+      
+      
+      {' '}
+      & {' '}
       <Link to="/legal" className="font-medium text-[#3B82F6] underline-offset-2 hover:underline">
         policies
       </Link>
