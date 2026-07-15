@@ -1,13 +1,8 @@
-import {ShieldCheck} from 'lucide-react';
+
 import {Link} from 'react-router-dom';
 import logo from '../../assets/Logo.png';
 
-const features = [
-  {label: 'Creative Community', color: 'bg-blue-500'},
-  {label: 'Inspire Each Other', color: 'bg-orange-400'},
-  {label: 'Collaborate Freely', color: 'bg-emerald-500'},
-  {label: 'Grow Together', color: 'bg-violet-500'},
-];
+
 
 export function BrandMark({
   compact = false,
@@ -17,22 +12,55 @@ export function BrandMark({
   showTagline?: boolean;
 }) {
   return (
-    <div className="flex max-w-full items-center gap-3.5">
+    <div
+      className={`flex max-w-full ${
+        compact ? 'items-center gap-3.5' : 'flex-col items-center text-center'
+      }`}
+    >
       <img
         src={logo}
         alt="Woo Woo Art House"
-        className={`w-auto max-w-[46vw] object-contain object-left ${
-          compact ? 'h-[62px]' : 'h-[4.5rem] sm:h-20'
+        className={`object-contain ${
+          compact
+            ? 'object-left h-[62px] w-auto max-w-[46vw]'
+            : 'object-center w-full max-w-[280px] sm:max-w-[340px] lg:max-w-[400px] h-auto'
         }`}
       />
       {showTagline ? (
         <>
-          <div className="h-12 w-px shrink-0 bg-[#D1D5DB]" />
-          <div className="min-w-0 text-left">
-            <p className="whitespace-nowrap text-[13px] font-semibold leading-snug text-[#1F2937]">
+          {compact ? (
+            <div className="h-12 w-px shrink-0 bg-[#D1D5DB]" />
+          ) : null}
+          <div
+            className={`min-w-0 ${
+              compact ? 'text-left' : 'flex flex-col items-center w-fit mt-0'
+            }`}
+          >
+            {!compact && <div className="w-full h-[1.5px] bg-black mb-0" />}
+            <p
+              className={`font-bold tracking-tight text-[#1F2937] ${
+                compact
+                  ? 'whitespace-nowrap text-[13px] leading-snug'
+                  : 'text-2xl sm:text-[1.75rem] lg:text-[2.25rem] leading-tight mt-0'
+              }`}
+            >
               House of Creatives!
             </p>
-            <p className="mt-0.5 text-[11px] text-[#9CA3AF]">Since 2021</p>
+           {compact ? (
+  <p className="mt-0.5 text-[11px] text-[#6B7280]/50">
+    Since 2021
+  </p>
+) : (
+<>
+  <p className="mt-2 text-8xl sm:text-[1.75rem] lg:text-[8rem] font-black leading-tight text-[#6B7280]/5 [-webkit-text-stroke:3px_rgba(107,114,128,0.05)] ">
+    SINCE
+  </p>
+
+  <p className="mt-[-40px] text-8xl sm:text-[1.75rem] lg:text-[8rem] scale-x-110 origin-left font-black leading-tight text-[#6B7280]/5 [-webkit-text-stroke:3px_rgba(107,114,128,0.05)] ">
+  2 0 2 1
+</p>
+</>
+)}
           </div>
         </>
       ) : null}
@@ -43,29 +71,14 @@ export function BrandMark({
 export function BrandPanel() {
   return (
     <aside className="brush-bg relative hidden min-h-screen flex-col justify-between px-10 py-8 lg:flex xl:px-16">
-      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand-blue text-white">
-          a⁺
-        </span>
-        Atives
-      </div>
+     
 
-      <div className="mx-auto max-w-md space-y-10">
+      <div className="mx-auto max-w-md space-y-10 mt-12 lg:mt-20">
         <BrandMark />
-        <div className="grid grid-cols-2 gap-4">
-          {features.map(item => (
-            <div
-              key={item.label}
-              className="rounded-2xl border border-white/70 bg-white/70 p-4 shadow-sm backdrop-blur"
-            >
-              <div className={`mb-3 h-9 w-9 rounded-xl ${item.color} opacity-90`} />
-              <p className="text-sm font-medium text-slate-700">{item.label}</p>
-            </div>
-          ))}
-        </div>
+     
       </div>
 
-      <p className="text-xs text-slate-500">Crafted for creatives · Woo Woo Art House</p>
+      <p className="text-xs text-slate-500">© 2026 WOOWOO ART HOUSE. All rights reserved.</p>
     </aside>
   );
 }
@@ -74,7 +87,7 @@ type AuthShellProps = {
   children: React.ReactNode;
   title: string;
   subtitle: string;
-  showShield?: boolean;
+
   variant?: 'welcome' | 'default';
   footer?: React.ReactNode;
 };
@@ -83,7 +96,7 @@ export function AuthShell({
   children,
   title,
   subtitle,
-  showShield = true,
+
   variant = 'default',
   footer,
 }: AuthShellProps) {
@@ -119,12 +132,6 @@ export function AuthShell({
                 : 'auth-card rounded-[28px] border border-white/80 p-6 sm:p-8 lg:flex-none'
             }`}
           >
-            {showShield ? (
-              <div className="mx-auto mb-5 hidden h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-brand-blue lg:flex">
-                <ShieldCheck className="h-7 w-7" />
-              </div>
-            ) : null}
-
             <h1 className="text-center text-[2rem] font-bold tracking-tight text-ink lg:text-3xl">
               {title}
             </h1>
