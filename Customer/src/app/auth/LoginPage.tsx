@@ -3,7 +3,7 @@ import {Link, useNavigate} from 'react-router-dom';
 import {useForm} from 'react-hook-form';
 import {z} from 'zod';
 import {zodResolver} from '@hookform/resolvers/zod';
-import {ArrowRight, Eye, EyeOff, Phone, Lock, ShieldCheck} from 'lucide-react';
+import {ArrowRight, Eye, EyeOff, Phone, Lock} from 'lucide-react';
 import {toast} from 'sonner';
 import {BrandMark, BrandPanel} from '../../components/auth/AuthShell';
 import {LegalNote, OtpHint} from '../../components/auth/AuthExtras';
@@ -132,12 +132,7 @@ export default function LoginPage() {
               >
                 Continue <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
               </Button>
-              <p className="text-center text-[13px] text-[#6B7280]">
-                New here?{' '}
-                <Link to="/signup" className="font-semibold text-[#3B82F6]">
-                  Create Account
-                </Link>
-              </p>
+              
               <LegalNote />
             </div>
           </form>
@@ -199,20 +194,10 @@ export default function LoginPage() {
       ) : (
       /* Desktop card */
       <section className="relative flex min-h-screen flex-col bg-surface px-8 py-6">
-        <div className="mb-6 flex justify-end">
-          <Link
-            to="/signup"
-            className="inline-flex items-center rounded-full bg-brand-blue px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:brightness-110"
-          >
-            Join Now +
-          </Link>
-        </div>
+        
 
         <div className="flex flex-1 items-center justify-center">
           <div className="auth-card w-full max-w-md rounded-[28px] border border-white/80 p-8">
-            <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-brand-blue">
-              <ShieldCheck className="h-7 w-7" />
-            </div>
             <h1 className="text-center text-3xl font-bold tracking-tight text-ink">Welcome</h1>
             <p className="mt-2 text-center text-sm text-muted">
               {mode === 'otp'
@@ -242,7 +227,7 @@ export default function LoginPage() {
             </div>
 
             {mode === 'otp' ? (
-              <form onSubmit={onOtpContinue} className="space-y-4">
+              <form onSubmit={onOtpContinue} className="flex flex-col gap-2.5">
                 <Input
                   leftIcon={<Phone className="h-4 w-4" />}
                   placeholder="Enter your mobile number"
@@ -251,18 +236,13 @@ export default function LoginPage() {
                   {...otpForm.register('mobile')}
                 />
                 <OtpHint />
-                <Button type="submit" loading={loading} className="rounded-2xl py-4">
+                <Button type="submit" loading={loading} className="rounded-2xl py-4 mt-8">
                   Continue <ArrowRight className="h-4 w-4" />
                 </Button>
-                <p className="text-center text-sm text-slate-600">
-                  New here?{' '}
-                  <Link to="/signup" className="font-semibold text-brand-blue">
-                    Create account
-                  </Link>
-                </p>
+
               </form>
             ) : (
-              <form onSubmit={onPasswordLogin} className="space-y-4">
+              <form onSubmit={onPasswordLogin} className="flex flex-col gap-3">
                 <Input
                   leftIcon={<Phone className="h-4 w-4" />}
                   placeholder="Email or mobile number"
@@ -297,15 +277,10 @@ export default function LoginPage() {
                 <Button type="submit" loading={loading} className="rounded-2xl py-4">
                   Login <ArrowRight className="h-4 w-4" />
                 </Button>
-                <p className="text-center text-sm text-slate-600">
-                  New here?{' '}
-                  <Link to="/signup" className="font-semibold text-brand-blue">
-                    Create account
-                  </Link>
-                </p>
+
               </form>
             )}
-            <LegalNote className="mt-6" />
+            <LegalNote className="mt-4" />
           </div>
         </div>
       </section>
