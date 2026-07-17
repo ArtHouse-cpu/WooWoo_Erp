@@ -1,7 +1,6 @@
 import {Link, useNavigate} from 'react-router-dom';
-import {Star, Wallet} from 'lucide-react';
+import {Star, Wallet, ArrowRight} from 'lucide-react';
 import {motion} from 'framer-motion';
-import {artistQuote} from '../../data/dashboard';
 import {cardClass} from './SectionHeading';
 import {useAuthStore} from '../../store/authStore';
 
@@ -13,90 +12,49 @@ function membershipLabel(type?: string) {
 export function HeroBanner() {
   const navigate = useNavigate();
   const customer = useAuthStore(s => s.customer);
-  const firstName = (customer?.name || 'Creator').split(' ')[0];
-  const wallet = customer?.walletBalance ?? customer?.walletAmount ?? 0;
-  const initial = (customer?.name || 'C').charAt(0).toUpperCase();
+  const firstName = (customer?.name || 'Ankur').split(' ')[0];
+  const wallet = customer?.walletBalance ?? customer?.walletAmount ?? 71;
 
   return (
     <motion.section
       initial={{opacity: 0, y: 16}}
       animate={{opacity: 1, y: 0}}
       transition={{duration: 0.45}}
-      className={`${cardClass} relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFF] to-[#FFF7ED] p-5 md:min-h-[220px] md:p-6`}
+      className="rounded-[24px] border border-black/[0.05] bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] sm:p-6"
     >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-10 top-0 h-40 w-40 rounded-full bg-[#FDE68A]/40 blur-3xl md:h-56 md:w-56"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -left-8 bottom-0 h-32 w-32 rounded-full bg-[#BFDBFE]/50 blur-3xl"
-      />
-
-      <div className="relative grid gap-5 lg:grid-cols-[1.1fr_0.9fr_0.9fr] lg:items-center">
-        <div className="flex items-start gap-3.5 md:items-center">
-          <button
-            type="button"
-            onClick={() => navigate('/profile')}
-            className="relative shrink-0"
-            aria-label="Open profile"
-          >
-            <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#DBEAFE] to-[#C4B5FD] text-[20px] font-bold text-[#1D4ED8] shadow-md ring-2 ring-white md:h-16 md:w-16">
-              {customer?.profileImage ? (
-                <img src={customer.profileImage} alt="" className="h-full w-full object-cover" />
-              ) : (
-                initial
-              )}
-            </div>
-            <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-[#22C55E]" />
-          </button>
-          <div className="min-w-0">
-            <h1 className="truncate text-[20px] font-bold tracking-tight text-[#111111] md:text-[22px]">
-              Hi, {firstName} 👋
-            </h1>
-            <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#EEF4FF] px-2.5 py-0.5 text-[11px] font-semibold text-[#2563EB]">
-              <Star className="h-3 w-3 fill-current" />
-              {membershipLabel(customer?.membershipType)}
+      <div className="grid grid-cols-2 items-center gap-4 divide-x divide-slate-100">
+        {/* Left Side: Greeting & Membership Badge */}
+        <div className="flex flex-col justify-center space-y-2.5 pr-2">
+          <h1 className="text-[20px] font-extrabold tracking-tight text-[#111111] sm:text-[24px]">
+            Hi, {firstName} 👋
+          </h1>
+          <div className="w-fit">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF4FF] px-2.5 py-0.5 text-[11px] font-bold text-[#2563EB]">
+              <span className="text-[12px] leading-none">★</span>
+              {membershipLabel(customer?.membershipType || 'premium')}
             </span>
-            <p className="mt-3 hidden max-w-sm text-[13px] leading-relaxed text-[#6B7280] md:block">
-              “{artistQuote}”
-            </p>
           </div>
+        </div>
 
-          <div className="ml-auto flex items-center gap-2 md:hidden">
-            <div className="text-right">
-              <p className="text-[10px] font-medium text-[#9CA3AF]">Wallet Balance</p>
-              <p className="text-[16px] font-bold tabular-nums text-[#111111]">
+        {/* Right Side: Wallet details */}
+        <div className="relative pl-5 flex flex-col justify-between h-full min-h-[76px]">
+          <div className="flex items-start justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[11px] font-semibold text-[#9CA3AF] tracking-wide">Wallet Balance</p>
+              <p className="text-[24px] font-black tracking-tight text-[#111111] tabular-nums sm:text-[28px]">
                 ₹{wallet.toLocaleString('en-IN', {minimumFractionDigits: 0})}
               </p>
             </div>
-            <button
-              type="button"
-              className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[#2563EB] text-white shadow-[0_8px_20px_rgba(37,99,235,0.35)]"
-              aria-label="Wallet"
-            >
-              <Wallet className="h-4 w-4" />
-            </button>
+            <div className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors mt-0.5">
+              <Wallet className="h-[22px] w-[22px]" strokeWidth={1.5} />
+            </div>
           </div>
-        </div>
-
-        <div className="hidden items-center justify-center lg:flex">
-          <div className="relative flex h-36 w-full max-w-[220px] items-end justify-center rounded-[20px] bg-gradient-to-t from-[#FFEDD5]/80 to-transparent">
-            <span className="select-none text-[72px] leading-none drop-shadow-sm">🎨</span>
-          </div>
-        </div>
-
-        <div className="hidden rounded-[20px] border border-[#E5E7EB]/80 bg-white/80 p-4 backdrop-blur md:block">
-          <p className="text-[12px] font-medium text-[#9CA3AF]">Wallet Balance</p>
-          <p className="mt-1 text-[28px] font-bold tabular-nums tracking-tight text-[#111111]">
-            ₹{wallet.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-          </p>
-          <button
-            type="button"
-            className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#2563EB] py-2.5 text-[13px] font-semibold text-white shadow-[0_8px_20px_rgba(37,99,235,0.3)] transition hover:brightness-110"
+          <Link
+            to="/wallet"
+            className="mt-2 inline-flex items-center gap-1 text-[12px] font-extrabold text-[#EA580C] transition hover:text-[#C2410C]"
           >
-            <Wallet className="h-4 w-4" /> Add Money
-          </button>
+            View Wallet <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.5} />
+          </Link>
         </div>
       </div>
     </motion.section>
