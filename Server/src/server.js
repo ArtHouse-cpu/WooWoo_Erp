@@ -22,6 +22,7 @@ import inventoryRoutes from './routes/Inventory.router.js';
 import walletRoutes from './routes/wallet.router.js';
 import couponRoutes from './routes/coupon.route.js';
 import companyRoutes from './routes/company.route.js';
+import affiliateRoutes from './routes/affiliate.route.js';
 import customerAuthRoutes from './modules/customer/routes/auth.routes.js';
 import {customerErrorHandler} from './modules/customer/middlewares/errorHandler.js';
 import path from 'path';
@@ -85,9 +86,11 @@ app.use('/purchaseOrder', purchaseOrderRoutes);
 app.use('/purchaseReturn', purchaseReturnRoutes);
 app.use('/vendor', vendorRoutes);
 app.use('/inventory', inventoryRoutes);
+
 app.use('/wallet', walletRoutes);
 app.use('/coupon', couponRoutes);
 app.use('/company', companyRoutes);
+app.use('/affiliate', affiliateRoutes);
 
 // Customer portal auth APIs — isolated namespace (does not conflict with admin /customer)
 app.use('/api/customer', customerAuthRoutes);

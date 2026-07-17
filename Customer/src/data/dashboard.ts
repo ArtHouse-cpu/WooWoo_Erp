@@ -11,6 +11,7 @@ import {
   MapPin,
   MessageCircle,
   Package,
+  Share2,
   ShoppingBag,
   Star,
   Utensils,
@@ -25,6 +26,15 @@ export type NavItem = {
   section?: string;
 };
 
+export type ActionItem = {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: 'headphones' | 'map' | 'share';
+  color: string;
+  to?: string;
+};
+
 export const dashboardNav: NavItem[] = [
   {id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, to: '/home', section: 'Main'},
   {id: 'store', label: 'Store', icon: ShoppingBag, section: 'Explore'},
@@ -36,6 +46,7 @@ export const dashboardNav: NavItem[] = [
   {id: 'services', label: 'Get Services', icon: Briefcase, section: 'Services'},
   {id: 'food', label: 'Order Food', icon: Utensils, section: 'Services'},
   {id: 'artists', label: 'Artists', icon: Users, section: 'Community'},
+  {id: 'refer', label: 'Refer & Earn', icon: Share2, to: '/refer-and-earn', section: 'Community'},
   {id: 'community', label: 'Community', icon: Heart, section: 'Community'},
   {id: 'messages', label: 'Messages', icon: MessageCircle, section: 'Community'},
   {id: 'saved', label: 'Saved', icon: Star, section: 'Community'},
@@ -119,7 +130,7 @@ export const serviceItems = [
   },
 ];
 
-export const actionItems = [
+export const actionItems: ActionItem[] = [
   {
     id: 'help',
     title: 'Help',
@@ -140,6 +151,7 @@ export const actionItems = [
     subtitle: 'Invite & Earn',
     icon: 'share' as const,
     color: 'text-[#8B5CF6]',
+    to: '/refer-and-earn',
   },
 ];
 

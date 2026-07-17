@@ -1178,3 +1178,102 @@ export const handleSwitchCompany = async (companyId: string) => {
   }
 };
 
+export const handleGetAffiliateSettings = async (signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/affiliate/settings", { signal });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching affiliate settings:", error);
+    throw error;
+  }
+};
+
+export const handleUpdateAffiliateSettings = async (payload: any) => {
+  try {
+    const response = await axiosInstance.put("/affiliate/settings", payload);
+    return response.data;
+  } catch (error) {
+    console.log("Error updating affiliate settings:", error);
+    throw error;
+  }
+};
+
+export const handleGetAffiliateOverview = async (signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/affiliate/overview", { signal });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching affiliate overview:", error);
+    throw error;
+  }
+};
+
+export const handleGetAffiliateLeaderboard = async (signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/affiliate/leaderboard", { signal });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching affiliate leaderboard:", error);
+    throw error;
+  }
+};
+
+export const handleGetAffiliateWalletSummary = async (signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/affiliate/wallet-summary", { signal });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching wallet summary:", error);
+    throw error;
+  }
+};
+
+export const handleGetAffiliatesList = async (params?: Record<string, string>, signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/affiliate/list", { params, signal });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching affiliates list:", error);
+    throw error;
+  }
+};
+
+export const handleGetAffiliateById = async (id: string, signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get(`/affiliate/affiliates/${id}`, { signal });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching affiliate detail:", error);
+    throw error;
+  }
+};
+
+export const handleGetPayoutsList = async (params?: Record<string, string>, signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/affiliate/payouts", { params, signal });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching payouts list:", error);
+    throw error;
+  }
+};
+
+export const handleCreateManualPayout = async (payload: any) => {
+  try {
+    const response = await axiosInstance.post("/affiliate/payouts/manual", payload);
+    return response.data;
+  } catch (error) {
+    console.log("Error creating manual payout:", error);
+    throw error;
+  }
+};
+
+export const handleUpdatePayoutStatus = async (id: string, payload: any) => {
+  try {
+    const response = await axiosInstance.put(`/affiliate/payouts/${id}`, payload);
+    return response.data;
+  } catch (error) {
+    console.log("Error updating payout status:", error);
+    throw error;
+  }
+};

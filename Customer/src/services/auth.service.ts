@@ -1,5 +1,5 @@
 import {api} from './axios';
-import type {ApiResponse, Customer, OtpPurpose} from '../types/auth';
+import type {ApiResponse, Customer, OtpPurpose, ReferralDashboard} from '../types/auth';
 
 export const authApi = {
   signup: (payload: {
@@ -24,6 +24,7 @@ export const authApi = {
     otp: string;
     purpose?: OtpPurpose;
     name?: string;
+    ref?: string;
   }) => api.post<ApiResponse<Customer | {resetToken?: string; identifier?: string}>>(
     '/verify-otp',
     payload,
@@ -51,6 +52,8 @@ export const authApi = {
   logout: () => api.post<ApiResponse>('/logout'),
 
   me: () => api.get<ApiResponse<Customer>>('/me'),
+
+  getReferralDashboard: () => api.get<ApiResponse<ReferralDashboard>>('/referral'),
 
   updateProfile: (
     payload: Partial<Customer> & {
