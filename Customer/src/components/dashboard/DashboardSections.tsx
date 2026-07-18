@@ -150,7 +150,7 @@ export function MembershipBanner() {
   );
 }
 
-export function ActionCards() {
+export function ActionCards({onActionClick}: {onActionClick?: (id: string) => void}) {
   const icons = {
     headphones: Headphones,
     map: MapPin,
@@ -186,6 +186,7 @@ export function ActionCards() {
           <motion.button
             key={item.id}
             type="button"
+            onClick={() => onActionClick?.(item.id)}
             whileHover={{scale: 1.02}}
             className="flex flex-col items-center justify-center py-2 px-1 text-center transition cursor-pointer"
           >
