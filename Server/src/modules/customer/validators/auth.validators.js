@@ -56,6 +56,7 @@ export const verifyOtpSchema = z
     otp: otpSchema,
     name: z.string().optional(),
     countryCode: z.string().optional(),
+    ref: z.string().trim().max(32).optional(),
     purpose: z
       .enum(['login', 'signup', 'forgot-password', 'verify-mobile', 'verify-email'])
       .optional(),

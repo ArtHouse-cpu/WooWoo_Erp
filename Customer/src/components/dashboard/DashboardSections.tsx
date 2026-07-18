@@ -168,6 +168,20 @@ export function ActionCards() {
       {actionItems.map(item => {
         const Icon = icons[item.icon];
         const colorClass = colors[item.id as keyof typeof colors] || item.color;
+        const className = `${cardClass} px-2 py-4 text-center`;
+
+        if (item.to) {
+          return (
+            <motion.div key={item.id} whileHover={{y: -3}}>
+              <Link to={item.to} className={`${className} block`}>
+                <Icon className={`mx-auto h-5 w-5 ${item.color}`} strokeWidth={1.75} />
+                <p className="mt-2 text-[13px] font-semibold text-[#111111]">{item.title}</p>
+                <p className="text-[11px] text-[#6B7280]">{item.subtitle}</p>
+              </Link>
+            </motion.div>
+          );
+        }
+
         return (
           <motion.button
             key={item.id}
