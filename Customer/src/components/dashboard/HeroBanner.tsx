@@ -11,8 +11,8 @@ function membershipLabel(type?: string) {
 
 export function HeroBanner() {
   const customer = useAuthStore(s => s.customer);
-  const firstName = (customer?.name || 'Ankur').split(' ')[0];
-  const wallet = customer?.walletBalance ?? customer?.walletAmount ?? 71;
+  const firstName = (customer?.name || 'Member').split(' ')[0];
+  const wallet = customer?.walletBalance ?? customer?.walletAmount ?? 0;
 
   return (
     <motion.section
@@ -30,7 +30,7 @@ export function HeroBanner() {
           <div className="w-fit">
             <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF4FF] px-2.5 py-0.5 text-[11px] font-bold text-[#2563EB]">
               <span className="text-[12px] leading-none">★</span>
-              {membershipLabel(customer?.membershipType || 'premium')}
+              {membershipLabel(customer?.membershipType)}
             </span>
           </div>
         </div>

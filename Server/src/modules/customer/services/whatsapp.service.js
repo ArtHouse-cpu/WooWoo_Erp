@@ -267,7 +267,18 @@ export const sendWhatsAppOtp = async ({to, otp}) => {
   let friendly = `Failed to send WhatsApp OTP: ${metaMessage}`;
   if (lastError?.code === 190) {
     friendly =
-      'WhatsApp access token is invalid or expired. Generate a new token in Meta Developer Console and update WHATSAPP_ACCESS_TOKEN.';
+      'WhatsApp access token is invalid or expired. Generate a new permanent System User token in Meta Business Settings and update WHATSAPP_ACCESS_TOKEN.';
+  } else if (
+    lastError?.code === 100 ||
+    /Object with ID|does not exist|missing permissions|does not support this operation/i.test(
+      metaMessage,
+    )
+  ) {
+    friendly =
+      `Failed to send WhatsApp OTP: Meta cannot access phone number ID "${phoneNumberId}". ` +
+      'Use Phone Number ID (not WABA ID) from Meta App Dashboard → WhatsApp → API Setup, ' +
+      'ensure WHATSAPP_ACCESS_TOKEN has whatsapp_business_messaging + whatsapp_business_management, ' +
+      'and assign the System User to that WhatsApp Business Account with full control.';
   }
 
   const error = new Error(friendly);

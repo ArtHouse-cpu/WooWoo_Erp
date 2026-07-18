@@ -12,6 +12,7 @@ import {validateMembershipCoupon} from './coupon.service.js';
 import Coupon from '../../../models/coupon.model.js';
 import PaymentOrder from '../models/paymentOrder.model.js';
 import {getMembershipOrderAmount} from '../constants/membershipPlans.js';
+import {creditInviteReward} from './referral.service.js';
 import {
   generateAccessToken,
   createRefreshToken,
@@ -189,6 +190,17 @@ export const signupCustomer = async (res, payload, meta = {}) => {
       referredBy,
       referredAt: referredBy ? new Date() : null,
     });
+    try {
+      await creditInviteReward({
+        referredCustomerId: customer._id,
+        orderAmount: 0,
+        paidAmount: 0,
+        sourceId: `registration:${customer._id}`,
+        eventTrigger: 'registration',
+      });
+    } catch (error) {
+      console.error('[Referral] Registration reward failed:', error?.message || error);
+    }
     await notifyAccountCreated(customer);
   }
 
@@ -308,6 +320,17 @@ export const verifyLoginOtp = async (res, payload, meta = {}) => {
     // Credit welcome bonus now; WhatsApp waits until Create Account (real name)
     applyWelcomeBonus(customer);
     await customer.save();
+    try {
+      await creditInviteReward({
+        referredCustomerId: customer._id,
+        orderAmount: 0,
+        paidAmount: 0,
+        sourceId: `registration:${customer._id}`,
+        eventTrigger: 'registration',
+      });
+    } catch (error) {
+      console.error('[Referral] Registration reward failed:', error?.message || error);
+    }
   } else {
     customer.mobileVerified = true;
     customer.isVerified = true;
@@ -793,6 +816,21 @@ export const activateMembership = async (customerId, payload = {}) => {
   }
 
   await customer.save();
+
+  try {
+    await creditInviteReward({
+      referredCustomerId: customer._id,
+      orderAmount,
+      paidAmount,
+      sourceId: paymentOrder?.txnid || `membership:${customer._id}`,
+      eventTrigger: 'membership_activate',
+    });
+  } catch (error) {
+    console.error(
+      '[Referral] Could not credit invite reward:',
+      error?.message || error,
+    );
+  }
 
   if (couponCode && paymentOrder) {
     // increment after payment success
