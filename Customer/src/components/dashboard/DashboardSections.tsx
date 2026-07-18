@@ -11,7 +11,6 @@ import {Link} from 'react-router-dom';
 import {motion} from 'framer-motion';
 import {
   actionItems,
-  exploreItems,
   exploreItemsDesktop,
   serviceItems,
   topArtists,
@@ -19,7 +18,7 @@ import {
 } from '../../data/dashboard';
 import {cardClass, SectionHeading} from './SectionHeading';
 
-export function ExploreGrid() {
+export function ExploreGrid({onItemClick}: {onItemClick?: (id: string) => void}) {
   return (
     <section>
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -41,6 +40,7 @@ export function ExploreGrid() {
             <motion.button
               key={item.id}
               type="button"
+              onClick={() => onItemClick?.(item.id)}
               initial={{opacity: 0, y: 12}}
               animate={{opacity: 1, y: 0}}
               transition={{delay: i * 0.05}}

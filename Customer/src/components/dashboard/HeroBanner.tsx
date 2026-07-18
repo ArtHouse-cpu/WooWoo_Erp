@@ -10,7 +10,6 @@ function membershipLabel(type?: string) {
 }
 
 export function HeroBanner() {
-  const navigate = useNavigate();
   const customer = useAuthStore(s => s.customer);
   const firstName = (customer?.name || 'Ankur').split(' ')[0];
   const wallet = customer?.walletBalance ?? customer?.walletAmount ?? 71;

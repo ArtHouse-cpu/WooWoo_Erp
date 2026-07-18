@@ -1,8 +1,5 @@
 import {useState} from 'react';
-import {Link} from 'react-router-dom';
-import {ArrowRight} from 'lucide-react';
 import {DashboardSidebar} from '../../components/dashboard/DashboardSidebar';
-import {MobileBottomNav} from '../../components/dashboard/MobileBottomNav';
 import {TopNavbar, MobileHeader} from '../../components/dashboard/TopNavbar';
 import {HeroBanner, ProfileAsideCard} from '../../components/dashboard/HeroBanner';
 import {
@@ -13,9 +10,25 @@ import {
   UpcomingEvents,
 } from '../../components/dashboard/DashboardSections';
 import {SearchBar} from '../../components/dashboard/SearchBar';
+import {SuppliesBottomSheet} from '../../components/dashboard/SuppliesBottomSheet';
+import {ServicesBottomSheet} from '../../components/dashboard/ServicesBottomSheet';
+import {EventsBottomSheet} from '../../components/dashboard/EventsBottomSheet';
 
 export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [suppliesOpen, setSuppliesOpen] = useState(false);
+  const [servicesOpen, setServicesOpen] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(false);
+
+  const handleExploreClick = (id: string) => {
+    if (id === 'store') {
+      setSuppliesOpen(true);
+    } else if (id === 'services') {
+      setServicesOpen(true);
+    } else if (id === 'events') {
+      setEventsOpen(true);
+    }
+  };
 
   return (
     <div className="min-h-dvh bg-[#FAFBFD]">
@@ -33,7 +46,7 @@ export default function HomePage() {
           <div className="min-w-0 flex-1 space-y-6">
             <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
             <HeroBanner />
-            <ExploreGrid />
+            <ExploreGrid onItemClick={handleExploreClick} />
             <MembershipBanner />
             <ActionCards />
           </div>
@@ -52,16 +65,18 @@ export default function HomePage() {
             <SearchBar className="max-w-none" />
           </div>
 
-          <div className="space-y-5 pb-28">
+          <div className="space-y-5 pb-4">
             <HeroBanner />
-            <ExploreGrid />
+            <ExploreGrid onItemClick={handleExploreClick} />
             <MembershipBanner />
             <ActionCards />
           </div>
-
-          <MobileBottomNav />
         </div>
       </div>
+
+      <SuppliesBottomSheet isOpen={suppliesOpen} onClose={() => setSuppliesOpen(false)} />
+      <ServicesBottomSheet isOpen={servicesOpen} onClose={() => setServicesOpen(false)} />
+      <EventsBottomSheet isOpen={eventsOpen} onClose={() => setEventsOpen(false)} />
     </div>
   );
 }
