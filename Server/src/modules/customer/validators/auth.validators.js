@@ -31,6 +31,7 @@ export const signupSchema = z
     gender: z.enum(['male', 'female', 'other', '']).optional(),
     dob: z.union([z.string(), z.date(), z.null()]).optional(),
     acceptTerms: z.boolean().optional(),
+    ref: z.string().trim().max(32).optional(),
   })
   .refine(
     data => !data.confirmPassword || data.password === data.confirmPassword,

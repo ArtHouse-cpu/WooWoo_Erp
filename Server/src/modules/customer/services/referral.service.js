@@ -1,31 +1,92 @@
 import Customer from '../../../models/customer.model.js';
-import AffiliateSettings from '../../../models/affiliateSettings.model.js';
+import AffiliateSettings, {
+  normalizeAffiliateRules,
+} from '../../../models/affiliateSettings.model.js';
 import AffiliateCommission from '../../../models/affiliateCommission.model.js';
 import CommissionLedger from '../../../models/commissionLedger.model.js';
 
-const ensureReferralCode = async customer => {
-  if (customer.referralCode) return customer;
+const generateReferralCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
   for (let i = 0; i < 8; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  customer.referralCode = `W${code}`;
-  await customer.save();
-  return customer;
+  return `W${code}`;
 };
 
-const calculateCommission = (rule, orderAmount) => {
-  const amount = Number(orderAmount || 0);
-  if (amount < Number(rule.minOrderAmount || 0)) return 0;
+const ensureReferralCode = async customer => {
+  if (customer.referralCode) return customer;
 
-  const raw =
-    rule.commissionType === 'percentage'
-      ? (amount * Number(rule.commissionValue || 0)) / 100
-      : Number(rule.commissionValue || 0);
-  const max = Number(rule.maxCommissionAmount);
-  const capped = Number.isFinite(max) && max > 0 ? Math.min(raw, max) : raw;
-  return Math.max(0, Math.round(capped * 100) / 100);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    customer.referralCode = generateReferralCode();
+    try {
+      await customer.save();
+      return customer;
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      customer.referralCode = undefined;
+    }
+  }
+
+  throw new Error('Could not generate a unique referral code');
+};
+
+const ensureAffiliateSettings = async () => {
+  let settings = await AffiliateSettings.findOne({key: 'default'});
+  if (!settings) {
+    settings = await AffiliateSettings.create({key: 'default'});
+  }
+
+  const normalizedRules = normalizeAffiliateRules(settings.rules);
+  const before = JSON.stringify(
+    (settings.rules || []).map(rule =>
+      typeof rule.toObject === 'function' ? rule.toObject() : rule,
+    ),
+  );
+  const after = JSON.stringify(normalizedRules);
+  if (before !== after) {
+    settings.rules = normalizedRules;
+    settings.markModified('rules');
+    await settings.save();
+  }
+
+  return settings;
+};
+
+const calculateSignupBonusAmount = rule =>
+  Math.max(0, Math.round(Number(rule?.commissionValue || 0) * 100) / 100);
+
+const ensureInviteBalanceCredited = async (commission, inviterId) => {
+  if (!commission) return commission;
+
+  // Only repair commissions created with the new explicit flag.
+  // Legacy records without the flag are assumed already balanced.
+  if (commission.meta?.balanceCredited !== false) {
+    return commission;
+  }
+
+  await Customer.updateOne(
+    {_id: inviterId},
+    {$inc: {affiliateBalance: Number(commission.commissionAmount || 0)}},
+  );
+
+  commission.meta = {
+    ...(typeof commission.meta?.toObject === 'function'
+      ? commission.meta.toObject()
+      : commission.meta || {}),
+    balanceCredited: true,
+  };
+  if (typeof commission.save === 'function') {
+    commission.markModified?.('meta');
+    await commission.save();
+  } else {
+    await AffiliateCommission.updateOne(
+      {_id: commission._id},
+      {$set: {'meta.balanceCredited': true}},
+    );
+  }
+
+  return commission;
 };
 
 export const creditInviteReward = async ({
@@ -36,33 +97,22 @@ export const creditInviteReward = async ({
   eventTrigger,
 }) => {
   const referredCustomer = await Customer.findById(referredCustomerId);
-  if (
-    !referredCustomer?.referredBy ||
-    referredCustomer.inviteRewardCredited
-  ) {
+  if (!referredCustomer?.referredBy) {
     return null;
   }
 
-  const settings = await AffiliateSettings.findOne({key: 'default'});
-  const inviteRule = settings?.rules?.find(rule => rule.category === 'invite');
-  if (
-    settings?.isEnabled === false ||
-    !inviteRule ||
-    inviteRule.enabled === false
-  ) {
+  const settings = await ensureAffiliateSettings();
+  const inviteRule = settings.rules?.find(rule => rule.category === 'invite');
+  if (settings.isEnabled === false || !inviteRule || inviteRule.enabled === false) {
     return null;
   }
 
-  const configuredTrigger =
-    inviteRule.inviteTrigger || 'first_paid_transaction';
-  const triggerMatches =
-    configuredTrigger === eventTrigger ||
-    (configuredTrigger === 'first_paid_transaction' &&
-      eventTrigger === 'membership_activate' &&
-      Number(paidAmount || 0) > 0);
-  if (!triggerMatches) return null;
+  // Signup bonus only. Legacy purchase-based triggers are ignored.
+  const configuredTrigger = 'registration';
+  if (eventTrigger !== configuredTrigger) return null;
 
-  const commissionAmount = calculateCommission(inviteRule, orderAmount);
+  // Always use the configured fixed amount (percentage of ₹0 would never pay).
+  const commissionAmount = calculateSignupBonusAmount(inviteRule);
   if (commissionAmount <= 0) return null;
 
   const idempotencyKey = `invite:${configuredTrigger}:${referredCustomer._id}`;
@@ -72,11 +122,15 @@ export const creditInviteReward = async ({
       referredCustomer.inviteRewardCredited = true;
       await referredCustomer.save();
     }
-    return existing;
+    return ensureInviteBalanceCredited(existing, referredCustomer.referredBy);
+  }
+
+  if (referredCustomer.inviteRewardCredited) {
+    return null;
   }
 
   const claimed = await Customer.findOneAndUpdate(
-    {_id: referredCustomer._id, inviteRewardCredited: false},
+    {_id: referredCustomer._id, inviteRewardCredited: {$ne: true}},
     {$set: {inviteRewardCredited: true}},
     {new: true},
   );
@@ -90,28 +144,31 @@ export const creditInviteReward = async ({
       sourceType: eventTrigger,
       sourceId: String(sourceId || referredCustomer._id),
       orderAmount: Number(orderAmount || 0),
-      commissionType: inviteRule.commissionType,
+      commissionType: 'fixed',
       commissionValue: Number(inviteRule.commissionValue || 0),
       commissionAmount,
       status: 'credited',
       idempotencyKey,
-      description: `Invite reward for ${referredCustomer.name || 'referred customer'}`,
+      description: `Signup bonus for ${referredCustomer.name || 'referred customer'}`,
       approvedAt: new Date(),
       creditedAt: new Date(),
+      meta: {balanceCredited: false},
     });
 
-    await Customer.updateOne(
-      {_id: referredCustomer.referredBy},
-      {$inc: {affiliateBalance: commissionAmount}},
-    );
-    return commission;
+    return ensureInviteBalanceCredited(commission, referredCustomer.referredBy);
   } catch (error) {
     if (error?.code === 11000) {
       await Customer.updateOne(
         {_id: referredCustomer._id},
         {$set: {inviteRewardCredited: true}},
       );
-      return AffiliateCommission.findOne({idempotencyKey});
+      const existingCommission = await AffiliateCommission.findOne({
+        idempotencyKey,
+      });
+      return ensureInviteBalanceCredited(
+        existingCommission,
+        referredCustomer.referredBy,
+      );
     }
     await Customer.updateOne(
       {_id: referredCustomer._id},
@@ -131,11 +188,7 @@ export const getReferralDashboard = async (customerId, appBaseUrl) => {
 
   await ensureReferralCode(customer);
 
-  let settings = await AffiliateSettings.findOne({key: 'default'});
-  if (!settings) {
-    settings = await AffiliateSettings.create({key: 'default'});
-  }
-
+  const settings = await ensureAffiliateSettings();
   const inviteRule =
     settings.rules?.find(r => r.category === 'invite') || {
       enabled: true,

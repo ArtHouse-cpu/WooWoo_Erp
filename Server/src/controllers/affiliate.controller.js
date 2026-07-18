@@ -1,4 +1,6 @@
-import AffiliateSettings from '../models/affiliateSettings.model.js';
+import AffiliateSettings, {
+  normalizeAffiliateRules,
+} from '../models/affiliateSettings.model.js';
 import Customer from '../models/customer.model.js';
 import AffiliateCommission from '../models/affiliateCommission.model.js';
 import PayoutRequest from '../models/payoutRequest.model.js';
@@ -75,6 +77,20 @@ const ensureSettings = async () => {
   if (!settings) {
     settings = await AffiliateSettings.create({key: 'default'});
   }
+
+  const normalizedRules = normalizeAffiliateRules(settings.rules);
+  const before = JSON.stringify(
+    (settings.rules || []).map(rule =>
+      typeof rule.toObject === 'function' ? rule.toObject() : rule,
+    ),
+  );
+  const after = JSON.stringify(normalizedRules);
+  if (before !== after) {
+    settings.rules = normalizedRules;
+    settings.markModified('rules');
+    await settings.save();
+  }
+
   return settings;
 };
 
@@ -95,7 +111,10 @@ export const updateAffiliateSettings = async (req, res) => {
     const settings = await ensureSettings();
 
     if (payload.isEnabled !== undefined) settings.isEnabled = payload.isEnabled;
-    if (payload.rules) settings.rules = payload.rules;
+    if (payload.rules) {
+      settings.rules = normalizeAffiliateRules(payload.rules);
+      settings.markModified('rules');
+    }
     if (payload.milestones) settings.milestones = payload.milestones;
     applyNested(settings, 'withdrawal', payload.withdrawal);
     applyNested(settings, 'payoutSettings', payload.payoutSettings);

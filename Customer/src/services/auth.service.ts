@@ -16,6 +16,7 @@ export const authApi = {
     confirmPassword?: string;
     gender?: string;
     dob?: string;
+    ref?: string;
   }) => api.post<ApiResponse<Customer>>('/signup', payload),
 
   login: (payload: {identifier: string; password: string; rememberMe?: boolean}) =>
