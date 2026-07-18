@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import {
   ArrowLeft,
+  Clock,
   Copy,
   Gift,
   MessageCircle,
@@ -224,7 +225,7 @@ export default function ReferAndEarnPage() {
             </div>
           </motion.div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-[20px] border border-black/[0.04] bg-white p-4 text-center shadow-sm">
               <Users className="mx-auto h-4 w-4 text-[#2563EB]" />
               <p className="mt-2 text-[18px] font-bold text-[#111111]">{data.stats.totalReferrals}</p>
@@ -243,6 +244,43 @@ export default function ReferAndEarnPage() {
                 {formatInr(data.stats.totalEarned)}
               </p>
               <p className="text-[11px] text-[#6B7280]">Earned</p>
+            </div>
+            <div className="rounded-[20px] border border-black/[0.04] bg-white p-4 text-center shadow-sm">
+              <Clock className="mx-auto h-4 w-4 text-[#EA580C]" />
+              <p className="mt-2 text-[18px] font-bold text-[#111111]">
+                {formatInr(data.stats.pendingEarnings)}
+              </p>
+              <p className="text-[11px] text-[#6B7280]">Pending</p>
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-black/[0.04] bg-white p-4 shadow-sm">
+            <p className="mb-3 text-[14px] font-semibold text-[#111111]">Earnings summary</p>
+            <div className="space-y-3 text-[13px]">
+              <div className="flex items-center justify-between">
+                <span className="text-[#6B7280]">Withdrawable affiliate balance</span>
+                <span className="font-semibold text-[#16A34A]">
+                  {formatInr(data.wallet.affiliateBalance)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[#6B7280]">Reserved for payouts</span>
+                <span className="font-semibold text-[#111111]">
+                  {formatInr(data.wallet.affiliateReserved)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[#6B7280]">Cashback balance</span>
+                <span className="font-semibold text-[#111111]">
+                  {formatInr(data.wallet.cashbackBalance)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t border-[#F3F4F6] pt-3">
+                <span className="text-[#6B7280]">Active referred members</span>
+                <span className="font-semibold text-[#111111]">
+                  {data.stats.activeReferrals} of {data.stats.totalReferrals}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -316,16 +354,29 @@ export default function ReferAndEarnPage() {
             ) : (
               <ul className="divide-y divide-[#F3F4F6]">
                 {data.recentReferrals.map((item, index) => (
-                  <li key={`${item.name}-${index}`} className="flex items-center justify-between py-3">
+                  <li key={item.id || `${item.name}-${index}`} className="flex items-center justify-between gap-3 py-3">
                     <div>
                       <p className="text-[13px] font-semibold text-[#111111]">{item.name}</p>
                       <p className="text-[11px] capitalize text-[#6B7280]">
                         {item.membershipType || 'none'} · {item.status || 'active'}
                       </p>
                     </div>
-                    <p className="text-[11px] text-[#9CA3AF]">
-                      {item.joinedAt ? new Date(item.joinedAt).toLocaleDateString('en-IN') : '—'}
-                    </p>
+                    <div className="text-right">
+                      <p className="text-[12px] font-semibold text-[#16A34A]">
+                        {formatInr(item.totalEarned)}
+                      </p>
+                      {item.pendingEarnings > 0 ? (
+                        <p className="text-[10px] text-[#EA580C]">
+                          {formatInr(item.pendingEarnings)} pending
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-[#9CA3AF]">
+                          {item.joinedAt
+                            ? new Date(item.joinedAt).toLocaleDateString('en-IN')
+                            : '—'}
+                        </p>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>

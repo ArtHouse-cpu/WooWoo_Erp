@@ -22,6 +22,7 @@ import {
   paymentStatus,
 } from '../controllers/payment.controller.js';
 import {getReferralDashboard} from '../controllers/referral.controller.js';
+import {getWalletDashboard} from '../controllers/wallet.controller.js';
 import {validateRequest} from '../middlewares/validateRequest.js';
 import {
   authenticateCustomer,
@@ -97,6 +98,12 @@ router.get(
   authenticateCustomer,
   authorizeCustomer('active'),
   getReferralDashboard,
+);
+router.get(
+  '/wallet',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  getWalletDashboard,
 );
 router.put(
   '/profile',

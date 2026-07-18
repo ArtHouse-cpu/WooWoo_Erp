@@ -1,5 +1,11 @@
 import {api} from './axios';
-import type {ApiResponse, Customer, OtpPurpose, ReferralDashboard} from '../types/auth';
+import type {
+  ApiResponse,
+  Customer,
+  OtpPurpose,
+  ReferralDashboard,
+  WalletDashboard,
+} from '../types/auth';
 
 export const authApi = {
   signup: (payload: {
@@ -54,6 +60,8 @@ export const authApi = {
   me: () => api.get<ApiResponse<Customer>>('/me'),
 
   getReferralDashboard: () => api.get<ApiResponse<ReferralDashboard>>('/referral'),
+
+  getWalletDashboard: () => api.get<ApiResponse<WalletDashboard>>('/wallet'),
 
   updateProfile: (
     payload: Partial<Customer> & {

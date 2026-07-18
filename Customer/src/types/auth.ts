@@ -49,15 +49,67 @@ export interface ReferralDashboard {
   };
   stats: {
     totalReferrals: number;
+    activeReferrals: number;
     totalEarned: number;
+    pendingEarnings: number;
+    totalTransactions: number;
     totalOrders: number;
   };
   recentReferrals: Array<{
+    id?: string;
     name: string;
     membershipType?: string;
     status?: string;
     joinedAt?: string;
+    totalEarned: number;
+    pendingEarnings: number;
   }>;
+}
+
+export interface WalletDashboard {
+  balances: {
+    totalAvailable: number;
+    generalBalance: number;
+    affiliateBalance: number;
+    affiliateReserved: number;
+    cashbackBalance: number;
+    withdrawable: number;
+  };
+  summary: {
+    cashbackBalance: number;
+    totalAffiliateEarned: number;
+    rewardTransactions: number;
+    totalTransactions: number;
+  };
+  affiliateThisMonth: {
+    earnings: number;
+    referrals: number;
+    revenue: number;
+    conversionRate: number;
+    transactionCount: number;
+  };
+  categories: Array<{
+    category: string;
+    label: string;
+    amount: number;
+    transactionCount: number;
+  }>;
+  transactions: Array<{
+    id: string;
+    kind: 'wallet' | 'commission' | 'withdrawal';
+    title: string;
+    type: 'credit' | 'debit';
+    amount: number;
+    status: string;
+    category: string;
+    createdAt: string;
+  }>;
+  referral: {
+    referralCode: string;
+    shareUrl: string;
+    shareMessage: string;
+  };
+  updatedAt: string;
 }
 
 export interface ApiResponse<T = unknown> {
