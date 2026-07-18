@@ -265,6 +265,7 @@ const customerSchema = new mongoose.Schema(
       uppercase: true,
       default: null,
       sparse: true,
+      unique: true,
     },
     referredBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -389,7 +390,6 @@ customerSchema.pre("save", function (next) {
     for (let i = 0; i < 8; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    // ensure unique prefix maybe? Or rely on index. A simple 8 char alphanumeric should be fairly unique.
     this.referralCode = `W${code}`;
   }
   next();

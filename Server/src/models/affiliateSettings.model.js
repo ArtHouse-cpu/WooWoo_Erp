@@ -29,7 +29,7 @@ const commissionRuleSchema = new mongoose.Schema(
     inviteTrigger: {
       type: String,
       enum: ['registration', 'first_paid_transaction', 'membership_activate'],
-      default: 'first_paid_transaction',
+      default: 'registration',
     },
   },
   {_id: false},
@@ -49,13 +49,13 @@ const affiliateSettingsSchema = new mongoose.Schema(
       default: () => [
         {
           category: 'invite',
-          label: 'Successful Invite Reward',
+          label: 'Signup Bonus',
           enabled: true,
           commissionType: 'fixed',
           commissionValue: 100,
           minOrderAmount: 0,
           maxCommissionAmount: null,
-          inviteTrigger: 'first_paid_transaction',
+          inviteTrigger: 'registration',
         },
         {
           category: 'product',
@@ -188,6 +188,46 @@ const affiliateSettingsSchema = new mongoose.Schema(
   },
   {timestamps: true},
 );
+
+export const DEFAULT_INVITE_RULE = {
+  category: 'invite',
+  label: 'Signup Bonus',
+  enabled: true,
+  commissionType: 'fixed',
+  commissionValue: 100,
+  minOrderAmount: 0,
+  maxCommissionAmount: null,
+  inviteTrigger: 'registration',
+};
+
+const toPlainRule = rule =>
+  rule && typeof rule.toObject === 'function' ? rule.toObject() : {...(rule || {})};
+
+export const normalizeAffiliateRules = (rules = []) => {
+  const next = Array.isArray(rules) ? rules.map(toPlainRule) : [];
+  const inviteIndex = next.findIndex(rule => rule.category === 'invite');
+
+  if (inviteIndex === -1) {
+    next.unshift({...DEFAULT_INVITE_RULE});
+    return next;
+  }
+
+  const current = next[inviteIndex];
+  next[inviteIndex] = {
+    ...DEFAULT_INVITE_RULE,
+    ...current,
+    category: 'invite',
+    label: 'Signup Bonus',
+    commissionType: 'fixed',
+    commissionValue: Math.max(0, Number(current.commissionValue ?? DEFAULT_INVITE_RULE.commissionValue) || 0),
+    minOrderAmount: 0,
+    maxCommissionAmount: null,
+    inviteTrigger: 'registration',
+    enabled: current.enabled !== false,
+  };
+
+  return next;
+};
 
 const AffiliateSettings = mongoose.model('AffiliateSettings', affiliateSettingsSchema);
 export default AffiliateSettings;

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Users, Gift, Calendar, Activity, HelpCircle } from 'lucide-react';
+import { Users, Gift, Calendar, Activity, HelpCircle, UserPlus } from 'lucide-react';
 import { AffiliateToggle, SimpleModal } from '../components/affiliateShared';
 
 const CATEGORIES = [
+  { key: 'invite', label: 'Signup Bonus', icon: UserPlus },
   { key: 'membership', label: 'Membership', icon: Users },
   { key: 'product', label: 'Store Supplies', icon: Gift },
   { key: 'space', label: 'Space Booking', icon: Calendar },
@@ -33,31 +34,53 @@ export default function CommissionRulesTab({ settings, handleSave }: Props) {
       r.category === category ? { ...r, enabled: !rule.enabled } : r,
     );
     if (!rules.find((r: any) => r.category === category)) {
-      next.push({ category, enabled: true, commissionType: 'percentage', commissionValue: 0, minOrderAmount: 0 });
+      next.push(
+        category === 'invite'
+          ? {
+              category,
+              label: 'Signup Bonus',
+              enabled: true,
+              commissionType: 'fixed',
+              commissionValue: 0,
+              minOrderAmount: 0,
+              maxCommissionAmount: null,
+              inviteTrigger: 'registration',
+            }
+          : { category, enabled: true, commissionType: 'percentage', commissionValue: 0, minOrderAmount: 0 },
+      );
     }
     await saveRules(next);
   };
 
   const openEdit = (category: string) => {
     const rule = getRule(category);
+    const isSignupBonus = category === 'invite';
     setDraft({
       category,
-      label: rule.label || category,
+      label: rule.label || (isSignupBonus ? 'Signup Bonus' : category),
       enabled: rule.enabled ?? true,
-      commissionType: rule.commissionType || 'percentage',
+      commissionType: isSignupBonus ? 'fixed' : rule.commissionType || 'percentage',
       commissionValue: rule.commissionValue ?? 0,
-      minOrderAmount: rule.minOrderAmount ?? 0,
-      maxCommissionAmount: rule.maxCommissionAmount ?? '',
+      minOrderAmount: isSignupBonus ? 0 : rule.minOrderAmount ?? 0,
+      maxCommissionAmount: isSignupBonus ? '' : rule.maxCommissionAmount ?? '',
+      ...(isSignupBonus ? { inviteTrigger: 'registration' } : {}),
     });
     setEditingRule(category);
   };
 
   const submitEdit = async () => {
+    const isSignupBonus = draft.category === 'invite';
     const updated = {
       ...draft,
-      maxCommissionAmount: draft.maxCommissionAmount === '' ? null : Number(draft.maxCommissionAmount),
+      label: isSignupBonus ? 'Signup Bonus' : draft.label,
+      commissionType: isSignupBonus ? 'fixed' : draft.commissionType,
+      maxCommissionAmount:
+        isSignupBonus || draft.maxCommissionAmount === ''
+          ? null
+          : Number(draft.maxCommissionAmount),
       commissionValue: Number(draft.commissionValue),
-      minOrderAmount: Number(draft.minOrderAmount),
+      minOrderAmount: isSignupBonus ? 0 : Number(draft.minOrderAmount),
+      ...(isSignupBonus ? { inviteTrigger: 'registration' } : {}),
     };
     const exists = rules.some((r: any) => r.category === draft.category);
     const next = exists
@@ -69,11 +92,16 @@ export default function CommissionRulesTab({ settings, handleSave }: Props) {
   };
 
   const deleteRule = async (category: string) => {
+    if (category === 'invite') {
+      window.alert('Signup Bonus cannot be deleted. Disable it or set the amount to 0 instead.');
+      return;
+    }
     if (!window.confirm('Remove this commission rule?')) return;
     await saveRules(rules.filter((r: any) => r.category !== category));
   };
 
 const CARD_STYLES: Record<string, { border: string; bg: string; iconBg: string; iconText: string; toggle: string }> = {
+  invite: { border: 'border-violet-100', bg: 'bg-violet-50/30', iconBg: 'bg-violet-100', iconText: 'text-violet-600', toggle: 'bg-violet-600' },
   membership: { border: 'border-indigo-100', bg: 'bg-indigo-50/30', iconBg: 'bg-indigo-100', iconText: 'text-indigo-600', toggle: 'bg-indigo-600' },
   product: { border: 'border-green-100', bg: 'bg-green-50/30', iconBg: 'bg-green-100', iconText: 'text-green-600', toggle: 'bg-green-600' },
   space: { border: 'border-orange-100', bg: 'bg-orange-50/30', iconBg: 'bg-orange-100', iconText: 'text-orange-600', toggle: 'bg-orange-600' },
@@ -103,7 +131,7 @@ const CARD_STYLES: Record<string, { border: string; bg: string; iconBg: string; 
         </button>
       </div>
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
         {CATEGORIES.map(({ key, label, icon: Icon }) => {
           const rule = getRule(key);
           const style = CARD_STYLES[key];
@@ -118,9 +146,9 @@ const CARD_STYLES: Record<string, { border: string; bg: string; iconBg: string; 
                 </div>
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                {rule.commissionType === 'fixed' ? '₹' : ''}
+                {(key === 'invite' || rule.commissionType === 'fixed') ? '₹' : ''}
                 {rule.commissionValue || 0}
-                {rule.commissionType === 'percentage' ? '%' : ''}
+                {key !== 'invite' && rule.commissionType === 'percentage' ? '%' : ''}
               </h2>
               <div className="flex justify-between items-center mt-auto">
                 <div className="flex items-center gap-2">
@@ -152,15 +180,21 @@ const CARD_STYLES: Record<string, { border: string; bg: string; iconBg: string; 
               <tr><td colSpan={5} className="py-8 text-center text-gray-500">No commission rules configured.</td></tr>
             ) : rules.map((rule: any) => (
               <tr key={rule.category} className="hover:bg-gray-50">
-                <td className="py-3 px-5 capitalize">{rule.category}</td>
-                <td className="py-3 px-5">{rule.minOrderAmount || 0}</td>
-                <td className="py-3 px-5">{rule.maxCommissionAmount ?? 'No Limit'}</td>
+                <td className="py-3 px-5 capitalize">
+                  {rule.category === 'invite' ? 'Signup Bonus' : (rule.label || rule.category)}
+                </td>
+                <td className="py-3 px-5">{rule.category === 'invite' ? 'N/A' : (rule.minOrderAmount || 0)}</td>
+                <td className="py-3 px-5">{rule.category === 'invite' ? 'N/A' : (rule.maxCommissionAmount ?? 'No Limit')}</td>
                 <td className={`py-3 px-5 font-medium ${rule.enabled ? 'text-green-600' : 'text-gray-400'}`}>
                   {rule.enabled ? 'Active' : 'Inactive'}
                 </td>
                 <td className="py-3 px-5 flex gap-2">
                   <button type="button" onClick={() => openEdit(rule.category)} className="text-indigo-600 hover:underline">Edit</button>
-                  <button type="button" onClick={() => deleteRule(rule.category)} className="text-red-600 hover:underline">Delete</button>
+                  {rule.category === 'invite' ? (
+                    <span className="text-gray-400">Protected</span>
+                  ) : (
+                    <button type="button" onClick={() => deleteRule(rule.category)} className="text-red-600 hover:underline">Delete</button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -173,14 +207,36 @@ const CARD_STYLES: Record<string, { border: string; bg: string; iconBg: string; 
           {showAdd && (
             <input className="w-full border rounded-lg p-2 text-sm" placeholder="Category (e.g. other)" value={draft.category || ''} onChange={(e) => setDraft({ ...draft, category: e.target.value })} />
           )}
-          <input className="w-full border rounded-lg p-2 text-sm" placeholder="Label" value={draft.label || ''} onChange={(e) => setDraft({ ...draft, label: e.target.value })} />
-          <select className="w-full border rounded-lg p-2 text-sm" value={draft.commissionType || 'percentage'} onChange={(e) => setDraft({ ...draft, commissionType: e.target.value })}>
-            <option value="percentage">Percentage</option>
-            <option value="fixed">Fixed Amount</option>
-          </select>
-          <input type="number" className="w-full border rounded-lg p-2 text-sm" placeholder="Commission value" value={draft.commissionValue ?? ''} onChange={(e) => setDraft({ ...draft, commissionValue: e.target.value })} />
-          <input type="number" className="w-full border rounded-lg p-2 text-sm" placeholder="Min order amount" value={draft.minOrderAmount ?? ''} onChange={(e) => setDraft({ ...draft, minOrderAmount: e.target.value })} />
-          <input type="number" className="w-full border rounded-lg p-2 text-sm" placeholder="Max commission (empty = no limit)" value={draft.maxCommissionAmount ?? ''} onChange={(e) => setDraft({ ...draft, maxCommissionAmount: e.target.value })} />
+          {draft.category === 'invite' ? (
+            <>
+              <div className="rounded-lg border border-violet-100 bg-violet-50 p-3 text-sm text-violet-800">
+                This fixed amount is credited to the inviter once, immediately after a new customer signs up through their referral link.
+              </div>
+              <label className="block text-sm font-medium text-gray-700">
+                Signup bonus amount (₹)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="mt-1 w-full border rounded-lg p-2 text-sm"
+                  placeholder="Signup bonus amount"
+                  value={draft.commissionValue ?? ''}
+                  onChange={(e) => setDraft({ ...draft, commissionValue: e.target.value })}
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <input className="w-full border rounded-lg p-2 text-sm" placeholder="Label" value={draft.label || ''} onChange={(e) => setDraft({ ...draft, label: e.target.value })} />
+              <select className="w-full border rounded-lg p-2 text-sm" value={draft.commissionType || 'percentage'} onChange={(e) => setDraft({ ...draft, commissionType: e.target.value })}>
+                <option value="percentage">Percentage</option>
+                <option value="fixed">Fixed Amount</option>
+              </select>
+              <input type="number" min="0" className="w-full border rounded-lg p-2 text-sm" placeholder="Commission value" value={draft.commissionValue ?? ''} onChange={(e) => setDraft({ ...draft, commissionValue: e.target.value })} />
+              <input type="number" min="0" className="w-full border rounded-lg p-2 text-sm" placeholder="Min order amount" value={draft.minOrderAmount ?? ''} onChange={(e) => setDraft({ ...draft, minOrderAmount: e.target.value })} />
+              <input type="number" min="0" className="w-full border rounded-lg p-2 text-sm" placeholder="Max commission (empty = no limit)" value={draft.maxCommissionAmount ?? ''} onChange={(e) => setDraft({ ...draft, maxCommissionAmount: e.target.value })} />
+            </>
+          )}
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={!!draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} />
             Active
