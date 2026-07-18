@@ -145,6 +145,15 @@ export const signupCustomer = async (res, payload, meta = {}) => {
     }
   }
 
+  let referredBy = null;
+  if (payload.ref) {
+    const inviterCode = String(payload.ref).trim().toUpperCase();
+    const inviter = await findActiveCustomer({ referralCode: inviterCode });
+    if (inviter) {
+      referredBy = inviter._id;
+    }
+  }
+
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
   let customer = existingMobile;
 
@@ -177,6 +186,8 @@ export const signupCustomer = async (res, payload, meta = {}) => {
       onboardingCompleted: false,
       welcomeBonusCredited: false,
       accountCreatedWhatsAppSent: false,
+      referredBy,
+      referredAt: referredBy ? new Date() : null,
     });
     await notifyAccountCreated(customer);
   }
@@ -268,6 +279,16 @@ export const verifyLoginOtp = async (res, payload, meta = {}) => {
       error.status = 404;
       throw error;
     }
+
+    let referredBy = null;
+    if (payload.ref) {
+      const inviterCode = String(payload.ref).trim().toUpperCase();
+      const inviter = await findActiveCustomer({ referralCode: inviterCode });
+      if (inviter) {
+        referredBy = inviter._id;
+      }
+    }
+
     customer = await Customer.create({
       name: payload.name || `Customer ${mobile.slice(-4)}`,
       mobile,
@@ -281,6 +302,8 @@ export const verifyLoginOtp = async (res, payload, meta = {}) => {
       onboardingCompleted: false,
       welcomeBonusCredited: false,
       accountCreatedWhatsAppSent: false,
+      referredBy,
+      referredAt: referredBy ? new Date() : null,
     });
     // Credit welcome bonus now; WhatsApp waits until Create Account (real name)
     applyWelcomeBonus(customer);

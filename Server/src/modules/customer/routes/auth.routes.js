@@ -21,6 +21,7 @@ import {
   payuFailure,
   paymentStatus,
 } from '../controllers/payment.controller.js';
+import {getReferralDashboard} from '../controllers/referral.controller.js';
 import {validateRequest} from '../middlewares/validateRequest.js';
 import {
   authenticateCustomer,
@@ -91,6 +92,12 @@ router.post('/payments/payu/success', payuSuccess);
 router.post('/payments/payu/failure', payuFailure);
 
 router.get('/me', authenticateCustomer, authorizeCustomer('active'), me);
+router.get(
+  '/referral',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  getReferralDashboard,
+);
 router.put(
   '/profile',
   authenticateCustomer,

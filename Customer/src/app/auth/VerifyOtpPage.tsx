@@ -11,6 +11,7 @@ import {getErrorMessage} from '../../services/axios';
 import {useAuthStore} from '../../store/authStore';
 import type {Customer, OtpPurpose} from '../../types/auth';
 import {getPostAuthPath} from '../../utils/onboarding';
+import {clearInviteRef, getInviteRef} from '../../utils/inviteRef';
 
 interface LocationState {
   mobile?: string;
@@ -56,11 +57,13 @@ export default function VerifyOtpPage() {
     }
     setLoading(true);
     try {
+      const inviteRef = getInviteRef();
       const {data} = await authApi.verifyOtp({
         mobile: mobile || undefined,
         identifier,
         otp,
         purpose,
+        ...(inviteRef ? {ref: inviteRef} : {}),
       });
 
       if (purpose === 'forgot-password') {
@@ -79,6 +82,7 @@ export default function VerifyOtpPage() {
       if (!data.token || !data.data) throw new Error(data.message);
       setSession({customer: data.data as Customer, token: data.token});
       sessionStorage.removeItem('customer_profile_draft');
+      clearInviteRef();
       toast.success(data.message || 'OTP verified successfully');
       navigate(getPostAuthPath(data.data as Customer), {replace: true});
     } catch (error) {

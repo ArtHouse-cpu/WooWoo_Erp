@@ -24,8 +24,40 @@ export interface Customer {
   membershipType?: 'none' | 'pro' | 'premium' | 'special' | 'junior' | 'general';
   profileSetupCompleted?: boolean;
   onboardingCompleted?: boolean;
+  referralCode?: string | null;
+  affiliateBalance?: number;
+  affiliateReserved?: number;
+  cashbackBalance?: number;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ReferralDashboard {
+  programEnabled: boolean;
+  referralCode: string;
+  shareUrl: string;
+  shareMessage: string;
+  inviteReward: {
+    enabled: boolean;
+    type: 'percentage' | 'fixed' | string;
+    value: number;
+  };
+  wallet: {
+    affiliateBalance: number;
+    affiliateReserved: number;
+    cashbackBalance: number;
+  };
+  stats: {
+    totalReferrals: number;
+    totalEarned: number;
+    totalOrders: number;
+  };
+  recentReferrals: Array<{
+    name: string;
+    membershipType?: string;
+    status?: string;
+    joinedAt?: string;
+  }>;
 }
 
 export interface ApiResponse<T = unknown> {

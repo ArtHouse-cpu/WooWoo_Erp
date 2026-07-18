@@ -226,7 +226,7 @@ const customerSchema = new mongoose.Schema(
     },
 
     // =========================
-    // WALLET
+    // WALLET (dual balances)
     // =========================
     walletAmount: {
       type: Number,
@@ -237,6 +237,48 @@ const customerSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0,
+    },
+    // Withdrawable affiliate / referral earnings
+    affiliateBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // Non-withdrawable cashback / promotional credits
+    cashbackBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    affiliateReserved: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    // =========================
+    // REFERRAL / AFFILIATE
+    // =========================
+    referralCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: null,
+      sparse: true,
+    },
+    referredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      default: null,
+      index: true,
+    },
+    referredAt: {
+      type: Date,
+      default: null,
+    },
+    inviteRewardCredited: {
+      type: Boolean,
+      default: false,
     },
 
     // =========================
@@ -336,6 +378,22 @@ customerSchema.methods.toSafeObject = function toSafeObject() {
   obj.walletBalance = obj.walletAmount ?? 0;
   return obj;
 };
+
+// =========================
+// HOOKS
+// =========================
+customerSchema.pre("save", function (next) {
+  if (!this.referralCode) {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let code = "";
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    // ensure unique prefix maybe? Or rely on index. A simple 8 char alphanumeric should be fairly unique.
+    this.referralCode = `W${code}`;
+  }
+  next();
+});
 
 // =========================
 // MODEL

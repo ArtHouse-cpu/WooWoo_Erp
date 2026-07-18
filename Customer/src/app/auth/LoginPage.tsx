@@ -1,5 +1,5 @@
-import {useState} from 'react';
-import {Link, useNavigate} from 'react-router-dom';
+import {useEffect, useState} from 'react';
+import {Link, useNavigate, useSearchParams} from 'react-router-dom';
 import {useForm} from 'react-hook-form';
 import {z} from 'zod';
 import {zodResolver} from '@hookform/resolvers/zod';
@@ -14,6 +14,7 @@ import {getErrorMessage} from '../../services/axios';
 import {useAuthStore} from '../../store/authStore';
 import {useIsDesktop} from '../../hooks/useIsDesktop';
 import {getPostAuthPath} from '../../utils/onboarding';
+import {captureInviteRefFromSearch} from '../../utils/inviteRef';
 
 const otpSchema = z.object({
   mobile: z
@@ -33,11 +34,16 @@ type PasswordForm = z.infer<typeof passwordSchema>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const setSession = useAuthStore(s => s.setSession);
   const [mode, setMode] = useState<'otp' | 'password'>('otp');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const isDesktop = useIsDesktop();
+
+  useEffect(() => {
+    captureInviteRefFromSearch(searchParams.toString() ? `?${searchParams.toString()}` : '');
+  }, [searchParams]);
 
   const otpForm = useForm<OtpForm>({
     resolver: zodResolver(otpSchema),
