@@ -13,12 +13,14 @@ import {SearchBar} from '../../components/dashboard/SearchBar';
 import {SuppliesBottomSheet} from '../../components/dashboard/SuppliesBottomSheet';
 import {ServicesBottomSheet} from '../../components/dashboard/ServicesBottomSheet';
 import {EventsBottomSheet} from '../../components/dashboard/EventsBottomSheet';
+import {SpaceBottomSheet} from '../../components/dashboard/SpaceBottomSheet';
 
 export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [suppliesOpen, setSuppliesOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const [eventsOpen, setEventsOpen] = useState(false);
+  const [spaceOpen, setSpaceOpen] = useState(false);
 
   const handleExploreClick = (id: string) => {
     if (id === 'store') {
@@ -27,6 +29,8 @@ export default function HomePage() {
       setServicesOpen(true);
     } else if (id === 'events') {
       setEventsOpen(true);
+    } else if (id === 'space') {
+      setSpaceOpen(true);
     }
   };
 
@@ -77,6 +81,7 @@ export default function HomePage() {
       <SuppliesBottomSheet isOpen={suppliesOpen} onClose={() => setSuppliesOpen(false)} />
       <ServicesBottomSheet isOpen={servicesOpen} onClose={() => setServicesOpen(false)} />
       <EventsBottomSheet isOpen={eventsOpen} onClose={() => setEventsOpen(false)} />
+      <SpaceBottomSheet isOpen={spaceOpen} onClose={() => setSpaceOpen(false)} />
     </div>
   );
 }

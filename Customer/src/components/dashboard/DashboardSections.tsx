@@ -33,7 +33,7 @@ export function ExploreGrid({onItemClick}: {onItemClick?: (id: string) => void})
         </Link>
       </div>
 
-      <div className="grid grid-cols-6 gap-3 lg:grid-cols-5 lg:gap-4">
+      <div className="grid grid-cols-6 gap-2 sm:gap-3 lg:grid-cols-5 lg:gap-4">
         {exploreItemsDesktop.map((item, i) => {
           const colSpan = i < 3 ? 'col-span-2 lg:col-span-1' : 'col-span-3 lg:col-span-1';
           return (
@@ -65,19 +65,19 @@ export function ExploreGrid({onItemClick}: {onItemClick?: (id: string) => void})
               </div>
 
               {/* Content Area */}
-              <div className="relative flex flex-1 flex-col justify-between p-3 pt-5 sm:p-4 sm:pt-6">
-                <div className="min-w-0 pr-6">
+              <div className="relative flex flex-1 flex-col justify-between p-2.5 pt-4 sm:p-4 sm:pt-6">
+                <div className="min-w-0 pr-5 sm:pr-6">
                   <p className="truncate text-[12px] font-extrabold text-[#111111] sm:text-[14px] leading-tight">
                     {item.title}
                   </p>
-                  <p className="mt-0.5 truncate text-[9.5px] font-semibold text-[#9CA3AF] sm:text-[11px]">
+                  <p className="mt-0.5 truncate text-[8px] font-semibold text-[#9CA3AF] sm:text-[9.5px]">
                     {item.subtitle}
                   </p>
                 </div>
 
                 {/* Small orange navigation arrow button */}
-                <div className="absolute bottom-3 right-3 flex h-[24px] w-[24px] items-center justify-center rounded-full bg-[#EA580C] text-[#FFFFFF] shadow-sm transition-all duration-200 group-hover:bg-[#F97316] group-hover:scale-105 sm:bottom-4 sm:right-4 sm:h-7 sm:w-7">
-                  <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" strokeWidth={3} />
+                <div className="absolute bottom-2.5 right-2.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#EA580C] text-[#FFFFFF] shadow-sm transition-all duration-200 group-hover:bg-[#F97316] group-hover:scale-105 sm:bottom-4 sm:right-4 sm:h-7 sm:w-7">
+                  <ArrowRight className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5" strokeWidth={3} />
                 </div>
               </div>
             </motion.button>
