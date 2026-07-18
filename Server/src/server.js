@@ -95,6 +95,7 @@ app.use('/affiliate', affiliateRoutes);
 // Customer portal auth APIs — isolated namespace (does not conflict with admin /customer)
 app.use('/api/customer', customerAuthRoutes);
 
+
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 connectDB();
