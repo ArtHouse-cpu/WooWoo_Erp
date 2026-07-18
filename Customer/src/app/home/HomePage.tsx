@@ -14,6 +14,8 @@ import {SuppliesBottomSheet} from '../../components/dashboard/SuppliesBottomShee
 import {ServicesBottomSheet} from '../../components/dashboard/ServicesBottomSheet';
 import {EventsBottomSheet} from '../../components/dashboard/EventsBottomSheet';
 import {SpaceBottomSheet} from '../../components/dashboard/SpaceBottomSheet';
+import {WoofooBottomSheet} from '../../components/dashboard/WoofooBottomSheet';
+import {HelpSupportBottomSheet} from '../../components/dashboard/HelpSupportBottomSheet';
 
 export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -21,6 +23,14 @@ export default function HomePage() {
   const [servicesOpen, setServicesOpen] = useState(false);
   const [eventsOpen, setEventsOpen] = useState(false);
   const [spaceOpen, setSpaceOpen] = useState(false);
+  const [woofooOpen, setWoofooOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  const handleActionClick = (id: string) => {
+    if (id === 'help') {
+      setHelpOpen(true);
+    }
+  };
 
   const handleExploreClick = (id: string) => {
     if (id === 'store') {
@@ -31,6 +41,8 @@ export default function HomePage() {
       setEventsOpen(true);
     } else if (id === 'space') {
       setSpaceOpen(true);
+    } else if (id === 'cafe') {
+      setWoofooOpen(true);
     }
   };
 
@@ -52,7 +64,7 @@ export default function HomePage() {
             <HeroBanner />
             <ExploreGrid onItemClick={handleExploreClick} />
             <MembershipBanner />
-            <ActionCards />
+            <ActionCards onActionClick={handleActionClick} />
           </div>
 
           <aside className="sticky top-6 flex w-[340px] shrink-0 flex-col gap-5 self-start">
@@ -73,7 +85,7 @@ export default function HomePage() {
             <HeroBanner />
             <ExploreGrid onItemClick={handleExploreClick} />
             <MembershipBanner />
-            <ActionCards />
+            <ActionCards onActionClick={handleActionClick} />
           </div>
         </div>
       </div>
@@ -82,6 +94,8 @@ export default function HomePage() {
       <ServicesBottomSheet isOpen={servicesOpen} onClose={() => setServicesOpen(false)} />
       <EventsBottomSheet isOpen={eventsOpen} onClose={() => setEventsOpen(false)} />
       <SpaceBottomSheet isOpen={spaceOpen} onClose={() => setSpaceOpen(false)} />
+      <WoofooBottomSheet isOpen={woofooOpen} onClose={() => setWoofooOpen(false)} />
+      <HelpSupportBottomSheet isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }
