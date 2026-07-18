@@ -16,6 +16,8 @@ import {
   Star,
   Utensils,
   Users,
+  Wrench,
+  Wallet,
 } from 'lucide-react';
 
 export type NavItem = {
@@ -37,6 +39,7 @@ export type ActionItem = {
 
 export const dashboardNav: NavItem[] = [
   {id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, to: '/home', section: 'Main'},
+  {id: 'wallet', label: 'Wallet', icon: Wallet, to: '/wallet', section: 'Main'},
   {id: 'store', label: 'Store', icon: ShoppingBag, section: 'Explore'},
   {id: 'space', label: 'Space', icon: MapPin, section: 'Explore'},
   {id: 'events', label: 'Events', icon: Calendar, section: 'Explore'},
@@ -84,6 +87,54 @@ export const exploreItems = [
     gradient: 'from-[#FEF9C3] to-[#FDE68A]',
     iconColor: 'text-[#CA8A04]',
     icon: Coffee,
+  },
+];
+
+export const exploreItemsDesktop = [
+  {
+    id: 'store',
+    title: 'Supplies',
+    subtitle: 'Art materials & more',
+    icon: ShoppingBag,
+    iconBg: 'bg-[#F3E8FF]',
+    iconColor: 'text-[#7C3AED]',
+    image: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=500&q=80',
+  },
+  {
+    id: 'space',
+    title: 'Space',
+    subtitle: 'Book studio space',
+    icon: MapPin,
+    iconBg: 'bg-[#FFEDD5]',
+    iconColor: 'text-[#EA580C]',
+    image: 'https://images.unsplash.com/photo-1599508704512-2f19efd1e35f?auto=format&fit=crop&w=500&q=80',
+  },
+  {
+    id: 'services',
+    title: 'Services',
+    subtitle: 'Creative services',
+    icon: Wrench,
+    iconBg: 'bg-[#DBEAFE]',
+    iconColor: 'text-[#2563EB]',
+    image: 'https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&w=500&q=80',
+  },
+  {
+    id: 'events',
+    title: 'Events',
+    subtitle: 'Workshops & more',
+    icon: Calendar,
+    iconBg: 'bg-[#DCFCE7]',
+    iconColor: 'text-[#16A34A]',
+    image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=500&q=80',
+  },
+  {
+    id: 'cafe',
+    title: 'WOOFOO',
+    subtitle: 'Create Art & enjoy food',
+    icon: Coffee,
+    iconBg: 'bg-[#FEF9C3]',
+    iconColor: 'text-[#CA8A04]',
+    image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=500&q=80',
   },
 ];
 

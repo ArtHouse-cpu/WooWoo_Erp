@@ -89,10 +89,10 @@ export function MobileHeader({onMenuClick}: {onMenuClick: () => void}) {
       <button
         type="button"
         onClick={onMenuClick}
-        className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
+        className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/[0.04] bg-white text-[#111111] shadow-[0_4px_12px_rgba(15,23,42,0.05)] transition hover:scale-95"
         aria-label="Open menu"
       >
-        <Menu className="h-5 w-5" />
+        <Menu className="h-[20px] w-[20px]" strokeWidth={2} />
       </button>
       <div className="flex min-w-0 flex-1 justify-center">
         <BrandMark compact showTagline={false} />
@@ -100,11 +100,11 @@ export function MobileHeader({onMenuClick}: {onMenuClick: () => void}) {
       <button
         type="button"
         onClick={() => navigate('/profile')}
-        className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-[0_4px_14px_rgba(15,23,42,0.06)]"
+        className="relative flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/[0.04] bg-white text-[#111111] shadow-[0_4px_12px_rgba(15,23,42,0.05)] transition hover:scale-95"
         aria-label="Notifications"
       >
-        <Bell className="h-5 w-5" />
-        <span className="absolute right-2 top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#EF4444] px-1 text-[9px] font-bold text-white">
+        <Bell className="h-[20px] w-[20px]" strokeWidth={2} />
+        <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-white bg-[#EF4444] px-1 text-[9px] font-extrabold text-white">
           3
         </span>
       </button>

@@ -17,6 +17,7 @@ import ProfilePage from './app/auth/ProfilePage';
 import CreateAccountOnboardingPage from './app/onboarding/CreateAccountOnboardingPage';
 import MembershipOnboardingPage from './app/onboarding/MembershipOnboardingPage';
 import HomePage from './app/home/HomePage';
+import WalletPage from './app/wallet/WalletPage';
 import ReferAndEarnPage from './app/refer/ReferAndEarnPage';
 import PaymentResultPage from './app/payment/PaymentResultPage';
 import PrivacyPolicyPage from './app/legal/PrivacyPolicyPage';
@@ -76,6 +77,7 @@ export default function App() {
 
               <Route element={<AppRoute />}>
                 <Route path="/home" element={<HomePage />} />
+                <Route path="/wallet" element={<WalletPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/membership" element={<MembershipOnboardingPage />} />
                 <Route path="/refer-and-earn" element={<ReferAndEarnPage />} />
