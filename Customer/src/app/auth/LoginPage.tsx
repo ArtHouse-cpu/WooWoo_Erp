@@ -20,7 +20,7 @@ const otpSchema = z.object({
   mobile: z
     .string()
     .trim()
-    .regex(/^(?:\+?91)?[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
+    .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
 });
 
 const passwordSchema = z.object({
@@ -121,9 +121,15 @@ export default function LoginPage() {
                   placeholder="Enter your mobile number"
                   inputMode="numeric"
                   autoComplete="tel"
+                  maxLength={10}
                   className="rounded-[14px] border-[#DCE3EE] py-4 shadow-[0_0_0_3px_rgba(107,163,247,0.14)] focus-within:border-[#6BA3F7] focus-within:shadow-[0_0_0_4px_rgba(107,163,247,0.25)] focus-within:ring-0"
                   error={otpForm.formState.errors.mobile?.message}
-                  {...otpForm.register('mobile')}
+                  {...otpForm.register('mobile', {
+                    onChange: e => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      otpForm.setValue('mobile', val, {shouldValidate: true});
+                    },
+                  })}
                 />
                 <OtpHint />
               </div>
@@ -238,8 +244,14 @@ export default function LoginPage() {
                   leftIcon={<Phone className="h-4 w-4" />}
                   placeholder="Enter your mobile number"
                   inputMode="numeric"
+                  maxLength={10}
                   error={otpForm.formState.errors.mobile?.message}
-                  {...otpForm.register('mobile')}
+                  {...otpForm.register('mobile', {
+                    onChange: e => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      otpForm.setValue('mobile', val, {shouldValidate: true});
+                    },
+                  })}
                 />
                 <OtpHint />
                 <Button type="submit" loading={loading} className="rounded-2xl py-4 mt-8">

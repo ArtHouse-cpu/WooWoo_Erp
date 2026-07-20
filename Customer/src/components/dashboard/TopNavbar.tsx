@@ -7,10 +7,11 @@ import {useAuthStore} from '../../store/authStore';
 
 type Props = {
   onMenuClick: () => void;
+  onNotificationClick?: () => void;
   showBrand?: boolean;
 };
 
-export function TopNavbar({onMenuClick, showBrand = false}: Props) {
+export function TopNavbar({onMenuClick, onNotificationClick, showBrand = false}: Props) {
   const navigate = useNavigate();
   const customer = useAuthStore(s => s.customer);
   const initial = (customer?.name || 'C').charAt(0).toUpperCase();
@@ -54,11 +55,12 @@ export function TopNavbar({onMenuClick, showBrand = false}: Props) {
         </button>
         <button
           type="button"
-          className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-black/[0.05] bg-white text-[#4B5563] shadow-sm"
+          onClick={onNotificationClick}
+          className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-black/[0.05] bg-white text-[#4B5563] shadow-sm hover:bg-slate-50 transition cursor-pointer"
           aria-label="Notifications"
         >
           <Bell className="h-5 w-5" />
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#2563EB] px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#EF4444] px-1 text-[10px] font-bold text-white">
             3
           </span>
         </button>
@@ -82,14 +84,19 @@ export function TopNavbar({onMenuClick, showBrand = false}: Props) {
   );
 }
 
-export function MobileHeader({onMenuClick}: {onMenuClick: () => void}) {
-  const navigate = useNavigate();
+export function MobileHeader({
+  onMenuClick,
+  onNotificationClick,
+}: {
+  onMenuClick: () => void;
+  onNotificationClick?: () => void;
+}) {
   return (
     <header className="mb-4 flex items-center justify-between gap-3 xl:hidden">
       <button
         type="button"
         onClick={onMenuClick}
-        className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/[0.04] bg-white text-[#111111] shadow-[0_4px_12px_rgba(15,23,42,0.05)] transition hover:scale-95"
+        className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/[0.04] bg-white text-[#111111] shadow-[0_4px_12px_rgba(15,23,42,0.05)] transition hover:scale-95 cursor-pointer"
         aria-label="Open menu"
       >
         <Menu className="h-[20px] w-[20px]" strokeWidth={2} />
@@ -99,8 +106,8 @@ export function MobileHeader({onMenuClick}: {onMenuClick: () => void}) {
       </div>
       <button
         type="button"
-        onClick={() => navigate('/profile')}
-        className="relative flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/[0.04] bg-white text-[#111111] shadow-[0_4px_12px_rgba(15,23,42,0.05)] transition hover:scale-95"
+        onClick={onNotificationClick}
+        className="relative flex h-11 w-11 items-center justify-center rounded-[14px] border border-black/[0.04] bg-white text-[#111111] shadow-[0_4px_12px_rgba(15,23,42,0.05)] transition hover:scale-95 cursor-pointer"
         aria-label="Notifications"
       >
         <Bell className="h-[20px] w-[20px]" strokeWidth={2} />

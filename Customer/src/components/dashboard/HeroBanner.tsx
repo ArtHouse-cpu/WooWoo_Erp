@@ -19,41 +19,43 @@ export function HeroBanner() {
       initial={{opacity: 0, y: 16}}
       animate={{opacity: 1, y: 0}}
       transition={{duration: 0.45}}
-      className="rounded-[24px] border border-black/[0.05] bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] sm:p-6"
+      className="rounded-[20px] border border-black/[0.05] bg-white py-3.5 px-4 shadow-[0_6px_24px_rgba(0,0,0,0.03)] sm:py-4 sm:px-5"
     >
-      <div className="grid grid-cols-2 items-center gap-4 divide-x divide-slate-100">
+      <div className="grid grid-cols-2 items-center gap-3 divide-x divide-slate-100">
         {/* Left Side: Greeting & Membership Badge */}
-        <div className="flex flex-col justify-center space-y-2.5 pr-2">
-          <h1 className="text-[20px] font-extrabold tracking-tight text-[#111111] sm:text-[24px]">
+        <div className="flex flex-col justify-center space-y-0.5 pr-2">
+          <h1 className="text-[18px] font-extrabold tracking-tight text-[#111111] sm:text-[22px] leading-tight">
             Hi, {firstName} 👋
           </h1>
-          <div className="w-fit">
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF4FF] px-2.5 py-0.5 text-[11px] font-bold text-[#2563EB]">
-              <span className="text-[12px] leading-none">★</span>
-              {membershipLabel(customer?.membershipType)}
-            </span>
-          </div>
+          <div className="w-fit -mt-2">
+  <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF4FF] px-2.5 py-0.5 text-[10.5px] font-bold text-[#2563EB]">
+    <span className="text-[11px] leading-none">★</span>
+    {membershipLabel(customer?.membershipType)}
+  </span>
+</div>
         </div>
 
         {/* Right Side: Wallet details */}
-        <div className="relative pl-5 flex flex-col justify-between h-full min-h-[76px]">
-          <div className="flex items-start justify-between">
-            <div className="space-y-0.5">
-              <p className="text-[11px] font-semibold text-[#9CA3AF] tracking-wide">Wallet Balance</p>
-              <p className="text-[24px] font-black tracking-tight text-[#111111] tabular-nums sm:text-[28px]">
-                ₹{wallet.toLocaleString('en-IN', {minimumFractionDigits: 0})}
-              </p>
-            </div>
-            <div className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors mt-0.5">
-              <Wallet className="h-[22px] w-[22px]" strokeWidth={1.5} />
-            </div>
+        <div className="relative pl-4 sm:pl-5 flex items-center justify-between">
+          <div>
+            <p className="text-[10.5px] font-semibold text-[#9CA3AF] tracking-wide">Wallet Balance</p>
+            <p className="text-[21px] font-black tracking-tight text-[#111111] tabular-nums sm:text-[24px] leading-tight mt-0.5">
+              <span className="text-[19px] font-bold sm:text-[21px] mr-0.5">₹</span>
+              {wallet.toLocaleString('en-IN', {minimumFractionDigits: 0})}
+            </p>
           </div>
-          <Link
-            to="/wallet"
-            className="mt-2 inline-flex items-center gap-1 text-[12px] font-extrabold text-[#EA580C] transition hover:text-[#C2410C]"
-          >
-            View Wallet <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.5} />
-          </Link>
+
+          <div className="flex flex-col items-end justify-between space-y-2 text-right">
+            <div className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors">
+              <Wallet className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={1.5} />
+            </div>
+            <Link
+              to="/wallet"
+              className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#EA580C] transition hover:text-[#C2410C]"
+            >
+             <ArrowRight className="h-5 w-5" strokeWidth={3.5} />
+            </Link>
+          </div>
         </div>
       </div>
     </motion.section>

@@ -116,7 +116,7 @@ export const exploreItemsDesktop = [
     icon: Wrench,
     iconBg: 'bg-[#DBEAFE]',
     iconColor: 'text-[#2563EB]',
-    image: 'https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&w=500&q=80',
+    image: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=500&q=80',
   },
   {
     id: 'events',
@@ -187,7 +187,7 @@ export const actionItems: ActionItem[] = [
     title: 'Help',
     subtitle: 'Get Support',
     icon: 'headphones' as const,
-    color: 'text-[#2563EB]',
+    color: 'text-[#9333EA]',
   },
   {
     id: 'visit',
@@ -201,8 +201,7 @@ export const actionItems: ActionItem[] = [
     title: 'Share',
     subtitle: 'Invite & Earn',
     icon: 'share' as const,
-    color: 'text-[#8B5CF6]',
-    to: '/refer-and-earn',
+    color: 'text-[#9333EA]',
   },
 ];
 

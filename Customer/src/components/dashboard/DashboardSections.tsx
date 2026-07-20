@@ -25,17 +25,10 @@ export function ExploreGrid({onItemClick}: {onItemClick?: (id: string) => void})
         <h2 className="text-[17px] font-extrabold tracking-tight text-[#111111] sm:text-[18px]">
           Explore Art House
         </h2>
-        <Link
-          to="/explore"
-          className="inline-flex items-center gap-1 text-[12px] font-extrabold text-[#EA580C] hover:text-[#C2410C] transition-colors"
-        >
-          View All <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.5} />
-        </Link>
       </div>
 
-      <div className="grid grid-cols-6 gap-2 sm:gap-3 lg:grid-cols-5 lg:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5 lg:gap-4">
         {exploreItemsDesktop.map((item, i) => {
-          const colSpan = i < 3 ? 'col-span-2 lg:col-span-1' : 'col-span-3 lg:col-span-1';
           return (
             <motion.button
               key={item.id}
@@ -45,7 +38,7 @@ export function ExploreGrid({onItemClick}: {onItemClick?: (id: string) => void})
               animate={{opacity: 1, y: 0}}
               transition={{delay: i * 0.05}}
               whileHover={{y: -4}}
-              className={`${colSpan} group relative flex flex-col overflow-hidden rounded-[20px] border border-black/[0.05] bg-white text-left shadow-[0_8px_30px_rgba(0,0,0,0.03)] h-[155px] sm:h-[185px] lg:h-[210px]`}
+              className="col-span-1 group relative flex flex-col overflow-hidden rounded-[20px] border border-black/[0.05] bg-white text-left shadow-[0_8px_30px_rgba(0,0,0,0.03)] h-[170px] sm:h-[190px] lg:h-[210px]"
             >
               {/* Card Image */}
               <div className="relative h-[95px] w-full overflow-hidden bg-slate-100 sm:h-[115px] lg:h-[125px]">
@@ -65,19 +58,19 @@ export function ExploreGrid({onItemClick}: {onItemClick?: (id: string) => void})
               </div>
 
               {/* Content Area */}
-              <div className="relative flex flex-1 flex-col justify-between p-2.5 pt-4 sm:p-4 sm:pt-6">
-                <div className="min-w-0 pr-5 sm:pr-6">
-                  <p className="truncate text-[12px] font-extrabold text-[#111111] sm:text-[14px] leading-tight">
+              <div className="relative flex flex-1 flex-col justify-between p-3 pt-4 sm:p-4 sm:pt-6">
+                <div className="min-w-0 pr-6 sm:pr-8">
+                  <p className="truncate text-[14px] font-black text-[#111111] sm:text-[15px] leading-tight">
                     {item.title}
                   </p>
-                  <p className="mt-0.5 truncate text-[8px] font-semibold text-[#9CA3AF] sm:text-[9.5px]">
+                  <p className="mt-1 truncate text-[11px] font-bold text-[#4B5563] sm:text-[12px] leading-snug">
                     {item.subtitle}
                   </p>
                 </div>
 
                 {/* Small orange navigation arrow button */}
-                <div className="absolute bottom-2.5 right-2.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#EA580C] text-[#FFFFFF] shadow-sm transition-all duration-200 group-hover:bg-[#F97316] group-hover:scale-105 sm:bottom-4 sm:right-4 sm:h-7 sm:w-7">
-                  <ArrowRight className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5" strokeWidth={3} />
+                <div className="absolute bottom-3 right-3 flex h-5 w-5 items-center justify-center rounded-full bg-[#EA580C] text-[#FFFFFF] shadow-sm transition-all duration-200 group-hover:bg-[#F97316] group-hover:scale-105 sm:bottom-4 sm:right-4 sm:h-7 sm:w-7">
+                  <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" strokeWidth={3} />
                 </div>
               </div>
             </motion.button>
@@ -127,30 +120,40 @@ export function MembershipBanner() {
   return (
     <motion.div
       whileHover={{y: -2}}
-      className="flex items-center justify-between gap-4 rounded-[24px] bg-gradient-to-r from-[#FAF5FF] via-[#FFF0F6] to-[#FFF7ED] border border-[#F3E8FF] p-4 shadow-[0_8px_30px_rgba(139,92,246,0.05)]"
+      className="flex items-center justify-between gap-2.5 sm:gap-4 rounded-[18px] bg-gradient-to-r from-[#FAF5FF] via-[#FFF0F6] to-[#FFF7ED] border border-[#F3E8FF] py-2.5 px-3 sm:p-3 shadow-[0_4px_20px_rgba(139,92,246,0.04)]"
     >
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white border border-[#EDE9FE] text-[#7C3AED] shadow-sm">
-          <Crown className="h-[22px] w-[22px]" strokeWidth={1.75} />
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-[12px] bg-white border border-[#EDE9FE] text-[#7C3AED] shadow-sm">
+          <Crown className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={2} />
         </div>
         <div className="min-w-0">
-          <p className="text-[14px] font-black text-[#111111] leading-tight">Upgrade Membership</p>
-          <p className="mt-0.5 text-[11px] font-medium text-[#6B7280]">
-            Unlock more exclusive offers & benefits.
+          <p className="text-[13px] font-black text-[#111111] leading-tight sm:text-[14px]">Upgrade Membership</p>
+          <p className="mt-0.5 text-[10.5px] font-semibold text-[#6B7280] leading-snug sm:text-[11px]">
+           <p>
+  Unlock more exclusive offers,
+  <br />
+  cashback & benefits.
+</p>
           </p>
         </div>
       </div>
       <Link
         to="/membership"
-        className="inline-flex shrink-0 items-center justify-center gap-1 rounded-full border border-[#F97316]/30 bg-white px-4 py-2 text-[12px] font-extrabold text-[#EA580C] shadow-sm transition hover:bg-[#FFF8F2]"
+        className="inline-flex shrink-0 items-center justify-center gap-1 rounded-full border border-[#F97316]/30 bg-white px-2.5 py-1 text-[10.5px] font-extrabold text-[#EA580C] shadow-sm transition hover:bg-[#FFF8F2] sm:px-3 sm:py-1.5 sm:text-[11px]"
       >
-        Upgrade Now <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.5} />
+        Upgrade Now <ArrowRight className="h-3 w-3" strokeWidth={2.5} />
       </Link>
     </motion.div>
   );
 }
 
-export function ActionCards({onActionClick}: {onActionClick?: (id: string) => void}) {
+export function ActionCards({
+  onActionClick,
+  isSticky = false,
+}: {
+  onActionClick?: (id: string) => void;
+  isSticky?: boolean;
+}) {
   const icons = {
     headphones: Headphones,
     map: MapPin,
@@ -164,19 +167,25 @@ export function ActionCards({onActionClick}: {onActionClick?: (id: string) => vo
   };
 
   return (
-    <div className="rounded-[24px] border border-black/[0.05] bg-white py-4 px-2 shadow-[0_8px_30px_rgba(0,0,0,0.03)] grid grid-cols-3 divide-x divide-slate-100">
+    <div
+      className={`rounded-[18px] border bg-white/95 backdrop-blur-md py-1.5 px-1.5 grid grid-cols-3 divide-x divide-slate-100 ${
+        isSticky
+          ? 'shadow-[0_-6px_20px_rgba(15,23,42,0.1)] border-black/[0.08]'
+          : 'shadow-[0_4px_20px_rgba(0,0,0,0.03)] border-black/[0.05]'
+      }`}
+    >
       {actionItems.map(item => {
         const Icon = icons[item.icon];
         const colorClass = colors[item.id as keyof typeof colors] || item.color;
-        const className = `${cardClass} px-2 py-4 text-center`;
+        const className = `${cardClass} px-2 py-2 text-center`;
 
         if (item.to) {
           return (
-            <motion.div key={item.id} whileHover={{y: -3}}>
+            <motion.div key={item.id} whileHover={{y: -2}}>
               <Link to={item.to} className={`${className} block`}>
-                <Icon className={`mx-auto h-5 w-5 ${item.color}`} strokeWidth={1.75} />
-                <p className="mt-2 text-[13px] font-semibold text-[#111111]">{item.title}</p>
-                <p className="text-[11px] text-[#6B7280]">{item.subtitle}</p>
+                <Icon className={`mx-auto h-4 w-4 ${item.color}`} strokeWidth={1.75} />
+                <p className="mt-1 text-[12px] font-semibold text-[#111111]">{item.title}</p>
+                <p className="text-[10px] text-[#6B7280]">{item.subtitle}</p>
               </Link>
             </motion.div>
           );
@@ -188,11 +197,12 @@ export function ActionCards({onActionClick}: {onActionClick?: (id: string) => vo
             type="button"
             onClick={() => onActionClick?.(item.id)}
             whileHover={{scale: 1.02}}
-            className="flex flex-col items-center justify-center py-2 px-1 text-center transition cursor-pointer"
+            whileTap={{scale: 0.96}}
+            className="flex flex-col items-center justify-center py-1 px-1 text-center transition cursor-pointer"
           >
-            <Icon className={`h-5 w-5 ${colorClass}`} strokeWidth={2} />
-            <p className="mt-2 text-[13px] font-extrabold text-[#111111] leading-none">{item.title}</p>
-            <p className="mt-1 text-[10px] font-semibold text-[#9CA3AF] leading-none">{item.subtitle}</p>
+            <Icon className={`h-4.5 w-4.5 ${colorClass}`} strokeWidth={2} />
+            <p className="mt-1 text-[12px] font-extrabold text-[#111111] leading-none">{item.title}</p>
+            <p className="mt-0.5 text-[9.5px] font-semibold text-[#9CA3AF] leading-none">{item.subtitle}</p>
           </motion.button>
         );
       })}
