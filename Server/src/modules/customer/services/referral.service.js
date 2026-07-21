@@ -193,7 +193,10 @@ export const creditReferralDiscountToInviter = async ({
 
   const credited = [];
   const segmentList = Array.isArray(segments)
-    ? segments.filter(segment => Number(segment?.discountAmount || 0) > 0)
+    ? segments.filter(
+        segment =>
+          Number(segment?.commissionAmount || segment?.discountAmount || 0) > 0,
+      )
     : [];
 
   if (segmentList.length > 0) {
@@ -207,10 +210,12 @@ export const creditReferralDiscountToInviter = async ({
         orderAmount: Number(segment.lineAmount || orderAmount || 0),
         commissionType: segment.commissionType,
         commissionValue: segment.commissionValue,
-        commissionAmount: segment.discountAmount,
-        description: `Referral discount credited for ${
+        commissionAmount: Number(
+          segment.commissionAmount ?? segment.discountAmount ?? 0,
+        ),
+        description: `Referral commission (${
           segment.label || segment.category
-        } · ${buyerName || 'referred customer'} · ${sourceType} ${sourceId}`,
+        }) · ${buyerName || 'referred customer'} · ${sourceType} ${sourceId}`,
       });
       if (row) credited.push(row);
     }
@@ -233,6 +238,28 @@ export const creditReferralDiscountToInviter = async ({
   });
   if (row) credited.push(row);
   return credited;
+};
+
+/**
+ * Mark buyer account so referral checkout discount cannot be applied again.
+ */
+export const markReferralDiscountUsed = async ({
+  customerId,
+  sourceId,
+}) => {
+  if (!customerId) return null;
+
+  return Customer.findOneAndUpdate(
+    {_id: customerId, referralDiscountUsed: {$ne: true}},
+    {
+      $set: {
+        referralDiscountUsed: true,
+        referralDiscountUsedAt: new Date(),
+        referralDiscountSourceId: String(sourceId || ''),
+      },
+    },
+    {new: true},
+  );
 };
 
 export const creditInviteReward = async ({

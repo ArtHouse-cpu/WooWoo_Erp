@@ -851,6 +851,167 @@ export const handleDeleteMembership = async (id: string) => {
   return response.data;
 };
 
+export type SpacePayload = {
+  _id?: string;
+  name: string;
+  category?: string;
+  price?: number;
+  capacity?: number;
+  status?: "Available" | "Booked" | "Maintenance";
+  description?: string;
+  imageUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const handleGetSpaces = async (
+  params?: { search?: string; category?: string; status?: string },
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/space", {
+    params: {
+      search: params?.search?.trim() ?? "",
+      category: params?.category ?? "All",
+      status: params?.status ?? "All",
+    },
+    signal,
+  });
+  return response.data;
+};
+
+export const handleGetSpaceById = async (id: string, signal?: AbortSignal) => {
+  const response = await axiosInstance.get(`/space/${id}`, { signal });
+  return response.data;
+};
+
+export const spacePayloadToFormData = (
+  payload: SpacePayload | Partial<SpacePayload>,
+  imageFile?: File | null,
+) => {
+  const fd = new FormData();
+  if (payload.name !== undefined) fd.append("name", String(payload.name));
+  if (payload.category !== undefined) fd.append("category", String(payload.category));
+  if (payload.price !== undefined) fd.append("price", String(payload.price));
+  if (payload.capacity !== undefined) fd.append("capacity", String(payload.capacity));
+  if (payload.status !== undefined) fd.append("status", String(payload.status));
+  if (payload.description !== undefined) {
+    fd.append("description", String(payload.description));
+  }
+  if (imageFile) fd.append("image", imageFile);
+  return fd;
+};
+
+export const handleCreateSpace = async (
+  payload: SpacePayload | FormData,
+) => {
+  const response = await axiosInstance.post(
+    "/space",
+    payload,
+    payload instanceof FormData
+      ? { headers: { "Content-Type": "multipart/form-data" } }
+      : undefined,
+  );
+  return response.data;
+};
+
+export const handleUpdateSpace = async (
+  id: string,
+  payload: Partial<SpacePayload> | FormData,
+) => {
+  const response = await axiosInstance.put(
+    `/space/${id}`,
+    payload,
+    payload instanceof FormData
+      ? { headers: { "Content-Type": "multipart/form-data" } }
+      : undefined,
+  );
+  return response.data;
+};
+
+export const handleDeleteSpace = async (id: string) => {
+  const response = await axiosInstance.delete(`/space/${id}`);
+  return response.data;
+};
+
+export type FoodPayload = {
+  _id?: string;
+  name: string;
+  category?: string;
+  price?: number;
+  stock?: number;
+  unit?: string;
+  description?: string;
+  isVeg?: boolean;
+  status?: "Active" | "Inactive";
+  imageUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const handleGetFoods = async (
+  params?: { search?: string; category?: string; status?: string },
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/food", {
+    params: {
+      search: params?.search?.trim() ?? "",
+      category: params?.category ?? "All",
+      status: params?.status ?? "All",
+    },
+    signal,
+  });
+  return response.data;
+};
+
+export const foodPayloadToFormData = (
+  payload: FoodPayload | Partial<FoodPayload>,
+  imageFile?: File | null,
+) => {
+  const fd = new FormData();
+  if (payload.name !== undefined) fd.append("name", String(payload.name));
+  if (payload.category !== undefined) fd.append("category", String(payload.category));
+  if (payload.price !== undefined) fd.append("price", String(payload.price));
+  if (payload.stock !== undefined) fd.append("stock", String(payload.stock));
+  if (payload.unit !== undefined) fd.append("unit", String(payload.unit));
+  if (payload.description !== undefined) {
+    fd.append("description", String(payload.description));
+  }
+  if (payload.isVeg !== undefined) fd.append("isVeg", String(payload.isVeg));
+  if (payload.status !== undefined) fd.append("status", String(payload.status));
+  if (imageFile) fd.append("image", imageFile);
+  return fd;
+};
+
+export const handleCreateFood = async (payload: FoodPayload | FormData) => {
+  const response = await axiosInstance.post(
+    "/food",
+    payload,
+    payload instanceof FormData
+      ? { headers: { "Content-Type": "multipart/form-data" } }
+      : undefined,
+  );
+  return response.data;
+};
+
+export const handleUpdateFood = async (
+  id: string,
+  payload: Partial<FoodPayload> | FormData,
+) => {
+  const response = await axiosInstance.put(
+    `/food/${id}`,
+    payload,
+    payload instanceof FormData
+      ? { headers: { "Content-Type": "multipart/form-data" } }
+      : undefined,
+  );
+  return response.data;
+};
+
+export const handleDeleteFood = async (id: string) => {
+  const response = await axiosInstance.delete(`/food/${id}`);
+  return response.data;
+};
+
 export type PurchaseItemPayload = {
   productName: string;
   qty: number;
@@ -1070,12 +1231,48 @@ export const handleGetProducts = async (search = "", signal?: AbortSignal) => {
       params: { search: search.trim() },
       signal,
     });
-    // console.log(response.data); 
+    // console.log(response.data);
     return response.data;
   } catch (error) {
     console.log("Error fetching products:", error);
     throw error;
   }
+};
+
+export type CatalogueLookupItem = {
+  _id: string;
+  sourceId: string;
+  sourceType: "product" | "service" | "space" | "food";
+  name: string;
+  productName: string;
+  sellingPrice: number;
+  stockQty: number | null;
+  trackStock: boolean;
+  category: string;
+  lineCategory: string;
+  imageUrl?: string | null;
+  unit?: string;
+  discountType?: string;
+  discountValue?: number;
+  status?: string;
+  capacity?: number;
+  isVeg?: boolean;
+};
+
+export const handleCatalogueLookup = async (
+  search = "",
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/catalogue/lookup", {
+    params: { search: search.trim() },
+    signal,
+  });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    items: CatalogueLookupItem[];
+    counts?: Record<string, number>;
+  };
 };
 
 export const handleCreateProduct = async (formData: FormData) => {

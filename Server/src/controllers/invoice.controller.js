@@ -7,7 +7,31 @@ import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
 import { appendTransaction } from './wallet.controller.js';
 import { validateCouponForOrder } from './coupon.controller.js';
 import { validateReferralDiscountForOrder } from './affiliate.controller.js';
-import { creditReferralDiscountToInviter } from '../modules/customer/services/referral.service.js';
+import { creditReferralDiscountToInviter, markReferralDiscountUsed } from '../modules/customer/services/referral.service.js';
+
+/** Products track inventory; space / service / food / membership do not. */
+const isInventoryTrackedCategory = raw => {
+  const value = String(raw || '')
+    .trim()
+    .toLowerCase();
+  if (!value || value === 'general' || value === 'product') return true;
+  if (
+    ['space', 'service', 'food', 'membership', 'other'].includes(value) ||
+    value.includes('space') ||
+    value.includes('booking') ||
+    value.includes('service') ||
+    value.includes('food') ||
+    value.includes('membership')
+  ) {
+    return false;
+  }
+  return true;
+};
+
+const isSoftReferralSkipMessage = message =>
+  /no referral discount applies|no enabled commission rules|no commission rules/i.test(
+    String(message || ''),
+  );
 
 const getStartOfToday = () => {
   const d = new Date();
@@ -165,11 +189,16 @@ const createInvoice = async (req, res) => {
       };
     });
 
-    const requestNames = normalizedItems.map((item) => item.productName);
-    const stockMap = await computeStockByProductNames({ names: requestNames });
+    const requestNames = normalizedItems
+      .filter(item => isInventoryTrackedCategory(item.category))
+      .map(item => item.productName);
+    const stockMap = requestNames.length
+      ? await computeStockByProductNames({names: requestNames})
+      : new Map();
     const requestedQtyMap = new Map();
 
     for (const item of normalizedItems) {
+      if (!isInventoryTrackedCategory(item.category)) continue;
       const name = String(item.productName ?? '').trim();
       const qty = Number(item.qty ?? 0);
       requestedQtyMap.set(name, (requestedQtyMap.get(name) ?? 0) + qty);
@@ -241,13 +270,18 @@ const createInvoice = async (req, res) => {
         })),
       });
       if (!referralValidation.ok) {
-        return res.status(400).json({
-          success: false,
-          message: referralValidation.message,
-        });
+        // Rule toggled off / no matching segment → skip referral, do not block checkout
+        if (!isSoftReferralSkipMessage(referralValidation.message)) {
+          return res.status(400).json({
+            success: false,
+            message: referralValidation.message,
+          });
+        }
+      } else {
+        appliedReferral = referralValidation;
+        // Buyer discount only on first referral use for the account
+        referralDiscount = Number(referralValidation.discountAmount ?? 0);
       }
-      appliedReferral = referralValidation;
-      referralDiscount = Number(referralValidation.discountAmount ?? 0);
     }
 
     const extraChargesTotal = Array.isArray(extraCharges) 
@@ -295,7 +329,7 @@ const createInvoice = async (req, res) => {
       status: status === 'draft' ? 'draft' : 'final',
       items: normalizedItems,
       subTotal: Number(subTotal ?? computedSubTotal),
-      discountTotal: Number(discountTotal ?? computedDiscountTotal),
+      discountTotal: computedDiscountTotal,
       coupon: appliedCoupon
         ? {
             code: appliedCoupon.code,
@@ -315,7 +349,7 @@ const createInvoice = async (req, res) => {
             label: appliedReferral.label,
           }
         : undefined,
-      grandTotal: Number(grandTotal ?? computedGrandTotal),
+      grandTotal: computedGrandTotal,
       extraCharges: Array.isArray(extraCharges) ? extraCharges : [],
       mode: String(mode ?? 'Cash'),
       paymentStatus:
@@ -348,26 +382,41 @@ const createInvoice = async (req, res) => {
 
     if (
       appliedReferral &&
-      referralDiscount > 0 &&
       invoice.status !== 'cancelled' &&
       invoice.status !== 'draft'
     ) {
+      const commissionAmount = Number(
+        appliedReferral.commissionAmount ?? referralDiscount ?? 0,
+      );
       try {
-        await creditReferralDiscountToInviter({
-          inviterId: appliedReferral.inviterId,
-          referredCustomerId: appliedReferral.buyerId || customer?._id,
-          sourceType: 'invoice',
-          sourceId: invoiceCode,
-          orderAmount: preReferralAmount > 0 ? preReferralAmount : preCouponAmount,
-          commissionAmount: referralDiscount,
-          commissionType: appliedReferral.discountType,
-          commissionValue: appliedReferral.discountValue,
-          category: appliedReferral.segments?.[0]?.category || 'product',
-          segments: appliedReferral.segments,
-          buyerName: customer?.name || customerName,
-        });
+        if (commissionAmount > 0) {
+          await creditReferralDiscountToInviter({
+            inviterId: appliedReferral.inviterId,
+            referredCustomerId: appliedReferral.buyerId || customer?._id,
+            sourceType: 'invoice',
+            sourceId: invoiceCode,
+            orderAmount: preReferralAmount > 0 ? preReferralAmount : preCouponAmount,
+            commissionAmount,
+            commissionType: appliedReferral.discountType,
+            commissionValue: appliedReferral.discountValue,
+            category: appliedReferral.segments?.[0]?.category || 'product',
+            segments: appliedReferral.segments,
+            buyerName: customer?.name || customerName,
+          });
+        }
       } catch (creditError) {
         console.error('createInvoice referral commission credit error:', creditError);
+      }
+
+      if (referralDiscount > 0 && (appliedReferral.buyerId || customer?._id)) {
+        try {
+          await markReferralDiscountUsed({
+            customerId: appliedReferral.buyerId || customer._id,
+            sourceId: invoiceCode,
+          });
+        } catch (markError) {
+          console.error('createInvoice mark referral discount used error:', markError);
+        }
       }
     }
 
@@ -514,19 +563,25 @@ const updateInvoice = async (req, res) => {
           unitPrice,
           discount,
           lineTotal,
+          category: String(item.category || 'General').trim(),
         };
       });
     }
 
     if (normalizedItems && normalizedItems.length) {
-      const requestNames = normalizedItems.map((item) => item.productName);
-      const stockMap = await computeStockByProductNames({
-        names: requestNames,
-        excludeInvoiceId: id,
-      });
+      const requestNames = normalizedItems
+        .filter(item => isInventoryTrackedCategory(item.category))
+        .map(item => item.productName);
+      const stockMap = requestNames.length
+        ? await computeStockByProductNames({
+            names: requestNames,
+            excludeInvoiceId: id,
+          })
+        : new Map();
 
       const requestedQtyMap = new Map();
       for (const item of normalizedItems) {
+        if (!isInventoryTrackedCategory(item.category)) continue;
         const name = String(item.productName ?? '').trim();
         const qty = Number(item.qty ?? 0);
         requestedQtyMap.set(name, (requestedQtyMap.get(name) ?? 0) + qty);

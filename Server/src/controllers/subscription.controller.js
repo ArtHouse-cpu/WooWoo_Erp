@@ -9,7 +9,7 @@ import {
 } from '../schemas/subscription.schema.js';
 import {validateReferralDiscountForOrder} from './affiliate.controller.js';
 import {validateCouponForOrder} from './coupon.controller.js';
-import {creditReferralDiscountToInviter} from '../modules/customer/services/referral.service.js';
+import {creditReferralDiscountToInviter, markReferralDiscountUsed} from '../modules/customer/services/referral.service.js';
 
 const getNextSubscriptionNumber = async () => {
   const counter = await Counter.findOneAndUpdate(
@@ -94,13 +94,20 @@ export const createSubscription = async (req, res) => {
         })),
       });
       if (!referralValidation.ok) {
-        return res.status(400).json({
-          success: false,
-          message: referralValidation.message,
-        });
+        const softSkip =
+          /no referral discount applies|no enabled commission rules|no commission rules/i.test(
+            String(referralValidation.message || ''),
+          );
+        if (!softSkip) {
+          return res.status(400).json({
+            success: false,
+            message: referralValidation.message,
+          });
+        }
+      } else {
+        appliedReferral = referralValidation;
+        referralDiscount = Number(referralValidation.discountAmount ?? 0);
       }
-      appliedReferral = referralValidation;
-      referralDiscount = Number(referralValidation.discountAmount ?? 0);
     }
 
     let couponDiscount = 0;
@@ -179,7 +186,10 @@ export const createSubscription = async (req, res) => {
       nextInvoiceDate: parsed.data.startDate,
     });
 
-    if (appliedReferral && referralDiscount > 0) {
+    if (appliedReferral) {
+      const commissionAmount = Number(
+        appliedReferral.commissionAmount ?? referralDiscount ?? 0,
+      );
       try {
         const buyer = await Customer.findOne({
           mobile: parsed.data.customerPhone,
@@ -188,19 +198,28 @@ export const createSubscription = async (req, res) => {
           .select('_id name')
           .lean();
 
-        await creditReferralDiscountToInviter({
-          inviterId: appliedReferral.inviterId,
-          referredCustomerId: appliedReferral.buyerId || buyer?._id,
-          sourceType: 'subscription',
-          sourceId: subscriptionCode,
-          orderAmount: parsed.data.subTotal,
-          commissionAmount: referralDiscount,
-          commissionType: appliedReferral.discountType,
-          commissionValue: appliedReferral.discountValue,
-          category: appliedReferral.segments?.[0]?.category || 'membership',
-          segments: appliedReferral.segments,
-          buyerName: buyer?.name || parsed.data.customerName,
-        });
+        if (commissionAmount > 0) {
+          await creditReferralDiscountToInviter({
+            inviterId: appliedReferral.inviterId,
+            referredCustomerId: appliedReferral.buyerId || buyer?._id,
+            sourceType: 'subscription',
+            sourceId: subscriptionCode,
+            orderAmount: parsed.data.subTotal,
+            commissionAmount,
+            commissionType: appliedReferral.discountType,
+            commissionValue: appliedReferral.discountValue,
+            category: appliedReferral.segments?.[0]?.category || 'membership',
+            segments: appliedReferral.segments,
+            buyerName: buyer?.name || parsed.data.customerName,
+          });
+        }
+
+        if (referralDiscount > 0 && (appliedReferral.buyerId || buyer?._id)) {
+          await markReferralDiscountUsed({
+            customerId: appliedReferral.buyerId || buyer._id,
+            sourceId: subscriptionCode,
+          });
+        }
       } catch (creditError) {
         console.error(
           'createSubscription referral commission credit error:',

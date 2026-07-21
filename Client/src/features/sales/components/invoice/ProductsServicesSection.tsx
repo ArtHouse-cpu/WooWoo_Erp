@@ -1,7 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { Plus, Trash2, Minus } from "lucide-react";
 import type { InvoiceItem } from "./types";
-import { handleGetProducts, handleCreateProduct } from "@/services/apiClient";
+import {
+  handleCatalogueLookup,
+  handleCreateProduct,
+  type CatalogueLookupItem,
+} from "@/services/apiClient";
 import CreateProductModal from "./Modal/CreateProductModal";
 import Swal from "sweetalert2";
 
@@ -32,6 +36,24 @@ type Props = {
 const inputStyle =
   "h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-500";
 
+const SOURCE_BADGE: Record<
+  CatalogueLookupItem["sourceType"],
+  { label: string; className: string }
+> = {
+  product: { label: "Product", className: "bg-slate-100 text-slate-700" },
+  service: { label: "Service", className: "bg-indigo-50 text-indigo-700" },
+  space: { label: "Space", className: "bg-emerald-50 text-emerald-700" },
+  food: { label: "Food", className: "bg-amber-50 text-amber-800" },
+};
+
+function isAbortError(error: unknown) {
+  return (
+    (error as { name?: string; code?: string })?.name === "CanceledError" ||
+    (error as { name?: string; code?: string })?.name === "AbortError" ||
+    (error as { code?: string })?.code === "ERR_CANCELED"
+  );
+}
+
 export default function ProductsServicesSection({
   draft,
   items,
@@ -45,7 +67,7 @@ export default function ProductsServicesSection({
   membershipPlans = [],
   membershipPlanId = null,
 }: Props) {
-  const [products, setProducts] = useState<any[]>([]);
+  const [catalogueItems, setCatalogueItems] = useState<CatalogueLookupItem[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -63,14 +85,13 @@ export default function ProductsServicesSection({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
+  const fetchCatalogue = async (searchText = "", signal?: AbortSignal) => {
     try {
       setLoadingProducts(true);
-      const response = await handleGetProducts(searchText, signal);
-      console.log(response);
-      setProducts(Array.isArray(response?.products) ? response.products : []);
-    } catch {
-      setProducts([]);
+      const response = await handleCatalogueLookup(searchText, signal);
+      setCatalogueItems(Array.isArray(response?.items) ? response.items : []);
+    } catch (error) {
+      if (!isAbortError(error)) setCatalogueItems([]);
     } finally {
       setLoadingProducts(false);
     }
@@ -82,7 +103,7 @@ export default function ProductsServicesSection({
 
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
-      fetchProducts(term, controller.signal);
+      fetchCatalogue(term, controller.signal);
     }, 250);
 
     return () => {
@@ -91,65 +112,97 @@ export default function ProductsServicesSection({
     };
   }, [draft.name, dropdownOpen]);
 
-  const handleSelectProduct = (product: any) => {
-    if (Number(product?.stockQty ?? 0) <= 0) {
-      Swal.fire("Out of stock", `${product.productName} is currently out of stock.`, "warning");
-      return;
-    }
+  const resolveMembershipPlan = () =>
+    membershipPlans.find(
+      (p) =>
+        (membershipPlanId && p._id === membershipPlanId) ||
+        p.planId?.toLowerCase() === membershipType.toLowerCase() ||
+        p.planType?.toLowerCase() === membershipType.toLowerCase() ||
+        p.displayName?.toLowerCase() === membershipType.toLowerCase(),
+    );
 
+  const applyItemToDraft = (item: CatalogueLookupItem | any) => {
     const qty = Number(draft.qty || 1);
-    const sellingPrice = Number(product.sellingPrice ?? 0);
-    const category = product.category || "General";
+    const sellingPrice = Number(item.sellingPrice ?? 0);
+    const membershipCategory = item.category || "General";
+    const lineCategory = item.lineCategory || item.sourceType || "product";
 
     let calculatedDiscount = 0;
     let calculatedCashback = 0;
-    const plan = membershipPlans.find(p => 
-        (membershipPlanId && p._id === membershipPlanId) ||
-        p.planId?.toLowerCase() === membershipType.toLowerCase() ||
-        p.planType?.toLowerCase() === membershipType.toLowerCase() || 
-        p.displayName?.toLowerCase() === membershipType.toLowerCase()
-    );
+    const plan = resolveMembershipPlan();
 
-    if (plan && plan.usageLimits && (plan.usageLimits[category] || plan.usageLimits["General"])) {
-        const limit = plan.usageLimits[category] || plan.usageLimits["General"];
-        if (limit.discount) {
-            calculatedDiscount = (sellingPrice * qty * limit.discount) / 100;
-        }
-        if (limit.cashback) {
-            calculatedCashback = (sellingPrice * qty * limit.cashback) / 100;
-        }
+    if (
+      plan?.usageLimits &&
+      (plan.usageLimits[membershipCategory] || plan.usageLimits.General)
+    ) {
+      const limit =
+        plan.usageLimits[membershipCategory] || plan.usageLimits.General;
+      if (limit.discount) {
+        calculatedDiscount = (sellingPrice * qty * limit.discount) / 100;
+      }
+      if (limit.cashback) {
+        calculatedCashback = (sellingPrice * qty * limit.cashback) / 100;
+      }
     } else {
-        const dValue = Number(product.discountValue ?? 0);
-        const dType = product.discountType ?? "flat";
-        if (dType === "percentage") {
-            calculatedDiscount = (sellingPrice * qty * dValue) / 100;
-        } else {
-            calculatedDiscount = dValue * qty;
-        }
+      const dValue = Number(item.discountValue ?? 0);
+      const dType = item.discountType ?? "flat";
+      if (dType === "percentage") {
+        calculatedDiscount = (sellingPrice * qty * dValue) / 100;
+      } else {
+        calculatedDiscount = dValue * qty;
+      }
     }
 
-    onDraftChange("name", product.productName);
+    const displayName = item.productName || item.name || "";
+    // Set category first (parent may recalculate membership), then lock discount/cashback.
+    onDraftChange("category", lineCategory);
+    onDraftChange("name", displayName);
     onDraftChange("price", String(sellingPrice));
     onDraftChange("discount", String(calculatedDiscount));
     onDraftChange("cashback", String(calculatedCashback));
-    onDraftChange("image", product.imageUrl || (product.images && product.images[0]) || "");
-    onDraftChange("category", category);
+    onDraftChange(
+      "image",
+      item.imageUrl || (item.images && item.images[0]) || "",
+    );
+  };
+
+  const handleSelectProduct = (item: CatalogueLookupItem) => {
+    if (item.trackStock && Number(item.stockQty ?? 0) <= 0) {
+      Swal.fire(
+        "Out of stock",
+        `${item.productName || item.name} is currently out of stock.`,
+        "warning",
+      );
+      return;
+    }
+
+    applyItemToDraft(item);
     setDropdownOpen(false);
   };
 
   const handleAddToBill = () => {
     const name = draft.name.trim();
     const qty = Number(draft.qty || 0);
-    const selected = products.find(
-      (p) => String(p?.productName ?? "").trim().toLowerCase() === name.toLowerCase(),
+    const selected = catalogueItems.find(
+      (p) =>
+        String(p?.productName ?? p?.name ?? "")
+          .trim()
+          .toLowerCase() === name.toLowerCase(),
     );
 
-    if (selected && Number(selected.stockQty ?? 0) <= 0) {
-      Swal.fire("Out of stock", `${selected.productName} is currently out of stock.`, "warning");
+    if (selected?.trackStock && Number(selected.stockQty ?? 0) <= 0) {
+      Swal.fire(
+        "Out of stock",
+        `${selected.productName} is currently out of stock.`,
+        "warning",
+      );
       return;
     }
 
-    if (selected && qty > Number(selected.stockQty ?? 0)) {
+    if (
+      selected?.trackStock &&
+      qty > Number(selected.stockQty ?? 0)
+    ) {
       Swal.fire(
         "Insufficient stock",
         `${selected.productName} has only ${selected.stockQty} qty available.`,
@@ -167,43 +220,18 @@ export default function ProductsServicesSection({
       const response = await handleCreateProduct(formData);
       const prod = response?.product;
       if (prod) {
-        const qty = Number(draft.qty || 1);
-        const sellingPrice = Number(prod.sellingPrice ?? 0);
-        const category = prod.category || "General";
-
-        let calculatedDiscount = 0;
-        let calculatedCashback = 0;
-        const plan = membershipPlans.find(p => 
-            (membershipPlanId && p._id === membershipPlanId) ||
-            p.planId?.toLowerCase() === membershipType.toLowerCase() ||
-            p.planType?.toLowerCase() === membershipType.toLowerCase() || 
-            p.displayName?.toLowerCase() === membershipType.toLowerCase()
-        );
-
-        if (plan && plan.usageLimits && (plan.usageLimits[category] || plan.usageLimits["General"])) {
-            const limit = plan.usageLimits[category] || plan.usageLimits["General"];
-            if (limit.discount) {
-                calculatedDiscount = (sellingPrice * qty * limit.discount) / 100;
-            }
-            if (limit.cashback) {
-                calculatedCashback = (sellingPrice * qty * limit.cashback) / 100;
-            }
-        } else {
-            const dValue = Number(prod.discountValue ?? 0);
-            const dType = prod.discountType ?? "flat";
-            if (dType === "percentage") {
-                calculatedDiscount = (sellingPrice * qty * dValue) / 100;
-            } else {
-                calculatedDiscount = dValue * qty;
-            }
-        }
-
-        onDraftChange("name", prod.productName);
-        onDraftChange("price", String(sellingPrice));
-        onDraftChange("discount", String(calculatedDiscount));
-        onDraftChange("cashback", String(calculatedCashback));
-        onDraftChange("image", prod.imageUrl || (prod.images && prod.images[0]) || "");
-        onDraftChange("category", category);
+        applyItemToDraft({
+          ...prod,
+          productName: prod.productName,
+          sellingPrice: prod.sellingPrice,
+          category: prod.category || "General",
+          lineCategory: "product",
+          sourceType: "product",
+          trackStock: true,
+          discountType: prod.discountType,
+          discountValue: prod.discountValue,
+          imageUrl: prod.imageUrl || prod.images?.[0],
+        });
       }
       setShowCreateModal(false);
       Swal.fire("Product created", "Product has been successfully added.", "success");
@@ -235,30 +263,46 @@ export default function ProductsServicesSection({
               setDropdownOpen(true);
             }}
             onFocus={() => setDropdownOpen(true)}
-            placeholder="Search product..."
+            placeholder="Search product, space, service, food..."
             className={inputStyle}
           />
           {dropdownOpen && (
             <div className="absolute left-0 mt-1 w-full rounded-md border border-gray-200 bg-white py-1 shadow-lg z-10">
               {loadingProducts ? (
                 <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
-              ) : products.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-gray-500">No products found</div>
+              ) : catalogueItems.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-gray-500">No items found</div>
               ) : (
                 <div className="max-h-48 overflow-y-auto">
-                  {products.map((p) => (
-                    <div
-                      key={p._id}
-                      onClick={() => handleSelectProduct(p)}
-                      className="cursor-pointer px-3 py-2 text-sm hover:bg-gray-50"
-                    >
-                      <div className="font-medium text-gray-800">{p.productName}</div>
-                      <div className="text-xs text-gray-500">
-                        ₹{p.sellingPrice} {p.stockQty ? `|Qty: ${p.stockQty}` : ""}
+                  {catalogueItems.map((p) => {
+                    const badge = SOURCE_BADGE[p.sourceType] || SOURCE_BADGE.product;
+                    const stockLabel =
+                      p.trackStock && p.stockQty != null
+                        ? ` | Qty: ${p.stockQty}`
+                        : "";
+                    return (
+                      <div
+                        key={`${p.sourceType}-${p._id}`}
+                        onClick={() => handleSelectProduct(p)}
+                        className="cursor-pointer px-3 py-2 text-sm hover:bg-gray-50"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-medium text-gray-800 truncate">
+                            {p.productName || p.name}
+                          </div>
+                          <span
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.className}`}
+                          >
+                            {badge.label}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          ₹{p.sellingPrice}
+                          {stockLabel}
+                        </div>
                       </div>
-                    
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
               <div
@@ -348,7 +392,7 @@ export default function ProductsServicesSection({
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-10 text-center text-gray-500">
+                <td colSpan={7} className="px-3 py-10 text-center text-gray-500">
                   Search or add products to start creating invoice.
                 </td>
               </tr>

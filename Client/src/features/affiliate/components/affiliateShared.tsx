@@ -10,6 +10,17 @@ export const formatDate = (value?: string | Date) => {
   return new Date(value).toLocaleDateString('en-IN');
 };
 
+export const formatDateTime = (value?: string | Date) => {
+  if (!value) return '—';
+  return new Date(value).toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
 type ToggleProps = {
   enabled: boolean;
   onChange: (value: boolean) => void;

@@ -271,6 +271,8 @@ export default function CheckoutModal({
   const [referralLabel, setReferralLabel] = useState("Referral Discount");
   const [referralCodeApplied, setReferralCodeApplied] = useState("");
   const [referralInviterName, setReferralInviterName] = useState("");
+  const [referralDiscountAlreadyUsed, setReferralDiscountAlreadyUsed] = useState(false);
+  const [referralStatusMessage, setReferralStatusMessage] = useState("");
   const [referralSegments, setReferralSegments] = useState<
     Array<{
       category: string;
@@ -279,6 +281,8 @@ export default function CheckoutModal({
       commissionValue: number;
       lineAmount: number;
       discountAmount: number;
+      commissionAmount?: number;
+      buyerDiscountAmount?: number;
     }>
   >([]);
   const [loadingReferral, setLoadingReferral] = useState(false);
@@ -361,6 +365,8 @@ export default function CheckoutModal({
     setReferralCodeApplied("");
     setReferralInviterName("");
     setReferralSegments([]);
+    setReferralDiscountAlreadyUsed(false);
+    setReferralStatusMessage("");
   };
 
   const buildReferralItems = () =>
@@ -413,20 +419,45 @@ export default function CheckoutModal({
         items: buildReferralItems(),
       });
       const data = response?.data || response;
-      if (!data?.discountAmount) {
+      if (!data?.referralCode && !data?.ok && !data?.commissionAmount) {
         clearReferralDiscount();
         return;
       }
-      setReferralDiscount(Number(data.discountAmount || 0));
+
+      const alreadyUsed = data.discountAlreadyUsed === true || data.discountEligible === false;
+      const discountAmt = Number(data.discountAmount || 0);
+      const commissionAmt = Number(data.commissionAmount || 0);
+
+      setReferralDiscount(discountAmt);
       setReferralLabel(data.label || "Referral Discount");
       setReferralCodeApplied(String(data.referralCode || code || "").toUpperCase());
       setReferralInviterName(String(data.inviterName || ""));
       setReferralSegments(Array.isArray(data.segments) ? data.segments : []);
+      setReferralDiscountAlreadyUsed(alreadyUsed && discountAmt <= 0 && commissionAmt > 0);
+      setReferralStatusMessage(
+        String(
+          data.message ||
+            (alreadyUsed && discountAmt <= 0
+              ? "Referral discount already used on this account. Referrer will still earn commission."
+              : ""),
+        ),
+      );
       if (data.referralCode) {
         setReferralCodeInput(String(data.referralCode).toUpperCase());
       }
-    } catch {
+    } catch (error: unknown) {
       clearReferralDiscount();
+      const err = error as { response?: { data?: { message?: string } } };
+      const message = err?.response?.data?.message;
+      if (message) {
+        void Swal.fire({
+          icon: "info",
+          title: "Referral not applied",
+          text: message,
+          timer: 3200,
+          showConfirmButton: false,
+        });
+      }
     } finally {
       setLoadingReferral(false);
     }
@@ -746,15 +777,14 @@ export default function CheckoutModal({
             discountAmount: couponDiscount,
           }
         : null,
-      referral:
-        referralDiscount > 0 && referralCodeApplied
-          ? {
-              code: referralCodeApplied,
-              discountAmount: referralDiscount,
-              inviterName: referralInviterName,
-              label: referralLabel,
-            }
-          : null,
+      referral: referralCodeApplied
+        ? {
+            code: referralCodeApplied,
+            discountAmount: referralDiscount,
+            inviterName: referralInviterName,
+            label: referralLabel,
+          }
+        : null,
       customerName: customerName.trim(),
       customerPhone: customerSearch.trim(),
       notes: instructionNotes.trim(),
@@ -776,6 +806,7 @@ export default function CheckoutModal({
         qty: Number(item.qty),
         unitPrice: Number(item.price),
         discount: Number(item.discount ?? 0),
+        category: item.category || "General",
         image: item.image || "",
       })),
       subTotal: items.reduce(
@@ -794,15 +825,14 @@ export default function CheckoutModal({
             discountAmount: couponDiscount,
           }
         : null,
-      referral:
-        referralDiscount > 0 && referralCodeApplied
-          ? {
-              code: referralCodeApplied,
-              discountAmount: referralDiscount,
-              inviterName: referralInviterName,
-              label: referralLabel,
-            }
-          : null,
+      referral: referralCodeApplied
+        ? {
+            code: referralCodeApplied,
+            discountAmount: referralDiscount,
+            inviterName: referralInviterName,
+            label: referralLabel,
+          }
+        : null,
       status: "final" as const,
       mode: paymentPayload.mode,
       paymentStatus: paymentPayload.paymentStatus,
@@ -988,14 +1018,6 @@ export default function CheckoutModal({
                     tone="discount"
                   />
                 )}
-                {referralSegments.map((segment) => (
-                  <SummaryLine
-                    key={segment.category}
-                    label={`${segment.label} (${segment.commissionType === "fixed" ? `₹${segment.commissionValue}` : `${segment.commissionValue}%`})`}
-                    value={`− ${formatInr(segment.discountAmount)}`}
-                    className="text-violet-600"
-                  />
-                ))}
                 {extraCharges.map((c, i) => (
                   <SummaryLine 
                     key={i}
@@ -1169,7 +1191,7 @@ export default function CheckoutModal({
                   </h3>
                 </div>
                 <p className="mb-3 text-[11px] text-slate-500">
-                  Discount comes from Affiliate Program → Commission Rules for each cart segment (Store Supplies, Services, etc.).
+                  Referral discount can be used once per customer account. Referrer earns commission every time the code is used.
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -1203,11 +1225,58 @@ export default function CheckoutModal({
                       Code {referralCodeApplied}
                       {referralInviterName ? ` · referred by ${referralInviterName}` : ""}
                     </p>
-                    {/* {referralSegments.map((segment) => (
-                      <p key={segment.category} className="text-violet-700">
-                        {segment.label}: {segment.commissionType === "fixed" ? `₹${segment.commissionValue}` : `${segment.commissionValue}%`} on {formatInr(segment.lineAmount)} → −{formatInr(segment.discountAmount)}
-                      </p>
-                    ))} */}
+                    {referralSegments.length > 0 ? (
+                      <ul className="mt-1 space-y-0.5 text-violet-600">
+                        {referralSegments.map((seg) => (
+                          <li key={seg.category || seg.label}>
+                            {seg.label || seg.category}: −
+                            {formatInr(Number(seg.buyerDiscountAmount ?? seg.discountAmount ?? 0))}
+                            {seg.commissionType === "percentage"
+                              ? ` (${Number(seg.commissionValue || 0)}%)`
+                              : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+                {referralDiscountAlreadyUsed && referralCodeApplied ? (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <p className="font-semibold">Referral discount already used</p>
+                    <p className="mt-0.5">
+                      {referralStatusMessage ||
+                        "This account already used a referral discount. No buyer discount this time."}
+                    </p>
+                    <p className="mt-1 text-amber-700">
+                      Code {referralCodeApplied}
+                      {referralInviterName ? ` · ${referralInviterName}` : ""} will still earn commission
+                      {referralSegments.length > 0
+                        ? ` (${formatInr(
+                            referralSegments.reduce(
+                              (sum, seg) =>
+                                sum +
+                                Number(seg.commissionAmount ?? seg.discountAmount ?? 0),
+                              0,
+                            ),
+                          )})`
+                        : ""}
+                      .
+                    </p>
+                    {referralSegments.length > 0 ? (
+                      <ul className="mt-1 space-y-0.5 text-amber-700">
+                        {referralSegments.map((seg) => (
+                          <li key={`c-${seg.category || seg.label}`}>
+                            {seg.label || seg.category}:{" "}
+                            {formatInr(
+                              Number(seg.commissionAmount ?? seg.discountAmount ?? 0),
+                            )}
+                            {seg.commissionType === "percentage"
+                              ? ` (${Number(seg.commissionValue || 0)}%)`
+                              : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
                 ) : null}
               </section>

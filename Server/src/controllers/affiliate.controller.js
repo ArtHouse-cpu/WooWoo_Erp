@@ -6,6 +6,8 @@ import AffiliateCommission from '../models/affiliateCommission.model.js';
 import PayoutRequest from '../models/payoutRequest.model.js';
 import CommissionLedger from '../models/commissionLedger.model.js';
 import WalletWithdrawal from '../models/walletWithdrawal.model.js';
+import Invoice from '../models/invoice.model.js';
+import Subscription from '../models/subscription.model.js';
 import mongoose from 'mongoose';
 
 const mergeNested = (target, source) => {
@@ -317,29 +319,107 @@ export const getWalletSummary = async (req, res) => {
 
 // --- AFFILIATES LIST ---
 
+/**
+ * Anyone with an assigned referralCode is an affiliate.
+ * Revenue / commission come from AffiliateCommission (inviter).
+ * Referred customers = unique users with referredBy = affiliate
+ *   plus unique buyers attributed on commission rows.
+ * Joined By = the customer in referredBy (who referred this affiliate).
+ */
 const buildAffiliatePipeline = (match = {}) => [
   {$match: match},
   {
     $lookup: {
-      from: 'commissionledgers',
-      localField: '_id',
-      foreignField: 'affiliateId',
+      from: 'affiliatecommissions',
+      let: {affiliateId: '$_id'},
+      pipeline: [
+        {
+          $match: {
+            $expr: {$eq: ['$inviter', '$$affiliateId']},
+            status: {$nin: ['cancelled', 'reversed']},
+          },
+        },
+        {
+          $project: {
+            orderAmount: 1,
+            commissionAmount: 1,
+            referredCustomer: 1,
+            category: 1,
+            status: 1,
+          },
+        },
+      ],
       as: 'commissions',
     },
   },
   {
     $lookup: {
       from: 'customers',
-      localField: '_id',
-      foreignField: 'referredBy',
+      let: {affiliateId: '$_id'},
+      pipeline: [
+        {
+          $match: {
+            $expr: {$eq: ['$referredBy', '$$affiliateId']},
+            isDeleted: {$ne: true},
+          },
+        },
+        {$project: {_id: 1, name: 1}},
+      ],
       as: 'referredCustomers',
     },
   },
   {
+    $lookup: {
+      from: 'customers',
+      localField: 'referredBy',
+      foreignField: '_id',
+      as: 'joinedByCustomer',
+    },
+  },
+  {
     $addFields: {
-      totalCustomersReferred: {$size: '$referredCustomers'},
       totalRevenueGenerated: {$sum: '$commissions.orderAmount'},
       totalCommissionEarned: {$sum: '$commissions.commissionAmount'},
+      joinedByDoc: {$arrayElemAt: ['$joinedByCustomer', 0]},
+      referredCustomerIds: {
+        $setUnion: [
+          {
+            $map: {
+              input: '$referredCustomers',
+              as: 'rc',
+              in: '$$rc._id',
+            },
+          },
+          {
+            $filter: {
+              input: {
+                $map: {
+                  input: '$commissions',
+                  as: 'c',
+                  in: '$$c.referredCustomer',
+                },
+              },
+              as: 'id',
+              cond: {$ne: ['$$id', null]},
+            },
+          },
+        ],
+      },
+    },
+  },
+  {
+    $addFields: {
+      totalCustomersReferred: {$size: {$ifNull: ['$referredCustomerIds', []]}},
+      joinedByName: {$ifNull: ['$joinedByDoc.name', null]},
+      joinedByReferralCode: {$ifNull: ['$joinedByDoc.referralCode', null]},
+      joinedById: {$ifNull: ['$joinedByDoc._id', null]},
+      joinedByLabel: {
+        $cond: [
+          {$ifNull: ['$joinedByDoc.name', false]},
+          '$joinedByDoc.name',
+          'Direct',
+        ],
+      },
     },
   },
   {
@@ -349,13 +429,20 @@ const buildAffiliatePipeline = (match = {}) => [
       mobile: 1,
       customerId: 1,
       membershipType: 1,
+      membershipPlanId: 1,
       status: 1,
       createdAt: 1,
+      referralCode: 1,
+      referredBy: 1,
       affiliateBalance: 1,
       walletAmount: 1,
       totalCustomersReferred: 1,
       totalRevenueGenerated: 1,
       totalCommissionEarned: 1,
+      joinedByName: 1,
+      joinedByReferralCode: 1,
+      joinedById: 1,
+      joinedByLabel: 1,
     },
   },
 ];
@@ -371,10 +458,16 @@ export const getAffiliatesList = async (req, res) => {
       sortBy = 'latest',
     } = req.query;
 
-    const match = {membershipType: {$ne: 'none'}};
+    // Affiliates = users who have been assigned a referral / affiliate code
+    const match = {
+      isDeleted: {$ne: true},
+      referralCode: {$exists: true, $nin: [null, '']},
+    };
 
     if (status && status !== 'all') match.status = status;
-    if (membershipType && membershipType !== 'all') match.membershipType = membershipType;
+    if (membershipType && membershipType !== 'all') {
+      match.membershipType = membershipType;
+    }
 
     if (dateFrom || dateTo) {
       match.createdAt = {};
@@ -387,8 +480,14 @@ export const getAffiliatesList = async (req, res) => {
     }
 
     if (search) {
-      const regex = new RegExp(search, 'i');
-      match.$or = [{name: regex}, {email: regex}, {customerId: regex}, {mobile: regex}];
+      const regex = new RegExp(String(search).trim(), 'i');
+      match.$or = [
+        {name: regex},
+        {email: regex},
+        {customerId: regex},
+        {mobile: regex},
+        {referralCode: regex},
+      ];
     }
 
     const pipeline = buildAffiliatePipeline(match);
@@ -398,6 +497,7 @@ export const getAffiliatesList = async (req, res) => {
       oldest: {createdAt: 1},
       revenue: {totalRevenueGenerated: -1},
       commission: {totalCommissionEarned: -1},
+      referrals: {totalCustomersReferred: -1},
     };
     pipeline.push({$sort: sortMap[sortBy] || sortMap.latest});
 
@@ -418,6 +518,8 @@ export const getAffiliateById = async (req, res) => {
 
     const pipeline = buildAffiliatePipeline({
       _id: new mongoose.Types.ObjectId(id),
+      isDeleted: {$ne: true},
+      referralCode: {$exists: true, $nin: [null, '']},
     });
     const results = await Customer.aggregate(pipeline);
 
@@ -427,24 +529,51 @@ export const getAffiliateById = async (req, res) => {
 
     const affiliate = results[0];
 
-    const breakdown = await CommissionLedger.aggregate([
-      {$match: {affiliateId: affiliate._id}},
+    const breakdown = await AffiliateCommission.aggregate([
+      {
+        $match: {
+          inviter: affiliate._id,
+          status: {$nin: ['cancelled', 'reversed']},
+        },
+      },
       {
         $group: {
-          _id: '$orderType',
+          _id: '$category',
           count: {$sum: 1},
           revenue: {$sum: '$orderAmount'},
           commission: {$sum: '$commissionAmount'},
         },
       },
+      {$sort: {revenue: -1}},
     ]);
 
-    const referredCount = await Customer.countDocuments({referredBy: affiliate._id});
+    const referredCustomers = await Customer.find({
+      referredBy: affiliate._id,
+      isDeleted: {$ne: true},
+    })
+      .select('name email mobile referralCode membershipType createdAt')
+      .sort({createdAt: -1})
+      .limit(50)
+      .lean();
 
     res.status(200).json({
       ...affiliate,
-      activeCustomers: referredCount,
-      revenueBreakdown: breakdown,
+      activeCustomers: affiliate.totalCustomersReferred || 0,
+      revenueBreakdown: breakdown.map(row => ({
+        ...row,
+        _id: row._id || 'other',
+        label:
+          {
+            invite: 'Signup Bonus',
+            product: 'Store Supplies',
+            space: 'Space Booking',
+            service: 'Services',
+            food: 'Food Orders',
+            membership: 'Membership',
+            other: 'Other',
+          }[row._id] || row._id,
+      })),
+      referredCustomers,
     });
   } catch (error) {
     res.status(500).json({message: error.message});
@@ -910,25 +1039,87 @@ export const validateReferralDiscountForOrder = async ({
     return {ok: false, message: 'Self referral discount is not allowed.'};
   }
 
-  const {discountAmount, segments} = calculateReferralDiscountFromRules(
-    settings.rules,
-    items,
-    amount,
-  );
-
-  if (discountAmount <= 0 || segments.length === 0) {
+  if (!buyer) {
     return {
       ok: false,
-      message: 'No referral discount applies for these items.',
+      message: 'Select a customer account to apply a referral code.',
     };
   }
 
+  const {discountAmount: computedAmount, segments} =
+    calculateReferralDiscountFromRules(settings.rules, items, amount);
+
+  if (computedAmount <= 0 || segments.length === 0) {
+    return {
+      ok: false,
+      message:
+        'No enabled commission rules apply for these cart items. Turn on Space Booking / Services / Food Orders (or matching) rules on the Affiliate page.',
+    };
+  }
+
+  // Prefer explicit flag; also treat any prior paid referral discount on this account as used
+  // (covers invoices created before referralDiscountUsed was introduced).
+  let discountAlreadyUsed = buyer.referralDiscountUsed === true;
+  if (!discountAlreadyUsed) {
+    const phone = String(buyer.mobile || customerPhone || '').trim();
+    const priorInvoice = await Invoice.findOne({
+      status: {$ne: 'cancelled'},
+      'referral.discountAmount': {$gt: 0},
+      $or: [
+        ...(phone ? [{customerPhone: phone}] : []),
+        {customerName: String(buyer.name || '').trim()},
+      ],
+    })
+      .select('_id invoiceCode')
+      .lean();
+
+    const priorSubscription = !priorInvoice
+      ? await Subscription.findOne({
+          status: {$nin: ['cancelled']},
+          'referral.discountAmount': {$gt: 0},
+          ...(phone ? {customerPhone: phone} : {}),
+        })
+          .select('_id subscriptionCode')
+          .lean()
+      : null;
+
+    if (priorInvoice || priorSubscription) {
+      discountAlreadyUsed = true;
+      // Backfill so later checks are fast
+      await Customer.updateOne(
+        {_id: buyer._id, referralDiscountUsed: {$ne: true}},
+        {
+          $set: {
+            referralDiscountUsed: true,
+            referralDiscountUsedAt: new Date(),
+            referralDiscountSourceId: String(
+              priorInvoice?.invoiceCode ||
+                priorSubscription?.subscriptionCode ||
+                '',
+            ),
+          },
+        },
+      );
+    }
+  }
+
+  const discountEligible = !discountAlreadyUsed;
+  const discountAmount = discountEligible ? computedAmount : 0;
   const primary = segments[0];
+  // Keep segment commission amounts even when buyer discount is 0
+  const commissionSegments = segments.map(segment => ({
+    ...segment,
+    commissionAmount: Number(segment.discountAmount || 0),
+    buyerDiscountAmount: discountEligible ? Number(segment.discountAmount || 0) : 0,
+  }));
 
   return {
     ok: true,
+    discountEligible,
+    discountAlreadyUsed,
     discountAmount,
-    segments,
+    commissionAmount: computedAmount,
+    segments: commissionSegments,
     referralCode: inviter.referralCode,
     inviterName: inviter.name || '',
     inviterId: inviter._id,
@@ -938,7 +1129,10 @@ export const validateReferralDiscountForOrder = async ({
       segments.length === 1
         ? `${primary.label} Referral Discount`
         : 'Referral Discount',
-    buyerId: buyer?._id || null,
+    buyerId: buyer._id,
+    message: discountAlreadyUsed
+      ? 'Referral discount already used on this account. Referrer will still earn commission.'
+      : 'Referral discount applied',
   };
 };
 
@@ -950,7 +1144,7 @@ export const validateReferralDiscount = async (req, res) => {
     }
     return res.status(200).json({
       success: true,
-      message: 'Referral discount applied',
+      message: result.message || 'Referral discount applied',
       data: result,
     });
   } catch (error) {

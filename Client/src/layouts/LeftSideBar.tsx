@@ -26,6 +26,8 @@ import {
   ChevronLeft,
   ChevronRight,
   DollarSign,
+  MapPin,
+  UtensilsCrossed
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -151,6 +153,18 @@ export default function LeftSideBar() {
           label: "Products",
           icon: Package,
           path: "/products",
+        },
+        {
+          name: "spaces",
+          label: "Spaces",
+          icon: MapPin,
+          path: "/spaces",
+        },
+        {
+          name: "Foods",
+          label: "Foods",
+          icon: UtensilsCrossed,
+          path: "/foods",
         },
         {
           name: "services",

@@ -697,6 +697,7 @@ export default function CreateInvoiceScreen() {
           if (field === "discount") setDraftDiscount(value);
           if (field === "image") setDraftImage(value);
           if (field === "category") {
+            setDraftCategory(value);
             // Re-calculate discount based on membership when category is selected
             const benefits = getMembershipBenefitsForItem(Number(draftPrice), Number(draftQty), value, membership, membershipPlanId);
             if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
