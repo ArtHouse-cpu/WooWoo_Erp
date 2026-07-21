@@ -30,6 +30,16 @@ type PlanFormState = Required<
     NonNullable<MembershipPlanPayload["pricing"]>
   >;
   usageLimits: UsageLimits;
+  customerDisplay: {
+    showInApp: boolean;
+    badgeLabel: string;
+    themeKey: "blue" | "purple" | "green" | "orange";
+    iconKey: "user" | "star" | "graduation" | "crown";
+    cashbackPercent: number;
+    storeDiscountPercent: number;
+    spaceDiscountPercent: number;
+    features: Array<{ label: string; was: number }>;
+  };
 };
 
 type Props = {
@@ -100,13 +110,25 @@ const initialState: PlanFormState = {
     discountPercent: 0,
   },
   usageLimits: {},
+  customerDisplay: {
+    showInApp: true,
+    badgeLabel: "",
+    themeKey: "blue",
+    iconKey: "user",
+    cashbackPercent: 0,
+    storeDiscountPercent: 0,
+    spaceDiscountPercent: 0,
+    features: [{ label: "", was: 0 }],
+  },
   insightsLevel: "Basic",
   status: "Active",
   internalNotes: "",
 };
 
 const planTypes = ["Professional", "Business", "Personal"] as const;
-const periods = ["Monthly", "Yearly", "Lifetime"] as const;
+const periods = ["Monthly", "Yearly", "Lifetime", "Till School Life"] as const;
+const themeKeys = ["blue", "purple", "green", "orange"] as const;
+const iconKeys = ["user", "star", "graduation", "crown"] as const;
 const discountTypes = ["Percentage", "Flat"] as const;
 const insightLevels = ["Basic", "Advanced"] as const;
 
@@ -162,6 +184,25 @@ export default function AddnewPlansModal({
           ...prev.usageLimits,
           ...(initialPlan.usageLimits as UsageLimits | undefined),
         },
+        customerDisplay: {
+          ...prev.customerDisplay,
+          ...(initialPlan.customerDisplay ?? {}),
+          showInApp: initialPlan.customerDisplay?.showInApp !== false,
+          badgeLabel: String(initialPlan.customerDisplay?.badgeLabel ?? prev.customerDisplay.badgeLabel),
+          themeKey: (initialPlan.customerDisplay?.themeKey ?? prev.customerDisplay.themeKey) as PlanFormState["customerDisplay"]["themeKey"],
+          iconKey: (initialPlan.customerDisplay?.iconKey ?? prev.customerDisplay.iconKey) as PlanFormState["customerDisplay"]["iconKey"],
+          cashbackPercent: Number(initialPlan.customerDisplay?.cashbackPercent ?? prev.customerDisplay.cashbackPercent),
+          storeDiscountPercent: Number(initialPlan.customerDisplay?.storeDiscountPercent ?? prev.customerDisplay.storeDiscountPercent),
+          spaceDiscountPercent: Number(initialPlan.customerDisplay?.spaceDiscountPercent ?? prev.customerDisplay.spaceDiscountPercent),
+          features:
+            Array.isArray(initialPlan.customerDisplay?.features) &&
+            initialPlan.customerDisplay.features.length > 0
+              ? initialPlan.customerDisplay.features.map((item) => ({
+                  label: String(item.label ?? ""),
+                  was: Number(item.was ?? 0),
+                }))
+              : prev.customerDisplay.features,
+        },
       }));
     } else {
       setForm(initialState);
@@ -207,6 +248,45 @@ export default function AddnewPlansModal({
     }));
   };
 
+  const setFeature = (
+    index: number,
+    field: "label" | "was",
+    value: string,
+  ) => {
+    setForm((prev) => {
+      const features = [...prev.customerDisplay.features];
+      const current = features[index] || { label: "", was: 0 };
+      features[index] = {
+        ...current,
+        [field]: field === "was" ? Number(value || 0) : value,
+      };
+      return {
+        ...prev,
+        customerDisplay: { ...prev.customerDisplay, features },
+      };
+    });
+  };
+
+  const addFeature = () => {
+    setForm((prev) => ({
+      ...prev,
+      customerDisplay: {
+        ...prev.customerDisplay,
+        features: [...prev.customerDisplay.features, { label: "", was: 0 }],
+      },
+    }));
+  };
+
+  const removeFeature = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      customerDisplay: {
+        ...prev.customerDisplay,
+        features: prev.customerDisplay.features.filter((_, i) => i !== index),
+      },
+    }));
+  };
+
   const submit = async () => {
     if (!form.planId.trim() || !form.displayName.trim()) return;
 
@@ -224,6 +304,13 @@ export default function AddnewPlansModal({
         discountPercent: Number(form.pricing.discountPercent || 0),
       },
       usageLimits: form.usageLimits,
+      customerDisplay: {
+        ...form.customerDisplay,
+        badgeLabel:
+          form.customerDisplay.badgeLabel.trim() ||
+          form.pricing.period,
+        features: form.customerDisplay.features.filter((item) => item.label.trim()),
+      },
       insightsLevel: form.insightsLevel,
       status: form.status,
       internalNotes: form.internalNotes.trim(),
@@ -540,6 +627,185 @@ export default function AddnewPlansModal({
                       </div>
                     );
                   })}
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-violet-100 bg-violet-50/40 p-6 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-violet-500" />
+                  <div className="text-base font-semibold text-slate-900">
+                    Customer App Display
+                  </div>
+                </div>
+                <p className="mb-4 text-xs text-slate-500">
+                  These fields control what customers see on the Membership onboarding screen. Plan ID should match values like general, special, junior, premium.
+                </p>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                  <InputField
+                    label="Badge Label"
+                    value={form.customerDisplay.badgeLabel}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        customerDisplay: { ...p.customerDisplay, badgeLabel: v },
+                      }))
+                    }
+                    placeholder={form.pricing.period || "Lifetime"}
+                  />
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Theme Color</label>
+                    <select
+                      value={form.customerDisplay.themeKey}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          customerDisplay: {
+                            ...p.customerDisplay,
+                            themeKey: e.target.value as PlanFormState["customerDisplay"]["themeKey"],
+                          },
+                        }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    >
+                      {themeKeys.map((key) => (
+                        <option key={key} value={key}>{key}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Card Icon</label>
+                    <select
+                      value={form.customerDisplay.iconKey}
+                      onChange={(e) =>
+                        setForm((p) => ({
+                          ...p,
+                          customerDisplay: {
+                            ...p.customerDisplay,
+                            iconKey: e.target.value as PlanFormState["customerDisplay"]["iconKey"],
+                          },
+                        }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    >
+                      {iconKeys.map((key) => (
+                        <option key={key} value={key}>{key}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <InputField
+                    label="Store Discount (%)"
+                    value={String(form.customerDisplay.storeDiscountPercent)}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        customerDisplay: {
+                          ...p.customerDisplay,
+                          storeDiscountPercent: Number(v || 0),
+                        },
+                      }))
+                    }
+                    type="number"
+                    placeholder="5"
+                  />
+                  <InputField
+                    label="Space Discount (%)"
+                    value={String(form.customerDisplay.spaceDiscountPercent)}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        customerDisplay: {
+                          ...p.customerDisplay,
+                          spaceDiscountPercent: Number(v || 0),
+                        },
+                      }))
+                    }
+                    type="number"
+                    placeholder="10"
+                  />
+                  <InputField
+                    label="Cashback (%)"
+                    value={String(form.customerDisplay.cashbackPercent)}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        customerDisplay: {
+                          ...p.customerDisplay,
+                          cashbackPercent: Number(v || 0),
+                        },
+                      }))
+                    }
+                    type="number"
+                    placeholder="1"
+                  />
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-violet-200 bg-white p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="text-sm font-semibold text-slate-900">Feature Bullets</div>
+                    <button
+                      type="button"
+                      onClick={addFeature}
+                      className="rounded-lg border border-violet-200 px-3 py-1.5 text-xs font-semibold text-violet-700"
+                    >
+                      Add Feature
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {form.customerDisplay.features.map((feature, index) => (
+                      <div key={index} className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_auto]">
+                        <input
+                          value={feature.label}
+                          onChange={(e) => setFeature(index, "label", e.target.value)}
+                          placeholder="Feature description"
+                          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                        />
+                        <input
+                          value={String(feature.was || 0)}
+                          onChange={(e) => setFeature(index, "was", e.target.value)}
+                          type="number"
+                          placeholder="Was price"
+                          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeFeature(index)}
+                          className="rounded-xl border border-red-200 px-3 py-3 text-sm text-red-600"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Show in Customer App</div>
+                      <div className="text-xs text-slate-500">Display this plan on the customer membership screen</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm((p) => ({
+                          ...p,
+                          customerDisplay: {
+                            ...p.customerDisplay,
+                            showInApp: !p.customerDisplay.showInApp,
+                          },
+                        }))
+                      }
+                      className={`relative h-8 w-14 rounded-full transition ${
+                        form.customerDisplay.showInApp ? "bg-emerald-500" : "bg-slate-300"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${
+                          form.customerDisplay.showInApp ? "left-7" : "left-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
               </section>
 

@@ -89,6 +89,152 @@ const ensureInviteBalanceCredited = async (commission, inviterId) => {
   return commission;
 };
 
+const ALLOWED_PURCHASE_CATEGORIES = new Set([
+  'product',
+  'space',
+  'food',
+  'service',
+  'membership',
+  'other',
+]);
+
+const normalizePurchaseCategory = raw => {
+  const value = String(raw || '')
+    .trim()
+    .toLowerCase();
+  if (ALLOWED_PURCHASE_CATEGORIES.has(value)) return value;
+  return 'other';
+};
+
+const creditOneReferralCommission = async ({
+  inviterId,
+  referredCustomerId,
+  category,
+  sourceType,
+  sourceId,
+  orderAmount,
+  commissionType,
+  commissionValue,
+  commissionAmount,
+  description,
+}) => {
+  const amount = Math.max(0, Math.round(Number(commissionAmount || 0) * 100) / 100);
+  if (!inviterId || !referredCustomerId || amount <= 0) return null;
+
+  const safeCategory = normalizePurchaseCategory(category);
+  const idempotencyKey = `referral-discount:${sourceType}:${sourceId}:${safeCategory}`;
+  const existing = await AffiliateCommission.findOne({idempotencyKey});
+  if (existing) {
+    return ensureInviteBalanceCredited(existing, inviterId);
+  }
+
+  try {
+    const commission = await AffiliateCommission.create({
+      inviter: inviterId,
+      referredCustomer: referredCustomerId,
+      category: safeCategory,
+      sourceType: String(sourceType || 'purchase'),
+      sourceId: String(sourceId || ''),
+      orderAmount: Math.max(0, Number(orderAmount || 0)),
+      commissionType:
+        commissionType === 'fixed' || commissionType === 'percentage'
+          ? commissionType
+          : 'percentage',
+      commissionValue: Math.max(0, Number(commissionValue || 0)),
+      commissionAmount: amount,
+      status: 'credited',
+      idempotencyKey,
+      description:
+        description ||
+        `Referral commission (${safeCategory}) for ${sourceType} ${sourceId}`,
+      approvedAt: new Date(),
+      creditedAt: new Date(),
+      meta: {
+        balanceCredited: false,
+        kind: 'referral_discount',
+      },
+    });
+
+    return ensureInviteBalanceCredited(commission, inviterId);
+  } catch (error) {
+    if (error?.code === 11000) {
+      const existingCommission = await AffiliateCommission.findOne({
+        idempotencyKey,
+      });
+      return ensureInviteBalanceCredited(existingCommission, inviterId);
+    }
+    throw error;
+  }
+};
+
+/**
+ * Credit the inviter's affiliateBalance with the same amount given as
+ * referral discount to the referred buyer at checkout (all segments).
+ */
+export const creditReferralDiscountToInviter = async ({
+  inviterId,
+  referredCustomerId,
+  sourceType,
+  sourceId,
+  orderAmount,
+  commissionAmount,
+  commissionType,
+  commissionValue,
+  category,
+  segments,
+  buyerName,
+}) => {
+  if (!inviterId || !referredCustomerId) return [];
+
+  const settings = await ensureAffiliateSettings();
+  if (settings.isEnabled === false) return [];
+
+  if (String(inviterId) === String(referredCustomerId)) return [];
+
+  const credited = [];
+  const segmentList = Array.isArray(segments)
+    ? segments.filter(segment => Number(segment?.discountAmount || 0) > 0)
+    : [];
+
+  if (segmentList.length > 0) {
+    for (const segment of segmentList) {
+      const row = await creditOneReferralCommission({
+        inviterId,
+        referredCustomerId,
+        category: segment.category,
+        sourceType,
+        sourceId,
+        orderAmount: Number(segment.lineAmount || orderAmount || 0),
+        commissionType: segment.commissionType,
+        commissionValue: segment.commissionValue,
+        commissionAmount: segment.discountAmount,
+        description: `Referral discount credited for ${
+          segment.label || segment.category
+        } · ${buyerName || 'referred customer'} · ${sourceType} ${sourceId}`,
+      });
+      if (row) credited.push(row);
+    }
+    return credited;
+  }
+
+  const row = await creditOneReferralCommission({
+    inviterId,
+    referredCustomerId,
+    category: category || 'other',
+    sourceType,
+    sourceId,
+    orderAmount,
+    commissionType,
+    commissionValue,
+    commissionAmount,
+    description: `Referral discount credited for ${
+      buyerName || 'referred customer'
+    } · ${sourceType} ${sourceId}`,
+  });
+  if (row) credited.push(row);
+  return credited;
+};
+
 export const creditInviteReward = async ({
   referredCustomerId,
   orderAmount,

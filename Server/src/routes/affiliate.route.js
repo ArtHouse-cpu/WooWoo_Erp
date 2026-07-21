@@ -12,6 +12,7 @@ import {
   getPayoutsList,
   createManualPayout,
   updatePayoutStatus,
+  validateReferralDiscount,
 } from '../controllers/affiliate.controller.js';
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.use(authenticateUser);
 
 router.get('/settings', getAffiliateSettings);
 router.put('/settings', updateAffiliateSettings);
+router.post('/validate-referral-discount', validateReferralDiscount);
 router.get('/overview', getAffiliateOverview);
 router.get('/leaderboard', getAffiliateLeaderboard);
 router.get('/stats', getAffiliateStats);

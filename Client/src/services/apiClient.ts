@@ -119,6 +119,7 @@ export type CreateInvoiceItemPayload = {
   qty: number;
   unitPrice: number;
   discount: number;
+  category?: string;
 };
 
 export type CreateInvoicePayload = {
@@ -149,6 +150,12 @@ export type CreateInvoicePayload = {
   coupon?: {
     code: string;
     discountAmount?: number;
+  } | null;
+  referral?: {
+    code: string;
+    discountAmount?: number;
+    inviterName?: string;
+    label?: string;
   } | null;
   createdBy?: {
     m_staff_id?: string | null;
@@ -365,6 +372,29 @@ export const handleValidateCoupon = async (payload: {
   return response.data;
 };
 
+export const handleValidateReferralDiscount = async (payload: {
+  customerId?: string;
+  customerPhone?: string;
+  referralCode?: string;
+  orderAmount: number;
+  items?: Array<{
+    name?: string;
+    productName?: string;
+    qty?: number;
+    unitPrice?: number;
+    price?: number;
+    discount?: number;
+    lineTotal?: number;
+    category?: string;
+  }>;
+}) => {
+  const response = await axiosInstance.post(
+    "/affiliate/validate-referral-discount",
+    payload,
+  );
+  return response.data;
+};
+
 
 export type ReturnSaleItemPayload = CreateInvoiceItemPayload;
 
@@ -470,6 +500,16 @@ export type CreateSubscriptionPayload = {
     dueAmount: number;
     changeAmount: number;
   };
+  coupon?: {
+    code: string;
+    discountAmount?: number;
+  } | null;
+  referral?: {
+    code: string;
+    discountAmount?: number;
+    inviterName?: string;
+    label?: string;
+  } | null;
 };
 
 export const handleGetSubscriptions = async (
@@ -761,6 +801,16 @@ export type MembershipPlanPayload = {
   insightsLevel?: string;
   status?: "Active" | "Inactive";
   internalNotes?: string;
+  customerDisplay?: {
+    showInApp?: boolean;
+    badgeLabel?: string;
+    themeKey?: "blue" | "purple" | "green" | "orange";
+    iconKey?: "user" | "star" | "graduation" | "crown";
+    cashbackPercent?: number;
+    storeDiscountPercent?: number;
+    spaceDiscountPercent?: number;
+    features?: Array<{ label: string; was?: number }>;
+  };
   createdBy?: {
     m_staff_id?: string | null;
     m_staff_name?: string | null;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 export const formatCurrency = (value: number) =>
   `₹${(value || 0).toLocaleString('en-IN')}`;
@@ -135,11 +136,35 @@ export const MEMBERSHIP_TYPE_OPTIONS = [
 export const notifyAffiliate = (message: string, type: 'success' | 'error' = 'success') => {
   if (type === 'error') {
     console.error(message);
+    Swal.fire({
+      title: 'Error',
+      text: message,
+      icon: 'error'
+    });
+  } else {
+    Swal.fire({
+      title: 'Success',
+      text: message,
+      icon: 'success',
+      timer: 1500,
+      showConfirmButton: false
+    });
   }
-  window.alert(message);
 };
 
-export const runAffiliateAction = async (action: () => Promise<void>, successMessage?: string) => {
+export const runAffiliateAction = async (action: () => Promise<void>, successMessage?: string, confirmMessage?: string) => {
+  if (confirmMessage) {
+    const result = await Swal.fire({
+      title: 'Confirm',
+      text: confirmMessage,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#4f46e5',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes'
+    });
+    if (!result.isConfirmed) return;
+  }
   try {
     await action();
     if (successMessage) notifyAffiliate(successMessage, 'success');

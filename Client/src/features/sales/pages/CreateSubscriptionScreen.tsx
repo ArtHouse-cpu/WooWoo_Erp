@@ -109,7 +109,17 @@ const computeEndDateFromPeriod = (startDateValue: string, periodRaw: string) => 
   return start.toISOString().split("T")[0];
 };
 
-export default function CreateSubscriptionScreen() {
+export default function CreateSubscriptionScreen({
+  onClose,
+  initialData,
+  initialMode,
+  onSave
+}: {
+  onClose?: () => void;
+  initialData?: any;
+  initialMode?: Mode;
+  onSave?: () => void;
+} = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<Mode>("create");
@@ -220,10 +230,12 @@ export default function CreateSubscriptionScreen() {
       }
     };
 
-    if (state?.subscription) {
+    if (initialData) {
+      applyDoc(initialData, initialMode ?? "edit");
+    } else if (state?.subscription) {
       applyDoc(state.subscription, state.mode ?? "edit");
     }
-  }, [location.state]);
+  }, [location.state, initialData, initialMode]);
   const selectedMembership = useMemo(
     () => memberships.find((m) => m._id === selectedMembershipId) ?? null,
     [memberships, selectedMembershipId],
@@ -276,6 +288,7 @@ export default function CreateSubscriptionScreen() {
               qty: 1,
               unitPrice: selectedMembership.amount,
               discount: 0,
+              category: "membership",
             },
           ]
         : [],
@@ -499,15 +512,37 @@ export default function CreateSubscriptionScreen() {
       dueAmount: number;
       changeAmount: number;
     };
+    finalAmount?: number;
+    coupon?: {
+      code: string;
+      discountAmount: number;
+    } | null;
+    referral?: {
+      code: string;
+      discountAmount: number;
+      inviterName?: string;
+      label?: string;
+    } | null;
   }) => {
     try {
       setSaving(true);
+      const couponDiscount = Number(payment.coupon?.discountAmount ?? 0);
+      const referralDiscount = Number(payment.referral?.discountAmount ?? 0);
+      const appliedDiscountTotal = Math.max(0, discountTotal + couponDiscount + referralDiscount);
+      const payableTotal = Math.max(
+        0,
+        Number(payment.finalAmount ?? Math.max(0, grandTotal - couponDiscount - referralDiscount)),
+      );
       const payload: CreateSubscriptionPayload = {
         ...buildPayload("active"),
+        discountTotal: appliedDiscountTotal,
+        grandTotal: payableTotal,
         subscriptionCode: subscriptionNo,
         mode: payment.mode,
         paymentStatus: payment.paymentStatus,
         paymentBreakdown: payment.paymentBreakdown,
+        coupon: payment.coupon ?? null,
+        referral: payment.referral ?? null,
       };
       if (mode === "edit" && subscriptionId) {
         await handleUpdateSubscription(subscriptionId, payload);
@@ -516,7 +551,6 @@ export default function CreateSubscriptionScreen() {
             membershipType: getCustomerMembershipType(selectedMembership),
           });
         }
-        // console.log("Updated", payload);
         printThermalReceipt({
           invoiceNo: subscriptionNo,
           customerName: customer.trim(),
@@ -526,17 +560,21 @@ export default function CreateSubscriptionScreen() {
               name: selectedMembership?.displayName ?? "Membership",
               qty: 1,
               price: selectedMembership?.amount ?? 0,
-              discount: 0,
+              discount: appliedDiscountTotal,
             },
           ],
-          totalMRP: grandTotal,
-          discountTotal,
-          finalAmount: grandTotal,
+          totalMRP: subTotal,
+          discountTotal: appliedDiscountTotal,
+          finalAmount: payableTotal,
           totalDue: payment.paymentBreakdown.dueAmount,
           totalQty: 1,
         });
         Swal.fire("Updated", "Subscription updated successfully.", "success").then(
-          () => navigate(-1),
+          () => {
+            if (onSave) onSave();
+            if (onClose) onClose();
+            else navigate(-1);
+          }
         );
         return;
       }
@@ -558,12 +596,12 @@ export default function CreateSubscriptionScreen() {
             name: selectedMembership?.displayName ?? "Membership",
             qty: 1,
             price: selectedMembership?.amount ?? 0,
-            discount: 0,
+            discount: appliedDiscountTotal,
           },
         ],
-        totalMRP: grandTotal,
-        discountTotal,
-        finalAmount: grandTotal,
+        totalMRP: subTotal,
+        discountTotal: appliedDiscountTotal,
+        finalAmount: payableTotal,
         totalDue: payment.paymentBreakdown.dueAmount,
         totalQty: 1,
       });
@@ -571,7 +609,11 @@ export default function CreateSubscriptionScreen() {
         "Saved",
         `Subscription ${savedCode} saved successfully.`,
         "success",
-      ).then(() => navigate(-1));
+      ).then(() => {
+        if (onSave) onSave();
+        if (onClose) onClose();
+        else navigate(-1);
+      });
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       Swal.fire(
@@ -607,9 +649,12 @@ export default function CreateSubscriptionScreen() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
       onMouseDown={(e) => {
-        if (e.currentTarget === e.target) navigate(-1);
+        if (e.currentTarget === e.target) {
+          if (onClose) onClose();
+          else navigate(-1);
+        }
       }}
     >
       <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
@@ -624,7 +669,10 @@ export default function CreateSubscriptionScreen() {
           </div>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              if (onClose) onClose();
+              else navigate(-1);
+            }}
             className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-black"
           >
             <X size={18} />
@@ -975,7 +1023,10 @@ export default function CreateSubscriptionScreen() {
         <div className="flex items-center justify-end gap-3 border-t bg-gray-50 px-6 py-4">
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              if (onClose) onClose();
+              else navigate(-1);
+            }}
             className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300"
           >
             Cancel
@@ -1014,12 +1065,14 @@ export default function CreateSubscriptionScreen() {
                   qty: 1,
                   price: selectedMembership.amount,
                   discount: 0,
+                  category: "membership",
                 },
               ]
             : []
         }
         initialCustomerName={customer}
         initialCustomerPhone={phone}
+        initialCustomerId={selectedCustomerId || null}
         initialMembership={selectedMembership?.displayName ?? ""}
         onClose={() => setOpenCheckout(false)}
         onConfirmPayment={async (payment) => {

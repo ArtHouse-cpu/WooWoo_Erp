@@ -122,6 +122,7 @@ export const updateAffiliateSettings = async (req, res) => {
     applyNested(settings, 'milestoneSettings', payload.milestoneSettings);
     applyNested(settings, 'notifications', payload.notifications);
     applyNested(settings, 'registrationSettings', payload.registrationSettings);
+    applyNested(settings, 'referralCheckoutDiscount', payload.referralCheckoutDiscount);
     if (payload.cookieDurationDays !== undefined) settings.cookieDurationDays = payload.cookieDurationDays;
     if (payload.maxCommissionPerOrder !== undefined) settings.maxCommissionPerOrder = payload.maxCommissionPerOrder;
     if (payload.autoApproveCommissions !== undefined) settings.autoApproveCommissions = payload.autoApproveCommissions;
@@ -692,5 +693,267 @@ export const updatePayoutStatus = async (req, res) => {
     res.status(200).json({message: 'Payout status updated', payout: mapPayoutRequest(payout)});
   } catch (error) {
     res.status(500).json({message: error.message});
+  }
+};
+
+const calculateReferralCheckoutDiscount = (config, orderAmount) => {
+  const amount = Number(orderAmount || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+
+  const minOrder = Number(config?.minOrderAmount || 0);
+  if (amount < minOrder) return 0;
+
+  let raw = 0;
+  if (config?.discountType === 'fixed') {
+    raw = Number(config.discountValue || 0);
+  } else {
+    raw = (amount * Number(config.discountValue || 0)) / 100;
+  }
+
+  const maxCap = Number(config?.maxDiscountAmount);
+  if (Number.isFinite(maxCap) && maxCap > 0) {
+    raw = Math.min(raw, maxCap);
+  }
+
+  return Math.max(0, Math.min(amount, Math.round(raw * 100) / 100));
+};
+
+const RULE_SEGMENT_LABELS = {
+  product: 'Store Supplies',
+  membership: 'Membership',
+  space: 'Space Booking',
+  service: 'Services',
+  food: 'Food Orders',
+  other: 'Other',
+};
+
+const mapLineCategoryToRuleCategory = raw => {
+  const value = String(raw || '')
+    .trim()
+    .toLowerCase();
+  if (!value || value === 'general') return 'product';
+  if (['product', 'membership', 'space', 'service', 'food', 'other'].includes(value)) {
+    return value;
+  }
+  if (value.includes('store') || value.includes('supply') || value.includes('product')) {
+    return 'product';
+  }
+  if (value.includes('membership')) return 'membership';
+  if (value.includes('space') || value.includes('booking')) return 'space';
+  if (value.includes('service')) return 'service';
+  if (value.includes('food')) return 'food';
+  return 'product';
+};
+
+const calculateCommissionRuleDiscount = (rule, orderAmount) => {
+  const amount = Number(orderAmount || 0);
+  if (!rule || rule.enabled === false || amount <= 0) return 0;
+  if (amount < Number(rule.minOrderAmount || 0)) return 0;
+
+  const raw =
+    rule.commissionType === 'percentage'
+      ? (amount * Number(rule.commissionValue || 0)) / 100
+      : Number(rule.commissionValue || 0);
+  const max = Number(rule.maxCommissionAmount);
+  const capped = Number.isFinite(max) && max > 0 ? Math.min(raw, max) : raw;
+  return Math.max(0, Math.min(amount, Math.round(capped * 100) / 100));
+};
+
+const calculateReferralDiscountFromRules = (rules = [], items = [], fallbackAmount = 0) => {
+  const ruleMap = new Map(
+    (Array.isArray(rules) ? rules : [])
+      .filter(rule => rule?.category && rule.category !== 'invite')
+      .map(rule => [rule.category, rule]),
+  );
+
+  const normalizedItems = Array.isArray(items)
+    ? items
+        .map(item => {
+          const qty = Number(item.qty ?? item.quantity ?? 1) || 1;
+          const unitPrice = Number(item.unitPrice ?? item.price ?? 0) || 0;
+          const lineDiscount = Number(item.discount ?? 0) || 0;
+          const lineAmount = Math.max(
+            0,
+            Number(item.lineTotal ?? qty * unitPrice - lineDiscount) || 0,
+          );
+          const ruleCategory = mapLineCategoryToRuleCategory(
+            item.category || item.productName || item.name,
+          );
+          return {
+            ruleCategory,
+            lineAmount,
+            name: String(item.name ?? item.productName ?? '').trim(),
+          };
+        })
+        .filter(item => item.lineAmount > 0)
+    : [];
+
+  const segments = [];
+
+  if (normalizedItems.length > 0) {
+    for (const item of normalizedItems) {
+      const rule = ruleMap.get(item.ruleCategory);
+      const discountAmount = calculateCommissionRuleDiscount(rule, item.lineAmount);
+      if (discountAmount <= 0) continue;
+
+      const existing = segments.find(segment => segment.category === item.ruleCategory);
+      if (existing) {
+        existing.lineAmount += item.lineAmount;
+        existing.discountAmount += discountAmount;
+        if (item.name) existing.items.push(item.name);
+      } else {
+        segments.push({
+          category: item.ruleCategory,
+          label: rule?.label || RULE_SEGMENT_LABELS[item.ruleCategory] || item.ruleCategory,
+          commissionType: rule?.commissionType || 'percentage',
+          commissionValue: Number(rule?.commissionValue || 0),
+          lineAmount: item.lineAmount,
+          discountAmount,
+          items: item.name ? [item.name] : [],
+        });
+      }
+    }
+  } else if (fallbackAmount > 0) {
+    const rule = ruleMap.get('product') || ruleMap.get('other');
+    const discountAmount = calculateCommissionRuleDiscount(rule, fallbackAmount);
+    if (discountAmount > 0) {
+      segments.push({
+        category: rule?.category || 'product',
+        label: rule?.label || RULE_SEGMENT_LABELS.product,
+        commissionType: rule?.commissionType || 'percentage',
+        commissionValue: Number(rule?.commissionValue || 0),
+        lineAmount: fallbackAmount,
+        discountAmount,
+        items: [],
+      });
+    }
+  }
+
+  segments.forEach(segment => {
+    segment.lineAmount = Math.round(segment.lineAmount * 100) / 100;
+    segment.discountAmount = Math.round(segment.discountAmount * 100) / 100;
+  });
+
+  const discountAmount = segments.reduce(
+    (sum, segment) => sum + Number(segment.discountAmount || 0),
+    0,
+  );
+
+  return {
+    discountAmount: Math.round(discountAmount * 100) / 100,
+    segments,
+  };
+};
+
+export const validateReferralDiscountForOrder = async ({
+  customerId,
+  customerPhone,
+  referralCode,
+  orderAmount,
+  items,
+}) => {
+  const settings = await ensureSettings();
+
+  if (settings.isEnabled === false) {
+    return {
+      ok: false,
+      message: 'Affiliate program is disabled.',
+    };
+  }
+
+  const amount = Number(orderAmount || 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return {ok: false, message: 'Order amount must be greater than 0.'};
+  }
+
+  let buyer = null;
+  if (customerId && mongoose.Types.ObjectId.isValid(String(customerId))) {
+    buyer = await Customer.findById(customerId);
+  } else if (customerPhone) {
+    const phone = String(customerPhone).trim();
+    buyer = await Customer.findOne({
+      $or: [{mobile: phone}, {whatsappNumber: phone}],
+      isDeleted: {$ne: true},
+    });
+  }
+
+  let inviter = null;
+  const manualCode = String(referralCode || '')
+    .trim()
+    .toUpperCase();
+
+  if (manualCode) {
+    inviter = await Customer.findOne({
+      referralCode: manualCode,
+      isDeleted: {$ne: true},
+    });
+    if (!inviter) {
+      return {ok: false, message: 'Referral code not found.'};
+    }
+  } else if (buyer?.referredBy) {
+    inviter = await Customer.findById(buyer.referredBy);
+    if (!inviter) {
+      return {ok: false, message: 'Referrer not found for this customer.'};
+    }
+  } else {
+    return {
+      ok: false,
+      message: 'Customer was not referred and no referral code was provided.',
+    };
+  }
+
+  if (
+    buyer &&
+    String(buyer._id) === String(inviter._id) &&
+    settings.programControls?.allowSelfReferral !== true
+  ) {
+    return {ok: false, message: 'Self referral discount is not allowed.'};
+  }
+
+  const {discountAmount, segments} = calculateReferralDiscountFromRules(
+    settings.rules,
+    items,
+    amount,
+  );
+
+  if (discountAmount <= 0 || segments.length === 0) {
+    return {
+      ok: false,
+      message: 'No referral discount applies for these items.',
+    };
+  }
+
+  const primary = segments[0];
+
+  return {
+    ok: true,
+    discountAmount,
+    segments,
+    referralCode: inviter.referralCode,
+    inviterName: inviter.name || '',
+    inviterId: inviter._id,
+    discountType: primary.commissionType || 'percentage',
+    discountValue: Number(primary.commissionValue || 0),
+    label:
+      segments.length === 1
+        ? `${primary.label} Referral Discount`
+        : 'Referral Discount',
+    buyerId: buyer?._id || null,
+  };
+};
+
+export const validateReferralDiscount = async (req, res) => {
+  try {
+    const result = await validateReferralDiscountForOrder(req.body || {});
+    if (!result.ok) {
+      return res.status(400).json({success: false, message: result.message});
+    }
+    return res.status(200).json({
+      success: true,
+      message: 'Referral discount applied',
+      data: result,
+    });
+  } catch (error) {
+    res.status(500).json({success: false, message: error.message});
   }
 };

@@ -23,6 +23,7 @@ import {
 } from '../controllers/payment.controller.js';
 import {getReferralDashboard} from '../controllers/referral.controller.js';
 import {getWalletDashboard} from '../controllers/wallet.controller.js';
+import {getCustomerMembershipPlans} from '../controllers/membership.controller.js';
 import {validateRequest} from '../middlewares/validateRequest.js';
 import {
   authenticateCustomer,
@@ -87,6 +88,8 @@ router.post(
 );
 router.post('/refresh-token', refreshToken);
 router.post('/logout', logout);
+
+router.get('/membership/plans', getCustomerMembershipPlans);
 
 // PayU browser callbacks (no auth — PayU server redirect POST)
 router.post('/payments/payu/success', payuSuccess);

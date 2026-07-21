@@ -7,6 +7,9 @@ import {
   validateSubscriptionCreateBody,
   validateSubscriptionUpdateBody,
 } from '../schemas/subscription.schema.js';
+import {validateReferralDiscountForOrder} from './affiliate.controller.js';
+import {validateCouponForOrder} from './coupon.controller.js';
+import {creditReferralDiscountToInviter} from '../modules/customer/services/referral.service.js';
 
 const getNextSubscriptionNumber = async () => {
   const counter = await Counter.findOneAndUpdate(
@@ -73,6 +76,59 @@ export const createSubscription = async (req, res) => {
       });
     }
 
+    let referralDiscount = 0;
+    let appliedReferral = null;
+    const referral = parsed.data.referral;
+    if (referral?.code || Number(referral?.discountAmount) > 0) {
+      const referralValidation = await validateReferralDiscountForOrder({
+        customerPhone: parsed.data.customerPhone,
+        referralCode: referral?.code,
+        orderAmount: parsed.data.subTotal,
+        items: (parsed.data.items || []).map(item => ({
+          productName: item.productName,
+          qty: item.qty,
+          unitPrice: item.unitPrice,
+          discount: item.discount,
+          lineTotal: item.lineTotal,
+          category: item.category || 'membership',
+        })),
+      });
+      if (!referralValidation.ok) {
+        return res.status(400).json({
+          success: false,
+          message: referralValidation.message,
+        });
+      }
+      appliedReferral = referralValidation;
+      referralDiscount = Number(referralValidation.discountAmount ?? 0);
+    }
+
+    let couponDiscount = 0;
+    let appliedCoupon = null;
+    const coupon = parsed.data.coupon;
+    if (coupon?.code) {
+      const couponValidation = await validateCouponForOrder({
+        code: coupon.code,
+        orderAmount: Math.max(0, parsed.data.subTotal - referralDiscount),
+        customerPhone: parsed.data.customerPhone,
+      });
+      if (!couponValidation.ok) {
+        return res.status(400).json({
+          success: false,
+          message: couponValidation.message,
+        });
+      }
+      appliedCoupon = couponValidation.coupon;
+      couponDiscount = Number(couponValidation.discountAmount ?? 0);
+    }
+
+    const itemDiscountTotal = (parsed.data.items || []).reduce(
+      (sum, item) => sum + Number(item.discount ?? 0),
+      0,
+    );
+    const computedDiscountTotal = itemDiscountTotal + couponDiscount + referralDiscount;
+    const computedGrandTotal = Math.max(0, Number(parsed.data.subTotal) - computedDiscountTotal);
+
     const subscription = await Subscription.create({
       subscriptionPrefix,
       subscriptionNumber: nextNumber,
@@ -92,15 +148,66 @@ export const createSubscription = async (req, res) => {
       salesPersonName: parsed.data.salesPersonName,
       notes: parsed.data.notes,
       status: parsed.data.status,
-      items: parsed.data.items,
+      items: parsed.data.items.map(item => ({
+        productName: item.productName,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        lineTotal: item.lineTotal,
+      })),
       students: parsed.data.students,
       subTotal: parsed.data.subTotal,
-      discountTotal: parsed.data.discountTotal,
-      grandTotal: parsed.data.grandTotal,
+      discountTotal: computedDiscountTotal,
+      grandTotal: computedGrandTotal,
+      referral: appliedReferral
+        ? {
+            code: appliedReferral.referralCode,
+            inviterName: appliedReferral.inviterName || '',
+            label: appliedReferral.label || 'Membership Referral Discount',
+            discountAmount: referralDiscount,
+          }
+        : undefined,
+      coupon: appliedCoupon
+        ? {
+            code: appliedCoupon.code,
+            title: appliedCoupon.title,
+            discountAmount: couponDiscount,
+          }
+        : undefined,
       createdBy,
       noOfInvoices: 0,
       nextInvoiceDate: parsed.data.startDate,
     });
+
+    if (appliedReferral && referralDiscount > 0) {
+      try {
+        const buyer = await Customer.findOne({
+          mobile: parsed.data.customerPhone,
+          isDeleted: {$ne: true},
+        })
+          .select('_id name')
+          .lean();
+
+        await creditReferralDiscountToInviter({
+          inviterId: appliedReferral.inviterId,
+          referredCustomerId: appliedReferral.buyerId || buyer?._id,
+          sourceType: 'subscription',
+          sourceId: subscriptionCode,
+          orderAmount: parsed.data.subTotal,
+          commissionAmount: referralDiscount,
+          commissionType: appliedReferral.discountType,
+          commissionValue: appliedReferral.discountValue,
+          category: appliedReferral.segments?.[0]?.category || 'membership',
+          segments: appliedReferral.segments,
+          buyerName: buyer?.name || parsed.data.customerName,
+        });
+      } catch (creditError) {
+        console.error(
+          'createSubscription referral commission credit error:',
+          creditError,
+        );
+      }
+    }
 
     const normalizedCustomerMembership = juniorMembership
       ? 'junior'

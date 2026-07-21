@@ -14,7 +14,7 @@ import {
   Trash2,
   Wallet,
 } from "lucide-react";
-import { handleGetCustomers, handleGetWallets } from "@/services/apiClient";
+import { handleGetCustomers, handleGetWallets, handleGetMemberships } from "@/services/apiClient";
 export default function MembershipScreen() {
   const [walletTotal, setWalletTotal] = useState(0);
   const [walletCustomers, setWalletCustomers] = useState(0);
@@ -117,44 +117,37 @@ export default function MembershipScreen() {
     []
   );
 
-  const data = useMemo(
-    () => [
-      {
-        id: 1,
-        membership_name: "Basic Plan",
-        description: "Access to essential features with limited support.",
-        price: "299",
-        validity: "30 Days",
-        plan_images: 3,
-      },
-      {
-        id: 2,
-        membership_name: "Standard Plan",
-        description: "Includes all basic features plus priority support.",
-        price: "599",
-        validity: "90 Days",
-        plan_images: 5,
-      },
-      {
-        id: 3,
-        membership_name: "Premium Plan",
-        description:
-          "Full access to all premium features with 24/7 customer support.",
-        price: "999",
-        validity: "180 Days",
-        plan_images: 8,
-      },
-      {
-        id: 4,
-        membership_name: "Ultimate Plan",
-        description: "Unlimited access, exclusive deals, and premium support.",
-        price: "1499",
-        validity: "365 Days",
-        plan_images: 12,
-      },
-    ],
-    []
-  );
+  const [data, setData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMemberships = async () => {
+      try {
+        setIsLoading(true);
+        // Assuming handleGetMemberships is available in apiClient
+        const res = await handleGetMemberships();
+        const memberships = Array.isArray(res?.memberships) ? res.memberships : [];
+        
+        const mappedData = memberships.map((m: any, index: number) => ({
+          id: m.planId || m._id || (index + 1),
+          membership_name: m.displayName || "Unknown Plan",
+          description: m.description || "No description provided.",
+          price: m.pricing?.amount?.toString() || "0",
+          validity: m.pricing?.period || "N/A",
+          plan_images: 0, // Placeholder as backend doesn't store plan images yet
+        }));
+        
+        setData(mappedData);
+      } catch (error) {
+        console.error("Failed to fetch memberships:", error);
+        setData([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void fetchMemberships();
+  }, []);
 
   const table = useMaterialReactTable({
     columns,

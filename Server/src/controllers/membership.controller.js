@@ -1,6 +1,24 @@
 import mongoose from 'mongoose';
 import Membership from '../models/membership.model.js';
 
+const normalizeCustomerDisplay = (input = {}) => ({
+  showInApp: input.showInApp !== false,
+  badgeLabel: String(input.badgeLabel ?? '').trim(),
+  themeKey: String(input.themeKey ?? 'blue').trim(),
+  iconKey: String(input.iconKey ?? 'user').trim(),
+  cashbackPercent: Math.max(0, Number(input.cashbackPercent ?? 0)),
+  storeDiscountPercent: Math.max(0, Number(input.storeDiscountPercent ?? 0)),
+  spaceDiscountPercent: Math.max(0, Number(input.spaceDiscountPercent ?? 0)),
+  features: Array.isArray(input.features)
+    ? input.features
+        .map(item => ({
+          label: String(item?.label ?? '').trim(),
+          was: Math.max(0, Number(item?.was ?? 0)),
+        }))
+        .filter(item => item.label)
+    : [],
+});
+
 export const createMembership = async (req, res) => {
   try {
     const {
@@ -14,6 +32,7 @@ export const createMembership = async (req, res) => {
       insightsLevel,
       status,
       internalNotes,
+      customerDisplay,
       createdBy,
     } = req.body;
 
@@ -50,6 +69,7 @@ export const createMembership = async (req, res) => {
       insightsLevel: String(insightsLevel ?? 'Basic').trim(),
       status: String(status ?? 'Active').trim(),
       internalNotes: String(internalNotes ?? '').trim(),
+      customerDisplay: normalizeCustomerDisplay(customerDisplay),
       createdBy: createdBy ?? undefined,
     });
 
@@ -125,6 +145,9 @@ export const updateMembership = async (req, res) => {
     if (body.internalNotes !== undefined) patch.internalNotes = String(body.internalNotes ?? '').trim();
     if (body.createdBy !== undefined) patch.createdBy = body.createdBy;
     if (body.usageLimits !== undefined) patch.usageLimits = body.usageLimits;
+    if (body.customerDisplay !== undefined) {
+      patch.customerDisplay = normalizeCustomerDisplay(body.customerDisplay);
+    }
     if (body.pricing !== undefined) {
       patch.pricing = {
         period: String(body.pricing?.period ?? 'Monthly').trim(),

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Users, Gift, Calendar, Activity, HelpCircle, UserPlus } from 'lucide-react';
-import { AffiliateToggle, SimpleModal } from '../components/affiliateShared';
+import { AffiliateToggle, SimpleModal, notifyAffiliate } from '../components/affiliateShared';
 
 const CATEGORIES = [
   { key: 'invite', label: 'Signup Bonus', icon: UserPlus },
@@ -93,10 +93,9 @@ export default function CommissionRulesTab({ settings, handleSave }: Props) {
 
   const deleteRule = async (category: string) => {
     if (category === 'invite') {
-      window.alert('Signup Bonus cannot be deleted. Disable it or set the amount to 0 instead.');
+      notifyAffiliate('Signup Bonus cannot be deleted. Disable it or set the amount to 0 instead.', 'error');
       return;
     }
-    if (!window.confirm('Remove this commission rule?')) return;
     await saveRules(rules.filter((r: any) => r.category !== category));
   };
 

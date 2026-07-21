@@ -12,6 +12,10 @@ import {validateMembershipCoupon} from './coupon.service.js';
 import Coupon from '../../../models/coupon.model.js';
 import PaymentOrder from '../models/paymentOrder.model.js';
 import {getMembershipOrderAmount} from '../constants/membershipPlans.js';
+import {
+  assertActiveMembershipPlan,
+  resolvePlanMeta,
+} from '../../../services/membershipPlan.service.js';
 import {creditInviteReward} from './referral.service.js';
 import {
   generateAccessToken,
@@ -656,7 +660,13 @@ const MEMBERSHIP_META = {
  */
 export const activateMembership = async (customerId, payload = {}) => {
   let membershipType = String(payload.membershipType || '').toLowerCase();
-  const meta = MEMBERSHIP_META[membershipType];
+  let membershipPlan = null;
+  try {
+    membershipPlan = await assertActiveMembershipPlan(membershipType);
+  } catch {
+    membershipPlan = null;
+  }
+  let meta = membershipPlan ? resolvePlanMeta(membershipPlan) : MEMBERSHIP_META[membershipType];
 
   if ((!meta || membershipType === 'none') && !payload.paymentOrderId) {
     const error = new Error('Select a valid membership plan');
@@ -727,7 +737,7 @@ export const activateMembership = async (customerId, payload = {}) => {
       throw error;
     }
 
-    orderAmount = getMembershipOrderAmount(membershipType);
+    orderAmount = await getMembershipOrderAmount(membershipType);
     if (orderAmount == null) {
       const error = new Error('Select a valid membership plan');
       error.status = 400;
@@ -764,7 +774,16 @@ export const activateMembership = async (customerId, payload = {}) => {
     }
   }
 
-  const planMeta = MEMBERSHIP_META[membershipType];
+  if (!membershipPlan) {
+    try {
+      membershipPlan = await assertActiveMembershipPlan(membershipType);
+    } catch {
+      membershipPlan = null;
+    }
+  }
+  const planMeta = membershipPlan
+    ? resolvePlanMeta(membershipPlan)
+    : MEMBERSHIP_META[membershipType];
   if (!planMeta) {
     const error = new Error('Select a valid membership plan');
     error.status = 400;
@@ -781,6 +800,9 @@ export const activateMembership = async (customerId, payload = {}) => {
     : 50;
 
   customer.membershipType = membershipType;
+  if (membershipPlan?._id) {
+    customer.membershipPlanId = membershipPlan._id;
+  }
   customer.onboardingCompleted = true;
   customer.profileSetupCompleted = true;
   customer.walletAmount = Number(customer.walletAmount || 0) + safeCashback;

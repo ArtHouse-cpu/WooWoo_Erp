@@ -265,12 +265,17 @@ export default function CreatePosScreen({
           qty: item.qty,
           unitPrice: item.price,
           discount: item.discount,
+          category: item.category || "General",
         })),
         subTotal,
-        discountTotal,
+        discountTotal:
+          discountTotal +
+          Number(payment.coupon?.discountAmount ?? 0) +
+          Number(payment.referral?.discountAmount ?? 0),
         extraCharges,
         grandTotal: payment.finalAmount,
         coupon: payment.coupon ?? null,
+        referral: payment.referral ?? null,
         status: "final",
         mode: payment.mode,
         paymentStatus: payment.paymentStatus,
@@ -302,7 +307,10 @@ export default function CreatePosScreen({
           discount: item.discount,
         })),
         totalMRP: subTotal,
-        discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
+        discountTotal:
+          discountTotal +
+          Number(payment.coupon?.discountAmount ?? 0) +
+          Number(payment.referral?.discountAmount ?? 0),
         cashbackAmount: payment.cashbackTotal,
         finalAmount: payment.finalAmount,
         totalDue: payment.paymentBreakdown.dueAmount,

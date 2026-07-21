@@ -6,6 +6,8 @@ import Wallet from '../models/wallet.model.js';
 import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
 import { appendTransaction } from './wallet.controller.js';
 import { validateCouponForOrder } from './coupon.controller.js';
+import { validateReferralDiscountForOrder } from './affiliate.controller.js';
+import { creditReferralDiscountToInviter } from '../modules/customer/services/referral.service.js';
 
 const getStartOfToday = () => {
   const d = new Date();
@@ -107,6 +109,7 @@ const createInvoice = async (req, res) => {
       createdBy,
       pendingAmount,
       coupon,
+      referral,
       extraCharges,
     } = req.body;
 
@@ -158,6 +161,7 @@ const createInvoice = async (req, res) => {
         unitPrice,
         discount,
         lineTotal,
+        category: String(item.category || 'General').trim(),
       };
     });
 
@@ -200,6 +204,8 @@ const createInvoice = async (req, res) => {
     let appliedCoupon = null;
     let couponDiscount = 0;
     const preCouponAmount = Math.max(0, computedSubTotal - itemDiscountTotal);
+    const customer = await findCustomerForInvoice({ customerPhone, customerName });
+
     if (coupon?.code) {
       const couponValidation = await validateCouponForOrder({
         code: coupon.code,
@@ -216,18 +222,45 @@ const createInvoice = async (req, res) => {
       couponDiscount = Number(couponValidation.discountAmount ?? 0);
     }
 
+    let appliedReferral = null;
+    let referralDiscount = 0;
+    const preReferralAmount = Math.max(0, preCouponAmount - couponDiscount);
+    if (referral?.code || referral?.discountAmount > 0) {
+      const referralValidation = await validateReferralDiscountForOrder({
+        customerPhone,
+        customerId: customer?._id,
+        referralCode: referral?.code,
+        orderAmount: preReferralAmount > 0 ? preReferralAmount : preCouponAmount,
+        items: (req.body.items || normalizedItems).map(item => ({
+          productName: item.productName,
+          qty: item.qty,
+          unitPrice: item.unitPrice,
+          discount: item.discount,
+          lineTotal: item.lineTotal,
+          category: item.category || 'General',
+        })),
+      });
+      if (!referralValidation.ok) {
+        return res.status(400).json({
+          success: false,
+          message: referralValidation.message,
+        });
+      }
+      appliedReferral = referralValidation;
+      referralDiscount = Number(referralValidation.discountAmount ?? 0);
+    }
+
     const extraChargesTotal = Array.isArray(extraCharges) 
       ? extraCharges.reduce((sum, c) => sum + Number(c.amount ?? 0), 0)
       : 0;
 
-    const computedDiscountTotal = itemDiscountTotal + couponDiscount;
+    const computedDiscountTotal = itemDiscountTotal + couponDiscount + referralDiscount;
     const computedGrandTotal = Math.max(0, computedSubTotal - computedDiscountTotal + extraChargesTotal);
 
     const nextNumber = await getNextInvoiceNumber();
     const invoicePrefix = 'INVVWAH';
     const invoiceCode = `${invoicePrefix}-${nextNumber}`;
     const actor = buildCreatedBy(req, createdBy);
-    const customer = await findCustomerForInvoice({ customerPhone, customerName });
 
     if (walletAmount > 0) {
       if (!customer) {
@@ -272,6 +305,16 @@ const createInvoice = async (req, res) => {
             discountAmount: couponDiscount,
           }
         : undefined,
+      referral: appliedReferral
+        ? {
+            code: appliedReferral.referralCode,
+            inviterName: appliedReferral.inviterName,
+            discountType: appliedReferral.discountType,
+            discountValue: Number(appliedReferral.discountValue ?? 0),
+            discountAmount: referralDiscount,
+            label: appliedReferral.label,
+          }
+        : undefined,
       grandTotal: Number(grandTotal ?? computedGrandTotal),
       extraCharges: Array.isArray(extraCharges) ? extraCharges : [],
       mode: String(mode ?? 'Cash'),
@@ -301,6 +344,31 @@ const createInvoice = async (req, res) => {
         createdBy: actor,
         note: `Wallet used for invoice ${invoiceCode}`,
       });
+    }
+
+    if (
+      appliedReferral &&
+      referralDiscount > 0 &&
+      invoice.status !== 'cancelled' &&
+      invoice.status !== 'draft'
+    ) {
+      try {
+        await creditReferralDiscountToInviter({
+          inviterId: appliedReferral.inviterId,
+          referredCustomerId: appliedReferral.buyerId || customer?._id,
+          sourceType: 'invoice',
+          sourceId: invoiceCode,
+          orderAmount: preReferralAmount > 0 ? preReferralAmount : preCouponAmount,
+          commissionAmount: referralDiscount,
+          commissionType: appliedReferral.discountType,
+          commissionValue: appliedReferral.discountValue,
+          category: appliedReferral.segments?.[0]?.category || 'product',
+          segments: appliedReferral.segments,
+          buyerName: customer?.name || customerName,
+        });
+      } catch (creditError) {
+        console.error('createInvoice referral commission credit error:', creditError);
+      }
     }
 
     if (appliedCoupon?.code && invoice.status !== 'cancelled') {

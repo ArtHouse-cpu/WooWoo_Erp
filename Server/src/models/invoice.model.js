@@ -112,6 +112,18 @@ const invoiceSchema = new mongoose.Schema(
       discountValue: { type: Number, min: 0, default: 0 },
       discountAmount: { type: Number, min: 0, default: 0 },
     },
+    referral: {
+      code: { type: String, trim: true, uppercase: true, default: null },
+      inviterName: { type: String, trim: true, default: null },
+      discountType: {
+        type: String,
+        enum: ['percentage', 'fixed', null],
+        default: null,
+      },
+      discountValue: { type: Number, min: 0, default: 0 },
+      discountAmount: { type: Number, min: 0, default: 0 },
+      label: { type: String, trim: true, default: 'Referral Discount' },
+    },
     grandTotal: {
       type: Number,
       required: true,
