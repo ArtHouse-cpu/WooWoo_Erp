@@ -3,6 +3,7 @@ import {
   Calendar,
   Coffee,
   Compass,
+  Gift,
   Home,
   LayoutDashboard,
   MapPin,
@@ -119,6 +120,15 @@ export const exploreItemsDesktop = [
     iconBg: 'bg-[#FEF9C3]',
     iconColor: 'text-[#CA8A04]',
     image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=500&q=80',
+  },
+  {
+    id: 'programs',
+    title: 'Programs',
+    subtitle: 'Grow & Earn with us',
+    icon: Gift,
+    iconBg: 'bg-[#FFF3EB]',
+    iconColor: 'text-[#EA580C]',
+    image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=500&q=80',
   },
 ];
 
