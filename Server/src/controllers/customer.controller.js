@@ -256,6 +256,7 @@ const getCustomers = async (req, res) => {
         {email: regex},
         {companyName: regex},
         {gstin: regex},
+        {referralCode: regex},
       ];
     }
 

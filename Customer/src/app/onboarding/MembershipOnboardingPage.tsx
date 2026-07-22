@@ -22,8 +22,9 @@ import {
 import {toast} from 'sonner';
 import {Button} from '../../components/ui/Button';
 import {
+  FALLBACK_MEMBERSHIP_PLANS,
   getMembershipPlan,
-  MEMBERSHIP_PLANS,
+  mapApiPlanToMembershipPlan,
   type MembershipPlan,
   type MembershipPlanId,
 } from '../../data/membershipPlans';
@@ -33,11 +34,17 @@ import {useAuthStore} from '../../store/authStore';
 import {useIsDesktop} from '../../hooks/useIsDesktop';
 import {redirectToPayu} from '../../utils/payuCheckout';
 
-function PlanIcon({id, className}: {id: MembershipPlanId; className?: string}) {
-  if (id === 'general') return <User className={className} strokeWidth={2} />;
-  if (id === 'special') return <Star className={className} strokeWidth={2} />;
-  if (id === 'junior') return <GraduationCap className={className} strokeWidth={2} />;
-  return <Crown className={className} strokeWidth={2} />;
+function PlanIcon({
+  iconKey,
+  className,
+}: {
+  iconKey?: MembershipPlan['iconKey'];
+  className?: string;
+}) {
+  if (iconKey === 'star') return <Star className={className} strokeWidth={2} />;
+  if (iconKey === 'graduation') return <GraduationCap className={className} strokeWidth={2} />;
+  if (iconKey === 'crown') return <Crown className={className} strokeWidth={2} />;
+  return <User className={className} strokeWidth={2} />;
 }
 
 function DiscountIcon({type}: {type: 'store' | 'space'}) {
@@ -66,7 +73,7 @@ function MembershipCard({
         <div
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${plan.theme.iconBg} ${plan.theme.iconText}`}
         >
-          <PlanIcon id={plan.id} className="h-4 w-4" />
+          <PlanIcon iconKey={plan.iconKey} className="h-4 w-4" />
         </div>
 
         <div className="min-w-0 flex-1">
@@ -152,19 +159,18 @@ function MembershipCard({
 }
 
 function CheckoutSheet({
-  planId,
+  plan,
   open,
   onClose,
   onPay,
   loading,
 }: {
-  planId: MembershipPlanId;
+  plan: MembershipPlan;
   open: boolean;
   onClose: () => void;
   onPay: (couponCode?: string, payableAmount?: number) => void;
   loading: boolean;
 }) {
-  const plan = getMembershipPlan(planId);
   const [coupon, setCoupon] = useState('');
   const [applied, setApplied] = useState<{
     code: string;
@@ -179,7 +185,7 @@ function CheckoutSheet({
     setCoupon('');
     setApplied(null);
     setValidating(false);
-  }, [open, planId]);
+  }, [open, plan.id]);
 
   if (!open) return null;
 
@@ -246,7 +252,7 @@ function CheckoutSheet({
             <div
               className={`flex h-10 w-10 items-center justify-center rounded-[12px] ${plan.theme.iconBg} ${plan.theme.iconText}`}
             >
-              <PlanIcon id={plan.id} className="h-4 w-4" />
+              <PlanIcon iconKey={plan.iconKey} className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -350,12 +356,43 @@ export default function MembershipOnboardingPage() {
   const navigate = useNavigate();
   const setCustomer = useAuthStore(s => s.setCustomer);
   const isDesktop = useIsDesktop();
+  const [plans, setPlans] = useState<MembershipPlan[]>(FALLBACK_MEMBERSHIP_PLANS);
   const [selected, setSelected] = useState<MembershipPlanId>('general');
   const [menuOpen, setMenuOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingPlans, setLoadingPlans] = useState(true);
 
-  const selectedPlan = useMemo(() => getMembershipPlan(selected), [selected]);
+  useEffect(() => {
+    let active = true;
+    void authApi
+      .getMembershipPlans()
+      .then(({data}) => {
+        if (!active) return;
+        const apiPlans = Array.isArray(data.data)
+          ? data.data.map(mapApiPlanToMembershipPlan)
+          : [];
+        if (apiPlans.length > 0) {
+          setPlans(apiPlans);
+          setSelected(apiPlans[0].id);
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setPlans(FALLBACK_MEMBERSHIP_PLANS);
+      })
+      .finally(() => {
+        if (active) setLoadingPlans(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const selectedPlan = useMemo(
+    () => getMembershipPlan(selected, plans),
+    [selected, plans],
+  );
 
   const finishOnboarding = async (
     membershipType: MembershipPlanId | 'none',
@@ -437,7 +474,7 @@ export default function MembershipOnboardingPage() {
   const onContinue = () => setCheckoutOpen(true);
 
   const onPay = async (couponCode?: string, payableAmount?: number) => {
-    const plan = getMembershipPlan(selected);
+    const plan = getMembershipPlan(selected, plans);
     const amount = payableAmount ?? plan.price;
     const result = await Swal.fire({
       title: `Pay ₹ ${amount}?`,
@@ -507,14 +544,20 @@ export default function MembershipOnboardingPage() {
         </div>
 
         <div className={`space-y-3 ${isDesktop ? 'grid grid-cols-2 gap-3 space-y-0' : ''}`}>
-          {MEMBERSHIP_PLANS.map(plan => (
-            <MembershipCard
-              key={plan.id}
-              plan={plan}
-              selected={selected === plan.id}
-              onSelect={() => setSelected(plan.id)}
-            />
-          ))}
+          {loadingPlans ? (
+            <div className="rounded-[18px] border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+              Loading membership plans...
+            </div>
+          ) : (
+            plans.map(plan => (
+              <MembershipCard
+                key={plan.id}
+                plan={plan}
+                selected={selected === plan.id}
+                onSelect={() => setSelected(plan.id)}
+              />
+            ))
+          )}
         </div>
 
         <div
@@ -539,7 +582,7 @@ export default function MembershipOnboardingPage() {
       </div>
 
       <CheckoutSheet
-        planId={selected}
+        plan={selectedPlan}
         open={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
         onPay={onPay}

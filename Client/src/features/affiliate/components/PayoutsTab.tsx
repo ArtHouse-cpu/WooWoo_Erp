@@ -59,7 +59,7 @@ export default function PayoutsTab({ onOpenSettings }: { onOpenSettings?: () => 
       await handleUpdatePayoutStatus(payout._id, { status, source: payout.source || 'payout', ...extra });
       await fetchPayouts();
       setViewPayout(null);
-    }, 'Payout status updated');
+    }, 'Payout status updated', `Are you sure you want to mark this payout as ${status}?`);
   };
 
   const createManual = async () => {
@@ -77,7 +77,7 @@ export default function PayoutsTab({ onOpenSettings }: { onOpenSettings?: () => 
       setManualOpen(false);
       setManualForm({ affiliateId: '', amount: '', payoutMethod: 'Manual', markPending: false });
       await fetchPayouts();
-    }, manualForm.markPending ? 'Payout request created' : 'Manual payout created');
+    }, manualForm.markPending ? 'Payout request created' : 'Manual payout created', 'Are you sure you want to create this manual payout?');
   };
 
   const exportCsv = () => {

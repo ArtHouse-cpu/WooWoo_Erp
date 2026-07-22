@@ -49,6 +49,33 @@ const membershipSchema = new mongoose.Schema(
 
     internalNotes: { type: String, default: "", trim: true },
 
+    customerDisplay: {
+      showInApp: { type: Boolean, default: true },
+      badgeLabel: { type: String, default: "", trim: true },
+      themeKey: {
+        type: String,
+        enum: ["blue", "purple", "green", "orange"],
+        default: "blue",
+      },
+      iconKey: {
+        type: String,
+        enum: ["user", "star", "graduation", "crown"],
+        default: "user",
+      },
+      cashbackPercent: { type: Number, default: 0, min: 0 },
+      storeDiscountPercent: { type: Number, default: 0, min: 0 },
+      spaceDiscountPercent: { type: Number, default: 0, min: 0 },
+      features: {
+        type: [
+          {
+            label: { type: String, default: "", trim: true },
+            was: { type: Number, default: 0, min: 0 },
+          },
+        ],
+        default: [],
+      },
+    },
+
     createdBy: {
       m_staff_id: { type: String, default: null },
       m_staff_name: { type: String, default: null },

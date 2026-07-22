@@ -6,7 +6,7 @@ import {
   handleGetAffiliateSettings,
   handleUpdateAffiliateSettings,
 } from '@/services/apiClient';
-import { AffiliateToggle, notifyAffiliate } from '../components/affiliateShared';
+import { AffiliateToggle, notifyAffiliate, runAffiliateAction } from '../components/affiliateShared';
 
 const DEFAULT_SETTINGS = {
   isEnabled: true,
@@ -55,12 +55,14 @@ export default function AffiliateProgramScreen() {
   };
 
   const handleSave = async (updatedSettings: any) => {
-    try {
-      const data = await handleUpdateAffiliateSettings(updatedSettings);
-      setSettings(data);
-    } catch (error: any) {
-      notifyAffiliate(error?.response?.data?.message || 'Failed to save settings', 'error');
-    }
+    await runAffiliateAction(
+      async () => {
+        const data = await handleUpdateAffiliateSettings(updatedSettings);
+        setSettings(data);
+      },
+      'Settings saved successfully',
+      'Are you sure you want to save these changes?'
+    );
   };
 
   if (isLoading) {

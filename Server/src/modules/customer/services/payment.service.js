@@ -11,14 +11,7 @@ import {validateMembershipCoupon} from './coupon.service.js';
 import {getMembershipOrderAmount} from '../constants/membershipPlans.js';
 import {activateMembership} from './auth.service.js';
 import Customer from '../../../models/customer.model.js';
-
-const MEMBERSHIP_LABELS = {
-  general: 'General Membership',
-  special: 'Special Membership',
-  junior: 'Junior Membership',
-  premium: 'Premium Membership',
-  pro: 'Pro Membership',
-};
+import {assertActiveMembershipPlan, resolvePlanMeta} from '../../../services/membershipPlan.service.js';
 
 const getPublicServerUrl = req => {
   const configured = String(process.env.SERVER_PUBLIC_URL || '').replace(/\/$/, '');
@@ -32,7 +25,7 @@ const getCustomerAppUrl = () =>
   String(process.env.CUSTOMER_APP_URL || 'http://localhost:5174').replace(/\/$/, '');
 
 const buildPricing = async ({customer, membershipType, couponCode}) => {
-  const orderAmount = getMembershipOrderAmount(membershipType);
+  const orderAmount = await getMembershipOrderAmount(membershipType);
   if (orderAmount == null) {
     const error = new Error('Select a valid membership plan');
     error.status = 400;
@@ -63,11 +56,8 @@ const buildPricing = async ({customer, membershipType, couponCode}) => {
  */
 export const initiateMembershipPayment = async (req, customerId, payload = {}) => {
   const membershipType = String(payload.membershipType || '').toLowerCase();
-  if (!MEMBERSHIP_LABELS[membershipType]) {
-    const error = new Error('Select a valid membership plan');
-    error.status = 400;
-    throw error;
-  }
+  const plan = await assertActiveMembershipPlan(membershipType);
+  const planMeta = resolvePlanMeta(plan);
 
   const customer = await Customer.findOne({
     _id: customerId,
@@ -104,7 +94,7 @@ export const initiateMembershipPayment = async (req, customerId, payload = {}) =
   const {key, salt, paymentUrl} = getPayuConfig();
   const txnid = createTxnId();
   const amount = formatPayuAmount(pricing.paidAmount);
-  const productinfo = MEMBERSHIP_LABELS[membershipType];
+  const productinfo = planMeta.label;
   const firstname = String(customer.name || 'Customer').trim().slice(0, 60) || 'Customer';
   const email =
     String(customer.email || '').trim() ||

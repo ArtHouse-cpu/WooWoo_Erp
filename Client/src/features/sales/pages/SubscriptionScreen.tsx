@@ -17,6 +17,7 @@ import {
   normalizeIndianWhatsAppDigits,
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
+import CreateSubscriptionScreen from "./CreateSubscriptionScreen";
 
 type SubscriptionStatus =
   | "active"
@@ -72,6 +73,9 @@ export default function SubscriptionScreen() {
   const [loading, setLoading] = useState(false);
   const [selectedActionRow, setSelectedActionRow] =
     useState<SubscriptionRow | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"create" | "edit" | "view">("create");
+  const [modalData, setModalData] = useState<any>(null);
 
   useEffect(() => {
     const fetchMemberships = async () => {
@@ -101,13 +105,13 @@ export default function SubscriptionScreen() {
     const { _id, raw } = selectedActionRow;
 
     if (action === "view") {
-      navigate("/create-subscription", {
-        state: { subscription: raw, mode: "view" },
-      });
+      setModalMode("view");
+      setModalData(raw);
+      setIsModalOpen(true);
     } else if (action === "edit") {
-      navigate("/create-subscription", {
-        state: { subscription: raw, mode: "edit" },
-      });
+      setModalMode("edit");
+      setModalData(raw);
+      setIsModalOpen(true);
     } else if (action === "delete") {
       const confirm = await Swal.fire({
         title: "Delete Subscription?",
@@ -630,7 +634,11 @@ export default function SubscriptionScreen() {
         <div className="flex items-center gap-2">
           <button
             className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
-            onClick={() => navigate("/create-subscription")}
+            onClick={() => {
+              setModalMode("create");
+              setModalData(null);
+              setIsModalOpen(true);
+            }}
           >
             + Create Subscription
           </button>
@@ -787,6 +795,17 @@ export default function SubscriptionScreen() {
             </div>
           </div>
         </div>
+      )}
+
+      {isModalOpen && (
+        <CreateSubscriptionScreen
+          initialMode={modalMode}
+          initialData={modalData}
+          onClose={() => setIsModalOpen(false)}
+          onSave={() => {
+            fetchSubscriptions();
+          }}
+        />
       )}
     </div>
   );

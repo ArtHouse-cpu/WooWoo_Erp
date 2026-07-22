@@ -19,6 +19,7 @@ import {
   handleGetWalletById,
   handleGetMemberships,
   handleValidateCoupon,
+  handleValidateReferralDiscount,
   type MembershipPlanPayload,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
@@ -76,6 +77,12 @@ type Props = {
       code: string;
       discountAmount: number;
     } | null;
+    referral?: {
+      code: string;
+      discountAmount: number;
+      inviterName?: string;
+      label?: string;
+    } | null;
     cashbackTotal: number;
     membershipDiscount: number;
     extraCharges: Array<{ label: string; amount: number }>;
@@ -127,9 +134,9 @@ function SummaryLine({
   };
 
   return (
-    <div className={`flex items-center justify-between gap-3 text-xs ${className}`}>
+    <div className={`flex items-start justify-between gap-3 text-xs ${className}`}>
       <span className="text-slate-500 font-medium">{label}</span>
-      <span className={`tabular-nums ${valueCls[tone]}`}>{value}</span>
+      <span className={`shrink-0 whitespace-nowrap text-right tabular-nums ${valueCls[tone]}`}>{value}</span>
     </div>
   );
 }
@@ -259,6 +266,26 @@ export default function CheckoutModal({
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponLabel, setCouponLabel] = useState("");
+  const [referralCodeInput, setReferralCodeInput] = useState("");
+  const [referralDiscount, setReferralDiscount] = useState(0);
+  const [referralLabel, setReferralLabel] = useState("Referral Discount");
+  const [referralCodeApplied, setReferralCodeApplied] = useState("");
+  const [referralInviterName, setReferralInviterName] = useState("");
+  const [referralDiscountAlreadyUsed, setReferralDiscountAlreadyUsed] = useState(false);
+  const [referralStatusMessage, setReferralStatusMessage] = useState("");
+  const [referralSegments, setReferralSegments] = useState<
+    Array<{
+      category: string;
+      label: string;
+      commissionType: string;
+      commissionValue: number;
+      lineAmount: number;
+      discountAmount: number;
+      commissionAmount?: number;
+      buyerDiscountAmount?: number;
+    }>
+  >([]);
+  const [loadingReferral, setLoadingReferral] = useState(false);
 
   const [resolvedMembershipPlans, setResolvedMembershipPlans] = useState<
     MembershipPlanPayload[]
@@ -317,6 +344,11 @@ export default function CheckoutModal({
       setCouponCode("");
       setCouponDiscount(0);
       setCouponLabel("");
+      setReferralCodeInput("");
+      setReferralDiscount(0);
+      setReferralLabel("Referral Discount");
+      setReferralCodeApplied("");
+      setReferralInviterName("");
     }
   }, [
     open,
@@ -326,6 +358,110 @@ export default function CheckoutModal({
     initialCustomerId,
     initialMembershipPlanId,
   ]);
+
+  const clearReferralDiscount = () => {
+    setReferralDiscount(0);
+    setReferralLabel("Referral Discount");
+    setReferralCodeApplied("");
+    setReferralInviterName("");
+    setReferralSegments([]);
+    setReferralDiscountAlreadyUsed(false);
+    setReferralStatusMessage("");
+  };
+
+  const buildReferralItems = () =>
+    items.map((item) => {
+      const qty = Number(item.qty || 0);
+      const unitPrice = Number(item.price || 0);
+      const lineDiscount = Number(item.discount ?? 0);
+      return {
+        name: item.name,
+        productName: item.name,
+        qty,
+        unitPrice,
+        price: unitPrice,
+        discount: lineDiscount,
+        lineTotal: Math.max(0, qty * unitPrice - lineDiscount),
+        category: item.category || "General",
+      };
+    });
+
+  const applyReferralDiscount = async (opts?: {
+    customer?: any | null;
+    referralCode?: string;
+  }) => {
+    const customer = opts?.customer ?? selectedCustomer;
+    const code = String(opts?.referralCode ?? referralCodeInput ?? "").trim();
+    const orderAmount = Math.max(0, Number(grandTotal || 0) - Number(couponDiscount || 0));
+
+    if (orderAmount <= 0) {
+      clearReferralDiscount();
+      return;
+    }
+
+    const customerId = String(customer?._id ?? initialCustomerId ?? "").trim();
+    const customerPhone = String(
+      customer?.mobile ?? customerSearch ?? initialCustomerPhone ?? "",
+    ).trim();
+
+    if (!customerId && !customerPhone && !code) {
+      clearReferralDiscount();
+      return;
+    }
+
+    setLoadingReferral(true);
+    try {
+      const response = await handleValidateReferralDiscount({
+        ...(customerId ? { customerId } : {}),
+        ...(customerPhone ? { customerPhone } : {}),
+        ...(code ? { referralCode: code } : {}),
+        orderAmount,
+        items: buildReferralItems(),
+      });
+      const data = response?.data || response;
+      if (!data?.referralCode && !data?.ok && !data?.commissionAmount) {
+        clearReferralDiscount();
+        return;
+      }
+
+      const alreadyUsed = data.discountAlreadyUsed === true || data.discountEligible === false;
+      const discountAmt = Number(data.discountAmount || 0);
+      const commissionAmt = Number(data.commissionAmount || 0);
+
+      setReferralDiscount(discountAmt);
+      setReferralLabel(data.label || "Referral Discount");
+      setReferralCodeApplied(String(data.referralCode || code || "").toUpperCase());
+      setReferralInviterName(String(data.inviterName || ""));
+      setReferralSegments(Array.isArray(data.segments) ? data.segments : []);
+      setReferralDiscountAlreadyUsed(alreadyUsed && discountAmt <= 0 && commissionAmt > 0);
+      setReferralStatusMessage(
+        String(
+          data.message ||
+            (alreadyUsed && discountAmt <= 0
+              ? "Referral discount already used on this account. Referrer will still earn commission."
+              : ""),
+        ),
+      );
+      if (data.referralCode) {
+        setReferralCodeInput(String(data.referralCode).toUpperCase());
+      }
+    } catch (error: unknown) {
+      clearReferralDiscount();
+      const err = error as { response?: { data?: { message?: string } } };
+      const message = err?.response?.data?.message;
+      if (message) {
+        void Swal.fire({
+          icon: "info",
+          title: "Referral not applied",
+          text: message,
+          timer: 3200,
+          showConfirmButton: false,
+        });
+      }
+    } finally {
+      setLoadingReferral(false);
+    }
+  };
 
   const summary = useMemo(() => {
     const mType =
@@ -387,7 +523,7 @@ export default function CheckoutModal({
   );
 
   useEffect(() => {
-    const payable = Math.max(0, grandTotal - couponDiscount);
+    const payable = Math.max(0, grandTotal - couponDiscount - referralDiscount);
 
     if (paymentStatus === "full") {
       if (isMultiMode) {
@@ -396,7 +532,23 @@ export default function CheckoutModal({
         setCashGiven(payable);
       }
     }
-  }, [paymentStatus, isMultiMode, grandTotal, couponDiscount]);
+  }, [paymentStatus, isMultiMode, grandTotal, couponDiscount, referralDiscount]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!initialCustomerId && !initialCustomerPhone && !referralCodeInput) return;
+    void applyReferralDiscount({
+      customer: initialCustomerId
+        ? {
+            _id: initialCustomerId,
+            name: initialCustomerName,
+            mobile: initialCustomerPhone,
+          }
+        : selectedCustomer,
+      referralCode: referralCodeInput || referralCodeApplied,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialCustomerId, initialCustomerPhone, grandTotal, couponDiscount, items]);
 
   useEffect(() => {
     const term = debouncedCustomerSearch;
@@ -507,6 +659,7 @@ export default function CheckoutModal({
     setMembership(customer.membershipType || "");
     setWalletBalance(nextWalletBalance);
     setShowDropdown(false);
+    void applyReferralDiscount({ customer, referralCode: "" });
 
     const customerId = String(customer?._id ?? "").trim();
     if (customerId) {
@@ -535,7 +688,7 @@ export default function CheckoutModal({
     [items],
   );
 
-  const finalPayable = Math.max(0, grandTotal - couponDiscount);
+  const finalPayable = Math.max(0, grandTotal - couponDiscount - referralDiscount);
   const isPartialPayment = paymentStatus === "partial";
   const totalPaid = isMultiMode
     ? splitPayments.cash +
@@ -624,6 +777,14 @@ export default function CheckoutModal({
             discountAmount: couponDiscount,
           }
         : null,
+      referral: referralCodeApplied
+        ? {
+            code: referralCodeApplied,
+            discountAmount: referralDiscount,
+            inviterName: referralInviterName,
+            label: referralLabel,
+          }
+        : null,
       customerName: customerName.trim(),
       customerPhone: customerSearch.trim(),
       notes: instructionNotes.trim(),
@@ -645,19 +806,31 @@ export default function CheckoutModal({
         qty: Number(item.qty),
         unitPrice: Number(item.price),
         discount: Number(item.discount ?? 0),
+        category: item.category || "General",
         image: item.image || "",
       })),
       subTotal: items.reduce(
         (sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0),
         0,
       ),
-      discountTotal: items.reduce((sum, item) => sum + Number(item.discount || 0), 0),
+      discountTotal:
+        items.reduce((sum, item) => sum + Number(item.discount || 0), 0) +
+        couponDiscount +
+        referralDiscount,
       extraCharges: extraCharges,
       grandTotal: finalPayable,
       coupon: couponCode.trim()
         ? {
             code: couponCode.trim().toUpperCase(),
             discountAmount: couponDiscount,
+          }
+        : null,
+      referral: referralCodeApplied
+        ? {
+            code: referralCodeApplied,
+            discountAmount: referralDiscount,
+            inviterName: referralInviterName,
+            label: referralLabel,
           }
         : null,
       status: "final" as const,
@@ -838,6 +1011,13 @@ export default function CheckoutModal({
                     className="text-violet-600"
                   />
                 )}
+                {referralDiscount > 0 && (
+                  <SummaryLine
+                    label={`${referralLabel}${referralCodeApplied ? ` (${referralCodeApplied})` : ""}`}
+                    value={`− ${formatInr(referralDiscount)}`}
+                    tone="discount"
+                  />
+                )}
                 {extraCharges.map((c, i) => (
                   <SummaryLine 
                     key={i}
@@ -907,7 +1087,10 @@ export default function CheckoutModal({
                               className="flex w-full flex-col p-3 text-left hover:bg-slate-50 border-b border-slate-50 last:border-0"
                             >
                               <span className="text-sm font-semibold">{c.name}</span>
-                              <span className="text-xs text-slate-500">{c.mobile}</span>
+                              <span className="text-xs text-slate-500">
+                                {c.mobile}
+                                {c.referralCode ? ` · Ref ${c.referralCode}` : ""}
+                              </span>
                             </button>
                           ))
                         )}
@@ -977,6 +1160,10 @@ export default function CheckoutModal({
                         setCouponDiscount(discount);
                         setCouponCode(code.toUpperCase());
                         setCouponLabel(String(response?.coupon?.title ?? "Coupon Applied"));
+                        void applyReferralDiscount({
+                          customer: selectedCustomer,
+                          referralCode: referralCodeInput || referralCodeApplied,
+                        });
                         Swal.fire("Success", "Coupon applied", "success");
                       } catch (error: any) {
                         setCouponDiscount(0);
@@ -994,6 +1181,104 @@ export default function CheckoutModal({
                     {couponLabel}: −{formatInr(couponDiscount)}
                   </p>
                 )}
+              </section>
+
+              <section className="rounded-xl border border-dashed border-violet-300 bg-violet-50/40 p-5">
+                <div className="mb-3 flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-violet-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-violet-500">
+                    Referral Discount
+                  </h3>
+                </div>
+                <p className="mb-3 text-[11px] text-slate-500">
+                  Referral discount can be used once per customer account. Referrer earns commission every time the code is used.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    value={referralCodeInput}
+                    onChange={(e) => {
+                      setReferralCodeInput(e.target.value.toUpperCase());
+                      if (!e.target.value.trim()) clearReferralDiscount();
+                    }}
+                    placeholder="Enter referral code (e.g. W7QEK05GO)"
+                    className="flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-medium uppercase focus:border-violet-500 outline-none transition-all"
+                  />
+                  <button
+                    type="button"
+                    disabled={loadingReferral}
+                    onClick={async () => {
+                      await applyReferralDiscount({
+                        referralCode: referralCodeInput,
+                      });
+                    }}
+                    className="rounded-lg bg-violet-700 px-4 py-2 text-xs font-bold text-white hover:bg-violet-600 transition-colors disabled:opacity-60"
+                  >
+                    {loadingReferral ? "..." : "Apply"}
+                  </button>
+                </div>
+                {referralDiscount > 0 ? (
+                  <div className="mt-3 space-y-2 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-violet-800">
+                    <p className="font-semibold">
+                      {referralLabel}: −{formatInr(referralDiscount)}
+                    </p>
+                    <p className="text-violet-600">
+                      Code {referralCodeApplied}
+                      {referralInviterName ? ` · referred by ${referralInviterName}` : ""}
+                    </p>
+                    {referralSegments.length > 0 ? (
+                      <ul className="mt-1 space-y-0.5 text-violet-600">
+                        {referralSegments.map((seg) => (
+                          <li key={seg.category || seg.label}>
+                            {seg.label || seg.category}: −
+                            {formatInr(Number(seg.buyerDiscountAmount ?? seg.discountAmount ?? 0))}
+                            {seg.commissionType === "percentage"
+                              ? ` (${Number(seg.commissionValue || 0)}%)`
+                              : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+                {referralDiscountAlreadyUsed && referralCodeApplied ? (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    <p className="font-semibold">Referral discount already used</p>
+                    <p className="mt-0.5">
+                      {referralStatusMessage ||
+                        "This account already used a referral discount. No buyer discount this time."}
+                    </p>
+                    <p className="mt-1 text-amber-700">
+                      Code {referralCodeApplied}
+                      {referralInviterName ? ` · ${referralInviterName}` : ""} will still earn commission
+                      {referralSegments.length > 0
+                        ? ` (${formatInr(
+                            referralSegments.reduce(
+                              (sum, seg) =>
+                                sum +
+                                Number(seg.commissionAmount ?? seg.discountAmount ?? 0),
+                              0,
+                            ),
+                          )})`
+                        : ""}
+                      .
+                    </p>
+                    {referralSegments.length > 0 ? (
+                      <ul className="mt-1 space-y-0.5 text-amber-700">
+                        {referralSegments.map((seg) => (
+                          <li key={`c-${seg.category || seg.label}`}>
+                            {seg.label || seg.category}:{" "}
+                            {formatInr(
+                              Number(seg.commissionAmount ?? seg.discountAmount ?? 0),
+                            )}
+                            {seg.commissionType === "percentage"
+                              ? ` (${Number(seg.commissionValue || 0)}%)`
+                              : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
               </section>
 
               <SectionCard 

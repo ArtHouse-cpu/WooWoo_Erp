@@ -22,6 +22,8 @@ let otpStore = {};
 
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString().substring(0, 6);
 
+// console.log(otpStore);
+
 const formatPhone = number => {
   number = number.toString().trim();
 
@@ -35,6 +37,8 @@ const formatPhone = number => {
   return `+91${number}`;
 };
 
+
+//Phone sms otp
 const sendOtpSms = async mobileNumber => {
   const formattedNumber = formatPhone(mobileNumber);
   const otp = generateOtp();

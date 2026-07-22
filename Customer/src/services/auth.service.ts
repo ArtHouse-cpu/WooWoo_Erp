@@ -76,7 +76,26 @@ export const authApi = {
 
   deleteProfile: () => api.delete<ApiResponse>('/profile'),
 
-  validateCoupon: (payload: {code: string; membershipType: NonNullable<Customer['membershipType']>}) =>
+  getMembershipPlans: () =>
+    api.get<
+      ApiResponse<
+        Array<{
+          id: string;
+          planId: string;
+          title: string;
+          badge: string;
+          price: number;
+          description: string;
+          themeKey?: string;
+          iconKey?: 'user' | 'star' | 'graduation' | 'crown';
+          features?: Array<{label: string; was?: number}>;
+          discounts?: Array<{icon: 'store' | 'space'; label: string}>;
+          cashback?: string;
+        }>
+      >
+    >('/membership/plans'),
+
+  validateCoupon: (payload: {code: string; membershipType: string}) =>
     api.post<
       ApiResponse<{
         code: string;
@@ -90,12 +109,12 @@ export const authApi = {
     >('/coupon/validate', payload),
 
   activateMembership: (payload: {
-    membershipType: NonNullable<Customer['membershipType']>;
+    membershipType: string;
     couponCode?: string;
   }) => api.post<ApiResponse<Customer>>('/membership/activate', payload),
 
   initiatePayuPayment: (payload: {
-    membershipType: NonNullable<Customer['membershipType']>;
+    membershipType: string;
     couponCode?: string;
   }) =>
     api.post<

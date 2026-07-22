@@ -220,7 +220,7 @@ export const sendWhatsAppOtp = async ({to, otp}) => {
       if (result.ok) {
         const messageId = result.json?.messages?.[0]?.id || null;
         console.log(
-          `[Customer OTP][WhatsApp] delivered to=${recipient} template=${templateName} lang=${lang} button=${includeButton} id=${messageId}`,
+          `[Customer OTP][WhatsApp] delivered to=${recipient} template=${templateName} lang=${lang} button=${includeButton} id=${messageId} opt is ${otp}`,
         );
         return {
           channel: 'whatsapp',

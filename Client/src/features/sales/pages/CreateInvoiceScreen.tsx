@@ -294,6 +294,7 @@ export default function CreateInvoiceScreen() {
           qty: item.qty,
           unitPrice: item.unitPrice,
           discount: item.discount,
+          category: item.category || "General",
         })),
         subTotal,
         discountTotal,
@@ -388,6 +389,12 @@ export default function CreateInvoiceScreen() {
       code: string;
       discountAmount: number;
     } | null;
+    referral?: {
+      code: string;
+      discountAmount: number;
+      inviterName?: string;
+      label?: string;
+    } | null;
     cashbackTotal: number;
     membershipDiscount?: number;
     extraCharges: Array<{ label: string; amount: number }>;
@@ -408,12 +415,17 @@ export default function CreateInvoiceScreen() {
             qty: item.qty,
             unitPrice: item.unitPrice,
             discount: item.discount,
+            category: item.category || "General",
           })),
           subTotal,
-          discountTotal,
+          discountTotal:
+            discountTotal +
+            Number(payment.coupon?.discountAmount ?? 0) +
+            Number(payment.referral?.discountAmount ?? 0),
           extraCharges,
           grandTotal: payment.finalAmount,
           coupon: payment.coupon ?? null,
+          referral: payment.referral ?? null,
           status: "final",
           mode: payment.mode,
           paymentStatus: payment.paymentStatus,
@@ -438,7 +450,10 @@ export default function CreateInvoiceScreen() {
             discount: item.discount,
           })),
           totalMRP: items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
-          discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
+          discountTotal:
+            discountTotal +
+            Number(payment.coupon?.discountAmount ?? 0) +
+            Number(payment.referral?.discountAmount ?? 0),
           cashbackAmount: payment.cashbackTotal,
           finalAmount: payment.finalAmount,
           totalDue: payment.paymentBreakdown.dueAmount,
@@ -460,12 +475,17 @@ export default function CreateInvoiceScreen() {
             qty: item.qty,
             unitPrice: item.unitPrice,
             discount: item.discount,
+            category: item.category || "General",
           })),
           subTotal,
-          discountTotal,
+          discountTotal:
+            discountTotal +
+            Number(payment.coupon?.discountAmount ?? 0) +
+            Number(payment.referral?.discountAmount ?? 0),
           extraCharges,
           grandTotal: payment.finalAmount,
           coupon: payment.coupon ?? null,
+          referral: payment.referral ?? null,
           status: "final",
           mode: payment.mode,
           paymentStatus: payment.paymentStatus,
@@ -497,7 +517,10 @@ export default function CreateInvoiceScreen() {
             discount: item.discount,
           })),
           totalMRP: items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
-          discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
+          discountTotal:
+            discountTotal +
+            Number(payment.coupon?.discountAmount ?? 0) +
+            Number(payment.referral?.discountAmount ?? 0),
           cashbackAmount: payment.cashbackTotal,
           finalAmount: payment.finalAmount,
           totalDue: payment.paymentBreakdown.dueAmount,
@@ -674,6 +697,7 @@ export default function CreateInvoiceScreen() {
           if (field === "discount") setDraftDiscount(value);
           if (field === "image") setDraftImage(value);
           if (field === "category") {
+            setDraftCategory(value);
             // Re-calculate discount based on membership when category is selected
             const benefits = getMembershipBenefitsForItem(Number(draftPrice), Number(draftQty), value, membership, membershipPlanId);
             if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));

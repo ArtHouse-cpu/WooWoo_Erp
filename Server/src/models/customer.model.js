@@ -281,6 +281,21 @@ const customerSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Buyer can receive referral checkout discount only once per account
+    referralDiscountUsed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    referralDiscountUsedAt: {
+      type: Date,
+      default: null,
+    },
+    referralDiscountSourceId: {
+      type: String,
+      default: null,
+      trim: true,
+    },
 
     // =========================
     // CUSTOMER AUTH (portal)

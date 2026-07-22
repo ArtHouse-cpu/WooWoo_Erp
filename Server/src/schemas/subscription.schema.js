@@ -67,6 +67,7 @@ const normalizeItems = (items, errors) => {
       unitPrice,
       discount,
       lineTotal,
+      category: String(item.category ?? 'membership').trim() || 'membership',
       _idx: idx,
     };
   });
@@ -146,6 +147,8 @@ export function validateSubscriptionCreateBody(body) {
     membershipPlanId,
     membershipType,
     students,
+    referral,
+    coupon,
   } = body ?? {};
 
   if (!customerName || !String(customerName).trim()) errors.push('Customer name is required.');
@@ -207,6 +210,8 @@ export function validateSubscriptionCreateBody(body) {
       grandTotal: gt,
       status: normalizedStatus,
       createdBy: createdBy ?? null,
+      referral: referral ?? null,
+      coupon: coupon ?? null,
       ...repeatData,
     },
   };

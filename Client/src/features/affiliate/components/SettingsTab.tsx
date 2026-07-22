@@ -129,6 +129,17 @@ export default function SettingsTab({ settings, handleSave }: Props) {
           </div>
         </div>
 
+        <div className="border rounded-xl bg-white p-6 space-y-3">
+          <h3 className="font-semibold">Checkout Referral Discount</h3>
+          <p className="text-xs text-gray-500">
+            Checkout discounts for referred customers are controlled in the <strong>Commission Rules</strong> tab.
+            Each segment (Store Supplies, Membership, Space Booking, Services, Food Orders) applies its own percentage or fixed discount to matching cart lines at Invoice/POS checkout.
+          </p>
+          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+            Example: Store Supplies at 50% gives referred buyers 50% off all product/store-supply line items.
+          </p>
+        </div>
+
         <div className="border rounded-xl bg-white p-6 space-y-5">
           <h3 className="font-semibold">Notification Settings</h3>
           {[

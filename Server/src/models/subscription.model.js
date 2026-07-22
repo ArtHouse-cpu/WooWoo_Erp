@@ -179,6 +179,17 @@ const subscriptionSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    referral: {
+      code: {type: String, default: '', trim: true},
+      inviterName: {type: String, default: '', trim: true},
+      label: {type: String, default: '', trim: true},
+      discountAmount: {type: Number, default: 0, min: 0},
+    },
+    coupon: {
+      code: {type: String, default: '', trim: true},
+      title: {type: String, default: '', trim: true},
+      discountAmount: {type: Number, default: 0, min: 0},
+    },
     createdBy: {
       m_staff_id: {type: String, default: null},
       m_staff_name: {type: String, default: null},

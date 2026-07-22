@@ -154,6 +154,18 @@ export default function LeftSideBar() {
           path: "/products",
         },
         {
+          name: "spaces",
+          label: "Spaces",
+          icon: MapPin,
+          path: "/spaces",
+        },
+        {
+          name: "Foods",
+          label: "Foods",
+          icon: UtensilsCrossed,
+          path: "/foods",
+        },
+        {
           name: "services",
           label: "Services",
           icon: FileText,

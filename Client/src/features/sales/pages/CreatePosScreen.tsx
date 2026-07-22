@@ -3,7 +3,7 @@ import { X, Printer, ShoppingCart, Trash2, User } from "lucide-react";
 import Swal from "sweetalert2";
 import {
   handleCreateProduct,
-  handleGetProducts,
+  handleCatalogueLookup,
   handleCreateCustomer,
   handleCreateInvoice,
   handleGetCustomers,
@@ -160,12 +160,28 @@ export default function CreatePosScreen({
       return;
     }
 
+    if (
+      selectedProduct?.trackStock &&
+      Number(selectedProduct?.stockQty ?? 0) <= 0
+    ) {
+      Swal.fire(
+        "Out of stock",
+        `${selectedProduct.productName || name} is currently out of stock.`,
+        "warning",
+      );
+      return;
+    }
+
     const price = Number(selectedProduct?.sellingPrice ?? 0);
-    const category = selectedProduct?.category || "General";
+    const membershipCategory = selectedProduct?.category || "General";
+    const lineCategory =
+      selectedProduct?.lineCategory ||
+      selectedProduct?.sourceType ||
+      "product";
     const benefits = getMembershipBenefitsForItem(
       price,
       qty,
-      category,
+      membershipCategory,
       membership,
       membershipPlanId,
     );
@@ -179,8 +195,10 @@ export default function CreatePosScreen({
         price,
         discount: benefits.discount || 0,
         cashback: benefits.cashback || 0,
-        category,
-        stockQty: Number(selectedProduct?.stockQty ?? 0),
+        category: lineCategory,
+        stockQty: selectedProduct?.trackStock
+          ? Number(selectedProduct?.stockQty ?? 0)
+          : undefined,
         image: selectedProduct?.imageUrl || (selectedProduct?.images && selectedProduct?.images[0]) || "",
       },
     ]);
@@ -265,12 +283,17 @@ export default function CreatePosScreen({
           qty: item.qty,
           unitPrice: item.price,
           discount: item.discount,
+          category: item.category || "General",
         })),
         subTotal,
-        discountTotal,
+        discountTotal:
+          discountTotal +
+          Number(payment.coupon?.discountAmount ?? 0) +
+          Number(payment.referral?.discountAmount ?? 0),
         extraCharges,
         grandTotal: payment.finalAmount,
         coupon: payment.coupon ?? null,
+        referral: payment.referral ?? null,
         status: "final",
         mode: payment.mode,
         paymentStatus: payment.paymentStatus,
@@ -302,7 +325,10 @@ export default function CreatePosScreen({
           discount: item.discount,
         })),
         totalMRP: subTotal,
-        discountTotal: discountTotal + Number(payment.coupon?.discountAmount ?? 0),
+        discountTotal:
+          discountTotal +
+          Number(payment.coupon?.discountAmount ?? 0) +
+          Number(payment.referral?.discountAmount ?? 0),
         cashbackAmount: payment.cashbackTotal,
         finalAmount: payment.finalAmount,
         totalDue: payment.paymentBreakdown.dueAmount,
@@ -410,8 +436,8 @@ export default function CreatePosScreen({
     (async () => {
       try {
         setLoadingProducts(true);
-        const response = await handleGetProducts(term, controller.signal);
-        setProducts(Array.isArray(response?.products) ? response.products : []);
+        const response = await handleCatalogueLookup(term, controller.signal);
+        setProducts(Array.isArray(response?.items) ? response.items : []);
       } catch {
         setProducts([]);
       } finally {
@@ -553,7 +579,7 @@ export default function CreatePosScreen({
                   setSearchText(e.target.value);
                   setSelectedProduct(null);
                 }}
-                placeholder="Search product or scan barcode..."
+                placeholder="Search product, space, service, food..."
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
 
@@ -596,21 +622,26 @@ export default function CreatePosScreen({
                 <div className="max-h-56 overflow-auto">
                   {products.map((p) => (
                     <button
-                      key={p._id}
+                      key={`${p.sourceType || "product"}-${p._id}`}
                       type="button"
                       onClick={() => {
-                        setSearchText(p.productName ?? "");
+                        setSearchText(p.productName ?? p.name ?? "");
                         setSelectedProduct(p);
                         setProducts([]);
                       }}
                       className="flex w-full flex-col gap-0.5 border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
                     >
-                      <span className="text-sm font-medium text-gray-800">
-                        {p.productName}
+                      <span className="flex items-center justify-between gap-2 text-sm font-medium text-gray-800">
+                        <span className="truncate">{p.productName ?? p.name}</span>
+                        <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                          {p.sourceType || "product"}
+                        </span>
                       </span>
                       <span className="text-xs text-gray-500">
-                        ₹{p.sellingPrice ?? 0} |{" "}
-                        {p.stockQty ? `Qty: ${p.stockQty}` : ""}
+                        ₹{p.sellingPrice ?? 0}
+                        {p.trackStock && p.stockQty != null
+                          ? ` | Qty: ${p.stockQty}`
+                          : ""}
                       </span>
                     </button>
                   ))}

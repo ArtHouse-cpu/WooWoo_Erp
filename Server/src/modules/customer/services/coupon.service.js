@@ -11,7 +11,7 @@ export const validateMembershipCoupon = async ({
   membershipType,
   customerPhone,
 }) => {
-  const orderAmount = getMembershipOrderAmount(membershipType);
+  const orderAmount = await getMembershipOrderAmount(membershipType);
   if (orderAmount == null) {
     const error = new Error('Select a valid membership plan');
     error.status = 400;

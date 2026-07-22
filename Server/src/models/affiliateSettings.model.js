@@ -142,6 +142,20 @@ const affiliateSettingsSchema = new mongoose.Schema(
       multiLevelReferral: {type: Boolean, default: false},
       commissionOnRefund: {type: String, enum: ['deduct', 'keep'], default: 'deduct'},
     },
+    // Buyer-side discount at admin checkout when customer was referred
+    // (or when staff enters an inviter referralCode).
+    referralCheckoutDiscount: {
+      enabled: {type: Boolean, default: true},
+      discountType: {
+        type: String,
+        enum: ['percentage', 'fixed'],
+        default: 'percentage',
+      },
+      discountValue: {type: Number, default: 10, min: 0},
+      maxDiscountAmount: {type: Number, default: null},
+      minOrderAmount: {type: Number, default: 0, min: 0},
+      label: {type: String, default: 'Referral Discount', trim: true},
+    },
     milestones: [
       {
         revenueAmount: {type: Number, required: true, min: 0},
