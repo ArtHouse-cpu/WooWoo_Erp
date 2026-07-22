@@ -30,7 +30,7 @@ export function HeroBanner() {
           <h1 className="text-[18px] font-extrabold tracking-tight text-[#111111] sm:text-[22px] leading-tight">
             Hi, {firstName} 👋
           </h1>
-          <div className="w-fit -mt-2">
+          <div className="w-fit -mt-1">
   <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF4FF] px-2.5 py-0.5 text-[10.5px] font-bold text-[#2563EB]">
     <span className="text-[11px] leading-none">★</span>
     {membershipLabel(customer?.membershipType)}
