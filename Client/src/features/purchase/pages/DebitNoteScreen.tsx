@@ -14,6 +14,8 @@ import {
   normalizeIndianWhatsAppDigits,
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 type DebitNoteRow = {
   id: string;
@@ -331,13 +333,15 @@ export default function DebitNoteScreen() {
           Purchase Returns / Debit Notes
         </h1>
         <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => navigate("/create-purchase-return")}
-            className="w-[260px] bg-black text-white py-2 px-1 rounded text-[14px] font-semibold transition text-center cursor-pointer"
-          >
-            Create Purchase Return/Debit Note
-          </button>
+          <Can permission={PERMISSIONS.DEBIT_NOTE_CREATE}>
+            <button
+              type="button"
+              onClick={() => navigate("/create-purchase-return")}
+              className="w-[260px] bg-black text-white py-2 px-1 rounded text-[14px] font-semibold transition text-center cursor-pointer"
+            >
+              Create Purchase Return/Debit Note
+            </button>
+          </Can>
         </div>
       </div>
 
@@ -359,24 +363,26 @@ export default function DebitNoteScreen() {
               </button>
             </div>
             <div className="space-y-3 p-5">
-              <button
-                type="button"
-                onClick={() => {
-                  navigate("/create-purchase-return", {
-                    state: { purchase: selectedActionRow.raw, mode: "edit" },
-                  });
-                  setSelectedActionRow(null);
-                }}
-                className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
-              >
-                <div className="rounded-full bg-blue-100 p-2 text-blue-600">
-                  <Edit size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-800">Edit Debit Note</div>
-                  <div className="text-xs text-gray-500">Update return details</div>
-                </div>
-              </button>
+              <Can permission={PERMISSIONS.DEBIT_NOTE_CREATE}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate("/create-purchase-return", {
+                      state: { purchase: selectedActionRow.raw, mode: "edit" },
+                    });
+                    setSelectedActionRow(null);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
+                >
+                  <div className="rounded-full bg-blue-100 p-2 text-blue-600">
+                    <Edit size={18} />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-800">Edit Debit Note</div>
+                    <div className="text-xs text-gray-500">Update return details</div>
+                  </div>
+                </button>
+              </Can>
               <button
                 type="button"
                 onClick={() => {

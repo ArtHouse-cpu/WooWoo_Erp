@@ -5,6 +5,8 @@ import {
 } from "material-react-table";
 import { Eye, IndianRupee, MoreHorizontal, SendHorizontal, Plus, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 export default function InvoiceScreen() {
   const navigate = useNavigate();
@@ -218,13 +220,15 @@ export default function InvoiceScreen() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate("/create-invoice")}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
-            >
-              <Plus size={18} />
-              Create Invoice
-            </button>
+            <Can permission={PERMISSIONS.INVOICE_CREATE}>
+              <button
+                onClick={() => navigate("/create-invoice")}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+              >
+                <Plus size={18} />
+                Create Invoice
+              </button>
+            </Can>
           </div>
         </div>
         

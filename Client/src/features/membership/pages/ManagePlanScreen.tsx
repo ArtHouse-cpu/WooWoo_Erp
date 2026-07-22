@@ -17,6 +17,8 @@ import {
   type MembershipPlanPayload,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 type PlanRow = MembershipPlanPayload & {
   _id: string;
@@ -245,30 +247,36 @@ export default function ManagePlanScreen() {
         size: 140,
         Cell: ({ row }: { row: MRT_Row<PlanRow> }) => (
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openEdit(row.original)}
-              className="rounded-lg bg-blue-50 p-2 text-blue-700 hover:bg-blue-100"
-              title="Edit"
-            >
-              <Pencil size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => toggleStatus(row.original)}
-              className="rounded-lg bg-emerald-50 p-2 text-emerald-700 hover:bg-emerald-100"
-              title="Toggle status"
-            >
-              <Power size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => confirmDelete(row.original._id)}
-              className="rounded-lg bg-rose-50 p-2 text-rose-700 hover:bg-rose-100"
-              title="Delete"
-            >
-              <Trash2 size={16} />
-            </button>
+            <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+              <button
+                type="button"
+                onClick={() => openEdit(row.original)}
+                className="rounded-lg bg-blue-50 p-2 text-blue-700 hover:bg-blue-100"
+                title="Edit"
+              >
+                <Pencil size={16} />
+              </button>
+            </Can>
+            <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+              <button
+                type="button"
+                onClick={() => toggleStatus(row.original)}
+                className="rounded-lg bg-emerald-50 p-2 text-emerald-700 hover:bg-emerald-100"
+                title="Toggle status"
+              >
+                <Power size={16} />
+              </button>
+            </Can>
+            <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+              <button
+                type="button"
+                onClick={() => confirmDelete(row.original._id)}
+                className="rounded-lg bg-rose-50 p-2 text-rose-700 hover:bg-rose-100"
+                title="Delete"
+              >
+                <Trash2 size={16} />
+              </button>
+            </Can>
           </div>
         ),
       },
@@ -308,14 +316,16 @@ export default function ManagePlanScreen() {
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-        >
-          <Plus size={16} />
-          Add New Plan
-        </button>
+        <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+          >
+            <Plus size={16} />
+            Add New Plan
+          </button>
+        </Can>
       </div>
 
       <div className="mb-5 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">

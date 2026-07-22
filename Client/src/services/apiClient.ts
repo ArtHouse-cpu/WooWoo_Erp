@@ -78,9 +78,10 @@ export const handleVerifyOtp = async (digits10: string, otp: string) => {
   }
 };
 
-export const handleUpdateUser = async (mobile: string, payload: any) => {
+export const handleUpdateUser = async (_mobile: string, payload: any) => {
   try {
-    const response = await axiosInstance.patch(`/auth/${mobile}`, payload);
+    // Step 11: authenticated self-profile update (mobile path kept for callers)
+    const response = await axiosInstance.patch(`/auth/me`, payload);
     return response.data;
   } catch (error) {
     console.log("Error updating user:", error);
@@ -1524,3 +1525,80 @@ export const handleUpdatePayoutStatus = async (id: string, payload: any) => {
     throw error;
   }
 };
+
+/* ——— Access Control (RBAC Step 10) ——— */
+
+export type AccessRole = {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  permissions?: string[];
+  permissionCount?: number;
+  isSystem?: boolean;
+  isActive?: boolean;
+};
+
+export type AccessStaffRow = {
+  _id: string;
+  m_staff_id?: string;
+  fullName: string;
+  email: string;
+  phoneNumber?: string;
+  legacyRole?: string;
+  role?: {
+    id: string;
+    name: string;
+    slug: string;
+    isSystem?: boolean;
+    permissionCount?: number;
+  } | null;
+  permissionCount?: number;
+  createdAt?: string;
+};
+
+export const handleGetAccessRoles = async (signal?: AbortSignal) => {
+  const response = await axiosInstance.get("/access/roles", { signal });
+  return response.data;
+};
+
+export const handleGetAccessStaff = async (
+  search = "",
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/access/staff", {
+    params: search ? { search } : undefined,
+    signal,
+  });
+  return response.data;
+};
+
+export const handleAssignStaffRole = async (
+  staffId: string,
+  roleId: string | null,
+) => {
+  const response = await axiosInstance.patch(`/access/staff/${staffId}/role`, {
+    roleId,
+  });
+  return response.data;
+};
+
+export const handleUpdateAccessRole = async (
+  roleId: string,
+  payload: { name?: string; description?: string; permissions?: string[] },
+) => {
+  const response = await axiosInstance.patch(`/access/roles/${roleId}`, payload);
+  return response.data;
+};
+
+export const handleCreateAccessStaff = async (payload: {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  roleId?: string | null;
+}) => {
+  const response = await axiosInstance.post("/access/staff", payload);
+  return response.data;
+};
+

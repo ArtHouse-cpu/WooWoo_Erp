@@ -18,6 +18,8 @@ import {
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
 import CreateSubscriptionScreen from "./CreateSubscriptionScreen";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 type SubscriptionStatus =
   | "active"
@@ -632,16 +634,18 @@ export default function SubscriptionScreen() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
-            onClick={() => {
-              setModalMode("create");
-              setModalData(null);
-              setIsModalOpen(true);
-            }}
-          >
-            + Create Subscription
-          </button>
+          <Can permission={PERMISSIONS.SUBSCRIPTION_CREATE}>
+            <button
+              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+              onClick={() => {
+                setModalMode("create");
+                setModalData(null);
+                setIsModalOpen(true);
+              }}
+            >
+              + Create Subscription
+            </button>
+          </Can>
         </div>
       </div>
 
@@ -759,39 +763,43 @@ export default function SubscriptionScreen() {
                   </div>
                 </div>
               </button>
-              <button
-                onClick={() => handleAction("edit")}
-                disabled={selectedActionRow.status === "cancelled"}
-                className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
-              >
-                <div className="rounded-full bg-blue-100 p-2 text-blue-600">
-                  <Edit size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-800">
-                    Edit Subscription
+              <Can permission={PERMISSIONS.SUBSCRIPTION_UPDATE}>
+                <button
+                  onClick={() => handleAction("edit")}
+                  disabled={selectedActionRow.status === "cancelled"}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
+                >
+                  <div className="rounded-full bg-blue-100 p-2 text-blue-600">
+                    <Edit size={18} />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Modify subscription details
+                  <div>
+                    <div className="font-semibold text-gray-800">
+                      Edit Subscription
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Modify subscription details
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleAction("delete")}
-                className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
-              >
-                <div className="rounded-full bg-red-200 p-2 text-red-700">
-                  <Trash2 size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-red-700">
-                    Delete Subscription
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.SUBSCRIPTION_DELETE}>
+                <button
+                  onClick={() => handleAction("delete")}
+                  className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
+                >
+                  <div className="rounded-full bg-red-200 p-2 text-red-700">
+                    <Trash2 size={18} />
                   </div>
-                  <div className="text-xs text-red-600/70">
-                    Permanently remove
+                  <div>
+                    <div className="font-semibold text-red-700">
+                      Delete Subscription
+                    </div>
+                    <div className="text-xs text-red-600/70">
+                      Permanently remove
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              </Can>
             </div>
           </div>
         </div>

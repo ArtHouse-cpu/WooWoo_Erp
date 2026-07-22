@@ -27,6 +27,8 @@ import {
   normalizeIndianWhatsAppDigits,
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 type PosRow = {
   id: number;
@@ -617,18 +619,22 @@ export default function PosScreen() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            className="rounded-md bg-violet-100 px-3 py-2 text-sm font-semibold text-violet-700"
-            onClick={() => setPosModalOpen(true)}
-          >
-            POS Billing
-          </button>
-          <button
-            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
-            onClick={() => navigate("/create-invoice")}
-          >
-            + Create Invoice
-          </button>
+          <Can permission={PERMISSIONS.INVOICE_CREATE}>
+            <button
+              className="rounded-md bg-violet-100 px-3 py-2 text-sm font-semibold text-violet-700"
+              onClick={() => setPosModalOpen(true)}
+            >
+              POS Billing
+            </button>
+          </Can>
+          <Can permission={PERMISSIONS.INVOICE_CREATE}>
+            <button
+              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+              onClick={() => navigate("/create-invoice")}
+            >
+              + Create Invoice
+            </button>
+          </Can>
         </div>
       </div>
 
@@ -731,72 +737,80 @@ export default function PosScreen() {
                   </div>
                 </div>
               </button>
-              <button
-                onClick={() => handleAction("edit")}
-                disabled={selectedActionRow.status === "Cancelled"}
-                className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "Cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
-              >
-                <div className="rounded-full bg-blue-100 p-2 text-blue-600">
-                  <Edit size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-800">
-                    Edit Invoice
+              <Can permission={PERMISSIONS.INVOICE_UPDATE}>
+                <button
+                  onClick={() => handleAction("edit")}
+                  disabled={selectedActionRow.status === "Cancelled"}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "Cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
+                >
+                  <div className="rounded-full bg-blue-100 p-2 text-blue-600">
+                    <Edit size={18} />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Modify invoice details
+                  <div>
+                    <div className="font-semibold text-gray-800">
+                      Edit Invoice
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Modify invoice details
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleAction("cancel")}
-                disabled={selectedActionRow.status === "Cancelled"}
-                className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "Cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
-              >
-                <div className="rounded-full bg-yellow-100 p-2 text-yellow-600">
-                  <XCircle size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-800">
-                    Cancel Invoice
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.INVOICE_DELETE}>
+                <button
+                  onClick={() => handleAction("cancel")}
+                  disabled={selectedActionRow.status === "Cancelled"}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "Cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
+                >
+                  <div className="rounded-full bg-yellow-100 p-2 text-yellow-600">
+                    <XCircle size={18} />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Mark status as cancelled
+                  <div>
+                    <div className="font-semibold text-gray-800">
+                      Cancel Invoice
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Mark status as cancelled
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleAction("Credit Note")}
-                className="flex w-full items-center gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-left transition-colors hover:bg-green-100"
-              >
-                <div className="rounded-full bg-green-200 p-2 text-green-700">
-                  <Trash2 size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-green-700">
-                    Sales return
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.CREDIT_NOTE_CREATE}>
+                <button
+                  onClick={() => handleAction("Credit Note")}
+                  className="flex w-full items-center gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-left transition-colors hover:bg-green-100"
+                >
+                  <div className="rounded-full bg-green-200 p-2 text-green-700">
+                    <Trash2 size={18} />
                   </div>
-                  <div className="text-xs text-green-600/70">
-                    Convert to Sale return
+                  <div>
+                    <div className="font-semibold text-green-700">
+                      Sales return
+                    </div>
+                    <div className="text-xs text-green-600/70">
+                      Convert to Sale return
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleAction("delete")}
-                className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
-              >
-                <div className="rounded-full bg-red-200 p-2 text-red-700">
-                  <Trash2 size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-red-700">
-                    Delete Invoice
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.INVOICE_DELETE}>
+                <button
+                  onClick={() => handleAction("delete")}
+                  className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
+                >
+                  <div className="rounded-full bg-red-200 p-2 text-red-700">
+                    <Trash2 size={18} />
                   </div>
-                  <div className="text-xs text-red-600/70">
-                    Permanently remove
+                  <div>
+                    <div className="font-semibold text-red-700">
+                      Delete Invoice
+                    </div>
+                    <div className="text-xs text-red-600/70">
+                      Permanently remove
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              </Can>
             </div>
           </div>
         </div>

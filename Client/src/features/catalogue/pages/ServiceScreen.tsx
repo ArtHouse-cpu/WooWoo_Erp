@@ -14,6 +14,9 @@ import {
   Trash2,
 } from "lucide-react";
 import CategoryListModal from "@/features/catalogue/components/CategoryListModal";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
+
 export default function ServiceScreen() {
   const [openCategoryListModal, setOpenCategoryListModal] = useState(false);
   const columns = useMemo(
@@ -28,21 +31,23 @@ export default function ServiceScreen() {
         accessorKey: "actions",
         Cell: ({ row }: { row: any }) => (
           <div className="flex items-center gap-2">
-            {/* Edit */}
-            <button
-              onClick={() => console.log("Edit:", row.original)}
-              className="px-3 py-2 text-sm bg-green-100 text-white rounded hover:bg-green-200 cursor-pointer"
-            >
-              <SquarePen color="green" size={18} />
-            </button>
+            <Can permission={PERMISSIONS.SERVICE_UPDATE}>
+              <button
+                onClick={() => console.log("Edit:", row.original)}
+                className="px-3 py-2 text-sm bg-green-100 text-white rounded hover:bg-green-200 cursor-pointer"
+              >
+                <SquarePen color="green" size={18} />
+              </button>
+            </Can>
 
-            {/* Delete */}
-            <button
-              onClick={() => console.log("Delete:", row.original)}
-              className="px-3 py-2 text-sm bg-red-100 rounded hover:bg-red-200 cursor-pointer"
-            >
-              <Trash2 color="red" size={18} />
-            </button>
+            <Can permission={PERMISSIONS.SERVICE_DELETE}>
+              <button
+                onClick={() => console.log("Delete:", row.original)}
+                className="px-3 py-2 text-sm bg-red-100 rounded hover:bg-red-200 cursor-pointer"
+              >
+                <Trash2 color="red" size={18} />
+              </button>
+            </Can>
           </div>
         ),
       },
@@ -131,23 +136,27 @@ export default function ServiceScreen() {
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-semibold ">Services List</h1>
         <div className="flex gap-3">
-          <div
-            className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
-            onClick={() => setOpenCategoryListModal(true)}
-          >
-            Category
-          </div>
+          <Can permission={PERMISSIONS.CATEGORY_MANAGE}>
+            <div
+              className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
+              onClick={() => setOpenCategoryListModal(true)}
+            >
+              Category
+            </div>
+          </Can>
           {openCategoryListModal && (
             <CategoryListModal
               onClose={() => setOpenCategoryListModal(false)}
             />
           )}
-          <Link
-            className="w-[130px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px]"
-            to="/create-new-service"
-          >
-            Create Service
-          </Link>
+          <Can permission={PERMISSIONS.SERVICE_CREATE}>
+            <Link
+              className="w-[130px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px]"
+              to="/create-new-service"
+            >
+              Create Service
+            </Link>
+          </Can>
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-3">

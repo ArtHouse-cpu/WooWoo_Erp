@@ -7,6 +7,15 @@ interface User {
   email: string;
   phoneNumber: string;
   role: string;
+  roleId?: string | null;
+  rbacRole?: {
+    id: string;
+    name: string;
+    slug: string;
+  } | null;
+  permissions?: string[];
+  access_module?: string[];
+  m_staff_id?: string;
   createdAt?: string;
   updatedAt?: string;
 }

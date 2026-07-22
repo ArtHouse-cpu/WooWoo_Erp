@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import logo from "@/assets/images/logo/woo_woo_art_house_logo.png";
 import ButtonComponent from "@/components/ButtonComponent";
 import { handleLogin, handleRequestEmailOtp, handleResetPassword } from "@/services/apiClient";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { useAuthStore } from "@/store/authStore";
 import { useAppDispatch } from "@/store/hooks";
@@ -181,10 +181,6 @@ export default function LoginScreen() {
             Login
           </h2>
 
-          <p className="text-center text-gray-600 mb-8 text-base">
-            Sign in with your email or mobile number and password.
-          </p>
-
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <div
               className={`flex items-center gap-3 border rounded-xl px-4 py-4 bg-gray-50 transition ${
@@ -193,7 +189,6 @@ export default function LoginScreen() {
             >
               <div className="flex items-center gap-1 shrink-0 text-gray-500">
                 <Mail className="w-5 h-5" />
-                <Phone className="w-4 h-4 -ml-1" />
               </div>
               <input
                 type="text"
@@ -236,16 +231,6 @@ export default function LoginScreen() {
             </div>
 
             <ButtonComponent type="submit" title="Log in" loading={loading} />
-
-            <p className="text-center text-gray-600 text-sm">
-              Don’t have an account?{" "}
-              <Link
-                to="/signup"
-                className="text-black font-semibold hover:underline"
-              >
-                Sign Up
-              </Link>
-            </p>
           </form>
         </div>
       </div>
@@ -276,7 +261,7 @@ export default function LoginScreen() {
                   <ButtonComponent
                     title="Cancel"
                     onClick={() => setShowForgot(false)}
-                    variant="outline"
+                    // variant="outline"
                   />
                   <ButtonComponent
                     title="Send OTP"
@@ -316,7 +301,7 @@ export default function LoginScreen() {
                   <ButtonComponent
                     title="Cancel"
                     onClick={() => setShowForgot(false)}
-                    variant="outline"
+                    // variant="outline"
                   />
                   <ButtonComponent
                     title="Reset Password"

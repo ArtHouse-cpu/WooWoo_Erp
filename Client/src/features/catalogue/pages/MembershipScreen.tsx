@@ -15,6 +15,9 @@ import {
   Wallet,
 } from "lucide-react";
 import { handleGetCustomers, handleGetWallets, handleGetMemberships } from "@/services/apiClient";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
+
 export default function MembershipScreen() {
   const [walletTotal, setWalletTotal] = useState(0);
   const [walletCustomers, setWalletCustomers] = useState(0);
@@ -95,21 +98,23 @@ export default function MembershipScreen() {
         accessorKey: "actions",
         Cell: ({ row }: { row: any }) => (
           <div className="flex items-center gap-2">
-            {/* Edit */}
-            <button
-              onClick={() => console.log("Edit:", row.original)}
-              className="px-3 py-2 text-sm bg-green-100 text-white rounded hover:bg-green-200 cursor-pointer"
-            >
-              <SquarePen color="green" size={18} />
-            </button>
+            <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+              <button
+                onClick={() => console.log("Edit:", row.original)}
+                className="px-3 py-2 text-sm bg-green-100 text-white rounded hover:bg-green-200 cursor-pointer"
+              >
+                <SquarePen color="green" size={18} />
+              </button>
+            </Can>
 
-            {/* Delete */}
-            <button
-              onClick={() => console.log("Delete:", row.original)}
-              className="px-3 py-2 text-sm bg-red-100 rounded hover:bg-red-200 cursor-pointer"
-            >
-              <Trash2 color="red" size={18} />
-            </button>
+            <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+              <button
+                onClick={() => console.log("Delete:", row.original)}
+                className="px-3 py-2 text-sm bg-red-100 rounded hover:bg-red-200 cursor-pointer"
+              >
+                <Trash2 color="red" size={18} />
+              </button>
+            </Can>
           </div>
         ),
       },
@@ -203,12 +208,14 @@ export default function MembershipScreen() {
     <div className="p-1">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-semibold ">Membership List</h1>
-        <Link
-          className="w-[165px] bg-black text-white py-2 px-3 rounded  text-[14px] font-semibold transition text-center border-radius-[50px]"
-          to="/create-new-membership"
-        >
-          Create Membership
-        </Link>
+        <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+          <Link
+            className="w-[165px] bg-black text-white py-2 px-3 rounded  text-[14px] font-semibold transition text-center border-radius-[50px]"
+            to="/create-new-membership"
+          >
+            Create Membership
+          </Link>
+        </Can>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-3">
         {cards.map((item, index) => (

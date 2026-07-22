@@ -17,6 +17,8 @@ import {
   type CustomerPayload,
 } from "@/services/apiClient";
 import AddVendorModal from "@/features/purchase/Modal/AddVendorModal";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 type VendorRow = {
   _id: string;
@@ -160,43 +162,47 @@ export default function VendorScreen() {
         accessorKey: "actions",
         Cell: ({ row }: { row: { original: VendorTableRow } }) => (
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => console.log("Edit:", row.original)}
-              className="px-3 py-2 text-sm bg-green-100 rounded hover:bg-green-200 cursor-pointer"
-            >
-              <SquarePen color="green" size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                const result = await Swal.fire({
-                  title: "Delete vendor?",
-                  text: "This action cannot be undone.",
-                  icon: "warning",
-                  showCancelButton: true,
-                  confirmButtonText: "Delete",
-                });
-                if (!result.isConfirmed) return;
-                try {
-                  await handleDeleteVendor(row.original._id);
-                  await fetchVendors();
-                } catch (error: unknown) {
-                  const err = error as {
-                    response?: { data?: { message?: string } };
-                  };
-                  Swal.fire(
-                    "Error",
-                    err.response?.data?.message ??
-                    "Failed to delete vendor.",
-                    "error",
-                  );
-                }
-              }}
-              className="px-3 py-2 text-sm bg-red-100 rounded hover:bg-red-200 cursor-pointer"
-            >
-              <Trash2 color="red" size={18} />
-            </button>
+            <Can permission={PERMISSIONS.VENDOR_UPDATE}>
+              <button
+                type="button"
+                onClick={() => console.log("Edit:", row.original)}
+                className="px-3 py-2 text-sm bg-green-100 rounded hover:bg-green-200 cursor-pointer"
+              >
+                <SquarePen color="green" size={18} />
+              </button>
+            </Can>
+            <Can permission={PERMISSIONS.VENDOR_DELETE}>
+              <button
+                type="button"
+                onClick={async () => {
+                  const result = await Swal.fire({
+                    title: "Delete vendor?",
+                    text: "This action cannot be undone.",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonText: "Delete",
+                  });
+                  if (!result.isConfirmed) return;
+                  try {
+                    await handleDeleteVendor(row.original._id);
+                    await fetchVendors();
+                  } catch (error: unknown) {
+                    const err = error as {
+                      response?: { data?: { message?: string } };
+                    };
+                    Swal.fire(
+                      "Error",
+                      err.response?.data?.message ??
+                        "Failed to delete vendor.",
+                      "error",
+                    );
+                  }
+                }}
+                className="px-3 py-2 text-sm bg-red-100 rounded hover:bg-red-200 cursor-pointer"
+              >
+                <Trash2 color="red" size={18} />
+              </button>
+            </Can>
           </div>
         ),
       },
@@ -222,13 +228,15 @@ export default function VendorScreen() {
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-semibold ">Vendors List</h1>
         <div className="flex gap-3">
-          <button
-            type="button"
-            className="w-[150px] rounded bg-black px-2 py-2 text-center text-[14px] font-semibold text-white transition hover:bg-neutral-900"
-            onClick={() => setOpenCreateVendorModal(true)}
-          >
-            Create New Vendor
-          </button>
+          <Can permission={PERMISSIONS.VENDOR_CREATE}>
+            <button
+              type="button"
+              className="w-[150px] rounded bg-black px-2 py-2 text-center text-[14px] font-semibold text-white transition hover:bg-neutral-900"
+              onClick={() => setOpenCreateVendorModal(true)}
+            >
+              Create New Vendor
+            </button>
+          </Can>
         </div>
       </div>
 

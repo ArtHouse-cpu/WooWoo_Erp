@@ -1,2 +1,13 @@
+@import url("https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap");
 @import "tailwindcss";
 
+@theme {
+  --font-display: "Syne", sans-serif;
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #141210;
+  --color-ink-soft: #2a2622;
+  --color-paper: #f0f1ef;
+  --color-paper-deep: #e4e6e2;
+  --color-brass: #8a7350;
+  --color-brass-deep: #6e5a3d;
+}

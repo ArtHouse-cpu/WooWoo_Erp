@@ -27,6 +27,8 @@ import {
   normalizeIndianWhatsAppDigits,
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 type CreditNoteStatus = "Final" | "Draft" | "Cancelled";
 
@@ -515,13 +517,15 @@ export default function CreditNoteScreen() {
             {filteredData.length}
           </span>
         </div>
-        <button
-          type="button"
-          className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
-          onClick={() => navigate("/create-sales-return")}
-        >
-          + Create Sales Return / Credit Note
-        </button>
+        <Can permission={PERMISSIONS.CREDIT_NOTE_CREATE}>
+          <button
+            type="button"
+            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+            onClick={() => navigate("/create-sales-return")}
+          >
+            + Create Sales Return / Credit Note
+          </button>
+        </Can>
       </div>
 
       <div className="flex items-center gap-6 border-b border-gray-200 pb-2">
@@ -640,59 +644,65 @@ export default function CreditNoteScreen() {
                   </div>
                 </div>
               </button>
-              <button
-                type="button"
-                onClick={() => handleAction(selectedActionRow, "edit")}
-                disabled={selectedActionRow.status === "Cancelled"}
-                className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "Cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
-              >
-                <div className="rounded-full bg-blue-100 p-2 text-blue-600">
-                  <Edit size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-800">
-                    Edit Credit Note
+              <Can permission={PERMISSIONS.CREDIT_NOTE_CREATE}>
+                <button
+                  type="button"
+                  onClick={() => handleAction(selectedActionRow, "edit")}
+                  disabled={selectedActionRow.status === "Cancelled"}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "Cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
+                >
+                  <div className="rounded-full bg-blue-100 p-2 text-blue-600">
+                    <Edit size={18} />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Modify return details
+                  <div>
+                    <div className="font-semibold text-gray-800">
+                      Edit Credit Note
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Modify return details
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAction(selectedActionRow, "cancel")}
-                disabled={selectedActionRow.status === "Cancelled"}
-                className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "Cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
-              >
-                <div className="rounded-full bg-yellow-100 p-2 text-yellow-600">
-                  <XCircle size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-800">
-                    Cancel Credit Note
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.CREDIT_NOTE_CREATE}>
+                <button
+                  type="button"
+                  onClick={() => handleAction(selectedActionRow, "cancel")}
+                  disabled={selectedActionRow.status === "Cancelled"}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "Cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
+                >
+                  <div className="rounded-full bg-yellow-100 p-2 text-yellow-600">
+                    <XCircle size={18} />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Mark status as cancelled
+                  <div>
+                    <div className="font-semibold text-gray-800">
+                      Cancel Credit Note
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Mark status as cancelled
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAction(selectedActionRow, "delete")}
-                className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
-              >
-                <div className="rounded-full bg-red-200 p-2 text-red-700">
-                  <Trash2 size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-red-700">
-                    Delete Credit Note
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.CREDIT_NOTE_CREATE}>
+                <button
+                  type="button"
+                  onClick={() => handleAction(selectedActionRow, "delete")}
+                  className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
+                >
+                  <div className="rounded-full bg-red-200 p-2 text-red-700">
+                    <Trash2 size={18} />
                   </div>
-                  <div className="text-xs text-red-600/70">
-                    Permanently remove
+                  <div>
+                    <div className="font-semibold text-red-700">
+                      Delete Credit Note
+                    </div>
+                    <div className="text-xs text-red-600/70">
+                      Permanently remove
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              </Can>
             </div>
           </div>
         </div>

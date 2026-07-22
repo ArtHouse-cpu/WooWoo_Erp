@@ -1,0 +1,32 @@
+import { Outlet, useLocation } from "react-router-dom";
+import { usePermission } from "@/hooks/usePermission";
+import {
+  getRequiredPermissionForPath,
+  normalizeAppPath,
+} from "@/utils/rbac";
+import ForbiddenScreen from "@/features/common/pages/ForbiddenScreen";
+
+/**
+ * Step 7 — Frontend route permission guard.
+ *
+ * Runs inside AuthRoute (user already has a token).
+ * Checks MENU_PERMISSION_MAP for the current pathname.
+ * UX only: backend APIs remain the real security boundary.
+ */
+export default function PermissionRoute() {
+  const location = useLocation();
+  const { canPath } = usePermission();
+  const path = normalizeAppPath(location.pathname);
+  const required = getRequiredPermissionForPath(path);
+
+  if (!canPath(path)) {
+    return (
+      <ForbiddenScreen
+        path={path}
+        requiredPermission={required ?? null}
+      />
+    );
+  }
+
+  return <Outlet />;
+}

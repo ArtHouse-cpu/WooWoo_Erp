@@ -25,6 +25,8 @@ import {
   spacePayloadToFormData,
   type SpacePayload,
 } from "@/services/apiClient";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 type SpaceRow = SpacePayload & { _id: string };
 
@@ -101,23 +103,27 @@ export default function CreateSpacesScreen() {
         enableSorting: false,
         Cell: ({ row }: { row: { original: SpaceRow } }) => (
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(row.original);
-                setOpenModal(true);
-              }}
-              className="cursor-pointer rounded bg-green-100 px-3 py-2 text-sm hover:bg-green-200"
-            >
-              <SquarePen color="green" size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleDelete(row.original)}
-              className="cursor-pointer rounded bg-red-100 px-3 py-2 text-sm hover:bg-red-200"
-            >
-              <Trash2 color="red" size={18} />
-            </button>
+            <Can permission={PERMISSIONS.SPACE_UPDATE}>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(row.original);
+                  setOpenModal(true);
+                }}
+                className="cursor-pointer rounded bg-green-100 px-3 py-2 text-sm hover:bg-green-200"
+              >
+                <SquarePen color="green" size={18} />
+              </button>
+            </Can>
+            <Can permission={PERMISSIONS.SPACE_DELETE}>
+              <button
+                type="button"
+                onClick={() => void handleDelete(row.original)}
+                className="cursor-pointer rounded bg-red-100 px-3 py-2 text-sm hover:bg-red-200"
+              >
+                <Trash2 color="red" size={18} />
+              </button>
+            </Can>
           </div>
         ),
       },
@@ -239,16 +245,18 @@ export default function CreateSpacesScreen() {
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold">Spaces List</h1>
         <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setEditing(null);
-              setOpenModal(true);
-            }}
-            className="cursor-pointer rounded bg-black px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-gray-900"
-          >
-            Add Space
-          </button>
+          <Can permission={PERMISSIONS.SPACE_CREATE}>
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setOpenModal(true);
+              }}
+              className="cursor-pointer rounded bg-black px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-gray-900"
+            >
+              Add Space
+            </button>
+          </Can>
         </div>
       </div>
 

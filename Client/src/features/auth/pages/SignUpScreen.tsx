@@ -11,6 +11,7 @@ import { handleSignup } from "@/services/apiClient";
 import { useAuthStore } from "@/store/authStore";
 import { useAppDispatch } from "@/store/hooks";
 import { loginFailure, loginStart, loginSuccess } from "@/store/slices/userSlice";
+import { mapAuthUserToReduxPayload } from "@/utils/authUserMapper";
 
 const signupSchema = z.object({
   fullName: z.string().min(2, "Enter your full name"),
@@ -65,14 +66,7 @@ export default function SignUpScreen() {
       });
       if (response.user && response.token) {
         setUser(response.user, response.token);
-        dispatch(
-          loginSuccess({
-            m_staff_id: response.user.m_staff_id,
-            m_staff_name: response.user.fullName,
-            m_staff_mobile: response.user.phoneNumber,
-            m_staff_email: response.user.email,
-          })
-        );
+        dispatch(loginSuccess(mapAuthUserToReduxPayload(response.user)));
         Swal.fire({
           icon: "success",
           title: "Account created",
@@ -114,7 +108,8 @@ export default function SignUpScreen() {
           </h2>
 
           <p className="text-center text-gray-600 mb-8 text-base">
-            Register with your email, mobile number, and password.
+            Public signup is limited. If registration is disabled, ask an admin
+            to create your account from Access Control.
           </p>
 
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>

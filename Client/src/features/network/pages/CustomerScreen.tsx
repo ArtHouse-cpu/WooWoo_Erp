@@ -11,6 +11,8 @@ import LedgerModal from "@/features/network/components/LedgerModal";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import UpdateCustomerModal from "@/features/network/components/UpdateCustomerModal";
 import CustomerDetailsModal from "@/features/network/components/CustomerDetailsModal";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 import {
   customerPayloadToFormData,
   handleCreateCustomer,
@@ -454,29 +456,31 @@ export default function CustomerScreen() {
         size: 60,
         Cell: ({ row }: { row: MRT_Row<CustomerRow> }) => (
           <div className="flex items-center gap-2">
-            {/* Edit */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedCustomer(row.original);
-                setEditOpen(true);
-              }}
-              className="px-3 py-2 bg-green-100 rounded hover:bg-green-200 cursor-pointer"
-            >
-              <SquarePen size={18} className="text-green-600" />
-            </button>
+            <Can permission={PERMISSIONS.CUSTOMER_UPDATE}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedCustomer(row.original);
+                  setEditOpen(true);
+                }}
+                className="px-3 py-2 bg-green-100 rounded hover:bg-green-200 cursor-pointer"
+              >
+                <SquarePen size={18} className="text-green-600" />
+              </button>
+            </Can>
 
-            {/* Delete */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const id = row.original._id;
-                if (id) void handleDelete(id);
-              }}
-              className="px-3 py-2 bg-red-100 rounded hover:bg-red-200 cursor-pointer"
-            >
-              <Trash2 size={18} className="text-red-600" />
-            </button>
+            <Can permission={PERMISSIONS.CUSTOMER_DELETE}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const id = row.original._id;
+                  if (id) void handleDelete(id);
+                }}
+                className="px-3 py-2 bg-red-100 rounded hover:bg-red-200 cursor-pointer"
+              >
+                <Trash2 size={18} className="text-red-600" />
+              </button>
+            </Can>
           </div>
         ),
       },
@@ -522,13 +526,15 @@ export default function CustomerScreen() {
 
         <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
 
-          <button
-            type="button"
-            className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-            onClick={() => setOpenCreateCustomerModal(true)}
-          >
-            + New Customer
-          </button>
+          <Can permission={PERMISSIONS.CUSTOMER_CREATE}>
+            <button
+              type="button"
+              className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              onClick={() => setOpenCreateCustomerModal(true)}
+            >
+              + New Customer
+            </button>
+          </Can>
         </div>
       </div>
 

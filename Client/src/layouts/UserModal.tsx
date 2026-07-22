@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useMemo } from "react";
 import { X, User, MapPin, Phone, Mail, UserCircle2, CalendarDays, Save } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
 import { handleUpdateUser } from "@/services/apiClient";
@@ -10,48 +10,122 @@ type UserModalProps = {
   user?: any;
 };
 
+type ProfileForm = {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  gender: string;
+  dob: string;
+  address: string;
+  membership: string;
+  gstin: string;
+  companyName: string;
+  pincode: string;
+  city: string;
+  state: string;
+  country: string;
+  membershipType: string;
+  adharNumber: string;
+  whatsappNumber: string;
+  AlternateMobile: string;
+};
+
 export const UserModal = ({ open, onClose, user: propUser }: UserModalProps) => {
   const staff = useAppSelector((state) => state.user);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const isPropUserObject = propUser && typeof propUser === "object";
-  
-  const displayUser = {
-    _id: isPropUserObject && propUser._id ? propUser._id : (staff.m_staff_id || ""),
-    name: isPropUserObject && propUser.name ? propUser.name : staff.m_staff_name || "",
-    email: isPropUserObject && propUser.email ? propUser.email : staff.m_staff_email || "",
-    phone: isPropUserObject && propUser.phone ? propUser.phone : staff.m_staff_mobile || "",
-    gender: isPropUserObject && propUser.gender ? propUser.gender : staff.gender || "",
-    dob: isPropUserObject && propUser.dob ? propUser.dob : staff.dob || "",
-    address: isPropUserObject && propUser.address ? propUser.address : staff.address || staff.m_staff_branch || "",
-    membership: isPropUserObject && propUser.membership ? propUser.membership : (staff.m_staff_role || "Active"),
-    gstin: isPropUserObject && propUser.gstin ? propUser.gstin : staff.gstin || "",
-    companyName: isPropUserObject && propUser.companyName ? propUser.companyName : staff.companyName || "",
-    pincode: isPropUserObject && propUser.pincode ? propUser.pincode : staff.pincode || "",
-    city: isPropUserObject && propUser.city ? propUser.city : staff.city || "",
-    state: isPropUserObject && propUser.state ? propUser.state : staff.state || "",
-    country: isPropUserObject && propUser.country ? propUser.country : staff.country || "",
-    membershipType: isPropUserObject && propUser.membershipType ? propUser.membershipType : staff.membershipType || "",
-    adharNumber: isPropUserObject && propUser.adharNumber ? propUser.adharNumber : staff.adharNumber || "",
-    whatsappNumber: isPropUserObject && propUser.whatsappNumber ? propUser.whatsappNumber : staff.whatsappNumber || "",
-    AlternateMobile: isPropUserObject && propUser.AlternateMobile ? propUser.AlternateMobile : staff.alternateMobile || "",
-  };
 
-  const [formData, setFormData] = useState(displayUser);
+  const displayUser = useMemo<ProfileForm>(
+    () => ({
+      _id:
+        isPropUserObject && propUser._id
+          ? propUser._id
+          : staff.m_staff_id || "",
+      name:
+        isPropUserObject && propUser.name
+          ? propUser.name
+          : staff.m_staff_name || "",
+      email:
+        isPropUserObject && propUser.email
+          ? propUser.email
+          : staff.m_staff_email || "",
+      phone:
+        isPropUserObject && propUser.phone
+          ? propUser.phone
+          : staff.m_staff_mobile || "",
+      gender:
+        isPropUserObject && propUser.gender
+          ? propUser.gender
+          : staff.gender || "",
+      dob: isPropUserObject && propUser.dob ? propUser.dob : staff.dob || "",
+      address:
+        isPropUserObject && propUser.address
+          ? propUser.address
+          : staff.address || staff.m_staff_branch || "",
+      membership:
+        isPropUserObject && propUser.membership
+          ? propUser.membership
+          : staff.m_staff_role || "Active",
+      gstin:
+        isPropUserObject && propUser.gstin ? propUser.gstin : staff.gstin || "",
+      companyName:
+        isPropUserObject && propUser.companyName
+          ? propUser.companyName
+          : staff.companyName || "",
+      pincode:
+        isPropUserObject && propUser.pincode
+          ? propUser.pincode
+          : staff.pincode || "",
+      city:
+        isPropUserObject && propUser.city ? propUser.city : staff.city || "",
+      state:
+        isPropUserObject && propUser.state
+          ? propUser.state
+          : staff.state || "",
+      country:
+        isPropUserObject && propUser.country
+          ? propUser.country
+          : staff.country || "",
+      membershipType:
+        isPropUserObject && propUser.membershipType
+          ? propUser.membershipType
+          : staff.membershipType || "",
+      adharNumber:
+        isPropUserObject && propUser.adharNumber
+          ? propUser.adharNumber
+          : staff.adharNumber || "",
+      whatsappNumber:
+        isPropUserObject && propUser.whatsappNumber
+          ? propUser.whatsappNumber
+          : staff.whatsappNumber || "",
+      AlternateMobile:
+        isPropUserObject && propUser.AlternateMobile
+          ? propUser.AlternateMobile
+          : staff.alternateMobile || "",
+    }),
+    [isPropUserObject, propUser, staff],
+  );
 
-  // Sync formData when modal opens or displayUser changes
+  const [formData, setFormData] = useState<ProfileForm>(displayUser);
+
+  // Sync form only while open; reset edit flag when closed (no loops)
   useEffect(() => {
-    setFormData(displayUser);
     if (!open) {
-      setIsEditing(false); // Reset edit state when closed
+      setIsEditing((prev) => (prev ? false : prev));
+      return;
     }
-  }, [open, staff, propUser]); // depend on staff implicitly updates displayUser
+    setFormData(displayUser);
+  }, [open, displayUser]);
 
-  const handleEsc = useCallback((e: KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
-  }, [onClose]);
-
+  const handleEsc = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    },
+    [onClose],
+  );
   useEffect(() => {
     if (open) {
       document.addEventListener("keydown", handleEsc);

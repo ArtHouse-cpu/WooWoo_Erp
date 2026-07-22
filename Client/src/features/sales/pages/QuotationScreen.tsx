@@ -20,6 +20,8 @@ import {
   normalizeIndianWhatsAppDigits,
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 type QuotationRow = {
   id: number;
@@ -306,12 +308,14 @@ export default function QuotationScreen() {
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Quotations</h1>
         <div className="flex gap-3 mt-4 sm:mt-0">
-          <button
-            onClick={() => navigate("/create-quotation")}
-            className="bg-black text-white py-2 px-4 rounded-full text-sm font-semibold hover:bg-gray-800 transition"
-          >
-            Create Quotation
-          </button>
+          <Can permission={PERMISSIONS.QUOTATION_CREATE}>
+            <button
+              onClick={() => navigate("/create-quotation")}
+              className="bg-black text-white py-2 px-4 rounded-full text-sm font-semibold hover:bg-gray-800 transition"
+            >
+              Create Quotation
+            </button>
+          </Can>
         </div>
       </div>
       <MaterialReactTable table={table} />
@@ -347,89 +351,99 @@ export default function QuotationScreen() {
                   </div>
                 </div>
               </button>
-              <button
-                onClick={() => handleAction("edit")}
-                disabled={selectedActionRow.status === "rejected"}
-                className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "rejected" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
-              >
-                <div className="rounded-full bg-blue-100 p-2 text-blue-600">
-                  <Edit size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-800">
-                    Edit Quotation
+              <Can permission={PERMISSIONS.QUOTATION_UPDATE}>
+                <button
+                  onClick={() => handleAction("edit")}
+                  disabled={selectedActionRow.status === "rejected"}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors ${selectedActionRow.status === "rejected" ? "cursor-not-allowed opacity-50" : "hover:bg-gray-50"}`}
+                >
+                  <div className="rounded-full bg-blue-100 p-2 text-blue-600">
+                    <Edit size={18} />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Modify quotation details
+                  <div>
+                    <div className="font-semibold text-gray-800">
+                      Edit Quotation
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Modify quotation details
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleAction("convert")}
-                className="flex w-full items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-left transition-colors hover:bg-indigo-100"
-              >
-                <div className="rounded-full bg-indigo-200 p-2 text-indigo-700">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
-                </div>
-                <div>
-                  <div className="font-semibold text-indigo-700">
-                    Convert to Invoice
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.INVOICE_CREATE}>
+                <button
+                  onClick={() => handleAction("convert")}
+                  className="flex w-full items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-left transition-colors hover:bg-indigo-100"
+                >
+                  <div className="rounded-full bg-indigo-200 p-2 text-indigo-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
                   </div>
-                  <div className="text-xs text-indigo-600/70">
-                    Create a sales invoice
+                  <div>
+                    <div className="font-semibold text-indigo-700">
+                      Convert to Invoice
+                    </div>
+                    <div className="text-xs text-indigo-600/70">
+                      Create a sales invoice
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleAction("accept")}
-                disabled={selectedActionRow.status === "accepted"}
-                className={`flex w-full items-center gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-left transition-colors ${selectedActionRow.status === "accepted" ? "cursor-not-allowed opacity-50" : "hover:bg-green-100"}`}
-              >
-                <div className="rounded-full bg-green-200 p-2 text-green-700">
-                  <Eye size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-green-700">
-                    Accept
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.QUOTATION_UPDATE}>
+                <button
+                  onClick={() => handleAction("accept")}
+                  disabled={selectedActionRow.status === "accepted"}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-left transition-colors ${selectedActionRow.status === "accepted" ? "cursor-not-allowed opacity-50" : "hover:bg-green-100"}`}
+                >
+                  <div className="rounded-full bg-green-200 p-2 text-green-700">
+                    <Eye size={18} />
                   </div>
-                  <div className="text-xs text-green-600/70">
-                    Mark as accepted
+                  <div>
+                    <div className="font-semibold text-green-700">
+                      Accept
+                    </div>
+                    <div className="text-xs text-green-600/70">
+                      Mark as accepted
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleAction("reject")}
-                disabled={selectedActionRow.status === "rejected"}
-                className={`flex w-full items-center gap-3 rounded-lg border border-orange-100 bg-orange-50 p-3 text-left transition-colors ${selectedActionRow.status === "rejected" ? "cursor-not-allowed opacity-50" : "hover:bg-orange-100"}`}
-              >
-                <div className="rounded-full bg-orange-200 p-2 text-orange-700">
-                  <XCircle size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-orange-700">
-                    Reject
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.QUOTATION_UPDATE}>
+                <button
+                  onClick={() => handleAction("reject")}
+                  disabled={selectedActionRow.status === "rejected"}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-orange-100 bg-orange-50 p-3 text-left transition-colors ${selectedActionRow.status === "rejected" ? "cursor-not-allowed opacity-50" : "hover:bg-orange-100"}`}
+                >
+                  <div className="rounded-full bg-orange-200 p-2 text-orange-700">
+                    <XCircle size={18} />
                   </div>
-                  <div className="text-xs text-orange-600/70">
-                    Mark as rejected
+                  <div>
+                    <div className="font-semibold text-orange-700">
+                      Reject
+                    </div>
+                    <div className="text-xs text-orange-600/70">
+                      Mark as rejected
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleAction("delete")}
-                className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
-              >
-                <div className="rounded-full bg-red-200 p-2 text-red-700">
-                  <Trash2 size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-red-700">
-                    Delete Quotation
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.QUOTATION_DELETE}>
+                <button
+                  onClick={() => handleAction("delete")}
+                  className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
+                >
+                  <div className="rounded-full bg-red-200 p-2 text-red-700">
+                    <Trash2 size={18} />
                   </div>
-                  <div className="text-xs text-red-600/70">
-                    Permanently remove
+                  <div>
+                    <div className="font-semibold text-red-700">
+                      Delete Quotation
+                    </div>
+                    <div className="text-xs text-red-600/70">
+                      Permanently remove
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              </Can>
             </div>
           </div>
         </div>

@@ -4,6 +4,9 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { handleVerifyOtp } from "@/services/apiClient";
 import { useAuthStore } from "@/store/authStore";
+import { useAppDispatch } from "@/store/hooks";
+import { loginSuccess } from "@/store/slices/userSlice";
+import { mapAuthUserToReduxPayload } from "@/utils/authUserMapper";
 
 export default function OtpScreen() {
   const [otp, setOtp] = useState(["", "", "", ""]);
@@ -12,6 +15,7 @@ export default function OtpScreen() {
   const [loading, setLoading] = useState(false);
   const setUser = useAuthStore((state) => state.setUser);
   const token = useAuthStore((state) => state.token);
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -77,6 +81,7 @@ export default function OtpScreen() {
       setLoading(true);
       const response = await handleVerifyOtp(mobileNumber, otp.join(""));
       setUser(response.user, response.token);
+      dispatch(loginSuccess(mapAuthUserToReduxPayload(response.user)));
       Swal.fire({
         icon: "success",
         title: "Success",

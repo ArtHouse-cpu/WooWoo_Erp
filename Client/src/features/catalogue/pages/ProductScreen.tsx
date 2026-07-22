@@ -22,6 +22,8 @@ import {
   handleDeleteProduct,
 } from "@/services/apiClient";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 type ProductRow = {
   _id?: string;
@@ -174,28 +176,30 @@ export default function ProductScreen() {
         accessorKey: "actions",
         Cell: ({ row }: { row: any }) => (
           <div className="flex items-center gap-2">
-            {/* Edit */}
-            <button
-              onClick={() => {
-                setEditProduct(row.original);
-                setShowCreateModal(true);
-              }}
-              className="px-3 py-2 text-sm bg-green-100 text-white rounded hover:bg-green-200 cursor-pointer"
-            >
-              <SquarePen color="green" size={18} />
-            </button>
+            <Can permission={PERMISSIONS.PRODUCT_UPDATE}>
+              <button
+                onClick={() => {
+                  setEditProduct(row.original);
+                  setShowCreateModal(true);
+                }}
+                className="px-3 py-2 text-sm bg-green-100 text-white rounded hover:bg-green-200 cursor-pointer"
+              >
+                <SquarePen color="green" size={18} />
+              </button>
+            </Can>
 
-            {/* Delete */}
-            <button
-              onClick={() => {
-                if (row.original._id) {
-                  handleDeleteProductClick(row.original._id);
-                }
-              }}
-              className="px-3 py-2 text-sm bg-red-100 rounded hover:bg-red-200 cursor-pointer"
-            >
-              <Trash2 color="red" size={18} />
-            </button>
+            <Can permission={PERMISSIONS.PRODUCT_DELETE}>
+              <button
+                onClick={() => {
+                  if (row.original._id) {
+                    handleDeleteProductClick(row.original._id);
+                  }
+                }}
+                className="px-3 py-2 text-sm bg-red-100 rounded hover:bg-red-200 cursor-pointer"
+              >
+                <Trash2 color="red" size={18} />
+              </button>
+            </Can>
           </div>
         ),
       },
@@ -263,20 +267,24 @@ export default function ProductScreen() {
               onClose={() => setOpenCategoryListModal(false)}
             />
           )}
-          <button
+          <Can permission={PERMISSIONS.CATEGORY_MANAGE}>
+            <button
               type="button"
               onClick={() => setShowCategorySidebar(true)}
-            className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
+              className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
             >
               + Add Category
             </button>
-          <button
+          </Can>
+          <Can permission={PERMISSIONS.PRODUCT_CREATE}>
+            <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-            className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
+              className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
             >
               + Add Product
             </button>
+          </Can>
           {showCategorySidebar && (
             <CategorySidebar
               isOpen={showCategorySidebar}

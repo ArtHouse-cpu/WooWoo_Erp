@@ -26,6 +26,8 @@ import {
 } from "@/services/apiClient";
 import { useNavigate } from "react-router-dom";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 import {
   buildWoowooInvoiceWhatsAppMessage,
   normalizeIndianWhatsAppDigits,
@@ -653,13 +655,15 @@ export default function PurchaseOrderScreen() {
             {filteredData.length}
           </span>
         </div>
-        <button
-          type="button"
-          className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
-          onClick={() => navigate("/create-purchase-order")}
-        >
-          + Create Order
-        </button>
+        <Can permission={PERMISSIONS.PURCHASE_ORDER_CREATE}>
+          <button
+            type="button"
+            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+            onClick={() => navigate("/create-purchase-order")}
+          >
+            + Create Order
+          </button>
+        </Can>
       </div>
 
       <div className="flex items-center gap-6 border-b border-gray-200 pb-2">
@@ -759,57 +763,63 @@ export default function PurchaseOrderScreen() {
               </button>
             </div>
             <div className="space-y-3 p-5">
-              <button
-                type="button"
-                onClick={() => handleAction(selectedActionRow, "edit")}
-                className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
-              >
-                <div className="rounded-full bg-blue-100 p-2 text-blue-600">
-                  <Edit size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-800">
-                    Edit Purchase Order
+              <Can permission={PERMISSIONS.PURCHASE_ORDER_UPDATE}>
+                <button
+                  type="button"
+                  onClick={() => handleAction(selectedActionRow, "edit")}
+                  className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
+                >
+                  <div className="rounded-full bg-blue-100 p-2 text-blue-600">
+                    <Edit size={18} />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Update order details
+                  <div>
+                    <div className="font-semibold text-gray-800">
+                      Edit Purchase Order
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Update order details
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleAction(selectedActionRow, "convertPurchase")
-                }
-                className="flex w-full items-center gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-left transition-colors hover:bg-green-100"
-              >
-                <div className="rounded-full bg-green-200 p-2 text-green-700">
-                  <ArrowRightLeft size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-green-800">
-                    Convert to Purchase
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.PURCHASE_CREATE}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleAction(selectedActionRow, "convertPurchase")
+                  }
+                  className="flex w-full items-center gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-left transition-colors hover:bg-green-100"
+                >
+                  <div className="rounded-full bg-green-200 p-2 text-green-700">
+                    <ArrowRightLeft size={18} />
                   </div>
-                  <div className="text-xs text-green-600/80">
-                    Creates a purchase and removes this order
+                  <div>
+                    <div className="font-semibold text-green-800">
+                      Convert to Purchase
+                    </div>
+                    <div className="text-xs text-green-600/80">
+                      Creates a purchase and removes this order
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAction(selectedActionRow, "delete")}
-                className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
-              >
-                <div className="rounded-full bg-red-200 p-2 text-red-700">
-                  <Trash2 size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-red-700">
-                    Delete Purchase Order
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.PURCHASE_ORDER_DELETE}>
+                <button
+                  type="button"
+                  onClick={() => handleAction(selectedActionRow, "delete")}
+                  className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
+                >
+                  <div className="rounded-full bg-red-200 p-2 text-red-700">
+                    <Trash2 size={18} />
                   </div>
-                  <div className="text-xs text-red-600/70">Permanently remove</div>
-                </div>
-              </button>
+                  <div>
+                    <div className="font-semibold text-red-700">
+                      Delete Purchase Order
+                    </div>
+                    <div className="text-xs text-red-600/70">Permanently remove</div>
+                  </div>
+                </button>
+              </Can>
             </div>
           </div>
         </div>

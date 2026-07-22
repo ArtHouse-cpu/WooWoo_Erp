@@ -13,6 +13,8 @@ import {
   handleUpdateWallet,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 type WalletRow = {
   id: string;
@@ -653,22 +655,26 @@ if (action === "set_minimum") {
         size: 150,
         Cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void handleWalletAction(row.original, "credit")}
-              className="rounded-lg bg-green-100 p-2 text-green-700 hover:bg-green-200"
-              title="Add amount"
-            >
-              <Plus size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleWalletAction(row.original, "debit")}
-              className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200"
-              title="Deduct amount"
-            >
-              <Minus size={16} />
-            </button>
+            <Can permission={PERMISSIONS.WALLET_MANAGE}>
+              <button
+                type="button"
+                onClick={() => void handleWalletAction(row.original, "credit")}
+                className="rounded-lg bg-green-100 p-2 text-green-700 hover:bg-green-200"
+                title="Add amount"
+              >
+                <Plus size={16} />
+              </button>
+            </Can>
+            <Can permission={PERMISSIONS.WALLET_MANAGE}>
+              <button
+                type="button"
+                onClick={() => void handleWalletAction(row.original, "debit")}
+                className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200"
+                title="Deduct amount"
+              >
+                <Minus size={16} />
+              </button>
+            </Can>
             <button
               type="button"
               onClick={() => void handleViewHistory(row.original)}
@@ -707,14 +713,16 @@ if (action === "set_minimum") {
           </p>
         </div>
         <div className="flex w-full max-w-3xl flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => void handleSetInstruction()}
-            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
-          >
-            <Settings2 size={16} />
-            Set Instructions
-          </button>
+          <Can permission={PERMISSIONS.WALLET_MANAGE}>
+            <button
+              type="button"
+              onClick={() => void handleSetInstruction()}
+              className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+            >
+              <Settings2 size={16} />
+              Set Instructions
+            </button>
+          </Can>
           <div className="w-full max-w-md">
             <input
               value={search}
