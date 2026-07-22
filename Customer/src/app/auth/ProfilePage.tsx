@@ -323,7 +323,7 @@ const profileFields = (
               </p>
               {customer?.createdAt ? (
                 <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand-blue">
-                  {formatJoinedDate(customer.createdAt)}
+                  Member since:{formatJoinedDate(customer.createdAt)}
                 </p>
               ) : null}
             </div>
