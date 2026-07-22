@@ -79,6 +79,7 @@ export default function App() {
                 <Route path="/home" element={<HomePage />} />
                 <Route path="/wallet" element={<WalletPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/settings" element={<ProfilePage />} />
                 <Route path="/membership" element={<MembershipOnboardingPage />} />
                 <Route path="/refer-and-earn" element={<ReferAndEarnPage />} />
               </Route>

@@ -277,102 +277,101 @@ export default function WalletPage() {
     if (!data) return null;
     return (
       <div
-        className={`relative flex flex-col justify-between gap-4 overflow-hidden rounded-[24px] border border-[#FFE4D6] bg-gradient-to-r from-[#FFF5F1] via-[#FFF9F6] to-[#FFFBF9] p-5 shadow-[0_8px_30px_rgba(234,88,12,0.03)] md:flex-row md:items-center ${
+        className={`relative overflow-hidden rounded-[20px] sm:rounded-[24px] border border-[#FFE4D6] bg-gradient-to-r from-[#FFF5F1] via-[#FFF9F6] to-[#FFFBF9] p-4 sm:p-5 shadow-[0_8px_30px_rgba(234,88,12,0.06)] ${
           isFloating
             ? 'border-2 bg-[#FFFBF9]/95 shadow-[0_-10px_40px_rgba(234,88,12,0.12)] backdrop-blur-md'
             : ''
         }`}
       >
-        <div className="flex-1 space-y-4">
-          <div>
-            <h3 className="text-[18px] font-black text-[#EA580C]">Invite &amp; Earn</h3>
-            <p className="mt-0.5 text-[12px] font-semibold text-[#6B7280]">
+        {/* Compact Header with Gift Sticker at top-left */}
+        <div className="mb-3 flex items-center gap-2.5 sm:gap-3">
+          <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center">
+            <svg
+              className="h-9 w-9 sm:h-10 sm:w-10"
+              viewBox="0 0 100 100"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M15 25L18 28M85 30L82 33M20 75L23 72M78 80L81 77"
+                stroke="#F97316"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <circle cx="28" cy="20" r="2" fill="#2563EB" />
+              <circle cx="75" cy="22" r="3" fill="#EAB308" />
+              <circle cx="85" cy="70" r="2" fill="#EF4444" />
+              <circle cx="15" cy="65" r="3.5" fill="#22C55E" />
+
+              <g transform="translate(15, 25)">
+                <rect x="5" y="25" width="60" height="45" rx="4" fill="#FEF08A" stroke="#EA580C" strokeWidth="3" />
+                <rect x="0" y="15" width="70" height="12" rx="3" fill="#FDE047" stroke="#EA580C" strokeWidth="3" />
+                <rect x="30" y="25" width="10" height="45" fill="#EF4444" />
+                <rect x="30" y="15" width="10" height="12" fill="#EF4444" />
+                <path d="M35 15C25 5 15 5 25 15C35 25 35 15 35 15Z" fill="#EF4444" stroke="#D97706" strokeWidth="1" />
+                <path d="M35 15C45 5 55 5 45 15C35 25 35 15 35 15Z" fill="#EF4444" stroke="#D97706" strokeWidth="1" />
+              </g>
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-[18px] font-bold leading-tight text-[#EA580C]">Invite &amp; Earn</h3>
+            <p className="mt-0.5 text-[13px] font-medium text-[#6B7280]">
               Invite friends and earn exciting rewards
             </p>
           </div>
+        </div>
 
-          <div className="flex flex-col gap-3.5 pt-1">
-            <div className="flex w-full flex-col items-center gap-3.5 sm:flex-row">
-              {/* Your Code box */}
-              <div className="flex w-full items-center justify-between rounded-[12px] border border-dashed border-[#FFE4D6] bg-white px-3 py-1.5 sm:flex-1">
-                <div>
-                  <p className="text-[9px] font-semibold uppercase tracking-wider text-[#9CA3AF]">
-                    Your Code
-                  </p>
-                  <p className="text-[12px] font-extrabold text-[#111111]">
-                    {data.referral.referralCode}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void copyValue('Code', data.referral.referralCode)}
-                  className="cursor-pointer p-1 text-[#EA580C] transition hover:text-[#F97316]"
-                  title="Copy Code"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              {/* Referral Link box */}
-              <div className="flex w-full items-center justify-between rounded-[12px] border border-dashed border-[#FFE4D6] bg-white px-3 py-1.5 sm:flex-[2]">
-                <div className="min-w-0">
-                  <p className="text-[9px] font-semibold uppercase tracking-wider text-[#9CA3AF]">
-                    Referral Link
-                  </p>
-                  <p className="max-w-[150px] truncate text-[12px] font-extrabold text-[#111111] md:max-w-none">
-                    {shareLinkDisplay}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void copyValue('Link', data.referral.shareUrl)}
-                  className="cursor-pointer p-1 text-[#EA580C] transition hover:text-[#F97316]"
-                  title="Copy Link"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </button>
-              </div>
+        {/* Code & Referral Link in One Row */}
+        <div className="grid grid-cols-1 gap-2.5 min-[340px]:grid-cols-2">
+          {/* Your Code card */}
+          <div className="flex h-[56px] items-center justify-between rounded-[12px] border border-dashed border-[#FFE4D6] bg-white px-3 py-1.5">
+            <div className="min-w-0 flex-1 pr-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider leading-none text-[#9CA3AF]">
+                YOUR CODE
+              </p>
+              <p className="mt-1 truncate text-[13px] font-extrabold leading-tight text-[#111111]">
+                {data.referral.referralCode}
+              </p>
             </div>
-
             <button
               type="button"
-              onClick={() => void onInvite()}
-              className="w-full cursor-pointer rounded-[12px] bg-[#EA580C] py-3.5 text-center text-[12px] font-extrabold text-white shadow-[0_4px_12px_rgba(234,88,12,0.15)] transition hover:bg-[#F97316]"
+              onClick={() => void copyValue('Code', data.referral.referralCode)}
+              className="cursor-pointer shrink-0 p-1 text-[#EA580C] transition hover:text-[#F97316]"
+              title="Copy Code"
             >
-              Invite
+              <Copy className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Referral Link card */}
+          <div className="flex h-[56px] items-center justify-between rounded-[12px] border border-dashed border-[#FFE4D6] bg-white px-3 py-1.5">
+            <div className="min-w-0 flex-1 pr-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider leading-none text-[#9CA3AF]">
+                REFERRAL LINK
+              </p>
+              <p className="mt-1 truncate text-[13px] font-extrabold leading-tight text-[#111111]">
+                {shareLinkDisplay}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void copyValue('Link', data.referral.shareUrl)}
+              className="cursor-pointer shrink-0 p-1 text-[#EA580C] transition hover:text-[#F97316]"
+              title="Copy Link"
+            >
+              <Copy className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* Gift box graphics with confetti */}
-        <div className="flex shrink-0 items-center justify-center pr-4">
-          <svg
-            className="h-16 w-16 md:h-20 md:w-20"
-            viewBox="0 0 100 100"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M15 25L18 28M85 30L82 33M20 75L23 72M78 80L81 77"
-              stroke="#F97316"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            <circle cx="28" cy="20" r="2" fill="#2563EB" />
-            <circle cx="75" cy="22" r="3" fill="#EAB308" />
-            <circle cx="85" cy="70" r="2" fill="#EF4444" />
-            <circle cx="15" cy="65" r="3.5" fill="#22C55E" />
-
-            <g transform="translate(15, 25)">
-              <rect x="5" y="25" width="60" height="45" rx="4" fill="#FEF08A" stroke="#EA580C" strokeWidth="3" />
-              <rect x="0" y="15" width="70" height="12" rx="3" fill="#FDE047" stroke="#EA580C" strokeWidth="3" />
-              <rect x="30" y="25" width="10" height="45" fill="#EF4444" />
-              <rect x="30" y="15" width="10" height="12" fill="#EF4444" />
-              <path d="M35 15C25 5 15 5 25 15C35 25 35 15 35 15Z" fill="#EF4444" stroke="#D97706" strokeWidth="1" />
-              <path d="M35 15C45 5 55 5 45 15C35 25 35 15 35 15Z" fill="#EF4444" stroke="#D97706" strokeWidth="1" />
-            </g>
-          </svg>
-        </div>
+        {/* Invite Button */}
+        <button
+          type="button"
+          onClick={() => void onInvite()}
+          className="mt-4 flex h-[48px] w-full cursor-pointer items-center justify-center rounded-[12px] bg-gradient-to-r from-[#EA580C] to-[#F97316] text-center text-[13px] font-extrabold text-white shadow-[0_4px_12px_rgba(234,88,12,0.2)] transition hover:opacity-95 active:scale-[0.99]"
+        >
+          Invite
+        </button>
       </div>
     );
   };
@@ -535,14 +534,14 @@ export default function WalletPage() {
         <div className="space-y-2.5">
           <h3 className="text-[15px] font-black text-[#111111]">You Earn From</h3>
           <div className="rounded-[24px] border border-black/[0.05] bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
-            <div className="grid grid-cols-3 divide-x divide-slate-100 py-2.5 sm:grid-cols-6">
+            <div className="grid grid-cols-3 divide-x divide-slate-100 py-1.5 sm:grid-cols-6">
               {earnCategories.map(item => (
-                <div key={item.category} className="flex flex-col items-center justify-center py-1.5 text-center">
+                <div key={item.category} className="flex flex-col items-center justify-center py-1 text-center">
                   <div className={`flex h-8 w-8 items-center justify-center rounded-full ${item.bg}`}>
                     <item.icon className={`h-4 w-4 ${item.color}`} strokeWidth={2} />
                   </div>
-                  <p className="mt-2 text-[9px] font-bold leading-none text-slate-500">{item.label}</p>
-                  <p className="mt-1.5 text-[10px] font-extrabold leading-none text-[#22C55E]">
+                  <p className="mt-1.5 text-[9px] font-bold leading-none text-slate-500">{item.label}</p>
+                  <p className="mt-1 text-[10px] font-extrabold leading-none text-[#22C55E]">
                     {formatInr(item.amount)}
                   </p>
                 </div>
