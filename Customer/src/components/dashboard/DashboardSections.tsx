@@ -6,6 +6,8 @@ import {
   Headphones,
   MapPin,
   Share2,
+  ShoppingBag,
+  Users,
 } from 'lucide-react';
 import {Link} from 'react-router-dom';
 import {motion} from 'framer-motion';
@@ -27,7 +29,7 @@ export function ExploreGrid({onItemClick}: {onItemClick?: (id: string) => void})
         </h2>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5 lg:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-6 lg:gap-4">
         {exploreItemsDesktop.map((item, i) => {
           return (
             <motion.button
@@ -265,5 +267,80 @@ export function TopArtists() {
         ))}
       </ul>
     </div>
+  );
+}
+
+export function ProgramsSection({
+  onProgramClick,
+}: {
+  onProgramClick?: (tab: 'csp' | 'hap') => void;
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[17px] font-extrabold tracking-tight text-[#111111] sm:text-[18px]">
+          Our Programs
+        </h2>
+        <p className="text-[11px] font-bold text-[#EA580C] bg-[#FFF8F2] border border-[#FFEDD5] rounded-full px-2.5 py-0.5 leading-none">
+          Grow & Earn
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* CSP Card */}
+        <motion.button
+          type="button"
+          onClick={() => onProgramClick?.('csp')}
+          whileHover={{y: -4, scale: 1.01}}
+          className="group flex items-start gap-4 p-5 rounded-[24px] border border-black/[0.05] bg-white text-left shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all cursor-pointer w-full"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#FFF3EB] text-[#EA580C] group-hover:scale-105 transition-transform">
+            <ShoppingBag className="h-6 w-6" strokeWidth={2.25} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[15px] font-black text-[#111111] leading-tight">
+              Creative Seller Program
+            </h3>
+            <p className="mt-1 text-[11px] font-extrabold text-slate-400 leading-none">
+              CSP
+            </p>
+            <p className="mt-2 text-[12px] font-semibold text-[#4B5563] leading-snug">
+              Sell your creative products directly at WooWoo Art House with zero rent and investment.
+            </p>
+            <div className="mt-4 flex items-center gap-1.5 text-[12px] font-extrabold text-[#EA580C]">
+              <span>Learn More</span>
+              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+            </div>
+          </div>
+        </motion.button>
+
+        {/* HAP Card */}
+        <motion.button
+          type="button"
+          onClick={() => onProgramClick?.('hap')}
+          whileHover={{y: -4, scale: 1.01}}
+          className="group flex items-start gap-4 p-5 rounded-[24px] border border-black/[0.05] bg-white text-left shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all cursor-pointer w-full"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F5F3FF] text-[#7C3AED] group-hover:scale-105 transition-transform">
+            <Users className="h-6 w-6" strokeWidth={2.25} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[15px] font-black text-[#111111] leading-tight">
+              House Affiliate Program
+            </h3>
+            <p className="mt-1 text-[11px] font-extrabold text-slate-400 leading-none">
+              HAP
+            </p>
+            <p className="mt-2 text-[12px] font-semibold text-[#4B5563] leading-snug">
+              Promote art events, workspaces & workshops and earn 10% commission on every booking.
+            </p>
+            <div className="mt-4 flex items-center gap-1.5 text-[12px] font-extrabold text-[#7C3AED]">
+              <span>Learn More</span>
+              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+            </div>
+          </div>
+        </motion.button>
+      </div>
+    </section>
   );
 }
