@@ -26,8 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
   DollarSign,
-  MapPin,
-  UtensilsCrossed
+  ShieldUser
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -348,6 +347,22 @@ export default function LeftSideBar() {
             <Network size={20} className="text-gray-500" />
             {!collapsed && (
               <span className="text-[15px] font-semibold">Affiliate Program</span>
+            )}
+          </button>
+        </div>
+        <div className="mt-2">
+          <button
+            className={`flex items-center gap-3 w-full py-2.5 px-3 rounded-lg transition-all
+            ${
+              activeMenu === "Access"
+                ? "bg-gray-100 border-l-4 border-blue-500 text-black shadow-sm"
+                : "text-gray-700 hover:bg-gray-50 hover:text-black"
+            }`}
+            onClick={() => handleMenuClick("access", "/access")}
+          >
+            <ShieldUser  size={20} className="text-gray-500" />
+            {!collapsed && (
+              <span className="text-[15px] font-semibold">Access </span>
             )}
           </button>
         </div>
