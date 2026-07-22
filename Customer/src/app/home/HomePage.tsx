@@ -18,6 +18,7 @@ import {HelpSupportBottomSheet} from '../../components/dashboard/HelpSupportBott
 import {VisitBottomSheet} from '../../components/dashboard/VisitBottomSheet';
 import {ShareBottomSheet} from '../../components/dashboard/ShareBottomSheet';
 import {NotificationsBottomSheet} from '../../components/dashboard/NotificationsBottomSheet';
+import {ProgramsBottomSheet} from '../../components/dashboard/ProgramsBottomSheet';
 
 export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -30,6 +31,13 @@ export default function HomePage() {
   const [visitOpen, setVisitOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [programsOpen, setProgramsOpen] = useState(false);
+  const [selectedProgram, setSelectedProgram] = useState<'csp' | 'hap'>('csp');
+
+  const handleProgramClick = (tab: 'csp' | 'hap') => {
+    setSelectedProgram(tab);
+    setProgramsOpen(true);
+  };
 
   const handleActionClick = (id: string) => {
     if (id === 'help') {
@@ -52,6 +60,8 @@ export default function HomePage() {
       setSpaceOpen(true);
     } else if (id === 'cafe') {
       setWoofooOpen(true);
+    } else if (id === 'programs') {
+      handleProgramClick('csp');
     }
   };
 
@@ -117,6 +127,7 @@ export default function HomePage() {
       <VisitBottomSheet isOpen={visitOpen} onClose={() => setVisitOpen(false)} />
       <ShareBottomSheet isOpen={shareOpen} onClose={() => setShareOpen(false)} />
       <NotificationsBottomSheet isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
+      <ProgramsBottomSheet isOpen={programsOpen} onClose={() => setProgramsOpen(false)} initialTab={selectedProgram} />
     </div>
   );
 }
