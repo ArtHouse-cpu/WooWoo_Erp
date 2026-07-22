@@ -48,6 +48,7 @@ import PurchaseScreen from "@/features/purchase/pages/PurchaseScreen";
 import CreatePurchaseOrderScreen from "@/features/purchase/pages/CreatePurchaseOrderScreen";
 import { WalletScreen } from "@/features/wallet";
 import { AffiliateProgramScreen } from "@/features/affiliate";
+import { AccessScreen } from "@/features/access/components/pages";
 
 export const router = createBrowserRouter([
   {
@@ -94,6 +95,7 @@ export const router = createBrowserRouter([
       { path: "/Vendor list", element: <VendorScreen /> },
       { path: "/coupons", element: <CouponsScreen /> },
       { path: "/affiliate-program", element: <AffiliateProgramScreen /> },
+      { path: "/access", element: < AccessScreen/> },
     ],
   },
   {
