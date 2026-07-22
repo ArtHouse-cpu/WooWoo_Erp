@@ -3,10 +3,9 @@ import {useNavigate} from 'react-router-dom';
 import {useForm} from 'react-hook-form';
 import {z} from 'zod';
 import {zodResolver} from '@hookform/resolvers/zod';
-import {Calendar, Gift, LogOut, Mail, Trash2, User} from 'lucide-react';
+import {Calendar, Gift, Mail, Trash2, User} from 'lucide-react';
 import {toast} from 'sonner';
 import Swal from 'sweetalert2';
-import {BrandMark} from '../../components/auth/AuthShell';
 import {Button} from '../../components/ui/Button';
 import {Input} from '../../components/ui/Input';
 import {authApi} from '../../services/auth.service';
@@ -75,7 +74,6 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const {customer, setCustomer, logout} = useAuthStore();
   const [loading, setLoading] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const isDesktop = useIsDesktop();
 
@@ -119,19 +117,6 @@ export default function ProfilePage() {
     }
   });
 
-  const onLogout = async () => {
-    setLoggingOut(true);
-    try {
-      await authApi.logout();
-      logout();
-      toast.success('Logged out');
-    } catch {
-      logout();
-    } finally {
-      setLoggingOut(false);
-    }
-  };
-
   const onDeleteProfile = async () => {
     const result = await Swal.fire({
       title: 'Delete profile?',
@@ -170,7 +155,7 @@ export default function ProfilePage() {
   const initial = (customer?.name || 'C').charAt(0).toUpperCase();
 
   const actionButtons = (
-    <div className="space-y-3 pt-2">
+    <div className="space-y-3 pt-50 sm:pt-35">
       <Button
         type="submit"
         loading={loading}
@@ -191,7 +176,18 @@ export default function ProfilePage() {
     </div>
   );
 
-  const profileFields = (
+const formatJoinedDate = (dateStr?: string) => {
+  if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return String(dateStr);
+  return d.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const profileFields = (
     <>
       <label className="block space-y-2">
         <span className="text-[14px] font-semibold text-[#111111]">
@@ -239,6 +235,8 @@ export default function ProfilePage() {
         </span>
       </div>
 
+      
+
       <div>
         <p className="mb-2.5 text-[14px] font-semibold text-[#111111]">Gender</p>
         <div className="grid grid-cols-3 gap-2.5">
@@ -264,46 +262,38 @@ export default function ProfilePage() {
 
   if (!isDesktop) {
     return (
-      <div className="min-h-dvh bg-gradient-to-b from-[#EAF2FF] via-[#F5F8FF] to-[#EEF1F6]">
-        <div className="flex items-center justify-between gap-3 px-5 pb-3 pt-[max(1.25rem,env(safe-area-inset-top))]">
-          <BrandMark compact />
-          <button
-            type="button"
-            onClick={onLogout}
-            disabled={loggingOut}
-            className="flex shrink-0 items-center gap-1.5 text-[14px] font-semibold text-[#3B82F6]"
-          >
-            <LogOut className="h-4 w-4" />
-            Logout
-          </button>
-        </div>
-
-        <div className="mt-4 min-h-[calc(100dvh-9rem)] rounded-t-[28px] bg-white px-5 pb-10 pt-6 shadow-[0_-8px_30px_rgba(15,23,42,0.06)]">
-          <div className="mb-6 flex items-center gap-3.5">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#DBEAFE] text-[22px] font-bold text-[#1D4ED8]">
-              {customer?.profileImage ? (
-                <img
-                  src={customer.profileImage}
-                  alt={customer.name}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                initial
-              )}
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-[26px] font-bold leading-tight text-[#111111]">My Profile</h1>
-              <p className="mt-0.5 truncate text-[13px] text-[#9CA3AF]">
-                {customer?.customerId || 'Customer'} · {customer?.mobile}
-              </p>
-            </div>
+      <div className="min-h-dvh bg-white px-5 pb-10 pt-6">
+        <div className="mb-6 flex items-center gap-3.5">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#DBEAFE] text-[22px] font-bold text-[#1D4ED8]">
+            {customer?.profileImage ? (
+              <img
+                src={customer.profileImage}
+                alt={customer.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              initial
+            )}
           </div>
-
-          <form onSubmit={onSave} className="space-y-4">
-            {profileFields}
-            {actionButtons}
-          </form>
+          <div className="min-w-0">
+            {customer?.name ? (
+              <h1 className="text-2xl font-bold text-[#111111]">{customer.name}</h1>
+            ) : null}
+            <p className="text-sm text-[#9CA3AF]">
+              {customer?.customerId || 'Customer'} · {customer?.mobile}
+            </p>
+            {customer?.createdAt ? (
+              <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand-blue">
+                {formatJoinedDate(customer.createdAt)}
+              </p>
+            ) : null}
+          </div>
         </div>
+
+        <form onSubmit={onSave} className="space-y-4">
+          {profileFields}
+          {actionButtons}
+        </form>
       </div>
     );
   }
@@ -311,19 +301,6 @@ export default function ProfilePage() {
   return (
     <div className="brush-bg min-h-screen px-4 py-8 sm:px-8">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <BrandMark compact />
-          <Button
-            type="button"
-            variant="ghost"
-            loading={loggingOut}
-            onClick={onLogout}
-            className="w-auto px-4"
-          >
-            <LogOut className="h-4 w-4" /> Logout
-          </Button>
-        </div>
-
         <div className="auth-card rounded-[28px] border border-white/80 p-6 sm:p-8">
           <div className="mb-6 flex items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-blue-50 text-2xl font-bold text-brand-blue">
@@ -338,10 +315,17 @@ export default function ProfilePage() {
               )}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-ink">My Profile</h1>
+              {customer?.name ? (
+                <h1 className="text-2xl font-bold text-ink">{customer.name}</h1>
+              ) : null}
               <p className="text-sm text-muted">
                 {customer?.customerId || 'Customer'} · {customer?.mobile}
               </p>
+              {customer?.createdAt ? (
+                <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-brand-blue">
+                  {formatJoinedDate(customer.createdAt)}
+                </p>
+              ) : null}
             </div>
           </div>
 

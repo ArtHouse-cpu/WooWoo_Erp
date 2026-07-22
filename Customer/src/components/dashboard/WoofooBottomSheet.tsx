@@ -216,7 +216,7 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
                 <h4 className="text-[13.5px] font-black text-slate-900 tracking-tight leading-tight">
                   Moments Made Here
                 </h4>
-                <p className="mt-2.5 text-[11.5px] font-bold text-slate-500 leading-snug">
+                <p className="mt-0.5 text-[11.5px] font-bold text-slate-500 leading-snug">
                   An  art  cafe where good food, creativity and connection come together.
                 </p>
               </div>

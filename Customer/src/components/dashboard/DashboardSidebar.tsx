@@ -18,7 +18,7 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose}: Props) 
   const logout = useAuthStore(s => s.logout);
   const isDrawer = mode === 'drawer';
 
-  const sections = ['Main', 'Explore', 'Services', 'Community'] as const;
+  const sections = ['Main', 'Account'] as const;
 
   const onLogout = async () => {
     try {

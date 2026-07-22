@@ -242,7 +242,7 @@ export function HelpSupportBottomSheet({isOpen, onClose}: HelpSupportBottomSheet
               <div className="px-5 grid grid-cols-3 gap-3 mb-6">
                 {/* Chat Card */}
                 <a
-                  href="https://wa.me/#"
+                  href="https://wa.me/918073988123"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-[20px] p-3 text-center flex flex-col items-center justify-center min-h-[90px] bg-[#F0FDF4] border border-[#DCFCE7] shadow-3xs hover:bg-[#E8FBF0] transition"
@@ -253,7 +253,7 @@ export function HelpSupportBottomSheet({isOpen, onClose}: HelpSupportBottomSheet
 
                 {/* Email Card */}
                 <a
-                  href="mailto:support@woowooarthouse.com"
+                  href="mailto:hello@woowooarthouse.in"
                   className="rounded-[20px] p-3 text-center flex flex-col items-center justify-center min-h-[90px] bg-[#EFF6FF] border border-[#DBEAFE] shadow-3xs hover:bg-[#E0F2FE] transition"
                 >
                   <Mail className="h-5 w-5 text-[#2563EB] mb-1.5" strokeWidth={2.5} />
@@ -262,7 +262,7 @@ export function HelpSupportBottomSheet({isOpen, onClose}: HelpSupportBottomSheet
 
                 {/* Call Card */}
                 <a
-                  href="tel:#"
+                  href="tel:8073988123"
                   className="rounded-[20px] p-3 text-center flex flex-col items-center justify-center min-h-[90px] bg-[#F3F4F6] border border-[#E5E7EB] shadow-3xs hover:bg-[#E5E7EB]/50 transition"
                 >
                   <Phone className="h-5 w-5 text-[#111111] mb-1.5" strokeWidth={2.5} />

@@ -1,23 +1,18 @@
 import type {LucideIcon} from 'lucide-react';
 import {
-  BookOpen,
-  Briefcase,
   Calendar,
   Coffee,
   Compass,
-  Heart,
   Home,
   LayoutDashboard,
   MapPin,
   MessageCircle,
-  Package,
-  Share2,
+  Settings,
   ShoppingBag,
   Star,
-  Utensils,
+  User,
   Users,
   Wrench,
-  Wallet,
 } from 'lucide-react';
 
 export type NavItem = {
@@ -39,20 +34,9 @@ export type ActionItem = {
 
 export const dashboardNav: NavItem[] = [
   {id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, to: '/home', section: 'Main'},
-  {id: 'wallet', label: 'Wallet', icon: Wallet, to: '/wallet', section: 'Main'},
-  {id: 'store', label: 'Store', icon: ShoppingBag, section: 'Explore'},
-  {id: 'space', label: 'Space', icon: MapPin, section: 'Explore'},
-  {id: 'events', label: 'Events', icon: Calendar, section: 'Explore'},
-  {id: 'cafe', label: 'Art Café', icon: Coffee, section: 'Explore'},
-  {id: 'shop', label: 'Shop Supplies', icon: Package, section: 'Services'},
-  {id: 'book', label: 'Book Space', icon: BookOpen, section: 'Services'},
-  {id: 'services', label: 'Get Services', icon: Briefcase, section: 'Services'},
-  {id: 'food', label: 'Order Food', icon: Utensils, section: 'Services'},
-  {id: 'artists', label: 'Artists', icon: Users, section: 'Community'},
-  {id: 'refer', label: 'Refer & Earn', icon: Share2, to: '/refer-and-earn', section: 'Community'},
-  {id: 'community', label: 'Community', icon: Heart, section: 'Community'},
-  {id: 'messages', label: 'Messages', icon: MessageCircle, section: 'Community'},
-  {id: 'saved', label: 'Saved', icon: Star, section: 'Community'},
+
+  {id: 'account', label: 'Account', icon: User, to: '/profile', section: 'Account'},
+  {id: 'settings', label: 'Settings', icon: Settings, to: '/settings', section: 'Account'},
 ];
 
 export const exploreItems = [
@@ -116,7 +100,7 @@ export const exploreItemsDesktop = [
     icon: Wrench,
     iconBg: 'bg-[#DBEAFE]',
     iconColor: 'text-[#2563EB]',
-    image: 'https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&w=500&q=80',
+    image: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=500&q=80',
   },
   {
     id: 'events',
@@ -187,7 +171,7 @@ export const actionItems: ActionItem[] = [
     title: 'Help',
     subtitle: 'Get Support',
     icon: 'headphones' as const,
-    color: 'text-[#2563EB]',
+    color: 'text-[#9333EA]',
   },
   {
     id: 'visit',
@@ -201,8 +185,7 @@ export const actionItems: ActionItem[] = [
     title: 'Share',
     subtitle: 'Invite & Earn',
     icon: 'share' as const,
-    color: 'text-[#8B5CF6]',
-    to: '/refer-and-earn',
+    color: 'text-[#9333EA]',
   },
 ];
 
