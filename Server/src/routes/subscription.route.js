@@ -1,5 +1,7 @@
 import express from 'express';
-import { authenticateUser } from '../middlewares/auth.middleware.js';
+import {authenticateUser} from '../middlewares/auth.middleware.js';
+import {attachStaffContext, requirePermission} from '../middlewares/authorize.middleware.js';
+import {PERMISSIONS} from '../constants/permissions.js';
 import {
   createSubscription,
   deleteSubscription,
@@ -10,10 +12,12 @@ import {
 
 const router = express.Router();
 
-router.get('/', authenticateUser, getSubscriptions);
-router.get('/:id', authenticateUser, getSubscriptionById);
-router.post('/', authenticateUser, createSubscription);
-router.patch('/:id', authenticateUser, updateSubscription);
-router.delete('/:id', authenticateUser, deleteSubscription);
+router.use(authenticateUser, attachStaffContext);
+
+router.get('/', requirePermission(PERMISSIONS.SUBSCRIPTION_READ), getSubscriptions);
+router.get('/:id', requirePermission(PERMISSIONS.SUBSCRIPTION_READ), getSubscriptionById);
+router.post('/', requirePermission(PERMISSIONS.SUBSCRIPTION_CREATE), createSubscription);
+router.patch('/:id', requirePermission(PERMISSIONS.SUBSCRIPTION_UPDATE), updateSubscription);
+router.delete('/:id', requirePermission(PERMISSIONS.SUBSCRIPTION_DELETE), deleteSubscription);
 
 export default router;

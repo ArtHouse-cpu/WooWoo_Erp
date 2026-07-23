@@ -32,10 +32,25 @@ const userSchema = new mongoose.Schema(
       required: true,
       select: false,
     },
+    /**
+     * Legacy coarse role string (kept for backward compatibility).
+     * Prefer `roleId` + Role.permissions for real RBAC.
+     */
     role: {
       type: String,
       enum: ['admin', 'user'],
       default: 'user',
+      index: true,
+    },
+    /**
+     * RBAC: reference to Role document that holds permission keys.
+     * Null = no RBAC role assigned yet (fallback behavior defined in middleware later).
+     */
+    roleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Role',
+      default: null,
+      index: true,
     },
     gstin: { type: String, trim: true },
     companyName: { type: String, trim: true },
