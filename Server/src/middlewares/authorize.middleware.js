@@ -2,17 +2,6 @@ import User from '../models/auth.model.js';
 import {hasAllPermissions, hasAnyPermission} from '../constants/permissions.js';
 import {resolveUserPermissions} from '../utils/rbac.utils.js';
 
-/**
- * Step 5 — Authorization middleware
- *
- * Must run AFTER authenticateUser.
- *
- * Loads staff User from DB (never trust client-sent roles/permissions),
- * resolves permission list, attaches:
- *   req.staff        — full staff user (no passwordHash)
- *   req.permissions  — string[] permission keys
- *   req.user.staffId — convenience alias of Mongo _id
- */
 
 export const attachStaffContext = async (req, res, next) => {
   try {
@@ -24,7 +13,7 @@ export const attachStaffContext = async (req, res, next) => {
     }
 
     const staff = await User.findById(req.user.userId)
-      .select('-passwordHash')
+      .select('-passwordHash')//exclude password
       .populate('roleId', 'name slug permissions isActive')
       .lean();
 
@@ -60,11 +49,7 @@ export const attachStaffContext = async (req, res, next) => {
   }
 };
 
-/**
- * Require ALL listed permissions.
- * Usage: requirePermission(PERMISSIONS.INVOICE_CREATE)
- *        requirePermission(PERMISSIONS.INVOICE_READ, PERMISSIONS.CUSTOMER_READ)
- */
+
 export const requirePermission = (...required) => {
   const needed = required.filter(Boolean);
 
@@ -118,13 +103,7 @@ export const requireAnyPermission = (...required) => {
   };
 };
 
-/**
- * Convenience chain for routes:
- *   authAndPermit(PERMISSIONS.PRODUCT_DELETE)
- * equals authenticateUser → attachStaffContext → requirePermission(...)
- *
- * Note: import authenticateUser separately when composing manually.
- */
+
 export const permit = (...required) => [
   attachStaffContext,
   requirePermission(...required),

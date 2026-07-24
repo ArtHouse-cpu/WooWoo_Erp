@@ -1,21 +1,74 @@
 import { Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
 import Header from "./Header";
 import LeftSideBar from "./LeftSideBar";
+import MobileBottomNav from "./MobileBottomNav";
 
 export default function DashboardLayout() {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 768) setMobileNavOpen(false);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = mobileNavOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileNavOpen]);
+
   return (
-    <div className="w-full h-screen flex flex-col overflow-hidden">
-      <div className="fixed top-0 left-0 w-full z-50 bg-red-500 shadow">
-        <Header />
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-[#F7F8FA]">
+      <div className="fixed inset-x-0 top-0 z-50 bg-white shadow-sm">
+        <Header
+          onMenuClick={() => setMobileNavOpen(true)}
+          showMenuButton
+        />
       </div>
-      <div className="flex h-full overflow-hidden border-black">
-        <div className=" bg-white overflow-y-auto">
+
+      <div className="flex min-h-0 flex-1 overflow-hidden pt-14">
+        {/* Desktop sidebar */}
+        <aside className="hidden h-full shrink-0 md:block">
           <LeftSideBar />
+        </aside>
+
+        {/* Mobile drawer */}
+        <div
+          className={`fixed inset-0 z-50 md:hidden ${
+            mobileNavOpen ? "pointer-events-auto" : "pointer-events-none"
+          }`}
+        >
+          <button
+            type="button"
+            aria-label="Close navigation"
+            className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${
+              mobileNavOpen ? "opacity-100" : "opacity-0"
+            }`}
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <div
+            className={`absolute inset-y-0 left-0 w-[min(18rem,86vw)] transform bg-white shadow-xl transition-transform duration-300 ${
+              mobileNavOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
+          >
+            <LeftSideBar
+              mobile
+              onNavigate={() => setMobileNavOpen(false)}
+            />
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 bg-white mt-16">
+
+        <main className="min-w-0 flex-1 overflow-y-auto px-3 pb-24 pt-3 sm:px-4 md:px-5 md:pb-6 md:pt-4">
           <Outlet />
-        </div>
+        </main>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 }

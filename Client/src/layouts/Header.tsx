@@ -1,16 +1,25 @@
-import { Bell, User, Shuffle, ChevronDown } from "lucide-react";
+import { Bell, User, Shuffle, ChevronDown, Menu } from "lucide-react";
 import logo from "../assets/images/logo/woo_woo_art_house_logo.png";
 import { useState } from "react";
 import { UserModal } from "./UserModal";
 import { CompanySelectorModal } from "./CompanySelectorModal";
 import { useAppSelector } from "@/store/hooks";
 
-export default function Header() {
+type HeaderProps = {
+  onMenuClick?: () => void;
+  showMenuButton?: boolean;
+};
+
+export default function Header({
+  onMenuClick,
+  showMenuButton = false,
+}: HeaderProps) {
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
-  const { companyName, m_staff_branch, companies, activeCompanyId } = useAppSelector((state) => state.user);
-  
-  const activeCompany = (companies || []).find(c => c.id === activeCompanyId);
+  const { companyName, m_staff_branch, companies, activeCompanyId } =
+    useAppSelector((state) => state.user);
+
+  const activeCompany = (companies || []).find((c) => c.id === activeCompanyId);
   const activeLogo = activeCompany?.logo || logo;
 
   const handleOpenUser = () => {
@@ -18,27 +27,48 @@ export default function Header() {
   };
 
   return (
-    <header className="w-full bg-white border-b border-gray-200 px-4 md:px-6 py-2.5 flex items-center justify-between">
-      <div className="flex items-center gap-3 md:gap-4">
+    <header className="flex w-full items-center justify-between border-b border-gray-200 bg-white px-3 py-2.5 sm:px-4 md:px-6">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-3 md:gap-4">
+        {showMenuButton ? (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-700 transition hover:bg-gray-50 md:hidden"
+            aria-label="Open navigation menu"
+          >
+            <Menu size={20} />
+          </button>
+        ) : null}
+
         <img
           src={activeLogo}
           alt="logo"
-          className="h-10 w-10 rounded-full object-cover cursor-pointer border border-gray-100 shadow-sm"
+          className="h-9 w-9 shrink-0 rounded-full border border-gray-100 object-cover shadow-sm sm:h-10 sm:w-10"
         />
 
-        <div className="flex flex-col leading-tight cursor-pointer group" onClick={() => setIsCompanyModalOpen(true)}>
-          <div className="flex items-center gap-2">
-            <h1 className="font-bold text-sm md:text-[15px] text-gray-900 group-hover:text-blue-600 transition-colors">
+        <div
+          className="group flex min-w-0 cursor-pointer flex-col leading-tight"
+          onClick={() => setIsCompanyModalOpen(true)}
+        >
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+            <h1 className="truncate font-bold text-sm text-gray-900 transition-colors group-hover:text-blue-600 md:text-[15px]">
               {companyName || "WOO WOO Art House"}
             </h1>
-            <ChevronDown size={14} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
+            <ChevronDown
+              size={14}
+              className="shrink-0 text-gray-400 transition-colors group-hover:text-blue-500"
+            />
           </div>
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <Shuffle size={12} className="text-gray-400" />
-            <span className="text-[12px] font-medium uppercase tracking-tight">Change Company</span>
-            {m_staff_branch && (
-              <span className="ml-1 text-gray-400 font-normal">({m_staff_branch})</span>
-            )}
+            <Shuffle size={12} className="hidden text-gray-400 sm:block" />
+            <span className="truncate text-[11px] font-medium tracking-tight uppercase sm:text-[12px]">
+              Change Company
+            </span>
+            {m_staff_branch ? (
+              <span className="ml-1 hidden font-normal text-gray-400 sm:inline">
+                ({m_staff_branch})
+              </span>
+            ) : null}
           </div>
         </div>
       </div>
