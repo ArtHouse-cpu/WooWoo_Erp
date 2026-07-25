@@ -14,15 +14,6 @@ type CanProps = {
   fallback?: ReactNode;
 };
 
-/**
- * Conditionally render UI by permission.
- *
- * Examples:
- *   <Can permission={PERMISSIONS.INVOICE_CREATE}><button>Create</button></Can>
- *   <Can anyOf={[PERMISSIONS.AFFILIATE_READ, PERMISSIONS.AFFILIATE_MANAGE]}>...</Can>
- *
- * Note: This only hides UI. Backend APIs must still enforce permissions.
- */
 export default function Can({
   permission,
   anyOf,

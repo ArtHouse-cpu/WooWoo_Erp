@@ -1,5 +1,10 @@
 import axios from "axios";
 import { useAuthStore } from "@/store/authStore";
+import {
+  forceLogout,
+  isPublicAuthRequest,
+  isTokenExpired,
+} from "@/utils/session";
 
 export const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "https://woo-woo-erp.vercel.app/",
@@ -12,9 +17,41 @@ export const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
 
+  // Proactive logout if JWT already past exp (before hitting API)
+  if (token && isTokenExpired(token) && !isPublicAuthRequest(config.url || "")) {
+    forceLogout({ reason: "expired" });
+    return Promise.reject(new Error("Session expired"));
+  }
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
   return config;
 });
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url = String(error?.config?.url || "");
+    const message = String(error?.response?.data?.message || "").toLowerCase();
+
+    const looksLikeExpiredToken =
+      status === 401 &&
+      !isPublicAuthRequest(url) &&
+      Boolean(useAuthStore.getState().token) &&
+      (message.includes("expired") ||
+        message.includes("invalid") ||
+        message.includes("unauthorized") ||
+        message.includes("token"));
+
+    if (looksLikeExpiredToken || (status === 401 && !isPublicAuthRequest(url) && useAuthStore.getState().token)) {
+      forceLogout({
+        reason: message.includes("expired") ? "expired" : "unauthorized",
+      });
+    }
+
+    return Promise.reject(error);
+  },
+);

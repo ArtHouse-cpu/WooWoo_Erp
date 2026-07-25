@@ -5,14 +5,6 @@ import {
   normalizeAppPath,
 } from "@/utils/rbac";
 import ForbiddenScreen from "@/features/common/pages/ForbiddenScreen";
-
-/**
- * Step 7 — Frontend route permission guard.
- *
- * Runs inside AuthRoute (user already has a token).
- * Checks MENU_PERMISSION_MAP for the current pathname.
- * UX only: backend APIs remain the real security boundary.
- */
 export default function PermissionRoute() {
   const location = useLocation();
   const { canPath } = usePermission();

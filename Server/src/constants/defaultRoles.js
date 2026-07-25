@@ -1,9 +1,5 @@
 import {PERMISSIONS, ALL_PERMISSIONS} from './permissions.js';
 
-/**
- * Default system roles for WooWooErp Admin RBAC (Step 3).
- * Permissions must come from the catalog — never invent keys here.
- */
 
 const P = PERMISSIONS;
 
