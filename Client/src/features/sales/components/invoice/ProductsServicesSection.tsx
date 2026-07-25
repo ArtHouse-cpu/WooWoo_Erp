@@ -27,10 +27,11 @@ type Props = {
   onRemoveItem: (id: number) => void;
   onUpdateItemQty: (id: number, newQty: number) => void;
   onUpdateItemDiscount: (id: number, newDiscount: number) => void;
-  onUpdateItemCashback: (id: number, newCashback: number) => void;
+  onUpdateItemCashback?: (id: number, newCashback: number) => void;
   membershipType?: string;
   membershipPlans?: any[];
   membershipPlanId?: string | null;
+  onAddDirectItem?: (item: Omit<InvoiceItem, "id">) => void;
 };
 
 const inputStyle =
@@ -66,6 +67,7 @@ export default function ProductsServicesSection({
   membershipType = "none",
   membershipPlans = [],
   membershipPlanId = null,
+  onAddDirectItem,
 }: Props) {
   const [catalogueItems, setCatalogueItems] = useState<CatalogueLookupItem[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -74,6 +76,123 @@ export default function ProductsServicesSection({
   const [creating, setCreating] = useState(false);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  const [gridItems, setGridItems] = useState<CatalogueLookupItem[]>([]);
+  const [loadingGrid, setLoadingGrid] = useState(false);
+  const [selectedType, setSelectedType] = useState<string>("all");
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
+  const handleImageError = (id: string) => {
+    setImageErrors((prev) => ({ ...prev, [id]: true }));
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchGridItems = async () => {
+      try {
+        setLoadingGrid(true);
+        const term = draft.name.trim();
+        const response = await handleCatalogueLookup(term, controller.signal);
+        setGridItems(Array.isArray(response?.items) ? response.items : []);
+      } catch (error) {
+        if (!isAbortError(error)) setGridItems([]);
+      } finally {
+        setLoadingGrid(false);
+      }
+    };
+
+    const timeout = window.setTimeout(() => {
+      fetchGridItems();
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [draft.name]);
+
+  const getCalculatedItemBenefits = (item: CatalogueLookupItem, qty: number) => {
+    const sellingPrice = Number(item.sellingPrice ?? 0);
+    const membershipCategory = item.category || "General";
+    const lineCategory = item.lineCategory || item.sourceType || "product";
+
+    let calculatedDiscount = 0;
+    let calculatedCashback = 0;
+    const plan = resolveMembershipPlan();
+
+    if (
+      plan?.usageLimits &&
+      (plan.usageLimits[membershipCategory] || plan.usageLimits.General)
+    ) {
+      const limit =
+        plan.usageLimits[membershipCategory] || plan.usageLimits.General;
+      if (limit.discount) {
+        calculatedDiscount = (sellingPrice * qty * limit.discount) / 100;
+      }
+      if (limit.cashback) {
+        calculatedCashback = (sellingPrice * qty * limit.cashback) / 100;
+      }
+    } else {
+      const dValue = Number(item.discountValue ?? 0);
+      const dType = item.discountType ?? "flat";
+      if (dType === "percentage") {
+        calculatedDiscount = (sellingPrice * qty * dValue) / 100;
+      } else {
+        calculatedDiscount = dValue * qty;
+      }
+    }
+
+    return {
+      discount: calculatedDiscount,
+      cashback: calculatedCashback,
+      category: lineCategory,
+    };
+  };
+
+  const handleAddGridItem = (item: CatalogueLookupItem) => {
+    if (item.trackStock && Number(item.stockQty ?? 0) <= 0) {
+      Swal.fire(
+        "Out of stock",
+        `${item.productName || item.name} is currently out of stock.`,
+        "warning",
+      );
+      return;
+    }
+
+    const { discount, cashback, category } = getCalculatedItemBenefits(item, 1);
+
+    if (onAddDirectItem) {
+      onAddDirectItem({
+        productName: item.productName || item.name || "",
+        qty: 1,
+        unitPrice: Number(item.sellingPrice ?? 0),
+        discount,
+        cashback,
+        image: item.imageUrl || (item.images && item.images[0]) || "",
+        category,
+      });
+    }
+  };
+
+  const handleIncrementGridItem = (item: CatalogueLookupItem, itemInCart: InvoiceItem) => {
+    if (item.trackStock && Number(item.stockQty ?? 0) <= itemInCart.qty) {
+      Swal.fire(
+        "Insufficient stock",
+        `${item.productName || item.name} has only ${item.stockQty} qty available.`,
+        "warning",
+      );
+      return;
+    }
+    onUpdateItemQty(itemInCart.id, itemInCart.qty + 1);
+  };
+
+  const handleDecrementGridItem = (itemInCart: InvoiceItem) => {
+    if (itemInCart.qty <= 1) {
+      onRemoveItem(itemInCart.id);
+    } else {
+      onUpdateItemQty(itemInCart.id, itemInCart.qty - 1);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -248,6 +367,11 @@ export default function ProductsServicesSection({
     onDraftChange("qty", String(next));
   };
 
+  const filteredGridItems = gridItems.filter((item) => {
+    if (selectedType === "all") return true;
+    return item.sourceType === selectedType;
+  });
+
   return (
     <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -375,6 +499,160 @@ export default function ProductsServicesSection({
         </button>
       </div>
 
+      {/* Instamart Catalogue Grid */}
+      <div className="border-t border-gray-100 pt-4 mt-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-700">Quick Select Menu</h3>
+            {loadingGrid && <span className="text-xs text-gray-400 animate-pulse">Loading menu...</span>}
+          </div>
+          {/* Category tabs */}
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { id: "all", label: "All" },
+              { id: "product", label: "Products" },
+              { id: "service", label: "Services" },
+              { id: "space", label: "Spaces" },
+              { id: "food", label: "Foods" },
+            ].map((tab) => {
+              const isActive = selectedType === tab.id;
+              const count = gridItems.filter(i => tab.id === 'all' || i.sourceType === tab.id).length;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setSelectedType(tab.id)}
+                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 border ${
+                    isActive
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300"
+                  }`}
+                >
+                  {tab.label} <span className={`text-[10px] ml-0.5 ${isActive ? "text-blue-100" : "text-gray-400"}`}>({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {filteredGridItems.length === 0 ? (
+          <div className="text-center py-8 text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+            {loadingGrid ? "Fetching items from database..." : "No items found in database matching search."}
+          </div>
+        ) : (
+          <div className="flex gap-2 overflow-x-auto p-1 pb-2 custom-scrollbar scroll-smooth whitespace-nowrap">
+            {filteredGridItems.map((item) => {
+              const badge = SOURCE_BADGE[item.sourceType] || SOURCE_BADGE.product;
+              const itemInCart = items.find(
+                (i) => i.productName.toLowerCase() === (item.productName || item.name || "").toLowerCase()
+              );
+              const hasImage = item.imageUrl && !imageErrors[item._id];
+              
+              return (
+                <div
+                  key={`${item.sourceType}-${item._id}`}
+                  className="flex-shrink-0 w-28 sm:w-32 group relative border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 rounded-xl bg-white p-2 flex flex-col justify-between whitespace-normal"
+                >
+                  {/* Veg / Non-Veg badge */}
+                  {item.sourceType === "food" && (
+                    <span className="absolute top-1 right-1 p-0.5 bg-white rounded shadow-sm border border-gray-100 flex items-center justify-center z-10">
+                      <span
+                        className={`w-2.5 h-2.5 border flex items-center justify-center ${
+                          item.isVeg !== false ? "border-green-600" : "border-red-600"
+                        }`}
+                        style={{ padding: "0.5px" }}
+                      >
+                        <span
+                          className={`w-1 h-1 rounded-full ${
+                            item.isVeg !== false ? "bg-green-600" : "bg-red-600"
+                          }`}
+                        />
+                      </span>
+                    </span>
+                  )}
+
+                  <div>
+                    {/* Item Image with Fallback */}
+                    <div className="relative w-full h-16 mb-1 rounded-lg overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center">
+                      {hasImage ? (
+                        <img
+                          src={item.imageUrl!}
+                          alt={item.name}
+                          onError={() => handleImageError(item._id)}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-500 font-bold uppercase text-sm select-none">
+                          {(item.productName || item.name || "P").charAt(0)}
+                        </div>
+                      )}
+                      
+                      {/* Source badge overlay */}
+                      <span
+                        className={`absolute bottom-0.5 left-0.5 rounded px-1 py-0.2 text-[8px] font-bold uppercase tracking-wider shadow-sm ${badge.className}`}
+                      >
+                        {badge.label}
+                      </span>
+                    </div>
+
+                    {/* Item Name */}
+                    <div className="text-[10px] sm:text-xs font-semibold text-gray-800 line-clamp-2 min-h-[24px] group-hover:text-blue-600 transition-colors leading-tight" title={item.productName || item.name}>
+                      {item.productName || item.name}
+                    </div>
+
+                    {/* Category */}
+                    <div className="text-[9px] text-gray-400 font-medium mt-0.5">
+                      {item.category || "General"}
+                    </div>
+                  </div>
+
+                  <div className="mt-1">
+                    {/* Price and Stock */}
+                    <div className="flex items-baseline justify-between gap-1 flex-wrap">
+                      <span className="text-[11px] sm:text-xs font-bold text-gray-900">₹{item.sellingPrice}</span>
+                      {item.trackStock && item.stockQty != null && (
+                        <span className={`text-[8px] sm:text-[9px] font-medium ${item.stockQty <= 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                          {item.stockQty <= 0 ? "Out" : `Stock: ${item.stockQty}`}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Add / Qty Control button */}
+                    {itemInCart ? (
+                      <div className="flex items-center justify-between border border-blue-600 bg-blue-50 rounded-lg h-6 px-1 mt-1 text-blue-600 font-semibold text-xs">
+                        <button
+                          type="button"
+                          onClick={() => handleDecrementGridItem(itemInCart)}
+                          className="p-0.5 hover:bg-blue-100 rounded transition-colors"
+                        >
+                          <Minus size={10} />
+                        </button>
+                        <span className="px-0.5 text-[10px]">{itemInCart.qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleIncrementGridItem(item, itemInCart)}
+                          className="p-0.5 hover:bg-blue-100 rounded transition-colors"
+                        >
+                          <Plus size={10} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleAddGridItem(item)}
+                        disabled={item.trackStock && Number(item.stockQty ?? 0) <= 0}
+                        className="w-full mt-1 h-6 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 font-bold text-[10px] transition-all duration-200 flex items-center justify-center gap-0.5 shadow-sm"
+                      >
+                        <Plus size={10} /> Add
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="min-w-full text-sm">
@@ -439,7 +717,7 @@ export default function ProductsServicesSection({
                           type="number"
                           min={0}
                           value={item.cashback}
-                          onChange={(e) => onUpdateItemCashback(item.id, Number(e.target.value))}
+                          onChange={(e) => onUpdateItemCashback?.(item.id, Number(e.target.value))}
                           className="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500"
                         />
                       </div>

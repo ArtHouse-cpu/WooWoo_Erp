@@ -710,6 +710,12 @@ export default function CreateInvoiceScreen() {
         onUpdateItemQty={updateItemQty}
         onUpdateItemDiscount={updateItemDiscount}
         onUpdateItemCashback={updateItemCashback}
+        onAddDirectItem={(newItem) => {
+          setItems((prev) => {
+            const nextId = prev.length > 0 ? Math.max(...prev.map((i) => i.id)) + 1 : 1;
+            return [...prev, { ...newItem, id: nextId }];
+          });
+        }}
       />
 
       {/* <PaymentSection /> */}
