@@ -20,6 +20,7 @@ import {
   ShieldUser,
   MapPin,
   UtensilsCrossed,
+  Utensils,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -171,6 +172,7 @@ const MENU_GROUPS: MenuGroup[] = [
 ];
 
 const TOP_LINKS: TopLink[] = [
+  { key: "foodBill", label: "Food Billing", icon: Utensils, path: "/foodBill" },
   { key: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
   { key: "coupons", label: "Coupons", icon: Percent, path: "/coupons" },
   {
@@ -180,6 +182,7 @@ const TOP_LINKS: TopLink[] = [
     path: "/affiliate-program",
   },
   { key: "access", label: "Access", icon: ShieldUser, path: "/access" },
+
 ];
 
 /**
@@ -262,14 +265,12 @@ export default function LeftSideBar({
 
   return (
     <div
-      className={`flex h-full flex-col border-r border-gray-100 bg-white/95 shadow-sm backdrop-blur transition-all duration-300 ${
-        mobile ? "w-full" : isCollapsed ? "w-16" : "w-64"
-      }`}
+      className={`flex h-full flex-col border-r border-gray-100 bg-white/95 shadow-sm backdrop-blur transition-all duration-300 ${mobile ? "w-full" : isCollapsed ? "w-16" : "w-64"
+        }`}
     >
       <div
-        className={`flex items-center justify-between border-b border-gray-100 px-3 py-3 ${
-          mobile ? "" : ""
-        }`}
+        className={`flex items-center justify-between border-b border-gray-100 px-3 py-3 ${mobile ? "" : ""
+          }`}
       >
         {!isCollapsed && (
           <span className="text-sm font-semibold tracking-wide text-gray-500 uppercase">
@@ -278,9 +279,8 @@ export default function LeftSideBar({
         )}
         {!mobile ? (
           <button
-            className={`rounded-lg p-2 text-gray-600 transition-all hover:bg-gray-100 hover:text-black ${
-              isCollapsed ? "mx-auto" : ""
-            }`}
+            className={`rounded-lg p-2 text-gray-600 transition-all hover:bg-gray-100 hover:text-black ${isCollapsed ? "mx-auto" : ""
+              }`}
             onClick={() => setCollapsed(!collapsed)}
           >
             {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -293,11 +293,10 @@ export default function LeftSideBar({
       <div className="flex-1 space-y-2 overflow-y-auto px-3 py-4 text-gray-700">
         {showHome ? (
           <button
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
-              activeMenu === "home"
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${activeMenu === "home"
                 ? "border-l-4 border-blue-500 bg-gray-100 text-black shadow-sm"
                 : "text-gray-700 hover:bg-gray-50 hover:text-black"
-            }`}
+              }`}
             onClick={() => handleMenuClick("home", "/")}
           >
             <LayoutDashboard size={20} className="text-gray-500" />
@@ -313,11 +312,10 @@ export default function LeftSideBar({
           return (
             <div key={menu.key} className="mt-2">
               <button
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
-                  activeMenu === menu.key
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${activeMenu === menu.key
                     ? "border-l-4 border-blue-500 bg-gray-100 text-black shadow-sm"
                     : "text-gray-700 hover:bg-gray-50 hover:text-black"
-                }`}
+                  }`}
                 onClick={() => {
                   handleMenuClick(menu.key);
                   handleToggleMenu(menu.key);
@@ -332,11 +330,10 @@ export default function LeftSideBar({
                 {!isCollapsed && (
                   <ChevronDown
                     size={18}
-                    className={`ml-auto transition-all duration-300 ${
-                      openMenu === menu.key
+                    className={`ml-auto transition-all duration-300 ${openMenu === menu.key
                         ? "rotate-180 text-gray-700"
                         : "text-gray-400"
-                    }`}
+                      }`}
                   />
                 )}
               </button>
@@ -349,11 +346,10 @@ export default function LeftSideBar({
                     return (
                       <div
                         key={sub.name}
-                        className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-all ${
-                          activeSubmenu === sub.name
+                        className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-all ${activeSubmenu === sub.name
                             ? "bg-gray-100 font-medium text-black"
                             : "text-gray-600 hover:bg-gray-50 hover:text-black"
-                        }`}
+                          }`}
                         onClick={() =>
                           handleSubmenuClick(menu.key, sub.name, sub.path)
                         }
@@ -374,11 +370,10 @@ export default function LeftSideBar({
           return (
             <div key={link.key} className="mt-2">
               <button
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
-                  activeMenu === link.key
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${activeMenu === link.key
                     ? "border-l-4 border-blue-500 bg-gray-100 text-black shadow-sm"
                     : "text-gray-700 hover:bg-gray-50 hover:text-black"
-                }`}
+                  }`}
                 onClick={() => handleMenuClick(link.key, link.path)}
               >
                 <Icon size={20} className="text-gray-500" />
