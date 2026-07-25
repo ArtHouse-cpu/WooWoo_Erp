@@ -1,0 +1,1 @@
+export { default as FoodBill } from './FoodBill';

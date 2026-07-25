@@ -52,6 +52,7 @@ import { AffiliateProgramScreen } from "@/features/affiliate";
 import { AccessScreen } from "@/features/access/components/pages";
 import CreateSpacesScreen from "@/features/catalogue/pages/CreateSpacesScreen";
 import CreateFoodScreen from "@/features/catalogue/pages/CreateFoodScreen";
+import { FoodBill } from "@/features/foodbill";
 
 export const router = createBrowserRouter([
   {
@@ -115,6 +116,7 @@ export const router = createBrowserRouter([
           { path: "access", element: <AccessScreen /> },
           { path: "spaces", element: <CreateSpacesScreen /> },
           { path: "foods", element: <CreateFoodScreen /> },
+          { path: "foodBill", element: <FoodBill /> },
         ],
       },
     ],
