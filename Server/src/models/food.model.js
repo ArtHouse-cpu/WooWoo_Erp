@@ -37,9 +37,11 @@ const foodSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Cloudinary HTTPS URL (secure_url) saved after upload via CLOUDINARY_URL
     imageUrl: {
       type: String,
       default: null,
+      trim: true,
     },
     status: {
       type: String,

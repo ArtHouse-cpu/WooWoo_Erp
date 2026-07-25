@@ -74,8 +74,11 @@ const buildFoodPayload = (body = {}, imageUrl) => {
 const resolveImageUrl = async req => {
   if (!req.file?.path) return undefined;
   try {
-    const uploaded = await uploadOnCloudinary(req.file.path);
-    return uploaded?.secure_url || uploaded?.url || null;
+    // uploadOnCloudinary returns the secure_url string (Cloudinary CDN URL)
+    const uploadedUrl = await uploadOnCloudinary(req.file.path, {
+      folder: 'woowoo/foods',
+    });
+    return uploadedUrl || null;
   } catch (error) {
     console.error('food image upload error:', error);
     return null;

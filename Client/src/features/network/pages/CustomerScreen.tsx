@@ -5,10 +5,11 @@ import {
   type MRT_ColumnDef,
   type MRT_Row,
 } from "material-react-table";
-import { Eye, SquarePen, Trash2 } from "lucide-react";
+import { Eye, FileSpreadsheet, SquarePen, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
 import LedgerModal from "@/features/network/components/LedgerModal";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
+import ImportCustomersModal from "@/features/network/components/ImportCustomersModal";
 import UpdateCustomerModal from "@/features/network/components/UpdateCustomerModal";
 import CustomerDetailsModal from "@/features/network/components/CustomerDetailsModal";
 import Can from "@/components/rbac/Can";
@@ -21,7 +22,9 @@ import {
   handleGetInvoices,
   handleGetSubscriptions,
   handleGetWallets,
+  handleImportCustomers,
   handleUpdateCustomer,
+  type CustomerImportRow,
   type CustomerPayload,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
@@ -49,11 +52,13 @@ type CustomerRow = {
 };
 export default function CustomerScreen() {
   const [openCreateCustomerModal, setOpenCreateCustomerModal] = useState(false);
+  const [openImportModal, setOpenImportModal] = useState(false);
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
   const [search, setSearch] = useState("");
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [importingCustomers, setImportingCustomers] = useState(false);
   const [updatingCustomer, setUpdatingCustomer] = useState(false);
   const staff = useAppSelector((state) => state.user);
   // console.log("staff", staff);
@@ -107,22 +112,37 @@ export default function CustomerScreen() {
   const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
     try {
       setLoadingCustomers(true);
-      const [customerResponse, walletResponse, invoiceResponse] = await Promise.allSettled([
-        handleGetCustomers(searchText, signal),
+      const [
+        customerResponse,
+        walletResponse,
+        invoiceResponse,
+        subscriptionResponse,
+      ] = await Promise.allSettled([
+        handleGetCustomers(searchText, signal, 6000),
         handleGetWallets({ search: searchText }, signal),
         handleGetInvoices(searchText, signal),
+        handleGetSubscriptions(searchText, 300, signal),
       ]);
-      const subscriptionResponse = await handleGetSubscriptions(
-        searchText,
-        300,
-        signal,
-      );
 
       const customerList =
         customerResponse.status === "fulfilled" &&
         Array.isArray(customerResponse.value?.customers)
           ? customerResponse.value.customers
           : [];
+
+      // Never wipe an existing table if only a secondary API failed
+      if (
+        customerResponse.status !== "fulfilled" &&
+        !customerList.length
+      ) {
+        console.error(
+          "Failed to fetch customers:",
+          customerResponse.status === "rejected"
+            ? customerResponse.reason
+            : "unknown",
+        );
+        return;
+      }
 
       const walletItems =
         walletResponse.status === "fulfilled"
@@ -163,9 +183,11 @@ export default function CustomerScreen() {
         },
         {},
       );
-      const subscriptions = Array.isArray(subscriptionResponse?.subscriptions)
-        ? subscriptionResponse.subscriptions
-        : [];
+      const subscriptions =
+        subscriptionResponse.status === "fulfilled" &&
+        Array.isArray(subscriptionResponse.value?.subscriptions)
+          ? subscriptionResponse.value.subscriptions
+          : [];
       const membershipLookup = subscriptions.reduce(
         (acc: Record<string, { type: string; startDate?: string; endDate?: string }>, subscription: any) => {
           const membershipType = String(
@@ -248,8 +270,9 @@ export default function CustomerScreen() {
           };
         }),
       );
-    } catch {
-      setCustomers([]);
+    } catch (error) {
+      console.error("fetchCustomers error:", error);
+      // Keep current rows — do not blank the grid on refresh errors
     } finally {
       setLoadingCustomers(false);
     }
@@ -525,8 +548,15 @@ export default function CustomerScreen() {
         </div>
 
         <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
-
           <Can permission={PERMISSIONS.CUSTOMER_CREATE}>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
+              onClick={() => setOpenImportModal(true)}
+            >
+              <FileSpreadsheet size={16} />
+              Excel Import
+            </button>
             <button
               type="button"
               className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
@@ -547,6 +577,97 @@ export default function CustomerScreen() {
           loading={creatingCustomer}
         />
       )}
+
+      <ImportCustomersModal
+        open={openImportModal}
+        loading={importingCustomers}
+        onClose={() => setOpenImportModal(false)}
+        onImport={async (rows: CustomerImportRow[]) => {
+          try {
+            setImportingCustomers(true);
+            const response = await handleImportCustomers(rows);
+            const summary = response?.summary;
+            const createdRows = Array.isArray(response?.customers)
+              ? response.customers
+              : [];
+            setOpenImportModal(false);
+
+            // Show created rows immediately even if list refresh is slow/fails
+            if (createdRows.length) {
+              setCustomers((prev) => {
+                const seen = new Set(
+                  createdRows.map((c: CustomerRow) => String(c._id || c.mobile)),
+                );
+                const rest = prev.filter(
+                  (c) => !seen.has(String(c._id || c.mobile)),
+                );
+                return [...createdRows, ...rest];
+              });
+            }
+
+            // Clear search so newly imported rows are not filtered out of the grid
+            setSearch("");
+            await fetchCustomers("");
+
+            const created = Number(summary?.created || 0);
+            const failed = Number(summary?.failed || 0);
+            const skipped = Number(summary?.skipped || 0);
+            const errorLines = Array.isArray(summary?.errors)
+              ? summary.errors
+                  .slice(0, 8)
+                  .map(
+                    (e: { row?: number; message?: string }) =>
+                      `<li>Row ${e.row ?? "?"}: ${e.message || "Error"}</li>`,
+                  )
+                  .join("")
+              : "";
+
+            await Swal.fire({
+              icon: created > 0 ? "success" : failed > 0 ? "error" : "info",
+              title:
+                created > 0
+                  ? `${created} customer${created === 1 ? "" : "s"} saved`
+                  : failed > 0
+                    ? "Import finished with errors"
+                    : "Nothing saved to database",
+              html: `
+                <div class="text-sm text-left space-y-1">
+                  <p>${response?.message || "Import finished."}</p>
+                  <p>Created in DB: <b>${created}</b> · Skipped: <b>${skipped}</b> · Failed: <b>${failed}</b></p>
+                  ${
+                    errorLines
+                      ? `<ul class="mt-2 list-disc pl-4 text-xs text-slate-600">${errorLines}</ul>`
+                      : ""
+                  }
+                </div>
+              `,
+              confirmButtonColor: "#2563eb",
+            });
+          } catch (error: unknown) {
+            const err = error as {
+              response?: { data?: { message?: string; summary?: { errors?: { row?: number; message?: string }[] } } };
+            };
+            const details = Array.isArray(err?.response?.data?.summary?.errors)
+              ? err.response.data.summary.errors
+                  .slice(0, 5)
+                  .map((e) => `Row ${e.row ?? "?"}: ${e.message || "Error"}`)
+                  .join("\n")
+              : "";
+            Swal.fire(
+              "Import failed",
+              [
+                err?.response?.data?.message ?? "Could not import customers.",
+                details,
+              ]
+                .filter(Boolean)
+                .join("\n"),
+              "error",
+            );
+          } finally {
+            setImportingCustomers(false);
+          }
+        }}
+      />
 
       <UpdateCustomerModal
         open={editOpen}

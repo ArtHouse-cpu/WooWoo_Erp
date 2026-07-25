@@ -73,8 +73,10 @@ const buildSpacePayload = (body = {}, imageUrl) => {
 const resolveImageUrl = async req => {
   if (!req.file?.path) return undefined;
   try {
-    const uploaded = await uploadOnCloudinary(req.file.path);
-    return uploaded?.secure_url || uploaded?.url || null;
+    const uploadedUrl = await uploadOnCloudinary(req.file.path, {
+      folder: 'woowoo/spaces',
+    });
+    return uploadedUrl || null;
   } catch (error) {
     console.error('space image upload error:', error);
     return null;

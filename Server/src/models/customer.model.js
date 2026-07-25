@@ -300,10 +300,12 @@ const customerSchema = new mongoose.Schema(
     // =========================
     // CUSTOMER AUTH (portal)
     // =========================
+    // Portal login id. Omit when unset — do NOT default to null.
+    // A unique sparse/partial index treats null as a real value and blocks inserts.
     customerId: {
       type: String,
       trim: true,
-      default: null,
+      default: undefined,
     },
     countryCode: {
       type: String,
@@ -378,7 +380,17 @@ const customerSchema = new mongoose.Schema(
 // =========================
 customerSchema.index({ name: 1 });
 customerSchema.index({ mobile: 1 }, { unique: true });
-customerSchema.index({ customerId: 1 }, { unique: true, sparse: true });
+// Only enforce uniqueness when a real portal customerId is present
+customerSchema.index(
+  { customerId: 1 },
+  {
+    unique: true,
+    name: "customerId_unique_partial",
+    partialFilterExpression: {
+      customerId: { $type: "string", $gt: "" },
+    },
+  },
+);
 customerSchema.index(
   { email: 1 },
   {

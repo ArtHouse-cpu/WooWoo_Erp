@@ -103,7 +103,7 @@ const initialState: FormState = {
   membershipType: "",
   adharNumber: "",
   dob: "",
-  gender: "Not Specified",
+  gender: "",
   whatsappNumber: "",
   AlternateMobile: "",
   IFSCcode: "",
@@ -389,18 +389,18 @@ export default function UpdateCustomerModal({
 
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Gender <span className="text-red-500">*</span>
+                      Gender{" "}
+                      <span className="font-normal text-slate-400">(optional)</span>
                     </label>
                     <select
-                      value={form.gender}
+                      value={String(form.gender || "").toLowerCase() === "not specified" ? "" : String(form.gender || "").toLowerCase()}
                       onChange={(e) => update("gender", e.target.value)}
                       className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                      required
                     >
-                      <option value="Not Specified">Not Specified</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
+                      <option value="">Not Specified</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
                     </select>
                   </div>
 

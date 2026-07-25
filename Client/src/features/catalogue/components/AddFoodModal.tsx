@@ -22,11 +22,14 @@ type Props = {
 };
 
 const FOOD_CATEGORIES = [
-  "Beverages",
-  "Snacks",
-  "Meals",
-  "Desserts",
+  "Drinks",
+  "Healthy",
+  "Starters",
+  "Main Course",
   "Combos",
+  "Desserts",
+  "Extras",
+  "Snacks",
 ];
 
 const UNITS = ["Plate", "Cup", "Glass", "Piece", "Pack", "Bowl"];

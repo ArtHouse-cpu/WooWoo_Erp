@@ -5,6 +5,7 @@ import {
   uploadCustomerImage,
   deleteCustomer,
   editCustomer,
+  importCustomers,
 } from '../controllers/customer.controller.js';
 import {authenticateUser} from '../middlewares/auth.middleware.js';
 import {attachStaffContext, requirePermission} from '../middlewares/authorize.middleware.js';
@@ -19,6 +20,11 @@ router.post(
   requirePermission(PERMISSIONS.CUSTOMER_CREATE),
   uploadCustomerImage.single('profileImage'),
   createCustomer,
+);
+router.post(
+  '/import',
+  requirePermission(PERMISSIONS.CUSTOMER_CREATE),
+  importCustomers,
 );
 router.get('/', requirePermission(PERMISSIONS.CUSTOMER_READ), getCustomers);
 router.patch(

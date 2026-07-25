@@ -60,7 +60,24 @@ const validMemberships = [
   'general',
 ];
 
-const validGenders = ['male', 'female', 'other', ''];
+const validGenders = ['male', 'female', 'other'];
+const optionalGenderValues = new Set([
+  '',
+  'not specified',
+  'n/a',
+  'na',
+  'none',
+  'null',
+  'undefined',
+]);
+
+/** Gender is optional. Empty / "Not Specified" → "". Invalid non-empty → null. */
+const normalizeGender = gender => {
+  const genderVal = String(gender ?? '').trim().toLowerCase();
+  if (optionalGenderValues.has(genderVal)) return '';
+  if (validGenders.includes(genderVal)) return genderVal;
+  return null;
+};
 
 const createCustomer = async (req, res) => {
   try {
@@ -128,13 +145,7 @@ const createCustomer = async (req, res) => {
       });
     }
 
-    const genderVal = String(gender ?? '').trim().toLowerCase();
-    const genderNorm =
-      genderVal === ''
-        ? ''
-        : validGenders.includes(genderVal)
-          ? genderVal
-          : null;
+    const genderNorm = normalizeGender(gender);
     if (genderNorm === null) {
       return res.status(400).json({
         success: false,
@@ -190,6 +201,12 @@ const createCustomer = async (req, res) => {
       },
     });
 
+    // Never keep customerId:null (breaks unique customerId indexes)
+    await Customer.updateOne(
+      {_id: customer._id, customerId: null},
+      {$unset: {customerId: 1}},
+    );
+
     // Automatically create a wallet for the customer and credit ₹25 joining bonus
     await Wallet.create({
       customerId: customer._id,
@@ -218,6 +235,7 @@ const createCustomer = async (req, res) => {
           walletAmount: 25,
           closingBalance: 25,
         },
+        $unset: {customerId: 1},
       },
       { new: true }
     );
@@ -245,8 +263,8 @@ const createCustomer = async (req, res) => {
 const getCustomers = async (req, res) => {
   try {
     const search = String(req.query.search ?? '').trim();
-    const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
-    const query = {};
+    const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 5000);
+    const query = {isDeleted: {$ne: true}};
 
     if (search) {
       const regex = new RegExp(escapeRegex(search), 'i');
@@ -260,14 +278,17 @@ const getCustomers = async (req, res) => {
       ];
     }
 
-    const customers = await Customer.find(query)
-      .sort({createdAt: -1})
-      .limit(limit);
+    const [customers, total] = await Promise.all([
+      Customer.find(query).sort({createdAt: -1}).limit(limit).lean(),
+      Customer.countDocuments(query),
+    ]);
 
     return res.status(200).json({
       success: true,
       message: 'Customers fetched successfully.',
       customers,
+      total,
+      limit,
     });
   } catch (error) {
     console.error('getCustomers error:', error);
@@ -336,11 +357,11 @@ const editCustomer = async (req, res) => {
       update.dob = b.dob ? new Date(b.dob) : null;
     }
     if (b.gender !== undefined) {
-      const genderVal = String(b.gender ?? '').trim().toLowerCase();
-      if (genderVal !== '' && !validGenders.includes(genderVal)) {
+      const genderNorm = normalizeGender(b.gender);
+      if (genderNorm === null) {
         return res.status(400).json({success: false, message: 'Invalid gender value.'});
       }
-      update.gender = genderVal;
+      update.gender = genderNorm;
     }
     if (b.whatsappNumber !== undefined) {
       update.whatsappNumber = String(b.whatsappNumber ?? '').trim();
@@ -435,4 +456,292 @@ const deleteCustomer = async (req, res) => {
   }
 };
 
-export {createCustomer, getCustomers, editCustomer, deleteCustomer};
+/**
+ * Bulk import customers from Excel-parsed rows.
+ * Expected fields per row: name, email/mail, mobile/number/phone,
+ * and optional walletAmount/balance/closingBalance.
+ */
+const normalizeImportHeader = value =>
+  String(value || '')
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
+const pickImportField = (row, aliases) => {
+  const wanted = new Set(aliases.map(normalizeImportHeader));
+  for (const [key, value] of Object.entries(row || {})) {
+    if (value === undefined || value === null) continue;
+    if (wanted.has(normalizeImportHeader(key))) return value;
+  }
+  return '';
+};
+
+const normalizeImportMobile = raw => {
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const digits = String(Math.trunc(Math.abs(raw)));
+    return digits.length > 10 ? digits.slice(-10) : digits;
+  }
+
+  const text = String(raw ?? '').trim();
+  if (!text) return '';
+  if (/e[+-]?\d+/i.test(text)) {
+    const asNum = Number(text);
+    if (Number.isFinite(asNum)) return normalizeImportMobile(asNum);
+  }
+
+  const digits = text.replace(/\D/g, '');
+  return digits.length > 10 ? digits.slice(-10) : digits;
+};
+
+const normalizeImportBalance = raw => {
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return Math.max(0, raw);
+  }
+  const text = String(raw ?? '')
+    .trim()
+    .replace(/[,₹\s]/g, '');
+  if (!text) return 0;
+  const num = Number(text);
+  return Number.isFinite(num) ? Math.max(0, num) : 0;
+};
+
+const importCustomers = async (req, res) => {
+  try {
+    const rows = Array.isArray(req.body?.customers) ? req.body.customers : [];
+    if (!rows.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'No customers provided for import.',
+      });
+    }
+
+    const createdBy = {
+      m_staff_id: req.user?.userId ?? req.user?.m_staff_id ?? null,
+      m_staff_name: req.user?.m_staff_name ?? req.user?.name ?? null,
+      m_staff_email: req.user?.m_staff_email ?? req.user?.email ?? null,
+    };
+
+    const summary = {
+      total: rows.length,
+      created: 0,
+      skipped: 0,
+      failed: 0,
+      errors: [],
+    };
+    const createdCustomers = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i] || {};
+      const rowNo = i + 2; // assuming row 1 is header in Excel
+
+      try {
+        const name = String(
+          pickImportField(row, [
+            'name',
+            'customer name',
+            'full name',
+            'customer',
+            'client name',
+          ]) ||
+            row.name ||
+            '',
+        ).trim();
+        const emailRaw = String(
+          pickImportField(row, ['email', 'mail', 'email id', 'email address']) ||
+            row.email ||
+            '',
+        )
+          .trim()
+          .toLowerCase();
+        // Empty email must be omitted (not null) for unique email index safety
+        const email = emailRaw;
+        const mobile = normalizeImportMobile(
+          pickImportField(row, [
+            'mobile',
+            'mobile number',
+            'mobile no',
+            'phone number',
+            'phone no',
+            'phonenumber',
+            'contact number',
+            'whatsapp',
+            'phone',
+            'contact',
+          ]) ||
+            row.mobile ||
+            '',
+        );
+        const openingBalance = normalizeImportBalance(
+          pickImportField(row, [
+            'walletAmount',
+            'wallet amount',
+            'balance',
+            'closingBalance',
+            'closing balance',
+            'wallet',
+            'wallet balance',
+            'opening balance',
+          ]) ??
+            row.walletAmount ??
+            0,
+        );
+
+        if (!name || !mobile) {
+          summary.failed += 1;
+          summary.errors.push({
+            row: rowNo,
+            message: 'Name and mobile are required.',
+          });
+          continue;
+        }
+
+        if (!/^[6-9]\d{9}$/.test(mobile)) {
+          summary.failed += 1;
+          summary.errors.push({
+            row: rowNo,
+            message: `Invalid mobile: ${mobile}`,
+          });
+          continue;
+        }
+
+        const exists = await Customer.findOne({
+          mobile,
+          isDeleted: {$ne: true},
+        }).select('_id');
+        if (exists) {
+          summary.skipped += 1;
+          summary.errors.push({
+            row: rowNo,
+            message: `Duplicate mobile skipped: ${mobile}`,
+          });
+          continue;
+        }
+
+        const genderNorm = normalizeGender(row.gender);
+        if (genderNorm === null) {
+          summary.failed += 1;
+          summary.errors.push({
+            row: rowNo,
+            message: 'Invalid gender value.',
+          });
+          continue;
+        }
+
+        const initialWallet = openingBalance > 0 ? openingBalance : 25;
+        const note =
+          openingBalance > 0
+            ? 'Opening balance from Excel import'
+            : 'Joining Bonus';
+
+        const payload = {
+          name,
+          mobile,
+          membershipType: 'none',
+          gender: genderNorm,
+          country: 'India',
+          walletAmount: initialWallet,
+          closingBalance: initialWallet,
+          createdBy,
+        };
+        if (email) payload.email = email;
+
+        const customer = await Customer.create(payload);
+
+        if (!customer) {
+          summary.failed += 1;
+          summary.errors.push({
+            row: rowNo,
+            message: 'Failed to create customer.',
+          });
+          continue;
+        }
+
+        // Never persist customerId:null — it breaks unique sparse/partial indexes
+        if (customer.customerId == null) {
+          await Customer.updateOne(
+            {_id: customer._id},
+            {$unset: {customerId: 1}},
+          );
+          customer.customerId = undefined;
+        }
+
+        try {
+          await Wallet.create({
+            customerId: customer._id,
+            customerName: customer.name,
+            customerPhone: customer.mobile,
+            walletAmount: initialWallet,
+            transactions: [
+              {
+                type: 'credit',
+                amount: initialWallet,
+                note,
+                referenceType:
+                  openingBalance > 0 ? 'OpeningBalance' : 'JoiningBonus',
+                closingBalance: initialWallet,
+                createdBy,
+              },
+            ],
+          });
+        } catch (walletError) {
+          await Customer.findByIdAndDelete(customer._id).catch(() => null);
+          throw walletError;
+        }
+
+        summary.created += 1;
+        createdCustomers.push({
+          _id: customer._id,
+          name: customer.name,
+          mobile: customer.mobile,
+          email: customer.email || '',
+          membershipType: customer.membershipType || 'none',
+          walletAmount: initialWallet,
+          closingBalance: initialWallet,
+          createdAt: customer.createdAt,
+          createdBy: customer.createdBy,
+        });
+      } catch (error) {
+        summary.failed += 1;
+        let message = error?.message || 'Failed to import row';
+        if (error?.code === 11000) {
+          const keys = Object.keys(error?.keyPattern || {});
+          if (keys.includes('mobile') || (keys.includes('name') && keys.includes('mobile'))) {
+            message = 'Duplicate mobile';
+          } else if (keys.includes('email')) {
+            message = 'Duplicate email';
+          } else if (keys.includes('customerId')) {
+            message = 'Customer id conflict (retry import)';
+          } else {
+            message = `Duplicate ${keys[0] || 'field'}`;
+          }
+        }
+        summary.errors.push({
+          row: rowNo,
+          message,
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: summary.created > 0,
+      message: `Import finished. Created ${summary.created}, skipped ${summary.skipped}, failed ${summary.failed}.`,
+      summary,
+      customers: createdCustomers,
+    });
+  } catch (error) {
+    console.error('importCustomers error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to import customers.',
+    });
+  }
+};
+
+export {
+  createCustomer,
+  getCustomers,
+  editCustomer,
+  deleteCustomer,
+  importCustomers,
+};

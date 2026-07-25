@@ -611,13 +611,16 @@ export function customerPayloadToFormData(
   return fd;
 }
 
-export const handleGetCustomers = async (search = "", signal?: AbortSignal) => {
+export const handleGetCustomers = async (
+  search = "",
+  signal?: AbortSignal,
+  limit = 2000,
+) => {
   try {
     const response = await axiosInstance.get("/customer", {
-      params: { search: search.trim() },
+      params: { search: search.trim(), limit },
       signal,
     });
-    console.log("Customers:", response.data);
     return response.data;
   } catch (error) {
     console.log("Error fetching customers:", error);
@@ -639,6 +642,21 @@ export const handleCreateCustomer = async (payload: CustomerPayload | FormData) 
     console.log("Error creating customer:", error);
     throw error;
   }
+};
+
+export type CustomerImportRow = {
+  name: string;
+  email?: string;
+  mobile: string;
+  walletAmount?: number;
+  balance?: number;
+  closingBalance?: number;
+  gender?: string;
+};
+
+export const handleImportCustomers = async (customers: CustomerImportRow[]) => {
+  const response = await axiosInstance.post("/customer/import", { customers });
+  return response.data;
 };
 
 export const handleUpdateCustomer = async (
