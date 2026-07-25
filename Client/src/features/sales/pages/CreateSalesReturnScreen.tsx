@@ -506,6 +506,12 @@ export default function CreateSalesReturnScreen() {
         onRemoveItem={removeItem}
         onUpdateItemQty={updateItemQty}
         onUpdateItemDiscount={updateItemDiscount}
+        onAddDirectItem={(newItem) => {
+          setItems((prev) => {
+            const nextId = prev.length > 0 ? Math.max(...prev.map((i) => i.id)) + 1 : 1;
+            return [...prev, { ...newItem, id: nextId }];
+          });
+        }}
       />
 
       {/* <PaymentSection /> */}
