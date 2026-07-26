@@ -76,7 +76,7 @@ const initialState: FormState = {
   membershipType: "general",
   adharNumber: "",
   dob: "",
-  gender: "Not Specified",
+  gender: "",
   whatsappNumber: "",
   AlternateMobile: "",
   IFSCcode: "",
@@ -252,7 +252,7 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
                       onChange={(e) => update("gender", e.target.value)}
                       className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                     >
-                      <option value="Not Specified">Not Specified</option>
+                      <option value="">Not Specified</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>

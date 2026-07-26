@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ChevronDown,
@@ -31,14 +31,22 @@ import {
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
+import AddFoodModal, {
+  type FoodFormPayload,
+} from "@/features/catalogue/components/AddFoodModal";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAppSelector } from "@/store/hooks";
 import {
   customerPayloadToFormData,
+  foodPayloadToFormData,
   handleCreateCustomer,
+  handleCreateInvoice,
   handleGetCustomers,
   handleGetFoods,
+  handleUpdateFood,
+  handleValidateReferralDiscount,
   type CustomerPayload,
+  type FoodPayload,
 } from "@/services/apiClient";
 
 // Types
@@ -54,6 +62,8 @@ interface FoodItem {
   price: number;
   isVeg: boolean;
   category: string;
+  unit?: string;
+  description?: string;
   /** Cloudinary secure_url (or placeholder) */
   image: string;
   imageUrl?: string | null;
@@ -94,9 +104,25 @@ function mapApiFood(raw: any): FoodItem | null {
     price: Math.max(0, Number(raw?.price ?? 0) || 0),
     isVeg: raw?.isVeg !== false && raw?.isVeg !== "false",
     category,
+    unit: String(raw?.unit || "Plate").trim() || "Plate",
+    description: String(raw?.description || "").trim(),
     image: imageUrl || PLACEHOLDER_FOOD_IMAGE,
     imageUrl: imageUrl || null,
     status: raw?.status === "Inactive" ? "Inactive" : "Active",
+  };
+}
+
+function foodItemToPayload(food: FoodItem): FoodPayload {
+  return {
+    _id: food.id,
+    name: food.name,
+    category: food.category,
+    price: food.price,
+    unit: food.unit || "Plate",
+    description: food.description || "",
+    isVeg: food.isVeg,
+    status: food.status === "Inactive" ? "Inactive" : "Active",
+    imageUrl: food.imageUrl || null,
   };
 }
 
@@ -107,6 +133,9 @@ interface Customer {
   tier: "Silver" | "Gold" | "New Customer" | string;
   points?: number;
   membershipType?: string;
+  /** Customer's own share code (e.g. W9454ZZ5P) — not used as checkout discount code */
+  referralCode?: string;
+  referredBy?: string;
 }
 
 const WALK_IN_CUSTOMER: Customer = {
@@ -118,8 +147,28 @@ const WALK_IN_CUSTOMER: Customer = {
   membershipType: "none",
 };
 
+function toInvoicePaymentMode(method: string) {
+  const m = String(method || "Cash")
+    .trim()
+    .toUpperCase();
+  if (m === "UPI") return "UPI";
+  if (m === "CARD") return "CARD";
+  if (m === "WALLET") return "WALLET";
+  return "CASH";
+}
+
+type ReferralApplyResult = {
+  discountAmount: number;
+  code: string;
+  inviterName: string;
+  label: string;
+  message: string;
+};
+
 function mapMembershipTier(membershipType?: string | null): string {
-  const raw = String(membershipType || "none").trim().toLowerCase();
+  const raw = String(membershipType || "none")
+    .trim()
+    .toLowerCase();
   if (!raw || raw === "none" || raw === "new") return "New Customer";
   if (raw.includes("gold")) return "Gold";
   if (raw.includes("silver")) return "Silver";
@@ -132,6 +181,12 @@ function mapApiCustomer(raw: any): Customer | null {
   const name = String(raw?.name || "").trim();
   if (!id || !name) return null;
   const membershipType = String(raw?.membershipType || "none");
+  const ownCode = String(raw?.referralCode || raw?.referral?.code || "")
+    .trim()
+    .toUpperCase();
+  const referredBy = raw?.referredBy
+    ? String(raw.referredBy._id || raw.referredBy).trim()
+    : "";
   return {
     id,
     name,
@@ -139,6 +194,8 @@ function mapApiCustomer(raw: any): Customer | null {
     tier: mapMembershipTier(membershipType),
     membershipType,
     points: Number(raw?.walletAmount ?? raw?.points ?? 0) || 0,
+    referralCode: ownCode || undefined,
+    referredBy: referredBy || undefined,
   };
 }
 
@@ -162,13 +219,20 @@ export default function FoodBill() {
 
   // State Variables
   const [customers, setCustomers] = useState<Customer[]>([WALK_IN_CUSTOMER]);
-  const [selectedCustomerId, setSelectedCustomerId] =
-    useState<string>(WALK_IN_CUSTOMER.id);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
+    WALK_IN_CUSTOMER.id,
+  );
   const [customerSearch, setCustomerSearch] = useState<string>("");
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
+  const [showEditFoodModal, setShowEditFoodModal] = useState(false);
+  const [editingFood, setEditingFood] = useState<FoodPayload | null>(null);
+  const [savingFood, setSavingFood] = useState(false);
+  // Call customers API only after typing stops (300ms) — not on every keystroke
   const debouncedCustomerSearch = useDebounce(customerSearch.trim(), 300);
+  // Keep input snappy while filtering the local list
+  const deferredCustomerSearch = useDeferredValue(customerSearch.trim());
 
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [itemSearch, setItemSearch] = useState<string>("");
@@ -186,6 +250,15 @@ export default function FoodBill() {
   const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
   const [amountReceived, setAmountReceived] = useState<string>("0");
   const [billNote, setBillNote] = useState<string>("");
+  const [savingBill, setSavingBill] = useState(false);
+
+  // Referral discount (same API as invoice CheckoutModal)
+  const [referralDiscount, setReferralDiscount] = useState(0);
+  const [referralCodeApplied, setReferralCodeApplied] = useState("");
+  const [referralInviterName, setReferralInviterName] = useState("");
+  const [referralLabel, setReferralLabel] = useState("Referral Discount");
+  const [referralStatusMessage, setReferralStatusMessage] = useState("");
+  const [loadingReferral, setLoadingReferral] = useState(false);
 
   // Logged-in staff from Redux (auto Billed By)
   const billedBy = useMemo(() => {
@@ -198,33 +271,59 @@ export default function FoodBill() {
     useState<boolean>(false);
   const [recentBills, setRecentBills] = useState<RecentBill[]>([]);
 
+  const clearReferralDiscount = () => {
+    setReferralDiscount(0);
+    setReferralCodeApplied("");
+    setReferralInviterName("");
+    setReferralLabel("Referral Discount");
+    setReferralStatusMessage("");
+  };
+
   const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
+    const q = searchText.trim();
+    // Never auto-load the full customer list — only search results
+    if (!q) {
+      setCustomers([WALK_IN_CUSTOMER]);
+      setLoadingCustomers(false);
+      return;
+    }
+
     try {
       setLoadingCustomers(true);
-      const response = await handleGetCustomers(searchText, signal);
+      const response = await handleGetCustomers(q, signal, 50);
       const rows = Array.isArray(response?.customers) ? response.customers : [];
       const mapped = rows
         .map(mapApiCustomer)
         .filter((c: Customer | null): c is Customer => Boolean(c));
 
-      const walkInMatches =
-        !searchText.trim() ||
-        WALK_IN_CUSTOMER.name.toLowerCase().includes(searchText.toLowerCase());
+      const walkInMatches = WALK_IN_CUSTOMER.name
+        .toLowerCase()
+        .includes(q.toLowerCase());
 
       setCustomers(
-        walkInMatches ? [...mapped, WALK_IN_CUSTOMER] : mapped.length ? mapped : [WALK_IN_CUSTOMER],
+        walkInMatches
+          ? [...mapped, WALK_IN_CUSTOMER]
+          : mapped.length
+            ? mapped
+            : [],
       );
     } catch (error: any) {
       if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
         return;
       }
-      setCustomers([WALK_IN_CUSTOMER]);
+      setCustomers([]);
     } finally {
       setLoadingCustomers(false);
     }
   };
 
+  // Remote search only when user pauses typing for 300ms (skip empty query)
   useEffect(() => {
+    if (!debouncedCustomerSearch) {
+      setCustomers([WALK_IN_CUSTOMER]);
+      setLoadingCustomers(false);
+      return;
+    }
     const controller = new AbortController();
     void fetchCustomers(debouncedCustomerSearch, controller.signal);
     return () => controller.abort();
@@ -280,16 +379,30 @@ export default function FoodBill() {
     ];
   }, [foodItems]);
 
-  // Cards to show in the quick picker
+  // Show customers only after user types a search (never a default list)
   const filteredCustomers = useMemo(() => {
-    // Prefer real customers first, walk-in last; keep a compact row
-    const sorted = [...customers].sort((a, b) => {
-      if (a.id === WALK_IN_CUSTOMER.id) return 1;
-      if (b.id === WALK_IN_CUSTOMER.id) return -1;
-      return a.name.localeCompare(b.name);
-    });
-    return sorted.slice(0, 6);
-  }, [customers]);
+    const q = deferredCustomerSearch.toLowerCase();
+    if (!q) return [];
+
+    return [...customers]
+      .filter((c) => {
+        if (c.id === WALK_IN_CUSTOMER.id) {
+          return WALK_IN_CUSTOMER.name.toLowerCase().includes(q);
+        }
+        const name = c.name.toLowerCase();
+        const phone = String(c.phone || "").replace(/\D/g, "");
+        const qDigits = q.replace(/\D/g, "");
+        return (
+          name.includes(q) || (qDigits.length > 0 && phone.includes(qDigits))
+        );
+      })
+      .sort((a, b) => {
+        if (a.id === WALK_IN_CUSTOMER.id) return 1;
+        if (b.id === WALK_IN_CUSTOMER.id) return -1;
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 6);
+  }, [customers, deferredCustomerSearch]);
 
   const handleCreateCustomerSubmit = async (args: {
     payload: CustomerPayload;
@@ -326,7 +439,7 @@ export default function FoodBill() {
           ),
           WALK_IN_CUSTOMER,
         ]);
-        setSelectedCustomerId(created.id);
+        handleSelectCustomer(created);
       } else {
         await fetchCustomers(debouncedCustomerSearch);
       }
@@ -378,6 +491,55 @@ export default function FoodBill() {
     });
   };
 
+  const handleEditFood = (food: FoodItem) => {
+    setEditingFood(foodItemToPayload(food));
+    setShowEditFoodModal(true);
+  };
+
+  const handleUpdateFoodSubmit = async (
+    payload: FoodFormPayload,
+    imageFile: File | null,
+  ) => {
+    const foodId = String(editingFood?._id || "").trim();
+    if (!foodId) return;
+
+    try {
+      setSavingFood(true);
+      const formData = foodPayloadToFormData(payload, imageFile);
+      const response = await handleUpdateFood(foodId, formData);
+      const updatedRaw = response?.food ?? response?.data ?? null;
+      const updated = updatedRaw ? mapApiFood(updatedRaw) : null;
+
+      // Refresh list + keep cart line in sync with new price/name/image
+      await fetchFoods(debouncedItemSearch);
+      if (updated) {
+        setCart((prev) =>
+          prev.map((line) =>
+            line.item.id === foodId ? { ...line, item: updated } : line,
+          ),
+        );
+      }
+
+      setShowEditFoodModal(false);
+      setEditingFood(null);
+      await Swal.fire({
+        icon: "success",
+        title: "Food updated",
+        timer: 1400,
+        showConfirmButton: false,
+      });
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Update failed",
+        err?.response?.data?.message || "Could not update food item.",
+        "error",
+      );
+    } finally {
+      setSavingFood(false);
+    }
+  };
+
   const updateQuantity = (itemId: string, change: number) => {
     setCart((prev) => {
       return prev
@@ -396,7 +558,7 @@ export default function FoodBill() {
     setCart((prev) => prev.filter((i) => i.item.id !== itemId));
   };
 
-  // Pricing calculations
+  // Pricing calculations (referral applied after tax, same pattern as invoice checkout)
   const subtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.item.price * item.quantity, 0);
   }, [cart]);
@@ -410,19 +572,22 @@ export default function FoodBill() {
     return Math.max(0, subtotal - manualDiscount) + tax;
   }, [subtotal, manualDiscount, tax]);
 
-  const grandTotal = useMemo(() => {
+  const roundedBeforeReferral = useMemo(() => {
     return Math.round(totalBeforeRound);
   }, [totalBeforeRound]);
 
   const roundOff = useMemo(() => {
-    const diff = grandTotal - totalBeforeRound;
+    const diff = roundedBeforeReferral - totalBeforeRound;
     return Math.round(diff * 100) / 100;
-  }, [grandTotal, totalBeforeRound]);
+  }, [roundedBeforeReferral, totalBeforeRound]);
+
+  const grandTotal = useMemo(() => {
+    return Math.max(0, roundedBeforeReferral - Number(referralDiscount || 0));
+  }, [roundedBeforeReferral, referralDiscount]);
 
   // Loyalty calculations
   const loyaltyPointsEarned = useMemo(() => {
     if (selectedCustomer.tier === "New Customer") return 0;
-    // Earn 1 point per 100 rupees
     return Math.max(1, Math.floor(grandTotal / 100));
   }, [selectedCustomer, grandTotal]);
 
@@ -432,8 +597,126 @@ export default function FoodBill() {
     return Math.max(0, receivedNum - grandTotal);
   }, [amountReceived, grandTotal]);
 
-  // Handle Generate Bill
-  const handleGenerateBill = () => {
+  const applyReferralDiscount = async (opts?: {
+    customer?: Customer;
+  }): Promise<ReferralApplyResult | null> => {
+    const customer = opts?.customer ?? selectedCustomer;
+    const isWalkIn = customer.id === WALK_IN_CUSTOMER.id;
+    // Same order amount basis as invoice checkout (before referral)
+    const orderAmount = Math.max(0, subtotal - manualDiscount);
+
+    if (isWalkIn || !customer.phone) {
+      clearReferralDiscount();
+      return null;
+    }
+
+    // Need cart amount > 0 — same as validate API (orderAmount must be > 0)
+    if (orderAmount <= 0 || cart.length === 0) {
+      clearReferralDiscount();
+      setReferralStatusMessage(
+        "Add food items to auto-apply referral discount for this customer.",
+      );
+      return null;
+    }
+
+    setLoadingReferral(true);
+    try {
+      // Same as invoice CheckoutModal handleSelectCustomer:
+      // omit referralCode so server uses buyer.referredBy.
+      // Inviter code (e.g. W9454ZZ5P) is returned in the response.
+      const response = await handleValidateReferralDiscount({
+        customerId: customer.id,
+        customerPhone: customer.phone,
+        orderAmount,
+        items: cart.map((line) => ({
+          productName: line.item.name,
+          name: line.item.name,
+          qty: line.quantity,
+          unitPrice: line.item.price,
+          price: line.item.price,
+          discount: 0,
+          category: "Food",
+          lineTotal: line.item.price * line.quantity,
+        })),
+      });
+      const data = response?.data || response;
+
+      if (!data?.referralCode && !data?.ok && !Number(data?.discountAmount)) {
+        clearReferralDiscount();
+        setReferralStatusMessage(
+          String(data?.message || "No referral discount for this customer."),
+        );
+        return null;
+      }
+
+      const discountAmt = Number(data.discountAmount || 0);
+      const code = String(data.referralCode || "")
+        .trim()
+        .toUpperCase();
+      const label = String(data.label || "Referral Discount");
+      const inviterName = String(data.inviterName || "");
+      const alreadyUsed =
+        data.discountAlreadyUsed === true || data.discountEligible === false;
+      const message = String(
+        data.message ||
+          (alreadyUsed
+            ? "Referral discount already used on this account."
+            : "Referral discount applied"),
+      );
+
+      setReferralDiscount(discountAmt);
+      setReferralLabel(label);
+      setReferralCodeApplied(code);
+      setReferralInviterName(inviterName);
+      setReferralStatusMessage(message);
+
+      return {
+        discountAmount: discountAmt,
+        code,
+        inviterName,
+        label,
+        message,
+      };
+    } catch (error: unknown) {
+      clearReferralDiscount();
+      const err = error as { response?: { data?: { message?: string } } };
+      setReferralStatusMessage(
+        err?.response?.data?.message ||
+          "No referral discount for this customer.",
+      );
+      return null;
+    } finally {
+      setLoadingReferral(false);
+    }
+  };
+
+  /** Same as invoice CheckoutModal — apply referral as soon as customer is picked */
+  const handleSelectCustomer = (cust: Customer) => {
+    setSelectedCustomerId(cust.id);
+    if (cust.id === WALK_IN_CUSTOMER.id) {
+      clearReferralDiscount();
+      return;
+    }
+    void applyReferralDiscount({ customer: cust });
+  };
+
+  // Re-apply when cart / discount changes for the selected customer
+  const referralOrderKey = useMemo(
+    () =>
+      `${selectedCustomer.id}|${selectedCustomer.phone}|${cart
+        .map((c) => `${c.item.id}:${c.quantity}`)
+        .join(",")}|${manualDiscount}`,
+    [selectedCustomer.id, selectedCustomer.phone, cart, manualDiscount],
+  );
+  const debouncedReferralKey = useDebounce(referralOrderKey, 350);
+
+  useEffect(() => {
+    void applyReferralDiscount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedReferralKey]);
+
+  // Handle Generate Bill → same POST /invoice API as sales invoice
+  const handleGenerateBill = async () => {
     if (cart.length === 0) {
       Swal.fire({
         title: "Cart Empty",
@@ -444,19 +727,37 @@ export default function FoodBill() {
       return;
     }
 
-    const billId = `BILL-${Math.floor(10000 + Math.random() * 90000)}`;
+    if (
+      selectedCustomer.id === WALK_IN_CUSTOMER.id ||
+      !selectedCustomer.phone
+    ) {
+      Swal.fire({
+        title: "Customer required",
+        text: "Search and select a customer with a mobile number before generating the invoice.",
+        icon: "warning",
+        confirmButtonColor: "#3B82F6",
+      });
+      return;
+    }
+
     const nowStr = new Date().toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
     });
+    const today = new Date().toISOString().split("T")[0];
+    const paid =
+      paymentMethod === "Cash"
+        ? Math.max(Number(amountReceived) || grandTotal, grandTotal)
+        : grandTotal;
+    const mode = toInvoicePaymentMode(paymentMethod);
 
-    Swal.fire({
+    const confirm = await Swal.fire({
       title: "Confirm Bill Generation",
       html: `
         <div class="text-left bg-gray-50 p-4 rounded-xl text-sm leading-relaxed border border-gray-100">
           <p class="font-bold text-gray-800 text-center mb-3">WOO WOO ART HOUSE</p>
           <div class="flex justify-between text-xs text-gray-500 mb-2">
-            <span>Bill ID: ${billId}</span>
+            <span>Food Bill → Invoice</span>
             <span>Date: Today, ${nowStr}</span>
           </div>
           <hr class="border-dashed border-gray-300 my-2" />
@@ -476,6 +777,11 @@ export default function FoodBill() {
           <div class="space-y-1 text-xs">
             <div class="flex justify-between"><span class="text-gray-500">Subtotal:</span><span class="text-gray-900">₹${subtotal.toFixed(2)}</span></div>
             <div class="flex justify-between"><span class="text-gray-500">Discount:</span><span class="text-green-600">-₹${manualDiscount.toFixed(2)}</span></div>
+            ${
+              referralDiscount > 0
+                ? `<div class="flex justify-between"><span class="text-gray-500">${referralLabel}${referralCodeApplied ? ` (${referralCodeApplied})` : ""}:</span><span class="text-green-600">-₹${referralDiscount.toFixed(2)}</span></div>`
+                : ""
+            }
             <div class="flex justify-between"><span class="text-gray-500">Tax (5%):</span><span class="text-gray-900">₹${tax.toFixed(2)}</span></div>
             <div class="flex justify-between font-bold text-base text-gray-900 pt-1 mt-1 border-t border-gray-200">
               <span>Grand Total:</span>
@@ -483,60 +789,153 @@ export default function FoodBill() {
             </div>
             <div class="flex justify-between text-xs mt-2 text-gray-600 pt-1 border-t border-gray-100">
               <span>Paid via ${paymentMethod}:</span>
-              <span>₹${parseFloat(amountReceived) || grandTotal}</span>
-            </div>
-            <div class="flex justify-between text-xs font-semibold text-green-600">
-              <span>Change Returned:</span>
-              <span>₹${changeAmount.toFixed(2)}</span>
+              <span>₹${paid.toFixed(2)}</span>
             </div>
           </div>
-          ${
-            selectedCustomer.tier !== "New Customer"
-              ? `
-            <div class="mt-3 bg-yellow-50 p-2 rounded-lg text-[11px] text-yellow-800 border border-yellow-100 flex items-center gap-1">
-              <span>⭐</span>
-              <span>Loyalty: <strong>${selectedCustomer.name}</strong> will earn <strong>${loyaltyPointsEarned} points</strong>.</span>
-            </div>
-          `
-              : ""
-          }
         </div>
       `,
-      icon: "success",
+      icon: "question",
       showCancelButton: true,
-      confirmButtonText: "Print Receipt",
-      cancelButtonText: "Close & New Order",
+      confirmButtonText: "Save Invoice",
+      cancelButtonText: "Cancel",
       confirmButtonColor: "#3B82F6",
       cancelButtonColor: "#6B7280",
-    }).then((result) => {
-      // Add to recent bills list
-      const newBill: RecentBill = {
-        id: billId,
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      setSavingBill(true);
+      // Refresh referral once more before save; use returned values (avoid stale state)
+      const referral = await applyReferralDiscount();
+      const appliedReferralDiscount = Number(
+        referral?.discountAmount ?? referralDiscount ?? 0,
+      );
+      const appliedReferralCode = String(
+        referral?.code ?? referralCodeApplied ?? "",
+      ).trim();
+      const appliedReferralLabel = String(
+        referral?.label ?? referralLabel ?? "Referral Discount",
+      );
+      const appliedReferralInviter = String(
+        referral?.inviterName ?? referralInviterName ?? "",
+      );
+      const payableTotal = Math.max(
+        0,
+        roundedBeforeReferral - appliedReferralDiscount,
+      );
+      const paidFinal =
+        paymentMethod === "Cash"
+          ? Math.max(Number(amountReceived) || payableTotal, payableTotal)
+          : payableTotal;
+
+      const notes = [
+        billNote,
+        specialInstructions,
+        `${orderType} · ${tableNumber}`,
+        "Source: Food Bill",
+      ]
+        .map((v) => String(v || "").trim())
+        .filter(Boolean)
+        .join(" | ");
+
+      const response = await handleCreateInvoice({
         customerName: selectedCustomer.name,
-        grandTotal: grandTotal,
-        paymentMethod: paymentMethod,
+        customerPhone: selectedCustomer.phone,
+        invoiceDate: today,
+        dueDate: today,
+        salesPersonName: staff?.m_staff_name ?? "Food Bill",
+        notes,
+        items: cart.map((line) => ({
+          productName: line.item.name,
+          qty: line.quantity,
+          unitPrice: line.item.price,
+          discount: 0,
+          category: "Food",
+        })),
+        subTotal: subtotal,
+        discountTotal:
+          Number(manualDiscount || 0) + Number(appliedReferralDiscount || 0),
+        grandTotal: payableTotal,
+        coupon: null,
+        referral: appliedReferralCode
+          ? {
+              code: appliedReferralCode,
+              discountAmount: appliedReferralDiscount,
+              inviterName: appliedReferralInviter,
+              label: appliedReferralLabel,
+            }
+          : null,
+        status: "final",
+        mode,
+        paymentStatus: "full",
+        paymentBreakdown: {
+          cash: mode === "CASH" ? paidFinal : 0,
+          upi: mode === "UPI" ? paidFinal : 0,
+          card: mode === "CARD" ? paidFinal : 0,
+          wallet: mode === "WALLET" ? paidFinal : 0,
+          paidAmount: paidFinal,
+          dueAmount: 0,
+          changeAmount: Math.max(0, paidFinal - payableTotal),
+        },
+        createdBy: {
+          m_staff_id: staff?.m_staff_id ?? null,
+          m_staff_name: staff?.m_staff_name ?? null,
+          m_staff_email: staff?.m_staff_email ?? null,
+        },
+      });
+
+      const invoiceCode =
+        response?.invoice?.invoiceCode ||
+        response?.invoice?.invoiceNumber ||
+        response?.invoice?._id ||
+        "N/A";
+
+      const newBill: RecentBill = {
+        id: String(invoiceCode),
+        customerName: selectedCustomer.name,
+        grandTotal: payableTotal,
+        paymentMethod,
         date: `Today, ${nowStr}`,
         itemsCount: cart.reduce((sum, item) => sum + item.quantity, 0),
       };
       setRecentBills((prev) => [newBill, ...prev]);
 
-      if (result.isConfirmed) {
-        Swal.fire({
-          title: "Sending to Printer...",
-          text: "Thermal receipt printer triggered successfully.",
-          icon: "info",
-          timer: 1500,
-          showConfirmButton: false,
-        });
-      }
+      await Swal.fire({
+        icon: "success",
+        title: "Invoice created",
+        html: `
+          <div class="text-sm text-left space-y-1">
+            <p>Invoice <b>${invoiceCode}</b> saved.</p>
+            ${
+              appliedReferralDiscount > 0
+                ? `<p class="text-green-700">${appliedReferralLabel}${appliedReferralCode ? ` (${appliedReferralCode})` : ""}: −₹${appliedReferralDiscount.toFixed(2)}</p>`
+                : ""
+            }
+            <p>Total: <b>₹${payableTotal.toFixed(2)}</b></p>
+          </div>
+        `,
+        confirmButtonColor: "#3B82F6",
+      });
 
-      // Reset state for new order
       setCart([]);
       setAmountReceived("0");
       setManualDiscount(0);
       setSpecialInstructions("");
       setBillNote("");
-    });
+      clearReferralDiscount();
+      setCustomerSearch("");
+      setSelectedCustomerId(WALK_IN_CUSTOMER.id);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      Swal.fire(
+        "Bill failed",
+        err?.response?.data?.message ?? "Could not create invoice. Try again.",
+        "error",
+      );
+    } finally {
+      setSavingBill(false);
+    }
   };
 
   const handleManualDiscountClick = async () => {
@@ -638,10 +1037,11 @@ export default function FoodBill() {
           {/* New Walk-in Button */}
           <button
             onClick={() => {
-              setSelectedCustomerId("c3"); // Walk-in
+              handleSelectCustomer(WALK_IN_CUSTOMER);
               setCart([]);
               setManualDiscount(0);
               setSpecialInstructions("");
+              setCustomerSearch("");
               Swal.fire({
                 title: "New Walk-in Session",
                 text: "Cart cleared. Walk-in customer selected.",
@@ -674,6 +1074,11 @@ export default function FoodBill() {
                 onChange={(e) => setCustomerSearch(e.target.value)}
                 className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
               />
+              {loadingCustomers ? (
+                <span className="shrink-0 text-[10px] font-medium text-blue-500">
+                  Searching…
+                </span>
+              ) : null}
               <span title="Scan Barcode" className="shrink-0">
                 <Scan
                   size={18}
@@ -682,18 +1087,22 @@ export default function FoodBill() {
               </span>
             </div>
 
-            {/* Quick Cards Grid */}
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-              {loadingCustomers ? (
-                Array.from({ length: 3 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-[72px] animate-pulse rounded-xl border border-gray-100 bg-gray-50"
-                  />
-                ))
-              ) : filteredCustomers.length === 0 ? (
+            {/* Quick Cards Grid — filtered via useMemo on each key; API only after pause */}
+            <div
+              className={`grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 ${
+                loadingCustomers &&
+                customerSearch.trim() !== debouncedCustomerSearch
+                  ? "opacity-80"
+                  : ""
+              }`}
+            >
+              {filteredCustomers.length === 0 ? (
                 <div className="col-span-full rounded-xl border border-dashed border-gray-200 px-3 py-6 text-center text-xs text-gray-500">
-                  No customers found. Add a new customer to continue.
+                  {!customerSearch.trim()
+                    ? "Search by name or mobile to find a customer. Walk-in stays selected by default."
+                    : loadingCustomers
+                      ? "Looking up customers…"
+                      : "No customers found. Add a new customer to continue."}
                 </div>
               ) : (
                 filteredCustomers.map((cust) => {
@@ -709,7 +1118,7 @@ export default function FoodBill() {
                   return (
                     <div
                       key={cust.id}
-                      onClick={() => setSelectedCustomerId(cust.id)}
+                      onClick={() => handleSelectCustomer(cust)}
                       className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition duration-150 ${
                         isSelected
                           ? "border-blue-500 bg-blue-50/50 shadow-2xs"
@@ -738,17 +1147,32 @@ export default function FoodBill() {
                         <p className="truncate text-[11px] text-gray-500">
                           {cust.phone || "No phone linked"}
                         </p>
-                        <span
-                          className={`mt-1 inline-block rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none ${
-                            cust.tier === "Gold"
-                              ? "border border-amber-100 bg-amber-50 text-amber-600"
-                              : cust.tier === "Silver"
-                                ? "border border-slate-200 bg-slate-100 text-slate-600"
-                                : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {cust.tier}
-                        </span>
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                          <span
+                            className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none ${
+                              cust.tier === "Gold"
+                                ? "border border-amber-100 bg-amber-50 text-amber-600"
+                                : cust.tier === "Silver"
+                                  ? "border border-slate-200 bg-slate-100 text-slate-600"
+                                  : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {cust.tier}
+                          </span>
+                          {cust.referredBy ? (
+                            <span className="inline-block rounded-md border border-green-100 bg-green-50 px-1.5 py-0.5 text-[10px] font-medium leading-none text-green-700">
+                              Referred
+                            </span>
+                          ) : null}
+                          {cust.referralCode ? (
+                            <span
+                              className="inline-block rounded-md border border-indigo-100 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium leading-none text-indigo-700"
+                              title="Customer's own share code (not applied as discount)"
+                            >
+                              {cust.referralCode}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   );
@@ -870,17 +1294,31 @@ export default function FoodBill() {
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => addToCart(food)}
-                          className={`cursor-pointer rounded-lg border px-4 py-1.5 text-xs font-bold transition ${
-                            isInCart
-                              ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
-                              : "border-blue-200 bg-blue-50/40 text-blue-600 hover:bg-blue-50"
-                          }`}
-                        >
-                          {isInCart ? "Add +" : "Add"}
-                        </button>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <button
+                            type="button"
+                            title="Edit food item"
+                            aria-label={`Edit ${food.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditFood(food);
+                            }}
+                            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-blue-200 bg-blue-50/40 text-blue-600 transition hover:bg-blue-50"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addToCart(food)}
+                            className={`cursor-pointer rounded-lg border px-4 py-1.5 text-xs font-bold transition ${
+                              isInCart
+                                ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
+                                : "border-blue-200 bg-blue-50/40 text-blue-600 hover:bg-blue-50"
+                            }`}
+                          >
+                            {isInCart ? "Add +" : "Add"}
+                          </button>
+                        </div>
                       </div>
                     );
                   })
@@ -1047,6 +1485,35 @@ export default function FoodBill() {
                     </span>
                   </div>
                 </div>
+                {selectedCustomer.id !== WALK_IN_CUSTOMER.id ? (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-2.5 py-2 space-y-1">
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-violet-600">
+                        Referral Discount
+                        {loadingReferral ? " …" : ""}
+                      </span>
+                      <span className="text-xs font-semibold text-green-600">
+                        -₹{Number(referralDiscount || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    {referralDiscount > 0 ? (
+                      <p className="text-[10px] text-violet-700">
+                        {referralLabel}
+                        {referralCodeApplied
+                          ? ` · Code ${referralCodeApplied}`
+                          : ""}
+                        {referralInviterName
+                          ? ` · referred by ${referralInviterName}`
+                          : ""}
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-violet-500">
+                        {referralStatusMessage ||
+                          "Select customer — discount auto-applies if they were referred."}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
                 <div className="flex justify-between text-gray-500">
                   <span>Tax (5%)</span>
                   <span className="font-semibold text-gray-850">
@@ -1089,7 +1556,10 @@ export default function FoodBill() {
                     </div>
                   </div>
                   <button
-                    onClick={() => setSelectedCustomerId("c3")} // switch back to Walk-in
+                    onClick={() => {
+                      setSelectedCustomerId(WALK_IN_CUSTOMER.id);
+                      clearReferralDiscount();
+                    }}
                     className="rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-gray-500 hover:bg-gray-100 border border-gray-200 transition cursor-pointer"
                   >
                     Remove
@@ -1166,11 +1636,12 @@ export default function FoodBill() {
             {/* Bottom Billing Actions */}
             <div className="mt-5 pt-3 border-t border-gray-100 space-y-2">
               <button
-                onClick={handleGenerateBill}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition cursor-pointer"
+                onClick={() => void handleGenerateBill()}
+                disabled={savingBill || cart.length === 0}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <FileText size={15} />
-                Generate Bill
+                {savingBill ? "Saving Invoice…" : "Generate Bill"}
               </button>
 
               <div className="grid grid-cols-2 gap-2">
@@ -1275,6 +1746,18 @@ export default function FoodBill() {
           onSubmit={handleCreateCustomerSubmit}
         />
       ) : null}
+
+      <AddFoodModal
+        open={showEditFoodModal}
+        loading={savingFood}
+        initialFood={editingFood}
+        onClose={() => {
+          if (savingFood) return;
+          setShowEditFoodModal(false);
+          setEditingFood(null);
+        }}
+        onSubmit={handleUpdateFoodSubmit}
+      />
 
       {/* RECENT BILLS SIDEBAR DRAWER */}
       {showRecentBillsDrawer && (

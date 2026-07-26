@@ -1215,9 +1215,50 @@ export type VendorPayload = {
   gstin?: string;
   companyName?: string;
   address?: string;
+  billingAddress1?: string;
+  billingAddress2?: string;
+  pincode?: string;
   city?: string;
   state?: string;
   country?: string;
+  openingBalance?: number;
+  debitLimit?: number;
+  defaultDueDays?: number;
+  closingBalance?: number;
+  netBalance?: number;
+  notes?: string;
+  adharNumber?: string;
+  dob?: string;
+  gender?: string;
+  whatsappNumber?: string;
+  AlternateMobile?: string;
+  IFSCcode?: string;
+  bankName?: string;
+  branchName?: string;
+  accountNumber?: string;
+  panNumber?: string;
+  accountHolderName?: string;
+  UPIID?: string;
+};
+
+export type VendorImportRow = {
+  name: string;
+  mobile: string;
+  email?: string;
+  companyName?: string;
+  gstin?: string;
+  billingAddress1?: string;
+  billingAddress2?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  country?: string;
+  openingBalance?: number;
+  debitLimit?: number;
+  defaultDueDays?: number;
+  netBalance?: number;
+  closingBalance?: number;
+  notes?: string;
 };
 
 export const handleGetVendors = async (signal?: AbortSignal) => {
@@ -1242,6 +1283,11 @@ export const handleUpdateVendor = async (id: string, payload: Partial<VendorPayl
 
 export const handleDeleteVendor = async (id: string) => {
   const response = await axiosInstance.delete(`/vendor/${id}`);
+  return response.data;
+};
+
+export const handleImportVendors = async (vendors: VendorImportRow[]) => {
+  const response = await axiosInstance.post("/vendor/import", { vendors });
   return response.data;
 };
 export const handleGetProducts = async (search = "", signal?: AbortSignal) => {

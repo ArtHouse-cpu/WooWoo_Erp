@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 
-
 const vendorSchema = new mongoose.Schema(
   {
     name: {
@@ -59,6 +58,7 @@ const vendorSchema = new mongoose.Schema(
       enum: ["Male", "Female", "Other", ""],
       default: "",
     },
+
     whatsappNumber: {
       type: String,
       default: "",
@@ -70,7 +70,21 @@ const vendorSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+
+    // Legacy single-line address (kept for older UI)
     address: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    // Excel import / billing address split
+    billingAddress1: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    billingAddress2: {
       type: String,
       default: "",
       trim: true,
@@ -99,6 +113,35 @@ const vendorSchema = new mongoose.Schema(
       default: "India",
       trim: true,
     },
+
+    // Financial fields from Excel (Zoho/Tally style exports)
+    openingBalance: {
+      type: Number,
+      default: 0,
+    },
+    debitLimit: {
+      type: Number,
+      default: 0,
+    },
+    /** Due days from Excel "Default Due Date" (often -1 / 0 / N days) */
+    defaultDueDays: {
+      type: Number,
+      default: -1,
+    },
+    closingBalance: {
+      type: Number,
+      default: 0,
+    },
+    netBalance: {
+      type: Number,
+      default: 0,
+    },
+    notes: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     bankName: {
       type: String,
       default: "",
@@ -135,6 +178,7 @@ const vendorSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+
     isActive: {
       type: Boolean,
       default: true,
@@ -142,11 +186,13 @@ const vendorSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 vendorSchema.index({ name: 1 });
 vendorSchema.index({ mobile: 1 }, { unique: true });
+vendorSchema.index({ companyName: 1 });
+vendorSchema.index({ email: 1 });
 
 const Vendor = mongoose.model("Vendor", vendorSchema);
 

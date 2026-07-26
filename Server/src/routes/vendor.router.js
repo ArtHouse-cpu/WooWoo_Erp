@@ -8,6 +8,7 @@ import {
   getVendorById,
   deleteVendor,
   updateVendor,
+  importVendors,
 } from '../controllers/vendor.controller.js';
 
 const router = express.Router();
@@ -15,6 +16,11 @@ const router = express.Router();
 router.use(authenticateUser, attachStaffContext);
 
 router.post('/', requirePermission(PERMISSIONS.VENDOR_CREATE), createVendor);
+router.post(
+  '/import',
+  requirePermission(PERMISSIONS.VENDOR_CREATE),
+  importVendors,
+);
 router.get('/', requirePermission(PERMISSIONS.VENDOR_READ), getVendors);
 router.get('/:id', requirePermission(PERMISSIONS.VENDOR_READ), getVendorById);
 router.delete('/:id', requirePermission(PERMISSIONS.VENDOR_DELETE), deleteVendor);
