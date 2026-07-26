@@ -10,6 +10,7 @@ import {
   SlidersHorizontal,
   UserPlus,
   Users,
+  Utensils
 } from "lucide-react";
 import { axiosInstance } from "@/services/axiosInstance";
 import { usePermission } from "@/hooks/usePermission";
@@ -197,49 +198,61 @@ export default function HomeScreen() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5 font-sans">
       {/* Quick actions */}
-      <section className="grid grid-cols-3 gap-2.5 sm:gap-3 md:gap-4">
-        <button
-          type="button"
-          onClick={() => navigate(quickBillPath)}
-          className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-2 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:py-5"
-        >
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#2F6FED] sm:h-14 sm:w-14">
-            <FilePlus2 size={24} />
-          </span>
-          <span className="text-center text-xs font-semibold text-gray-800 sm:text-sm">
-            Quick Bill
-          </span>
-        </button>
+     <section className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+  <button
+    type="button"
+    onClick={() => navigate("/foodBill")}
+    className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+  >
+    <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-blue-50 text-[#2F6FED]">
+      <Utensils size={20} className="sm:w-6 sm:h-6" />
+    </span>
+    <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
+      Food Bill
+    </span>
+  </button>
 
-        <button
-          type="button"
-          onClick={() => navigate("/customers")}
-          className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-2 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:py-5"
-        >
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 sm:h-14 sm:w-14">
-            <UserPlus size={24} />
-          </span>
-          <span className="text-center text-xs font-semibold text-gray-800 sm:text-sm">
-            Add Customer
-          </span>
-        </button>
+  <button
+    type="button"
+    onClick={() => navigate(quickBillPath)}
+    className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+  >
+    <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-blue-50 text-[#2F6FED]">
+      <FilePlus2 size={20} className="sm:w-6 sm:h-6" />
+    </span>
+    <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
+      Quick Bill
+    </span>
+  </button>
 
-        <button
-          type="button"
-          onClick={() =>
-            navigate(canPath("/membership") ? "/membership" : "/manage-plans")
-          }
-          className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-gray-200 bg-white px-2 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:py-5"
-        >
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 sm:h-14 sm:w-14">
-            <Crown size={24} />
-          </span>
-          <span className="text-center text-[11px] font-semibold leading-tight text-gray-800 sm:text-sm">
-            Activate Membership
-          </span>
-        </button>
-      </section>
+  <button
+    type="button"
+    onClick={() => navigate("/customers")}
+    className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+  >
+    <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+      <UserPlus size={20} className="sm:w-6 sm:h-6" />
+    </span>
+    <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
+      Add Customer
+    </span>
+  </button>
 
+  <button
+    type="button"
+    onClick={() =>
+      navigate(canPath("/membership") ? "/membership" : "/manage-plans")
+    }
+    className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+  >
+    <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
+      <Crown size={20} className="sm:w-6 sm:h-6" />
+    </span>
+    <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
+      Activate Membership
+    </span>
+  </button>
+</section>
       {/* Search + filters */}
       <section className="space-y-3">
         <div className="flex items-center gap-3 rounded-full border border-gray-200 bg-white px-4 py-3 shadow-sm">

@@ -828,6 +828,7 @@ export type MembershipPlanPayload = {
     cashbackPercent?: number;
     storeDiscountPercent?: number;
     spaceDiscountPercent?: number;
+    foodDiscountPercent?: number;
     features?: Array<{ label: string; was?: number }>;
   };
   createdBy?: {

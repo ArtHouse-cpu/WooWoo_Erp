@@ -94,9 +94,13 @@ export const formatCustomerMembershipPlan = membership => {
     Number(display.spaceDiscountPercent ?? 0) ||
     findUsageLimitValue(usageLimits, ['space', 'booking'], 'discount');
 
+  const foodDiscount =
+    Number(display.foodDiscountPercent ?? 0) ||
+    findUsageLimitValue(usageLimits, ['food', 'meal', 'canteen'], 'discount');
+
   const cashbackPercent =
     Number(display.cashbackPercent ?? 0) ||
-    findUsageLimitValue(usageLimits, ['store', 'product', 'general', 'space'], 'cashback');
+    findUsageLimitValue(usageLimits, ['store', 'product', 'general', 'space', 'food'], 'cashback');
 
   const features = Array.isArray(display.features) && display.features.length
     ? display.features.map(item => ({
@@ -127,6 +131,9 @@ export const formatCustomerMembershipPlan = membership => {
     discounts: [
       ...(storeDiscount > 0
         ? [{icon: 'store', label: `Store ${storeDiscount}%`}]
+        : []),
+      ...(foodDiscount > 0
+        ? [{icon: 'food', label: `Food ${foodDiscount}%`}]
         : []),
       ...(spaceDiscount > 0
         ? [{icon: 'space', label: `Space ${spaceDiscount}%`}]

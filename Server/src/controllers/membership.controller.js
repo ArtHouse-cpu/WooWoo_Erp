@@ -9,6 +9,7 @@ const normalizeCustomerDisplay = (input = {}) => ({
   cashbackPercent: Math.max(0, Number(input.cashbackPercent ?? 0)),
   storeDiscountPercent: Math.max(0, Number(input.storeDiscountPercent ?? 0)),
   spaceDiscountPercent: Math.max(0, Number(input.spaceDiscountPercent ?? 0)),
+  foodDiscountPercent: Math.max(0, Number(input.foodDiscountPercent ?? 0)),
   features: Array.isArray(input.features)
     ? input.features
         .map(item => ({

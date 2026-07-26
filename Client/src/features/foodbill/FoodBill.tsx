@@ -25,8 +25,10 @@ import {
   ChevronRight,
   UserPlus,
   UtensilsCrossed,
+  Wallet,
   X,
   History,
+  Tag,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
@@ -43,11 +45,28 @@ import {
   handleCreateInvoice,
   handleGetCustomers,
   handleGetFoods,
+  handleGetMemberships,
+  handleGetWalletById,
   handleUpdateFood,
+  handleValidateCoupon,
   handleValidateReferralDiscount,
   type CustomerPayload,
   type FoodPayload,
+  type MembershipPlanPayload,
 } from "@/services/apiClient";
+import {
+  getUsageLimitForCategory,
+  summarizeMembershipForCart,
+} from "@/features/sales/utils/membershipInvoiceUtils";
+
+type SplitPayments = {
+  cash: number;
+  upi: number;
+  card: number;
+  wallet: number;
+};
+
+type SplitKey = keyof SplitPayments;
 
 // Types
 interface Category {
@@ -133,6 +152,7 @@ interface Customer {
   tier: "Silver" | "Gold" | "New Customer" | string;
   points?: number;
   membershipType?: string;
+  membershipPlanId?: string | null;
   /** Customer's own share code (e.g. W9454ZZ5P) — not used as checkout discount code */
   referralCode?: string;
   referredBy?: string;
@@ -145,6 +165,7 @@ const WALK_IN_CUSTOMER: Customer = {
   tier: "New Customer",
   points: 0,
   membershipType: "none",
+  membershipPlanId: null,
 };
 
 function toInvoicePaymentMode(method: string) {
@@ -181,6 +202,11 @@ function mapApiCustomer(raw: any): Customer | null {
   const name = String(raw?.name || "").trim();
   if (!id || !name) return null;
   const membershipType = String(raw?.membershipType || "none");
+  const membershipPlanId = raw?.membershipPlanId
+    ? String(
+        raw.membershipPlanId._id || raw.membershipPlanId.id || raw.membershipPlanId,
+      ).trim()
+    : null;
   const ownCode = String(raw?.referralCode || raw?.referral?.code || "")
     .trim()
     .toUpperCase();
@@ -193,6 +219,7 @@ function mapApiCustomer(raw: any): Customer | null {
     phone: String(raw?.mobile || raw?.phone || "").trim(),
     tier: mapMembershipTier(membershipType),
     membershipType,
+    membershipPlanId: membershipPlanId || null,
     points: Number(raw?.walletAmount ?? raw?.points ?? 0) || 0,
     referralCode: ownCode || undefined,
     referredBy: referredBy || undefined,
@@ -249,12 +276,31 @@ export default function FoodBill() {
   const [manualDiscount, setManualDiscount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
   const [amountReceived, setAmountReceived] = useState<string>("0");
+  const [isMultiMode, setIsMultiMode] = useState(false);
+  const [splitPayments, setSplitPayments] = useState<SplitPayments>({
+    cash: 0,
+    upi: 0,
+    card: 0,
+    wallet: 0,
+  });
+  const [walletBalance, setWalletBalance] = useState(0);
   const [billNote, setBillNote] = useState<string>("");
   const [savingBill, setSavingBill] = useState(false);
+  const [membershipPlans, setMembershipPlans] = useState<
+    MembershipPlanPayload[]
+  >([]);
 
-  // Referral discount (same API as invoice CheckoutModal)
+  // Promo codes (coupon OR referral — same APIs as invoice CheckoutModal)
+  const [promoCodeInput, setPromoCodeInput] = useState("");
+  const [promoType, setPromoType] = useState<"coupon" | "referral">("coupon");
+  const [loadingPromo, setLoadingPromo] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponLabel, setCouponLabel] = useState("");
+  // Referral discount (auto from referredBy + optional manual code)
   const [referralDiscount, setReferralDiscount] = useState(0);
   const [referralCodeApplied, setReferralCodeApplied] = useState("");
+  const [referralCodeInput, setReferralCodeInput] = useState("");
   const [referralInviterName, setReferralInviterName] = useState("");
   const [referralLabel, setReferralLabel] = useState("Referral Discount");
   const [referralStatusMessage, setReferralStatusMessage] = useState("");
@@ -274,9 +320,16 @@ export default function FoodBill() {
   const clearReferralDiscount = () => {
     setReferralDiscount(0);
     setReferralCodeApplied("");
+    setReferralCodeInput("");
     setReferralInviterName("");
     setReferralLabel("Referral Discount");
     setReferralStatusMessage("");
+  };
+
+  const clearCouponDiscount = () => {
+    setCouponCode("");
+    setCouponDiscount(0);
+    setCouponLabel("");
   };
 
   const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
@@ -320,13 +373,21 @@ export default function FoodBill() {
   // Remote search only when user pauses typing for 300ms (skip empty query)
   useEffect(() => {
     if (!debouncedCustomerSearch) {
-      setCustomers([WALK_IN_CUSTOMER]);
+      // Keep selected customer pinned when search is cleared
+      setCustomers((prev) => {
+        const selected = prev.find(
+          (c) =>
+            c.id === selectedCustomerId && c.id !== WALK_IN_CUSTOMER.id,
+        );
+        return selected ? [selected, WALK_IN_CUSTOMER] : [WALK_IN_CUSTOMER];
+      });
       setLoadingCustomers(false);
       return;
     }
     const controller = new AbortController();
     void fetchCustomers(debouncedCustomerSearch, controller.signal);
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedCustomerSearch]);
 
   const fetchFoods = async (searchText = "", signal?: AbortSignal) => {
@@ -356,6 +417,15 @@ export default function FoodBill() {
     void fetchFoods(debouncedItemSearch, controller.signal);
     return () => controller.abort();
   }, [debouncedItemSearch]);
+
+  // Active membership plans (Food usage-limit discounts)
+  useEffect(() => {
+    const controller = new AbortController();
+    handleGetMemberships({ status: "Active" }, controller.signal)
+      .then((res) => setMembershipPlans(res?.memberships || []))
+      .catch(() => setMembershipPlans([]));
+    return () => controller.abort();
+  }, []);
 
   // Selected Customer details helper
   const selectedCustomer = useMemo(() => {
@@ -403,6 +473,17 @@ export default function FoodBill() {
       })
       .slice(0, 6);
   }, [customers, deferredCustomerSearch]);
+
+  // On select: hide all other customer cards — only selected remains
+  const visibleCustomers = useMemo(() => {
+    if (selectedCustomerId !== WALK_IN_CUSTOMER.id) {
+      const selected =
+        customers.find((c) => c.id === selectedCustomerId) ||
+        filteredCustomers.find((c) => c.id === selectedCustomerId);
+      return selected ? [selected] : [];
+    }
+    return filteredCustomers;
+  }, [selectedCustomerId, customers, filteredCustomers]);
 
   const handleCreateCustomerSubmit = async (args: {
     payload: CustomerPayload;
@@ -558,19 +639,63 @@ export default function FoodBill() {
     setCart((prev) => prev.filter((i) => i.item.id !== itemId));
   };
 
-  // Pricing calculations (referral applied after tax, same pattern as invoice checkout)
+  // Pricing calculations (membership → tax → coupon/referral)
   const subtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.item.price * item.quantity, 0);
   }, [cart]);
 
+  const membershipSummary = useMemo(() => {
+    if (
+      selectedCustomer.id === WALK_IN_CUSTOMER.id ||
+      !selectedCustomer.membershipType ||
+      selectedCustomer.membershipType === "none"
+    ) {
+      return {
+        membershipDiscount: 0,
+        cashbackTotal: 0,
+        plan: undefined as MembershipPlanPayload | undefined,
+      };
+    }
+    return summarizeMembershipForCart(
+      membershipPlans,
+      selectedCustomer.membershipType,
+      selectedCustomer.membershipPlanId,
+      cart.map((line) => ({
+        price: line.item.price,
+        qty: line.quantity,
+        // Use Food so plan usageLimits.Food applies (also matches food item categories)
+        category: "Food",
+      })),
+    );
+  }, [
+    membershipPlans,
+    selectedCustomer.id,
+    selectedCustomer.membershipType,
+    selectedCustomer.membershipPlanId,
+    cart,
+  ]);
+
+  const membershipDiscount = Number(
+    membershipSummary.membershipDiscount || 0,
+  );
+  const membershipCashback = Number(membershipSummary.cashbackTotal || 0);
+  const membershipPlan = membershipSummary.plan;
+  const membershipDiscountPercent = Number(
+    getUsageLimitForCategory(membershipPlan?.usageLimits, "Food")?.discount ||
+      0,
+  );
+
   const tax = useMemo(() => {
-    const taxableAmount = Math.max(0, subtotal - manualDiscount);
+    const taxableAmount = Math.max(
+      0,
+      subtotal - manualDiscount - membershipDiscount,
+    );
     return Math.round(taxableAmount * 0.05 * 100) / 100; // 5% tax
-  }, [subtotal, manualDiscount]);
+  }, [subtotal, manualDiscount, membershipDiscount]);
 
   const totalBeforeRound = useMemo(() => {
-    return Math.max(0, subtotal - manualDiscount) + tax;
-  }, [subtotal, manualDiscount, tax]);
+    return Math.max(0, subtotal - manualDiscount - membershipDiscount) + tax;
+  }, [subtotal, manualDiscount, membershipDiscount, tax]);
 
   const roundedBeforeReferral = useMemo(() => {
     return Math.round(totalBeforeRound);
@@ -582,8 +707,13 @@ export default function FoodBill() {
   }, [roundedBeforeReferral, totalBeforeRound]);
 
   const grandTotal = useMemo(() => {
-    return Math.max(0, roundedBeforeReferral - Number(referralDiscount || 0));
-  }, [roundedBeforeReferral, referralDiscount]);
+    return Math.max(
+      0,
+      roundedBeforeReferral -
+        Number(couponDiscount || 0) -
+        Number(referralDiscount || 0),
+    );
+  }, [roundedBeforeReferral, couponDiscount, referralDiscount]);
 
   // Loyalty calculations
   const loyaltyPointsEarned = useMemo(() => {
@@ -591,42 +721,102 @@ export default function FoodBill() {
     return Math.max(1, Math.floor(grandTotal / 100));
   }, [selectedCustomer, grandTotal]);
 
-  // Change computation
+  const setSplitAmount = (mode: SplitKey, value: number) => {
+    setSplitPayments((prev) => ({
+      ...prev,
+      [mode]: Math.max(0, Number(value) || 0),
+    }));
+  };
+
+  const splitTotalPaid = useMemo(
+    () =>
+      Number(splitPayments.cash || 0) +
+      Number(splitPayments.upi || 0) +
+      Number(splitPayments.card || 0) +
+      Number(splitPayments.wallet || 0),
+    [splitPayments],
+  );
+
+  const totalPaidDisplay = useMemo(() => {
+    if (isMultiMode) return splitTotalPaid;
+    if (paymentMethod === "Cash") {
+      return Math.max(Number(amountReceived) || 0, 0);
+    }
+    return grandTotal;
+  }, [isMultiMode, splitTotalPaid, paymentMethod, amountReceived, grandTotal]);
+
+  const remainingForFull = useMemo(
+    () =>
+      Math.max(
+        0,
+        grandTotal - (isMultiMode ? splitTotalPaid : totalPaidDisplay),
+      ),
+    [grandTotal, isMultiMode, splitTotalPaid, totalPaidDisplay],
+  );
+
+  // Change computation (single cash or split overpay)
   const changeAmount = useMemo(() => {
+    if (isMultiMode) {
+      return Math.max(0, splitTotalPaid - grandTotal);
+    }
     const receivedNum = parseFloat(amountReceived) || 0;
     return Math.max(0, receivedNum - grandTotal);
-  }, [amountReceived, grandTotal]);
+  }, [isMultiMode, splitTotalPaid, amountReceived, grandTotal]);
+
+  // Keep single-mode cash amount in sync with payable when total changes
+  useEffect(() => {
+    if (isMultiMode) return;
+    if (paymentMethod === "Cash") {
+      setAmountReceived(String(grandTotal));
+    }
+  }, [grandTotal, paymentMethod, isMultiMode]);
+
+  // When enabling split, seed remaining into cash if nothing allocated yet
+  useEffect(() => {
+    if (!isMultiMode) return;
+    setSplitPayments((prev) => {
+      const allocated = prev.cash + prev.upi + prev.card + prev.wallet;
+      if (allocated > 0) return prev;
+      return { cash: grandTotal, upi: 0, card: 0, wallet: 0 };
+    });
+  }, [isMultiMode, grandTotal]);
 
   const applyReferralDiscount = async (opts?: {
     customer?: Customer;
+    referralCode?: string;
   }): Promise<ReferralApplyResult | null> => {
     const customer = opts?.customer ?? selectedCustomer;
     const isWalkIn = customer.id === WALK_IN_CUSTOMER.id;
-    // Same order amount basis as invoice checkout (before referral)
-    const orderAmount = Math.max(0, subtotal - manualDiscount);
+    const manualCode = String(opts?.referralCode ?? referralCodeInput ?? "")
+      .trim()
+      .toUpperCase();
+    // Same as invoice: amount after coupon, before referral
+    const orderAmount = Math.max(
+      0,
+      roundedBeforeReferral - Number(couponDiscount || 0),
+    );
 
-    if (isWalkIn || !customer.phone) {
+    if ((isWalkIn || !customer.phone) && !manualCode) {
       clearReferralDiscount();
       return null;
     }
 
-    // Need cart amount > 0 — same as validate API (orderAmount must be > 0)
     if (orderAmount <= 0 || cart.length === 0) {
-      clearReferralDiscount();
+      if (!manualCode) clearReferralDiscount();
       setReferralStatusMessage(
-        "Add food items to auto-apply referral discount for this customer.",
+        "Add food items to apply referral / coupon discount.",
       );
       return null;
     }
 
     setLoadingReferral(true);
     try {
-      // Same as invoice CheckoutModal handleSelectCustomer:
-      // omit referralCode so server uses buyer.referredBy.
-      // Inviter code (e.g. W9454ZZ5P) is returned in the response.
       const response = await handleValidateReferralDiscount({
-        customerId: customer.id,
-        customerPhone: customer.phone,
+        ...(customer.id !== WALK_IN_CUSTOMER.id
+          ? { customerId: customer.id }
+          : {}),
+        ...(customer.phone ? { customerPhone: customer.phone } : {}),
+        ...(manualCode ? { referralCode: manualCode } : {}),
         orderAmount,
         items: cart.map((line) => ({
           productName: line.item.name,
@@ -650,7 +840,7 @@ export default function FoodBill() {
       }
 
       const discountAmt = Number(data.discountAmount || 0);
-      const code = String(data.referralCode || "")
+      const code = String(data.referralCode || manualCode || "")
         .trim()
         .toUpperCase();
       const label = String(data.label || "Referral Discount");
@@ -667,6 +857,7 @@ export default function FoodBill() {
       setReferralDiscount(discountAmt);
       setReferralLabel(label);
       setReferralCodeApplied(code);
+      if (code) setReferralCodeInput(code);
       setReferralInviterName(inviterName);
       setReferralStatusMessage(message);
 
@@ -690,14 +881,158 @@ export default function FoodBill() {
     }
   };
 
+  /** Apply coupon or referral from shared promo input in order summary */
+  const handleApplyPromoCode = async () => {
+    const code = promoCodeInput.trim().toUpperCase();
+    if (!code) {
+      Swal.fire("Code required", "Enter a coupon or referral code.", "warning");
+      return;
+    }
+    if (cart.length === 0) {
+      Swal.fire(
+        "Cart empty",
+        "Add food items before applying a discount code.",
+        "warning",
+      );
+      return;
+    }
+
+    setLoadingPromo(true);
+    try {
+      if (promoType === "coupon") {
+        const response = await handleValidateCoupon({
+          code,
+          orderAmount: Math.max(0, roundedBeforeReferral),
+          customerPhone: selectedCustomer.phone || undefined,
+        });
+        const discount = Number(response?.discountAmount ?? 0);
+        if (discount <= 0) {
+          clearCouponDiscount();
+          Swal.fire(
+            "Invalid coupon",
+            "Coupon did not apply a discount.",
+            "error",
+          );
+          return;
+        }
+        setCouponDiscount(discount);
+        setCouponCode(code);
+        setCouponLabel(
+          String(
+            response?.coupon?.title ?? response?.title ?? "Coupon Applied",
+          ),
+        );
+        setPromoCodeInput(code);
+        void applyReferralDiscount({
+          referralCode: referralCodeInput || referralCodeApplied || "",
+        });
+        await Swal.fire({
+          icon: "success",
+          title: "Coupon applied",
+          text: `${code}: −₹${discount.toFixed(2)}`,
+          timer: 1600,
+          showConfirmButton: false,
+        });
+        return;
+      }
+
+      if (
+        selectedCustomer.id === WALK_IN_CUSTOMER.id ||
+        !selectedCustomer.phone
+      ) {
+        Swal.fire(
+          "Customer required",
+          "Select a customer before applying a referral code.",
+          "warning",
+        );
+        return;
+      }
+
+      setReferralCodeInput(code);
+      setPromoCodeInput(code);
+      const result = await applyReferralDiscount({ referralCode: code });
+      if (result && (result.discountAmount > 0 || result.code)) {
+        await Swal.fire({
+          icon: "success",
+          title: "Referral applied",
+          text:
+            result.discountAmount > 0
+              ? `${result.code || code}: −₹${result.discountAmount.toFixed(2)}`
+              : result.message || "Referral code verified.",
+          timer: 1800,
+          showConfirmButton: false,
+        });
+      } else {
+        Swal.fire(
+          "Referral not applied",
+          "Could not apply this referral code.",
+          "info",
+        );
+      }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      if (promoType === "coupon") {
+        clearCouponDiscount();
+        Swal.fire(
+          "Invalid coupon",
+          err?.response?.data?.message || "Coupon code is not valid.",
+          "error",
+        );
+      } else {
+        Swal.fire(
+          "Referral failed",
+          err?.response?.data?.message || "Referral code is not valid.",
+          "error",
+        );
+      }
+    } finally {
+      setLoadingPromo(false);
+    }
+  };
+
   /** Same as invoice CheckoutModal — apply referral as soon as customer is picked */
   const handleSelectCustomer = (cust: Customer) => {
     setSelectedCustomerId(cust.id);
     if (cust.id === WALK_IN_CUSTOMER.id) {
       clearReferralDiscount();
+      setWalletBalance(0);
       return;
     }
+    // Pin selected customer so other search results hide cleanly
+    setCustomers((prev) => [
+      cust,
+      ...prev.filter(
+        (c) => c.id !== cust.id && c.id !== WALK_IN_CUSTOMER.id,
+      ),
+      WALK_IN_CUSTOMER,
+    ]);
+    setWalletBalance(Number(cust.points || 0) || 0);
     void applyReferralDiscount({ customer: cust });
+
+    // Refresh wallet balance (needed for split / wallet payment)
+    const customerId = String(cust.id || "").trim();
+    if (!customerId) return;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await handleGetWalletById(
+          customerId,
+          controller.signal,
+        );
+        const wallet = response?.wallet ?? response?.data ?? response ?? null;
+        const amount = Number(
+          wallet?.walletAmount ??
+            wallet?.balance ??
+            wallet?.currentBalance ??
+            wallet?.availableBalance ??
+            cust.points ??
+            0,
+        );
+        if (Number.isFinite(amount)) setWalletBalance(Math.max(0, amount));
+      } catch {
+        setWalletBalance(Number(cust.points || 0) || 0);
+      }
+    })();
   };
 
   // Re-apply when cart / discount changes for the selected customer
@@ -745,11 +1080,49 @@ export default function FoodBill() {
       minute: "2-digit",
     });
     const today = new Date().toISOString().split("T")[0];
-    const paid =
-      paymentMethod === "Cash"
+
+    // Validate wallet usage before confirm
+    const walletUsed = isMultiMode
+      ? Number(splitPayments.wallet || 0)
+      : paymentMethod === "Wallet"
+        ? grandTotal
+        : 0;
+    if (walletUsed > walletBalance + 0.001) {
+      Swal.fire(
+        "Wallet amount exceeded",
+        `Wallet payment (₹${walletUsed.toFixed(2)}) cannot exceed balance (₹${walletBalance.toFixed(2)}).`,
+        "warning",
+      );
+      return;
+    }
+    if (
+      (paymentMethod === "Wallet" || (isMultiMode && walletUsed > 0)) &&
+      selectedCustomer.id === WALK_IN_CUSTOMER.id
+    ) {
+      Swal.fire(
+        "Customer required",
+        "Select a customer before using wallet payment.",
+        "warning",
+      );
+      return;
+    }
+    if (isMultiMode && remainingForFull > 0.001) {
+      Swal.fire(
+        "Payment incomplete",
+        `Allocate the full amount. Remaining: ₹${remainingForFull.toFixed(2)}`,
+        "warning",
+      );
+      return;
+    }
+
+    const previewPaid = isMultiMode
+      ? splitTotalPaid
+      : paymentMethod === "Cash"
         ? Math.max(Number(amountReceived) || grandTotal, grandTotal)
         : grandTotal;
-    const mode = toInvoicePaymentMode(paymentMethod);
+    const paymentLabel = isMultiMode
+      ? `Split (C:${splitPayments.cash}/U:${splitPayments.upi}/Card:${splitPayments.card}/W:${splitPayments.wallet})`
+      : paymentMethod;
 
     const confirm = await Swal.fire({
       title: "Confirm Bill Generation",
@@ -778,6 +1151,16 @@ export default function FoodBill() {
             <div class="flex justify-between"><span class="text-gray-500">Subtotal:</span><span class="text-gray-900">₹${subtotal.toFixed(2)}</span></div>
             <div class="flex justify-between"><span class="text-gray-500">Discount:</span><span class="text-green-600">-₹${manualDiscount.toFixed(2)}</span></div>
             ${
+              membershipDiscount > 0
+                ? `<div class="flex justify-between"><span class="text-gray-500">Membership${membershipDiscountPercent > 0 ? ` (${membershipDiscountPercent}%)` : ""}${membershipPlan?.displayName ? ` · ${membershipPlan.displayName}` : ""}:</span><span class="text-green-600">-₹${membershipDiscount.toFixed(2)}</span></div>`
+                : ""
+            }
+            ${
+              couponDiscount > 0
+                ? `<div class="flex justify-between"><span class="text-gray-500">${couponLabel || "Coupon"}${couponCode ? ` (${couponCode})` : ""}:</span><span class="text-green-600">-₹${couponDiscount.toFixed(2)}</span></div>`
+                : ""
+            }
+            ${
               referralDiscount > 0
                 ? `<div class="flex justify-between"><span class="text-gray-500">${referralLabel}${referralCodeApplied ? ` (${referralCodeApplied})` : ""}:</span><span class="text-green-600">-₹${referralDiscount.toFixed(2)}</span></div>`
                 : ""
@@ -788,8 +1171,8 @@ export default function FoodBill() {
               <span class="text-blue-600">₹${grandTotal.toFixed(2)}</span>
             </div>
             <div class="flex justify-between text-xs mt-2 text-gray-600 pt-1 border-t border-gray-100">
-              <span>Paid via ${paymentMethod}:</span>
-              <span>₹${paid.toFixed(2)}</span>
+              <span>Paid via ${paymentLabel}:</span>
+              <span>₹${previewPaid.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -807,7 +1190,9 @@ export default function FoodBill() {
     try {
       setSavingBill(true);
       // Refresh referral once more before save; use returned values (avoid stale state)
-      const referral = await applyReferralDiscount();
+      const referral = await applyReferralDiscount({
+        referralCode: referralCodeInput || referralCodeApplied || "",
+      });
       const appliedReferralDiscount = Number(
         referral?.discountAmount ?? referralDiscount ?? 0,
       );
@@ -820,14 +1205,61 @@ export default function FoodBill() {
       const appliedReferralInviter = String(
         referral?.inviterName ?? referralInviterName ?? "",
       );
+      const appliedCouponDiscount = Number(couponDiscount || 0);
+      const appliedMembershipDiscount = Number(membershipDiscount || 0);
       const payableTotal = Math.max(
         0,
-        roundedBeforeReferral - appliedReferralDiscount,
+        roundedBeforeReferral -
+          appliedCouponDiscount -
+          appliedReferralDiscount,
       );
-      const paidFinal =
-        paymentMethod === "Cash"
-          ? Math.max(Number(amountReceived) || payableTotal, payableTotal)
-          : payableTotal;
+
+      const mode = isMultiMode ? "MULTI" : toInvoicePaymentMode(paymentMethod);
+
+      let breakdown = {
+        cash: 0,
+        upi: 0,
+        card: 0,
+        wallet: 0,
+        paidAmount: 0,
+        dueAmount: 0,
+        changeAmount: 0,
+      };
+
+      if (isMultiMode) {
+        const paidFinal = Math.round(splitTotalPaid * 100) / 100;
+        if (paidFinal + 0.001 < payableTotal) {
+          Swal.fire(
+            "Payment incomplete",
+            `Allocate the full amount. Remaining: ₹${(payableTotal - paidFinal).toFixed(2)}`,
+            "warning",
+          );
+          return;
+        }
+        breakdown = {
+          cash: Number(splitPayments.cash || 0),
+          upi: Number(splitPayments.upi || 0),
+          card: Number(splitPayments.card || 0),
+          wallet: Number(splitPayments.wallet || 0),
+          paidAmount: paidFinal,
+          dueAmount: Math.max(0, payableTotal - paidFinal),
+          changeAmount: Math.max(0, paidFinal - payableTotal),
+        };
+      } else {
+        const paidFinal =
+          paymentMethod === "Cash"
+            ? Math.max(Number(amountReceived) || payableTotal, payableTotal)
+            : payableTotal;
+        breakdown = {
+          cash: mode === "CASH" ? paidFinal : 0,
+          upi: mode === "UPI" ? paidFinal : 0,
+          card: mode === "CARD" ? paidFinal : 0,
+          wallet: mode === "WALLET" ? paidFinal : 0,
+          paidAmount: paidFinal,
+          dueAmount: 0,
+          changeAmount: Math.max(0, paidFinal - payableTotal),
+        };
+      }
 
       const notes = [
         billNote,
@@ -855,9 +1287,18 @@ export default function FoodBill() {
         })),
         subTotal: subtotal,
         discountTotal:
-          Number(manualDiscount || 0) + Number(appliedReferralDiscount || 0),
+          Number(manualDiscount || 0) +
+          Number(appliedMembershipDiscount || 0) +
+          Number(appliedCouponDiscount || 0) +
+          Number(appliedReferralDiscount || 0),
         grandTotal: payableTotal,
-        coupon: null,
+        coupon:
+          couponCode && appliedCouponDiscount > 0
+            ? {
+                code: couponCode,
+                discountAmount: appliedCouponDiscount,
+              }
+            : null,
         referral: appliedReferralCode
           ? {
               code: appliedReferralCode,
@@ -869,15 +1310,7 @@ export default function FoodBill() {
         status: "final",
         mode,
         paymentStatus: "full",
-        paymentBreakdown: {
-          cash: mode === "CASH" ? paidFinal : 0,
-          upi: mode === "UPI" ? paidFinal : 0,
-          card: mode === "CARD" ? paidFinal : 0,
-          wallet: mode === "WALLET" ? paidFinal : 0,
-          paidAmount: paidFinal,
-          dueAmount: 0,
-          changeAmount: Math.max(0, paidFinal - payableTotal),
-        },
+        paymentBreakdown: breakdown,
         createdBy: {
           m_staff_id: staff?.m_staff_id ?? null,
           m_staff_name: staff?.m_staff_name ?? null,
@@ -895,7 +1328,7 @@ export default function FoodBill() {
         id: String(invoiceCode),
         customerName: selectedCustomer.name,
         grandTotal: payableTotal,
-        paymentMethod,
+        paymentMethod: isMultiMode ? "Split" : paymentMethod,
         date: `Today, ${nowStr}`,
         itemsCount: cart.reduce((sum, item) => sum + item.quantity, 0),
       };
@@ -908,11 +1341,26 @@ export default function FoodBill() {
           <div class="text-sm text-left space-y-1">
             <p>Invoice <b>${invoiceCode}</b> saved.</p>
             ${
+              appliedMembershipDiscount > 0
+                ? `<p class="text-emerald-700">Membership${membershipDiscountPercent > 0 ? ` (${membershipDiscountPercent}%)` : ""}: −₹${appliedMembershipDiscount.toFixed(2)}</p>`
+                : ""
+            }
+            ${
+              appliedCouponDiscount > 0
+                ? `<p class="text-indigo-700">${couponLabel || "Coupon"}${couponCode ? ` (${couponCode})` : ""}: −₹${appliedCouponDiscount.toFixed(2)}</p>`
+                : ""
+            }
+            ${
               appliedReferralDiscount > 0
                 ? `<p class="text-green-700">${appliedReferralLabel}${appliedReferralCode ? ` (${appliedReferralCode})` : ""}: −₹${appliedReferralDiscount.toFixed(2)}</p>`
                 : ""
             }
             <p>Total: <b>₹${payableTotal.toFixed(2)}</b></p>
+            ${
+              isMultiMode
+                ? `<p class="text-gray-600">Split: Cash ₹${breakdown.cash} · UPI ₹${breakdown.upi} · Card ₹${breakdown.card} · Wallet ₹${breakdown.wallet}</p>`
+                : ""
+            }
           </div>
         `,
         confirmButtonColor: "#3B82F6",
@@ -923,9 +1371,16 @@ export default function FoodBill() {
       setManualDiscount(0);
       setSpecialInstructions("");
       setBillNote("");
+      setIsMultiMode(false);
+      setSplitPayments({ cash: 0, upi: 0, card: 0, wallet: 0 });
+      setPaymentMethod("Cash");
       clearReferralDiscount();
+      clearCouponDiscount();
+      setPromoCodeInput("");
+      setPromoType("coupon");
       setCustomerSearch("");
       setSelectedCustomerId(WALK_IN_CUSTOMER.id);
+      setWalletBalance(0);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       Swal.fire(
@@ -1080,23 +1535,30 @@ export default function FoodBill() {
                 </span>
               ) : null}
               <span title="Scan Barcode" className="shrink-0">
-                <Scan
-                  size={18}
-                  className="cursor-pointer text-gray-400 hover:text-gray-600"
-                />
+                <button
+                  type="button"
+                  onClick={() => setShowCreateCustomerModal(true)}
+                  className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-blue-600 transition hover:text-blue-800"
+                >
+                  <UserPlus size={14} />
+                </button>
               </span>
             </div>
 
-            {/* Quick Cards Grid — filtered via useMemo on each key; API only after pause */}
+            {/* Quick Cards — on select, only selected customer stays visible */}
             <div
-              className={`grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 ${
+              className={`grid grid-cols-1 gap-2.5 ${
+                selectedCustomerId === WALK_IN_CUSTOMER.id
+                  ? "sm:grid-cols-2 lg:grid-cols-3"
+                  : "sm:grid-cols-1 lg:grid-cols-1 max-w-md"
+              } ${
                 loadingCustomers &&
                 customerSearch.trim() !== debouncedCustomerSearch
                   ? "opacity-80"
                   : ""
               }`}
             >
-              {filteredCustomers.length === 0 ? (
+              {visibleCustomers.length === 0 ? (
                 <div className="col-span-full rounded-xl border border-dashed border-gray-200 px-3 py-6 text-center text-xs text-gray-500">
                   {!customerSearch.trim()
                     ? "Search by name or mobile to find a customer. Walk-in stays selected by default."
@@ -1105,7 +1567,7 @@ export default function FoodBill() {
                       : "No customers found. Add a new customer to continue."}
                 </div>
               ) : (
-                filteredCustomers.map((cust) => {
+                visibleCustomers.map((cust) => {
                   const isSelected = selectedCustomerId === cust.id;
                   const initials = cust.name
                     .split(" ")
@@ -1114,15 +1576,19 @@ export default function FoodBill() {
                     .toUpperCase()
                     .slice(0, 2);
                   const isWalkIn = cust.id === WALK_IN_CUSTOMER.id;
+                  const showOnlySelected =
+                    selectedCustomerId !== WALK_IN_CUSTOMER.id && isSelected;
 
                   return (
                     <div
                       key={cust.id}
-                      onClick={() => handleSelectCustomer(cust)}
-                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition duration-150 ${
+                      onClick={() => {
+                        if (!showOnlySelected) handleSelectCustomer(cust);
+                      }}
+                      className={`flex items-center gap-3 rounded-xl border p-3 transition duration-150 ${
                         isSelected
                           ? "border-blue-500 bg-blue-50/50 shadow-2xs"
-                          : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                          : "cursor-pointer border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                       }`}
                     >
                       <div
@@ -1174,21 +1640,26 @@ export default function FoodBill() {
                           ) : null}
                         </div>
                       </div>
+                      {showOnlySelected ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectCustomer(WALK_IN_CUSTOMER);
+                            setCustomerSearch("");
+                            clearReferralDiscount();
+                            clearCouponDiscount();
+                            setPromoCodeInput("");
+                          }}
+                          className="shrink-0 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-gray-600 hover:bg-gray-50"
+                        >
+                          Change
+                        </button>
+                      ) : null}
                     </div>
                   );
                 })
               )}
-            </div>
-
-            {/* Add customer action */}
-            <div className="mt-3.5 text-center">
-              <button
-                type="button"
-                onClick={() => setShowCreateCustomerModal(true)}
-                className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-blue-600 transition hover:text-blue-800"
-              >
-                <UserPlus size={14} />+ Add New Customer
-              </button>
             </div>
           </div>
 
@@ -1485,35 +1956,151 @@ export default function FoodBill() {
                     </span>
                   </div>
                 </div>
-                {selectedCustomer.id !== WALK_IN_CUSTOMER.id ? (
-                  <div className="rounded-xl border border-violet-200 bg-violet-50/50 px-2.5 py-2 space-y-1">
+
+                {(membershipDiscount > 0 ||
+                  (selectedCustomer.id !== WALK_IN_CUSTOMER.id &&
+                    selectedCustomer.membershipType &&
+                    selectedCustomer.membershipType !== "none")) && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-2.5 py-2 space-y-0.5">
                     <div className="flex justify-between items-center gap-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wide text-violet-600">
-                        Referral Discount
-                        {loadingReferral ? " …" : ""}
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+                        Membership Discount
+                        {membershipDiscountPercent > 0
+                          ? ` (${membershipDiscountPercent}%)`
+                          : ""}
                       </span>
                       <span className="text-xs font-semibold text-green-600">
-                        -₹{Number(referralDiscount || 0).toFixed(2)}
+                        −₹{membershipDiscount.toFixed(2)}
                       </span>
                     </div>
-                    {referralDiscount > 0 ? (
-                      <p className="text-[10px] text-violet-700">
+                    <p className="text-[10px] text-emerald-700/80">
+                      {membershipPlan?.displayName ||
+                        selectedCustomer.tier ||
+                        "Member"}
+                      {membershipDiscount > 0
+                        ? " · Food plan benefit applied"
+                        : " · No Food discount on this plan"}
+                      {membershipCashback > 0
+                        ? ` · Cashback ₹${membershipCashback.toFixed(2)}`
+                        : ""}
+                    </p>
+                  </div>
+                )}
+
+                {/* Coupon / Referral promo — choose type, verify & apply */}
+                <div className="rounded-xl border border-dashed border-violet-300 bg-violet-50/40 px-2.5 py-2.5 space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Tag size={12} className="text-violet-500" />
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-violet-600">
+                      Coupon / Referral
+                    </span>
+                  </div>
+                  <div className="flex gap-1 rounded-lg bg-white/80 p-0.5 border border-violet-100">
+                    <button
+                      type="button"
+                      onClick={() => setPromoType("coupon")}
+                      className={`flex-1 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                        promoType === "coupon"
+                          ? "bg-violet-600 text-white"
+                          : "text-violet-500 hover:bg-violet-50"
+                      }`}
+                    >
+                      Coupon
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPromoType("referral")}
+                      className={`flex-1 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                        promoType === "referral"
+                          ? "bg-violet-600 text-white"
+                          : "text-violet-500 hover:bg-violet-50"
+                      }`}
+                    >
+                      Referral
+                    </button>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input
+                      value={promoCodeInput}
+                      onChange={(e) =>
+                        setPromoCodeInput(e.target.value.toUpperCase())
+                      }
+                      placeholder={
+                        promoType === "coupon"
+                          ? "Enter coupon code"
+                          : "Enter referral code"
+                      }
+                      className="min-w-0 flex-1 rounded-lg border border-violet-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase text-gray-800 outline-none focus:border-violet-500"
+                    />
+                    <button
+                      type="button"
+                      disabled={loadingPromo || loadingReferral}
+                      onClick={() => void handleApplyPromoCode()}
+                      className="shrink-0 rounded-lg bg-violet-700 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white hover:bg-violet-600 disabled:opacity-60"
+                    >
+                      {loadingPromo || loadingReferral ? "…" : "Apply"}
+                    </button>
+                  </div>
+                  {couponDiscount > 0 ? (
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-indigo-700">
+                      <span className="truncate font-semibold">
+                        {couponLabel || "Coupon"}
+                        {couponCode ? ` (${couponCode})` : ""}
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-bold text-green-600">
+                          −₹{couponDiscount.toFixed(2)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={clearCouponDiscount}
+                          className="text-gray-400 hover:text-rose-500"
+                          title="Remove coupon"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  {referralDiscount > 0 || referralCodeApplied ? (
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-violet-700">
+                      <span className="truncate font-semibold">
                         {referralLabel}
                         {referralCodeApplied
-                          ? ` · Code ${referralCodeApplied}`
+                          ? ` (${referralCodeApplied})`
                           : ""}
                         {referralInviterName
-                          ? ` · referred by ${referralInviterName}`
+                          ? ` · ${referralInviterName}`
                           : ""}
-                      </p>
-                    ) : (
-                      <p className="text-[10px] text-violet-500">
-                        {referralStatusMessage ||
-                          "Select customer — discount auto-applies if they were referred."}
-                      </p>
-                    )}
-                  </div>
-                ) : null}
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-bold text-green-600">
+                          −₹{Number(referralDiscount || 0).toFixed(2)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={clearReferralDiscount}
+                          className="text-gray-400 hover:text-rose-500"
+                          title="Remove referral"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : selectedCustomer.id !== WALK_IN_CUSTOMER.id ? (
+                    <p className="text-[10px] text-violet-500">
+                      {referralStatusMessage ||
+                        (loadingReferral
+                          ? "Checking referral…"
+                          : "Auto-checks referral on customer select. Or enter a code above.")}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-violet-500">
+                      Choose Coupon or Referral, enter code, then Apply.
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex justify-between text-gray-500">
                   <span>Tax (5%)</span>
                   <span className="font-semibold text-gray-850">
@@ -1569,64 +2156,192 @@ export default function FoodBill() {
 
               {/* Payment Methods */}
               <div className="mt-4 border-t border-gray-100 pt-3.5">
-                <h3 className="mb-2 text-xs font-bold text-gray-600">
-                  Payment Method
-                </h3>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[
-                    { id: "Cash", label: "Cash", icon: DollarSignIcon },
-                    { id: "UPI", label: "UPI", icon: UpiIcon },
-                    { id: "Card", label: "Card", icon: CreditCard },
-                    { id: "More", label: "More", icon: MoreHorizontal },
-                  ].map((method) => {
-                    const IconComp = method.icon;
-                    const isActive = paymentMethod === method.id;
-
-                    return (
-                      <button
-                        key={method.id}
-                        onClick={() => setPaymentMethod(method.id)}
-                        className={`flex flex-col items-center justify-center gap-1 rounded-xl border py-2.5 transition duration-150 cursor-pointer ${
-                          isActive
-                            ? "border-blue-500 bg-blue-50/50 text-blue-600 font-bold"
-                            : "border-gray-250 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
-                        }`}
-                      >
-                        <IconComp size={16} />
-                        <span className="text-[10px]">{method.label}</span>
-                      </button>
-                    );
-                  })}
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-bold text-gray-600">
+                    Payment Method
+                  </h3>
+                  <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1">
+                    <input
+                      type="checkbox"
+                      checked={isMultiMode}
+                      onChange={(e) => setIsMultiMode(e.target.checked)}
+                      className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600"
+                    />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                      Split
+                    </span>
+                  </label>
                 </div>
 
-                {/* Amount Received (Only if Cash is selected) */}
-                {paymentMethod === "Cash" && (
-                  <div className="mt-3.5 space-y-2">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1">
-                          Amount Received
-                        </label>
-                        <div className="relative">
-                          <span className="absolute left-2.5 top-2 text-xs text-gray-500">
-                            ₹
-                          </span>
-                          <input
-                            type="number"
-                            value={amountReceived}
-                            onChange={(e) => setAmountReceived(e.target.value)}
-                            className="w-full rounded-xl border border-gray-200 bg-white py-1.5 pl-5 pr-2.5 text-xs font-bold text-gray-800 focus:border-blue-400 focus:outline-none"
-                          />
+                {!isMultiMode ? (
+                  <>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[
+                        { id: "Cash", label: "Cash", icon: DollarSignIcon },
+                        { id: "UPI", label: "UPI", icon: UpiIcon },
+                        { id: "Card", label: "Card", icon: CreditCard },
+                        { id: "Wallet", label: "Wallet", icon: Wallet },
+                      ].map((method) => {
+                        const IconComp = method.icon;
+                        const isActive = paymentMethod === method.id;
+
+                        return (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => setPaymentMethod(method.id)}
+                            className={`flex flex-col items-center justify-center gap-1 rounded-xl border py-2.5 transition duration-150 cursor-pointer ${
+                              isActive
+                                ? "border-blue-500 bg-blue-50/50 text-blue-600 font-bold"
+                                : "border-gray-250 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                            }`}
+                          >
+                            <IconComp size={16} />
+                            <span className="text-[10px]">{method.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {paymentMethod === "Wallet" ? (
+                      <p className="mt-2 text-[10px] font-medium text-amber-700">
+                        Wallet balance: ₹{walletBalance.toFixed(2)}
+                      </p>
+                    ) : null}
+
+                    {paymentMethod === "Cash" && (
+                      <div className="mt-3.5 space-y-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1">
+                              Amount Received
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-2 text-xs text-gray-500">
+                                ₹
+                              </span>
+                              <input
+                                type="number"
+                                value={amountReceived}
+                                onChange={(e) =>
+                                  setAmountReceived(e.target.value)
+                                }
+                                className="w-full rounded-xl border border-gray-200 bg-white py-1.5 pl-5 pr-2.5 text-xs font-bold text-gray-800 focus:border-blue-400 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1">
+                              Change
+                            </label>
+                            <div className="rounded-xl bg-gray-50 border border-gray-100 py-1.5 px-3 text-xs font-bold text-green-600 min-h-[30px] flex items-center">
+                              ₹{changeAmount.toFixed(2)}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 mb-1">
-                          Change
-                        </label>
-                        <div className="rounded-xl bg-gray-50 border border-gray-100 py-1.5 px-3 text-xs font-bold text-green-600 min-h-[30px] flex items-center">
-                          ₹{changeAmount.toFixed(2)}
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {(
+                        [
+                          { key: "cash", label: "Cash" },
+                          { key: "upi", label: "UPI" },
+                          { key: "card", label: "Card" },
+                          { key: "wallet", label: "Wallet" },
+                        ] as const
+                      ).map(({ key, label }) => (
+                        <div key={key}>
+                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                            {label}
+                            {key === "wallet"
+                              ? ` (bal ₹${walletBalance.toFixed(0)})`
+                              : ""}
+                          </label>
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-2 text-xs text-gray-500">
+                              ₹
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={splitPayments[key]}
+                              onChange={(e) =>
+                                setSplitAmount(key, Number(e.target.value) || 0)
+                              }
+                              className="w-full rounded-xl border border-gray-200 bg-white py-1.5 pl-5 pr-2 text-xs font-bold text-gray-800 focus:border-blue-400 focus:outline-none"
+                            />
+                          </div>
                         </div>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {(
+                        [
+                          ["Cash", "cash"],
+                          ["UPI", "upi"],
+                          ["Card", "card"],
+                          ["Wallet", "wallet"],
+                        ] as const
+                      ).map(([label, key]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          disabled={remainingForFull <= 0}
+                          onClick={() => {
+                            const add =
+                              key === "wallet"
+                                ? Math.min(
+                                    walletBalance - splitPayments.wallet,
+                                    remainingForFull,
+                                  )
+                                : remainingForFull;
+                            setSplitAmount(
+                              key,
+                              splitPayments[key] + Math.max(0, add),
+                            );
+                          }}
+                          className="rounded-md bg-gray-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-500 transition hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
+                        >
+                          + Rest → {label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="space-y-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-[11px] font-semibold">
+                      <div className="flex justify-between text-gray-500">
+                        <span>Payable</span>
+                        <span className="text-gray-800">
+                          ₹{grandTotal.toFixed(2)}
+                        </span>
                       </div>
+                      <div className="flex justify-between text-gray-500">
+                        <span>Allocated</span>
+                        <span className="text-blue-600">
+                          ₹{splitTotalPaid.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t border-gray-200 pt-1">
+                        <span className="text-gray-600">Remaining</span>
+                        <span
+                          className={
+                            remainingForFull > 0
+                              ? "text-amber-600"
+                              : "text-green-600"
+                          }
+                        >
+                          ₹{remainingForFull.toFixed(2)}
+                        </span>
+                      </div>
+                      {changeAmount > 0 ? (
+                        <div className="flex justify-between text-green-600">
+                          <span>Change</span>
+                          <span>₹{changeAmount.toFixed(2)}</span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 )}

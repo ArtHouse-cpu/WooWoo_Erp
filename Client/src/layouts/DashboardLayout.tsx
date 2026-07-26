@@ -9,7 +9,8 @@ export default function DashboardLayout() {
 
   useEffect(() => {
     const onResize = () => {
-      if (window.innerWidth >= 768) setMobileNavOpen(false);
+      // Desktop sidebar from lg (1024px); keep drawer on phone + tablet
+      if (window.innerWidth >= 1024) setMobileNavOpen(false);
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -32,14 +33,14 @@ export default function DashboardLayout() {
       </div>
 
       <div className="flex min-h-0 flex-1 overflow-hidden pt-14">
-        {/* Desktop sidebar */}
-        <aside className="hidden h-full shrink-0 md:block">
+        {/* Desktop sidebar — large screens only */}
+        <aside className="hidden h-full shrink-0 lg:block">
           <LeftSideBar />
         </aside>
 
-        {/* Mobile drawer */}
+        {/* Phone + tablet drawer (same menu button UX as mobile) */}
         <div
-          className={`fixed inset-0 z-50 md:hidden ${
+          className={`fixed inset-0 z-50 lg:hidden ${
             mobileNavOpen ? "pointer-events-auto" : "pointer-events-none"
           }`}
         >
@@ -63,7 +64,7 @@ export default function DashboardLayout() {
           </div>
         </div>
 
-        <main className="min-w-0 flex-1 overflow-y-auto px-3 pb-24 pt-3 sm:px-4 md:px-5 md:pb-6 md:pt-4">
+        <main className="min-w-0 flex-1 overflow-y-auto px-3 pb-24 pt-3 sm:px-4 md:px-5 lg:pb-6 lg:pt-4">
           <Outlet />
         </main>
       </div>

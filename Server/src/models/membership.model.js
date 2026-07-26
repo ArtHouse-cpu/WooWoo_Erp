@@ -65,6 +65,7 @@ const membershipSchema = new mongoose.Schema(
       cashbackPercent: { type: Number, default: 0, min: 0 },
       storeDiscountPercent: { type: Number, default: 0, min: 0 },
       spaceDiscountPercent: { type: Number, default: 0, min: 0 },
+      foodDiscountPercent: { type: Number, default: 0, min: 0 },
       features: {
         type: [
           {

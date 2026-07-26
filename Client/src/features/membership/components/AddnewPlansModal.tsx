@@ -38,6 +38,7 @@ type PlanFormState = Required<
     cashbackPercent: number;
     storeDiscountPercent: number;
     spaceDiscountPercent: number;
+    foodDiscountPercent: number;
     features: Array<{ label: string; was: number }>;
   };
 };
@@ -118,6 +119,7 @@ const initialState: PlanFormState = {
     cashbackPercent: 0,
     storeDiscountPercent: 0,
     spaceDiscountPercent: 0,
+    foodDiscountPercent: 0,
     features: [{ label: "", was: 0 }],
   },
   insightsLevel: "Basic",
@@ -132,6 +134,12 @@ const iconKeys = ["user", "star", "graduation", "crown"] as const;
 const discountTypes = ["Percentage", "Flat"] as const;
 const insightLevels = ["Basic", "Advanced"] as const;
 
+/** Always available for membership discounts (not only product catalogue categories) */
+const FIXED_USAGE_CATEGORIES = [
+  { _id: "fixed-food", name: "Food" },
+  { _id: "fixed-space", name: "Space" },
+] as const;
+
 export default function AddnewPlansModal({
   open,
   onClose,
@@ -140,7 +148,24 @@ export default function AddnewPlansModal({
   initialPlan,
 }: Props) {
   const [form, setForm] = useState<PlanFormState>(initialState);
-  const [categories, setCategories] = useState<{ _id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ _id: string; name: string }[]>(
+    [...FIXED_USAGE_CATEGORIES],
+  );
+
+  /** Food + Space first, then catalogue categories (Sheets, Stationary, …) */
+  const usageLimitCategories = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: { _id: string; name: string }[] = [];
+    for (const cat of [...FIXED_USAGE_CATEGORIES, ...categories]) {
+      const name = String(cat.name || "").trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push({ _id: String(cat._id || key), name });
+    }
+    return merged;
+  }, [categories]);
 
   useEffect(() => {
     if (!open) return;
@@ -180,10 +205,25 @@ export default function AddnewPlansModal({
             initialPlan.pricing?.discountPercent ?? prev.pricing.discountPercent,
           ),
         },
-        usageLimits: {
-          ...prev.usageLimits,
-          ...(initialPlan.usageLimits as UsageLimits | undefined),
-        },
+        usageLimits: (() => {
+          const merged: UsageLimits = {
+            ...prev.usageLimits,
+            ...(initialPlan.usageLimits as UsageLimits | undefined),
+          };
+          // Normalize Food / Space keys for the Usage Limits cards
+          for (const fixed of FIXED_USAGE_CATEGORIES) {
+            const hit = Object.entries(merged).find(([k]) =>
+              k.toLowerCase().includes(fixed.name.toLowerCase()),
+            );
+            if (hit && !merged[fixed.name]) {
+              merged[fixed.name] = hit[1];
+            }
+            if (!merged[fixed.name]) {
+              merged[fixed.name] = { discount: 0, cashback: 0 };
+            }
+          }
+          return merged;
+        })(),
         customerDisplay: {
           ...prev.customerDisplay,
           ...(initialPlan.customerDisplay ?? {}),
@@ -193,7 +233,18 @@ export default function AddnewPlansModal({
           iconKey: (initialPlan.customerDisplay?.iconKey ?? prev.customerDisplay.iconKey) as PlanFormState["customerDisplay"]["iconKey"],
           cashbackPercent: Number(initialPlan.customerDisplay?.cashbackPercent ?? prev.customerDisplay.cashbackPercent),
           storeDiscountPercent: Number(initialPlan.customerDisplay?.storeDiscountPercent ?? prev.customerDisplay.storeDiscountPercent),
-          spaceDiscountPercent: Number(initialPlan.customerDisplay?.spaceDiscountPercent ?? prev.customerDisplay.spaceDiscountPercent),
+          spaceDiscountPercent: Number(
+            initialPlan.customerDisplay?.spaceDiscountPercent ??
+              (initialPlan.usageLimits as UsageLimits | undefined)?.Space
+                ?.discount ??
+              prev.customerDisplay.spaceDiscountPercent,
+          ),
+          foodDiscountPercent: Number(
+            initialPlan.customerDisplay?.foodDiscountPercent ??
+              (initialPlan.usageLimits as UsageLimits | undefined)?.Food
+                ?.discount ??
+              prev.customerDisplay.foodDiscountPercent,
+          ),
           features:
             Array.isArray(initialPlan.customerDisplay?.features) &&
             initialPlan.customerDisplay.features.length > 0
@@ -236,16 +287,27 @@ export default function AddnewPlansModal({
   ]);
 
   const setUsage = (key: string, field: "discount" | "cashback", value: number) => {
-    setForm((prev) => ({
-      ...prev,
-      usageLimits: {
+    const next = Math.max(0, value);
+    setForm((prev) => {
+      const usageLimits = {
         ...prev.usageLimits,
         [key]: {
           ...(prev.usageLimits[key] || { discount: 0, cashback: 0 }),
-          [field]: Math.max(0, value),
+          [field]: next,
         },
-      },
-    }));
+      };
+      const customerDisplay = { ...prev.customerDisplay };
+      // Keep display badges aligned with Food / Space usage cards
+      if (field === "discount") {
+        if (key.toLowerCase() === "food") {
+          customerDisplay.foodDiscountPercent = next;
+        }
+        if (key.toLowerCase() === "space") {
+          customerDisplay.spaceDiscountPercent = next;
+        }
+      }
+      return { ...prev, usageLimits, customerDisplay };
+    });
   };
 
   const setFeature = (
@@ -290,6 +352,35 @@ export default function AddnewPlansModal({
   const submit = async () => {
     if (!form.planId.trim() || !form.displayName.trim()) return;
 
+    // Ensure Food / Space keys exist so member discounts apply on food bill & space booking
+    const usageLimits: UsageLimits = { ...form.usageLimits };
+    for (const fixed of FIXED_USAGE_CATEGORIES) {
+      if (!usageLimits[fixed.name]) {
+        // keep case-insensitive match if already saved under different casing
+        const existingKey = Object.keys(usageLimits).find(
+          (k) => k.toLowerCase() === fixed.name.toLowerCase(),
+        );
+        if (existingKey) {
+          usageLimits[fixed.name] = usageLimits[existingKey];
+        } else {
+          usageLimits[fixed.name] = { discount: 0, cashback: 0 };
+        }
+      }
+    }
+
+    const foodLimit =
+      usageLimits.Food ||
+      usageLimits.food ||
+      Object.entries(usageLimits).find(([k]) =>
+        k.toLowerCase().includes("food"),
+      )?.[1];
+    const spaceLimit =
+      usageLimits.Space ||
+      usageLimits.space ||
+      Object.entries(usageLimits).find(([k]) =>
+        k.toLowerCase().includes("space"),
+      )?.[1];
+
     await onSubmit({
       planId: form.planId.trim(),
       displayName: form.displayName.trim(),
@@ -303,9 +394,16 @@ export default function AddnewPlansModal({
         discountType: form.pricing.discountType,
         discountPercent: Number(form.pricing.discountPercent || 0),
       },
-      usageLimits: form.usageLimits,
+      usageLimits,
       customerDisplay: {
         ...form.customerDisplay,
+        // Keep app display badges in sync with usage-limit cards when set
+        spaceDiscountPercent:
+          Number(spaceLimit?.discount ?? form.customerDisplay.spaceDiscountPercent) ||
+          0,
+        foodDiscountPercent:
+          Number(foodLimit?.discount ?? form.customerDisplay.foodDiscountPercent) ||
+          0,
         badgeLabel:
           form.customerDisplay.badgeLabel.trim() ||
           form.pricing.period,
@@ -572,12 +670,24 @@ export default function AddnewPlansModal({
                   </div>
                 </div>
 
+                <p className="mb-4 text-xs text-slate-500">
+                  Set member Discount % and Cashback % per category.{" "}
+                  <span className="font-semibold text-orange-700">Food</span> and{" "}
+                  <span className="font-semibold text-orange-700">Space</span>{" "}
+                  apply on food bills and space bookings.
+                </p>
+
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {categories.map((category) => {
+                  {usageLimitCategories.map((category) => {
                     const key = category.name; // Use name as key to match usage check
                     const title = category.name;
                     const short = title.substring(0, 1).toUpperCase();
-                    const limit = form.usageLimits[key] || { discount: 0, cashback: 0 };
+                    const limit =
+                      form.usageLimits[key] ||
+                      Object.entries(form.usageLimits).find(
+                        ([k]) => k.toLowerCase() === key.toLowerCase(),
+                      )?.[1] ||
+                      { discount: 0, cashback: 0 };
 
                     return (
                       <div
@@ -708,6 +818,31 @@ export default function AddnewPlansModal({
                     placeholder="5"
                   />
                   <InputField
+                    label="Food Discount (%)"
+                    value={String(form.customerDisplay.foodDiscountPercent)}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        customerDisplay: {
+                          ...p.customerDisplay,
+                          foodDiscountPercent: Number(v || 0),
+                        },
+                        usageLimits: {
+                          ...p.usageLimits,
+                          Food: {
+                            ...(p.usageLimits.Food || {
+                              discount: 0,
+                              cashback: 0,
+                            }),
+                            discount: Number(v || 0),
+                          },
+                        },
+                      }))
+                    }
+                    type="number"
+                    placeholder="10"
+                  />
+                  <InputField
                     label="Space Discount (%)"
                     value={String(form.customerDisplay.spaceDiscountPercent)}
                     onChange={(v) =>
@@ -716,6 +851,16 @@ export default function AddnewPlansModal({
                         customerDisplay: {
                           ...p.customerDisplay,
                           spaceDiscountPercent: Number(v || 0),
+                        },
+                        usageLimits: {
+                          ...p.usageLimits,
+                          Space: {
+                            ...(p.usageLimits.Space || {
+                              discount: 0,
+                              cashback: 0,
+                            }),
+                            discount: Number(v || 0),
+                          },
                         },
                       }))
                     }

@@ -6,6 +6,7 @@ import {
   handleCreateProduct,
   type CatalogueLookupItem,
 } from "@/services/apiClient";
+import { getUsageLimitForCategory } from "../../utils/membershipInvoiceUtils";
 import CreateProductModal from "./Modal/CreateProductModal";
 import Swal from "sweetalert2";
 
@@ -120,17 +121,18 @@ export default function ProductsServicesSection({
     let calculatedCashback = 0;
     const plan = resolveMembershipPlan();
 
-    if (
-      plan?.usageLimits &&
-      (plan.usageLimits[membershipCategory] || plan.usageLimits.General)
-    ) {
-      const limit =
-        plan.usageLimits[membershipCategory] || plan.usageLimits.General;
+    // Prefer Food / Space / sourceType so plan usageLimits.Food|Space apply
+    const limit =
+      getUsageLimitForCategory(plan?.usageLimits, lineCategory) ||
+      getUsageLimitForCategory(plan?.usageLimits, membershipCategory);
+
+    if (limit && (limit.discount || limit.cashback)) {
       if (limit.discount) {
-        calculatedDiscount = (sellingPrice * qty * limit.discount) / 100;
+        calculatedDiscount = (sellingPrice * qty * Number(limit.discount)) / 100;
       }
       if (limit.cashback) {
-        calculatedCashback = (sellingPrice * qty * limit.cashback) / 100;
+        calculatedCashback =
+          (sellingPrice * qty * Number(limit.cashback)) / 100;
       }
     } else {
       const dValue = Number(item.discountValue ?? 0);
@@ -250,17 +252,17 @@ export default function ProductsServicesSection({
     let calculatedCashback = 0;
     const plan = resolveMembershipPlan();
 
-    if (
-      plan?.usageLimits &&
-      (plan.usageLimits[membershipCategory] || plan.usageLimits.General)
-    ) {
-      const limit =
-        plan.usageLimits[membershipCategory] || plan.usageLimits.General;
+    const limit =
+      getUsageLimitForCategory(plan?.usageLimits, lineCategory) ||
+      getUsageLimitForCategory(plan?.usageLimits, membershipCategory);
+
+    if (limit && (limit.discount || limit.cashback)) {
       if (limit.discount) {
-        calculatedDiscount = (sellingPrice * qty * limit.discount) / 100;
+        calculatedDiscount = (sellingPrice * qty * Number(limit.discount)) / 100;
       }
       if (limit.cashback) {
-        calculatedCashback = (sellingPrice * qty * limit.cashback) / 100;
+        calculatedCashback =
+          (sellingPrice * qty * Number(limit.cashback)) / 100;
       }
     } else {
       const dValue = Number(item.discountValue ?? 0);

@@ -42,10 +42,30 @@ export function getUsageLimitForCategory(
   if (!usageLimits || typeof usageLimits !== "object") return undefined;
   const cat = String(category ?? "General").trim();
   if (usageLimits[cat]) return usageLimits[cat];
-  if (usageLimits.General) return usageLimits.General;
+
   const lower = cat.toLowerCase();
-  const key = Object.keys(usageLimits).find((k) => k.toLowerCase() === lower);
-  return key ? usageLimits[key] : undefined;
+  const exact = Object.keys(usageLimits).find((k) => k.toLowerCase() === lower);
+  if (exact) return usageLimits[exact];
+
+  // Fuzzy match: Food / Space / Store / Service line categories
+  const aliasGroups: string[][] = [
+    ["food", "foods", "meal", "restaurant", "canteen"],
+    ["space", "spaces", "booking", "room"],
+    ["store", "product", "products", "supply", "sheets", "stationary", "stationery"],
+    ["service", "services"],
+  ];
+  for (const group of aliasGroups) {
+    if (!group.some((g) => lower.includes(g))) continue;
+    const key = Object.keys(usageLimits).find((k) => {
+      const nk = k.toLowerCase();
+      return group.some((g) => nk.includes(g));
+    });
+    if (key) return usageLimits[key];
+  }
+
+  if (usageLimits.General) return usageLimits.General;
+  if (usageLimits.general) return usageLimits.general;
+  return undefined;
 }
 
 export function membershipBenefitsForLine(
