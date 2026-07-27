@@ -62,6 +62,7 @@ import {
   membershipBenefitsForLine,
   summarizeMembershipForCart,
 } from "@/features/sales/utils/membershipInvoiceUtils";
+import { creditWalletCashback } from "@/features/sales/utils/walletCashback";
 
 type SplitPayments = {
   cash: number;
@@ -1395,6 +1396,10 @@ export default function FoodBill() {
         mode,
         paymentStatus: "full",
         paymentBreakdown: breakdown,
+        cashbackTotal: membershipCashback,
+        membershipDiscount: appliedMembershipDiscount,
+        membershipType: selectedCustomer.membershipType,
+        activityType: "Food Bill",
         createdBy: {
           m_staff_id: staff?.m_staff_id ?? null,
           m_staff_name: staff?.m_staff_name ?? null,
@@ -1407,6 +1412,31 @@ export default function FoodBill() {
         response?.invoice?.invoiceNumber ||
         response?.invoice?._id ||
         "N/A";
+
+      // Membership cashback → wallet (server also credits; wallet API is idempotent)
+      if (
+        membershipCashback > 0 &&
+        selectedCustomer.id !== WALK_IN_CUSTOMER.id &&
+        selectedCustomer.phone
+      ) {
+        try {
+          await creditWalletCashback({
+            customerId: selectedCustomer.id,
+            customerPhone: selectedCustomer.phone,
+            customerName: selectedCustomer.name,
+            amount: membershipCashback,
+            note: `Membership cashback for Food Bill #${invoiceCode}`,
+            referenceId: String(invoiceCode),
+            createdBy: {
+              m_staff_id: staff?.m_staff_id ?? null,
+              m_staff_name: staff?.m_staff_name ?? null,
+              m_staff_email: staff?.m_staff_email ?? null,
+            },
+          });
+        } catch (cashbackErr) {
+          console.error("Food Bill cashback wallet credit failed:", cashbackErr);
+        }
+      }
 
       const newBill: RecentBill = {
         id: String(invoiceCode),

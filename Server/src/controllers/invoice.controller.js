@@ -8,6 +8,8 @@ import { appendTransaction } from './wallet.controller.js';
 import { validateCouponForOrder } from './coupon.controller.js';
 import { validateReferralDiscountForOrder } from './affiliate.controller.js';
 import { creditReferralDiscountToInviter, markReferralDiscountUsed } from '../modules/customer/services/referral.service.js';
+import { sendActivityUpdateWhatsApp } from '../modules/customer/services/whatsapp.service.js';
+import { normalizeMobile } from '../modules/customer/utils/normalize.js';
 
 /** Products track inventory; space / service / food / membership do not. */
 const isInventoryTrackedCategory = raw => {
@@ -56,8 +58,19 @@ const buildCreatedBy = (req, fallback = {}) => ({
 
 const findCustomerForInvoice = async ({ customerPhone, customerName }) => {
   const phone = String(customerPhone ?? '').trim();
-  if (phone) {
-    const byPhone = await Customer.findOne({ mobile: phone });
+  const digits = normalizeMobile(phone) || phone.replace(/\D/g, '');
+  if (digits) {
+    const byPhone = await Customer.findOne({
+      $or: [
+        { mobile: phone },
+        { mobile: digits },
+        { mobile: `+91${digits}` },
+        { mobile: `91${digits}` },
+        { whatsappNumber: phone },
+        { whatsappNumber: digits },
+        { whatsappNumber: `+91${digits}` },
+      ],
+    });
     if (byPhone) return byPhone;
   }
 
@@ -67,6 +80,205 @@ const findCustomerForInvoice = async ({ customerPhone, customerName }) => {
   }
 
   return null;
+};
+
+const resolveActivityType = ({ activityType, notes, items }) => {
+  const explicit = String(activityType || '').trim();
+  if (explicit) return explicit;
+
+  const note = String(notes || '').toLowerCase();
+  if (note.includes('food bill') || note.includes('foodbill')) return 'Food Bill';
+  if (note.includes('space')) return 'Space Booking';
+  if (note.includes('pos')) return 'POS Sale';
+
+  const cats = (Array.isArray(items) ? items : []).map(i =>
+    String(i?.category || '').toLowerCase(),
+  );
+  if (cats.length && cats.every(c => c.includes('food'))) return 'Food Bill';
+  if (cats.length && cats.every(c => c.includes('space'))) return 'Space Booking';
+  if (cats.length && cats.every(c => c.includes('service'))) return 'Service';
+  if (cats.length && cats.every(c => c.includes('product') || !c || c === 'general')) {
+    return 'Purchase';
+  }
+  return 'Invoice';
+};
+
+const membershipLabelForCustomer = (customer, fallbackType) => {
+  const raw = String(
+    customer?.membershipType || fallbackType || 'none',
+  )
+    .trim()
+    .toLowerCase();
+  if (!raw || raw === 'none' || raw === 'new' || raw === 'guest') return 'Guest';
+  // Meta body: "As a {{4}}, you received:" → full label e.g. Premium Member
+  const title = raw.charAt(0).toUpperCase() + raw.slice(1);
+  return `${title} Member`;
+};
+
+/** Prefer real money paid; never leave WhatsApp Amount Paid at 0 when grandTotal exists */
+const resolveAmountPaid = (invoice, overridePaid) => {
+  const override = Number(overridePaid);
+  if (Number.isFinite(override) && override > 0) return override;
+
+  const breakdown = invoice?.paymentBreakdown?.toObject
+    ? invoice.paymentBreakdown.toObject()
+    : invoice?.paymentBreakdown || {};
+
+  const explicit = Number(breakdown.paidAmount);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+
+  const parts =
+    Number(breakdown.cash ?? 0) +
+    Number(breakdown.upi ?? 0) +
+    Number(breakdown.card ?? 0) +
+    Number(breakdown.wallet ?? 0);
+  if (parts > 0) return parts;
+
+  const grand = Number(invoice?.grandTotal);
+  if (Number.isFinite(grand) && grand > 0) return grand;
+
+  return 0;
+};
+
+/**
+ * Discount line = savings on the bill.
+ * Never use (subTotal - 0) when paid failed to resolve — that shows full bill as "discount".
+ */
+const resolveActivityDiscount = ({
+  subTotal,
+  paid,
+  membershipDiscount,
+  discountTotal,
+  couponDiscount,
+  referralDiscount,
+}) => {
+  const sub = Number(subTotal) || 0;
+  const paidAmt = Number(paid) || 0;
+  const membershipDisc = Math.max(0, Number(membershipDiscount) || 0);
+  const invoiceDisc = Math.max(0, Number(discountTotal) || 0);
+  const coupon = Math.max(0, Number(couponDiscount) || 0);
+  const referral = Math.max(0, Number(referralDiscount) || 0);
+
+  // Real savings only when we know what was paid
+  if (paidAmt > 0 && sub > paidAmt + 0.001) {
+    return Math.round((sub - paidAmt) * 100) / 100;
+  }
+
+  if (membershipDisc > 0) return membershipDisc;
+
+  const netInvoiceDisc = Math.max(0, invoiceDisc - coupon - referral);
+  if (netInvoiceDisc > 0) return netInvoiceDisc;
+
+  return 0;
+};
+
+const notifyActivityUpdateWhatsApp = async ({
+  customer,
+  customerName,
+  customerPhone,
+  invoice,
+  notes,
+  items,
+  activityType,
+  membershipDiscount,
+  cashbackTotal,
+  membershipType: membershipTypeHint,
+  amountPaidOverride,
+  subTotalOverride,
+}) => {
+  try {
+    if (!invoice || invoice.status === 'draft' || invoice.status === 'cancelled') {
+      return;
+    }
+
+    const phone =
+      String(customer?.whatsappNumber || '').trim() ||
+      String(customer?.mobile || customerPhone || '').trim();
+    if (!phone) return;
+
+    const paid = resolveAmountPaid(invoice, amountPaidOverride);
+    const subTotal = Number(
+      subTotalOverride ?? invoice?.subTotal ?? 0,
+    );
+
+    let discountAmt = resolveActivityDiscount({
+      subTotal,
+      paid,
+      membershipDiscount,
+      discountTotal: invoice?.discountTotal,
+      couponDiscount: invoice?.coupon?.discountAmount,
+      referralDiscount: invoice?.referral?.discountAmount,
+    });
+
+    // Hard guard: never show full bill as "discount" with Amount Paid ₹0
+    let amountPaidFinal = paid;
+    if (amountPaidFinal <= 0 && discountAmt > 0) {
+      amountPaidFinal = discountAmt;
+      discountAmt = 0;
+    }
+    if (
+      amountPaidFinal <= 0 &&
+      Number(amountPaidOverride) > 0
+    ) {
+      amountPaidFinal = Number(amountPaidOverride);
+    }
+    if (amountPaidFinal <= 0 && Number(invoice?.grandTotal) > 0) {
+      amountPaidFinal = Number(invoice.grandTotal);
+    }
+
+    const cashbackAmt = Math.max(0, Number(cashbackTotal ?? 0));
+
+    // Live wallet after debit + cashback credit (already posted before notify)
+    let walletBalance = Number(customer?.walletAmount ?? 0);
+    let membershipType = customer?.membershipType || membershipTypeHint;
+    if (customer?._id) {
+      const fresh = await Customer.findById(customer._id)
+        .select('walletAmount closingBalance membershipType name')
+        .lean();
+      if (fresh) {
+        walletBalance = Number(fresh.walletAmount ?? fresh.closingBalance ?? 0);
+        if (fresh.membershipType) membershipType = fresh.membershipType;
+      }
+    }
+    walletBalance = Math.max(0, walletBalance);
+
+    const detailsUrlParam = String(
+      process.env.WHATSAPP_ACTIVITY_DETAILS_URL_PARAM || invoice.invoiceCode || '',
+    ).trim();
+
+    const membershipLabel = membershipLabelForCustomer(
+      { membershipType },
+      membershipTypeHint,
+    );
+
+    console.log('[ActivityUpdate] notify payload', {
+      phone,
+      amountPaidFinal,
+      subTotal,
+      discountAmt,
+      cashbackAmt,
+      walletBalance,
+      membershipLabel,
+      membershipType,
+      grandTotal: invoice?.grandTotal,
+      paidAmount: invoice?.paymentBreakdown?.paidAmount,
+      amountPaidOverride,
+    });
+
+    await sendActivityUpdateWhatsApp({
+      to: phone,
+      name: customer?.name || customerName,
+      activityType: resolveActivityType({ activityType, notes, items }),
+      amountPaid: amountPaidFinal,
+      membershipLabel,
+      discountAmount: discountAmt,
+      cashbackAmount: cashbackAmt,
+      walletBalance,
+      detailsUrlParam,
+    });
+  } catch (err) {
+    console.error('[ActivityUpdate] notify error:', err?.message || err);
+  }
 };
 
 const applyWalletDelta = async ({
@@ -98,6 +310,49 @@ const applyWalletDelta = async ({
     note,
     referenceType: 'invoice',
     referenceId: invoiceCode,
+    createdBy,
+  });
+};
+
+/** Credit membership cashback to customer wallet (idempotent per invoice). */
+const creditMembershipCashback = async ({
+  customer,
+  invoiceCode,
+  amount,
+  createdBy,
+  activityType,
+}) => {
+  const cashbackAmt = Math.max(0, Number(amount ?? 0));
+  if (!customer?._id || !(cashbackAmt > 0)) return null;
+
+  let wallet = await Wallet.findOne({ customerId: customer._id });
+  if (!wallet) {
+    wallet = await Wallet.create({
+      customerId: customer._id,
+      customerName: String(customer.name ?? '').trim(),
+      customerPhone: String(customer.mobile ?? '').trim(),
+      walletAmount: 0,
+      transactions: [],
+    });
+  }
+
+  const ref = String(invoiceCode || '').trim();
+  const alreadyCredited = (wallet.transactions || []).some(
+    tx =>
+      String(tx.referenceId || '').trim() === ref &&
+      String(tx.type || '').toLowerCase() === 'credit' &&
+      /cashback/i.test(String(tx.note || '')),
+  );
+  if (alreadyCredited) {
+    return wallet;
+  }
+
+  return appendTransaction(wallet, {
+    type: 'credit',
+    amount: cashbackAmt,
+    note: `Membership cashback for ${String(activityType || 'Invoice').trim() || 'Invoice'} ${ref}`,
+    referenceType: 'invoice',
+    referenceId: ref,
     createdBy,
   });
 };
@@ -135,6 +390,10 @@ const createInvoice = async (req, res) => {
       coupon,
       referral,
       extraCharges,
+      cashbackTotal,
+      membershipDiscount,
+      activityType,
+      membershipType,
     } = req.body;
 
     console.log(req.body);
@@ -383,7 +642,17 @@ const createInvoice = async (req, res) => {
         upi: Number(paymentBreakdown?.upi ?? 0),
         card: Number(paymentBreakdown?.card ?? 0),
         wallet: walletAmount,
-        paidAmount: Number(paymentBreakdown?.paidAmount ?? 0),
+        paidAmount: (() => {
+          const explicit = Number(paymentBreakdown?.paidAmount ?? 0);
+          if (explicit > 0) return explicit;
+          const parts =
+            Number(paymentBreakdown?.cash ?? 0) +
+            Number(paymentBreakdown?.upi ?? 0) +
+            Number(paymentBreakdown?.card ?? 0) +
+            walletAmount;
+          if (parts > 0) return parts;
+          return Number(computedGrandTotal ?? 0);
+        })(),
         dueAmount: normalizedPendingAmount,
         changeAmount: Number(paymentBreakdown?.changeAmount ?? 0),
       },
@@ -398,6 +667,31 @@ const createInvoice = async (req, res) => {
         createdBy: actor,
         note: `Wallet used for invoice ${invoiceCode}`,
       });
+    }
+
+    // Post membership cashback to wallet before WhatsApp (idempotent per invoice)
+    const cashbackToCredit = Math.max(0, Number(cashbackTotal ?? 0));
+    if (
+      cashbackToCredit > 0 &&
+      customer &&
+      invoice.status !== 'draft' &&
+      invoice.status !== 'cancelled'
+    ) {
+      try {
+        await creditMembershipCashback({
+          customer,
+          invoiceCode,
+          amount: cashbackToCredit,
+          createdBy: actor,
+          activityType: resolveActivityType({
+            activityType,
+            notes,
+            items: normalizedItems,
+          }),
+        });
+      } catch (cashbackError) {
+        console.error('createInvoice cashback credit error:', cashbackError);
+      }
     }
 
     if (
@@ -443,6 +737,23 @@ const createInvoice = async (req, res) => {
     if (appliedCoupon?.code && invoice.status !== 'cancelled') {
       await applyCouponUsageDelta({ code: appliedCoupon.code, delta: 1 });
     }
+
+    // Fire-and-forget WhatsApp activity update (do not block invoice response)
+    void notifyActivityUpdateWhatsApp({
+      customer,
+      customerName,
+      customerPhone,
+      invoice,
+      notes,
+      items: normalizedItems,
+      activityType,
+      membershipDiscount,
+      cashbackTotal,
+      membershipType,
+      // Pass totals explicitly — do not rely on mongoose subdoc timing
+      amountPaidOverride: computedGrandTotal,
+      subTotalOverride: Number(subTotal ?? computedSubTotal),
+    });
 
     return res.status(201).json({
       success: true,

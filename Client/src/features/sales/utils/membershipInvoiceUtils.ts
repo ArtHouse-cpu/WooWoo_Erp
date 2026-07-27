@@ -104,23 +104,21 @@ export function getUsageLimitForCategory(
   const exact = Object.keys(limits).find((k) => k.toLowerCase() === lower);
   if (exact) return limits[exact];
 
-  // Fuzzy match: Food / Space / Store / Service line categories
+  // Fuzzy match: Food / Space / Products / Services / Store line categories
   const aliasGroups: string[][] = [
     ["food", "foods", "meal", "restaurant", "canteen"],
     ["space", "spaces", "booking", "room"],
-    [
-      "store",
-      "product",
-      "products",
-      "supply",
-      "sheets",
-      "stationary",
-      "stationery",
-    ],
+    ["product", "products", "store", "supply", "sheets", "stationary", "stationery"],
     ["service", "services"],
   ];
   for (const group of aliasGroups) {
-    if (!group.some((g) => lower.includes(g))) continue;
+    if (!group.some((g) => lower === g || lower.includes(g))) continue;
+    // Prefer canonical keys first (Products / Services / Food / Space)
+    const preferred = Object.keys(limits).find((k) => {
+      const nk = k.toLowerCase();
+      return group.some((g) => nk === g || nk === `${g}s`);
+    });
+    if (preferred) return limits[preferred];
     const key = Object.keys(limits).find((k) => {
       const nk = k.toLowerCase();
       return group.some((g) => nk.includes(g));
@@ -145,6 +143,38 @@ function isSpaceCategory(category: string) {
   return ["space", "spaces", "booking", "room"].some((g) => lower.includes(g));
 }
 
+function isProductCategory(category: string) {
+  const lower = String(category || "").trim().toLowerCase();
+  return [
+    "product",
+    "products",
+    "store",
+    "supply",
+    "sheets",
+    "stationary",
+    "stationery",
+  ].some((g) => lower === g || lower.includes(g));
+}
+
+function isServiceCategory(category: string) {
+  const lower = String(category || "").trim().toLowerCase();
+  return ["service", "services"].some((g) => lower === g || lower.includes(g));
+}
+
+function findLimitRow(
+  limits: Record<string, UsageLimit>,
+  matchers: string[],
+): UsageLimit | undefined {
+  const exact = Object.entries(limits).find(([k]) =>
+    matchers.some((m) => k.toLowerCase() === m),
+  );
+  if (exact) return exact[1];
+  const fuzzy = Object.entries(limits).find(([k]) =>
+    matchers.some((m) => k.toLowerCase().includes(m)),
+  );
+  return fuzzy?.[1];
+}
+
 /**
  * Resolve discount % and cashback % for a line.
  * Prefers usageLimits[category], then customerDisplay food/space/store badges.
@@ -166,7 +196,7 @@ export function resolveBenefitPercents(
         discountPercent = Number(display.foodDiscountPercent ?? 0) || 0;
       } else if (isSpaceCategory(category)) {
         discountPercent = Number(display.spaceDiscountPercent ?? 0) || 0;
-      } else {
+      } else if (isProductCategory(category)) {
         discountPercent = Number(display.storeDiscountPercent ?? 0) || 0;
       }
     }
@@ -175,23 +205,25 @@ export function resolveBenefitPercents(
     }
   }
 
-  // Last resort: any Food/Space row on the plan when category is Food/Space
+  // Last resort: canonical usageLimits rows (Food / Space / Products / Services)
   if (discountPercent <= 0 || cashbackPercent <= 0) {
     const limits = normalizeUsageLimits(plan.usageLimits);
+    let row: UsageLimit | undefined;
     if (isFoodCategory(category)) {
-      const foodRow =
-        limits.Food ||
-        limits.food ||
-        Object.entries(limits).find(([k]) =>
-          k.toLowerCase().includes("food"),
-        )?.[1];
-      if (foodRow) {
-        if (discountPercent <= 0) {
-          discountPercent = Number(foodRow.discount ?? 0) || 0;
-        }
-        if (cashbackPercent <= 0) {
-          cashbackPercent = Number(foodRow.cashback ?? 0) || 0;
-        }
+      row = findLimitRow(limits, ["food", "foods"]);
+    } else if (isSpaceCategory(category)) {
+      row = findLimitRow(limits, ["space", "spaces"]);
+    } else if (isServiceCategory(category)) {
+      row = findLimitRow(limits, ["services", "service"]);
+    } else if (isProductCategory(category)) {
+      row = findLimitRow(limits, ["products", "product", "store"]);
+    }
+    if (row) {
+      if (discountPercent <= 0) {
+        discountPercent = Number(row.discount ?? 0) || 0;
+      }
+      if (cashbackPercent <= 0) {
+        cashbackPercent = Number(row.cashback ?? 0) || 0;
       }
     }
   }

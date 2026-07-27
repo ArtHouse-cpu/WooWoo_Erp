@@ -72,6 +72,35 @@ const getAccountCreatedTemplateConfig = () => {
   };
 };
 
+const getActivityUpdateTemplateConfig = () => {
+  const {phoneNumberId, accessToken, language} = getConfig();
+  const templateName = (
+    process.env.WHATSAPP_ACTIVITY_UPDATE_TEMPLATE ||
+    'activityupdate'
+  ).trim();
+  const activityLanguage = (
+    process.env.WHATSAPP_ACTIVITY_UPDATE_TEMPLATE_LANGUAGE ||
+    language
+  ).trim();
+  const detailsUrlParam = (
+    process.env.WHATSAPP_ACTIVITY_DETAILS_URL_PARAM ||
+    ''
+  ).trim();
+  const walletUrlParam = (
+    process.env.WHATSAPP_ACTIVITY_WALLET_URL_PARAM ||
+    ''
+  ).trim();
+
+  return {
+    phoneNumberId,
+    accessToken,
+    templateName,
+    language: activityLanguage,
+    detailsUrlParam,
+    walletUrlParam,
+  };
+};
+
 const toWhatsAppRecipient = mobile => {
   const e164 = toE164(mobile);
   if (!e164) return null;
@@ -599,5 +628,231 @@ export const sendAccountCreatedWhatsApp = async ({to, name, cashbackLabel}) => {
     delivered: false,
     error: metaMessage,
     meta: lastError,
+  };
+};
+
+/** Plain amount for Meta templates that already include ₹ in the body text. */
+const formatAmountPlain = value => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '0';
+  const rounded = Math.round((n + Number.EPSILON) * 100) / 100;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return rounded.toFixed(2);
+};
+
+/**
+ * Live Meta body is: "As a {{6}} Member, you received:"
+ * so send tier only ("Premium") → "As a Premium Member".
+ * Set WHATSAPP_ACTIVITY_MEMBERSHIP_FULL_LABEL=1 only if Meta text has no trailing "Member".
+ */
+const formatActivityMembershipParam = label => {
+  const raw = String(label || 'Guest').trim() || 'Guest';
+  if (/^(1|true|yes)$/i.test(String(process.env.WHATSAPP_ACTIVITY_MEMBERSHIP_FULL_LABEL || '').trim())) {
+    return raw;
+  }
+  return (
+    raw
+      .replace(/\s+membership$/i, '')
+      .replace(/\s+member$/i, '')
+      .trim() || 'Guest'
+  );
+};
+
+/**
+ * Send post-bill Activity Update WhatsApp using template `activityupdate`.
+ *
+ * Live Meta placeholder map — proven by two delivery experiments (2026-07-27):
+ *   Send […,180,0,0,Guest,0] → Discount ₹180, Amount ₹0, Wallet ₹0
+ *   Send […,0,0,180,Guest,0] → Discount ₹0, Amount ₹0, Wallet ₹180
+ * Therefore:
+ *  {{1}} name
+ *  {{2}} activity
+ *  {{3}} discount
+ *  {{4}} cashback
+ *  {{5}} wallet balance
+ *  {{6}} membership (As a {{6}} Member)
+ *  {{7}} amount paid
+ */
+export const sendActivityUpdateWhatsApp = async ({
+  to,
+  name,
+  activityType,
+  amountPaid,
+  membershipLabel,
+  discountAmount,
+  cashbackAmount,
+  walletBalance,
+  detailsUrlParam,
+  walletUrlParam,
+}) => {
+  const config = getActivityUpdateTemplateConfig();
+  const {phoneNumberId, accessToken, templateName, language} = config;
+
+  const detailsParam = String(
+    detailsUrlParam ?? config.detailsUrlParam ?? '',
+  ).trim();
+  const walletParam = String(
+    walletUrlParam ?? config.walletUrlParam ?? '',
+  ).trim();
+
+  // Final safety: never deliver Amount Paid ₹0 with Discount = bill total
+  let paidSend = Number(amountPaid);
+  let discountSend = Number(discountAmount);
+  if (
+    (!Number.isFinite(paidSend) || paidSend <= 0) &&
+    Number.isFinite(discountSend) &&
+    discountSend > 0
+  ) {
+    paidSend = discountSend;
+    discountSend = 0;
+  }
+
+  // Match Meta numbers exactly (NOT visual reading order)
+  const bodyValues = [
+    String(name || 'Guest').trim() || 'Guest', // {{1}} name
+    String(activityType || 'Invoice').trim() || 'Invoice', // {{2}} activity
+    formatAmountPlain(discountSend), // {{3}} Discount
+    formatAmountPlain(cashbackAmount), // {{4}} Cashback
+    formatAmountPlain(walletBalance), // {{5}} Wallet
+    formatActivityMembershipParam(membershipLabel), // {{6}} membership
+    formatAmountPlain(paidSend), // {{7}} Amount Paid
+  ];
+
+  console.log('[ActivityUpdate] bodyValues', bodyValues, {
+    paidSend,
+    discountSend,
+    walletBalance,
+  });
+
+  if (!phoneNumberId || !accessToken) {
+    console.log(
+      `[ActivityUpdate][WhatsApp stub] to=${to} params=${JSON.stringify(bodyValues)}`,
+    );
+    return {channel: 'whatsapp-stub', delivered: false};
+  }
+
+  const recipient = toWhatsAppRecipient(to);
+  if (!recipient) {
+    return {
+      channel: 'whatsapp',
+      delivered: false,
+      error: 'Invalid mobile number for WhatsApp activity update',
+    };
+  }
+
+  let lastError = null;
+
+  // Prefer body-only first (static URL buttons on template), then dynamic URL suffixes
+  const buttonModes = [
+    {detailsParam: '', walletParam: ''},
+    {
+      detailsParam: detailsParam || 'details',
+      walletParam: walletParam || 'wallet',
+    },
+    {detailsParam: detailsParam || '', walletParam: ''},
+  ];
+
+  for (const lang of languageCandidates(language)) {
+    for (const mode of buttonModes) {
+      const components = [
+        {
+          type: 'body',
+          parameters: bodyValues.map(text => ({type: 'text', text})),
+        },
+      ];
+
+      if (mode.detailsParam) {
+        components.push({
+          type: 'button',
+          sub_type: 'url',
+          index: '0',
+          parameters: [{type: 'text', text: String(mode.detailsParam)}],
+        });
+      }
+      if (mode.walletParam) {
+        components.push({
+          type: 'button',
+          sub_type: 'url',
+          index: '1',
+          parameters: [{type: 'text', text: String(mode.walletParam)}],
+        });
+      }
+
+      const payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: recipient,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: {code: lang},
+          components,
+        },
+      };
+
+      const result = await postTemplateMessage({
+        phoneNumberId,
+        accessToken,
+        payload,
+      });
+
+      if (result.ok) {
+        const messageId = result.json?.messages?.[0]?.id || null;
+        console.log(
+          `[ActivityUpdate][WhatsApp] delivered to=${recipient} template=${templateName} lang=${lang} body=${JSON.stringify(bodyValues)} buttons=${JSON.stringify(mode)} id=${messageId}`,
+        );
+        return {
+          channel: 'whatsapp',
+          delivered: true,
+          messageId,
+          templateName,
+          language: lang,
+          bodyValues,
+        };
+      }
+
+      lastError = result.json?.error || {message: result.raw, status: result.status};
+      const message = String(lastError.message || '');
+
+      if (lastError.code === 190 || /oauth|access token|authenticat/i.test(message)) {
+        break;
+      }
+
+      if (/language|template name|does not exist|not found/i.test(message)) {
+        break;
+      }
+
+      if (/button|component|parameter|expected|number of params/i.test(message)) {
+        continue;
+      }
+
+      break;
+    }
+
+    if (
+      lastError?.code === 190 ||
+      /oauth|access token|authenticat|language|template name|does not exist|not found/i.test(
+        String(lastError?.message || ''),
+      )
+    ) {
+      break;
+    }
+  }
+
+  const metaMessage =
+    lastError?.error_user_msg ||
+    lastError?.message ||
+    'Unknown WhatsApp API error';
+
+  console.error('[ActivityUpdate][WhatsApp] failed:', lastError, {
+    bodyValues,
+  });
+
+  return {
+    channel: 'whatsapp',
+    delivered: false,
+    error: metaMessage,
+    meta: lastError,
+    bodyValues,
   };
 };

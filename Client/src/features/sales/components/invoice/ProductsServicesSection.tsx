@@ -121,7 +121,7 @@ export default function ProductsServicesSection({
     let calculatedCashback = 0;
     const plan = resolveMembershipPlan();
 
-    // Prefer Food / Space / sourceType so plan usageLimits.Food|Space apply
+    // Prefer Products / Services / Food / Space via sourceType so plan usageLimits apply
     const limit =
       getUsageLimitForCategory(plan?.usageLimits, lineCategory) ||
       getUsageLimitForCategory(plan?.usageLimits, membershipCategory);

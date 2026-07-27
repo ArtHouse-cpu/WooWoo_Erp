@@ -158,6 +158,14 @@ export type CreateInvoicePayload = {
     inviterName?: string;
     label?: string;
   } | null;
+  /** Membership cashback to show on WhatsApp activityupdate (and client wallet credit) */
+  cashbackTotal?: number;
+  /** Membership discount amount for WhatsApp activityupdate */
+  membershipDiscount?: number;
+  /** Customer membership tier for WhatsApp (premium | pro | …) */
+  membershipType?: string;
+  /** e.g. Food Bill | Space Booking | Invoice */
+  activityType?: string;
   createdBy?: {
     m_staff_id?: string | null;
     m_staff_name?: string | null;

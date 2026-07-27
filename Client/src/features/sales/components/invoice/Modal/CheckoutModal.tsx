@@ -837,6 +837,11 @@ export default function CheckoutModal({
       mode: paymentPayload.mode,
       paymentStatus: paymentPayload.paymentStatus,
       paymentBreakdown: paymentPayload.paymentBreakdown,
+      cashbackTotal: displayCashbackTotal,
+      membershipDiscount: displayMembershipDiscount,
+      membershipType:
+        selectedCustomer?.membershipType || membership || undefined,
+      activityType: "Invoice",
       createdBy: {
         m_staff_id: staff.m_staff_id,
         m_staff_name: staff.m_staff_name,

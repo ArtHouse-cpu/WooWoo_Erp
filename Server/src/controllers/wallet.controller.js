@@ -48,9 +48,25 @@ const appendTransaction = async (
   }
   const minimumAllowedBalance = Math.max(Number(minimumBalance) || 0, 0);
 
+  const refId = String(referenceId ?? "").trim();
+  const txType = String(type ?? "credit").toLowerCase();
+  // Prevent double membership cashback (server create + client credit)
+  if (refId && txType === "credit" && /cashback/i.test(String(note ?? ""))) {
+    const duplicate = (wallet.transactions || []).some(
+      tx =>
+        String(tx.referenceId || "").trim() === refId &&
+        String(tx.type || "").toLowerCase() === "credit" &&
+        Math.abs(Number(tx.amount) - numericAmount) < 0.001 &&
+        /cashback/i.test(String(tx.note || "")),
+    );
+    if (duplicate) {
+      return wallet;
+    }
+  }
+
   const currentBalance = Number(wallet.walletAmount ?? 0);
   const nextBalance =
-    type === "debit" ? currentBalance - numericAmount : currentBalance + numericAmount;
+    txType === "debit" ? currentBalance - numericAmount : currentBalance + numericAmount;
 
   if (nextBalance < 0) {
     throw new Error("Insufficient wallet balance.");
@@ -63,11 +79,11 @@ const appendTransaction = async (
 
   wallet.walletAmount = nextBalance;
   wallet.transactions.push({
-    type,
+    type: txType,
     amount: numericAmount,
     note: String(note ?? "").trim(),
     referenceType: String(referenceType ?? "").trim(),
-    referenceId: String(referenceId ?? "").trim(),
+    referenceId: refId,
     createdBy,
     closingBalance: nextBalance,
   });

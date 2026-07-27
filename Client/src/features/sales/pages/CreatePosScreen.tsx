@@ -299,6 +299,10 @@ export default function CreatePosScreen({
         paymentStatus: payment.paymentStatus,
         paymentBreakdown: payment.paymentBreakdown,
         pendingAmount: payment.paymentBreakdown.dueAmount,
+        cashbackTotal: payment.cashbackTotal,
+        membershipDiscount: payment.membershipDiscount,
+        membershipType: membership || undefined,
+        activityType: "POS Sale",
         createdBy: {
           m_staff_id: staff.m_staff_id,
           m_staff_name: staff.m_staff_name,

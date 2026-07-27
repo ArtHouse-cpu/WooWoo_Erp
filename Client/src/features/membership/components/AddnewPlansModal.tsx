@@ -134,10 +134,12 @@ const iconKeys = ["user", "star", "graduation", "crown"] as const;
 const discountTypes = ["Percentage", "Flat"] as const;
 const insightLevels = ["Basic", "Advanced"] as const;
 
-/** Always available for membership discounts (not only product catalogue categories) */
+/** Always available for membership discounts (catalogue line types + food/space) */
 const FIXED_USAGE_CATEGORIES = [
   { _id: "fixed-food", name: "Food" },
   { _id: "fixed-space", name: "Space" },
+  { _id: "fixed-products", name: "Products" },
+  { _id: "fixed-services", name: "Services" },
 ] as const;
 
 export default function AddnewPlansModal({
@@ -152,14 +154,31 @@ export default function AddnewPlansModal({
     [...FIXED_USAGE_CATEGORIES],
   );
 
-  /** Food + Space first, then catalogue categories (Sheets, Stationary, …) */
+  /** Food / Space / Products / Services first, then other catalogue categories */
   const usageLimitCategories = useMemo(() => {
     const seen = new Set<string>();
     const merged: { _id: string; name: string }[] = [];
+    const skipCatalogueDuplicates = new Set([
+      "food",
+      "foods",
+      "space",
+      "spaces",
+      "product",
+      "products",
+      "service",
+      "services",
+    ]);
     for (const cat of [...FIXED_USAGE_CATEGORIES, ...categories]) {
       const name = String(cat.name || "").trim();
       if (!name) continue;
       const key = name.toLowerCase();
+      // Avoid duplicate cards when catalogue already has Product/Service names
+      if (
+        !FIXED_USAGE_CATEGORIES.some((f) => f.name.toLowerCase() === key) &&
+        skipCatalogueDuplicates.has(key)
+      ) {
+        continue;
+      }
       if (seen.has(key)) continue;
       seen.add(key);
       merged.push({ _id: String(cat._id || key), name });
@@ -297,13 +316,16 @@ export default function AddnewPlansModal({
         },
       };
       const customerDisplay = { ...prev.customerDisplay };
-      // Keep display badges aligned with Food / Space usage cards
+      // Keep display badges aligned with Food / Space / Products usage cards
       if (field === "discount") {
         if (key.toLowerCase() === "food") {
           customerDisplay.foodDiscountPercent = next;
         }
         if (key.toLowerCase() === "space") {
           customerDisplay.spaceDiscountPercent = next;
+        }
+        if (key.toLowerCase() === "products" || key.toLowerCase() === "product") {
+          customerDisplay.storeDiscountPercent = next;
         }
       }
       if (field === "cashback" && key.toLowerCase() === "food") {
@@ -355,7 +377,7 @@ export default function AddnewPlansModal({
   const submit = async () => {
     if (!form.planId.trim() || !form.displayName.trim()) return;
 
-    // Ensure Food / Space keys exist so member discounts apply on food bill & space booking
+    // Ensure Food / Space / Products / Services keys exist for catalogue + food bill
     const usageLimits: UsageLimits = { ...form.usageLimits };
     for (const fixed of FIXED_USAGE_CATEGORIES) {
       if (!usageLimits[fixed.name]) {
@@ -383,6 +405,21 @@ export default function AddnewPlansModal({
       Object.entries(usageLimits).find(([k]) =>
         k.toLowerCase().includes("space"),
       )?.[1];
+    const productsLimit =
+      usageLimits.Products ||
+      usageLimits.Product ||
+      usageLimits.products ||
+      Object.entries(usageLimits).find(([k]) => {
+        const n = k.toLowerCase();
+        return n === "product" || n === "products" || n.includes("store");
+      })?.[1];
+    const servicesLimit =
+      usageLimits.Services ||
+      usageLimits.Service ||
+      usageLimits.services ||
+      Object.entries(usageLimits).find(([k]) =>
+        k.toLowerCase().includes("service"),
+      )?.[1];
 
     await onSubmit({
       planId: form.planId.trim(),
@@ -407,10 +444,17 @@ export default function AddnewPlansModal({
         foodDiscountPercent:
           Number(foodLimit?.discount ?? form.customerDisplay.foodDiscountPercent) ||
           0,
+        storeDiscountPercent:
+          Number(
+            productsLimit?.discount ?? form.customerDisplay.storeDiscountPercent,
+          ) || 0,
         // Prefer Food-card cashback when set so food bill can fall back to it
         cashbackPercent:
           Number(
-            foodLimit?.cashback ?? form.customerDisplay.cashbackPercent,
+            foodLimit?.cashback ??
+              productsLimit?.cashback ??
+              servicesLimit?.cashback ??
+              form.customerDisplay.cashbackPercent,
           ) || 0,
         badgeLabel:
           form.customerDisplay.badgeLabel.trim() ||
@@ -503,6 +547,50 @@ export default function AddnewPlansModal({
                     type="number"
                     placeholder="0"
                   />
+                    <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">
+                          Plan Status
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          Enable or disable this membership plan
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={
+                            form.status === "Active"
+                              ? "text-sm font-semibold text-emerald-700"
+                              : "text-sm font-semibold text-slate-500"
+                          }
+                        >
+                          {form.status}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((p) => ({
+                              ...p,
+                              status: p.status === "Active" ? "Inactive" : "Active",
+                            }))
+                          }
+                          className={`relative h-8 w-14 rounded-full transition ${
+                            form.status === "Active"
+                              ? "bg-emerald-500"
+                              : "bg-slate-300"
+                          }`}
+                          aria-label="Toggle status"
+                        >
+                          <span
+                            className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${
+                              form.status === "Active" ? "left-7" : "left-1"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </section>
 
@@ -680,9 +768,12 @@ export default function AddnewPlansModal({
 
                 <p className="mb-4 text-xs text-slate-500">
                   Set member Discount % and Cashback % per category.{" "}
-                  <span className="font-semibold text-orange-700">Food</span> and{" "}
-                  <span className="font-semibold text-orange-700">Space</span>{" "}
-                  apply on food bills and space bookings.
+                  <span className="font-semibold text-orange-700">Food</span>,{" "}
+                  <span className="font-semibold text-orange-700">Space</span>,{" "}
+                  <span className="font-semibold text-orange-700">Products</span>{" "}
+                  and{" "}
+                  <span className="font-semibold text-orange-700">Services</span>{" "}
+                  apply on food bills, space bookings, and catalogue sales.
                 </p>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -811,7 +902,7 @@ export default function AddnewPlansModal({
                     </select>
                   </div>
                   <InputField
-                    label="Store Discount (%)"
+                    label="Store / Products Discount (%)"
                     value={String(form.customerDisplay.storeDiscountPercent)}
                     onChange={(v) =>
                       setForm((p) => ({
@@ -819,6 +910,16 @@ export default function AddnewPlansModal({
                         customerDisplay: {
                           ...p.customerDisplay,
                           storeDiscountPercent: Number(v || 0),
+                        },
+                        usageLimits: {
+                          ...p.usageLimits,
+                          Products: {
+                            ...(p.usageLimits.Products || {
+                              discount: 0,
+                              cashback: 0,
+                            }),
+                            discount: Number(v || 0),
+                          },
                         },
                       }))
                     }
@@ -993,50 +1094,7 @@ export default function AddnewPlansModal({
                     </select>
                   </div>
 
-                  <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">
-                          Plan Status
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          Enable or disable this membership plan
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={
-                            form.status === "Active"
-                              ? "text-sm font-semibold text-emerald-700"
-                              : "text-sm font-semibold text-slate-500"
-                          }
-                        >
-                          {form.status}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setForm((p) => ({
-                              ...p,
-                              status: p.status === "Active" ? "Inactive" : "Active",
-                            }))
-                          }
-                          className={`relative h-8 w-14 rounded-full transition ${
-                            form.status === "Active"
-                              ? "bg-emerald-500"
-                              : "bg-slate-300"
-                          }`}
-                          aria-label="Toggle status"
-                        >
-                          <span
-                            className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${
-                              form.status === "Active" ? "left-7" : "left-1"
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                
                 </div>
               </section>
 
