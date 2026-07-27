@@ -3,6 +3,7 @@ import {
   Calendar,
   Coffee,
   Compass,
+  Crown,
   Gift,
   Home,
   LayoutDashboard,
@@ -35,8 +36,14 @@ export type ActionItem = {
 
 export const dashboardNav: NavItem[] = [
   {id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, to: '/home', section: 'Main'},
+  
+  {id: 'membership', label: 'Membership', icon: Crown, to: '/membership', section: 'Main'},
+
+
+
 
   {id: 'account', label: 'Account', icon: User, to: '/profile', section: 'Account'},
+
   {id: 'settings', label: 'Settings', icon: Settings, to: '/settings', section: 'Account'},
 ];
 
