@@ -288,8 +288,28 @@ const createInvoice = async (req, res) => {
       ? extraCharges.reduce((sum, c) => sum + Number(c.amount ?? 0), 0)
       : 0;
 
-    const computedDiscountTotal = itemDiscountTotal + couponDiscount + referralDiscount;
-    const computedGrandTotal = Math.max(0, computedSubTotal - computedDiscountTotal + extraChargesTotal);
+    // Line discounts (membership/item) + coupon + referral.
+    // If client also sends invoice-level discountTotal (e.g. membership not on lines),
+    // include the remainder so grandTotal matches the POS / Food Bill UI.
+    const promoDiscount = couponDiscount + referralDiscount;
+    const lineAndPromoDiscount = itemDiscountTotal + promoDiscount;
+    const clientDiscountTotal = Number(discountTotal);
+    const extraInvoiceDiscount =
+      Number.isFinite(clientDiscountTotal) && clientDiscountTotal > lineAndPromoDiscount + 0.001
+        ? Math.round((clientDiscountTotal - lineAndPromoDiscount) * 100) / 100
+        : 0;
+    const computedDiscountTotal = lineAndPromoDiscount + Math.max(0, extraInvoiceDiscount);
+    const computedFromParts = Math.max(
+      0,
+      computedSubTotal - computedDiscountTotal + extraChargesTotal,
+    );
+    const clientGrandTotal = Number(grandTotal);
+    // Prefer client grandTotal when it matches the discounted total (round-off / UI)
+    const computedGrandTotal =
+      Number.isFinite(clientGrandTotal) &&
+      Math.abs(clientGrandTotal - computedFromParts) <= 1
+        ? Math.max(0, clientGrandTotal)
+        : computedFromParts;
 
     const nextNumber = await getNextInvoiceNumber();
     const invoicePrefix = 'INVVWAH';

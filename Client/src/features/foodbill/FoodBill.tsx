@@ -59,6 +59,7 @@ import {
   type MembershipPlanPayload,
 } from "@/services/apiClient";
 import {
+  membershipBenefitsForLine,
   summarizeMembershipForCart,
 } from "@/features/sales/utils/membershipInvoiceUtils";
 
@@ -1259,12 +1260,51 @@ export default function FoodBill() {
       );
       const appliedCouponDiscount = Number(couponDiscount || 0);
       const appliedMembershipDiscount = Number(membershipDiscount || 0);
+      // Server recomputes grandTotal from line discounts + coupon + referral.
+      // Put membership (incl. round-off to match UI) on each item.discount.
+      const membershipDiscountForInvoice = Math.max(
+        0,
+        Math.round((subtotal - roundedBeforeReferral) * 100) / 100,
+      );
       const payableTotal = Math.max(
         0,
         roundedBeforeReferral -
           appliedCouponDiscount -
           appliedReferralDiscount,
       );
+
+      const invoiceItems = (() => {
+        const lines = cart.map((line) => {
+          const fromPlan = membershipBenefitsForLine(
+            line.item.price,
+            line.quantity,
+            "Food",
+            membershipPlan,
+          );
+          return {
+            productName: line.item.name,
+            qty: line.quantity,
+            unitPrice: line.item.price,
+            discount: Math.max(0, Number(fromPlan.discount || 0)),
+            category: "Food" as const,
+            lineGross: line.item.price * line.quantity,
+          };
+        });
+        const rawSum = lines.reduce((s, l) => s + l.discount, 0);
+        const target = membershipDiscountForInvoice;
+        const delta = Math.round((target - rawSum) * 100) / 100;
+        if (lines.length > 0 && Math.abs(delta) >= 0.01) {
+          // Adjust last line so invoice grand total matches Food Bill UI (incl. round off)
+          const last = lines[lines.length - 1];
+          last.discount = Math.max(
+            0,
+            Math.round((last.discount + delta) * 100) / 100,
+          );
+          // Cap so line discount never exceeds line gross
+          last.discount = Math.min(last.discount, last.lineGross);
+        }
+        return lines.map(({ lineGross: _g, ...item }) => item);
+      })();
 
       const mode = isMultiMode ? "MULTI" : toInvoicePaymentMode(paymentMethod);
 
@@ -1329,16 +1369,10 @@ export default function FoodBill() {
         dueDate: today,
         salesPersonName: staff?.m_staff_name ?? "Food Bill",
         notes,
-        items: cart.map((line) => ({
-          productName: line.item.name,
-          qty: line.quantity,
-          unitPrice: line.item.price,
-          discount: 0,
-          category: "Food",
-        })),
+        items: invoiceItems,
         subTotal: subtotal,
         discountTotal:
-          Number(appliedMembershipDiscount || 0) +
+          Number(membershipDiscountForInvoice || 0) +
           Number(appliedCouponDiscount || 0) +
           Number(appliedReferralDiscount || 0),
         grandTotal: payableTotal,
