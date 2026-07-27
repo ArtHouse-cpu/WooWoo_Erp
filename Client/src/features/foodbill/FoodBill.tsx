@@ -1,9 +1,14 @@
-import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
+import React, {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowLeft,
   ChevronDown,
   Search,
-  Scan,
   User,
   Plus,
   Minus,
@@ -17,7 +22,6 @@ import {
   Cookie,
   MoreHorizontal,
   Pencil,
-  Award,
   CreditCard,
   Save,
   FileText,
@@ -55,7 +59,6 @@ import {
   type MembershipPlanPayload,
 } from "@/services/apiClient";
 import {
-  getUsageLimitForCategory,
   summarizeMembershipForCart,
 } from "@/features/sales/utils/membershipInvoiceUtils";
 
@@ -197,6 +200,11 @@ function mapMembershipTier(membershipType?: string | null): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+function formatCustomerLabel(cust: { name: string; phone?: string }) {
+  const phone = String(cust.phone || "").trim();
+  return phone ? `${cust.name} · ${phone}` : cust.name;
+}
+
 function mapApiCustomer(raw: any): Customer | null {
   const id = String(raw?._id || raw?.id || "").trim();
   const name = String(raw?.name || "").trim();
@@ -249,7 +257,12 @@ export default function FoodBill() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
     WALK_IN_CUSTOMER.id,
   );
+  /** Keep full customer (membership fields) even if search refetch replaces the list */
+  const [selectedCustomerCache, setSelectedCustomerCache] =
+    useState<Customer>(WALK_IN_CUSTOMER);
   const [customerSearch, setCustomerSearch] = useState<string>("");
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const customerSearchWrapRef = useRef<HTMLDivElement>(null);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
@@ -272,8 +285,6 @@ export default function FoodBill() {
 
   const [tableNumber, setTableNumber] = useState<string>("Table 5");
   const [orderType, setOrderType] = useState<string>("Takeaway");
-  const [specialInstructions, setSpecialInstructions] = useState<string>("");
-  const [manualDiscount, setManualDiscount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
   const [amountReceived, setAmountReceived] = useState<string>("0");
   const [isMultiMode, setIsMultiMode] = useState(false);
@@ -332,11 +343,19 @@ export default function FoodBill() {
     setCouponLabel("");
   };
 
-  const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
+  const fetchCustomers = async (
+    searchText = "",
+    signal?: AbortSignal,
+    pinnedCustomer?: Customer | null,
+  ) => {
     const q = searchText.trim();
     // Never auto-load the full customer list — only search results
     if (!q) {
-      setCustomers([WALK_IN_CUSTOMER]);
+      setCustomers(
+        pinnedCustomer && pinnedCustomer.id !== WALK_IN_CUSTOMER.id
+          ? [pinnedCustomer, WALK_IN_CUSTOMER]
+          : [WALK_IN_CUSTOMER],
+      );
       setLoadingCustomers(false);
       return;
     }
@@ -349,22 +368,37 @@ export default function FoodBill() {
         .map(mapApiCustomer)
         .filter((c: Customer | null): c is Customer => Boolean(c));
 
+      const pinned =
+        pinnedCustomer && pinnedCustomer.id !== WALK_IN_CUSTOMER.id
+          ? pinnedCustomer
+          : null;
+      const withoutPinned = pinned
+        ? mapped.filter((c:any) => c.id !== pinned.id)
+        : mapped;
+
       const walkInMatches = WALK_IN_CUSTOMER.name
         .toLowerCase()
         .includes(q.toLowerCase());
 
+      const next = pinned ? [pinned, ...withoutPinned] : withoutPinned;
       setCustomers(
         walkInMatches
-          ? [...mapped, WALK_IN_CUSTOMER]
-          : mapped.length
-            ? mapped
-            : [],
+          ? [...next.filter((c:any) => c.id !== WALK_IN_CUSTOMER.id), WALK_IN_CUSTOMER]
+          : next.length
+            ? next
+            : pinned
+              ? [pinned, WALK_IN_CUSTOMER]
+              : [],
       );
     } catch (error: any) {
       if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
         return;
       }
-      setCustomers([]);
+      setCustomers(
+        pinnedCustomer && pinnedCustomer.id !== WALK_IN_CUSTOMER.id
+          ? [pinnedCustomer, WALK_IN_CUSTOMER]
+          : [],
+      );
     } finally {
       setLoadingCustomers(false);
     }
@@ -372,23 +406,31 @@ export default function FoodBill() {
 
   // Remote search only when user pauses typing for 300ms (skip empty query)
   useEffect(() => {
+    const pinned =
+      selectedCustomerCache.id !== WALK_IN_CUSTOMER.id
+        ? selectedCustomerCache
+        : null;
+
     if (!debouncedCustomerSearch) {
       // Keep selected customer pinned when search is cleared
-      setCustomers((prev) => {
-        const selected = prev.find(
-          (c) =>
-            c.id === selectedCustomerId && c.id !== WALK_IN_CUSTOMER.id,
-        );
-        return selected ? [selected, WALK_IN_CUSTOMER] : [WALK_IN_CUSTOMER];
-      });
+      setCustomers(pinned ? [pinned, WALK_IN_CUSTOMER] : [WALK_IN_CUSTOMER]);
       setLoadingCustomers(false);
       return;
     }
+
+    // After select the input shows "Name · Phone" — do not re-query that label
+    // (API won't match and would wipe the selected member).
+    if (pinned && formatCustomerLabel(pinned) === debouncedCustomerSearch) {
+      setCustomers([pinned, WALK_IN_CUSTOMER]);
+      setLoadingCustomers(false);
+      return;
+    }
+
     const controller = new AbortController();
-    void fetchCustomers(debouncedCustomerSearch, controller.signal);
+    void fetchCustomers(debouncedCustomerSearch, controller.signal, pinned);
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedCustomerSearch]);
+  }, [debouncedCustomerSearch, selectedCustomerCache]);
 
   const fetchFoods = async (searchText = "", signal?: AbortSignal) => {
     try {
@@ -422,17 +464,24 @@ export default function FoodBill() {
   useEffect(() => {
     const controller = new AbortController();
     handleGetMemberships({ status: "Active" }, controller.signal)
-      .then((res) => setMembershipPlans(res?.memberships || []))
+      .then((res) => {
+        const rows = Array.isArray(res?.memberships) ? res.memberships : [];
+        setMembershipPlans(rows);
+      })
       .catch(() => setMembershipPlans([]));
     return () => controller.abort();
   }, []);
 
-  // Selected Customer details helper
+  // Selected Customer details helper — prefer cache so membership survives search refetch
   const selectedCustomer = useMemo(() => {
+    if (selectedCustomerId === WALK_IN_CUSTOMER.id) return WALK_IN_CUSTOMER;
+    if (selectedCustomerCache.id === selectedCustomerId) {
+      return selectedCustomerCache;
+    }
     return (
       customers.find((c) => c.id === selectedCustomerId) || WALK_IN_CUSTOMER
     );
-  }, [customers, selectedCustomerId]);
+  }, [customers, selectedCustomerId, selectedCustomerCache]);
 
   const categories = useMemo<Category[]>(() => {
     const unique = Array.from(
@@ -471,19 +520,24 @@ export default function FoodBill() {
         if (b.id === WALK_IN_CUSTOMER.id) return -1;
         return a.name.localeCompare(b.name);
       })
-      .slice(0, 6);
+      .slice(0, 8);
   }, [customers, deferredCustomerSearch]);
 
-  // On select: hide all other customer cards — only selected remains
-  const visibleCustomers = useMemo(() => {
-    if (selectedCustomerId !== WALK_IN_CUSTOMER.id) {
-      const selected =
-        customers.find((c) => c.id === selectedCustomerId) ||
-        filteredCustomers.find((c) => c.id === selectedCustomerId);
-      return selected ? [selected] : [];
-    }
-    return filteredCustomers;
-  }, [selectedCustomerId, customers, filteredCustomers]);
+  const showCustomerDropdown =
+    customerDropdownOpen && customerSearch.trim().length > 0;
+
+  useEffect(() => {
+    const onPointerDown = (e: MouseEvent) => {
+      if (
+        customerSearchWrapRef.current &&
+        !customerSearchWrapRef.current.contains(e.target as Node)
+      ) {
+        setCustomerDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
 
   const handleCreateCustomerSubmit = async (args: {
     payload: CustomerPayload;
@@ -639,7 +693,7 @@ export default function FoodBill() {
     setCart((prev) => prev.filter((i) => i.item.id !== itemId));
   };
 
-  // Pricing calculations (membership → tax → coupon/referral)
+  // Pricing calculations (membership discount → coupon/referral; no tax)
   const subtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.item.price * item.quantity, 0);
   }, [cart]);
@@ -680,22 +734,14 @@ export default function FoodBill() {
   );
   const membershipCashback = Number(membershipSummary.cashbackTotal || 0);
   const membershipPlan = membershipSummary.plan;
-  const membershipDiscountPercent = Number(
-    getUsageLimitForCategory(membershipPlan?.usageLimits, "Food")?.discount ||
-      0,
-  );
+  const membershipBenefitTotal = Math.round(
+    (membershipDiscount + membershipCashback) * 10,
+  ) / 10;
 
-  const tax = useMemo(() => {
-    const taxableAmount = Math.max(
-      0,
-      subtotal - manualDiscount - membershipDiscount,
-    );
-    return Math.round(taxableAmount * 0.05 * 100) / 100; // 5% tax
-  }, [subtotal, manualDiscount, membershipDiscount]);
-
+  // No tax on food bill — membership discount reduces payable; cashback is wallet credit
   const totalBeforeRound = useMemo(() => {
-    return Math.max(0, subtotal - manualDiscount - membershipDiscount) + tax;
-  }, [subtotal, manualDiscount, membershipDiscount, tax]);
+    return Math.max(0, subtotal - membershipDiscount);
+  }, [subtotal, membershipDiscount]);
 
   const roundedBeforeReferral = useMemo(() => {
     return Math.round(totalBeforeRound);
@@ -714,12 +760,6 @@ export default function FoodBill() {
         Number(referralDiscount || 0),
     );
   }, [roundedBeforeReferral, couponDiscount, referralDiscount]);
-
-  // Loyalty calculations
-  const loyaltyPointsEarned = useMemo(() => {
-    if (selectedCustomer.tier === "New Customer") return 0;
-    return Math.max(1, Math.floor(grandTotal / 100));
-  }, [selectedCustomer, grandTotal]);
 
   const setSplitAmount = (mode: SplitKey, value: number) => {
     setSplitPayments((prev) => ({
@@ -993,12 +1033,15 @@ export default function FoodBill() {
   /** Same as invoice CheckoutModal — apply referral as soon as customer is picked */
   const handleSelectCustomer = (cust: Customer) => {
     setSelectedCustomerId(cust.id);
+    setSelectedCustomerCache(cust);
+    setCustomerDropdownOpen(false);
     if (cust.id === WALK_IN_CUSTOMER.id) {
       clearReferralDiscount();
       setWalletBalance(0);
       return;
     }
-    // Pin selected customer so other search results hide cleanly
+    setCustomerSearch(formatCustomerLabel(cust));
+    // Keep selected customer in local list for display / re-select
     setCustomers((prev) => [
       cust,
       ...prev.filter(
@@ -1035,13 +1078,22 @@ export default function FoodBill() {
     })();
   };
 
+  const handleClearSelectedCustomer = () => {
+    handleSelectCustomer(WALK_IN_CUSTOMER);
+    setCustomerSearch("");
+    clearReferralDiscount();
+    clearCouponDiscount();
+    setPromoCodeInput("");
+    setCustomerDropdownOpen(false);
+  };
+
   // Re-apply when cart / discount changes for the selected customer
   const referralOrderKey = useMemo(
     () =>
       `${selectedCustomer.id}|${selectedCustomer.phone}|${cart
         .map((c) => `${c.item.id}:${c.quantity}`)
-        .join(",")}|${manualDiscount}`,
-    [selectedCustomer.id, selectedCustomer.phone, cart, manualDiscount],
+        .join(",")}`,
+    [selectedCustomer.id, selectedCustomer.phone, cart],
   );
   const debouncedReferralKey = useDebounce(referralOrderKey, 350);
 
@@ -1149,10 +1201,11 @@ export default function FoodBill() {
           <hr class="border-dashed border-gray-300 my-2" />
           <div class="space-y-1 text-xs">
             <div class="flex justify-between"><span class="text-gray-500">Subtotal:</span><span class="text-gray-900">₹${subtotal.toFixed(2)}</span></div>
-            <div class="flex justify-between"><span class="text-gray-500">Discount:</span><span class="text-green-600">-₹${manualDiscount.toFixed(2)}</span></div>
             ${
-              membershipDiscount > 0
-                ? `<div class="flex justify-between"><span class="text-gray-500">Membership${membershipDiscountPercent > 0 ? ` (${membershipDiscountPercent}%)` : ""}${membershipPlan?.displayName ? ` · ${membershipPlan.displayName}` : ""}:</span><span class="text-green-600">-₹${membershipDiscount.toFixed(2)}</span></div>`
+              membershipDiscount > 0 || membershipCashback > 0
+                ? `<div class="flex justify-between"><span class="text-gray-500">Membership benefit:</span><span class="text-emerald-700 font-semibold">${membershipBenefitTotal.toFixed(1)}</span></div>
+            <div class="flex justify-between pl-2"><span class="text-gray-500">discount:</span><span class="text-green-600">₹${membershipDiscount.toFixed(2)}</span></div>
+            <div class="flex justify-between pl-2"><span class="text-gray-500">cashback:</span><span class="text-amber-600">₹${membershipCashback.toFixed(2)}</span></div>`
                 : ""
             }
             ${
@@ -1165,7 +1218,6 @@ export default function FoodBill() {
                 ? `<div class="flex justify-between"><span class="text-gray-500">${referralLabel}${referralCodeApplied ? ` (${referralCodeApplied})` : ""}:</span><span class="text-green-600">-₹${referralDiscount.toFixed(2)}</span></div>`
                 : ""
             }
-            <div class="flex justify-between"><span class="text-gray-500">Tax (5%):</span><span class="text-gray-900">₹${tax.toFixed(2)}</span></div>
             <div class="flex justify-between font-bold text-base text-gray-900 pt-1 mt-1 border-t border-gray-200">
               <span>Grand Total:</span>
               <span class="text-blue-600">₹${grandTotal.toFixed(2)}</span>
@@ -1263,7 +1315,6 @@ export default function FoodBill() {
 
       const notes = [
         billNote,
-        specialInstructions,
         `${orderType} · ${tableNumber}`,
         "Source: Food Bill",
       ]
@@ -1287,7 +1338,6 @@ export default function FoodBill() {
         })),
         subTotal: subtotal,
         discountTotal:
-          Number(manualDiscount || 0) +
           Number(appliedMembershipDiscount || 0) +
           Number(appliedCouponDiscount || 0) +
           Number(appliedReferralDiscount || 0),
@@ -1341,8 +1391,8 @@ export default function FoodBill() {
           <div class="text-sm text-left space-y-1">
             <p>Invoice <b>${invoiceCode}</b> saved.</p>
             ${
-              appliedMembershipDiscount > 0
-                ? `<p class="text-emerald-700">Membership${membershipDiscountPercent > 0 ? ` (${membershipDiscountPercent}%)` : ""}: −₹${appliedMembershipDiscount.toFixed(2)}</p>`
+              appliedMembershipDiscount > 0 || membershipCashback > 0
+                ? `<p class="text-emerald-700">Membership benefit: ${membershipBenefitTotal.toFixed(1)} (discount ₹${appliedMembershipDiscount.toFixed(2)} · cashback ₹${membershipCashback.toFixed(2)})</p>`
                 : ""
             }
             ${
@@ -1368,8 +1418,6 @@ export default function FoodBill() {
 
       setCart([]);
       setAmountReceived("0");
-      setManualDiscount(0);
-      setSpecialInstructions("");
       setBillNote("");
       setIsMultiMode(false);
       setSplitPayments({ cash: 0, upi: 0, card: 0, wallet: 0 });
@@ -1380,6 +1428,7 @@ export default function FoodBill() {
       setPromoType("coupon");
       setCustomerSearch("");
       setSelectedCustomerId(WALK_IN_CUSTOMER.id);
+      setSelectedCustomerCache(WALK_IN_CUSTOMER);
       setWalletBalance(0);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -1390,45 +1439,6 @@ export default function FoodBill() {
       );
     } finally {
       setSavingBill(false);
-    }
-  };
-
-  const handleManualDiscountClick = async () => {
-    const { value: discountInput } = await Swal.fire({
-      title: "Add Manual Discount",
-      input: "number",
-      inputLabel: "Discount Amount (₹)",
-      inputValue: manualDiscount.toString(),
-      showCancelButton: true,
-      inputValidator: (value) => {
-        if (!value || isNaN(Number(value)) || Number(value) < 0) {
-          return "Please enter a valid positive discount amount!";
-        }
-        if (Number(value) > subtotal) {
-          return `Discount cannot exceed subtotal (₹${subtotal})`;
-        }
-        return null;
-      },
-      confirmButtonColor: "#3B82F6",
-    });
-
-    if (discountInput) {
-      setManualDiscount(Number(discountInput));
-    }
-  };
-
-  const handleInstructionsClick = async () => {
-    const { value: text } = await Swal.fire({
-      title: "Special Instructions",
-      input: "textarea",
-      inputPlaceholder: "E.g., No onion/garlic, extra spicy, warm water...",
-      inputValue: specialInstructions,
-      showCancelButton: true,
-      confirmButtonColor: "#3B82F6",
-    });
-
-    if (text !== undefined) {
-      setSpecialInstructions(text);
     }
   };
 
@@ -1494,8 +1504,6 @@ export default function FoodBill() {
             onClick={() => {
               handleSelectCustomer(WALK_IN_CUSTOMER);
               setCart([]);
-              setManualDiscount(0);
-              setSpecialInstructions("");
               setCustomerSearch("");
               Swal.fire({
                 title: "New Walk-in Session",
@@ -1517,149 +1525,117 @@ export default function FoodBill() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         {/* LEFT / CENTER PANEL (8 Columns on desktop) */}
         <div className="lg:col-span-8 flex flex-col gap-4">
-          {/* A. CUSTOMER SEARCH & QUICK CARDS */}
+          {/* A. CUSTOMER SEARCH DROPDOWN */}
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-2xs">
-            {/* Search customer */}
-            <div className="mb-3.5 flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600 focus-within:border-blue-400 focus-within:bg-white transition-colors duration-150">
-              <Search size={18} className="text-gray-400 shrink-0" />
-              <input
-                type="text"
-                placeholder="Search customer by name or mobile"
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
-              />
-              {loadingCustomers ? (
-                <span className="shrink-0 text-[10px] font-medium text-blue-500">
-                  Searching…
-                </span>
-              ) : null}
-              <span title="Scan Barcode" className="shrink-0">
+            <div ref={customerSearchWrapRef} className="relative">
+              <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600 focus-within:border-blue-400 focus-within:bg-white transition-colors duration-150">
+                <Search size={18} className="text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  role="combobox"
+                  aria-expanded={showCustomerDropdown}
+                  aria-controls="foodbill-customer-listbox"
+                  aria-autocomplete="list"
+                  placeholder="Search customer by name or mobile"
+                  value={customerSearch}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setCustomerSearch(next);
+                    setCustomerDropdownOpen(true);
+                    if (selectedCustomerId !== WALK_IN_CUSTOMER.id) {
+                      setSelectedCustomerId(WALK_IN_CUSTOMER.id);
+                      setSelectedCustomerCache(WALK_IN_CUSTOMER);
+                      clearReferralDiscount();
+                      setWalletBalance(0);
+                    }
+                  }}
+                  onFocus={() => {
+                    if (customerSearch.trim()) setCustomerDropdownOpen(true);
+                  }}
+                  className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
+                />
+                {loadingCustomers ? (
+                  <span className="shrink-0 text-[10px] font-medium text-blue-500">
+                    Searching…
+                  </span>
+                ) : null}
+                {selectedCustomerId !== WALK_IN_CUSTOMER.id ? (
+                  <button
+                    type="button"
+                    onClick={handleClearSelectedCustomer}
+                    className="shrink-0 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[10px] font-bold text-gray-600 hover:bg-gray-50"
+                  >
+                    Change
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setShowCreateCustomerModal(true)}
-                  className="inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-blue-600 transition hover:text-blue-800"
+                  title="Add customer"
+                  className="inline-flex shrink-0 cursor-pointer items-center gap-1 text-xs font-semibold text-blue-600 transition hover:text-blue-800"
                 >
                   <UserPlus size={14} />
                 </button>
-              </span>
-            </div>
+              </div>
 
-            {/* Quick Cards — on select, only selected customer stays visible */}
-            <div
-              className={`grid grid-cols-1 gap-2.5 ${
-                selectedCustomerId === WALK_IN_CUSTOMER.id
-                  ? "sm:grid-cols-2 lg:grid-cols-3"
-                  : "sm:grid-cols-1 lg:grid-cols-1 max-w-md"
-              } ${
-                loadingCustomers &&
-                customerSearch.trim() !== debouncedCustomerSearch
-                  ? "opacity-80"
-                  : ""
-              }`}
-            >
-              {visibleCustomers.length === 0 ? (
-                <div className="col-span-full rounded-xl border border-dashed border-gray-200 px-3 py-6 text-center text-xs text-gray-500">
-                  {!customerSearch.trim()
-                    ? "Search by name or mobile to find a customer. Walk-in stays selected by default."
-                    : loadingCustomers
-                      ? "Looking up customers…"
-                      : "No customers found. Add a new customer to continue."}
-                </div>
-              ) : (
-                visibleCustomers.map((cust) => {
-                  const isSelected = selectedCustomerId === cust.id;
-                  const initials = cust.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()
-                    .slice(0, 2);
-                  const isWalkIn = cust.id === WALK_IN_CUSTOMER.id;
-                  const showOnlySelected =
-                    selectedCustomerId !== WALK_IN_CUSTOMER.id && isSelected;
-
-                  return (
-                    <div
-                      key={cust.id}
-                      onClick={() => {
-                        if (!showOnlySelected) handleSelectCustomer(cust);
-                      }}
-                      className={`flex items-center gap-3 rounded-xl border p-3 transition duration-150 ${
-                        isSelected
-                          ? "border-blue-500 bg-blue-50/50 shadow-2xs"
-                          : "cursor-pointer border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          cust.tier === "Gold"
-                            ? "bg-amber-100 text-amber-700"
-                            : cust.tier === "Silver"
-                              ? "bg-slate-200 text-slate-700"
-                              : "bg-blue-100 text-blue-700"
-                        }`}
-                      >
-                        {isWalkIn || !cust.phone ? (
-                          <User size={16} />
-                        ) : (
-                          initials
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="truncate font-semibold text-gray-900 text-xs sm:text-sm">
-                          {cust.name}
-                        </h3>
-                        <p className="truncate text-[11px] text-gray-500">
-                          {cust.phone || "No phone linked"}
-                        </p>
-                        <div className="mt-1 flex flex-wrap items-center gap-1">
-                          <span
-                            className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-medium leading-none ${
-                              cust.tier === "Gold"
-                                ? "border border-amber-100 bg-amber-50 text-amber-600"
-                                : cust.tier === "Silver"
-                                  ? "border border-slate-200 bg-slate-100 text-slate-600"
-                                  : "bg-gray-100 text-gray-600"
-                            }`}
+              {showCustomerDropdown ? (
+                <ul
+                  id="foodbill-customer-listbox"
+                  role="listbox"
+                  aria-label="Customers"
+                  className="absolute left-0 right-0 z-30 mt-1.5 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+                >
+                  {filteredCustomers.length === 0 ? (
+                    <li className="px-3 py-3 text-center text-xs text-gray-500">
+                      {loadingCustomers
+                        ? "Looking up customers…"
+                        : "No customers found"}
+                    </li>
+                  ) : (
+                    filteredCustomers.map((cust) => {
+                      const membershipLabel =
+                        cust.tier && cust.tier !== "New Customer"
+                          ? cust.tier
+                          : cust.membershipType &&
+                              cust.membershipType !== "none"
+                            ? mapMembershipTier(cust.membershipType)
+                            : "No membership";
+                      return (
+                        <li key={cust.id} role="option">
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleSelectCustomer(cust)}
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-blue-50 transition"
                           >
-                            {cust.tier}
-                          </span>
-                          {cust.referredBy ? (
-                            <span className="inline-block rounded-md border border-green-100 bg-green-50 px-1.5 py-0.5 text-[10px] font-medium leading-none text-green-700">
-                              Referred
-                            </span>
-                          ) : null}
-                          {cust.referralCode ? (
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-gray-900">
+                                {cust.name}
+                              </p>
+                              <p className="truncate text-[11px] text-gray-500">
+                                {cust.phone || "No phone"}
+                              </p>
+                            </div>
                             <span
-                              className="inline-block rounded-md border border-indigo-100 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium leading-none text-indigo-700"
-                              title="Customer's own share code (not applied as discount)"
+                              className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
+                                membershipLabel === "Gold"
+                                  ? "border border-amber-100 bg-amber-50 text-amber-700"
+                                  : membershipLabel === "Silver"
+                                    ? "border border-slate-200 bg-slate-100 text-slate-600"
+                                    : membershipLabel === "No membership"
+                                      ? "bg-gray-100 text-gray-500"
+                                      : "border border-indigo-100 bg-indigo-50 text-indigo-700"
+                              }`}
                             >
-                              {cust.referralCode}
+                              {membershipLabel}
                             </span>
-                          ) : null}
-                        </div>
-                      </div>
-                      {showOnlySelected ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectCustomer(WALK_IN_CUSTOMER);
-                            setCustomerSearch("");
-                            clearReferralDiscount();
-                            clearCouponDiscount();
-                            setPromoCodeInput("");
-                          }}
-                          className="shrink-0 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-gray-600 hover:bg-gray-50"
-                        >
-                          Change
-                        </button>
-                      ) : null}
-                    </div>
-                  );
-                })
-              )}
+                          </button>
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
+              ) : null}
             </div>
           </div>
 
@@ -1916,24 +1892,6 @@ export default function FoodBill() {
                 )}
               </div>
 
-              {/* Special Instructions Link */}
-              <div className="mb-4">
-                <button
-                  onClick={handleInstructionsClick}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-blue-200 bg-blue-50/20 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 transition cursor-pointer"
-                >
-                  <Pencil size={12} />
-                  {specialInstructions
-                    ? "Edit Special Instructions"
-                    : "Add Special Instructions"}
-                </button>
-                {specialInstructions && (
-                  <div className="mt-1.5 rounded-lg bg-gray-50 p-2 text-[10px] text-gray-500 italic border border-gray-100">
-                    "{specialInstructions}"
-                  </div>
-                )}
-              </div>
-
               {/* Bill values breakdown */}
               <div className="border-t border-gray-100 pt-3.5 space-y-1.5 text-xs">
                 <div className="flex justify-between text-gray-500">
@@ -1942,48 +1900,38 @@ export default function FoodBill() {
                     ₹{subtotal.toFixed(2)}
                   </span>
                 </div>
-                <div className="flex justify-between text-gray-500 items-center">
-                  <span>Discount</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleManualDiscountClick}
-                      className="text-blue-600 hover:underline font-semibold cursor-pointer"
-                    >
-                      Add Discount
-                    </button>
-                    <span className="font-semibold text-green-600">
-                      -₹{manualDiscount.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
 
                 {(membershipDiscount > 0 ||
+                  membershipCashback > 0 ||
                   (selectedCustomer.id !== WALK_IN_CUSTOMER.id &&
                     selectedCustomer.membershipType &&
                     selectedCustomer.membershipType !== "none")) && (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-2.5 py-2 space-y-0.5">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-2.5 py-2 space-y-1">
                     <div className="flex justify-between items-center gap-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-                        Membership Discount
-                        {membershipDiscountPercent > 0
-                          ? ` (${membershipDiscountPercent}%)`
-                          : ""}
+                      <span className="text-[11px] font-bold tracking-wide text-emerald-700">
+                        Membership benefit:{" "}
+                        {membershipBenefitTotal > 0
+                          ? membershipBenefitTotal.toFixed(1)
+                          : "0"}
                       </span>
-                      <span className="text-xs font-semibold text-green-600">
-                        −₹{membershipDiscount.toFixed(2)}
+                      <span className="text-[10px] font-medium text-emerald-600 truncate max-w-[40%]">
+                        {membershipPlan?.displayName ||
+                          selectedCustomer.tier ||
+                          "Member"}
                       </span>
                     </div>
-                    <p className="text-[10px] text-emerald-700/80">
-                      {membershipPlan?.displayName ||
-                        selectedCustomer.tier ||
-                        "Member"}
-                      {membershipDiscount > 0
-                        ? " · Food plan benefit applied"
-                        : " · No Food discount on this plan"}
-                      {membershipCashback > 0
-                        ? ` · Cashback ₹${membershipCashback.toFixed(2)}`
-                        : ""}
-                    </p>
+                    <div className="flex justify-between text-[11px] text-emerald-800">
+                      <span>discount:</span>
+                      <span className="font-semibold text-green-600">
+                        ₹{membershipDiscount.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-emerald-800">
+                      <span>cashback:</span>
+                      <span className="font-semibold text-amber-600">
+                        ₹{membershipCashback.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 )}
 
@@ -2102,12 +2050,6 @@ export default function FoodBill() {
                 </div>
 
                 <div className="flex justify-between text-gray-500">
-                  <span>Tax (5%)</span>
-                  <span className="font-semibold text-gray-850">
-                    ₹{tax.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-gray-500">
                   <span>Round off</span>
                   <span className="font-semibold text-gray-850">
                     ₹
@@ -2127,32 +2069,6 @@ export default function FoodBill() {
                   </span>
                 </div>
               </div>
-
-              {/* Loyalty banner */}
-              {selectedCustomer.tier !== "New Customer" && (
-                <div className="mt-3 flex items-center justify-between rounded-xl bg-amber-50 p-2.5 border border-amber-100">
-                  <div className="flex items-center gap-2">
-                    <Award size={18} className="text-amber-500 shrink-0" />
-                    <div className="min-w-0">
-                      <h4 className="truncate text-xs font-bold text-gray-900">
-                        {selectedCustomer.name} ({selectedCustomer.tier})
-                      </h4>
-                      <p className="text-[10px] text-gray-600">
-                        You will earn {loyaltyPointsEarned} points on this bill
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedCustomerId(WALK_IN_CUSTOMER.id);
-                      clearReferralDiscount();
-                    }}
-                    className="rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-gray-500 hover:bg-gray-100 border border-gray-200 transition cursor-pointer"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
 
               {/* Payment Methods */}
               <div className="mt-4 border-t border-gray-100 pt-3.5">

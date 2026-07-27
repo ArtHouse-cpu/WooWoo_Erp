@@ -1,6 +1,31 @@
 import mongoose from 'mongoose';
 import Membership from '../models/membership.model.js';
 
+/** Mongoose Map → plain object so clients always get Food/Space % keys */
+const toPlainUsageLimits = (usageLimits) => {
+  if (!usageLimits) return {};
+  if (usageLimits instanceof Map) {
+    return Object.fromEntries(usageLimits.entries());
+  }
+  if (typeof usageLimits?.toJSON === 'function') {
+    const json = usageLimits.toJSON();
+    if (json && typeof json === 'object') return json;
+  }
+  if (typeof usageLimits === 'object') return { ...usageLimits };
+  return {};
+};
+
+const serializeMembership = (doc) => {
+  const plain =
+    typeof doc?.toObject === 'function'
+      ? doc.toObject({ flattenMaps: true })
+      : { ...(doc || {}) };
+  plain.usageLimits = toPlainUsageLimits(
+    plain.usageLimits ?? doc?.usageLimits,
+  );
+  return plain;
+};
+
 const normalizeCustomerDisplay = (input = {}) => ({
   showInApp: input.showInApp !== false,
   badgeLabel: String(input.badgeLabel ?? '').trim(),
@@ -77,7 +102,7 @@ export const createMembership = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Membership created successfully.',
-      membership,
+      membership: serializeMembership(membership),
     });
   } catch (error) {
     console.error('createMembership error:', error);
@@ -112,7 +137,7 @@ export const getMemberships = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Memberships fetched successfully.',
-      memberships,
+      memberships: memberships.map(serializeMembership),
     });
   } catch (error) {
     console.error('getMemberships error:', error);
@@ -187,7 +212,7 @@ export const updateMembership = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Membership updated successfully.',
-      membership,
+      membership: serializeMembership(membership),
     });
   } catch (error) {
     console.error('updateMembership error:', error);

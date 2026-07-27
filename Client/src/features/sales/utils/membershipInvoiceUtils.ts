@@ -1,5 +1,7 @@
 import type { MembershipPlanPayload } from "@/services/apiClient";
 
+export type UsageLimit = { discount?: number; cashback?: number };
+
 export function toMembershipPlanId(raw: unknown): string | null {
   if (raw == null || raw === "") return null;
   if (typeof raw === "object" && raw !== null && "_id" in (raw as object)) {
@@ -11,61 +13,190 @@ export function toMembershipPlanId(raw: unknown): string | null {
   return s || null;
 }
 
+/** Convert Map / plain / nested API shapes into a plain Record */
+export function normalizeUsageLimits(
+  usageLimits: unknown,
+): Record<string, UsageLimit> {
+  if (!usageLimits) return {};
+
+  if (typeof Map !== "undefined" && usageLimits instanceof Map) {
+    return Object.fromEntries(
+      [...usageLimits.entries()].map(([k, v]) => [
+        String(k),
+        {
+          discount: Number((v as UsageLimit)?.discount ?? 0) || 0,
+          cashback: Number((v as UsageLimit)?.cashback ?? 0) || 0,
+        },
+      ]),
+    );
+  }
+
+  if (typeof usageLimits !== "object") return {};
+
+  const out: Record<string, UsageLimit> = {};
+  for (const [k, v] of Object.entries(usageLimits as Record<string, unknown>)) {
+    if (!v || typeof v !== "object") continue;
+    const row = v as UsageLimit;
+    out[String(k)] = {
+      discount: Number(row.discount ?? 0) || 0,
+      cashback: Number(row.cashback ?? 0) || 0,
+    };
+  }
+  return out;
+}
+
 export function resolveMembershipPlan(
   plans: MembershipPlanPayload[],
   membershipType: string,
   membershipPlanId?: unknown,
 ): MembershipPlanPayload | undefined {
+  const list = Array.isArray(plans) ? plans : [];
   const mId = toMembershipPlanId(membershipPlanId);
   const mType = String(membershipType ?? "none").trim().toLowerCase();
   if (!mId && (mType === "none" || mType === "")) return undefined;
 
   if (mId) {
-    const byId = plans.find((p) => p._id && String(p._id) === String(mId));
+    const byId = list.find((p) => p._id && String(p._id) === String(mId));
     if (byId) return byId;
   }
 
-  return plans.find(
-    (p) =>
-      String(p.planId ?? "").trim().toLowerCase() === mType ||
-      String(p.planType ?? "").trim().toLowerCase() === mType ||
-      String(p.displayName ?? "").trim().toLowerCase() === mType,
-  );
+  // Exact match on planId / planType / displayName
+  const exact = list.find((p) => {
+    const planId = String(p.planId ?? "").trim().toLowerCase();
+    const planType = String(p.planType ?? "").trim().toLowerCase();
+    const display = String(p.displayName ?? "").trim().toLowerCase();
+    return planId === mType || planType === mType || display === mType;
+  });
+  if (exact) return exact;
+
+  // Fuzzy: "premium" matches displayName "Premium Membership", planId "prem", etc.
+  const fuzzy = list.find((p) => {
+    const planId = String(p.planId ?? "").trim().toLowerCase();
+    const planType = String(p.planType ?? "").trim().toLowerCase();
+    const display = String(p.displayName ?? "").trim().toLowerCase();
+    const badge = String(p.customerDisplay?.badgeLabel ?? "")
+      .trim()
+      .toLowerCase();
+    return (
+      (planId && (planId.includes(mType) || mType.includes(planId))) ||
+      (display && (display.includes(mType) || mType.includes(display))) ||
+      (planType && (planType.includes(mType) || mType.includes(planType))) ||
+      (badge && badge.includes(mType))
+    );
+  });
+  return fuzzy;
 }
 
 export function getUsageLimitForCategory(
   usageLimits:
-    | Record<string, { discount?: number; cashback?: number }>
-    | undefined,
+    | Record<string, UsageLimit>
+    | undefined
+    | unknown,
   category: string,
-): { discount?: number; cashback?: number } | undefined {
-  if (!usageLimits || typeof usageLimits !== "object") return undefined;
+): UsageLimit | undefined {
+  const limits = normalizeUsageLimits(usageLimits);
+  if (!Object.keys(limits).length) return undefined;
+
   const cat = String(category ?? "General").trim();
-  if (usageLimits[cat]) return usageLimits[cat];
+  if (limits[cat]) return limits[cat];
 
   const lower = cat.toLowerCase();
-  const exact = Object.keys(usageLimits).find((k) => k.toLowerCase() === lower);
-  if (exact) return usageLimits[exact];
+  const exact = Object.keys(limits).find((k) => k.toLowerCase() === lower);
+  if (exact) return limits[exact];
 
   // Fuzzy match: Food / Space / Store / Service line categories
   const aliasGroups: string[][] = [
     ["food", "foods", "meal", "restaurant", "canteen"],
     ["space", "spaces", "booking", "room"],
-    ["store", "product", "products", "supply", "sheets", "stationary", "stationery"],
+    [
+      "store",
+      "product",
+      "products",
+      "supply",
+      "sheets",
+      "stationary",
+      "stationery",
+    ],
     ["service", "services"],
   ];
   for (const group of aliasGroups) {
     if (!group.some((g) => lower.includes(g))) continue;
-    const key = Object.keys(usageLimits).find((k) => {
+    const key = Object.keys(limits).find((k) => {
       const nk = k.toLowerCase();
       return group.some((g) => nk.includes(g));
     });
-    if (key) return usageLimits[key];
+    if (key) return limits[key];
   }
 
-  if (usageLimits.General) return usageLimits.General;
-  if (usageLimits.general) return usageLimits.general;
+  if (limits.General) return limits.General;
+  if (limits.general) return limits.general;
   return undefined;
+}
+
+function isFoodCategory(category: string) {
+  const lower = String(category || "").trim().toLowerCase();
+  return ["food", "foods", "meal", "restaurant", "canteen"].some((g) =>
+    lower.includes(g),
+  );
+}
+
+function isSpaceCategory(category: string) {
+  const lower = String(category || "").trim().toLowerCase();
+  return ["space", "spaces", "booking", "room"].some((g) => lower.includes(g));
+}
+
+/**
+ * Resolve discount % and cashback % for a line.
+ * Prefers usageLimits[category], then customerDisplay food/space/store badges.
+ */
+export function resolveBenefitPercents(
+  category: string,
+  plan: MembershipPlanPayload | undefined,
+): { discountPercent: number; cashbackPercent: number } {
+  if (!plan) return { discountPercent: 0, cashbackPercent: 0 };
+
+  const limit = getUsageLimitForCategory(plan.usageLimits, category);
+  let discountPercent = Number(limit?.discount ?? 0) || 0;
+  let cashbackPercent = Number(limit?.cashback ?? 0) || 0;
+
+  const display = plan.customerDisplay;
+  if (display) {
+    if (discountPercent <= 0) {
+      if (isFoodCategory(category)) {
+        discountPercent = Number(display.foodDiscountPercent ?? 0) || 0;
+      } else if (isSpaceCategory(category)) {
+        discountPercent = Number(display.spaceDiscountPercent ?? 0) || 0;
+      } else {
+        discountPercent = Number(display.storeDiscountPercent ?? 0) || 0;
+      }
+    }
+    if (cashbackPercent <= 0) {
+      cashbackPercent = Number(display.cashbackPercent ?? 0) || 0;
+    }
+  }
+
+  // Last resort: any Food/Space row on the plan when category is Food/Space
+  if (discountPercent <= 0 || cashbackPercent <= 0) {
+    const limits = normalizeUsageLimits(plan.usageLimits);
+    if (isFoodCategory(category)) {
+      const foodRow =
+        limits.Food ||
+        limits.food ||
+        Object.entries(limits).find(([k]) =>
+          k.toLowerCase().includes("food"),
+        )?.[1];
+      if (foodRow) {
+        if (discountPercent <= 0) {
+          discountPercent = Number(foodRow.discount ?? 0) || 0;
+        }
+        if (cashbackPercent <= 0) {
+          cashbackPercent = Number(foodRow.cashback ?? 0) || 0;
+        }
+      }
+    }
+  }
+
+  return { discountPercent, cashbackPercent };
 }
 
 export function membershipBenefitsForLine(
@@ -74,18 +205,21 @@ export function membershipBenefitsForLine(
   category: string,
   plan: MembershipPlanPayload | undefined,
 ): { discount: number; cashback: number } {
-  if (!plan?.usageLimits) return { discount: 0, cashback: 0 };
-  const limit = getUsageLimitForCategory(
-    plan.usageLimits as Record<string, { discount?: number; cashback?: number }>,
+  if (!plan) return { discount: 0, cashback: 0 };
+
+  const { discountPercent, cashbackPercent } = resolveBenefitPercents(
     category,
+    plan,
   );
-  if (!limit) return { discount: 0, cashback: 0 };
-  const discount = limit.discount
-    ? (Number(unitPrice) * Number(qty) * Number(limit.discount)) / 100
-    : 0;
-  const cashback = limit.cashback
-    ? (Number(unitPrice) * Number(qty) * Number(limit.cashback)) / 100
-    : 0;
+  const lineTotal = Number(unitPrice) * Number(qty);
+  if (!Number.isFinite(lineTotal) || lineTotal <= 0) {
+    return { discount: 0, cashback: 0 };
+  }
+
+  const discount =
+    discountPercent > 0 ? (lineTotal * discountPercent) / 100 : 0;
+  const cashback =
+    cashbackPercent > 0 ? (lineTotal * cashbackPercent) / 100 : 0;
   return { discount, cashback };
 }
 

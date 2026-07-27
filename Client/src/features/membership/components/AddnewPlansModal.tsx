@@ -306,6 +306,9 @@ export default function AddnewPlansModal({
           customerDisplay.spaceDiscountPercent = next;
         }
       }
+      if (field === "cashback" && key.toLowerCase() === "food") {
+        customerDisplay.cashbackPercent = next;
+      }
       return { ...prev, usageLimits, customerDisplay };
     });
   };
@@ -404,6 +407,11 @@ export default function AddnewPlansModal({
         foodDiscountPercent:
           Number(foodLimit?.discount ?? form.customerDisplay.foodDiscountPercent) ||
           0,
+        // Prefer Food-card cashback when set so food bill can fall back to it
+        cashbackPercent:
+          Number(
+            foodLimit?.cashback ?? form.customerDisplay.cashbackPercent,
+          ) || 0,
         badgeLabel:
           form.customerDisplay.badgeLabel.trim() ||
           form.pricing.period,
