@@ -79,6 +79,89 @@ const normalizeGender = gender => {
   return null;
 };
 
+/** Customer mobiles are stored as 10-digit Indian numbers (6–9…). */
+const normalizeCustomerMobile = input => {
+  const digits = String(input ?? '').replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    const ten = digits.slice(2);
+    return /^[6-9]\d{9}$/.test(ten) ? ten : null;
+  }
+  if (digits.length === 10 && /^[6-9]\d{9}$/.test(digits)) return digits;
+  return null;
+};
+
+const findCustomerByMobile = async (mobile, excludeId = null) => {
+  const query = {mobile, isDeleted: {$ne: true}};
+  if (excludeId && mongoose.Types.ObjectId.isValid(excludeId)) {
+    query._id = {$ne: excludeId};
+  }
+  return Customer.findOne(query)
+    .select('_id name mobile email membershipType')
+    .lean();
+};
+
+/**
+ * GET/POST /customer/check-phone
+ * Body/query: mobile | phone | phoneNumber
+ */
+const checkCustomerPhone = async (req, res) => {
+  try {
+    const raw =
+      req.body?.mobile ??
+      req.body?.phone ??
+      req.body?.phoneNumber ??
+      req.query?.mobile ??
+      req.query?.phone ??
+      req.query?.phoneNumber ??
+      '';
+    const excludeId =
+      req.body?.excludeId ?? req.query?.excludeId ?? null;
+
+    const mobile = normalizeCustomerMobile(raw);
+    if (!mobile) {
+      return res.status(400).json({
+        success: false,
+        exists: false,
+        available: false,
+        message: 'Valid 10-digit mobile number is required.',
+      });
+    }
+
+    const existing = await findCustomerByMobile(mobile, excludeId);
+    if (existing) {
+      return res.status(200).json({
+        success: true,
+        exists: true,
+        available: false,
+        message: 'A customer with this mobile number already exists.',
+        customer: {
+          id: existing._id,
+          name: existing.name,
+          mobile: existing.mobile,
+          email: existing.email,
+          membershipType: existing.membershipType,
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      exists: false,
+      available: true,
+      message: 'Mobile number is available.',
+      mobile,
+    });
+  } catch (error) {
+    console.error('checkCustomerPhone error:', error);
+    return res.status(500).json({
+      success: false,
+      exists: false,
+      available: false,
+      message: 'Failed to check mobile number.',
+    });
+  }
+};
+
 const createCustomer = async (req, res) => {
   try {
     const {
@@ -115,10 +198,26 @@ const createCustomer = async (req, res) => {
       });
     }
 
-    if (!/^[6-9]\d{9}$/.test(String(mobile).trim())) {
+    const mobileNorm = normalizeCustomerMobile(mobile);
+    if (!mobileNorm) {
       return res.status(400).json({
         success: false,
         message: 'Invalid mobile number',
+      });
+    }
+
+    // Explicit duplicate check (before create / unique-index race)
+    const existingMobile = await findCustomerByMobile(mobileNorm);
+    if (existingMobile) {
+      return res.status(409).json({
+        success: false,
+        exists: true,
+        message: 'A customer with this mobile number already exists.',
+        customer: {
+          id: existingMobile._id,
+          name: existingMobile.name,
+          mobile: existingMobile.mobile,
+        },
       });
     }
 
@@ -166,7 +265,7 @@ const createCustomer = async (req, res) => {
 
     const customer = await Customer.create({
       name: String(name).trim(),
-      mobile: String(mobile).trim(),
+      mobile: mobileNorm,
       email: String(email ?? '').trim(),
       gstin: String(gstin ?? '').trim(),
       companyName: String(companyName ?? '').trim(),
@@ -263,7 +362,10 @@ const createCustomer = async (req, res) => {
 const getCustomers = async (req, res) => {
   try {
     const search = String(req.query.search ?? '').trim();
-    const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 5000);
+    // Allow large list fetches for CRM; keep a hard cap for safety
+    const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 10000);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const skip = (page - 1) * limit;
     const query = {isDeleted: {$ne: true}};
 
     if (search) {
@@ -278,8 +380,18 @@ const getCustomers = async (req, res) => {
       ];
     }
 
+    // List payload must stay light — exclude heavy/nested fields that blow up
+    // empty-search responses (profileImage base64, coupon history, etc.)
+    const listProjection =
+      'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId walletAmount closingBalance cashbackBalance affiliateBalance referralCode referredBy status createdAt updatedAt createdBy';
+
     const [customers, total] = await Promise.all([
-      Customer.find(query).sort({createdAt: -1}).limit(limit).lean(),
+      Customer.find(query)
+        .select(listProjection)
+        .sort({createdAt: -1})
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       Customer.countDocuments(query),
     ]);
 
@@ -289,6 +401,9 @@ const getCustomers = async (req, res) => {
       customers,
       total,
       limit,
+      page,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      hasMore: skip + customers.length < total,
     });
   } catch (error) {
     console.error('getCustomers error:', error);
@@ -321,9 +436,24 @@ const editCustomer = async (req, res) => {
       update.name = String(b.name).trim();
     }
     if (b.mobile !== undefined) {
-      const m = String(b.mobile).trim();
-      if (!/^[6-9]\d{9}$/.test(m)) {
+      const m = normalizeCustomerMobile(b.mobile);
+      if (!m) {
         return res.status(400).json({success: false, message: 'Invalid mobile number.'});
+      }
+      if (m !== String(existing.mobile || '').trim()) {
+        const taken = await findCustomerByMobile(m, id);
+        if (taken) {
+          return res.status(409).json({
+            success: false,
+            exists: true,
+            message: 'A customer with this mobile number already exists.',
+            customer: {
+              id: taken._id,
+              name: taken.name,
+              mobile: taken.mobile,
+            },
+          });
+        }
       }
       update.mobile = m;
     }
@@ -744,4 +874,5 @@ export {
   editCustomer,
   deleteCustomer,
   importCustomers,
+  checkCustomerPhone,
 };

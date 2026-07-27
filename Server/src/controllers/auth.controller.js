@@ -614,6 +614,62 @@ const forgotPassword = async (req, res) => {
   }
 };
 
+const checkPhone = async (req, res) => {
+  try {
+    const raw =
+      req.body?.phoneNumber ??
+      req.body?.mobile ??
+      req.body?.phone ??
+      req.query?.phoneNumber ??
+      req.query?.mobile ??
+      '';
+
+    const phoneNorm = normalizePhone(raw);
+    if (!phoneNorm) {
+      return res.status(400).json({
+        success: false,
+        exists: false,
+        available: false,
+        message: 'Valid 10-digit phone number is required.',
+      });
+    }
+
+    const user = await User.findOne({ phoneNumber: phoneNorm })
+      .select('_id fullName phoneNumber email')
+      .lean();
+
+    if (user) {
+      return res.status(200).json({
+        success: true,
+        exists: true,
+        available: false,
+        message: 'Phone number already exists.',
+        user: {
+          id: user._id,
+          fullName: user.fullName,
+          phoneNumber: user.phoneNumber,
+          email: user.email,
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      exists: false,
+      available: true,
+      message: 'Phone number is available.',
+    });
+  } catch (error) {
+    console.error('checkPhone error:', error);
+    return res.status(500).json({
+      success: false,
+      exists: false,
+      available: false,
+      message: 'Failed to check phone number.',
+    });
+  }
+};
+
 export {
   healthCheck,
   register,
@@ -625,4 +681,5 @@ export {
   updateMe,
   updateUser,
   forgotPassword,
+  checkPhone
 };

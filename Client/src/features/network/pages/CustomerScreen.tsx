@@ -18,7 +18,7 @@ import {
   customerPayloadToFormData,
   handleCreateCustomer,
   handleDeleteCustomer,
-  handleGetCustomers,
+  handleGetAllCustomers,
   handleGetInvoices,
   handleGetSubscriptions,
   handleGetWallets,
@@ -112,37 +112,43 @@ export default function CustomerScreen() {
   const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
     try {
       setLoadingCustomers(true);
-      const [
-        customerResponse,
-        walletResponse,
-        invoiceResponse,
-        subscriptionResponse,
-      ] = await Promise.allSettled([
-        handleGetCustomers(searchText, signal, 6000),
-        handleGetWallets({ search: searchText }, signal),
-        handleGetInvoices(searchText, signal),
-        handleGetSubscriptions(searchText, 300, signal),
-      ]);
 
-      const customerList =
-        customerResponse.status === "fulfilled" &&
-        Array.isArray(customerResponse.value?.customers)
-          ? customerResponse.value.customers
-          : [];
-
-      // Never wipe an existing table if only a secondary API failed
-      if (
-        customerResponse.status !== "fulfilled" &&
-        !customerList.length
-      ) {
-        console.error(
-          "Failed to fetch customers:",
-          customerResponse.status === "rejected"
-            ? customerResponse.reason
-            : "unknown",
+      // 1) Load customers first (paged) so empty search still returns names
+      let customerList: CustomerRow[] = [];
+      try {
+        const customerResponse = await handleGetAllCustomers(
+          searchText,
+          signal,
+          2000,
         );
+        customerList = Array.isArray(customerResponse?.customers)
+          ? customerResponse.customers
+          : [];
+      } catch (error) {
+        console.error("Failed to fetch customers:", error);
         return;
       }
+
+      // Show names immediately — enrich wallet/due/membership after
+      setCustomers(
+        customerList.map((customer: CustomerRow) => ({
+          ...customer,
+          membershipType: customer.membershipType || "none",
+          walletAmount: Number(
+            customer?.walletAmount ?? customer?.closingBalance ?? 0,
+          ),
+          dueAmount: 0,
+        })),
+      );
+      setLoadingCustomers(false);
+
+      // 2) Enrich in parallel (failures must not clear the customer list)
+      const [walletResponse, invoiceResponse, subscriptionResponse] =
+        await Promise.allSettled([
+          handleGetWallets({ search: searchText, limit: 5000 }, signal),
+          handleGetInvoices(searchText, signal),
+          handleGetSubscriptions(searchText, 300, signal),
+        ]);
 
       const walletItems =
         walletResponse.status === "fulfilled"
@@ -165,7 +171,8 @@ export default function CustomerScreen() {
             wallet?.customer?.walletAmount,
           ];
           const amount =
-            amountCandidates.find((value) => Number.isFinite(Number(value))) ?? 0;
+            amountCandidates.find((value) => Number.isFinite(Number(value))) ??
+            0;
           const keys = [
             wallet?.customerId,
             wallet?.customer?._id,
@@ -189,7 +196,13 @@ export default function CustomerScreen() {
           ? subscriptionResponse.value.subscriptions
           : [];
       const membershipLookup = subscriptions.reduce(
-        (acc: Record<string, { type: string; startDate?: string; endDate?: string }>, subscription: any) => {
+        (
+          acc: Record<
+            string,
+            { type: string; startDate?: string; endDate?: string }
+          >,
+          subscription: any,
+        ) => {
           const membershipType = String(
             subscription?.membershipType ??
               subscription?.membershipName ??
@@ -228,13 +241,12 @@ export default function CustomerScreen() {
       const dueLookup = invoiceItems.reduce(
         (acc: Record<string, number>, invoice: any) => {
           const dueAmount = Number(
-            invoice?.pendingAmount ?? invoice?.paymentBreakdown?.dueAmount ?? 0,
+            invoice?.pendingAmount ??
+              invoice?.paymentBreakdown?.dueAmount ??
+              0,
           );
           if (dueAmount <= 0) return acc;
-          const keys = [
-            invoice?.customerPhone,
-            invoice?.customerName,
-          ]
+          const keys = [invoice?.customerPhone, invoice?.customerName]
             .map((value) => String(value ?? "").trim())
             .filter(Boolean);
           keys.forEach((key) => {
@@ -245,13 +257,14 @@ export default function CustomerScreen() {
         {},
       );
 
-
       setCustomers(
         customerList.map((customer: CustomerRow) => {
           const membershipInfo =
             membershipLookup[String(customer?._id ?? "").trim()] ??
             membershipLookup[String(customer?.mobile ?? "").trim()] ??
-            { type: "none" };
+            {
+              type: String(customer?.membershipType || "none"),
+            };
           const walletAmount =
             nextWalletMap[String(customer?._id ?? "").trim()] ??
             nextWalletMap[String(customer?.mobile ?? "").trim()] ??

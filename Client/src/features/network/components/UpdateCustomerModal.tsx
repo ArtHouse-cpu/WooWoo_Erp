@@ -15,7 +15,9 @@ import {
   Contact2,
   Award,
 } from "lucide-react";
+import Swal from "sweetalert2";
 import {
+  handleCheckCustomerPhone,
   type CustomerPayload,
 } from "@/services/apiClient";
 
@@ -201,10 +203,44 @@ export default function UpdateCustomerModal({
   const handleSubmit = async () => {
     if (!form.name.trim() || !form.mobile.trim()) return;
 
+    const mobile = form.mobile.trim();
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Invalid mobile",
+        text: "Enter a valid 10-digit mobile number.",
+      });
+      return;
+    }
+
+    try {
+      const check = await handleCheckCustomerPhone(mobile, {
+        excludeId: customer?._id,
+      });
+      if (check?.exists) {
+        await Swal.fire({
+          icon: "warning",
+          title: "Mobile already used",
+          text:
+            check.message ||
+            "A customer with this mobile number already exists.",
+        });
+        return;
+      }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire({
+        icon: "error",
+        title: "Could not verify mobile",
+        text: err?.response?.data?.message || "Please try again.",
+      });
+      return;
+    }
+
     const payload: CustomerPayload = {
       ...form,
       name: form.name.trim(),
-      mobile: form.mobile.trim(),
+      mobile,
       email: form.email.trim(),
       gstin: form.gstin.trim(),
       companyName: form.companyName.trim(),

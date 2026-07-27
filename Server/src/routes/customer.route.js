@@ -6,9 +6,10 @@ import {
   deleteCustomer,
   editCustomer,
   importCustomers,
+  checkCustomerPhone,
 } from '../controllers/customer.controller.js';
 import {authenticateUser} from '../middlewares/auth.middleware.js';
-import {attachStaffContext, requirePermission} from '../middlewares/authorize.middleware.js';
+import {attachStaffContext, requirePermission, requireAnyPermission} from '../middlewares/authorize.middleware.js';
 import {PERMISSIONS} from '../constants/permissions.js';
 
 const router = express.Router();
@@ -27,6 +28,16 @@ router.post(
   importCustomers,
 );
 router.get('/', requirePermission(PERMISSIONS.CUSTOMER_READ), getCustomers);
+router.get(
+  '/check-phone',
+  requireAnyPermission(PERMISSIONS.CUSTOMER_READ, PERMISSIONS.CUSTOMER_CREATE),
+  checkCustomerPhone,
+);
+router.post(
+  '/check-phone',
+  requireAnyPermission(PERMISSIONS.CUSTOMER_READ, PERMISSIONS.CUSTOMER_CREATE),
+  checkCustomerPhone,
+);
 router.patch(
   '/:id',
   requirePermission(PERMISSIONS.CUSTOMER_UPDATE),

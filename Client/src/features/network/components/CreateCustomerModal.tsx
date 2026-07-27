@@ -13,7 +13,11 @@ import {
   Wallet,
   Contact2,
 } from "lucide-react";
-import { type CustomerPayload } from "@/services/apiClient";
+import Swal from "sweetalert2";
+import {
+  handleCheckCustomerPhone,
+  type CustomerPayload,
+} from "@/services/apiClient";
 
 type Props = {
   onClose: () => void;
@@ -45,6 +49,9 @@ type InputFieldProps = {
   placeholder?: string;
   required?: boolean;
   maxLength?: number;
+  onBlur?: () => void;
+  error?: string;
+  hint?: string;
 };
 
 function InputField({
@@ -56,6 +63,9 @@ function InputField({
   placeholder,
   required = false,
   maxLength,
+  onBlur,
+  error,
+  hint,
 }: InputFieldProps) {
   return (
     <div>
@@ -70,13 +80,23 @@ function InputField({
         name={keyName}
         value={value}
         onChange={(e) => onValueChange(keyName, e.target.value)}
+        onBlur={onBlur}
         type={type}
         placeholder={placeholder}
         required={required}
         maxLength={maxLength}
         autoComplete="off"
-        className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+        className={`w-full rounded-lg border bg-white p-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:ring-4 ${
+          error
+            ? "border-red-400 focus:border-red-500 focus:ring-red-500/10"
+            : "border-slate-300 focus:border-blue-500 focus:ring-blue-500/10"
+        }`}
       />
+      {error ? (
+        <p className="mt-1 text-xs font-medium text-red-600">{error}</p>
+      ) : hint ? (
+        <p className="mt-1 text-xs text-emerald-600">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -116,6 +136,9 @@ export default function CreateCustomerModal({
 }: Props) {
   const [form, setForm] = useState<FormState>(initialState);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [mobileError, setMobileError] = useState("");
+  const [mobileHint, setMobileHint] = useState("");
+  const [checkingMobile, setCheckingMobile] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const initials = useMemo(() => {
@@ -141,10 +164,66 @@ export default function CreateCustomerModal({
       nextValue = nextValue.toUpperCase();
     }
     setForm((prev) => ({ ...prev, [key]: nextValue }));
+    if (key === "mobile") {
+      setMobileError("");
+      setMobileHint("");
+    }
+  };
+
+  const verifyMobileAvailable = async (mobile: string) => {
+    const cleaned = String(mobile || "").trim();
+    if (!cleaned) {
+      setMobileError("");
+      setMobileHint("");
+      return false;
+    }
+    if (!/^[6-9]\d{9}$/.test(cleaned)) {
+      setMobileError("Enter a valid 10-digit mobile number");
+      setMobileHint("");
+      return false;
+    }
+
+    try {
+      setCheckingMobile(true);
+      const result = await handleCheckCustomerPhone(cleaned);
+      if (result?.exists) {
+        const who = result.customer?.name
+          ? ` (${result.customer.name})`
+          : "";
+        setMobileError(
+          result.message ||
+            `This mobile already exists${who}. Use another number.`,
+        );
+        setMobileHint("");
+        return false;
+      }
+      setMobileError("");
+      setMobileHint("Mobile number is available");
+      return true;
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      setMobileError(
+        err?.response?.data?.message || "Could not verify mobile number",
+      );
+      setMobileHint("");
+      return false;
+    } finally {
+      setCheckingMobile(false);
+    }
   };
 
   const submit = async () => {
     if (!form.name.trim() || !form.mobile.trim()) return;
+
+    const ok = await verifyMobileAvailable(form.mobile.trim());
+    if (!ok) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Mobile already used",
+        text: "A customer with this mobile number already exists. Please use a different number.",
+      });
+      return;
+    }
 
     const payload: CustomerPayload = {
       ...form,
@@ -291,6 +370,13 @@ export default function CreateCustomerModal({
                     placeholder="Primary mobile"
                     required
                     maxLength={10}
+                    error={mobileError}
+                    hint={mobileHint}
+                    onBlur={() => {
+                      if (form.mobile.trim().length >= 10) {
+                        void verifyMobileAvailable(form.mobile.trim());
+                      }
+                    }}
                   />
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -533,7 +619,13 @@ export default function CreateCustomerModal({
             </button>
             <button
               type="submit"
-              disabled={loading || !form.name.trim() || !form.mobile.trim()}
+              disabled={
+                loading ||
+                checkingMobile ||
+                Boolean(mobileError) ||
+                !form.name.trim() ||
+                !form.mobile.trim()
+              }
               className="flex items-center justify-center rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Saving..." : "Create Customer"}

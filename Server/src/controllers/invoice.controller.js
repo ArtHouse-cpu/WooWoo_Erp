@@ -459,11 +459,28 @@ const createInvoice = async (req, res) => {
 };
 const getInvoices=async(req,res)=>{
     try {
-        const invoices = await Invoice.find().sort({createdAt: -1});
+        const search = String(req.query.search ?? '').trim();
+        const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 5000);
+        const query = {};
+        if (search) {
+          const regex = new RegExp(String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+          query.$or = [
+            { customerName: regex },
+            { customerPhone: regex },
+            { invoiceCode: regex },
+          ];
+        }
+        const invoices = await Invoice.find(query)
+          .sort({createdAt: -1})
+          .limit(limit)
+          .select('customerName customerPhone pendingAmount paymentBreakdown status invoiceCode createdAt grandTotal')
+          .lean();
         return res.status(200).json({
             success: true,
             message: 'Invoices fetched successfully.',
             invoices,
+            total: invoices.length,
+            limit,
         });
       } catch (error) {
         console.error('getInvoices error:', error);

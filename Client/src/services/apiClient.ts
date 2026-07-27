@@ -201,10 +201,14 @@ export const handleCreateInvoice = async (payload: CreateInvoicePayload) => {
   }
 };
 
-export const handleGetInvoices = async (search = "", signal?: AbortSignal) => {
+export const handleGetInvoices = async (
+  search = "",
+  signal?: AbortSignal,
+  limit = 2000,
+) => {
   try {
     const response = await axiosInstance.get("/invoice", {
-      params: { search: search.trim() },
+      params: { search: search.trim(), limit },
       signal,
     });
     return response.data;
@@ -550,6 +554,7 @@ export const handleDeleteSubscription = async (id: string) => {
 };
 
 export type CustomerPayload = {
+  _id?: string;
   name: string;
   mobile: string;
   membershipType?: string|null;
@@ -615,10 +620,15 @@ export const handleGetCustomers = async (
   search = "",
   signal?: AbortSignal,
   limit = 2000,
+  page = 1,
 ) => {
   try {
     const response = await axiosInstance.get("/customer", {
-      params: { search: search.trim(), limit },
+      params: {
+        search: search.trim(),
+        limit,
+        page,
+      },
       signal,
     });
     return response.data;
@@ -626,6 +636,34 @@ export const handleGetCustomers = async (
     console.log("Error fetching customers:", error);
     throw error;
   }
+};
+
+/** Fetch every matching customer by paging until exhausted */
+export const handleGetAllCustomers = async (
+  search = "",
+  signal?: AbortSignal,
+  pageSize = 2000,
+) => {
+  const size = Math.min(Math.max(Number(pageSize) || 2000, 1), 10000);
+  const all: any[] = [];
+  let page = 1;
+  let total = Infinity;
+
+  while (all.length < total) {
+    const data = await handleGetCustomers(search, signal, size, page);
+    const batch = Array.isArray(data?.customers) ? data.customers : [];
+    total = Number.isFinite(Number(data?.total)) ? Number(data.total) : batch.length;
+    all.push(...batch);
+    if (!batch.length || batch.length < size || data?.hasMore === false) break;
+    page += 1;
+    if (page > 100) break; // safety
+  }
+
+  return {
+    success: true,
+    customers: all,
+    total: all.length,
+  };
 };
 
 export const handleCreateCustomer = async (payload: CustomerPayload | FormData) => {
@@ -642,6 +680,40 @@ export const handleCreateCustomer = async (payload: CustomerPayload | FormData) 
     console.log("Error creating customer:", error);
     throw error;
   }
+};
+
+/** Check if a customer mobile already exists (CRM) */
+export const handleCheckCustomerPhone = async (
+  mobile: string,
+  opts?: { excludeId?: string; signal?: AbortSignal },
+) => {
+  const response = await axiosInstance.get("/customer/check-phone", {
+    params: {
+      mobile: String(mobile || "").trim(),
+      excludeId: opts?.excludeId,
+    },
+    signal: opts?.signal,
+  });
+  return response.data as {
+    success: boolean;
+    exists: boolean;
+    available: boolean;
+    message?: string;
+    customer?: { id?: string; name?: string; mobile?: string };
+  };
+};
+
+/** Check if a staff/user phone already exists (auth) */
+export const handleCheckPhone = async (phoneNumber: string) => {
+  const response = await axiosInstance.post("/auth/checkPhone", {
+    phoneNumber: String(phoneNumber || "").trim(),
+  });
+  return response.data as {
+    success: boolean;
+    exists: boolean;
+    available: boolean;
+    message?: string;
+  };
 };
 
 export type CustomerImportRow = {
@@ -725,12 +797,15 @@ export type WalletRecord = {
 
 
 export const handleGetWallets = async (
-  params?: { search?: string },
+  params?: { search?: string; limit?: number },
   signal?: AbortSignal,
 ) => {
   try {
     const response = await axiosInstance.get("/wallet", {
-      params: { search: params?.search?.trim() ?? "" },
+      params: {
+        search: params?.search?.trim() ?? "",
+        limit: params?.limit,
+      },
       signal,
     });
     console.log("Wallets:", response.data);

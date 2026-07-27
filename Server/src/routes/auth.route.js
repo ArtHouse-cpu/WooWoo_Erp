@@ -10,6 +10,7 @@ import {
   updateUser,
   forgotPassword,
   requestEmailOtp,
+  checkPhone
 } from '../controllers/auth.controller.js';
 import {authenticateUser} from '../middlewares/auth.middleware.js';
 import {
@@ -31,6 +32,8 @@ router.post('/request-otp', authOtpLimiter, requestOtp);
 router.post('/request-email-otp', authOtpLimiter, requestEmailOtp);
 router.post('/verify-otp', authOtpLimiter, verifyOtp);
 router.patch('/forgot-password', authPasswordResetLimiter, forgotPassword);
+router.post('/checkPhone', authPasswordResetLimiter, checkPhone);
+router.get('/checkPhone', authPasswordResetLimiter, checkPhone);
 
 // Authenticated profile updates (Step 11 — no more open PATCH /:mobile)
 router.patch('/me', authenticateUser, updateMe);
