@@ -15,6 +15,7 @@ import {
   User,
   Users,
   Wrench,
+  Activity
 } from 'lucide-react';
 
 export type NavItem = {
@@ -36,11 +37,10 @@ export type ActionItem = {
 
 export const dashboardNav: NavItem[] = [
   {id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, to: '/home', section: 'Main'},
+
+  {id: 'activity', label: 'Activities', icon: Activity, to: '/activities', section: 'Main'},
   
   {id: 'membership', label: 'Membership', icon: Crown, to: '/membership', section: 'Main'},
-
-
-
 
   {id: 'account', label: 'Account', icon: User, to: '/profile', section: 'Account'},
 

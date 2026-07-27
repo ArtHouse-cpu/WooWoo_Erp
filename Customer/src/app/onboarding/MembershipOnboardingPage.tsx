@@ -10,8 +10,6 @@ import {
   CircleHelp,
   Crown,
   DollarSign,
-  Eye,
-  FolderOpen,
   Gift,
   GraduationCap,
   Headphones,
@@ -27,7 +25,6 @@ import {
   Target,
   TrendingUp,
   User,
-  Users,
   Wrench,
   X,
 } from 'lucide-react';
@@ -418,14 +415,7 @@ function InsightsTab({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-[15px] font-extrabold text-[#111111]">Your Impact</h3>
-          <button
-            type="button"
-            className="text-[11px] font-bold text-[#4F46E5] flex items-center gap-0.5 hover:underline cursor-pointer"
-            onClick={() => toast.message('Lifetime overview coming soon')}
-          >
-            <span>Lifetime Overview</span>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+          
         </div>
 
         <div className="grid grid-cols-4 gap-2">
@@ -437,7 +427,7 @@ function InsightsTab({
             <div className="mt-2">
               <p className="text-[14px] font-extrabold text-[#111111] leading-none">₹12,450</p>
               <p className="text-[9px] font-bold text-[#6B7280] leading-tight mt-1"> Benefited</p>
-              
+              <p className="text-[8px] font-extrabold text-[#10B981] mt-1 whitespace-nowrap">Across all activities</p>
             </div>
           </div>
 
@@ -449,7 +439,7 @@ function InsightsTab({
             <div className="mt-2">
               <p className="text-[14px] font-extrabold text-[#111111] leading-none">₹2,350</p>
               <p className="text-[9px] font-bold text-[#6B7280] leading-tight mt-1">Cashbacks </p>
-             
+              <p className="text-[8px] font-extrabold text-[#2563EB] mt-1 whitespace-nowrap">Total cashback</p>
             </div>
           </div>
 
@@ -461,7 +451,7 @@ function InsightsTab({
             <div className="mt-2">
               <p className="text-[14px] font-extrabold text-[#111111] leading-none">₹1,860</p>
               <p className="text-[9px] font-bold text-[#6B7280] leading-tight mt-1">Discounts </p>
-             
+              <p className="text-[8px] font-extrabold text-[#EA580C] mt-1 whitespace-nowrap">Total discounts</p>
             </div>
           </div>
 
@@ -473,7 +463,7 @@ function InsightsTab({
             <div className="mt-2">
               <p className="text-[14px] font-extrabold text-[#111111] leading-none">18</p>
               <p className="text-[9px] font-bold text-[#6B7280] leading-tight mt-1">Rewards </p>
-             
+              <p className="text-[8px] font-extrabold text-[#9333EA] mt-1 whitespace-nowrap">Keep growing!</p>
             </div>
           </div>
         </div>
@@ -567,103 +557,6 @@ function InsightsTab({
               <span className="text-[9px] font-extrabold text-[#10B981] flex items-center gap-0.5 min-w-[45px] justify-end">
                 <span className="text-[11px] leading-none">↑</span> 8%
               </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Two-Column Grid: Ranking & Community */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Your Ranking */}
-        <div className="bg-white rounded-[24px] border border-black/[0.03] p-4 shadow-sm flex flex-col justify-between h-[175px]">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[12px] font-extrabold text-[#111111]">Your Ranking</h4>
-            <button
-              type="button"
-              className="text-[9px] font-extrabold text-[#4F46E5] hover:underline cursor-pointer"
-              onClick={() => toast.message('Leaderboard coming soon')}
-            >
-              View Leaderboard
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-              <svg className="h-full w-full" viewBox="0 0 100 100" fill="currentColor">
-                <defs>
-                  <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#C084FC" />
-                    <stop offset="100%" stopColor="#8B5CF6" />
-                  </linearGradient>
-                </defs>
-                <polygon points="50 1, 93 25, 93 75, 50 99, 7 75, 7 25" fill="url(#hexGrad)" />
-                <path d="M50 32 L60 48 L75 48 L64 57 L69 72 L50 62 L31 72 L36 57 L25 48 L40 48 Z" fill="white" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-[13px] font-extrabold text-[#111111] leading-none">Top 18%</p>
-              <p className="text-[9px] font-semibold text-[#6B7280] leading-tight mt-1">Among all Special Members</p>
-            </div>
-          </div>
-
-          <div className="mt-3">
-            <div className="w-full h-2 bg-[#F3F4F6] rounded-full overflow-hidden">
-              <div className="h-full rounded-full bg-gradient-to-r from-[#C084FC] to-[#8B5CF6]" style={{width: '82%'}} />
-            </div>
-            <p className="text-[9px] font-semibold text-[#9CA3AF] mt-1.5">You are ahead of 82% members</p>
-          </div>
-        </div>
-
-        {/* Community Standing */}
-        <div className="bg-white rounded-[24px] border border-black/[0.03] p-4 shadow-sm flex flex-col justify-between h-[175px]">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[12px] font-extrabold text-[#111111]">Community Standing</h4>
-            <Info 
-              className="text-[#9CA3AF] h-4 w-4 cursor-pointer hover:text-[#6B7280]" 
-              onClick={() => Swal.fire({
-                title: 'Community Standing',
-                text: 'Based on your recent profile activity, connections, shared projects, and feedback ratings in the creative community.',
-                confirmButtonText: 'OK',
-                confirmButtonColor: '#111111'
-              })}
-            />
-          </div>
-
-          <div className="space-y-1.5 mt-2">
-            {/* Profile Views */}
-            <div className="flex items-center justify-between text-[10px] font-semibold text-[#374151]">
-              <span className="flex items-center gap-1.5">
-                <Eye className="h-3.5 w-3.5 text-[#8B5CF6]" strokeWidth={2} />
-                <span>Profile Views</span>
-              </span>
-              <span className="font-extrabold text-[#111111]">1,245</span>
-            </div>
-
-            {/* Connections Made */}
-            <div className="flex items-center justify-between text-[10px] font-semibold text-[#374151]">
-              <span className="flex items-center gap-1.5">
-                <Users className="h-3.5 w-3.5 text-[#8B5CF6]" strokeWidth={2} />
-                <span>Connections Made</span>
-              </span>
-              <span className="font-extrabold text-[#111111]">86</span>
-            </div>
-
-            {/* Projects Shared */}
-            <div className="flex items-center justify-between text-[10px] font-semibold text-[#374151]">
-              <span className="flex items-center gap-1.5">
-                <FolderOpen className="h-3.5 w-3.5 text-[#8B5CF6]" strokeWidth={2} />
-                <span>Projects Shared</span>
-              </span>
-              <span className="font-extrabold text-[#111111]">12</span>
-            </div>
-
-            {/* Reviews Received */}
-            <div className="flex items-center justify-between text-[10px] font-semibold text-[#374151]">
-              <span className="flex items-center gap-1.5">
-                <Star className="h-3.5 w-3.5 text-[#8B5CF6]" strokeWidth={2} />
-                <span>Reviews Received</span>
-              </span>
-              <span className="font-extrabold text-[#111111]">24</span>
             </div>
           </div>
         </div>

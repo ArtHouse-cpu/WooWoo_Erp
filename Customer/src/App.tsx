@@ -32,6 +32,7 @@ import CommunityGuidelinesPage from './app/legal/CommunityGuidelinesPage';
 import RefundTermsPage from './app/legal/RefundTermsPage';
 import {useAuthStore} from './store/authStore';
 import {getPostAuthPath} from './utils/onboarding';
+import ActivityPage from './app/activity/ActivityPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,6 +82,8 @@ export default function App() {
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/settings" element={<ProfilePage />} />
                 <Route path="/membership" element={<MembershipOnboardingPage />} />
+                <Route path="/activities" element={<ActivityPage />} />
+
                 <Route path="/refer-and-earn" element={<ReferAndEarnPage />} />
               </Route>
             </Route>
