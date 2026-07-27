@@ -38,7 +38,7 @@ export type ActionItem = {
 export const dashboardNav: NavItem[] = [
   {id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, to: '/home', section: 'Main'},
 
-  {id: 'activities', label: 'Activities', icon: Activity, to: '/activity', section: 'Main'},
+  {id: 'activities', label: 'Activities', icon: Activity, to: '/activities', section: 'Main'},
   
   {id: 'membership', label: 'Membership', icon: Crown, to: '/membership', section: 'Main'},
 

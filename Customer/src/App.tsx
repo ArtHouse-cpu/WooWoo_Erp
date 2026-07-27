@@ -82,7 +82,7 @@ export default function App() {
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/settings" element={<ProfilePage />} />
                 <Route path="/membership" element={<MembershipOnboardingPage />} />
-                <Route path="/activity" element={<ActivityPage />} />
+                <Route path="/activities" element={<ActivityPage />} />
 
                 <Route path="/refer-and-earn" element={<ReferAndEarnPage />} />
               </Route>
