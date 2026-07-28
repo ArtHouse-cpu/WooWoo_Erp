@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import { sendNewAccountWhatsApp } from '../modules/customer/services/whatsapp.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -338,6 +339,27 @@ const createCustomer = async (req, res) => {
       },
       { new: true }
     );
+
+    // Fire-and-forget Meta WhatsApp `newaccount` (do not block create response)
+    // Label matches the ₹25 Joining Bonus credited above.
+    const whatsappTo =
+      String(updatedCustomer?.whatsappNumber || '').trim() ||
+      String(updatedCustomer?.mobile || mobileNorm).trim();
+
+    void (async () => {
+      try {
+        await sendNewAccountWhatsApp({
+          to: whatsappTo,
+          name: updatedCustomer?.name || customer.name || 'Member',
+          cashbackLabel: '₹25',
+        });
+      } catch (waError) {
+        console.error(
+          '[NewAccount] WhatsApp send error:',
+          waError?.message || waError,
+        );
+      }
+    })();
 
     return res.status(201).json({
       success: true,

@@ -81,6 +81,7 @@ export default function CreateInvoiceScreen() {
   const [draftImage, setDraftImage] = useState("");
   const [draftCategory, setDraftCategory] = useState("General");
   const [draftCashback, setDraftCashback] = useState("0");
+  const [draftIsCsp, setDraftIsCsp] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [membershipPlans, setMembershipPlans] = useState<MembershipPlanPayload[]>([]);
 
@@ -110,10 +111,12 @@ export default function CreateInvoiceScreen() {
                 productName: item.productName || "",
                 qty: item.qty || 1,
                 unitPrice: item.unitPrice || 0,
-                discount: item.discount || 0,
+                discount: item.isCsp ? 0 : item.discount || 0,
                 cashback: item.cashback || 0,
                 image: item.image || item.imageUrl || "",
-                category: item.category || "General"
+                category: item.category || "General",
+                isCsp: Boolean(item.isCsp),
+                cspLabel: item.cspLabel || (item.isCsp ? "CSP" : null),
             })));
         }
         if (inv.extraCharges) setExtraCharges(inv.extraCharges);
@@ -127,6 +130,7 @@ export default function CreateInvoiceScreen() {
     image: draftImage,
     category: draftCategory,
     cashback: draftCashback,
+    isCsp: draftIsCsp ? "true" : "false",
   };
 
   const getMembershipBenefitsForItem = (
@@ -135,9 +139,10 @@ export default function CreateInvoiceScreen() {
     category: string,
     mType: string,
     mId?: string | null,
+    isCsp?: boolean,
   ) => {
     const plan = resolveMembershipPlan(membershipPlans, mType, mId);
-    return membershipBenefitsForLine(price, qty, category, plan);
+    return membershipBenefitsForLine(price, qty, category, plan, { isCsp });
   };
 
   const addItem = () => {
@@ -147,8 +152,8 @@ export default function CreateInvoiceScreen() {
     }
     const qty = Number(draftQty);
     const price = Number(draftPrice);
-    const discount = Number(draftDiscount);
-    const cashback = Number(draftCashback);
+    const discount = draftIsCsp ? 0 : Number(draftDiscount);
+    const cashback = draftIsCsp ? 0 : Number(draftCashback);
     if (qty <= 0 || price < 0 || discount < 0 || cashback < 0) {
       Swal.fire("Invalid values", "Check quantity, price, discount and cashback.", "error");
       return;
@@ -164,6 +169,8 @@ export default function CreateInvoiceScreen() {
         cashback,
         image: draftImage,
         category: draftCategory,
+        isCsp: draftIsCsp,
+        cspLabel: draftIsCsp ? "CSP" : null,
       },
     ]);
     setDraftName("");
@@ -173,6 +180,7 @@ export default function CreateInvoiceScreen() {
     setDraftCashback("0");
     setDraftImage("");
     setDraftCategory("General");
+    setDraftIsCsp(false);
   };
 
   const removeItem = (id: number) => {
@@ -183,16 +191,25 @@ export default function CreateInvoiceScreen() {
     if (newQty < 1) return;
     setItems((prev) =>
       prev.map((item) => {
-        if (item.id === id) {
-          const benefits = getMembershipBenefitsForItem(item.unitPrice, newQty, item.category || "General", membership, membershipPlanId);
-          return { 
-            ...item, 
-            qty: newQty, 
-            discount: benefits.discount || item.discount,
-            cashback: benefits.cashback || item.cashback
-          };
+        if (item.id !== id) return item;
+        // CSP: never apply product / membership discount
+        if (item.isCsp) {
+          return { ...item, qty: newQty, discount: 0, cashback: 0 };
         }
-        return item;
+        const benefits = getMembershipBenefitsForItem(
+          item.unitPrice,
+          newQty,
+          item.category || "General",
+          membership,
+          membershipPlanId,
+          false,
+        );
+        return {
+          ...item,
+          qty: newQty,
+          discount: benefits.discount || item.discount,
+          cashback: benefits.cashback || item.cashback,
+        };
       }),
     );
   };
@@ -200,14 +217,22 @@ export default function CreateInvoiceScreen() {
   const updateItemDiscount = (id: number, newDiscount: number) => {
     if (newDiscount < 0) return;
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, discount: newDiscount } : item)),
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        if (item.isCsp) return { ...item, discount: 0 };
+        return { ...item, discount: newDiscount };
+      }),
     );
   };
 
   const updateItemCashback = (id: number, newCashback: number) => {
     if (newCashback < 0) return;
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, cashback: newCashback } : item)),
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        if (item.isCsp) return { ...item, cashback: 0 };
+        return { ...item, cashback: newCashback };
+      }),
     );
   };
 
@@ -233,9 +258,10 @@ export default function CreateInvoiceScreen() {
         name: item.productName,
         qty: item.qty,
         price: item.unitPrice,
-        discount: item.discount,
-        cashback: item.cashback,
+        discount: item.isCsp ? 0 : item.discount,
+        cashback: item.isCsp ? 0 : item.cashback,
         category: item.category,
+        isCsp: Boolean(item.isCsp),
       })),
     [items],
   );
@@ -664,9 +690,12 @@ export default function CreateInvoiceScreen() {
           setCustomers([]);
           setCustomerDropdownOpen(false);
 
-          // Auto-apply discounts to existing items
+          // Auto-apply discounts to existing items (skip CSP products)
           setItems(prev => prev.map(item => {
-            const benefits = getMembershipBenefitsForItem(item.unitPrice, item.qty, item.category || "General", mType, mId);
+            if (item.isCsp) {
+              return { ...item, discount: 0, cashback: 0 };
+            }
+            const benefits = getMembershipBenefitsForItem(item.unitPrice, item.qty, item.category || "General", mType, mId, false);
             return {
                 ...item,
                 discount: benefits.discount,
@@ -698,16 +727,33 @@ export default function CreateInvoiceScreen() {
           if (field === "name") setDraftName(value);
           if (field === "qty") setDraftQty(value);
           if (field === "price") setDraftPrice(value);
-          if (field === "discount") setDraftDiscount(value);
+          if (field === "discount") {
+            if (!draftIsCsp) setDraftDiscount(value);
+          }
           if (field === "image") setDraftImage(value);
+          if (field === "isCsp") {
+            const next = value === "true";
+            setDraftIsCsp(next);
+            if (next) {
+              setDraftDiscount("0");
+              setDraftCashback("0");
+            }
+          }
           if (field === "category") {
             setDraftCategory(value);
-            // Re-calculate discount based on membership when category is selected
-            const benefits = getMembershipBenefitsForItem(Number(draftPrice), Number(draftQty), value, membership, membershipPlanId);
-            if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
-            if (benefits.cashback > 0) setDraftCashback(String(benefits.cashback));
+            // Re-calculate discount based on membership when category is selected (not for CSP)
+            if (!draftIsCsp) {
+              const benefits = getMembershipBenefitsForItem(Number(draftPrice), Number(draftQty), value, membership, membershipPlanId, false);
+              if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
+              if (benefits.cashback > 0) setDraftCashback(String(benefits.cashback));
+            } else {
+              setDraftDiscount("0");
+              setDraftCashback("0");
+            }
           }
-          if (field === "cashback") setDraftCashback(value);
+          if (field === "cashback") {
+            if (!draftIsCsp) setDraftCashback(value);
+          }
         }}
         onAddItem={addItem}
         onRemoveItem={removeItem}
@@ -717,7 +763,17 @@ export default function CreateInvoiceScreen() {
         onAddDirectItem={(newItem) => {
           setItems((prev) => {
             const nextId = prev.length > 0 ? Math.max(...prev.map((i) => i.id)) + 1 : 1;
-            return [...prev, { ...newItem, id: nextId }];
+            const isCsp = Boolean(newItem.isCsp);
+            return [
+              ...prev,
+              {
+                ...newItem,
+                id: nextId,
+                discount: isCsp ? 0 : Number(newItem.discount || 0),
+                cashback: isCsp ? 0 : Number(newItem.cashback || 0),
+                isCsp,
+              },
+            ];
           });
         }}
       />

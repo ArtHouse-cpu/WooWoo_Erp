@@ -33,6 +33,30 @@ const invoiceItemSchema = new mongoose.Schema(
       trim: true,
       default: 'General',
     },
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Product',
+      default: null,
+    },
+    isCsp: {
+      type: Boolean,
+      default: false,
+    },
+    cspEnrollmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CustomerSellerProgram',
+      default: null,
+    },
+    cspCustomerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Customer',
+      default: null,
+    },
+    cspSellerAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {_id: false},
 );

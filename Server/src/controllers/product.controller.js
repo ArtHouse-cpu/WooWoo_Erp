@@ -1,10 +1,93 @@
 import Product from '../models/product.model.js';
+import CustomerSellerProgram from '../models/customerSellerProgram.model.js';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import mongoose from 'mongoose';
 
+const parseBool = raw => {
+  if (typeof raw === 'boolean') return raw;
+  const v = String(raw ?? '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'y';
+};
+
+const resolveCspFields = async ({ isCspRaw, cspEnrollmentIdRaw }) => {
+  const isCsp = parseBool(isCspRaw);
+  if (!isCsp) {
+    return {
+      isCsp: false,
+      cspEnrollmentId: null,
+      cspCustomerId: null,
+      cspVendorId: null,
+    };
+  }
+
+  const enrollmentId = String(cspEnrollmentIdRaw ?? '').trim();
+  if (!enrollmentId || !mongoose.Types.ObjectId.isValid(enrollmentId)) {
+    const error = new Error('CSP sailor is required when CSP is Yes.');
+    error.status = 400;
+    throw error;
+  }
+
+  const enrollment = await CustomerSellerProgram.findOne({
+    _id: enrollmentId,
+    status: 'active',
+  }).lean();
+
+  if (!enrollment) {
+    const error = new Error('Active CSP enrollment not found.');
+    error.status = 400;
+    throw error;
+  }
+
+  return {
+    isCsp: true,
+    cspEnrollmentId: enrollment._id,
+    cspCustomerId: enrollment.customerId || null,
+    cspVendorId: enrollment.vendorId || null,
+  };
+};
+
+const withCspLabel = async products => {
+  const list = Array.isArray(products) ? products : [];
+  const enrollmentIds = [
+    ...new Set(
+      list
+        .filter(p => p?.isCsp && p?.cspEnrollmentId)
+        .map(p => String(p.cspEnrollmentId)),
+    ),
+  ];
+
+  let enrollmentMap = new Map();
+  if (enrollmentIds.length) {
+    const rows = await CustomerSellerProgram.find({
+      _id: {$in: enrollmentIds},
+    })
+      .populate('customerId', 'name mobile')
+      .populate('vendorId', 'name mobile')
+      .lean();
+    enrollmentMap = new Map(rows.map(r => [String(r._id), r]));
+  }
+
+  return list.map(product => {
+    if (!product?.isCsp) {
+      return {...product, cspLabel: null, cspSailorName: null};
+    }
+    const enrollment = enrollmentMap.get(String(product.cspEnrollmentId || ''));
+    const sailorName =
+      String(enrollment?.displayName || '').trim() ||
+      String(enrollment?.customerId?.name || '').trim() ||
+      String(enrollment?.vendorId?.name || '').trim() ||
+      '';
+    return {
+      ...product,
+      cspSailorName: sailorName || null,
+      cspLabel: sailorName ? `CSP · ${sailorName}` : 'CSP',
+    };
+  });
+};
 const localUploadDir = path.resolve('uploads/products');
 const tmpUploadDir = path.join('/tmp', 'uploads', 'products');
 
@@ -50,6 +133,8 @@ export const createProduct = async (req, res) => {
       discountType,
       discountValue,
       variants,
+      isCsp,
+      cspEnrollmentId,
     } = req.body;
     console.log("product controller",req.body);
 
@@ -60,6 +145,19 @@ export const createProduct = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Name and selling price are required.",
+      });
+    }
+
+    let cspFields;
+    try {
+      cspFields = await resolveCspFields({
+        isCspRaw: isCsp,
+        cspEnrollmentIdRaw: cspEnrollmentId,
+      });
+    } catch (cspError) {
+      return res.status(cspError.status || 400).json({
+        success: false,
+        message: cspError.message || 'Invalid CSP selection.',
       });
     }
 
@@ -120,12 +218,15 @@ export const createProduct = async (req, res) => {
       variants: itemType === "product" ? parsedVariants : [],
       images: imageUrls,
       imageUrl: imageUrls[0] || null,
+      ...cspFields,
     });
+
+    const [productWithLabel] = await withCspLabel([product.toObject()]);
 
     return res.status(201).json({
       success: true,
       message: 'Product created successfully',
-      product,
+      product: productWithLabel,
     });
   } catch (error) {
     console.error('createProduct error:', error);
@@ -170,9 +271,11 @@ export const getProducts = async (req, res) => {
       };
     });
 
+    const productsWithCsp = await withCspLabel(productsWithLiveStock);
+
     return res.status(200).json({
       success: true,
-      products: productsWithLiveStock,
+      products: productsWithCsp,
     });
   } catch (error) {
     console.error('getProducts error:', error);
@@ -206,6 +309,8 @@ export const updateProduct = async (req, res) => {
       discountType,
       discountValue,
       variants,
+      isCsp,
+      cspEnrollmentId,
     } = req.body;
 
     // find existing product
@@ -216,6 +321,27 @@ export const updateProduct = async (req, res) => {
         success: false,
         message: "Product not found",
       });
+    }
+
+    if (isCsp !== undefined || cspEnrollmentId !== undefined) {
+      try {
+        const cspFields = await resolveCspFields({
+          isCspRaw: isCsp !== undefined ? isCsp : existingProduct.isCsp,
+          cspEnrollmentIdRaw:
+            cspEnrollmentId !== undefined
+              ? cspEnrollmentId
+              : existingProduct.cspEnrollmentId,
+        });
+        existingProduct.isCsp = cspFields.isCsp;
+        existingProduct.cspEnrollmentId = cspFields.cspEnrollmentId;
+        existingProduct.cspCustomerId = cspFields.cspCustomerId;
+        existingProduct.cspVendorId = cspFields.cspVendorId;
+      } catch (cspError) {
+        return res.status(cspError.status || 400).json({
+          success: false,
+          message: cspError.message || 'Invalid CSP selection.',
+        });
+      }
     }
 
     let imageUrls = existingProduct.images || [];
@@ -278,10 +404,12 @@ export const updateProduct = async (req, res) => {
 
     await existingProduct.save();
 
+    const [productWithLabel] = await withCspLabel([existingProduct.toObject()]);
+
     return res.status(200).json({
       success: true,
       message: "Product updated successfully",
-      product: existingProduct,
+      product: productWithLabel,
     });
   } catch (error) {
     console.error("updateProduct error:", error);

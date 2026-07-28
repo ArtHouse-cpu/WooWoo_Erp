@@ -94,6 +94,8 @@ export const PERMISSIONS = Object.freeze({
   VENDOR_DELETE: 'vendor.delete',
   PARTNER_READ: 'partner.read',
   GUEST_READ: 'guest.read',
+  CSP_READ: 'csp.read',
+  CSP_WRITE: 'csp.write',
 
   // Wallet / Coupons / Affiliate
   WALLET_READ: 'wallet.read',
@@ -185,6 +187,8 @@ export const PERMISSION_CATALOG = Object.freeze([
   {key: PERMISSIONS.VENDOR_DELETE, module: 'network', label: 'Delete vendors'},
   {key: PERMISSIONS.PARTNER_READ, module: 'network', label: 'View partners'},
   {key: PERMISSIONS.GUEST_READ, module: 'network', label: 'View guests'},
+  {key: PERMISSIONS.CSP_READ, module: 'network', label: 'View CSP sailors'},
+  {key: PERMISSIONS.CSP_WRITE, module: 'network', label: 'Enroll / manage CSP sailors'},
 
   // Money / marketing
   {key: PERMISSIONS.WALLET_READ, module: 'wallet', label: 'View wallets'},
@@ -196,9 +200,9 @@ export const PERMISSION_CATALOG = Object.freeze([
   {key: PERMISSIONS.AFFILIATE_PAYOUT, module: 'affiliate', label: 'Process affiliate payouts'},
 ]);
 
-/**
- * Minimum permission required to SHOW a sidebar item / route.
+/** Minimum permission required to SHOW a sidebar item / route.
  * Used later by LeftSideBar + route guards.
+ * Value may be a single permission or an array (ANY of them is enough).
  */
 export const MENU_PERMISSION_MAP = Object.freeze({
   '/': PERMISSIONS.DASHBOARD_READ,
@@ -232,6 +236,8 @@ export const MENU_PERMISSION_MAP = Object.freeze({
   '/create-new-membership': PERMISSIONS.MEMBERSHIP_PLAN_MANAGE,
   '/members-and-partners': PERMISSIONS.MEMBERSHIP_PLAN_READ,
   '/customers': PERMISSIONS.CUSTOMER_READ,
+  // CSP: dedicated perm OR customer network access (so menu shows for existing staff)
+  '/csp': [PERMISSIONS.CSP_READ, PERMISSIONS.CUSTOMER_READ],
   '/vendors': PERMISSIONS.VENDOR_READ,
   '/Vendor list': PERMISSIONS.VENDOR_READ,
   '/partners': PERMISSIONS.PARTNER_READ,
@@ -259,6 +265,12 @@ export const hasAnyPermission = (userPermissions = [], requiredList = []) => {
 export const hasAllPermissions = (userPermissions = [], requiredList = []) => {
   if (!Array.isArray(requiredList) || requiredList.length === 0) return true;
   return requiredList.every(p => hasPermission(userPermissions, p));
+};
+
+/** Resolve MENU_PERMISSION_MAP entry to a permission list (ANY). */
+export const resolveMenuPermissions = required => {
+  if (!required) return [];
+  return (Array.isArray(required) ? required : [required]).filter(Boolean);
 };
 
 export const normalizePermissionList = (value = []) => {

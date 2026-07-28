@@ -19,6 +19,7 @@ import {
 } from "@/features/membership";
 import {
   CustomerScreen,
+  CspScreen,
   GuestScreen,
   PartnerScreen,
   VendorScreen,
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
           },
           { path: "vendors", element: <VendorScreen /> },
           { path: "customers", element: <CustomerScreen /> },
+          { path: "csp", element: <CspScreen /> },
           { path: "partners", element: <PartnerScreen /> },
           { path: "guests", element: <GuestScreen /> },
           { path: "purchase", element: <PurchaseScreen /> },

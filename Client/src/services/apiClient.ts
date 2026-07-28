@@ -1374,6 +1374,79 @@ export const handleImportVendors = async (vendors: VendorImportRow[]) => {
   const response = await axiosInstance.post("/vendor/import", { vendors });
   return response.data;
 };
+
+export type CspEnrollment = {
+  _id: string;
+  customerId?: string | { _id?: string; name?: string; mobile?: string };
+  vendorId?: string | { _id?: string; name?: string; mobile?: string };
+  status?: "active" | "inactive";
+  sellerSharePercent?: number;
+  platformSharePercent?: number;
+  displayName?: string;
+  mobile?: string;
+  label?: string;
+  customer?: { _id?: string; name?: string; mobile?: string; email?: string };
+  vendor?: { _id?: string; name?: string; mobile?: string };
+};
+
+export const handleGetCspEnrollments = async (params?: {
+  status?: string;
+  search?: string;
+}) => {
+  const response = await axiosInstance.get("/csp", {
+    params: {
+      status: params?.status ?? "active",
+      search: params?.search ?? "",
+    },
+  });
+  return response.data as {
+    success: boolean;
+    enrollments?: CspEnrollment[];
+    csps?: CspEnrollment[];
+    message?: string;
+  };
+};
+
+export const handleEnrollCsp = async (payload: {
+  customerId?: string;
+  vendorId?: string;
+  name?: string;
+  mobile?: string;
+  email?: string;
+  companyName?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  sellerSharePercent?: number;
+  platformSharePercent?: number;
+}) => {
+  const response = await axiosInstance.post("/csp/enroll", payload);
+  return response.data as {
+    success: boolean;
+    enrollment?: CspEnrollment;
+    message?: string;
+  };
+};
+
+export const handleUpdateCsp = async (
+  id: string,
+  payload: {
+    status?: "active" | "inactive";
+    sellerSharePercent?: number;
+    platformSharePercent?: number;
+    displayName?: string;
+    mobile?: string;
+  },
+) => {
+  const response = await axiosInstance.patch(`/csp/${id}`, payload);
+  return response.data as {
+    success: boolean;
+    enrollment?: CspEnrollment;
+    message?: string;
+  };
+};
+
 export const handleGetProducts = async (search = "", signal?: AbortSignal) => {
   try {
     const response = await axiosInstance.get("/product", {
@@ -1406,6 +1479,8 @@ export type CatalogueLookupItem = {
   status?: string;
   capacity?: number;
   isVeg?: boolean;
+  isCsp?: boolean;
+  cspLabel?: string | null;
 };
 
 export const handleCatalogueLookup = async (

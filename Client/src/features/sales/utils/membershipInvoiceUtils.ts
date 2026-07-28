@@ -236,7 +236,12 @@ export function membershipBenefitsForLine(
   qty: number,
   category: string,
   plan: MembershipPlanPayload | undefined,
+  options?: { isCsp?: boolean },
 ): { discount: number; cashback: number } {
+  // CSP products: no membership / product discount (platform keeps 30%, sailor 70% of full line)
+  if (options?.isCsp) {
+    return { discount: 0, cashback: 0 };
+  }
   if (!plan) return { discount: 0, cashback: 0 };
 
   const { discountPercent, cashbackPercent } = resolveBenefitPercents(
@@ -265,12 +270,14 @@ export function summarizeMembershipForCart(
     category?: string;
     discount?: number;
     cashback?: number;
+    isCsp?: boolean;
   }>,
 ) {
   const plan = resolveMembershipPlan(plans, membershipType, membershipPlanId);
   let membershipDiscount = 0;
   let cashbackTotal = 0;
   for (const item of items) {
+    if (item.isCsp) continue;
     const cat = item.category || "General";
     const fromPlan = membershipBenefitsForLine(
       item.price,

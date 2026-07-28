@@ -27,6 +27,7 @@ import couponRoutes from './routes/coupon.route.js';
 import companyRoutes from './routes/company.route.js';
 import affiliateRoutes from './routes/affiliate.route.js';
 import accessRoutes from './routes/access.route.js';
+import cspRouters from './routes/csp.route.js'
 import customerAuthRoutes from './modules/customer/routes/auth.routes.js';
 import {customerErrorHandler} from './modules/customer/middlewares/errorHandler.js';
 import path from 'path';
@@ -99,6 +100,9 @@ app.use('/coupon', couponRoutes);
 app.use('/company', companyRoutes);
 app.use('/affiliate', affiliateRoutes);
 app.use('/access', accessRoutes);
+
+//CSP APIs
+app.use('/csp', cspRouters);
 
 
 // Customer portal auth APIs — isolated namespace (does not conflict with admin /customer)

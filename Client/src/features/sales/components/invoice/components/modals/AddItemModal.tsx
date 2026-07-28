@@ -36,6 +36,8 @@ const baseSchema = z.object({
   discountValue: z.number().min(0).default(0),
   variants: z.array(variantSchema).default([]),
   images: z.array(z.instanceof(File)).default([]),
+  isCsp: z.enum(["yes", "no"]).default("no"),
+  cspEnrollmentId: z.string().optional().default(""),
 });
 
 const schema = baseSchema.superRefine((value, ctx) => {
@@ -56,6 +58,14 @@ const schema = baseSchema.superRefine((value, ctx) => {
       code: "custom",
       message: "Percentage discount cannot exceed 100",
       path: ["discountValue"],
+    });
+  }
+
+  if (value.type === "product" && value.isCsp === "yes" && !String(value.cspEnrollmentId || "").trim()) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Select a CSP sailor when CSP is Yes",
+      path: ["cspEnrollmentId"],
     });
   }
 });
@@ -93,6 +103,8 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
       discountValue: initialData?.discountValue || 0,
       variants: initialData?.variants || [],
       images: initialData?.images || [],
+      isCsp: (initialData as any)?.isCsp === "yes" || (initialData as any)?.isCsp === true ? "yes" : "no",
+      cspEnrollmentId: (initialData as any)?.cspEnrollmentId || "",
     },
   });
 
@@ -132,6 +144,13 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
     payload.append("discountType", values.discountType);
     payload.append("discountValue", String(values.discountValue));
     payload.append("variants", JSON.stringify(values.variants));
+    payload.append("isCsp", values.type === "product" && values.isCsp === "yes" ? "true" : "false");
+    payload.append(
+      "cspEnrollmentId",
+      values.type === "product" && values.isCsp === "yes"
+        ? String(values.cspEnrollmentId || "")
+        : "",
+    );
     values.images.forEach((image: File) => payload.append("images", image));
     await onSubmit(payload);
     reset();

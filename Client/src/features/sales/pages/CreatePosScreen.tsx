@@ -50,6 +50,7 @@ type PosItem = {
   category?: string;
   stockQty?: number;
   image?: string;
+  isCsp?: boolean;
 };
 
 export default function CreatePosScreen({
@@ -108,9 +109,10 @@ export default function CreatePosScreen({
     category: string,
     mType: string,
     mId?: string | null,
+    isCsp?: boolean,
   ) => {
     const plan = resolveMembershipPlan(membershipPlans, mType, mId);
-    return membershipBenefitsForLine(price, qty, category, plan);
+    return membershipBenefitsForLine(price, qty, category, plan, { isCsp });
   };
 
   const handleChange = (
@@ -121,14 +123,21 @@ export default function CreatePosScreen({
     setItems((prev) =>
       prev.map((it) => {
         if (it.id === id) {
+          if (field === "discount" && it.isCsp) {
+            return { ...it, discount: 0 };
+          }
           const updated = { ...it, [field]: Number(value) };
           if (field === "qty" || field === "price") {
+            if (updated.isCsp) {
+              return { ...updated, discount: 0, cashback: 0 };
+            }
             const benefits = getMembershipBenefitsForItem(
               updated.price,
               updated.qty,
               updated.category || "General",
               membership,
               membershipPlanId,
+              false,
             );
             return {
               ...updated,
@@ -178,12 +187,14 @@ export default function CreatePosScreen({
       selectedProduct?.lineCategory ||
       selectedProduct?.sourceType ||
       "product";
+    const isCsp = Boolean(selectedProduct?.isCsp);
     const benefits = getMembershipBenefitsForItem(
       price,
       qty,
       membershipCategory,
       membership,
       membershipPlanId,
+      isCsp,
     );
 
     setItems((prev) => [
@@ -193,13 +204,14 @@ export default function CreatePosScreen({
         name,
         qty,
         price,
-        discount: benefits.discount || 0,
-        cashback: benefits.cashback || 0,
+        discount: isCsp ? 0 : benefits.discount || 0,
+        cashback: isCsp ? 0 : benefits.cashback || 0,
         category: lineCategory,
         stockQty: selectedProduct?.trackStock
           ? Number(selectedProduct?.stockQty ?? 0)
           : undefined,
         image: selectedProduct?.imageUrl || (selectedProduct?.images && selectedProduct?.images[0]) || "",
+        isCsp,
       },
     ]);
 
@@ -529,9 +541,12 @@ export default function CreatePosScreen({
                             setCustomers([]);
                             setCustomerDropdownOpen(false);
 
-                            // Auto-apply discounts to existing items
+                            // Auto-apply discounts to existing items (skip CSP)
                             setItems(prev => prev.map(item => {
-                              const benefits = getMembershipBenefitsForItem(item.price, item.qty, item.category || "General", mType, mId);
+                              if (item.isCsp) {
+                                return { ...item, discount: 0, cashback: 0 };
+                              }
+                              const benefits = getMembershipBenefitsForItem(item.price, item.qty, item.category || "General", mType, mId, false);
                               return {
                                   ...item,
                                   discount: benefits.discount || 0,
@@ -672,7 +687,14 @@ export default function CreatePosScreen({
                 {items.map((item) => (
                   <tr key={item.id} className="border-t">
                     <td className="p-3">
-                      <div className="font-medium">{item.name}</div>
+                      <div className="flex items-center gap-2 font-medium">
+                        <span>{item.name}</span>
+                        {item.isCsp && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                            CSP
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-green-600">
                         Avl Stock: {(item.stockQty ?? 0) - item.qty}
                       </div>
@@ -702,15 +724,19 @@ export default function CreatePosScreen({
                       />
                     </td>
 
-                    {/* Discount Input */}
+                    {/* Discount Input — CSP products cannot be discounted */}
                     <td className="p-3 text-center">
                       <input
                         type="number"
-                        value={item.discount}
+                        value={item.isCsp ? 0 : item.discount}
+                        disabled={Boolean(item.isCsp)}
+                        title={item.isCsp ? "No discount on CSP products" : undefined}
                         onChange={(e) =>
                           handleChange(item.id, "discount", e.target.value)
                         }
-                        className="w-20 border rounded px-2 py-1 text-center"
+                        className={`w-20 border rounded px-2 py-1 text-center ${
+                          item.isCsp ? "cursor-not-allowed bg-slate-50 text-slate-400" : ""
+                        }`}
                       />
                     </td>
 

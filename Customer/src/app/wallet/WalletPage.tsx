@@ -63,6 +63,7 @@ const txVisuals: Record<string, {icon: typeof ArrowDown; color: string; bg: stri
   general: {icon: Wallet, color: 'text-[#6366F1]', bg: 'bg-[#EEF2FF]'},
   cashback: {icon: Gift, color: 'text-[#6366F1]', bg: 'bg-[#EEF2FF]'},
   affiliate: {icon: TrendingUp, color: 'text-[#22C55E]', bg: 'bg-[#DCFCE7]'},
+  csp: {icon: TrendingUp, color: 'text-[#16A34A]', bg: 'bg-[#DCFCE7]'},
   other: {icon: PieChart, color: 'text-[#4B5563]', bg: 'bg-[#F3F4F6]'},
 };
 
@@ -175,8 +176,8 @@ export default function WalletPage() {
       title: 'Withdraw',
       text:
         data.balances.withdrawable > 0
-          ? `You have ${formatInr(data.balances.withdrawable)} available to withdraw. Withdrawal requests will be available here soon.`
-          : 'No withdrawable balance yet. Earn affiliate rewards to build your balance.',
+          ? `You have ${formatInr(data.balances.withdrawable)} available to withdraw (includes CSP sale share and affiliate earnings). Withdrawal requests will be available here soon.`
+          : 'No withdrawable balance yet. Earn CSP sale share or affiliate rewards to build your balance.',
       confirmButtonColor: '#111111',
     });
   };
@@ -512,7 +513,14 @@ export default function WalletPage() {
                         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${visual.bg}`}>
                           <Icon className={`h-[16px] w-[16px] ${visual.color}`} strokeWidth={income ? 2.5 : 1.75} />
                         </div>
-                        <p className="text-[13px] font-extrabold text-[#111111]">{tx.title}</p>
+                        <div>
+                          <p className="text-[13px] font-extrabold text-[#111111]">{tx.title}</p>
+                          {tx.withdrawable && income ? (
+                            <p className="mt-0.5 text-[10px] font-semibold text-[#16A34A]">
+                              Withdrawable
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
                       <div className="text-right">
                         <p className={`text-[13px] font-black ${income ? 'text-[#22C55E]' : 'text-[#111111]'}`}>

@@ -37,6 +37,7 @@ type CheckoutItem = {
   cashback?: number;
   image?: string;
   category?: string;
+  isCsp?: boolean;
 };
 
 type Props = {
@@ -478,6 +479,8 @@ export default function CheckoutModal({
         category: item.category,
         discount: Number(item.discount ?? 0),
         cashback: Number(item.cashback ?? 0),
+        // CSP products: never include in membership discount / cashback summary
+        isCsp: Boolean(item.isCsp),
       })),
     );
   }, [
@@ -490,24 +493,44 @@ export default function CheckoutModal({
   ]);
 
   const lineDiscountsTotal = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.discount ?? 0), 0),
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum + (item.isCsp ? 0 : Number(item.discount ?? 0)),
+        0,
+      ),
     [items],
   );
 
   const lineCashbackTotal = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.cashback ?? 0), 0),
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum + (item.isCsp ? 0 : Number(item.cashback ?? 0)),
+        0,
+      ),
     [items],
   );
 
-  const displayMembershipDiscount =
-    initialMembershipDiscount > 0
+  // Prefer actual line totals; fall back to plan summary (already CSP-aware).
+  // When any CSP item is present, never trust a stale initialMembershipDiscount
+  // that may have been recalculated without the CSP skip.
+  const cartHasCsp = items.some((item) => Boolean(item.isCsp));
+  const displayMembershipDiscount = cartHasCsp
+    ? lineDiscountsTotal > 0
+      ? lineDiscountsTotal
+      : summary.membershipDiscount
+    : initialMembershipDiscount > 0
       ? initialMembershipDiscount
       : lineDiscountsTotal > 0
         ? lineDiscountsTotal
         : summary.membershipDiscount;
 
-  const displayCashbackTotal =
-    initialCashbackTotal > 0
+  const displayCashbackTotal = cartHasCsp
+    ? lineCashbackTotal > 0
+      ? lineCashbackTotal
+      : summary.cashbackTotal
+    : initialCashbackTotal > 0
       ? initialCashbackTotal
       : lineCashbackTotal > 0
         ? lineCashbackTotal
@@ -805,16 +828,21 @@ export default function CheckoutModal({
         productName: item.name,
         qty: Number(item.qty),
         unitPrice: Number(item.price),
-        discount: Number(item.discount ?? 0),
+        discount: item.isCsp ? 0 : Number(item.discount ?? 0),
         category: item.category || "General",
         image: item.image || "",
+        isCsp: Boolean(item.isCsp),
       })),
       subTotal: items.reduce(
         (sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0),
         0,
       ),
       discountTotal:
-        items.reduce((sum, item) => sum + Number(item.discount || 0), 0) +
+        items.reduce(
+          (sum, item) =>
+            sum + (item.isCsp ? 0 : Number(item.discount || 0)),
+          0,
+        ) +
         couponDiscount +
         referralDiscount,
       extraCharges: extraCharges,

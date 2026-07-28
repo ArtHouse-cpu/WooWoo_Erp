@@ -21,16 +21,25 @@ const getConfig = () => {
 
 const getMembershipTemplateConfig = () => {
   const {phoneNumberId, accessToken, language} = getConfig();
+  // Customer portal uses `membershippurchase` (approved). `newmembership` is optional alias only if approved in Meta.
   const templateName = (
     process.env.WHATSAPP_MEMBERSHIP_TEMPLATE ||
+    process.env.WHATSAPP_NEW_MEMBERSHIP_TEMPLATE ||
     'membershippurchase'
   ).trim();
   const membershipLanguage = (
     process.env.WHATSAPP_MEMBERSHIP_TEMPLATE_LANGUAGE ||
-    language
+    language ||
+    'en_US'
   ).trim();
   const urlButtonParam = (
     process.env.WHATSAPP_MEMBERSHIP_VIEW_URL_PARAM ||
+    process.env.WHATSAPP_NEW_MEMBERSHIP_PROSITE_URL_PARAM ||
+    ''
+  ).trim();
+  const appUrlParam = (
+    process.env.WHATSAPP_MEMBERSHIP_APP_URL_PARAM ||
+    process.env.WHATSAPP_NEW_MEMBERSHIP_APP_URL_PARAM ||
     ''
   ).trim();
 
@@ -40,25 +49,31 @@ const getMembershipTemplateConfig = () => {
     templateName,
     language: membershipLanguage,
     urlButtonParam,
+    appUrlParam,
   };
 };
 
 const getAccountCreatedTemplateConfig = () => {
   const {phoneNumberId, accessToken, language} = getConfig();
+  // Customer portal uses `accountcreated` (approved). `newaccount` is optional alias only if approved in Meta.
   const templateName = (
     process.env.WHATSAPP_ACCOUNT_CREATED_TEMPLATE ||
+    process.env.WHATSAPP_NEW_ACCOUNT_TEMPLATE ||
     'accountcreated'
   ).trim();
   const accountLanguage = (
     process.env.WHATSAPP_ACCOUNT_CREATED_TEMPLATE_LANGUAGE ||
-    language
+    language ||
+    'en_US'
   ).trim();
   const balanceUrlParam = (
     process.env.WHATSAPP_ACCOUNT_CREATED_BALANCE_URL_PARAM ||
+    process.env.WHATSAPP_NEW_ACCOUNT_PROFILE_URL_PARAM ||
     ''
   ).trim();
   const prositeUrlParam = (
     process.env.WHATSAPP_ACCOUNT_CREATED_PROSITE_URL_PARAM ||
+    process.env.WHATSAPP_NEW_ACCOUNT_APP_URL_PARAM ||
     ''
   ).trim();
 
@@ -146,6 +161,7 @@ const buildMembershipTemplatePayload = ({
   validity,
   cashbackLabel,
   urlButtonParam,
+  appUrlParam,
 }) => {
   const components = [
     {
@@ -159,12 +175,21 @@ const buildMembershipTemplatePayload = ({
     },
   ];
 
+  // newmembership buttons: Setup Prosite (0), Open App (1)
   if (urlButtonParam) {
     components.push({
       type: 'button',
       sub_type: 'url',
       index: '0',
       parameters: [{type: 'text', text: String(urlButtonParam)}],
+    });
+  }
+  if (appUrlParam) {
+    components.push({
+      type: 'button',
+      sub_type: 'url',
+      index: '1',
+      parameters: [{type: 'text', text: String(appUrlParam)}],
     });
   }
 
@@ -206,8 +231,26 @@ const postTemplateMessage = async ({phoneNumberId, accessToken, payload}) => {
 };
 
 const languageCandidates = primary => {
+  // Prefer configured locale, then the ones used by Customer portal OTP (`en_US`) and plain `en`.
   const list = [primary, 'en_US', 'en'];
   return [...new Set(list.filter(Boolean))];
+};
+
+/** Try configured template first, then Customer-portal / legacy aliases on Meta 132001. */
+const templateNameCandidates = (primary, aliases = []) => {
+  return [...new Set([primary, ...aliases].map(n => String(n || '').trim()).filter(Boolean))];
+};
+
+const isMissingTemplateError = error => {
+  const code = Number(error?.code);
+  const message = String(error?.message || '');
+  const details = String(error?.error_data?.details || '');
+  return (
+    code === 132001 ||
+    /template name.*does not exist|does not exist in the translation|not found/i.test(
+      `${message} ${details}`,
+    )
+  );
 };
 
 /**
@@ -317,8 +360,10 @@ export const sendWhatsAppOtp = async ({to, otp}) => {
 };
 
 /**
- * Send membership activation WhatsApp using template `membershippurchase`.
- * Body vars: {{1}} name, {{2}} membership, {{3}} validity, {{4}} cashback (e.g. ₹50)
+ * Send membership activation WhatsApp.
+ * Customer portal template: `membershippurchase` (fallback: membershipchange, newmembership).
+ * Body: {{1}} name, {{2}} plan, {{3}} validity, {{4}} cashback (e.g. ₹50)
+ * Buttons: optional URL params (static URLs need none).
  */
 export const sendMembershipPurchaseWhatsApp = async ({
   to,
@@ -327,8 +372,14 @@ export const sendMembershipPurchaseWhatsApp = async ({
   validity,
   cashbackLabel,
 }) => {
-  const {phoneNumberId, accessToken, templateName, language, urlButtonParam} =
-    getMembershipTemplateConfig();
+  const {
+    phoneNumberId,
+    accessToken,
+    templateName,
+    language,
+    urlButtonParam,
+    appUrlParam,
+  } = getMembershipTemplateConfig();
 
   if (!phoneNumberId || !accessToken) {
     console.log(
@@ -345,57 +396,124 @@ export const sendMembershipPurchaseWhatsApp = async ({
   }
 
   let lastError = null;
-  const buttonVariants = urlButtonParam ? [urlButtonParam, ''] : ['', 'membership'];
+  const amountOnly = String(cashbackLabel || '').replace(/[^\d.]/g, '') || '50';
+  const bodyModes = [
+    [
+      String(name || 'Member'),
+      String(membershipLabel || 'Membership'),
+      String(validity || 'Yearly'),
+      String(cashbackLabel || `₹${amountOnly}`),
+    ],
+    [
+      String(name || 'Member'),
+      String(membershipLabel || 'Membership'),
+      String(validity || 'Yearly'),
+      `₹${amountOnly}`,
+    ],
+    [
+      String(name || 'Member'),
+      String(membershipLabel || 'Membership'),
+      String(validity || 'Yearly'),
+      `${amountOnly} coins`,
+    ],
+    [
+      String(name || 'Member'),
+      String(membershipLabel || 'Membership'),
+      String(validity || 'Yearly'),
+      amountOnly,
+    ],
+  ];
 
-  for (const lang of languageCandidates(language)) {
-    for (const buttonParam of buttonVariants) {
-      const payload = buildMembershipTemplatePayload({
-        to: recipient,
-        templateName,
-        language: lang,
-        name,
-        membershipLabel,
-        validity,
-        cashbackLabel,
-        urlButtonParam: buttonParam || null,
-      });
+  const buttonModes = [
+    {urlButtonParam: '', appUrlParam: ''},
+    {
+      urlButtonParam: urlButtonParam || 'prosite',
+      appUrlParam: appUrlParam || 'app',
+    },
+    {urlButtonParam: urlButtonParam || 'prosite', appUrlParam: ''},
+  ];
 
-      const result = await postTemplateMessage({
-        phoneNumberId,
-        accessToken,
-        payload,
-      });
+  const templateNames = templateNameCandidates(templateName, [
+    'membershippurchase',
+    'membershipchange',
+    'newmembership',
+  ]);
 
-      if (result.ok) {
-        const messageId = result.json?.messages?.[0]?.id || null;
-        console.log(
-          `[Membership][WhatsApp] delivered to=${recipient} template=${templateName} lang=${lang} button=${Boolean(buttonParam)} id=${messageId}`,
-        );
-        return {
-          channel: 'whatsapp',
-          delivered: true,
-          messageId,
-          templateName,
-          language: lang,
-        };
+  for (const activeTemplate of templateNames) {
+    for (const lang of languageCandidates(language)) {
+      for (const bodyParams of bodyModes) {
+        for (const mode of buttonModes) {
+          const payload = buildMembershipTemplatePayload({
+            to: recipient,
+            templateName: activeTemplate,
+            language: lang,
+            name: bodyParams[0],
+            membershipLabel: bodyParams[1],
+            validity: bodyParams[2],
+            cashbackLabel: bodyParams[3],
+            urlButtonParam: mode.urlButtonParam || null,
+            appUrlParam: mode.appUrlParam || null,
+          });
+
+          const result = await postTemplateMessage({
+            phoneNumberId,
+            accessToken,
+            payload,
+          });
+
+          if (result.ok) {
+            const messageId = result.json?.messages?.[0]?.id || null;
+            console.log(
+              `[Membership][WhatsApp] delivered to=${recipient} template=${activeTemplate} lang=${lang} body=${JSON.stringify(bodyParams)} id=${messageId}`,
+            );
+            return {
+              channel: 'whatsapp',
+              delivered: true,
+              messageId,
+              templateName: activeTemplate,
+              language: lang,
+            };
+          }
+
+          lastError = result.json?.error || {message: result.raw, status: result.status};
+          const message = String(lastError.message || '');
+
+          if (lastError.code === 190 || /oauth|access token|authenticat/i.test(message)) {
+            break;
+          }
+
+          // Wrong name/locale → try next language, then next template alias
+          if (isMissingTemplateError(lastError)) {
+            break;
+          }
+
+          if (/button|component|parameter|expected|number of params/i.test(message)) {
+            continue;
+          }
+
+          break;
+        }
+
+        if (
+          lastError?.code === 190 ||
+          isMissingTemplateError(lastError) ||
+          /oauth|access token|authenticat/i.test(String(lastError?.message || ''))
+        ) {
+          break;
+        }
       }
 
-      lastError = result.json?.error || {message: result.raw, status: result.status};
-      const message = String(lastError.message || '');
-
-      if (lastError.code === 190 || /oauth|access token|authenticat/i.test(message)) {
+      if (
+        lastError?.code === 190 ||
+        /oauth|access token|authenticat/i.test(String(lastError?.message || ''))
+      ) {
         break;
       }
 
-      if (/language|template name|does not exist|not found/i.test(message)) {
-        break;
-      }
-
-      if (/button|component|parameter|expected/i.test(message)) {
+      // 132001 for this language → try next language / template
+      if (isMissingTemplateError(lastError)) {
         continue;
       }
-
-      break;
     }
 
     if (
@@ -420,6 +538,9 @@ export const sendMembershipPurchaseWhatsApp = async ({
     meta: lastError,
   };
 };
+
+/** Alias used by Admin Create Subscription activation. */
+export const sendNewMembershipWhatsApp = sendMembershipPurchaseWhatsApp;
 
 const buildAccountCreatedTemplatePayload = ({
   to,
@@ -472,9 +593,10 @@ const buildAccountCreatedTemplatePayload = ({
 };
 
 /**
- * Send account-created WhatsApp using template `accountcreated`.
- * Body vars: {{1}} name, {{2}} welcome cashback (e.g. ₹21)
- * Buttons: Check Balance (URL), View Prosite (URL), Get help (call) — usually static.
+ * Send account-created WhatsApp.
+ * Customer portal template: `accountcreated` (fallback: newaccount).
+ * Body: {{1}} name, {{2}} welcome cashback (e.g. ₹25 / ₹21)
+ * Buttons: optional URL params (static URLs need none).
  */
 export const sendAccountCreatedWhatsApp = async ({to, name, cashbackLabel}) => {
   const {
@@ -502,109 +624,127 @@ export const sendAccountCreatedWhatsApp = async ({to, name, cashbackLabel}) => {
 
   let lastError = null;
 
-  const amountOnly = String(cashbackLabel || '').replace(/[^\d.]/g, '') || '21';
+  const amountOnly = String(cashbackLabel || '').replace(/[^\d.]/g, '') || '25';
 
-  // Body param variants: name+₹21, name+21, name-only (if template has 1 var)
+  // Prefer ₹ format used by Customer portal `accountcreated`
   const bodyModes = [
     [String(name || 'Member'), String(cashbackLabel || `₹${amountOnly}`)],
+    [String(name || 'Member'), `₹${amountOnly}`],
+    [String(name || 'Member'), `${amountOnly} coins`],
     [String(name || 'Member'), amountOnly],
     [String(name || 'Member')],
   ];
 
-  // Try body-only first (static URL/call buttons), then with optional URL params
   const buttonModes = [
     {balanceUrlParam: '', prositeUrlParam: ''},
     {
       balanceUrlParam: balanceUrlParam || 'balance',
       prositeUrlParam: prositeUrlParam || 'prosite',
     },
+    {balanceUrlParam: balanceUrlParam || 'balance', prositeUrlParam: ''},
   ];
 
-  for (const lang of languageCandidates(language)) {
-    for (const bodyParams of bodyModes) {
-      for (const mode of buttonModes) {
-        const components = [
-          {
-            type: 'body',
-            parameters: bodyParams.map(text => ({type: 'text', text})),
-          },
-        ];
+  const templateNames = templateNameCandidates(templateName, [
+    'accountcreated',
+    'newaccount',
+  ]);
 
-        if (mode.balanceUrlParam) {
-          components.push({
-            type: 'button',
-            sub_type: 'url',
-            index: '0',
-            parameters: [{type: 'text', text: String(mode.balanceUrlParam)}],
-          });
-        }
-        if (mode.prositeUrlParam) {
-          components.push({
-            type: 'button',
-            sub_type: 'url',
-            index: '1',
-            parameters: [{type: 'text', text: String(mode.prositeUrlParam)}],
-          });
-        }
+  for (const activeTemplate of templateNames) {
+    for (const lang of languageCandidates(language)) {
+      for (const bodyParams of bodyModes) {
+        for (const mode of buttonModes) {
+          const components = [
+            {
+              type: 'body',
+              parameters: bodyParams.map(text => ({type: 'text', text})),
+            },
+          ];
 
-        const payload = {
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: recipient,
-          type: 'template',
-          template: {
-            name: templateName,
-            language: {code: lang},
-            components,
-          },
-        };
+          if (mode.balanceUrlParam) {
+            components.push({
+              type: 'button',
+              sub_type: 'url',
+              index: '0',
+              parameters: [{type: 'text', text: String(mode.balanceUrlParam)}],
+            });
+          }
+          if (mode.prositeUrlParam) {
+            components.push({
+              type: 'button',
+              sub_type: 'url',
+              index: '1',
+              parameters: [{type: 'text', text: String(mode.prositeUrlParam)}],
+            });
+          }
 
-        const result = await postTemplateMessage({
-          phoneNumberId,
-          accessToken,
-          payload,
-        });
-
-        if (result.ok) {
-          const messageId = result.json?.messages?.[0]?.id || null;
-          console.log(
-            `[AccountCreated][WhatsApp] delivered to=${recipient} template=${templateName} lang=${lang} params=${bodyParams.length} id=${messageId}`,
-          );
-          return {
-            channel: 'whatsapp',
-            delivered: true,
-            messageId,
-            templateName,
-            language: lang,
+          const payload = {
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: recipient,
+            type: 'template',
+            template: {
+              name: activeTemplate,
+              language: {code: lang},
+              components,
+            },
           };
-        }
 
-        lastError = result.json?.error || {message: result.raw, status: result.status};
-        const message = String(lastError.message || '');
+          const result = await postTemplateMessage({
+            phoneNumberId,
+            accessToken,
+            payload,
+          });
 
-        if (lastError.code === 190 || /oauth|access token|authenticat/i.test(message)) {
+          if (result.ok) {
+            const messageId = result.json?.messages?.[0]?.id || null;
+            console.log(
+              `[AccountCreated][WhatsApp] delivered to=${recipient} template=${activeTemplate} lang=${lang} body=${JSON.stringify(bodyParams)} id=${messageId}`,
+            );
+            return {
+              channel: 'whatsapp',
+              delivered: true,
+              messageId,
+              templateName: activeTemplate,
+              language: lang,
+            };
+          }
+
+          lastError = result.json?.error || {message: result.raw, status: result.status};
+          const message = String(lastError.message || '');
+
+          if (lastError.code === 190 || /oauth|access token|authenticat/i.test(message)) {
+            break;
+          }
+
+          if (isMissingTemplateError(lastError)) {
+            break;
+          }
+
+          if (/button|component|parameter|expected|number of params/i.test(message)) {
+            continue;
+          }
+
           break;
         }
 
-        if (/language|template name|does not exist|not found/i.test(message)) {
+        if (
+          lastError?.code === 190 ||
+          isMissingTemplateError(lastError) ||
+          /oauth|access token|authenticat/i.test(String(lastError?.message || ''))
+        ) {
           break;
         }
-
-        // Try next body/button combination on component mismatch
-        if (/button|component|parameter|expected|number of params/i.test(message)) {
-          continue;
-        }
-
-        break;
       }
 
       if (
         lastError?.code === 190 ||
-        /oauth|access token|authenticat|language|template name|does not exist|not found/i.test(
-          String(lastError?.message || ''),
-        )
+        /oauth|access token|authenticat/i.test(String(lastError?.message || ''))
       ) {
         break;
+      }
+
+      if (isMissingTemplateError(lastError)) {
+        continue;
       }
     }
 
@@ -630,6 +770,9 @@ export const sendAccountCreatedWhatsApp = async ({to, name, cashbackLabel}) => {
     meta: lastError,
   };
 };
+
+/** Alias used by Admin Add Customer. */
+export const sendNewAccountWhatsApp = sendAccountCreatedWhatsApp;
 
 /** Plain amount for Meta templates that already include ₹ in the body text. */
 const formatAmountPlain = value => {

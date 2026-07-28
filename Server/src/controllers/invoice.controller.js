@@ -3,6 +3,8 @@ import Customer from '../models/customer.model.js';
 import Coupon from '../models/coupon.model.js';
 import Invoice from '../models/invoice.model.js';
 import Wallet from '../models/wallet.model.js';
+import Product from '../models/product.model.js';
+import CustomerSellerProgram from '../models/customerSellerProgram.model.js';
 import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
 import { appendTransaction } from './wallet.controller.js';
 import { validateCouponForOrder } from './coupon.controller.js';
@@ -11,6 +13,16 @@ import { creditReferralDiscountToInviter, markReferralDiscountUsed } from '../mo
 import { sendActivityUpdateWhatsApp } from '../modules/customer/services/whatsapp.service.js';
 import { normalizeMobile } from '../modules/customer/utils/normalize.js';
 
+const getCspSellerSharePercent = () => {
+  const n = Number(process.env.CSP_SELLER_SHARE_PERCENT ?? 70);
+  return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 70;
+};
+
+const roundMoney = value => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+};
 /** Products track inventory; space / service / food / membership do not. */
 const isInventoryTrackedCategory = raw => {
   const value = String(raw || '')
@@ -110,7 +122,6 @@ const membershipLabelForCustomer = (customer, fallbackType) => {
     .trim()
     .toLowerCase();
   if (!raw || raw === 'none' || raw === 'new' || raw === 'guest') return 'Guest';
-  // Meta body: "As a {{4}}, you received:" → full label e.g. Premium Member
   const title = raw.charAt(0).toUpperCase() + raw.slice(1);
   return `${title} Member`;
 };
@@ -357,6 +368,225 @@ const creditMembershipCashback = async ({
   });
 };
 
+/** Attach CSP metadata onto normalized invoice lines from Product catalogue. */
+const enrichItemsWithCsp = async items => {
+  const names = [
+    ...new Set(
+      (items || [])
+        .map(i => String(i.productName || '').trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (!names.length) return items;
+
+  const products = await Product.find({
+    productName: {$in: names},
+    isCsp: true,
+  })
+    .select('_id productName isCsp cspEnrollmentId cspCustomerId cspVendorId')
+    .lean();
+
+  const byName = new Map(
+    products.map(p => [String(p.productName || '').trim().toLowerCase(), p]),
+  );
+
+  const enrollmentIds = [
+    ...new Set(
+      products
+        .map(p => (p.cspEnrollmentId ? String(p.cspEnrollmentId) : ''))
+        .filter(Boolean),
+    ),
+  ];
+  const enrollments = enrollmentIds.length
+    ? await CustomerSellerProgram.find({
+        _id: {$in: enrollmentIds},
+        status: 'active',
+      })
+        .select('_id customerId vendorId sellerSharePercent status')
+        .lean()
+    : [];
+  const enrollmentMap = new Map(enrollments.map(e => [String(e._id), e]));
+
+  const defaultShare = getCspSellerSharePercent();
+
+  return (items || []).map(item => {
+    const key = String(item.productName || '').trim().toLowerCase();
+    const product = byName.get(key);
+    if (!product?.isCsp) {
+      return {
+        ...item,
+        productId: item.productId || null,
+        isCsp: false,
+        cspEnrollmentId: null,
+        cspCustomerId: null,
+        cspSellerAmount: 0,
+      };
+    }
+
+    const enrollment = product.cspEnrollmentId
+      ? enrollmentMap.get(String(product.cspEnrollmentId))
+      : null;
+    if (!enrollment) {
+      return {
+        ...item,
+        productId: product._id,
+        isCsp: false,
+        cspEnrollmentId: null,
+        cspCustomerId: null,
+        cspSellerAmount: 0,
+      };
+    }
+
+    const share =
+      Number.isFinite(Number(enrollment.sellerSharePercent))
+        ? Number(enrollment.sellerSharePercent)
+        : defaultShare;
+    // CSP: always use full line (qty × price), never discounted base
+    const base = roundMoney(
+      Math.max(0, Number(item.qty ?? 0) * Number(item.unitPrice ?? 0)),
+    );
+    const cspSellerAmount = roundMoney((base * share) / 100);
+
+    return {
+      ...item,
+      productId: product._id,
+      isCsp: true,
+      cspEnrollmentId: enrollment._id,
+      cspCustomerId: enrollment.customerId || product.cspCustomerId || null,
+      // CSP lines never carry product / membership discount
+      discount: 0,
+      lineTotal: base,
+      cspSellerAmount,
+    };
+  });
+};
+
+/** Credit 70% (or enrollment %) of CSP line totals to sailor customer wallets. */
+const creditCspSellerShares = async ({items, invoiceCode, createdBy}) => {
+  const ref = String(invoiceCode || '').trim();
+  if (!ref) return;
+
+  const cspItems = (items || []).filter(
+    i => i?.isCsp && Number(i.cspSellerAmount) > 0 && i.cspCustomerId,
+  );
+  if (!cspItems.length) return;
+
+  // Aggregate by sailor so one wallet write per customer
+  const byCustomer = new Map();
+  for (const item of cspItems) {
+    const key = String(item.cspCustomerId);
+    const prev = byCustomer.get(key) || {
+      customerId: item.cspCustomerId,
+      amount: 0,
+      productNames: [],
+    };
+    prev.amount = roundMoney(prev.amount + Number(item.cspSellerAmount));
+    prev.productNames.push(String(item.productName || 'item'));
+    byCustomer.set(key, prev);
+  }
+
+  for (const group of byCustomer.values()) {
+    const sailor = await Customer.findById(group.customerId);
+    if (!sailor) continue;
+
+    let wallet = await Wallet.findOne({customerId: sailor._id});
+    if (!wallet) {
+      wallet = await Wallet.create({
+        customerId: sailor._id,
+        customerName: String(sailor.name ?? '').trim(),
+        customerPhone: String(sailor.mobile ?? '').trim(),
+        walletAmount: 0,
+        transactions: [],
+      });
+    }
+
+    const productLabel = group.productNames.slice(0, 3).join(', ');
+    const note = `CSP Sale · ${ref} · ${productLabel}`;
+    const alreadyCredited = (wallet.transactions || []).some(
+      tx =>
+        String(tx.referenceId || '').trim() === ref &&
+        String(tx.type || '').toLowerCase() === 'credit' &&
+        String(tx.referenceType || '') === 'CspSale' &&
+        String(tx.note || '').includes(note),
+    );
+    // Broader idempotency: any CspSale credit for this invoice+customer
+    const alreadyForInvoice = (wallet.transactions || []).some(
+      tx =>
+        String(tx.referenceId || '').trim() === ref &&
+        String(tx.type || '').toLowerCase() === 'credit' &&
+        String(tx.referenceType || '') === 'CspSale',
+    );
+    if (alreadyCredited || alreadyForInvoice) continue;
+
+    await appendTransaction(wallet, {
+      type: 'credit',
+      amount: group.amount,
+      note,
+      referenceType: 'CspSale',
+      referenceId: ref,
+      // CSP sailor share is withdrawable (same bucket as affiliate earnings)
+      walletType: 'affiliate',
+      createdBy,
+    });
+  }
+};
+
+/** Reverse CSP credits for an invoice (cancel/delete). */
+const reverseCspSellerShares = async ({invoice, createdBy}) => {
+  const ref = String(invoice?.invoiceCode || '').trim();
+  if (!ref || !Array.isArray(invoice?.items)) return;
+
+  const cspItems = invoice.items.filter(
+    i => i?.isCsp && Number(i.cspSellerAmount) > 0 && i.cspCustomerId,
+  );
+  if (!cspItems.length) return;
+
+  const byCustomer = new Map();
+  for (const item of cspItems) {
+    const key = String(item.cspCustomerId);
+    const prev = byCustomer.get(key) || {
+      customerId: item.cspCustomerId,
+      amount: 0,
+    };
+    prev.amount = roundMoney(prev.amount + Number(item.cspSellerAmount));
+    byCustomer.set(key, prev);
+  }
+
+  for (const group of byCustomer.values()) {
+    const sailor = await Customer.findById(group.customerId);
+    if (!sailor) continue;
+
+    const wallet = await Wallet.findOne({customerId: sailor._id});
+    if (!wallet) continue;
+
+    const alreadyReversed = (wallet.transactions || []).some(
+      tx =>
+        String(tx.referenceId || '').trim() === ref &&
+        String(tx.type || '').toLowerCase() === 'debit' &&
+        String(tx.referenceType || '') === 'CspSale',
+    );
+    if (alreadyReversed) continue;
+
+    const hasCredit = (wallet.transactions || []).some(
+      tx =>
+        String(tx.referenceId || '').trim() === ref &&
+        String(tx.type || '').toLowerCase() === 'credit' &&
+        String(tx.referenceType || '') === 'CspSale',
+    );
+    if (!hasCredit) continue;
+
+    await appendTransaction(wallet, {
+      type: 'debit',
+      amount: group.amount,
+      note: `CSP Sale reversed · ${ref}`,
+      referenceType: 'CspSale',
+      referenceId: ref,
+      walletType: 'affiliate',
+      createdBy,
+    });
+  }
+};
+
 const applyCouponUsageDelta = async ({ code, delta }) => {
   const normalizedCode = String(code ?? '').trim().toUpperCase();
   if (!normalizedCode || !Number.isFinite(Number(delta)) || Number(delta) === 0) return;
@@ -479,6 +709,8 @@ const createInvoice = async (req, res) => {
         message: 'Invalid invoice item values.',
       });
     }
+
+    const enrichedItems = await enrichItemsWithCsp(normalizedItems);
 
     const computedSubTotal = normalizedItems.reduce(
       (sum, item) => sum + Number(item.qty ?? 0) * Number(item.unitPrice ?? 0),
@@ -606,7 +838,7 @@ const createInvoice = async (req, res) => {
       salesPersonName: String(salesPersonName).trim(),
       notes: String(notes ?? '').trim(),
       status: status === 'draft' ? 'draft' : 'final',
-      items: normalizedItems,
+      items: enrichedItems,
       subTotal: Number(subTotal ?? computedSubTotal),
       discountTotal: computedDiscountTotal,
       coupon: appliedCoupon
@@ -691,6 +923,19 @@ const createInvoice = async (req, res) => {
         });
       } catch (cashbackError) {
         console.error('createInvoice cashback credit error:', cashbackError);
+      }
+    }
+
+    // CSP sailor share (70% default) — platform 30% is not walleted
+    if (invoice.status !== 'draft' && invoice.status !== 'cancelled') {
+      try {
+        await creditCspSellerShares({
+          items: enrichedItems,
+          invoiceCode,
+          createdBy: actor,
+        });
+      } catch (cspError) {
+        console.error('createInvoice CSP credit error:', cspError);
       }
     }
 
@@ -784,7 +1029,7 @@ const getInvoices=async(req,res)=>{
         const invoices = await Invoice.find(query)
           .sort({createdAt: -1})
           .limit(limit)
-          .select('customerName customerPhone pendingAmount paymentBreakdown status invoiceCode createdAt grandTotal')
+          .select('customerName customerPhone pendingAmount paymentBreakdown status invoiceCode createdAt grandTotal createdBy    ')
           .lean();
         return res.status(200).json({
             success: true,
@@ -843,6 +1088,15 @@ const deleteInvoice = async (req, res) => {
 
     if (invoice.status !== 'cancelled' && invoice.coupon?.code) {
       await applyCouponUsageDelta({ code: invoice.coupon.code, delta: -1 });
+    }
+
+    try {
+      await reverseCspSellerShares({
+        invoice,
+        createdBy: buildCreatedBy(req),
+      });
+    } catch (cspError) {
+      console.error('deleteInvoice CSP reverse error:', cspError);
     }
 
     const deletedInvoice = await Invoice.findOneAndDelete({ _id: id });
@@ -1131,6 +1385,15 @@ const cancelInvoice = async (req, res) => {
 
     if (invoice.coupon?.code) {
       await applyCouponUsageDelta({ code: invoice.coupon.code, delta: -1 });
+    }
+
+    try {
+      await reverseCspSellerShares({
+        invoice,
+        createdBy: buildCreatedBy(req),
+      });
+    } catch (cspError) {
+      console.error('cancelInvoice CSP reverse error:', cspError);
     }
 
     const updatedInvoice = await Invoice.findByIdAndUpdate(

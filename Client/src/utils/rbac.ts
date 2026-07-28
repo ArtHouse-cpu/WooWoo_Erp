@@ -1,7 +1,8 @@
-import {
+﻿import {
   type Permission,
   isValidPermission,
   MENU_PERMISSION_MAP,
+  resolveMenuPermissions,
 } from "@/constants/permissions";
 
 /**
@@ -69,14 +70,14 @@ export function normalizeAppPath(path: string): string {
   return cleaned.endsWith("/") ? cleaned.slice(0, -1) : cleaned;
 }
 
-/** Permission required to open a path, if mapped. */
+/** Permission(s) required to open a path, if mapped. */
 export function getRequiredPermissionForPath(
   path: string,
-): Permission | undefined {
+): Permission | Permission[] | undefined {
   return MENU_PERMISSION_MAP[normalizeAppPath(path)];
 }
 
-/** Can the user open this path based on MENU_PERMISSION_MAP? */
+/** Can the user open this path based on MENU_PERMISSION_MAP? (ANY of listed). */
 export function canAccessPath(
   userPermissions: string[] | null | undefined,
   path: string,
@@ -84,5 +85,5 @@ export function canAccessPath(
   const required = getRequiredPermissionForPath(path);
   // Unmapped paths: allow (tighten when every screen is in the map)
   if (!required) return true;
-  return hasPermission(userPermissions, required);
+  return hasAnyPermission(userPermissions, resolveMenuPermissions(required));
 }

@@ -194,7 +194,11 @@ export default function PosScreen() {
           invoice?.invoiceCode ??
           `INVVWAH-${invoice?.invoiceNumber ?? index + 1}`,
         ),
-        owner: String(invoice?.createdBy?.m_staff_name),
+        owner: String(
+          invoice?.createdBy?.m_staff_name ||
+            invoice?.salesPersonName ||
+            "System",
+        ),
         customer: String(invoice?.customerName),
         phone: String(invoice?.customerPhone),
         date: formatDate(invoice?.invoiceDate),

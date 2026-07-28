@@ -88,7 +88,8 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
 
   const handleSelectProduct = (product: any) => {
     onDraftChange("name", product.productName);
-    onDraftChange("price", String(product.sellingPrice ?? 0));
+    // Purchases / POs use cost price, not selling price
+    onDraftChange("price", String(product.purchasePrice ?? 0));
     onDraftChange("image", product.imageUrl || (product.images && product.images[0]) || "");
     setDropdownOpen(false);
   };
@@ -100,7 +101,7 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
       const prod = response?.product;
       if (prod) {
         onDraftChange("name", prod.productName);
-        onDraftChange("price", String(prod.sellingPrice ?? 0));
+        onDraftChange("price", String(prod.purchasePrice ?? 0));
         onDraftChange("image", prod.imageUrl || (prod.images && prod.images[0]) || "");
       }
       setShowCreateModal(false);
@@ -146,7 +147,8 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
                     >
                       <div className="font-medium text-gray-800">{p.productName}</div>
                       <div className="text-xs text-gray-500">
-                        ₹{p.sellingPrice} {p.stockQty ? `|Qty: ${p.stockQty}` : ""}
+                        Purchase ₹{p.purchasePrice ?? 0}
+                        {p.stockQty ? ` | Qty: ${p.stockQty}` : ""}
                       </div>
                     </div>
                   ))}

@@ -108,6 +108,29 @@ const productSchema = new mongoose.Schema(
       type: [variantSchema],
       default: [],
     },
+    /** Customer Sailor Program product flag */
+    isCsp: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    cspEnrollmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CustomerSellerProgram',
+      default: null,
+      index: true,
+    },
+    cspCustomerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Customer',
+      default: null,
+      index: true,
+    },
+    cspVendorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Vendor',
+      default: null,
+    },
   },
   { timestamps: true }
 );

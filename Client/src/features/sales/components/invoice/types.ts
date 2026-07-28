@@ -14,6 +14,8 @@ export type InvoiceItem = {
   cashback: number;
   image?: string;
   category?: string;
+  isCsp?: boolean;
+  cspLabel?: string | null;
 };
 
 /** API / POS raw invoice shape used by PDF and print templates */

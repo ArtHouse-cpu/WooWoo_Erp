@@ -20,6 +20,26 @@ const syncCustomerWalletAmount = async (customerId, walletAmount) => {
   });
 };
 
+const syncCustomerWalletBuckets = async (
+  customerId,
+  { walletAmount, affiliateBalance, cashbackBalance },
+) => {
+  if (!mongoose.Types.ObjectId.isValid(String(customerId))) return;
+  const $set = {};
+  if (walletAmount !== undefined) {
+    $set.walletAmount = walletAmount;
+    $set.closingBalance = walletAmount;
+  }
+  if (affiliateBalance !== undefined) {
+    $set.affiliateBalance = affiliateBalance;
+  }
+  if (cashbackBalance !== undefined) {
+    $set.cashbackBalance = cashbackBalance;
+  }
+  if (!Object.keys($set).length) return;
+  await Customer.findByIdAndUpdate(customerId, { $set });
+};
+
 const resolveCustomer = async ({ customerId, customerPhone }) => {
   if (customerId && mongoose.Types.ObjectId.isValid(String(customerId))) {
     return Customer.findById(customerId);
@@ -40,6 +60,7 @@ const appendTransaction = async (
     referenceId = "",
     createdBy = {},
     minimumBalance = 0,
+    walletType = "general",
   },
 ) => {
   const numericAmount = Number(amount);
@@ -47,6 +68,11 @@ const appendTransaction = async (
     throw new Error("Valid transaction amount is required.");
   }
   const minimumAllowedBalance = Math.max(Number(minimumBalance) || 0, 0);
+  const bucket = ["affiliate", "cashback", "general"].includes(
+    String(walletType || "general").toLowerCase(),
+  )
+    ? String(walletType).toLowerCase()
+    : "general";
 
   const refId = String(referenceId ?? "").trim();
   const txType = String(type ?? "credit").toLowerCase();
@@ -64,31 +90,84 @@ const appendTransaction = async (
     }
   }
 
-  const currentBalance = Number(wallet.walletAmount ?? 0);
-  const nextBalance =
-    txType === "debit" ? currentBalance - numericAmount : currentBalance + numericAmount;
+  // Prefer customer bucket balances (source of truth for withdrawable / cashback)
+  const customer = await Customer.findById(wallet.customerId)
+    .select("walletAmount affiliateBalance cashbackBalance")
+    .lean();
 
-  if (nextBalance < 0) {
-    throw new Error("Insufficient wallet balance.");
-  }
-  if (nextBalance < minimumAllowedBalance) {
-    throw new Error(
-      `Final balance cannot be less than minimum balance ${minimumAllowedBalance}.`,
-    );
+  let generalBalance = Number(
+    wallet.walletAmount ?? customer?.walletAmount ?? 0,
+  );
+  let affiliateBalance = Number(
+    customer?.affiliateBalance ?? wallet.affiliateBalance ?? 0,
+  );
+  let cashbackBalance = Number(
+    customer?.cashbackBalance ?? wallet.cashbackBalance ?? 0,
+  );
+
+  const previousBalance =
+    bucket === "affiliate"
+      ? affiliateBalance
+      : bucket === "cashback"
+        ? cashbackBalance
+        : generalBalance;
+
+  const applyDelta = (current) =>
+    txType === "debit" ? current - numericAmount : current + numericAmount;
+
+  if (bucket === "affiliate") {
+    const nextAffiliate = applyDelta(affiliateBalance);
+    if (nextAffiliate < 0) {
+      throw new Error("Insufficient withdrawable (affiliate) balance.");
+    }
+    affiliateBalance = nextAffiliate;
+    wallet.affiliateBalance = nextAffiliate;
+  } else if (bucket === "cashback") {
+    const nextCashback = applyDelta(cashbackBalance);
+    if (nextCashback < 0) {
+      throw new Error("Insufficient cashback balance.");
+    }
+    cashbackBalance = nextCashback;
+    wallet.cashbackBalance = nextCashback;
+  } else {
+    const nextGeneral = applyDelta(generalBalance);
+    if (nextGeneral < 0) {
+      throw new Error("Insufficient wallet balance.");
+    }
+    if (nextGeneral < minimumAllowedBalance) {
+      throw new Error(
+        `Final balance cannot be less than minimum balance ${minimumAllowedBalance}.`,
+      );
+    }
+    generalBalance = nextGeneral;
+    wallet.walletAmount = nextGeneral;
   }
 
-  wallet.walletAmount = nextBalance;
   wallet.transactions.push({
     type: txType,
     amount: numericAmount,
+    walletType: bucket,
     note: String(note ?? "").trim(),
     referenceType: String(referenceType ?? "").trim(),
     referenceId: refId,
     createdBy,
-    closingBalance: nextBalance,
+    previousBalance,
+    closingBalance:
+      bucket === "affiliate"
+        ? affiliateBalance
+        : bucket === "cashback"
+          ? cashbackBalance
+          : generalBalance,
+    affiliateBalanceAfter: affiliateBalance,
+    cashbackBalanceAfter: cashbackBalance,
   });
+
   await wallet.save();
-  await syncCustomerWalletAmount(wallet.customerId, nextBalance);
+  await syncCustomerWalletBuckets(wallet.customerId, {
+    walletAmount: generalBalance,
+    affiliateBalance,
+    cashbackBalance,
+  });
   return wallet;
 };
 
@@ -118,12 +197,24 @@ const getWallets = async (req, res) => {
 
     const combinedWallets = customers.map(c => {
       const w = walletMap[c._id.toString()];
+      const generalBalance = Number(
+        c.walletAmount ?? (w ? w.walletAmount : 0) ?? 0,
+      );
+      const affiliateBalance = Number(
+        c.affiliateBalance ?? (w ? w.affiliateBalance : 0) ?? 0,
+      );
+      const cashbackBalance = Number(
+        c.cashbackBalance ?? (w ? w.cashbackBalance : 0) ?? 0,
+      );
       return {
         _id: w ? w._id : c._id,
         customerId: c._id,
         customerName: c.name,
         customerPhone: c.mobile,
-        walletAmount: c.walletAmount || (w ? w.walletAmount : 0) || 0,
+        walletAmount: generalBalance,
+        affiliateBalance,
+        cashbackBalance,
+        withdrawableBalance: affiliateBalance,
         transactions: w ? w.transactions : [],
         createdAt: w ? w.createdAt : c.createdAt,
         updatedAt: w ? w.updatedAt : c.updatedAt,

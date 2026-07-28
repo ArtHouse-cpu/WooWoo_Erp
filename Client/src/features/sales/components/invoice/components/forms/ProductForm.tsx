@@ -1,3 +1,4 @@
+﻿import { useEffect, useState } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import { Pencil, Plus, Trash2, Wand2 } from "lucide-react";
 import CategorySelect from "../shared/CategorySelect";
@@ -5,6 +6,10 @@ import DiscountInput from "../shared/DiscountInput";
 import ImageUploader from "../shared/ImageUploader";
 import type { AddItemFormValues } from "../modals/AddItemModal";
 import type { VariantInput } from "../modals/VariantModal";
+import {
+  handleGetCspEnrollments,
+  type CspEnrollment,
+} from "@/services/apiClient";
 
 type Props = {
   onAddVariant: () => void;
@@ -18,11 +23,39 @@ const generateBarcode = () =>
 export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
   const { register, watch, setValue, control } = useFormContext<AddItemFormValues>();
   const { fields, remove } = useFieldArray({ control, name: "variants" });
+  const [cspOptions, setCspOptions] = useState<CspEnrollment[]>([]);
+  const [loadingCsp, setLoadingCsp] = useState(false);
 
   const images = watch("images");
   const discountType = watch("discountType");
   const discountValue = watch("discountValue");
   const stockStatus = watch("stockStatus");
+  const isCsp = watch("isCsp");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingCsp(true);
+        const res = await handleGetCspEnrollments({ status: "active" });
+        if (cancelled) return;
+        const rows = Array.isArray(res?.enrollments)
+          ? res.enrollments
+          : Array.isArray(res?.csps)
+            ? res.csps
+            : [];
+        setCspOptions(rows);
+      } catch (error) {
+        console.error("Failed to load CSP sailors:", error);
+        if (!cancelled) setCspOptions([]);
+      } finally {
+        if (!cancelled) setLoadingCsp(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="space-y-5">
@@ -47,6 +80,47 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
             setValue("subCategory", name);
           }}
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">CSP (Customer Sailor Program)</label>
+          <select
+            value={isCsp || "no"}
+            onChange={(e) => {
+              const next = e.target.value as "yes" | "no";
+              setValue("isCsp", next, { shouldValidate: true });
+              if (next === "no") setValue("cspEnrollmentId", "");
+            }}
+            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm"
+          >
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </div>
+        {isCsp === "yes" && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">CSP Sailor *</label>
+            <select
+              {...register("cspEnrollmentId")}
+              className="w-full rounded-lg border border-gray-300 p-2.5 text-sm"
+              disabled={loadingCsp}
+            >
+              <option value="">{loadingCsp ? "Loading sailors…" : "Select CSP sailor"}</option>
+              {cspOptions.map((row) => (
+                <option key={row._id} value={row._id}>
+                  {row.label || `CSP · ${row.displayName || row.customer?.name || "Sailor"}`}
+                  {row.mobile ? ` (${row.mobile})` : ""}
+                </option>
+              ))}
+            </select>
+            {!loadingCsp && cspOptions.length === 0 && (
+              <p className="mt-1 text-xs text-amber-600">
+                No active CSP sailors. Enroll one under Network → CSP.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Counter from '../models/counter.model.js';
 import Subscription from '../models/subscription.model.js';
 import Customer from '../models/customer.model.js';
+import Membership from '../models/membership.model.js';
 import {sendSubscriptionCreatedEmail} from '../utils/brevoMailer.js';
 import {
   validateSubscriptionCreateBody,
@@ -10,6 +11,8 @@ import {
 import {validateReferralDiscountForOrder} from './affiliate.controller.js';
 import {validateCouponForOrder} from './coupon.controller.js';
 import {creditReferralDiscountToInviter, markReferralDiscountUsed} from '../modules/customer/services/referral.service.js';
+import {sendNewMembershipWhatsApp} from '../modules/customer/services/whatsapp.service.js';
+import {resolvePlanMeta} from '../services/membershipPlan.service.js';
 
 const getNextSubscriptionNumber = async () => {
   const counter = await Counter.findOneAndUpdate(
@@ -25,6 +28,32 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isJuniorMembership = value => {
   const v = String(value ?? '').trim().toLowerCase();
   return v.includes('junior') || v.includes('junoir');
+};
+
+/** Human-readable validity for WhatsApp `newmembership` {{3}}. */
+const formatSubscriptionValidity = ({startDate, endDate, repeatUnit, repeatType}) => {
+  const unit = String(repeatUnit || '').trim().toLowerCase();
+  const type = String(repeatType || '').trim().toLowerCase();
+  if (unit === 'year' || type === 'yearly') return '1 year';
+  if (unit === 'month' || type === 'monthly') return '1 month';
+  if (type === 'weekly') return '1 week';
+
+  const start = startDate ? new Date(startDate) : null;
+  const end = endDate ? new Date(endDate) : null;
+  if (
+    start &&
+    end &&
+    !Number.isNaN(start.getTime()) &&
+    !Number.isNaN(end.getTime()) &&
+    end > start
+  ) {
+    const days = Math.round((end.getTime() - start.getTime()) / 86400000);
+    if (days >= 360) return '1 year';
+    if (days >= 28 && days <= 31) return '1 month';
+    if (days > 0) return `${days} days`;
+  }
+
+  return '1 year';
 };
 
 export const createSubscription = async (req, res) => {
@@ -241,7 +270,7 @@ export const createSubscription = async (req, res) => {
       const customer = await Customer.findOne({
         mobile: parsed.data.customerPhone,
       })
-        .select('name email')
+        .select('name email whatsappNumber mobile')
         .lean();
       const customerEmail = String(customer?.email ?? '').trim().toLowerCase();
 
@@ -259,6 +288,88 @@ export const createSubscription = async (req, res) => {
       }
     } catch (mailError) {
       console.error('createSubscription email error:', mailError);
+    }
+
+    // Meta WhatsApp `newmembership` on activation (Create Subscription → active)
+    try {
+      const statusNorm = String(parsed.data.status || '').trim().toLowerCase();
+      if (statusNorm === 'active' || statusNorm === 'completed') {
+        const cashbackAmount = Number(
+          process.env.WHATSAPP_MEMBERSHIP_CASHBACK ||
+            process.env.MEMBERSHIP_WELCOME_CASHBACK ||
+            50,
+        );
+        const safeCashback =
+          Number.isFinite(cashbackAmount) && cashbackAmount > 0
+            ? cashbackAmount
+            : 50;
+
+        let membershipLabel =
+          String(parsed.data.items?.[0]?.productName || '').trim() ||
+          String(parsed.data.membershipType || 'Membership').trim();
+        let validity = formatSubscriptionValidity({
+          startDate: parsed.data.startDate,
+          endDate: parsed.data.endDate,
+          repeatUnit: parsed.data.repeatUnit,
+          repeatType: parsed.data.repeatType,
+        });
+
+        try {
+          const planQuery = {};
+          if (parsed.data.membershipId) {
+            planQuery._id = parsed.data.membershipId;
+          } else if (parsed.data.membershipPlanId) {
+            planQuery.planId = String(parsed.data.membershipPlanId)
+              .trim()
+              .toLowerCase();
+          }
+          if (Object.keys(planQuery).length) {
+            const plan = await Membership.findOne(planQuery).lean();
+            if (plan) {
+              const meta = resolvePlanMeta(plan);
+              membershipLabel = meta.label || membershipLabel;
+              validity = meta.validity || validity;
+            }
+          }
+        } catch (planError) {
+          console.warn(
+            'createSubscription: membership plan lookup for WhatsApp failed:',
+            planError?.message || planError,
+          );
+        }
+
+        const customer = await Customer.findOne({
+          mobile: parsed.data.customerPhone,
+        })
+          .select('name whatsappNumber mobile')
+          .lean();
+
+        const whatsappTo =
+          String(customer?.whatsappNumber || '').trim() ||
+          String(customer?.mobile || parsed.data.customerPhone).trim();
+
+        void (async () => {
+          try {
+            await sendNewMembershipWhatsApp({
+              to: whatsappTo,
+              name: customer?.name || parsed.data.customerName || 'Member',
+              membershipLabel,
+              validity,
+              cashbackLabel: `₹${safeCashback}`,
+            });
+          } catch (waError) {
+            console.error(
+              '[NewMembership] WhatsApp send error:',
+              waError?.message || waError,
+            );
+          }
+        })();
+      }
+    } catch (waSetupError) {
+      console.error(
+        'createSubscription WhatsApp setup error:',
+        waSetupError?.message || waSetupError,
+      );
     }
 
     return res.status(201).json({

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 import {
   Briefcase,
   ChevronRight,
@@ -10,11 +11,19 @@ import {
   SlidersHorizontal,
   UserPlus,
   Users,
-  Utensils
+  Utensils,
 } from "lucide-react";
 import { axiosInstance } from "@/services/axiosInstance";
+import {
+  customerPayloadToFormData,
+  handleCreateCustomer,
+  type CustomerPayload,
+} from "@/services/apiClient";
 import { usePermission } from "@/hooks/usePermission";
+import { useAppSelector } from "@/store/hooks";
 import RevenueCard from "@/features/home/components/RevenueCard";
+import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
+import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
 
 type FilterKey = "all" | "customers" | "products" | "services";
 
@@ -95,7 +104,13 @@ function toStatus(raw: unknown, dueAmount: number): RecentBill["status"] {
 
 export default function HomeScreen() {
   const navigate = useNavigate();
+  const staff = useAppSelector((state) => state.user);
   const { canPath } = usePermission();
+
+  const [openCreateCustomerModal, setOpenCreateCustomerModal] = useState(false);
+  const [openCreateSubscriptionModal, setOpenCreateSubscriptionModal] =
+    useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [bills, setBills] = useState<RecentBill[]>([]);
@@ -182,6 +197,51 @@ export default function HomeScreen() {
     setFilter(key);
   };
 
+  const handleCreateCustomerSubmit = async (args: {
+    payload: CustomerPayload;
+    profileImageFile?: File | null;
+  }) => {
+    try {
+      setCreatingCustomer(true);
+      const createdBy = {
+        m_staff_id: staff?.m_staff_id,
+        m_staff_name: staff?.m_staff_name,
+        m_staff_email: staff?.m_staff_email,
+      };
+
+      if (args.profileImageFile) {
+        const fd = customerPayloadToFormData(
+          {
+            ...args.payload,
+            createdBy,
+          },
+          args.profileImageFile,
+        );
+        await handleCreateCustomer(fd);
+      } else {
+        await handleCreateCustomer({
+          ...args.payload,
+          createdBy,
+        });
+      }
+      setOpenCreateCustomerModal(false);
+      await Swal.fire(
+        "Customer created",
+        "Customer saved successfully.",
+        "success",
+      );
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Create failed",
+        err?.response?.data?.message ?? "Could not create customer. Try again.",
+        "error",
+      );
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
+
   const filters: {
     key: FilterKey;
     label: string;
@@ -198,61 +258,60 @@ export default function HomeScreen() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5 font-sans">
       {/* Quick actions */}
-     <section className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-  <button
-    type="button"
-    onClick={() => navigate("/foodBill")}
-    className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-  >
-    <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-blue-50 text-[#2F6FED]">
-      <Utensils size={20} className="sm:w-6 sm:h-6" />
-    </span>
-    <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
-      Food Bill
-    </span>
-  </button>
+      <section className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+        <button
+          type="button"
+          onClick={() => navigate("/foodBill")}
+          className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-blue-50 text-[#2F6FED]">
+            <Utensils size={20} className="sm:w-6 sm:h-6" />
+          </span>
+          <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
+            Food Bill
+          </span>
+        </button>
 
-  <button
-    type="button"
-    onClick={() => navigate(quickBillPath)}
-    className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-  >
-    <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-blue-50 text-[#2F6FED]">
-      <FilePlus2 size={20} className="sm:w-6 sm:h-6" />
-    </span>
-    <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
-      Quick Bill
-    </span>
-  </button>
+        <button
+          type="button"
+          onClick={() => navigate(quickBillPath)}
+          className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-blue-50 text-[#2F6FED]">
+            <FilePlus2 size={20} className="sm:w-6 sm:h-6" />
+          </span>
+          <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
+            Quick Bill
+          </span>
+        </button>
 
-  <button
-    type="button"
-    onClick={() => navigate("/customers")}
-    className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-  >
-    <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-      <UserPlus size={20} className="sm:w-6 sm:h-6" />
-    </span>
-    <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
-      Add Customer
-    </span>
-  </button>
+        <button
+          type="button"
+          onClick={() => setOpenCreateCustomerModal(true)}
+          className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+            <UserPlus size={20} className="sm:w-6 sm:h-6" />
+          </span>
+          <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
+            Add Customer
+          </span>
+        </button>
 
-  <button
-    type="button"
-    onClick={() =>
-      navigate(canPath("/membership") ? "/membership" : "/manage-plans")
-    }
-    className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-  >
-    <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
-      <Crown size={20} className="sm:w-6 sm:h-6" />
-    </span>
-    <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
-      Activate Membership
-    </span>
-  </button>
-</section>
+        <button
+          type="button"
+          onClick={() => setOpenCreateSubscriptionModal(true)}
+          className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+          <span className="flex h-10 w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
+            <Crown size={20} className="sm:w-6 sm:h-6" />
+          </span>
+          <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
+            Activate Membership
+          </span>
+        </button>
+      </section>
+
       {/* Search + filters */}
       <section className="space-y-3">
         <div className="flex items-center gap-3 rounded-full border border-gray-200 bg-white px-4 py-3 shadow-sm">
@@ -431,6 +490,22 @@ export default function HomeScreen() {
           />
         </aside>
       </div>
+
+      {openCreateCustomerModal ? (
+        <CreateCustomerModal
+          onClose={() => setOpenCreateCustomerModal(false)}
+          onSubmit={handleCreateCustomerSubmit}
+          loading={creatingCustomer}
+        />
+      ) : null}
+
+      {openCreateSubscriptionModal ? (
+        <CreateSubscriptionScreen
+          initialMode="create"
+          onClose={() => setOpenCreateSubscriptionModal(false)}
+          onSave={() => setOpenCreateSubscriptionModal(false)}
+        />
+      ) : null}
     </div>
   );
 }

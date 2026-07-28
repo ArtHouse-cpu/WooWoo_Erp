@@ -22,6 +22,9 @@ type WalletRow = {
   customerName: string;
   customerPhone: string;
   walletAmount: number;
+  affiliateBalance?: number;
+  cashbackBalance?: number;
+  withdrawableBalance?: number;
   lastActivity?: string;
   raw?: any;
 };
@@ -51,6 +54,15 @@ function hasExistingWalletRecord(row: WalletRow) {
 
 function toWalletRow(entry: any): WalletRow {
   const customer = entry?.customer ?? {};
+  const affiliateBalance = toAmount(
+    entry?.affiliateBalance,
+    entry?.withdrawableBalance,
+    customer?.affiliateBalance,
+  );
+  const cashbackBalance = toAmount(
+    entry?.cashbackBalance,
+    customer?.cashbackBalance,
+  );
   return {
     id: String(
       entry?._id ??
@@ -77,6 +89,9 @@ function toWalletRow(entry: any): WalletRow {
       entry?.availableBalance,
       customer?.walletAmount,
     ),
+    affiliateBalance,
+    cashbackBalance,
+    withdrawableBalance: affiliateBalance,
     lastActivity: String(entry?.updatedAt ?? entry?.createdAt ?? "").trim(),
     raw: entry,
   };
@@ -384,6 +399,11 @@ if (action === "set_minimum") {
               entry?.note ?? entry?.remark ?? "No remarks"
             );
 
+            const walletType = String(entry?.walletType || "").toLowerCase();
+            const isWithdrawable =
+              walletType === "affiliate" ||
+              String(entry?.referenceType || "") === "CspSale";
+
             const staffName =
               entry?.createdBy?.m_staff_name ??
               entry?.staffName ??
@@ -456,6 +476,12 @@ if (action === "set_minimum") {
                         <span class="px-2.5 py-1 text-[11px] font-semibold rounded-full ${badgeClass}">
                           ${type}
                         </span>
+
+                        ${
+                          isWithdrawable
+                            ? `<span class="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-amber-100 text-amber-800 border border-amber-200">Withdrawable</span>`
+                            : ""
+                        }
 
                         <p class="text-sm font-medium text-slate-700 break-words">
                           ${note}
@@ -565,24 +591,58 @@ if (action === "set_minimum") {
           </div>
 
           <!-- Summary -->
-          <div class="grid grid-cols-2 gap-3 mt-5">
+          <div class="grid grid-cols-3 gap-3 mt-5">
+
+            <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+              <p class="text-xs font-medium text-slate-500 uppercase">
+                General
+              </p>
+
+              <h3 class="text-xl font-bold text-slate-800 mt-1">
+                ₹${Number(row.walletAmount || 0).toLocaleString("en-IN")}
+              </h3>
+            </div>
 
             <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+              <p class="text-xs font-medium text-emerald-600 uppercase">
+                Withdrawable
+              </p>
+
+              <h3 class="text-xl font-bold text-emerald-700 mt-1">
+                ₹${Number(row.withdrawableBalance ?? row.affiliateBalance ?? 0).toLocaleString("en-IN")}
+              </h3>
+            </div>
+
+            <div class="rounded-2xl bg-indigo-50 border border-indigo-100 p-4">
+              <p class="text-xs font-medium text-indigo-600 uppercase">
+                Cashback
+              </p>
+
+              <h3 class="text-xl font-bold text-indigo-700 mt-1">
+                ₹${Number(row.cashbackBalance || 0).toLocaleString("en-IN")}
+              </h3>
+            </div>
+
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mt-3">
+
+            <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-3">
               <p class="text-xs font-medium text-emerald-600 uppercase">
                 Total Credit
               </p>
 
-              <h3 class="text-2xl font-bold text-emerald-700 mt-1">
+              <h3 class="text-lg font-bold text-emerald-700 mt-1">
                 ₹${totalCredit.toLocaleString("en-IN")}
               </h3>
             </div>
 
-            <div class="rounded-2xl bg-rose-50 border border-rose-100 p-4">
+            <div class="rounded-2xl bg-rose-50 border border-rose-100 p-3">
               <p class="text-xs font-medium text-rose-600 uppercase">
                 Total Debit
               </p>
 
-              <h3 class="text-2xl font-bold text-rose-700 mt-1">
+              <h3 class="text-lg font-bold text-rose-700 mt-1">
                 ₹${totalDebit.toLocaleString("en-IN")}
               </h3>
             </div>
@@ -630,6 +690,21 @@ if (action === "set_minimum") {
         Cell: ({ cell }) => (
           <span className="font-semibold tabular-nums">
             ₹ {Number(cell.getValue() ?? 0).toLocaleString("en-IN")}
+          </span>
+        ),
+        size: 130,
+      },
+      {
+        header: "Withdrawable",
+        accessorKey: "withdrawableBalance",
+        Cell: ({ row }) => (
+          <span className="font-semibold tabular-nums text-emerald-700">
+            ₹{" "}
+            {Number(
+              row.original.withdrawableBalance ??
+                row.original.affiliateBalance ??
+                0,
+            ).toLocaleString("en-IN")}
           </span>
         ),
         size: 130,

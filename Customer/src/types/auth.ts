@@ -102,6 +102,7 @@ export interface WalletDashboard {
     amount: number;
     status: string;
     category: string;
+    withdrawable?: boolean;
     createdAt: string;
   }>;
   referral: {

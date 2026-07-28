@@ -92,6 +92,8 @@ export const PERMISSIONS = {
   VENDOR_DELETE: "vendor.delete",
   PARTNER_READ: "partner.read",
   GUEST_READ: "guest.read",
+  CSP_READ: "csp.read",
+  CSP_WRITE: "csp.write",
 
   // Wallet / Coupons / Affiliate
   WALLET_READ: "wallet.read",
@@ -181,6 +183,8 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
   { key: PERMISSIONS.VENDOR_DELETE, module: "network", label: "Delete vendors" },
   { key: PERMISSIONS.PARTNER_READ, module: "network", label: "View partners" },
   { key: PERMISSIONS.GUEST_READ, module: "network", label: "View guests" },
+  { key: PERMISSIONS.CSP_READ, module: "network", label: "View CSP sailors" },
+  { key: PERMISSIONS.CSP_WRITE, module: "network", label: "Enroll / manage CSP sailors" },
 
   { key: PERMISSIONS.WALLET_READ, module: "wallet", label: "View wallets" },
   { key: PERMISSIONS.WALLET_MANAGE, module: "wallet", label: "Manage wallets" },
@@ -191,8 +195,13 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
   { key: PERMISSIONS.AFFILIATE_PAYOUT, module: "affiliate", label: "Process affiliate payouts" },
 ];
 
-/** Minimum permission to show a route / sidebar item */
-export const MENU_PERMISSION_MAP: Record<string, Permission> = {
+/** Minimum permission to show a route / sidebar item.
+ * Single permission or array (ANY match is enough).
+ */
+export const MENU_PERMISSION_MAP: Record<
+  string,
+  Permission | Permission[]
+> = {
   "/": PERMISSIONS.DASHBOARD_READ,
   "/pos": PERMISSIONS.INVOICE_READ,
   "/invoices": PERMISSIONS.INVOICE_READ,
@@ -224,6 +233,7 @@ export const MENU_PERMISSION_MAP: Record<string, Permission> = {
   "/create-new-membership": PERMISSIONS.MEMBERSHIP_PLAN_MANAGE,
   "/members-and-partners": PERMISSIONS.MEMBERSHIP_PLAN_READ,
   "/customers": PERMISSIONS.CUSTOMER_READ,
+  "/csp": [PERMISSIONS.CSP_READ, PERMISSIONS.CUSTOMER_READ],
   "/vendors": PERMISSIONS.VENDOR_READ,
   "/Vendor list": PERMISSIONS.VENDOR_READ,
   "/partners": PERMISSIONS.PARTNER_READ,
@@ -232,6 +242,13 @@ export const MENU_PERMISSION_MAP: Record<string, Permission> = {
   "/coupons": PERMISSIONS.COUPON_READ,
   "/affiliate-program": PERMISSIONS.AFFILIATE_READ,
   "/access": PERMISSIONS.ACCESS_READ,
+};
+
+export const resolveMenuPermissions = (
+  required?: Permission | Permission[] | null,
+): Permission[] => {
+  if (!required) return [];
+  return (Array.isArray(required) ? required : [required]).filter(Boolean);
 };
 
 export const isValidPermission = (permission: string): permission is Permission =>

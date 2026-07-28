@@ -33,6 +33,9 @@ type ProductRow = {
   sellingPrice?: number;
   purchasePrice?: number;
   stockQty?: number;
+  isCsp?: boolean;
+  cspLabel?: string | null;
+  cspEnrollmentId?: string | null;
 };
 
 
@@ -134,9 +137,29 @@ export default function ProductScreen() {
         accessorKey: "productName",
         header: "Product Name",
         size: 150,
-        Cell: ({ cell }: { cell: any }) => (
-          <span className="font-semibold text-slate-800">{cell.getValue()}</span>
+        Cell: ({ cell, row }: { cell: any; row: any }) => (
+          <div className="flex flex-col gap-1">
+            <span className="font-semibold text-slate-800">{cell.getValue()}</span>
+            {row.original?.isCsp && (
+              <span className="inline-flex w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                {row.original.cspLabel || "CSP"}
+              </span>
+            )}
+          </div>
         ),
+      },
+      {
+        accessorKey: "cspLabel",
+        header: "CSP",
+        size: 120,
+        Cell: ({ row }: { row: any }) =>
+          row.original?.isCsp ? (
+            <span className="text-xs font-medium text-amber-700">
+              {row.original.cspLabel || "CSP"}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-400">—</span>
+          ),
       },
       {
         accessorKey: "category",
@@ -300,7 +323,20 @@ export default function ProductScreen() {
               }}
               onSubmit={handleSubmitProduct}
               loading={loading}
-              initialData={editProduct}
+              initialData={
+                editProduct
+                  ? {
+                      ...editProduct,
+                      type: "product",
+                      barcode: editProduct.barCode || editProduct.barcode || "",
+                      isCsp: editProduct.isCsp ? "yes" : "no",
+                      cspEnrollmentId: editProduct.cspEnrollmentId
+                        ? String(editProduct.cspEnrollmentId)
+                        : "",
+                      images: [],
+                    }
+                  : undefined
+              }
             />
           )}
         </div>

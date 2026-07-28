@@ -2,9 +2,6 @@ import mongoose from "mongoose";
 
 const customerSchema = new mongoose.Schema(
   {
-    // =========================
-    // BASIC INFO
-    // =========================
     name: {
       type: String,
       required: true,
@@ -25,9 +22,6 @@ const customerSchema = new mongoose.Schema(
       lowercase: true,
     },
 
-    // =========================
-    // BUSINESS INFO
-    // =========================
     gstin: {
       type: String,
       default: "",
@@ -41,9 +35,6 @@ const customerSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // =========================
-    // ADDRESS
-    // =========================
     address: {
       type: String,
       default: "",
@@ -74,9 +65,7 @@ const customerSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // =========================
-    // MEMBERSHIP
-    // =========================
+ 
     membershipType: {
       type: String,
       enum: ["none","pro", "premium", "special", "junior", "general"],

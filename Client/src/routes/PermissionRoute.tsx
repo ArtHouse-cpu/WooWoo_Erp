@@ -15,7 +15,9 @@ export default function PermissionRoute() {
     return (
       <ForbiddenScreen
         path={path}
-        requiredPermission={required ?? null}
+        requiredPermission={
+          Array.isArray(required) ? required.join(" or ") : required ?? null
+        }
       />
     );
   }

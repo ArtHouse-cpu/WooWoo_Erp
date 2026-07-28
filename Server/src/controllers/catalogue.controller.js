@@ -72,6 +72,7 @@ export const lookupCatalogueItems = async (req, res) => {
     const products = productDocs.map(product => {
       const name = String(product.productName ?? '').trim();
       const stockQty = Number(stockMap.get(name) ?? product.stockQty ?? 0);
+      const isCsp = Boolean(product.isCsp);
       return {
         _id: product._id,
         sourceId: product._id,
@@ -87,6 +88,8 @@ export const lookupCatalogueItems = async (req, res) => {
         unit: product.primaryUnit || '',
         discountType: product.discountType || 'flat',
         discountValue: Number(product.discountValue ?? 0),
+        isCsp,
+        cspLabel: isCsp ? 'CSP' : null,
       };
     });
 

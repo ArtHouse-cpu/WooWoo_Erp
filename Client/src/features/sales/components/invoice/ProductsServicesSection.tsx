@@ -18,6 +18,8 @@ type DraftItem = {
   image?: string;
   category?: string;
   cashback: string;
+  /** "true" when selected catalogue product is CSP */
+  isCsp?: string;
 };
 
 type Props = {
@@ -117,6 +119,15 @@ export default function ProductsServicesSection({
     const membershipCategory = item.category || "General";
     const lineCategory = item.lineCategory || item.sourceType || "product";
 
+    // CSP products never get product / membership discount
+    if (item.isCsp) {
+      return {
+        discount: 0,
+        cashback: 0,
+        category: lineCategory,
+      };
+    }
+
     let calculatedDiscount = 0;
     let calculatedCashback = 0;
     const plan = resolveMembershipPlan();
@@ -172,6 +183,8 @@ export default function ProductsServicesSection({
         cashback,
         image: item.imageUrl || (item.images && item.images[0]) || "",
         category,
+        isCsp: Boolean(item.isCsp),
+        cspLabel: item.cspLabel || null,
       });
     }
   };
@@ -247,30 +260,33 @@ export default function ProductsServicesSection({
     const sellingPrice = Number(item.sellingPrice ?? 0);
     const membershipCategory = item.category || "General";
     const lineCategory = item.lineCategory || item.sourceType || "product";
+    const isCsp = Boolean(item.isCsp);
 
     let calculatedDiscount = 0;
     let calculatedCashback = 0;
-    const plan = resolveMembershipPlan();
 
-    const limit =
-      getUsageLimitForCategory(plan?.usageLimits, lineCategory) ||
-      getUsageLimitForCategory(plan?.usageLimits, membershipCategory);
+    if (!isCsp) {
+      const plan = resolveMembershipPlan();
+      const limit =
+        getUsageLimitForCategory(plan?.usageLimits, lineCategory) ||
+        getUsageLimitForCategory(plan?.usageLimits, membershipCategory);
 
-    if (limit && (limit.discount || limit.cashback)) {
-      if (limit.discount) {
-        calculatedDiscount = (sellingPrice * qty * Number(limit.discount)) / 100;
-      }
-      if (limit.cashback) {
-        calculatedCashback =
-          (sellingPrice * qty * Number(limit.cashback)) / 100;
-      }
-    } else {
-      const dValue = Number(item.discountValue ?? 0);
-      const dType = item.discountType ?? "flat";
-      if (dType === "percentage") {
-        calculatedDiscount = (sellingPrice * qty * dValue) / 100;
+      if (limit && (limit.discount || limit.cashback)) {
+        if (limit.discount) {
+          calculatedDiscount = (sellingPrice * qty * Number(limit.discount)) / 100;
+        }
+        if (limit.cashback) {
+          calculatedCashback =
+            (sellingPrice * qty * Number(limit.cashback)) / 100;
+        }
       } else {
-        calculatedDiscount = dValue * qty;
+        const dValue = Number(item.discountValue ?? 0);
+        const dType = item.discountType ?? "flat";
+        if (dType === "percentage") {
+          calculatedDiscount = (sellingPrice * qty * dValue) / 100;
+        } else {
+          calculatedDiscount = dValue * qty;
+        }
       }
     }
 
@@ -281,6 +297,7 @@ export default function ProductsServicesSection({
     onDraftChange("price", String(sellingPrice));
     onDraftChange("discount", String(calculatedDiscount));
     onDraftChange("cashback", String(calculatedCashback));
+    onDraftChange("isCsp", isCsp ? "true" : "false");
     onDraftChange(
       "image",
       item.imageUrl || (item.images && item.images[0]) || "",
@@ -479,11 +496,22 @@ export default function ProductsServicesSection({
         />
         <input
           value={draft.discount}
-          onChange={(e) => onDraftChange("discount", e.target.value)}
+          onChange={(e) => {
+            if (draft.isCsp === "true") return;
+            onDraftChange("discount", e.target.value);
+          }}
           type="number"
           min={0}
-          placeholder="Discount"
-          className={`${inputStyle} md:col-span-1`}
+          placeholder={draft.isCsp === "true" ? "No discount (CSP)" : "Discount"}
+          disabled={draft.isCsp === "true"}
+          title={
+            draft.isCsp === "true"
+              ? "CSP products do not get product or membership discount"
+              : undefined
+          }
+          className={`${inputStyle} md:col-span-1 ${
+            draft.isCsp === "true" ? "cursor-not-allowed bg-slate-50 text-slate-400" : ""
+          }`}
         />
         <input
           value={draft.cashback}
@@ -601,6 +629,11 @@ export default function ProductsServicesSection({
                     <div className="text-[10px] sm:text-xs font-semibold text-gray-800 line-clamp-2 min-h-[24px] group-hover:text-blue-600 transition-colors leading-tight" title={item.productName || item.name}>
                       {item.productName || item.name}
                     </div>
+                    {item.isCsp && (
+                      <span className="mt-0.5 inline-flex rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
+                        {item.cspLabel || "CSP"}
+                      </span>
+                    )}
 
                     {/* Category */}
                     <div className="text-[9px] text-gray-400 font-medium mt-0.5">
@@ -681,7 +714,16 @@ export default function ProductsServicesSection({
                 const lineTotal = item.qty * item.unitPrice - item.discount;
                 return (
                   <tr key={item.id} className="border-t border-gray-100">
-                    <td className="px-3 py-2 font-medium text-gray-800">{item.productName}</td>
+                    <td className="px-3 py-2 font-medium text-gray-800">
+                      <div className="flex flex-col gap-0.5">
+                        <span>{item.productName}</span>
+                        {item.isCsp && (
+                          <span className="inline-flex w-fit rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
+                            {item.cspLabel || "CSP"}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -708,8 +750,19 @@ export default function ProductsServicesSection({
                           type="number"
                           min={0}
                           value={item.discount}
-                          onChange={(e) => onUpdateItemDiscount(item.id, Number(e.target.value))}
-                          className="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500"
+                          disabled={Boolean(item.isCsp)}
+                          title={
+                            item.isCsp
+                              ? "CSP products do not get product or membership discount"
+                              : undefined
+                          }
+                          onChange={(e) => {
+                            if (item.isCsp) return;
+                            onUpdateItemDiscount(item.id, Number(e.target.value));
+                          }}
+                          className={`w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500 ${
+                            item.isCsp ? "cursor-not-allowed bg-slate-50 text-slate-400" : ""
+                          }`}
                         />
                       </div>
                     </td>

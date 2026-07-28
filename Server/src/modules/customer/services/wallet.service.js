@@ -17,6 +17,8 @@ const categoryLabels = {
   space: 'Booking',
   service: 'Services',
   food: 'Food',
+  affiliate: 'Withdrawable',
+  csp: 'CSP Sale',
   other: 'Other',
 };
 
@@ -105,18 +107,32 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
     };
   });
 
-  const walletTransactions = (wallet?.transactions || []).map(transaction => ({
-    id: String(transaction._id),
-    kind: 'wallet',
-    title:
-      transaction.note ||
-      (transaction.type === 'credit' ? 'Wallet credit' : 'Wallet debit'),
-    type: transaction.type,
-    amount: Number(transaction.amount || 0),
-    status: 'completed',
-    category: transaction.walletType || 'general',
-    createdAt: transaction.createdAt,
-  }));
+  const walletTransactions = (wallet?.transactions || []).map(transaction => {
+    const refType = String(transaction.referenceType || '').trim();
+    const isCsp = refType === 'CspSale';
+    const walletType = String(transaction.walletType || 'general').toLowerCase();
+    return {
+      id: String(transaction._id),
+      kind: 'wallet',
+      title:
+        transaction.note ||
+        (isCsp
+          ? 'CSP sale share'
+          : transaction.type === 'credit'
+            ? 'Wallet credit'
+            : 'Wallet debit'),
+      type: transaction.type,
+      amount: Number(transaction.amount || 0),
+      status: 'completed',
+      category: isCsp
+        ? 'csp'
+        : walletType === 'affiliate'
+          ? 'affiliate'
+          : walletType || 'general',
+      withdrawable: isCsp || walletType === 'affiliate',
+      createdAt: transaction.createdAt,
+    };
+  });
 
   const commissionTransactions = earningRecords.map(record => ({
     id: String(record._id),
