@@ -140,7 +140,7 @@ function MembershipCard({
           <p className="text-[9px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
             Discounts (Assured)
           </p>
-          <div className="mt-1.5 flex flex-nowrap items-center gap-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {plan.discounts.map(d => (
               <span
                 key={d.label}
@@ -157,7 +157,7 @@ function MembershipCard({
           <p className="text-[9px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
             Cashback (Assured)
           </p>
-          <div className="mt-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-white px-1.5 py-1 text-[10px] font-medium text-[#374151] shadow-sm">
               <span className="text-[11px] font-bold text-[#2563EB]">₹</span>
               {plan.cashback}
