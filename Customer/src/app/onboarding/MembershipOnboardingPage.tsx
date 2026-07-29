@@ -19,7 +19,7 @@ import {
   MoreVertical,
   ShieldCheck,
   ShoppingBag,
-  Sparkles,
+  Soup,
   Star,
   Tag,
   Target,
@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import purpleStarPedestal from '../../assets/purple_star_pedestal.jpg';
 import {toast} from 'sonner';
+import { MOCK_TRANSACTIONS } from '../activity/ActivityPage';
 import {Button} from '../../components/ui/Button';
 import {
   FALLBACK_MEMBERSHIP_PLANS,
@@ -79,58 +80,58 @@ function MembershipCard({
         selected ? plan.theme.borderSelected : plan.theme.border
       }`}
     >
-      <div className="flex items-start gap-2.5">
-        <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${plan.theme.iconBg} ${plan.theme.iconText}`}
-        >
-          <PlanIcon iconKey={plan.iconKey} className="h-4 w-4" />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <h3 className={`text-[14px] font-bold ${plan.theme.title}`}>{plan.title}</h3>
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${plan.theme.badgeBg} ${plan.theme.badgeText}`}
-              >
-                {plan.badge}
-              </span>
-            </div>
+      {/* Top Header Row: Icon, Title, Badge, and Radio selector */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-[8px] ${plan.theme.iconBg} ${plan.theme.iconText}`}
+          >
+            <PlanIcon iconKey={plan.iconKey} className="h-3.5 w-3.5" />
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className={`text-[14px] font-bold ${plan.theme.title}`}>{plan.title}</h3>
             <span
-              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
-                selected ? plan.theme.radio : 'border-slate-300 text-transparent'
-              }`}
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${plan.theme.badgeBg} ${plan.theme.badgeText}`}
             >
-              <span className={`h-2 w-2 rounded-full ${selected ? 'bg-current' : ''}`} />
+              {plan.badge}
             </span>
           </div>
+        </div>
 
-          <div className="mt-2 flex gap-2">
-            <ul className="min-w-0 flex-1">
-              {plan.features.map(feature => (
-                <li
-                  key={feature.label}
-                  className="flex items-start gap-1.5 py-1.5 text-[11px] text-[#374151]"
-                >
-                  <Check
-                    className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${plan.theme.check}`}
-                    strokeWidth={2.5}
-                  />
-                  <span className="leading-snug">
-                    {feature.label}
-                    {feature.was ? (
-                      <span className="ml-1 text-[10px] text-[#9CA3AF] line-through">
-                        ₹{feature.was}
-                      </span>
-                    ) : null}
+        <span
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+            selected ? plan.theme.radio : 'border-slate-300 text-transparent'
+          }`}
+        >
+          <span className={`h-2 w-2 rounded-full ${selected ? 'bg-current' : ''}`} />
+        </span>
+      </div>
+
+      {/* Bottom Section: Bulletins list starting just below the icon + Price on the right */}
+      <div className="mt-2.5 flex justify-between items-start gap-4">
+        <ul className="min-w-0 flex-1">
+          {plan.features.map(feature => (
+            <li
+              key={feature.label}
+              className="flex items-start gap-1.5 py-1.5 text-[11px] text-[#374151]"
+            >
+              <Check
+                className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${plan.theme.check}`}
+                strokeWidth={2.5}
+              />
+              <span className="leading-snug">
+                {feature.label}
+                {feature.was ? (
+                  <span className="ml-1 text-[10px] text-[#9CA3AF] line-through">
+                    ₹{feature.was}
                   </span>
-                </li>
-              ))}
-            </ul>
-            <div className="shrink-0 pt-1 text-right">
-              <p className="text-[16px] font-bold leading-none text-[#111111]">₹ {plan.price}</p>
-            </div>
-          </div>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="shrink-0 pt-1 text-right">
+          <p className="text-[16px] font-bold leading-none text-[#111111]">₹ {plan.price}</p>
         </div>
       </div>
 
@@ -139,7 +140,7 @@ function MembershipCard({
           <p className="text-[9px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
             Discounts (Assured)
           </p>
-          <div className="mt-1.5 flex flex-nowrap items-center gap-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {plan.discounts.map(d => (
               <span
                 key={d.label}
@@ -156,7 +157,7 @@ function MembershipCard({
           <p className="text-[9px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
             Cashback (Assured)
           </p>
-          <div className="mt-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-white px-1.5 py-1 text-[10px] font-medium text-[#374151] shadow-sm">
               <span className="text-[11px] font-bold text-[#2563EB]">₹</span>
               {plan.cashback}
@@ -364,10 +365,8 @@ function CheckoutSheet({
 
 function InsightsTab({
   customer,
-  onBrowsePlans,
 }: {
   customer: any;
-  onBrowsePlans: () => void;
 }) {
   const navigate = useNavigate();
   const isMember = customer?.membershipType && customer.membershipType !== 'none';
@@ -384,6 +383,64 @@ function InsightsTab({
     }
     return 'Member since Jan 2024';
   }, [customer?.createdAt]);
+
+  const activitiesStats = useMemo(() => {
+    const categoriesList = ['shopping', 'services', 'space', 'food'] as const;
+    
+    return categoriesList.map(cat => {
+      const trans = MOCK_TRANSACTIONS.filter(t => t.category === cat);
+      const count = trans.length;
+      const benefit = trans.reduce((sum, t) => sum + t.discount + t.cashback, 0);
+
+      if (cat === 'shopping') {
+        return {
+          id: cat,
+          title: 'Shopping',
+          subtitle: 'Orders & Purchases',
+          count: 24,
+          benefit: 4210,
+          icon: ShoppingBag,
+          color: '#EA580C',
+          bg: 'bg-[#FFF7ED]',
+        };
+      }
+      if (cat === 'services') {
+        return {
+          id: cat,
+          title: 'Services',
+          subtitle: 'Custom Framings & Scans',
+          count: count,
+          benefit: benefit,
+          icon: Wrench,
+          color: '#9333EA',
+          bg: 'bg-[#FAF5FF]',
+        };
+      }
+      if (cat === 'space') {
+        return {
+          id: cat,
+          title: 'Space Bookings',
+          subtitle: 'Studio & Room Rentals',
+          count: count,
+          benefit: benefit,
+          icon: Calendar,
+          color: '#16A34A',
+          bg: 'bg-[#EAFDF4]',
+        };
+      }
+      // food
+      return {
+        id: cat,
+        title: 'Food & Cafe',
+        subtitle: 'Cafe Orders & Combos',
+        count: count,
+        benefit: benefit,
+        icon: Soup,
+        color: '#EF4444',
+        bg: 'bg-[#FEF2F2]',
+      };
+    });
+  }, []);
 
   return (
     <div className="space-y-6 text-left">
@@ -402,7 +459,7 @@ function InsightsTab({
           <p className="mt-1 text-[11px] font-bold text-[#7C3AED] opacity-75">{memberSince}</p>
         </div>
 
-        <div className="relative z-10 flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-white/40 backdrop-blur-sm p-1.5 shadow-inner">
+        <div className="relative z-10 flex h-15 w-18 shrink-0 items-center justify-center rounded-2xl bg-white/40 backdrop-blur-sm p-1.5 shadow-inner">
           <img
             src={purpleStarPedestal}
             className="h-full w-full object-contain mix-blend-multiply transition hover:scale-105 duration-300"
@@ -420,50 +477,50 @@ function InsightsTab({
 
         <div className="grid grid-cols-4 gap-2">
           {/* Card 1: Total Benefited */}
-          <div className="border border-black/[0.03] bg-white rounded-[20px] p-2.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
+          <div className="border border-black/[0.03] bg-white rounded-[20px] p-4.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EAFDF4] text-[#10B981]">
               <DollarSign className="h-4 w-4" />
             </div>
             <div className="mt-2">
               <p className="text-[14px] font-extrabold text-[#111111] leading-none">₹12,450</p>
-              <p className="text-[9px] font-bold text-[#6B7280] leading-tight mt-1"> Benefited</p>
-              <p className="text-[8px] font-extrabold text-[#10B981] mt-1 whitespace-nowrap">Across all activities</p>
+              <p className="text-[9px] font-bold text-[#10B981] leading-tight mt-1"> Benefited</p>
+              
             </div>
           </div>
 
           {/* Card 2: Cashbacks Earned */}
-          <div className="border border-black/[0.03] bg-white rounded-[20px] p-2.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
+          <div className="border border-black/[0.03] bg-white rounded-[20px] p-4.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
               <Target className="h-4 w-4" />
             </div>
             <div className="mt-2">
               <p className="text-[14px] font-extrabold text-[#111111] leading-none">₹2,350</p>
-              <p className="text-[9px] font-bold text-[#6B7280] leading-tight mt-1">Cashbacks </p>
-              <p className="text-[8px] font-extrabold text-[#2563EB] mt-1 whitespace-nowrap">Total cashback</p>
+              <p className="text-[9px] font-bold text-[#2563EB] leading-tight mt-1">Cashbacks </p>
+           
             </div>
           </div>
 
           {/* Card 3: Discounts Received */}
-          <div className="border border-black/[0.03] bg-white rounded-[20px] p-2.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
+          <div className="border border-black/[0.03] bg-white rounded-[20px] p-4.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FFF7ED] text-[#EA580C]">
               <Tag className="h-4 w-4" />
             </div>
             <div className="mt-2">
               <p className="text-[14px] font-extrabold text-[#111111] leading-none">₹1,860</p>
-              <p className="text-[9px] font-bold text-[#6B7280] leading-tight mt-1">Discounts </p>
-              <p className="text-[8px] font-extrabold text-[#EA580C] mt-1 whitespace-nowrap">Total discounts</p>
+              <p className="text-[9px] font-bold text-[#EA580C] leading-tight mt-1">Discounts </p>
+              
             </div>
           </div>
 
           {/* Card 4: Rewards Earned */}
-          <div className="border border-black/[0.03] bg-white rounded-[20px] p-2.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
+          <div className="border border-black/[0.03] bg-white rounded-[20px] p-4.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FAF5FF] text-[#9333EA]">
               <Gift className="h-4 w-4" />
             </div>
             <div className="mt-2">
               <p className="text-[14px] font-extrabold text-[#111111] leading-none">18</p>
-              <p className="text-[9px] font-bold text-[#6B7280] leading-tight mt-1">Rewards </p>
-              <p className="text-[8px] font-extrabold text-[#9333EA] mt-1 whitespace-nowrap">Keep growing!</p>
+              <p className="text-[9px] font-bold text-[#9333EA] leading-tight mt-1">Rewards </p>
+              
             </div>
           </div>
         </div>
@@ -476,7 +533,7 @@ function InsightsTab({
           <button
             type="button"
             className="text-[11px] font-bold text-[#4F46E5] flex items-center gap-0.5 hover:underline cursor-pointer"
-            onClick={() => toast.message('Activities overview coming soon')}
+            onClick={() => navigate('/activities')}
           >
             <span>View All</span>
             <ChevronRight className="h-3.5 w-3.5" />
@@ -484,231 +541,28 @@ function InsightsTab({
         </div>
 
         <div className="bg-white rounded-[24px] border border-black/[0.03] px-4 py-3 divide-y divide-black/[0.03] shadow-sm">
-          {/* Activity 1: Orders Placed */}
-          <div className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#FFF7ED] text-[#EA580C]">
-                <ShoppingBag className="h-[18px] w-[18px]" strokeWidth={2} />
+          {activitiesStats.map(item => {
+            const Icon = item.icon;
+            return (
+              <div key={item.id} className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] ${item.bg}`} style={{ color: item.color }}>
+                    <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <p className="text-[12px] font-extrabold text-[#111111]">{item.title}</p>
+                    <p className="text-[10px] font-semibold text-[#9CA3AF] mt-0.5">{item.subtitle}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 text-right">
+                  <span className="text-[12px] font-extrabold text-[#111111]">{item.count}</span>
+                  <span className="text-[9px] font-extrabold text-[#10B981] flex items-center gap-0.5 min-w-[70px] justify-end">
+                    +₹{item.benefit.toLocaleString('en-IN')}
+                  </span>
+                </div>
               </div>
-              <div>
-                <p className="text-[12px] font-extrabold text-[#111111]">Orders Placed</p>
-                <p className="text-[10px] font-semibold text-[#9CA3AF] mt-0.5">Products & Services</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 text-right">
-              <span className="text-[12px] font-extrabold text-[#111111]">23</span>
-              <span className="text-[9px] font-extrabold text-[#10B981] flex items-center gap-0.5 min-w-[45px] justify-end">
-                <span className="text-[11px] leading-none">↑</span> 12%
-              </span>
-            </div>
-          </div>
-
-          {/* Activity 2: Events Joined */}
-          <div className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#FAF5FF] text-[#9333EA]">
-                <Calendar className="h-[18px] w-[18px]" strokeWidth={2} />
-              </div>
-              <div>
-                <p className="text-[12px] font-extrabold text-[#111111]">Events Joined</p>
-                <p className="text-[10px] font-semibold text-[#9CA3AF] mt-0.5">Creative events</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 text-right">
-              <span className="text-[12px] font-extrabold text-[#111111]">8</span>
-              <span className="text-[9px] font-extrabold text-[#10B981] flex items-center gap-0.5 min-w-[45px] justify-end">
-                <span className="text-[11px] leading-none">↑</span> 5%
-              </span>
-            </div>
-          </div>
-
-          {/* Activity 3: Services Booked */}
-          <div className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#EFF6FF] text-[#2563EB]">
-                <Wrench className="h-[18px] w-[18px]" strokeWidth={2} />
-              </div>
-              <div>
-                <p className="text-[12px] font-extrabold text-[#111111]">Services Booked</p>
-                <p className="text-[10px] font-semibold text-[#9CA3AF] mt-0.5">From our partners</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 text-right">
-              <span className="text-[12px] font-extrabold text-[#111111]">6</span>
-              <span className="text-[9px] font-extrabold text-[#EF4444] flex items-center gap-0.5 min-w-[45px] justify-end">
-                <span className="text-[11px] leading-none">↓</span> 3%
-              </span>
-            </div>
-          </div>
-
-          {/* Activity 4: Products Sold */}
-          <div className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#EAFDF4] text-[#10B981]">
-                <Sparkles className="h-[18px] w-[18px]" strokeWidth={2} />
-              </div>
-              <div>
-                <p className="text-[12px] font-extrabold text-[#111111]">Products Sold</p>
-                <p className="text-[10px] font-semibold text-[#9CA3AF] mt-0.5">Through marketplace</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 text-right">
-              <span className="text-[12px] font-extrabold text-[#111111]">3</span>
-              <span className="text-[9px] font-extrabold text-[#10B981] flex items-center gap-0.5 min-w-[45px] justify-end">
-                <span className="text-[11px] leading-none">↑</span> 8%
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Suggested For You */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[15px] font-extrabold text-[#111111]">Suggested For You</h3>
-          <button
-            type="button"
-            className="text-[11px] font-bold text-[#4F46E5] flex items-center gap-0.5 hover:underline cursor-pointer"
-            onClick={() => toast.message('Suggestions coming soon')}
-          >
-            <span>Explore More</span>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          {/* Suggestion 1: Upgrade to Premium */}
-          <div 
-            className="border border-black/[0.03] bg-white rounded-[16px] p-2.5 flex items-center justify-between shadow-[0_2px_8px_rgba(15,23,42,0.01)] hover:border-[#4F46E5]/20 hover:bg-slate-50 transition cursor-pointer"
-            onClick={onBrowsePlans}
-          >
-            <div className="flex items-start gap-1.5 min-w-0">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#FEF3C7] text-[#D97706] mt-0.5">
-                <Star className="h-3 w-3 fill-current stroke-none" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[9px] font-extrabold text-[#111111] leading-tight truncate">Upgrade to Premium</p>
-                <p className="text-[8px] font-semibold text-[#9CA3AF] mt-0.5 truncate">Unlock 3X benefits</p>
-              </div>
-            </div>
-            <ChevronRight className="h-3 w-3 text-[#9CA3AF] shrink-0 ml-1" />
-          </div>
-
-          {/* Suggestion 2: Sell Your Creations */}
-          <div 
-            className="border border-black/[0.03] bg-white rounded-[16px] p-2.5 flex items-center justify-between shadow-[0_2px_8px_rgba(15,23,42,0.01)] hover:border-[#4F46E5]/20 hover:bg-slate-50 transition cursor-pointer"
-            onClick={() => navigate('/home')}
-          >
-            <div className="flex items-start gap-1.5 min-w-0">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#EAFDF4] text-[#10B981] mt-0.5">
-                <ShoppingBag className="h-3 w-3" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[9px] font-extrabold text-[#111111] leading-tight truncate">Sell Your Creations</p>
-                <p className="text-[8px] font-semibold text-[#9CA3AF] mt-0.5 truncate">Start earning now</p>
-              </div>
-            </div>
-            <ChevronRight className="h-3 w-3 text-[#9CA3AF] shrink-0 ml-1" />
-          </div>
-
-          {/* Suggestion 3: Invite & Earn */}
-          <div 
-            className="border border-black/[0.03] bg-white rounded-[16px] p-2.5 flex items-center justify-between shadow-[0_2px_8px_rgba(15,23,42,0.01)] hover:border-[#4F46E5]/20 hover:bg-slate-50 transition cursor-pointer"
-            onClick={() => navigate('/refer-and-earn')}
-          >
-            <div className="flex items-start gap-1.5 min-w-0">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pink-100 text-pink-600 mt-0.5">
-                <Gift className="h-3 w-3" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[9px] font-extrabold text-[#111111] leading-tight truncate">Invite & Earn</p>
-                <p className="text-[8px] font-semibold text-[#9CA3AF] mt-0.5 truncate">Earn rewards together</p>
-              </div>
-            </div>
-            <ChevronRight className="h-3 w-3 text-[#9CA3AF] shrink-0 ml-1" />
-          </div>
-        </div>
-      </div>
-
-      {/* Upgrade Banner */}
-      <div className="relative overflow-hidden rounded-[24px] bg-[#FFF7ED] border border-[#FFEDD5] p-5 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:flex shrink-0 h-24 w-24 items-center justify-center bg-white/40 rounded-2xl shadow-inner">
-            <svg className="h-20 w-20 text-[#EA580C]" viewBox="0 0 100 100" fill="none">
-              <path d="M40 75 C30 85, 45 95, 50 90 C55 95, 70 85, 60 75 Z" fill="#F97316" opacity="0.8" />
-              <path d="M45 75 C40 80, 48 88, 50 85 C52 88, 60 80, 55 75 Z" fill="#FBBF24" />
-              <path d="M50 15 C58 35, 62 55, 60 70 L40 70 C38 55, 42 35, 50 15 Z" fill="#E2E8F0" />
-              <path d="M50 15 C54 25, 56 35, 56 40 L44 40 C44 35, 46 25, 50 15 Z" fill="#EF4444" />
-              <path d="M40 60 L30 70 L40 70 Z" fill="#EF4444" />
-              <path d="M60 60 L70 70 L60 70 Z" fill="#EF4444" />
-              <circle cx="50" cy="45" r="5" fill="#3B82F6" stroke="#CBD5E1" strokeWidth="2" />
-              <circle cx="35" cy="80" r="4" fill="#E2E8F0" opacity="0.6" />
-              <circle cx="65" cy="82" r="5" fill="#E2E8F0" opacity="0.6" />
-              <circle cx="50" cy="92" r="3" fill="#E2E8F0" opacity="0.8" />
-            </svg>
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-[16px] font-extrabold text-[#111111]">
-                Unlock <span className="text-[#EA580C] text-[18px]">3X</span> More Benefits
-              </h3>
-              <span className="px-2 py-0.5 rounded-full bg-[#EA580C] text-white text-[8px] font-extrabold shadow-sm">
-                3X
-              </span>
-            </div>
-            
-            <p className="text-[10px] font-semibold text-[#6B7280] leading-tight mt-1">
-              Upgrade to Premium & take your growth to the next level!
-            </p>
-
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-3">
-              <div className="flex items-center gap-1.5 text-[9px] font-bold text-[#374151]">
-                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#EA580C]/10 text-[#EA580C]">
-                  <Check className="h-2 w-2 stroke-[3]" />
-                </span>
-                <span className="truncate">3X More Storage (100 GB)</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold text-[#374151]">
-                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#EA580C]/10 text-[#EA580C]">
-                  <Check className="h-2 w-2 stroke-[3]" />
-                </span>
-                <span className="truncate">3X More Cashback</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold text-[#374151]">
-                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#EA580C]/10 text-[#EA580C]">
-                  <Check className="h-2 w-2 stroke-[3]" />
-                </span>
-                <span className="truncate">3X More Visibility</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold text-[#374151]">
-                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-[#EA580C]/10 text-[#EA580C]">
-                  <Check className="h-2 w-2 stroke-[3]" />
-                </span>
-                <span className="truncate">Priority Support & More</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={onBrowsePlans}
-              className="mt-4 w-full bg-[#EA580C] hover:bg-orange-600 active:scale-98 text-white rounded-xl py-2.5 px-4 text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition shadow-md shadow-orange-500/10 cursor-pointer"
-            >
-              <span>Upgrade to Premium</span>
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <div className="hidden sm:flex shrink-0 h-24 w-20 items-center justify-center">
-            <svg className="h-20 w-20 text-[#EA580C]" viewBox="0 0 100 100" fill="none">
-              <rect x="15" y="65" width="10" height="20" rx="3" fill="#FFE8D6" />
-              <rect x="30" y="50" width="10" height="35" rx="3" fill="#FDBA74" />
-              <rect x="45" y="32" width="10" height="53" rx="3" fill="#FB923C" />
-              <rect x="60" y="15" width="10" height="70" rx="3" fill="#EA580C" />
-              <path d="M10 80 L30 60 L45 45 L70 25" stroke="#EA580C" strokeWidth="3.5" strokeLinecap="round" />
-              <path d="M54 25 L70 25 L70 41" fill="none" stroke="#EA580C" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -871,17 +725,19 @@ export default function MembershipOnboardingPage() {
         <div className="relative mb-6 flex items-center justify-between">
           {!isOnboarding ? (
             <>
-              <button
-                type="button"
-                onClick={() => navigate('/home')}
-                className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
-                aria-label="Go back"
-              >
-                <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
-              </button>
-              <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[18px] font-extrabold text-[#111111]">
-                Membership
-              </h1>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/home')}
+                  className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
+                  aria-label="Go back"
+                >
+                  <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+                </button>
+                <h1 className="text-[18px] font-extrabold text-[#111111]">
+                  Membership
+                </h1>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -1028,7 +884,6 @@ export default function MembershipOnboardingPage() {
         ) : (
           <InsightsTab
             customer={customer}
-            onBrowsePlans={() => setActiveTab('plans')}
           />
         )}
       </div>
