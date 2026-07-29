@@ -15,6 +15,7 @@ import {
   ChevronUp,
   MoreVertical,
   Gift,
+  X,
 } from 'lucide-react';
 import {toast} from 'sonner';
 import {DashboardSidebar} from '../../components/dashboard/DashboardSidebar';
@@ -23,7 +24,7 @@ import {TopNavbar} from '../../components/dashboard/TopNavbar';
 type DateFilter = 'today' | 'week' | 'month' | 'last_month' | 'lifetime';
 type Category = 'shopping' | 'services' | 'space' | 'food';
 
-interface Transaction {
+export interface Transaction {
   invoiceNo: string;
   items: string;
   dateTime: string;
@@ -37,7 +38,7 @@ interface Transaction {
 
 const CURRENT_MOCK_TIME = new Date('2026-07-27T12:00:00').getTime();
 
-const MOCK_TRANSACTIONS: Transaction[] = [
+export const MOCK_TRANSACTIONS: Transaction[] = [
   // Shopping transactions (from the screenshot)
   {
     invoiceNo: 'INV25478',
@@ -150,6 +151,61 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     category: 'services',
     timestamp: new Date('2025-05-14T10:00:00').getTime(),
   },
+  {
+    invoiceNo: 'INV25285',
+    items: 'Varnish Coating',
+    dateTime: '11 May 2025, 3:30 PM',
+    amount: 600,
+    discount: 60,
+    cashback: 30,
+    status: 'Paid',
+    category: 'services',
+    timestamp: new Date('2025-05-11T15:30:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25270',
+    items: 'Acrylic Restoration',
+    dateTime: '07 May 2025, 11:15 AM',
+    amount: 2500,
+    discount: 250,
+    cashback: 125,
+    status: 'Paid',
+    category: 'services',
+    timestamp: new Date('2025-05-07T11:15:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25260',
+    items: 'Canvas Stretching',
+    dateTime: '03 May 2025, 4:45 PM',
+    amount: 800,
+    discount: 80,
+    cashback: 40,
+    status: 'Pending',
+    category: 'services',
+    timestamp: new Date('2025-05-03T16:45:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25250',
+    items: 'Art Packaging',
+    dateTime: '29 Apr 2025, 2:30 PM',
+    amount: 350,
+    discount: 30,
+    cashback: 15,
+    status: 'Paid',
+    category: 'services',
+    timestamp: new Date('2025-04-29T14:30:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25240',
+    items: 'Framing Consultation',
+    dateTime: '25 Apr 2025, 10:00 AM',
+    amount: 150,
+    discount: 15,
+    cashback: 5,
+    status: 'Paid',
+    category: 'services',
+    timestamp: new Date('2025-04-25T10:00:00').getTime(),
+  },
   // Space bookings
   {
     invoiceNo: 'INV25192',
@@ -161,6 +217,72 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     status: 'Paid',
     category: 'space',
     timestamp: new Date('2025-05-22T13:00:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25185',
+    items: 'Meeting Room A',
+    dateTime: '19 May 2025, 10:30 AM',
+    amount: 1200,
+    discount: 120,
+    cashback: 60,
+    status: 'Paid',
+    category: 'space',
+    timestamp: new Date('2025-05-19T10:30:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25170',
+    items: 'Shared Desk (4h)',
+    dateTime: '15 May 2025, 9:00 AM',
+    amount: 300,
+    discount: 30,
+    cashback: 15,
+    status: 'Paid',
+    category: 'space',
+    timestamp: new Date('2025-05-15T09:00:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25160',
+    items: 'Photo Studio Slot',
+    dateTime: '09 May 2025, 2:00 PM',
+    amount: 1500,
+    discount: 150,
+    cashback: 75,
+    status: 'Paid',
+    category: 'space',
+    timestamp: new Date('2025-05-09T14:00:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25150',
+    items: 'Exhibition Space',
+    dateTime: '05 May 2025, 12:00 PM',
+    amount: 3500,
+    discount: 350,
+    cashback: 175,
+    status: 'Pending',
+    category: 'space',
+    timestamp: new Date('2025-05-05T12:00:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25140',
+    items: 'Shared Desk (8h)',
+    dateTime: '27 Apr 2025, 11:00 AM',
+    amount: 500,
+    discount: 50,
+    cashback: 25,
+    status: 'Paid',
+    category: 'space',
+    timestamp: new Date('2025-04-27T11:00:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25130',
+    items: 'Workshop Studio',
+    dateTime: '22 Apr 2025, 3:00 PM',
+    amount: 2000,
+    discount: 200,
+    cashback: 100,
+    status: 'Paid',
+    category: 'space',
+    timestamp: new Date('2025-04-22T15:00:00').getTime(),
   },
   // Food cafe
   {
@@ -174,11 +296,89 @@ const MOCK_TRANSACTIONS: Transaction[] = [
     category: 'food',
     timestamp: new Date('2025-05-26T11:45:00').getTime(),
   },
+  {
+    invoiceNo: 'INV25038',
+    items: 'Avocado Toast & Cold Brew',
+    dateTime: '23 May 2025, 9:15 AM',
+    amount: 450,
+    discount: 45,
+    cashback: 20,
+    status: 'Paid',
+    category: 'food',
+    timestamp: new Date('2025-05-23T09:15:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25032',
+    items: 'Spaghetti Carbonara',
+    dateTime: '20 May 2025, 1:30 PM',
+    amount: 680,
+    discount: 65,
+    cashback: 30,
+    status: 'Paid',
+    category: 'food',
+    timestamp: new Date('2025-05-20T13:30:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25028',
+    items: 'Iced Latte & Muffin',
+    dateTime: '16 May 2025, 4:00 PM',
+    amount: 380,
+    discount: 35,
+    cashback: 15,
+    status: 'Paid',
+    category: 'food',
+    timestamp: new Date('2025-05-16T16:00:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25022',
+    items: 'Grilled Chicken Salad',
+    dateTime: '12 May 2025, 12:45 PM',
+    amount: 520,
+    discount: 50,
+    cashback: 25,
+    status: 'Paid',
+    category: 'food',
+    timestamp: new Date('2025-05-12T12:45:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25015',
+    items: 'French Fries & Shake',
+    dateTime: '08 May 2025, 3:30 PM',
+    amount: 290,
+    discount: 25,
+    cashback: 10,
+    status: 'Pending',
+    category: 'food',
+    timestamp: new Date('2025-05-08T15:30:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25010',
+    items: 'Club Sandwich & Juice',
+    dateTime: '29 Apr 2025, 1:15 PM',
+    amount: 410,
+    discount: 40,
+    cashback: 20,
+    status: 'Paid',
+    category: 'food',
+    timestamp: new Date('2025-04-29T13:15:00').getTime(),
+  },
+  {
+    invoiceNo: 'INV25005',
+    items: 'Espresso & Chocolate Tart',
+    dateTime: '24 Apr 2025, 11:00 AM',
+    amount: 280,
+    discount: 25,
+    cashback: 10,
+    status: 'Paid',
+    category: 'food',
+    timestamp: new Date('2025-04-24T11:00:00').getTime(),
+  },
 ];
 
 export default function ActivityPage() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   const [dateFilter, setDateFilter] = useState<DateFilter>('month');
   const [activeCategory, setActiveCategory] = useState<Category>('shopping');
@@ -229,23 +429,109 @@ export default function ActivityPage() {
     }).sort((a, b) => b.timestamp - a.timestamp);
   }, [activeCategory, dateFilter]);
 
-  const totalBenefit = useMemo(() => {
+  const categoryConfig = {
+    shopping: {
+      card1Bg: 'from-[#FFFDFB] to-[#FFF7ED] border-[#FFEDD5]',
+      iconBg: 'bg-[#FFF7ED]',
+      iconColor: 'text-[#EA580C]',
+      textColor: 'text-[#EA580C]',
+      countLabel: 'Total Orders',
+      valueLabel: 'Total Order Value',
+      icon: ShoppingBag,
+    },
+    services: {
+      card1Bg: 'from-[#FCFAFE] to-[#FAF5FF] border-[#E9D5FF]/60',
+      iconBg: 'bg-[#FAF5FF]',
+      iconColor: 'text-[#9333EA]',
+      textColor: 'text-[#9333EA]',
+      countLabel: 'Total Services',
+      valueLabel: 'Total Service Value',
+      icon: Wrench,
+    },
+    space: {
+      card1Bg: 'from-[#F9FDFB] to-[#EAFDF4] border-[#BBF7D0]/60',
+      iconBg: 'bg-[#EAFDF4]',
+      iconColor: 'text-[#16A34A]',
+      textColor: 'text-[#16A34A]',
+      countLabel: 'Total Bookings',
+      valueLabel: 'Total Booking Value',
+      icon: Calendar,
+    },
+    food: {
+      card1Bg: 'from-[#FFFBFB] to-[#FEF2F2] border-[#FCA5A5]/60',
+      iconBg: 'bg-[#FEF2F2]',
+      iconColor: 'text-[#EF4444]',
+      textColor: 'text-[#EF4444]',
+      countLabel: 'Total Orders',
+      valueLabel: 'Total Spend Value',
+      icon: Soup,
+    },
+  };
+
+  const categoryStats = useMemo(() => {
+    const currentCount = filteredTransactions.length;
+    const currentValue = filteredTransactions.reduce((acc, item) => acc + item.amount, 0);
+    const currentDiscount = filteredTransactions.reduce((acc, item) => acc + item.discount, 0);
+    const currentCashback = filteredTransactions.reduce((acc, item) => acc + item.cashback, 0);
+
+    // Calculate growth vs Last Month (April 2025 in mock data)
+    const lastMonthTransactions = MOCK_TRANSACTIONS.filter(item => {
+      if (item.category !== activeCategory) return false;
+      const dateObj = new Date(item.timestamp);
+      return dateObj.getMonth() === 3; // April
+    });
+
+    const lastMonthDiscount = lastMonthTransactions.reduce((acc, item) => acc + item.discount, 0);
+    const lastMonthCashback = lastMonthTransactions.reduce((acc, item) => acc + item.cashback, 0);
+
+    const calculateTrend = (current: number, previous: number) => {
+      if (previous === 0) {
+        return { percent: current > 0 ? 14 : 0, isUp: true };
+      }
+      const diff = current - previous;
+      const percent = Math.round((diff / previous) * 100);
+      return {
+        percent: Math.min(150, Math.abs(percent)),
+        isUp: percent >= 0,
+      };
+    };
+
+    // Maintain exact mockup values for shopping under month/lifetime filters
     if (activeCategory === 'shopping' && (dateFilter === 'month' || dateFilter === 'lifetime')) {
-      return 4210;
+      return {
+        count: 24,
+        value: 8750,
+        discount: 1860,
+        cashback: 2350,
+        discountTrend: { percent: 15, isUp: true },
+        cashbackTrend: { percent: 12, isUp: true }
+      };
     }
-    const sum = filteredTransactions.reduce((acc, item) => acc + item.discount + item.cashback, 0);
-    return sum;
+
+    return {
+      count: currentCount,
+      value: currentValue,
+      discount: currentDiscount,
+      cashback: currentCashback,
+      discountTrend: calculateTrend(currentDiscount, lastMonthDiscount),
+      cashbackTrend: calculateTrend(currentCashback, lastMonthCashback),
+    };
   }, [filteredTransactions, activeCategory, dateFilter]);
+
+  const totalBenefit = useMemo(() => {
+    return categoryStats.discount + categoryStats.cashback;
+  }, [categoryStats]);
 
   const savePercent = useMemo(() => {
     if (activeCategory === 'shopping' && (dateFilter === 'month' || dateFilter === 'lifetime')) {
       return 33;
     }
-    const sumBenefit = filteredTransactions.reduce((acc, item) => acc + item.discount + item.cashback, 0);
-    const sumAmount = filteredTransactions.reduce((acc, item) => acc + item.amount, 0);
-    if (sumAmount === 0) return 0;
-    return Math.round((sumBenefit / sumAmount) * 100);
-  }, [filteredTransactions, activeCategory, dateFilter]);
+    if (categoryStats.value === 0) return 0;
+    return Math.round((totalBenefit / categoryStats.value) * 100);
+  }, [categoryStats, totalBenefit, activeCategory, dateFilter]);
+
+  const config = categoryConfig[activeCategory];
+  const Card1Icon = config.icon;
 
   const categories = [
     {id: 'shopping' as Category, label: 'Shopping', icon: ShoppingBag, color: '#EA580C', bg: 'bg-[#FFF7ED]', border: 'border-[#FDBA74]/40', activeStyle: 'bg-[#FFF7ED] text-[#EA580C] border-[#FDBA74]/40'},
@@ -267,7 +553,7 @@ export default function ActivityPage() {
           <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
         </button>
 
-        <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[18px] font-extrabold text-[#111111]">
+        <h1 className="absolute left-25 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[18px] font-extrabold text-[#111111]">
           Activities
         </h1>
 
@@ -355,59 +641,85 @@ export default function ActivityPage() {
         })}
       </div>
 
-      {/* Shopping Stats Cards - displayed for shopping tab */}
-      {activeCategory === 'shopping' && (
-        <div className="grid grid-cols-3 gap-3">
-          {/* Card 1: Total Orders */}
-          <div className="bg-gradient-to-b from-[#FFFDFB] to-[#FFF7ED] border border-[#FFEDD5] rounded-[24px] p-4 flex flex-col justify-between h-[155px] shadow-sm text-left">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF7ED] text-[#EA580C]">
-              <ShoppingBag className="h-4.5 w-4.5" />
-            </div>
-            <div>
-              <p className="text-[22px] font-extrabold text-[#111111] leading-none mt-2">24</p>
-              <p className="text-[11px] font-bold text-[#6B7280] leading-none mt-1">Total Orders</p>
-              <p className="text-[15px] font-extrabold text-[#EA580C] mt-3.5 leading-none">₹8,750</p>
-              <p className="text-[10px] font-bold text-[#6B7280] leading-none mt-1">Avg. Order Value</p>
-            </div>
+      {/* Stats Cards - displayed for all tabs */}
+      <div className="grid grid-cols-3 gap-3">
+        {/* Card 1: Total Category Details */}
+        <div className={`bg-gradient-to-b ${config.card1Bg} border rounded-[24px] p-4 flex flex-col justify-between h-[155px] shadow-sm text-left`}>
+          <div className={`flex h-8 w-8 items-center justify-center rounded-full ${config.iconBg} ${config.iconColor}`}>
+            <Card1Icon className="h-4.5 w-4.5" />
           </div>
-
-          {/* Card 2: Discount Savings */}
-          <div className="bg-gradient-to-b from-[#FAFAFA] to-[#FAF5FF] border border-[#F3E8FF] rounded-[24px] p-4 flex flex-col justify-between h-[155px] shadow-sm text-left">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FAF5FF] text-[#9333EA]">
-              <Tag className="h-4.5 w-4.5" />
-            </div>
-            <div>
-              <p className="text-[22px] font-extrabold text-[#111111] leading-none mt-2">₹1,860</p>
-              <p className="text-[11px] font-bold text-[#6B7280] leading-none mt-1">Discount </p>
-              <div className="flex items-center gap-1 mt-3.5 leading-none">
-                <span className="text-[15px] font-extrabold text-[#9333EA]">15%</span>
-                <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#EAFDF4] text-[#10B981]">
-                  <ChevronUp className="h-2.5 w-2.5 stroke-[3]" />
-                </span>
-              </div>
-              <p className="text-[10px] font-bold text-[#6B7280] leading-none mt-1">vs Last Month</p>
-            </div>
-          </div>
-
-          {/* Card 3: Cashbacks Earned */}
-          <div className="bg-gradient-to-b from-[#FAFAFA] to-[#EFF6FF] border border-[#DBEAFE] rounded-[24px] p-4 flex flex-col justify-between h-[155px] shadow-sm text-left">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
-              <Wallet className="h-4.5 w-4.5" />
-            </div>
-            <div>
-              <p className="text-[22px] font-extrabold text-[#111111] leading-none mt-2">₹2,350</p>
-              <p className="text-[11px] font-bold text-[#6B7280] leading-none mt-1">Cashbacks</p>
-              <div className="flex items-center gap-1 mt-3.5 leading-none">
-                <span className="text-[15px] font-extrabold text-[#2563EB]">12%</span>
-                <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#EAFDF4] text-[#10B981]">
-                  <ChevronUp className="h-2.5 w-2.5 stroke-[3]" />
-                </span>
-              </div>
-              <p className="text-[10px] font-bold text-[#6B7280] leading-none mt-1">vs Last Month</p>
-            </div>
+          <div>
+            <p className="text-[22px] font-extrabold text-[#111111] leading-none mt-2">
+              {categoryStats.count}
+            </p>
+            <p className="text-[11px] font-bold text-[#6B7280] leading-none mt-1">
+              {config.countLabel}
+            </p>
+            <p className={`text-[15px] font-extrabold ${config.textColor} mt-3.5 leading-none`}>
+              ₹{categoryStats.value.toLocaleString('en-IN')}
+            </p>
+            <p className="text-[10px] font-bold text-[#6B7280] leading-none mt-1">
+              {config.valueLabel}
+            </p>
           </div>
         </div>
-      )}
+
+        {/* Card 2: Discount Savings */}
+        <div className="bg-gradient-to-b from-[#FAFAFA] to-[#FAF5FF] border border-[#F3E8FF] rounded-[24px] p-4 flex flex-col justify-between h-[155px] shadow-sm text-left">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FAF5FF] text-[#9333EA]">
+            <Tag className="h-4.5 w-4.5" />
+          </div>
+          <div>
+            <p className="text-[22px] font-extrabold text-[#111111] leading-none mt-2">
+              ₹{categoryStats.discount.toLocaleString('en-IN')}
+            </p>
+            <p className="text-[11px] font-bold text-[#6B7280] leading-none mt-1">Discount</p>
+            <div className="flex items-center gap-1 mt-3.5 leading-none">
+              <span className="text-[15px] font-extrabold text-[#9333EA]">
+                {categoryStats.discountTrend.percent}%
+              </span>
+              <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-full ${
+                categoryStats.discountTrend.isUp ? 'bg-[#EAFDF4] text-[#10B981]' : 'bg-[#FEF2F2] text-[#EF4444]'
+              }`}>
+                {categoryStats.discountTrend.isUp ? (
+                  <ChevronUp className="h-2.5 w-2.5 stroke-[3]" />
+                ) : (
+                  <ChevronDown className="h-2.5 w-2.5 stroke-[3]" />
+                )}
+              </span>
+            </div>
+            <p className="text-[10px] font-bold text-[#6B7280] leading-none mt-1">vs Last Month</p>
+          </div>
+        </div>
+
+        {/* Card 3: Cashbacks Earned */}
+        <div className="bg-gradient-to-b from-[#FAFAFA] to-[#EFF6FF] border border-[#DBEAFE] rounded-[24px] p-4 flex flex-col justify-between h-[155px] shadow-sm text-left">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
+            <Wallet className="h-4.5 w-4.5" />
+          </div>
+          <div>
+            <p className="text-[22px] font-extrabold text-[#111111] leading-none mt-2">
+              ₹{categoryStats.cashback.toLocaleString('en-IN')}
+            </p>
+            <p className="text-[11px] font-bold text-[#6B7280] leading-none mt-1">Cashbacks</p>
+            <div className="flex items-center gap-1 mt-3.5 leading-none">
+              <span className="text-[15px] font-extrabold text-[#2563EB]">
+                {categoryStats.cashbackTrend.percent}%
+              </span>
+              <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-full ${
+                categoryStats.cashbackTrend.isUp ? 'bg-[#EAFDF4] text-[#10B981]' : 'bg-[#FEF2F2] text-[#EF4444]'
+              }`}>
+                {categoryStats.cashbackTrend.isUp ? (
+                  <ChevronUp className="h-2.5 w-2.5 stroke-[3]" />
+                ) : (
+                  <ChevronDown className="h-2.5 w-2.5 stroke-[3]" />
+                )}
+              </span>
+            </div>
+            <p className="text-[10px] font-bold text-[#6B7280] leading-none mt-1">vs Last Month</p>
+          </div>
+        </div>
+      </div>
 
       {/* Transaction History Section */}
       <div className="space-y-3">
@@ -426,8 +738,8 @@ export default function ActivityPage() {
                 <thead>
                   <tr className="border-b border-black/[0.03] bg-slate-50/50 text-[10px] font-extrabold uppercase tracking-wider text-[#6B7280]">
                     <th className="py-3 px-3 w-[26%] sm:w-auto">Invoice</th>
-                    <th className="py-3 px-3 w-[28%] sm:w-auto">Amount</th>
-                    <th className="py-3 px-3 w-[28%] sm:w-auto">Total Benefit</th>
+                    <th className="py-3 px-3 w-[28%] sm:w-auto">Paid</th>
+                    <th className="py-3 px-3 w-[28%] sm:w-auto"> Benefited</th>
                     <th className="py-3 px-3 w-[18%] sm:w-auto">Status</th>
                     <th className="py-3 px-1 w-6"></th>
                   </tr>
@@ -436,28 +748,32 @@ export default function ActivityPage() {
                   {filteredTransactions.map(item => {
                     const totalB = item.discount + item.cashback;
                     return (
-                      <tr key={item.invoiceNo} className="hover:bg-slate-50/40 transition">
+                      <tr
+                        key={item.invoiceNo}
+                        onClick={() => setSelectedTransaction(item)}
+                        className="hover:bg-slate-50/40 transition cursor-pointer"
+                      >
                         <td className="py-4 px-3 align-top">
                           <div className="text-[11px] sm:text-[12px] font-extrabold text-[#111111] truncate">
                             {item.invoiceNo}
+                          </div> <div className="text-[9px] sm:text-[10px] text-[#9CA3AF] mt-0.5 font-semibold">
+                            {item.dateTime.split(',')[0]}
+                          </div>
+                          <div className="text-[8px] sm:text-[9px] text-[#9CA3AF] font-medium mt-0.5">
+                            {item.dateTime.split(',')[1]?.trim()}
+                          </div>
+                          
+                        </td>
+                        <td className="py-4 px-3 align-top">
+                          <div className="text-[11px] sm:text-[12px] font-extrabold text-[#111111]">
+                            ₹{item.amount.toLocaleString('en-IN')}
                           </div>
                           <div className="text-[9px] sm:text-[10px] text-[#9CA3AF] mt-0.5">
                             {item.items}
                           </div>
                         </td>
                         <td className="py-4 px-3 align-top">
-                          <div className="text-[11px] sm:text-[12px] font-extrabold text-[#111111]">
-                            ₹{item.amount.toLocaleString('en-IN')}
-                          </div>
-                          <div className="text-[9px] sm:text-[10px] text-[#9CA3AF] mt-0.5 font-semibold">
-                            {item.dateTime.split(',')[0]}
-                          </div>
-                          <div className="text-[8px] sm:text-[9px] text-[#9CA3AF] font-medium mt-0.5">
-                            {item.dateTime.split(',')[1]?.trim()}
-                          </div>
-                        </td>
-                        <td className="py-4 px-3 align-top">
-                          <div className="text-[11px] sm:text-[12px] font-extrabold text-[#EA580C]">
+                          <div className="text-[11px] sm:text-[12px] font-extrabold text-[#10B981]">
                             ₹{totalB}
                           </div>
                           {item.discount > 0 && (
@@ -466,7 +782,7 @@ export default function ActivityPage() {
                             </span>
                           )}
                           {item.cashback > 0 && (
-                            <span className="block text-[9px] sm:text-[10px] font-bold text-[#10B981] mt-0.5">
+                            <span className="block text-[9px] sm:text-[10px] font-bold text-[#FF7A00] mt-0.5">
                               Cashback ₹{item.cashback}
                             </span>
                           )}
@@ -486,7 +802,10 @@ export default function ActivityPage() {
                         <td className="py-4 px-1 align-top">
                           <button
                             type="button"
-                            onClick={() => toast.success(`Details for ${item.invoiceNo}`)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTransaction(item);
+                            }}
                             className="text-[#9CA3AF] hover:text-[#4B5563] cursor-pointer"
                           >
                             <MoreVertical className="h-3.5 w-3.5" />
@@ -502,57 +821,38 @@ export default function ActivityPage() {
         )}
       </div>
 
-      {/* Shopping/Category Summary Banner Card */}
+      {/* Category Summary Banner Card */}
       {filteredTransactions.length > 0 && (
-        <div className="relative overflow-hidden rounded-[24px] bg-[#FFF8F5] border border-[#FFEDD5] p-5 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 text-left">
-            <div className="flex items-center gap-4">
-              <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#FFEBE5] text-[#FF5A26] shadow-sm">
-                {/* SVG Sparkles */}
-                <svg className="absolute top-2.5 left-1 h-3.5 w-3.5 text-[#FF5A26]" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0 C12 6.6 5.4 12 0 12 C5.4 12 12 17.4 12 24 C12 17.4 18.6 12 24 12 C18.6 12 12 6.6 12 0 Z" />
-                </svg>
-                <svg className="absolute bottom-1 left-7 h-4 w-4 text-[#FF5A26]" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0 C12 6.6 5.4 12 0 12 C5.4 12 12 17.4 12 24 C12 17.4 18.6 12 24 12 C18.6 12 12 6.6 12 0 Z" />
-                </svg>
-                <svg className="absolute bottom-4 right-1 h-2.5 w-2.5 text-[#FF5A26]" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 0 C12 6.6 5.4 12 0 12 C5.4 12 12 17.4 12 24 C12 17.4 18.6 12 24 12 C18.6 12 12 6.6 12 0 Z" />
-                </svg>
-                
-                <Gift className="h-7 w-7" />
+        <div className="sticky bottom-4 z-20 relative overflow-hidden rounded-[20px] bg-[#FFF8F5]/95 border border-[#FFEDD5] p-3.5 shadow-md backdrop-blur-sm">
+          <div className="flex items-center justify-between gap-3 text-left">
+            <div className="flex items-center gap-3">
+              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#FFEBE5] text-[#FF5A26] shadow-sm">
+                <Gift className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-[14px] font-extrabold text-[#111111]">
-                  {activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)} Summary ({filterLabels[dateFilter]})
+                <h3 className="text-[12px] font-extrabold text-[#111111]">
+                  {activeCategory.charAt(0).toUpperCase() + activeCategory.slice(1)} Summary
                 </h3>
-                <p className="text-[11px] font-semibold text-[#4F5B73] mt-0.5">
-                  Total Benefit (Discounts + Cashbacks)
-                </p>
-                <p className="text-[22px] font-extrabold text-[#FF5A26] mt-1.5 leading-none">
+                <p className="text-[15px] font-extrabold text-[#FF5A26] mt-0.5 leading-none">
                   ₹{totalBenefit.toLocaleString('en-IN')}
                 </p>
-              </div>
-           
-             <br />
-            
-            {/* Vertical Divider */}
-            <div className="hidden sm:block w-px h-12 bg-[#FFE2D4]" />
-
-            <div className="flex items-center justify-between sm:justify-start gap-6">
-              <div>
-                <p className="text-[11px] font-semibold text-[#4F5B73]">You saved</p>
-                <p className="text-[24px] font-extrabold text-[#FF5A26] mt-0.5 leading-none">
-                  {savePercent}%
+                <p className="text-[9px] font-semibold text-[#4F5B73] mt-0.5">
+                  Total Benefit ({filterLabels[dateFilter]})
                 </p>
-                <p className="text-[10px] font-semibold text-[#4F5B73] mt-1.5 leading-none">
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-[13px] font-extrabold text-[#FF5A26] leading-none">
+                  {savePercent}% Saved
+                </p>
+                <p className="text-[9px] font-semibold text-[#4F5B73] mt-0.5">
                   of your spend
                 </p>
               </div>
-               </div>
-
-              {/* Dynamic Conic Gradient Solid Pie Chart */}
               <div 
-                className="h-10 w-10 rounded-full shrink-0 border border-white/80 shadow-sm"
+                className="h-8 w-8 rounded-full shrink-0 border border-white/80 shadow-sm"
                 style={{
                   background: `conic-gradient(#FF5A26 ${savePercent}%, #FFE5D9 ${savePercent}% 100%)`
                 }}
@@ -585,6 +885,128 @@ export default function ActivityPage() {
           <div className="space-y-5 pb-6">{content}</div>
         </div>
       </div>
+
+      {/* Transaction Details Modal */}
+      {selectedTransaction && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => setSelectedTransaction(null)}
+        >
+          <div 
+            className="relative w-full max-w-md overflow-hidden rounded-[28px] border border-black/[0.05] bg-white p-6 shadow-[0_20px_50px_rgba(0,0,0,0.15)] text-left animate-in fade-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-black/[0.03] pb-4">
+              <div>
+                <h3 className="text-[16px] font-extrabold text-[#111111]">Invoice Receipt</h3>
+                <p className="text-[11px] font-semibold text-[#9CA3AF] mt-0.5">
+                  {selectedTransaction.invoiceNo}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTransaction(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 hover:bg-slate-100 text-[#4B5563] transition cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Content Details */}
+            <div className="py-4 space-y-4">
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF]">Items / Description</p>
+                  <p className="text-[13px] font-extrabold text-[#111111] mt-1">{selectedTransaction.items}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF]">Category</p>
+                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-extrabold mt-1 uppercase ${
+                    selectedTransaction.category === 'shopping' ? 'bg-[#FFF7ED] text-[#EA580C]' :
+                    selectedTransaction.category === 'services' ? 'bg-[#FAF5FF] text-[#9333EA]' :
+                    selectedTransaction.category === 'space' ? 'bg-[#EAFDF4] text-[#16A34A]' :
+                    'bg-[#FEF2F2] text-[#EF4444]'
+                  }`}>
+                    {selectedTransaction.category}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF]">Date & Time</p>
+                  <p className="text-[12px] font-semibold text-[#374151] mt-1">{selectedTransaction.dateTime}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9CA3AF]">Status</p>
+                  <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-extrabold mt-1 ${
+                    selectedTransaction.status === 'Paid' ? 'bg-[#EAFDF4] text-[#10B981]' : 'bg-[#FFF7ED] text-[#EA580C]'
+                  }`}>
+                    {selectedTransaction.status}
+                  </span>
+                </div>
+              </div>
+
+              {/* Price Breakdown */}
+              <div className="bg-slate-50/50 rounded-2xl p-4 border border-black/[0.02] space-y-2 mt-2">
+                <div className="flex justify-between text-[12px] font-semibold text-[#4B5563]">
+                  <span>Subtotal</span>
+                  <span>₹{selectedTransaction.amount.toLocaleString('en-IN')}</span>
+                </div>
+                {selectedTransaction.discount > 0 && (
+                  <div className="flex justify-between text-[12px] font-semibold text-[#9333EA]">
+                    <span>Discount</span>
+                    <span>- ₹{selectedTransaction.discount.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+                {selectedTransaction.cashback > 0 && (
+                  <div className="flex justify-between text-[12px] font-semibold text-[#2563EB]">
+                    <span>Cashback</span>
+                    <span>- ₹{selectedTransaction.cashback.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+                <div className="border-t border-dashed border-slate-200 pt-2 flex justify-between text-[14px] font-extrabold text-[#111111]">
+                  <span>Total Paid</span>
+                  <span>
+                    ₹{(selectedTransaction.amount - selectedTransaction.discount).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="border-t border-dashed border-slate-200/50 pt-2 flex justify-between text-[13px] font-bold text-[#10B981]">
+                  <span>Total Benefit</span>
+                  <span>
+                    ₹{(selectedTransaction.discount + selectedTransaction.cashback).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer actions */}
+            <div className="border-t border-black/[0.03] pt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  toast.success(`Invoice ${selectedTransaction.invoiceNo} shared successfully!`);
+                  setSelectedTransaction(null);
+                }}
+                className="flex-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#374151] py-2.5 text-[12px] font-extrabold text-center transition cursor-pointer"
+              >
+                Share Invoice
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toast.success(`Downloading invoice ${selectedTransaction.invoiceNo}...`);
+                  setSelectedTransaction(null);
+                }}
+                className="flex-1 rounded-xl bg-[#111111] hover:bg-black text-white py-2.5 text-[12px] font-extrabold text-center transition cursor-pointer"
+              >
+                Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
