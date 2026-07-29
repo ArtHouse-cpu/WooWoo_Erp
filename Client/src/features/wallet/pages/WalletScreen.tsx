@@ -21,7 +21,9 @@ type WalletRow = {
   customerId?: string;
   customerName: string;
   customerPhone: string;
+  /** Total available = general + cashback + affiliate */
   walletAmount: number;
+  generalBalance?: number;
   affiliateBalance?: number;
   cashbackBalance?: number;
   withdrawableBalance?: number;
@@ -54,6 +56,15 @@ function hasExistingWalletRecord(row: WalletRow) {
 
 function toWalletRow(entry: any): WalletRow {
   const customer = entry?.customer ?? {};
+  const hasSplit =
+    entry?.generalBalance !== undefined ||
+    entry?.cashbackBalance !== undefined ||
+    entry?.affiliateBalance !== undefined ||
+    entry?.totalBalance !== undefined;
+
+  const generalBalance = hasSplit
+    ? toAmount(entry?.generalBalance)
+    : toAmount(entry?.walletAmount, customer?.walletAmount);
   const affiliateBalance = toAmount(
     entry?.affiliateBalance,
     entry?.withdrawableBalance,
@@ -63,6 +74,13 @@ function toWalletRow(entry: any): WalletRow {
     entry?.cashbackBalance,
     customer?.cashbackBalance,
   );
+  const totalBalance = hasSplit
+    ? toAmount(
+        entry?.totalBalance,
+        generalBalance + cashbackBalance + affiliateBalance,
+      )
+    : generalBalance;
+
   return {
     id: String(
       entry?._id ??
@@ -82,13 +100,8 @@ function toWalletRow(entry: any): WalletRow {
     customerPhone: String(
       entry?.customerPhone ?? customer?.mobile ?? entry?.mobile ?? "-",
     ).trim(),
-    walletAmount: toAmount(
-      entry?.walletAmount,
-      entry?.balance,
-      entry?.currentBalance,
-      entry?.availableBalance,
-      customer?.walletAmount,
-    ),
+    walletAmount: totalBalance,
+    generalBalance,
     affiliateBalance,
     cashbackBalance,
     withdrawableBalance: affiliateBalance,
@@ -311,12 +324,19 @@ if (action === "set_minimum") {
           Swal.showValidationMessage("Enter a valid amount.");
           return undefined;
         }
-        if (type === "debit" && amount > row.walletAmount) {
-          Swal.showValidationMessage("Cannot deduct more than available wallet amount.");
+        const generalAvailable = Number(
+          row.generalBalance ?? row.walletAmount ?? 0,
+        );
+        if (type === "debit" && amount > generalAvailable) {
+          Swal.showValidationMessage(
+            "Cannot deduct more than available general wallet amount.",
+          );
           return undefined;
         }
         const remainingBalance =
-          type === "debit" ? row.walletAmount - amount : row.walletAmount + amount;
+          type === "debit"
+            ? generalAvailable - amount
+            : generalAvailable + amount;
         if (remainingBalance < instruction.minimumBalance) {
           Swal.showValidationMessage(
             `Final balance cannot be less than minimum balance ₹ ${instruction.minimumBalance.toLocaleString("en-IN")}.`,
@@ -591,7 +611,17 @@ if (action === "set_minimum") {
           </div>
 
           <!-- Summary -->
-          <div class="grid grid-cols-3 gap-3 mt-5">
+          <div class="grid grid-cols-2 gap-3 mt-5 sm:grid-cols-4">
+
+            <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
+              <p class="text-xs font-medium text-slate-500 uppercase">
+                Total Wallet
+              </p>
+
+              <h3 class="text-xl font-bold text-slate-800 mt-1">
+                ₹${Number(row.walletAmount || 0).toLocaleString("en-IN")}
+              </h3>
+            </div>
 
             <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
               <p class="text-xs font-medium text-slate-500 uppercase">
@@ -599,7 +629,7 @@ if (action === "set_minimum") {
               </p>
 
               <h3 class="text-xl font-bold text-slate-800 mt-1">
-                ₹${Number(row.walletAmount || 0).toLocaleString("en-IN")}
+                ₹${Number(row.generalBalance ?? 0).toLocaleString("en-IN")}
               </h3>
             </div>
 
@@ -687,12 +717,35 @@ if (action === "set_minimum") {
       {
         header: "Wallet Amount",
         accessorKey: "walletAmount",
-        Cell: ({ cell }) => (
-          <span className="font-semibold tabular-nums">
-            ₹ {Number(cell.getValue() ?? 0).toLocaleString("en-IN")}
-          </span>
-        ),
-        size: 130,
+        Cell: ({ row }) => {
+          const total = Number(row.original.walletAmount ?? 0);
+          const general = Number(row.original.generalBalance ?? 0);
+          const cashback = Number(row.original.cashbackBalance ?? 0);
+          const affiliate = Number(
+            row.original.withdrawableBalance ??
+              row.original.affiliateBalance ??
+              0,
+          );
+          return (
+            <div className="flex flex-col">
+              <span className="font-semibold tabular-nums text-slate-900">
+                ₹ {total.toLocaleString("en-IN")}
+              </span>
+              {(cashback > 0 || affiliate > 0) && (
+                <span className="text-[10px] text-slate-400">
+                  Gen ₹{general.toLocaleString("en-IN")}
+                  {cashback > 0
+                    ? ` · CB ₹${cashback.toLocaleString("en-IN")}`
+                    : ""}
+                  {affiliate > 0
+                    ? ` · Aff ₹${affiliate.toLocaleString("en-IN")}`
+                    : ""}
+                </span>
+              )}
+            </div>
+          );
+        },
+        size: 160,
       },
       {
         header: "Withdrawable",

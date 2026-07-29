@@ -4,7 +4,6 @@ import {
   useMaterialReactTable,
 } from "material-react-table";
 import {  Eye, Search, Edit, XCircle, Trash2, Download,Ellipsis } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   handleDeleteSubscription,
@@ -63,7 +62,6 @@ function paymentStatusForWhatsApp(raw: Record<string, unknown>, rowStatus: strin
 }
 
 export default function SubscriptionScreen() {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<SubscriptionStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [memberships, setMemberships] = useState<

@@ -64,6 +64,7 @@ const serializeMembership = (doc) => {
     const normalized = normalizePricing(plain.pricing);
     plain.pricing = normalized;
   }
+  plain.walletCashback = normalizeWalletCashback(plain.walletCashback);
   return plain;
 };
 
@@ -86,6 +87,10 @@ const normalizeCustomerDisplay = (input = {}) => ({
     : [],
 });
 
+const normalizeWalletCashback = (input = {}) => ({
+  amount: Math.max(0, Number(input?.amount ?? 0) || 0),
+});
+
 export const createMembership = async (req, res) => {
   try {
     const {
@@ -100,6 +105,7 @@ export const createMembership = async (req, res) => {
       status,
       internalNotes,
       customerDisplay,
+      walletCashback,
       createdBy,
     } = req.body;
 
@@ -119,6 +125,9 @@ export const createMembership = async (req, res) => {
       });
     }
 
+    const display = normalizeCustomerDisplay(customerDisplay);
+    const walletCb = normalizeWalletCashback(walletCashback);
+
     const membership = await Membership.create({
       planId: normalizedPlanId,
       displayName: String(displayName).trim(),
@@ -130,7 +139,8 @@ export const createMembership = async (req, res) => {
       insightsLevel: String(insightsLevel ?? 'Basic').trim(),
       status: String(status ?? 'Active').trim(),
       internalNotes: String(internalNotes ?? '').trim(),
-      customerDisplay: normalizeCustomerDisplay(customerDisplay),
+      customerDisplay: display,
+      walletCashback: walletCb,
       createdBy: createdBy ?? undefined,
     });
 
@@ -211,6 +221,9 @@ export const updateMembership = async (req, res) => {
     }
     if (body.pricing !== undefined) {
       patch.pricing = normalizePricing(body.pricing);
+    }
+    if (body.walletCashback !== undefined) {
+      patch.walletCashback = normalizeWalletCashback(body.walletCashback);
     }
 
     if (patch.planId) {

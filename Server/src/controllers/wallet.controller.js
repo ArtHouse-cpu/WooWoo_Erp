@@ -197,24 +197,29 @@ const getWallets = async (req, res) => {
 
     const combinedWallets = customers.map(c => {
       const w = walletMap[c._id.toString()];
+      // Prefer live wallet document buckets, fall back to customer fields
       const generalBalance = Number(
-        c.walletAmount ?? (w ? w.walletAmount : 0) ?? 0,
+        (w ? w.walletAmount : undefined) ?? c.walletAmount ?? 0,
       );
       const affiliateBalance = Number(
-        c.affiliateBalance ?? (w ? w.affiliateBalance : 0) ?? 0,
+        (w ? w.affiliateBalance : undefined) ?? c.affiliateBalance ?? 0,
       );
       const cashbackBalance = Number(
-        c.cashbackBalance ?? (w ? w.cashbackBalance : 0) ?? 0,
+        (w ? w.cashbackBalance : undefined) ?? c.cashbackBalance ?? 0,
       );
+      const totalBalance = generalBalance + affiliateBalance + cashbackBalance;
       return {
         _id: w ? w._id : c._id,
         customerId: c._id,
         customerName: c.name,
         customerPhone: c.mobile,
-        walletAmount: generalBalance,
+        // Wallet Amount column = sum of all buckets (general + cashback + affiliate)
+        walletAmount: totalBalance,
+        generalBalance,
         affiliateBalance,
         cashbackBalance,
         withdrawableBalance: affiliateBalance,
+        totalBalance,
         transactions: w ? w.transactions : [],
         createdAt: w ? w.createdAt : c.createdAt,
         updatedAt: w ? w.updatedAt : c.updatedAt,
@@ -275,6 +280,9 @@ const createWallet = async (req, res) => {
       referenceType,
       referenceId,
       minimumBalance: req.body?.minimumBalance,
+      walletType:
+        req.body?.walletType ||
+        (/cashback/i.test(String(note ?? "")) ? "cashback" : "general"),
       createdBy: buildCreatedBy(req, createdBy),
     });
 
@@ -367,6 +375,9 @@ const updateWallet = async (req, res) => {
         referenceType,
         referenceId,
         minimumBalance: req.body?.minimumBalance,
+        walletType:
+          req.body?.walletType ||
+          (/cashback/i.test(String(note ?? "")) ? "cashback" : "general"),
         createdBy: buildCreatedBy(req, createdBy),
       });
     } else {

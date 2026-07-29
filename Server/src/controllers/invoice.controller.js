@@ -364,6 +364,7 @@ const creditMembershipCashback = async ({
     note: `Membership cashback for ${String(activityType || 'Invoice').trim() || 'Invoice'} ${ref}`,
     referenceType: 'invoice',
     referenceId: ref,
+    walletType: 'cashback',
     createdBy,
   });
 };

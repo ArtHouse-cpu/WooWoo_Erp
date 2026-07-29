@@ -3,6 +3,7 @@ import Counter from '../models/counter.model.js';
 import Subscription from '../models/subscription.model.js';
 import Customer from '../models/customer.model.js';
 import Membership from '../models/membership.model.js';
+import Wallet from '../models/wallet.model.js';
 import {sendSubscriptionCreatedEmail} from '../utils/brevoMailer.js';
 import {
   validateSubscriptionCreateBody,
@@ -13,6 +14,50 @@ import {validateCouponForOrder} from './coupon.controller.js';
 import {creditReferralDiscountToInviter, markReferralDiscountUsed} from '../modules/customer/services/referral.service.js';
 import {sendNewMembershipWhatsApp} from '../modules/customer/services/whatsapp.service.js';
 import {resolvePlanMeta} from '../services/membershipPlan.service.js';
+import {appendTransaction} from './wallet.controller.js';
+
+/** Credit fixed plan wallet cashback when membership is purchased (idempotent). */
+const creditPlanPurchaseCashback = async ({
+  customer,
+  subscriptionCode,
+  amount,
+  planName,
+  createdBy,
+}) => {
+  const cashbackAmt = Math.max(0, Number(amount ?? 0));
+  if (!customer?._id || !(cashbackAmt > 0)) return null;
+
+  let wallet = await Wallet.findOne({customerId: customer._id});
+  if (!wallet) {
+    wallet = await Wallet.create({
+      customerId: customer._id,
+      customerName: String(customer.name ?? '').trim(),
+      customerPhone: String(customer.mobile ?? '').trim(),
+      walletAmount: 0,
+      transactions: [],
+    });
+  }
+
+  const ref = String(subscriptionCode || '').trim();
+  const alreadyCredited = (wallet.transactions || []).some(
+    tx =>
+      String(tx.referenceId || '').trim() === ref &&
+      String(tx.type || '').toLowerCase() === 'credit' &&
+      String(tx.referenceType || '') === 'MembershipPurchase' &&
+      /cashback/i.test(String(tx.note || '')),
+  );
+  if (alreadyCredited) return wallet;
+
+  return appendTransaction(wallet, {
+    type: 'credit',
+    amount: cashbackAmt,
+    note: `Membership purchase cashback · ${planName || 'Plan'} · ${ref}`,
+    referenceType: 'MembershipPurchase',
+    referenceId: ref,
+    walletType: 'cashback',
+    createdBy,
+  });
+};
 
 const getNextSubscriptionNumber = async () => {
   const counter = await Counter.findOneAndUpdate(
@@ -290,20 +335,10 @@ export const createSubscription = async (req, res) => {
       console.error('createSubscription email error:', mailError);
     }
 
-    // Meta WhatsApp `newmembership` on activation (Create Subscription → active)
+    // Credit plan wallet cashback + WhatsApp on activation
     try {
       const statusNorm = String(parsed.data.status || '').trim().toLowerCase();
       if (statusNorm === 'active' || statusNorm === 'completed') {
-        const cashbackAmount = Number(
-          process.env.WHATSAPP_MEMBERSHIP_CASHBACK ||
-            process.env.MEMBERSHIP_WELCOME_CASHBACK ||
-            50,
-        );
-        const safeCashback =
-          Number.isFinite(cashbackAmount) && cashbackAmount > 0
-            ? cashbackAmount
-            : 50;
-
         let membershipLabel =
           String(parsed.data.items?.[0]?.productName || '').trim() ||
           String(parsed.data.membershipType || 'Membership').trim();
@@ -313,6 +348,7 @@ export const createSubscription = async (req, res) => {
           repeatUnit: parsed.data.repeatUnit,
           repeatType: parsed.data.repeatType,
         });
+        let planWalletCashback = 0;
 
         try {
           const planQuery = {};
@@ -329,41 +365,76 @@ export const createSubscription = async (req, res) => {
               const meta = resolvePlanMeta(plan);
               membershipLabel = meta.label || membershipLabel;
               validity = meta.validity || validity;
+              planWalletCashback = Math.max(
+                0,
+                Number(plan.walletCashback?.amount ?? 0) || 0,
+              );
             }
           }
         } catch (planError) {
           console.warn(
-            'createSubscription: membership plan lookup for WhatsApp failed:',
+            'createSubscription: membership plan lookup failed:',
             planError?.message || planError,
           );
         }
 
+        const envCashback = Number(
+          process.env.WHATSAPP_MEMBERSHIP_CASHBACK ||
+            process.env.MEMBERSHIP_WELCOME_CASHBACK ||
+            0,
+        );
+        const safeCashback =
+          planWalletCashback > 0
+            ? planWalletCashback
+            : Number.isFinite(envCashback) && envCashback > 0
+              ? envCashback
+              : 0;
+
         const customer = await Customer.findOne({
           mobile: parsed.data.customerPhone,
         })
-          .select('name whatsappNumber mobile')
+          .select('_id name whatsappNumber mobile')
           .lean();
+
+        if (planWalletCashback > 0 && customer) {
+          try {
+            await creditPlanPurchaseCashback({
+              customer,
+              subscriptionCode,
+              amount: planWalletCashback,
+              planName: membershipLabel,
+              createdBy: parsed.data.createdBy,
+            });
+          } catch (walletError) {
+            console.error(
+              'createSubscription wallet cashback error:',
+              walletError?.message || walletError,
+            );
+          }
+        }
 
         const whatsappTo =
           String(customer?.whatsappNumber || '').trim() ||
           String(customer?.mobile || parsed.data.customerPhone).trim();
 
-        void (async () => {
-          try {
-            await sendNewMembershipWhatsApp({
-              to: whatsappTo,
-              name: customer?.name || parsed.data.customerName || 'Member',
-              membershipLabel,
-              validity,
-              cashbackLabel: `₹${safeCashback}`,
-            });
-          } catch (waError) {
-            console.error(
-              '[NewMembership] WhatsApp send error:',
-              waError?.message || waError,
-            );
-          }
-        })();
+        if (whatsappTo) {
+          void (async () => {
+            try {
+              await sendNewMembershipWhatsApp({
+                to: whatsappTo,
+                name: customer?.name || parsed.data.customerName || 'Member',
+                membershipLabel,
+                validity,
+                cashbackLabel: `₹${safeCashback}`,
+              });
+            } catch (waError) {
+              console.error(
+                '[NewMembership] WhatsApp send error:',
+                waError?.message || waError,
+              );
+            }
+          })();
+        }
       }
     } catch (waSetupError) {
       console.error(

@@ -37,6 +37,7 @@ export async function creditWalletCashback(
     referenceId: params.referenceId ?? "",
     customerName: params.customerName,
     customerPhone,
+    walletType: "cashback",
     createdBy: params.createdBy,
   };
 

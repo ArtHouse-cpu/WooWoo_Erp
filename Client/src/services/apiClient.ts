@@ -917,6 +917,10 @@ export type MembershipPlanPayload = {
     foodDiscountPercent?: number;
     features?: Array<{ label: string; was?: number }>;
   };
+  /** Fixed ₹ credited to wallet when this membership is purchased */
+  walletCashback?: {
+    amount?: number;
+  };
   createdBy?: {
     m_staff_id?: string | null;
     m_staff_name?: string | null;

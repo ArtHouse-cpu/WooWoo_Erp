@@ -7,6 +7,7 @@ import {
   Layers3,
   Plus,
   ShieldCheck,
+  Wallet,
   X,
 } from "lucide-react";
 import { handleGetCategories, type MembershipPlanPayload } from "@/services/apiClient";
@@ -40,6 +41,9 @@ type PlanFormState = Required<
     spaceDiscountPercent: number;
     foodDiscountPercent: number;
     features: Array<{ label: string; was: number }>;
+  };
+  walletCashback: {
+    amount: number;
   };
 };
 
@@ -123,6 +127,9 @@ const initialState: PlanFormState = {
     spaceDiscountPercent: 0,
     foodDiscountPercent: 0,
     features: [{ label: "", was: 0 }],
+  },
+  walletCashback: {
+    amount: 0,
   },
   insightsLevel: "Basic",
   status: "Active",
@@ -292,6 +299,14 @@ export default function AddnewPlansModal({
                 }))
               : prev.customerDisplay.features,
         },
+        walletCashback: {
+          amount: Number(
+            initialPlan.walletCashback?.amount ??
+              (initialPlan.walletCashback as { percent?: number } | undefined)
+                ?.percent ??
+              prev.walletCashback.amount,
+          ),
+        },
       }));
     } else {
       setForm(initialState);
@@ -416,6 +431,7 @@ export default function AddnewPlansModal({
         }
       }
     }
+    // Fixed ₹ wallet cashback is stored separately; category cashback % stays in Usage Limits
 
     const foodLimit =
       usageLimits.Food ||
@@ -462,6 +478,9 @@ export default function AddnewPlansModal({
         discountPercent: Number(form.pricing.discountPercent || 0),
       },
       usageLimits,
+      walletCashback: {
+        amount: Number(form.walletCashback.amount || 0),
+      },
       customerDisplay: {
         ...form.customerDisplay,
         // Keep app display badges in sync with usage-limit cards when set
@@ -475,7 +494,6 @@ export default function AddnewPlansModal({
           Number(
             productsLimit?.discount ?? form.customerDisplay.storeDiscountPercent,
           ) || 0,
-        // Prefer Food-card cashback when set so food bill can fall back to it
         cashbackPercent:
           Number(
             foodLimit?.cashback ??
@@ -834,6 +852,33 @@ export default function AddnewPlansModal({
                 </div>
               </section>
 
+              <section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-6 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <Wallet size={18} className="text-emerald-600" />
+                  <div className="text-base font-semibold text-slate-900">
+                    Wallet Cashback on Purchase
+                  </div>
+                </div>
+              
+                <div className="max-w-sm">
+                  <InputField
+                    label="Cashback Amount"
+                    value={String(form.walletCashback.amount)}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        walletCashback: {
+                          amount: Math.max(0, Number(v || 0)),
+                        },
+                      }))
+                    }
+                    type="number"
+                    placeholder="e.g. 50"
+                    rightElement={<span className="text-xs">₹</span>}
+                  />
+                </div>
+              </section>
+
               <section className="rounded-2xl border border-violet-100 bg-violet-50/40 p-6 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <ShieldCheck size={18} className="text-violet-500" />
@@ -972,14 +1017,14 @@ export default function AddnewPlansModal({
                     placeholder="10"
                   />
                   <InputField
-                    label="Cashback (%)"
+                    label="Cashback (%) — display badge"
                     value={String(form.customerDisplay.cashbackPercent)}
                     onChange={(v) =>
                       setForm((p) => ({
                         ...p,
                         customerDisplay: {
                           ...p.customerDisplay,
-                          cashbackPercent: Number(v || 0),
+                          cashbackPercent: Math.max(0, Number(v || 0)),
                         },
                       }))
                     }

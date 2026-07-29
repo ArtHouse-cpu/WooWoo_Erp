@@ -78,6 +78,11 @@ const membershipSchema = new mongoose.Schema(
       },
     },
 
+    // Fixed ₹ cashback credited to member wallet when this plan is purchased
+    walletCashback: {
+      amount: { type: Number, default: 0, min: 0 },
+    },
+
     createdBy: {
       m_staff_id: { type: String, default: null },
       m_staff_name: { type: String, default: null },
