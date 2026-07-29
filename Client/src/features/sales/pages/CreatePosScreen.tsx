@@ -17,6 +17,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import { useAppSelector } from "@/store/hooks";
 import {
+  calcCatalogueProductDiscount,
   membershipBenefitsForLine,
   resolveMembershipPlan,
   toMembershipPlanId,
@@ -51,6 +52,9 @@ type PosItem = {
   stockQty?: number;
   image?: string;
   isCsp?: boolean;
+  /** Catalogue discount metadata for CSP / product discount recalc on qty change */
+  productDiscountType?: string;
+  productDiscountValue?: number;
 };
 
 export default function CreatePosScreen({
@@ -122,32 +126,38 @@ export default function CreatePosScreen({
   ) => {
     setItems((prev) =>
       prev.map((it) => {
-        if (it.id === id) {
-          if (field === "discount" && it.isCsp) {
-            return { ...it, discount: 0 };
-          }
-          const updated = { ...it, [field]: Number(value) };
-          if (field === "qty" || field === "price") {
-            if (updated.isCsp) {
-              return { ...updated, discount: 0, cashback: 0 };
-            }
-            const benefits = getMembershipBenefitsForItem(
+        if (it.id !== id) return it;
+
+        const updated = { ...it, [field]: Number(value) };
+        if (field === "qty" || field === "price") {
+          if (updated.isCsp) {
+            const productDiscount = calcCatalogueProductDiscount(
               updated.price,
               updated.qty,
-              updated.category || "General",
-              membership,
-              membershipPlanId,
-              false,
+              updated.productDiscountType,
+              updated.productDiscountValue,
             );
             return {
               ...updated,
-              discount: benefits.discount || updated.discount,
-              cashback: benefits.cashback || updated.cashback,
+              discount: productDiscount,
+              cashback: 0,
             };
           }
-          return updated;
+          const benefits = getMembershipBenefitsForItem(
+            updated.price,
+            updated.qty,
+            updated.category || "General",
+            membership,
+            membershipPlanId,
+            false,
+          );
+          return {
+            ...updated,
+            discount: benefits.discount || updated.discount,
+            cashback: benefits.cashback || updated.cashback,
+          };
         }
-        return it;
+        return updated;
       }),
     );
   };
@@ -188,6 +198,14 @@ export default function CreatePosScreen({
       selectedProduct?.sourceType ||
       "product";
     const isCsp = Boolean(selectedProduct?.isCsp);
+    const productDiscountType = selectedProduct?.discountType;
+    const productDiscountValue = Number(selectedProduct?.discountValue ?? 0);
+    const productDiscount = calcCatalogueProductDiscount(
+      price,
+      qty,
+      productDiscountType,
+      productDiscountValue,
+    );
     const benefits = getMembershipBenefitsForItem(
       price,
       qty,
@@ -204,7 +222,7 @@ export default function CreatePosScreen({
         name,
         qty,
         price,
-        discount: isCsp ? 0 : benefits.discount || 0,
+        discount: isCsp ? productDiscount : benefits.discount || productDiscount || 0,
         cashback: isCsp ? 0 : benefits.cashback || 0,
         category: lineCategory,
         stockQty: selectedProduct?.trackStock
@@ -212,6 +230,8 @@ export default function CreatePosScreen({
           : undefined,
         image: selectedProduct?.imageUrl || (selectedProduct?.images && selectedProduct?.images[0]) || "",
         isCsp,
+        productDiscountType,
+        productDiscountValue,
       },
     ]);
 
@@ -330,28 +350,6 @@ export default function CreatePosScreen({
         payment.customerId,
       );
 
-      printThermalReceipt({
-        invoiceNo: savedCode,
-        customerName: customer.trim() || "Walk-in Customer",
-        customerPhone: phone.trim(),
-        items: items.map((item) => ({
-          name: item.name,
-          qty: item.qty,
-          price: item.price,
-          discount: item.discount,
-        })),
-        totalMRP: subTotal,
-        discountTotal:
-          discountTotal +
-          Number(payment.coupon?.discountAmount ?? 0) +
-          Number(payment.referral?.discountAmount ?? 0),
-        cashbackAmount: payment.cashbackTotal,
-        finalAmount: payment.finalAmount,
-        totalDue: payment.paymentBreakdown.dueAmount,
-        totalQty: items.reduce((sum, item) => sum + item.qty, 0),
-        extraCharges: payment.extraCharges,
-      });
-
       Swal.fire("Success", "POS Transaction completed.", "success");
       setItems([]);
       setOpenCheckout(false);
@@ -360,6 +358,31 @@ export default function CreatePosScreen({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handlePrintPosReceipt = () => {
+    if (items.length === 0) {
+      Swal.fire("No items", "Please add at least one item before printing.", "warning");
+      return;
+    }
+    printThermalReceipt({
+      invoiceNo: `DRAFT-${invoiceNo || new Date().toISOString().slice(0, 10).replace(/-/g, "")}`,
+      customerName: customer.trim() || "Walk-in Customer",
+      customerPhone: phone.trim(),
+      items: items.map((item) => ({
+        name: item.name,
+        qty: item.qty,
+        price: item.price,
+        discount: item.discount,
+      })),
+      totalMRP: subTotal,
+      discountTotal,
+      cashbackAmount: cashbackTotal,
+      finalAmount: grandTotal,
+      totalDue: grandTotal,
+      totalQty: items.reduce((sum, item) => sum + item.qty, 0),
+      extraCharges,
+    });
   };
 
   const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
@@ -541,10 +564,23 @@ export default function CreatePosScreen({
                             setCustomers([]);
                             setCustomerDropdownOpen(false);
 
-                            // Auto-apply discounts to existing items (skip CSP)
+                            // Auto-apply membership discounts (CSP keeps product discount; no membership)
                             setItems(prev => prev.map(item => {
                               if (item.isCsp) {
-                                return { ...item, discount: 0, cashback: 0 };
+                                const productDiscount = calcCatalogueProductDiscount(
+                                  item.price,
+                                  item.qty,
+                                  item.productDiscountType,
+                                  item.productDiscountValue,
+                                );
+                                return {
+                                  ...item,
+                                  discount:
+                                    productDiscount > 0
+                                      ? productDiscount
+                                      : item.discount,
+                                  cashback: 0,
+                                };
                               }
                               const benefits = getMembershipBenefitsForItem(item.price, item.qty, item.category || "General", mType, mId, false);
                               return {
@@ -724,19 +760,20 @@ export default function CreatePosScreen({
                       />
                     </td>
 
-                    {/* Discount Input — CSP products cannot be discounted */}
+                    {/* Discount Input — CSP still shows catalogue product discount */}
                     <td className="p-3 text-center">
                       <input
                         type="number"
-                        value={item.isCsp ? 0 : item.discount}
-                        disabled={Boolean(item.isCsp)}
-                        title={item.isCsp ? "No discount on CSP products" : undefined}
+                        value={item.discount}
+                        title={
+                          item.isCsp
+                            ? "Product discount (membership discount does not apply to CSP)"
+                            : undefined
+                        }
                         onChange={(e) =>
                           handleChange(item.id, "discount", e.target.value)
                         }
-                        className={`w-20 border rounded px-2 py-1 text-center ${
-                          item.isCsp ? "cursor-not-allowed bg-slate-50 text-slate-400" : ""
-                        }`}
+                        className="w-20 border rounded px-2 py-1 text-center"
                       />
                     </td>
 
@@ -854,8 +891,17 @@ export default function CreatePosScreen({
               </div>
             </div>
 
-            {/* Bottom Row (Checkout CTA) */}
-            <div className="flex justify-end">
+            {/* Bottom Row (Print + Checkout CTA) */}
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={handlePrintPosReceipt}
+                disabled={items.length === 0 || saving}
+                className="bg-white text-slate-700 border border-slate-200 px-6 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-slate-50 transition shadow-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                <Printer size={18} />
+                Print
+              </button>
               <button
                 type="button"
                 onClick={openCheckoutModal}

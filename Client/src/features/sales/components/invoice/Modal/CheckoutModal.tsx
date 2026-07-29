@@ -267,6 +267,9 @@ export default function CheckoutModal({
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponLabel, setCouponLabel] = useState("");
+  const [promoType, setPromoType] = useState<"coupon" | "referral">("coupon");
+  const [promoCodeInput, setPromoCodeInput] = useState("");
+  const [loadingPromo, setLoadingPromo] = useState(false);
   const [referralCodeInput, setReferralCodeInput] = useState("");
   const [referralDiscount, setReferralDiscount] = useState(0);
   const [referralLabel, setReferralLabel] = useState("Referral Discount");
@@ -345,11 +348,17 @@ export default function CheckoutModal({
       setCouponCode("");
       setCouponDiscount(0);
       setCouponLabel("");
+      setPromoType("coupon");
+      setPromoCodeInput("");
+      setLoadingPromo(false);
       setReferralCodeInput("");
       setReferralDiscount(0);
       setReferralLabel("Referral Discount");
       setReferralCodeApplied("");
       setReferralInviterName("");
+      setReferralSegments([]);
+      setReferralDiscountAlreadyUsed(false);
+      setReferralStatusMessage("");
     }
   }, [
     open,
@@ -368,6 +377,121 @@ export default function CheckoutModal({
     setReferralSegments([]);
     setReferralDiscountAlreadyUsed(false);
     setReferralStatusMessage("");
+    if (promoType === "referral") setPromoCodeInput("");
+  };
+
+  const clearCouponDiscount = () => {
+    setCouponCode("");
+    setCouponDiscount(0);
+    setCouponLabel("");
+    if (promoType === "coupon") setPromoCodeInput("");
+  };
+
+  const handleApplyPromoCode = async () => {
+    const code = promoCodeInput.trim().toUpperCase();
+    if (!code) {
+      Swal.fire("Code required", "Enter a coupon or referral code.", "warning");
+      return;
+    }
+    if (!items.length) {
+      Swal.fire(
+        "No items",
+        "Add items before applying a discount code.",
+        "warning",
+      );
+      return;
+    }
+
+    setLoadingPromo(true);
+    try {
+      if (promoType === "coupon") {
+        const response = await handleValidateCoupon({
+          code,
+          orderAmount: grandTotal,
+          customerPhone: customerSearch.trim() || undefined,
+        });
+        const discount = Number(response?.discountAmount ?? 0);
+        if (discount <= 0) {
+          clearCouponDiscount();
+          Swal.fire(
+            "Invalid coupon",
+            "Coupon did not apply a discount.",
+            "error",
+          );
+          return;
+        }
+        setCouponDiscount(discount);
+        setCouponCode(code);
+        setCouponLabel(
+          String(
+            response?.coupon?.title ?? response?.title ?? "Coupon Applied",
+          ),
+        );
+        setPromoCodeInput(code);
+        void applyReferralDiscount({
+          customer: selectedCustomer,
+          referralCode: referralCodeInput || referralCodeApplied || "",
+        });
+        await Swal.fire({
+          icon: "success",
+          title: "Coupon applied",
+          text: `${code}: −₹${discount.toFixed(2)}`,
+          timer: 1600,
+          showConfirmButton: false,
+        });
+        return;
+      }
+
+      if (!selectedCustomer?._id && !customerSearch.trim()) {
+        Swal.fire(
+          "Customer required",
+          "Select a customer before applying a referral code.",
+          "warning",
+        );
+        return;
+      }
+
+      setReferralCodeInput(code);
+      setPromoCodeInput(code);
+      const applied = await applyReferralDiscount({
+        customer: selectedCustomer,
+        referralCode: code,
+      });
+      if (applied) {
+        await Swal.fire({
+          icon: "success",
+          title: "Referral applied",
+          text: "Referral code verified.",
+          timer: 1800,
+          showConfirmButton: false,
+        });
+      } else {
+        Swal.fire(
+          "Referral not applied",
+          "Could not apply this referral code.",
+          "info",
+        );
+      }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      if (promoType === "coupon") {
+        clearCouponDiscount();
+        Swal.fire(
+          "Invalid coupon",
+          err?.response?.data?.message ?? "Invalid coupon",
+          "error",
+        );
+      } else {
+        clearReferralDiscount();
+        Swal.fire(
+          "Referral not applied",
+          err?.response?.data?.message ?? "Could not apply referral code.",
+          "info",
+        );
+      }
+    } finally {
+      setLoadingPromo(false);
+    }
   };
 
   const buildReferralItems = () =>
@@ -390,14 +514,14 @@ export default function CheckoutModal({
   const applyReferralDiscount = async (opts?: {
     customer?: any | null;
     referralCode?: string;
-  }) => {
+  }): Promise<boolean> => {
     const customer = opts?.customer ?? selectedCustomer;
     const code = String(opts?.referralCode ?? referralCodeInput ?? "").trim();
     const orderAmount = Math.max(0, Number(grandTotal || 0) - Number(couponDiscount || 0));
 
     if (orderAmount <= 0) {
       clearReferralDiscount();
-      return;
+      return false;
     }
 
     const customerId = String(customer?._id ?? initialCustomerId ?? "").trim();
@@ -407,7 +531,7 @@ export default function CheckoutModal({
 
     if (!customerId && !customerPhone && !code) {
       clearReferralDiscount();
-      return;
+      return false;
     }
 
     setLoadingReferral(true);
@@ -422,7 +546,7 @@ export default function CheckoutModal({
       const data = response?.data || response;
       if (!data?.referralCode && !data?.ok && !data?.commissionAmount) {
         clearReferralDiscount();
-        return;
+        return false;
       }
 
       const alreadyUsed = data.discountAlreadyUsed === true || data.discountEligible === false;
@@ -446,6 +570,7 @@ export default function CheckoutModal({
       if (data.referralCode) {
         setReferralCodeInput(String(data.referralCode).toUpperCase());
       }
+      return true;
     } catch (error: unknown) {
       clearReferralDiscount();
       const err = error as { response?: { data?: { message?: string } } };
@@ -459,6 +584,7 @@ export default function CheckoutModal({
           showConfirmButton: false,
         });
       }
+      return false;
     } finally {
       setLoadingReferral(false);
     }
@@ -495,8 +621,7 @@ export default function CheckoutModal({
   const lineDiscountsTotal = useMemo(
     () =>
       items.reduce(
-        (sum, item) =>
-          sum + (item.isCsp ? 0 : Number(item.discount ?? 0)),
+        (sum, item) => sum + Number(item.discount ?? 0),
         0,
       ),
     [items],
@@ -512,19 +637,24 @@ export default function CheckoutModal({
     [items],
   );
 
-  // Prefer actual line totals; fall back to plan summary (already CSP-aware).
-  // When any CSP item is present, never trust a stale initialMembershipDiscount
-  // that may have been recalculated without the CSP skip.
+  // Prefer actual line totals (includes catalogue product discount on CSP).
+  // Membership summary is CSP-aware (skips CSP lines for membership %).
   const cartHasCsp = items.some((item) => Boolean(item.isCsp));
+  const displayLineDiscount = lineDiscountsTotal > 0 ? lineDiscountsTotal : 0;
   const displayMembershipDiscount = cartHasCsp
-    ? lineDiscountsTotal > 0
-      ? lineDiscountsTotal
+    ? displayLineDiscount > 0
+      ? displayLineDiscount
       : summary.membershipDiscount
     : initialMembershipDiscount > 0
       ? initialMembershipDiscount
-      : lineDiscountsTotal > 0
-        ? lineDiscountsTotal
+      : displayLineDiscount > 0
+        ? displayLineDiscount
         : summary.membershipDiscount;
+  const discountSummaryLabel =
+    cartHasCsp ||
+    (displayLineDiscount > 0 && Number(summary.membershipDiscount || 0) <= 0)
+      ? "Product Discount"
+      : "Membership Discount";
 
   const displayCashbackTotal = cartHasCsp
     ? lineCashbackTotal > 0
@@ -724,7 +854,41 @@ export default function CheckoutModal({
   const remainingForFull = Math.max(0, finalPayable - totalPaid);
 
 
-  const handleSaveAndPrint = async () => {
+  const buildReceiptPayload = (invoiceNo: string) => ({
+    invoiceNo,
+    customerName: customerName.trim() || "Walk-in Customer",
+    customerPhone: customerSearch.trim(),
+    items: items.map((it) => ({
+      name: it.name,
+      qty: Number(it.qty),
+      price: Number(it.price),
+      discount: Number(it.discount ?? 0),
+    })),
+    totalMRP: items.reduce(
+      (sum, it) => sum + Number(it.qty) * Number(it.price),
+      0,
+    ),
+    discountTotal: lineDiscountsTotal + couponDiscount + referralDiscount,
+    cashbackAmount: displayCashbackTotal,
+    finalAmount: finalPayable,
+    totalDue: dueAmount,
+    totalQty,
+    extraCharges,
+  });
+
+  const handlePrintOnly = () => {
+    if (!items.length) {
+      Swal.fire("No items", "Please add at least one item before printing.", "warning");
+      return;
+    }
+    printThermalReceipt(
+      buildReceiptPayload(
+        `DRAFT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`,
+      ),
+    );
+  };
+
+  const handleComplete = async () => {
     if (!customerName.trim()) {
       Swal.fire("Customer required", "Please enter customer name.", "warning");
       return;
@@ -828,7 +992,7 @@ export default function CheckoutModal({
         productName: item.name,
         qty: Number(item.qty),
         unitPrice: Number(item.price),
-        discount: item.isCsp ? 0 : Number(item.discount ?? 0),
+        discount: Number(item.discount ?? 0),
         category: item.category || "General",
         image: item.image || "",
         isCsp: Boolean(item.isCsp),
@@ -840,7 +1004,7 @@ export default function CheckoutModal({
       discountTotal:
         items.reduce(
           (sum, item) =>
-            sum + (item.isCsp ? 0 : Number(item.discount || 0)),
+            sum + Number(item.discount || 0),
           0,
         ) +
         couponDiscount +
@@ -906,28 +1070,6 @@ export default function CheckoutModal({
           console.error("Failed to credit cashback to wallet", e);
         }
       }
-
-      printThermalReceipt({
-        invoiceNo: invoiceCode,
-        customerName: customerName,
-        customerPhone: customerSearch,
-        items: items.map((it) => ({
-          name: it.name,
-          qty: Number(it.qty),
-          price: Number(it.price),
-          discount: Number(it.discount ?? 0),
-        })),
-        totalMRP: items.reduce(
-          (sum, it) => sum + Number(it.qty) * Number(it.price),
-          0
-        ),
-        discountTotal:
-          lineDiscountsTotal + couponDiscount,
-        cashbackAmount: displayCashbackTotal,
-        finalAmount: finalPayable,
-        totalDue: dueAmount,
-        totalQty: totalQty,
-      });
 
       await Swal.fire(
         "Saved",
@@ -1032,7 +1174,7 @@ export default function CheckoutModal({
                 <SummaryLine label="Subtotal" value={formatInr(itemsSubtotal)} />
                 {displayMembershipDiscount > 0 && (
                   <SummaryLine 
-                    label="Membership Discount" 
+                    label={discountSummaryLabel} 
                     value={`− ${formatInr(displayMembershipDiscount)}`} 
                     tone="discount" 
                   />
@@ -1150,7 +1292,9 @@ export default function CheckoutModal({
                   </Badge>
                   {displayMembershipDiscount > 0 && (
                     <span className="text-[11px] font-medium text-indigo-600">
-                      Membership discount applied
+                      {displayLineDiscount > 0
+                        ? "Product discount applied"
+                        : "Membership discount applied"}
                     </span>
                   )}
                   <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-amber-600">
@@ -1160,158 +1304,122 @@ export default function CheckoutModal({
                 </div>
               </SectionCard>
 
-              <section className="rounded-xl border border-dashed border-slate-300 p-5">
-                <div className="flex items-center gap-2 mb-3">
-                  <Tag className="h-4 w-4 text-slate-400" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Coupon</h3>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    value={couponCode}
-                    onChange={(e) => {
-                      setCouponCode(e.target.value);
-                      if (!e.target.value.trim()) {
-                        setCouponDiscount(0);
-                        setCouponLabel("");
-                      }
-                    }}
-                    placeholder="Enter code"
-                    className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium focus:border-indigo-600 outline-none transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const code = couponCode.trim();
-                      if (!code) return;
-                      try {
-                        const response = await handleValidateCoupon({
-                          code,
-                          orderAmount: grandTotal,
-                          customerPhone: customerSearch.trim() || undefined,
-                        });
-                        const discount = Number(response?.discountAmount ?? 0);
-                        setCouponDiscount(discount);
-                        setCouponCode(code.toUpperCase());
-                        setCouponLabel(String(response?.coupon?.title ?? "Coupon Applied"));
-                        void applyReferralDiscount({
-                          customer: selectedCustomer,
-                          referralCode: referralCodeInput || referralCodeApplied,
-                        });
-                        Swal.fire("Success", "Coupon applied", "success");
-                      } catch (error: any) {
-                        setCouponDiscount(0);
-                        setCouponLabel("");
-                        Swal.fire("Error", "Invalid coupon", "error");
-                      }
-                    }}
-                    className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 transition-colors"
-                  >
-                    Apply
-                  </button>
-                </div>
-                {couponDiscount > 0 && (
-                  <p className="mt-2 text-xs font-medium text-indigo-600">
-                    {couponLabel}: −{formatInr(couponDiscount)}
-                  </p>
-                )}
-              </section>
-
-              <section className="rounded-xl border border-dashed border-violet-300 bg-violet-50/40 p-5">
-                <div className="mb-3 flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-violet-500" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-violet-500">
-                    Referral Discount
+              {/* Coupon / Referral — single input like FoodBill */}
+              <section className="rounded-xl border border-dashed border-violet-300 bg-violet-50/40 p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-violet-600" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-violet-600">
+                    Coupon / Referral
                   </h3>
                 </div>
-                <p className="mb-3 text-[11px] text-slate-500">
-                  Referral discount can be used once per customer account. Referrer earns commission every time the code is used.
-                </p>
+
+                <div className="flex gap-1 rounded-lg border border-violet-100 bg-white/80 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromoType("coupon");
+                      setPromoCodeInput(couponCode || "");
+                    }}
+                    className={`flex-1 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition ${
+                      promoType === "coupon"
+                        ? "bg-violet-600 text-white shadow-sm"
+                        : "text-violet-600 hover:bg-violet-50"
+                    }`}
+                  >
+                    Coupon
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromoType("referral");
+                      setPromoCodeInput(
+                        referralCodeInput || referralCodeApplied || "",
+                      );
+                    }}
+                    className={`flex-1 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition ${
+                      promoType === "referral"
+                        ? "bg-violet-600 text-white shadow-sm"
+                        : "text-violet-600 hover:bg-violet-50"
+                    }`}
+                  >
+                    Referral
+                  </button>
+                </div>
+
                 <div className="flex gap-2">
                   <input
-                    value={referralCodeInput}
-                    onChange={(e) => {
-                      setReferralCodeInput(e.target.value.toUpperCase());
-                      if (!e.target.value.trim()) clearReferralDiscount();
-                    }}
-                    placeholder="Enter referral code (e.g. W7QEK05GO)"
-                    className="flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm font-medium uppercase focus:border-violet-500 outline-none transition-all"
+                    value={promoCodeInput}
+                    onChange={(e) =>
+                      setPromoCodeInput(e.target.value.toUpperCase())
+                    }
+                    placeholder={
+                      promoType === "coupon"
+                        ? "ENTER COUPON CODE"
+                        : "ENTER REFERRAL CODE"
+                    }
+                    className="min-w-0 flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2.5 text-sm font-semibold uppercase text-slate-800 outline-none placeholder:font-medium placeholder:tracking-wide placeholder:text-slate-400 focus:border-violet-500"
                   />
                   <button
                     type="button"
-                    disabled={loadingReferral}
-                    onClick={async () => {
-                      await applyReferralDiscount({
-                        referralCode: referralCodeInput,
-                      });
-                    }}
-                    className="rounded-lg bg-violet-700 px-4 py-2 text-xs font-bold text-white hover:bg-violet-600 transition-colors disabled:opacity-60"
+                    disabled={loadingPromo || loadingReferral}
+                    onClick={() => void handleApplyPromoCode()}
+                    className="shrink-0 rounded-lg bg-violet-600 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
                   >
-                    {loadingReferral ? "..." : "Apply"}
+                    {loadingPromo || loadingReferral ? "…" : "Apply"}
                   </button>
                 </div>
-                {referralDiscount > 0 ? (
-                  <div className="mt-3 space-y-2 rounded-lg border border-violet-200 bg-white px-3 py-2 text-xs text-violet-800">
-                    <p className="font-semibold">
-                      {referralLabel}: −{formatInr(referralDiscount)}
-                    </p>
-                    <p className="text-violet-600">
-                      Code {referralCodeApplied}
-                      {referralInviterName ? ` · referred by ${referralInviterName}` : ""}
-                    </p>
-                    {referralSegments.length > 0 ? (
-                      <ul className="mt-1 space-y-0.5 text-violet-600">
-                        {referralSegments.map((seg) => (
-                          <li key={seg.category || seg.label}>
-                            {seg.label || seg.category}: −
-                            {formatInr(Number(seg.buyerDiscountAmount ?? seg.discountAmount ?? 0))}
-                            {seg.commissionType === "percentage"
-                              ? ` (${Number(seg.commissionValue || 0)}%)`
-                              : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
+
+                {couponDiscount > 0 ? (
+                  <div className="flex items-center justify-between gap-2 text-xs text-indigo-700">
+                    <span className="truncate font-semibold">
+                      {couponLabel || "Coupon"}
+                      {couponCode ? ` (${couponCode})` : ""}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="font-bold text-emerald-600">
+                        −{formatInr(couponDiscount)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={clearCouponDiscount}
+                        className="text-slate-400 hover:text-rose-500"
+                        title="Remove coupon"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ) : null}
-                {referralDiscountAlreadyUsed && referralCodeApplied ? (
-                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    <p className="font-semibold">Referral discount already used</p>
-                    <p className="mt-0.5">
-                      {referralStatusMessage ||
-                        "This account already used a referral discount. No buyer discount this time."}
-                    </p>
-                    <p className="mt-1 text-amber-700">
-                      Code {referralCodeApplied}
-                      {referralInviterName ? ` · ${referralInviterName}` : ""} will still earn commission
-                      {referralSegments.length > 0
-                        ? ` (${formatInr(
-                            referralSegments.reduce(
-                              (sum, seg) =>
-                                sum +
-                                Number(seg.commissionAmount ?? seg.discountAmount ?? 0),
-                              0,
-                            ),
-                          )})`
-                        : ""}
-                      .
-                    </p>
-                    {referralSegments.length > 0 ? (
-                      <ul className="mt-1 space-y-0.5 text-amber-700">
-                        {referralSegments.map((seg) => (
-                          <li key={`c-${seg.category || seg.label}`}>
-                            {seg.label || seg.category}:{" "}
-                            {formatInr(
-                              Number(seg.commissionAmount ?? seg.discountAmount ?? 0),
-                            )}
-                            {seg.commissionType === "percentage"
-                              ? ` (${Number(seg.commissionValue || 0)}%)`
-                              : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
+
+                {referralDiscount > 0 || referralCodeApplied ? (
+                  <div className="flex items-center justify-between gap-2 text-xs text-violet-700">
+                    <span className="truncate font-semibold">
+                      {referralLabel}
+                      {referralCodeApplied ? ` (${referralCodeApplied})` : ""}
+                      {referralInviterName ? ` · ${referralInviterName}` : ""}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="font-bold text-emerald-600">
+                        −{formatInr(referralDiscount)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={clearReferralDiscount}
+                        className="text-slate-400 hover:text-rose-500"
+                        title="Remove referral"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
-                ) : null}
+                ) : (
+                  <p className="text-[11px] text-violet-500">
+                    {referralStatusMessage ||
+                      (loadingReferral
+                        ? "Checking referral…"
+                        : "Choose Coupon or Referral, enter code, then Apply.")}
+                  </p>
+                )}
               </section>
 
               <SectionCard 
@@ -1456,18 +1564,25 @@ export default function CheckoutModal({
           </button>
           <button
             type="button"
+            onClick={handlePrintOnly}
+            disabled={saving || items.length === 0}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 transition-all"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Print</span>
+          </button>
+          <button
+            type="button"
             onClick={() => {
-              void handleSaveAndPrint();
+              void handleComplete();
             }}
             disabled={saving}
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-all"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Printer className="h-4 w-4" />
-            )}
-            <span>{saving ? "Saving..." : "Complete & Print"}</span>
+            ) : null}
+            <span>{saving ? "Saving..." : "Complete"}</span>
           </button>
         </footer>
       </div>

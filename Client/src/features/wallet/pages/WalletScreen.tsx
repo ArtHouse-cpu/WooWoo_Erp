@@ -719,29 +719,11 @@ if (action === "set_minimum") {
         accessorKey: "walletAmount",
         Cell: ({ row }) => {
           const total = Number(row.original.walletAmount ?? 0);
-          const general = Number(row.original.generalBalance ?? 0);
-          const cashback = Number(row.original.cashbackBalance ?? 0);
-          const affiliate = Number(
-            row.original.withdrawableBalance ??
-              row.original.affiliateBalance ??
-              0,
-          );
           return (
             <div className="flex flex-col">
               <span className="font-semibold tabular-nums text-slate-900">
                 ₹ {total.toLocaleString("en-IN")}
               </span>
-              {(cashback > 0 || affiliate > 0) && (
-                <span className="text-[10px] text-slate-400">
-                  Gen ₹{general.toLocaleString("en-IN")}
-                  {cashback > 0
-                    ? ` · CB ₹${cashback.toLocaleString("en-IN")}`
-                    : ""}
-                  {affiliate > 0
-                    ? ` · Aff ₹${affiliate.toLocaleString("en-IN")}`
-                    : ""}
-                </span>
-              )}
             </div>
           );
         },

@@ -149,19 +149,6 @@ export default function ProductScreen() {
         ),
       },
       {
-        accessorKey: "cspLabel",
-        header: "CSP",
-        size: 120,
-        Cell: ({ row }: { row: any }) =>
-          row.original?.isCsp ? (
-            <span className="text-xs font-medium text-amber-700">
-              {row.original.cspLabel || "CSP"}
-            </span>
-          ) : (
-            <span className="text-xs text-slate-400">—</span>
-          ),
-      },
-      {
         accessorKey: "category",
         header: "Category",
         size: 150,

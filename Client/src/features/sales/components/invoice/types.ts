@@ -16,6 +16,9 @@ export type InvoiceItem = {
   category?: string;
   isCsp?: boolean;
   cspLabel?: string | null;
+  /** Catalogue discount metadata for recalc on qty change */
+  productDiscountType?: string;
+  productDiscountValue?: number;
 };
 
 /** API / POS raw invoice shape used by PDF and print templates */

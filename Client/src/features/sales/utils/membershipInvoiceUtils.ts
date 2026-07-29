@@ -231,6 +231,27 @@ export function resolveBenefitPercents(
   return { discountPercent, cashbackPercent };
 }
 
+/** Catalogue product discount from discountType / discountValue (always applies, including CSP). */
+export function calcCatalogueProductDiscount(
+  unitPrice: number,
+  qty: number,
+  discountType?: string | null,
+  discountValue?: number | null,
+): number {
+  const price = Number(unitPrice) || 0;
+  const quantity = Number(qty) || 0;
+  const dValue = Number(discountValue ?? 0) || 0;
+  if (price <= 0 || quantity <= 0 || dValue <= 0) return 0;
+
+  const dType = String(discountType ?? "flat").trim().toLowerCase();
+  const lineTotal = price * quantity;
+  if (dType === "percentage") {
+    return Math.min(lineTotal, (lineTotal * dValue) / 100);
+  }
+  // flat = amount off per unit
+  return Math.min(lineTotal, dValue * quantity);
+}
+
 export function membershipBenefitsForLine(
   unitPrice: number,
   qty: number,
@@ -238,7 +259,7 @@ export function membershipBenefitsForLine(
   plan: MembershipPlanPayload | undefined,
   options?: { isCsp?: boolean },
 ): { discount: number; cashback: number } {
-  // CSP products: no membership / product discount (platform keeps 30%, sailor 70% of full line)
+  // CSP products: no membership discount / cashback (product catalogue discount is separate)
   if (options?.isCsp) {
     return { discount: 0, cashback: 0 };
   }

@@ -442,10 +442,10 @@ const enrichItemsWithCsp = async items => {
       Number.isFinite(Number(enrollment.sellerSharePercent))
         ? Number(enrollment.sellerSharePercent)
         : defaultShare;
-    // CSP: always use full line (qty × price), never discounted base
-    const base = roundMoney(
-      Math.max(0, Number(item.qty ?? 0) * Number(item.unitPrice ?? 0)),
-    );
+    // CSP sailor share on net line after product discount
+    const discount = Math.max(0, Number(item.discount ?? 0));
+    const gross = Math.max(0, Number(item.qty ?? 0) * Number(item.unitPrice ?? 0));
+    const base = roundMoney(Math.max(0, gross - discount));
     const cspSellerAmount = roundMoney((base * share) / 100);
 
     return {
@@ -454,8 +454,7 @@ const enrichItemsWithCsp = async items => {
       isCsp: true,
       cspEnrollmentId: enrollment._id,
       cspCustomerId: enrollment.customerId || product.cspCustomerId || null,
-      // CSP lines never carry product / membership discount
-      discount: 0,
+      discount,
       lineTotal: base,
       cspSellerAmount,
     };
@@ -1030,7 +1029,9 @@ const getInvoices=async(req,res)=>{
         const invoices = await Invoice.find(query)
           .sort({createdAt: -1})
           .limit(limit)
-          .select('customerName customerPhone pendingAmount paymentBreakdown status invoiceCode createdAt grandTotal createdBy    ')
+          .select(
+            'customerName customerPhone pendingAmount paymentBreakdown status invoiceCode createdAt grandTotal createdBy mode salesPersonName invoiceDate items coupon referral membershipDiscount cashbackTotal extraCharges',
+          )
           .lean();
         return res.status(200).json({
             success: true,

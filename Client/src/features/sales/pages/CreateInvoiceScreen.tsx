@@ -20,8 +20,8 @@ import {
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
-import { printThermalReceipt } from "@/utils/printUtils";
 import {
+  calcCatalogueProductDiscount,
   membershipBenefitsForLine,
   resolveMembershipPlan,
   toMembershipPlanId,
@@ -111,12 +111,14 @@ export default function CreateInvoiceScreen() {
                 productName: item.productName || "",
                 qty: item.qty || 1,
                 unitPrice: item.unitPrice || 0,
-                discount: item.isCsp ? 0 : item.discount || 0,
-                cashback: item.cashback || 0,
+                discount: item.discount || 0,
+                cashback: item.isCsp ? 0 : item.cashback || 0,
                 image: item.image || item.imageUrl || "",
                 category: item.category || "General",
                 isCsp: Boolean(item.isCsp),
                 cspLabel: item.cspLabel || (item.isCsp ? "CSP" : null),
+                productDiscountType: item.productDiscountType,
+                productDiscountValue: item.productDiscountValue,
             })));
         }
         if (inv.extraCharges) setExtraCharges(inv.extraCharges);
@@ -152,7 +154,7 @@ export default function CreateInvoiceScreen() {
     }
     const qty = Number(draftQty);
     const price = Number(draftPrice);
-    const discount = draftIsCsp ? 0 : Number(draftDiscount);
+    const discount = Number(draftDiscount);
     const cashback = draftIsCsp ? 0 : Number(draftCashback);
     if (qty <= 0 || price < 0 || discount < 0 || cashback < 0) {
       Swal.fire("Invalid values", "Check quantity, price, discount and cashback.", "error");
@@ -192,9 +194,21 @@ export default function CreateInvoiceScreen() {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
-        // CSP: never apply product / membership discount
+        // CSP: keep catalogue product discount; never membership cashback
         if (item.isCsp) {
-          return { ...item, qty: newQty, discount: 0, cashback: 0 };
+          const productDiscount = calcCatalogueProductDiscount(
+            item.unitPrice,
+            newQty,
+            item.productDiscountType,
+            item.productDiscountValue,
+          );
+          const scaled =
+            productDiscount > 0
+              ? productDiscount
+              : item.qty > 0
+                ? (item.discount / item.qty) * newQty
+                : item.discount;
+          return { ...item, qty: newQty, discount: scaled, cashback: 0 };
         }
         const benefits = getMembershipBenefitsForItem(
           item.unitPrice,
@@ -219,7 +233,6 @@ export default function CreateInvoiceScreen() {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
-        if (item.isCsp) return { ...item, discount: 0 };
         return { ...item, discount: newDiscount };
       }),
     );
@@ -258,7 +271,7 @@ export default function CreateInvoiceScreen() {
         name: item.productName,
         qty: item.qty,
         price: item.unitPrice,
-        discount: item.isCsp ? 0 : item.discount,
+        discount: item.discount,
         cashback: item.isCsp ? 0 : item.cashback,
         category: item.category,
         isCsp: Boolean(item.isCsp),
@@ -465,28 +478,6 @@ export default function CreateInvoiceScreen() {
           payment.customerId,
         );
 
-        printThermalReceipt({
-          invoiceNo: invoiceNo,
-          customerName: customer.trim(),
-          customerPhone: phone.trim(),
-          items: items.map((item) => ({
-            name: item.productName,
-            qty: item.qty,
-            price: item.unitPrice,
-            discount: item.discount,
-          })),
-          totalMRP: items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
-          discountTotal:
-            discountTotal +
-            Number(payment.coupon?.discountAmount ?? 0) +
-            Number(payment.referral?.discountAmount ?? 0),
-          cashbackAmount: payment.cashbackTotal,
-          finalAmount: payment.finalAmount,
-          totalDue: payment.paymentBreakdown.dueAmount,
-          totalQty: items.reduce((sum, item) => sum + item.qty, 0),
-          extraCharges: payment.extraCharges,
-        });
-
         Swal.fire("Invoice Updated", "Invoice updated successfully.", "success").then(() => navigate(-1));
       } else {
         const response = await handleCreateInvoice({
@@ -535,28 +526,6 @@ export default function CreateInvoiceScreen() {
           savedCode,
           payment.customerId,
         );
-
-        printThermalReceipt({
-          invoiceNo: savedCode,
-          customerName: customer.trim(),
-          customerPhone: phone.trim(),
-          items: items.map((item) => ({
-            name: item.productName,
-            qty: item.qty,
-            price: item.unitPrice,
-            discount: item.discount,
-          })),
-          totalMRP: items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
-          discountTotal:
-            discountTotal +
-            Number(payment.coupon?.discountAmount ?? 0) +
-            Number(payment.referral?.discountAmount ?? 0),
-          cashbackAmount: payment.cashbackTotal,
-          finalAmount: payment.finalAmount,
-          totalDue: payment.paymentBreakdown.dueAmount,
-          totalQty: items.reduce((sum, item) => sum + item.qty, 0),
-          extraCharges: payment.extraCharges,
-        });
 
         Swal.fire(
           "Invoice Saved",
@@ -690,10 +659,21 @@ export default function CreateInvoiceScreen() {
           setCustomers([]);
           setCustomerDropdownOpen(false);
 
-          // Auto-apply discounts to existing items (skip CSP products)
+          // Auto-apply membership discounts (CSP keeps product discount; no membership)
           setItems(prev => prev.map(item => {
             if (item.isCsp) {
-              return { ...item, discount: 0, cashback: 0 };
+              const productDiscount = calcCatalogueProductDiscount(
+                item.unitPrice,
+                item.qty,
+                item.productDiscountType,
+                item.productDiscountValue,
+              );
+              return {
+                ...item,
+                discount:
+                  productDiscount > 0 ? productDiscount : item.discount,
+                cashback: 0,
+              };
             }
             const benefits = getMembershipBenefitsForItem(item.unitPrice, item.qty, item.category || "General", mType, mId, false);
             return {
@@ -720,6 +700,7 @@ export default function CreateInvoiceScreen() {
       <ProductsServicesSection
         draft={draft}
         items={items}
+        readOnly={mode === "view"}
         membershipType={membership}
         membershipPlans={membershipPlans}
         membershipPlanId={membershipPlanId}
@@ -727,27 +708,23 @@ export default function CreateInvoiceScreen() {
           if (field === "name") setDraftName(value);
           if (field === "qty") setDraftQty(value);
           if (field === "price") setDraftPrice(value);
-          if (field === "discount") {
-            if (!draftIsCsp) setDraftDiscount(value);
-          }
+          if (field === "discount") setDraftDiscount(value);
           if (field === "image") setDraftImage(value);
           if (field === "isCsp") {
             const next = value === "true";
             setDraftIsCsp(next);
             if (next) {
-              setDraftDiscount("0");
               setDraftCashback("0");
             }
           }
           if (field === "category") {
             setDraftCategory(value);
-            // Re-calculate discount based on membership when category is selected (not for CSP)
+            // Re-calculate membership discount when category is selected (not for CSP)
             if (!draftIsCsp) {
               const benefits = getMembershipBenefitsForItem(Number(draftPrice), Number(draftQty), value, membership, membershipPlanId, false);
               if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
               if (benefits.cashback > 0) setDraftCashback(String(benefits.cashback));
             } else {
-              setDraftDiscount("0");
               setDraftCashback("0");
             }
           }
@@ -769,9 +746,11 @@ export default function CreateInvoiceScreen() {
               {
                 ...newItem,
                 id: nextId,
-                discount: isCsp ? 0 : Number(newItem.discount || 0),
+                discount: Number(newItem.discount || 0),
                 cashback: isCsp ? 0 : Number(newItem.cashback || 0),
                 isCsp,
+                productDiscountType: (newItem as any).productDiscountType,
+                productDiscountValue: (newItem as any).productDiscountValue,
               },
             ];
           });

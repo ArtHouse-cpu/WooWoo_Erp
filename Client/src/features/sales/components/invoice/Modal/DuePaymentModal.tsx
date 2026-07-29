@@ -12,7 +12,7 @@ type Props = {
 };
 
 export default function DuePaymentModal({ open, onClose, invoice, onSuccess }: Props) {
-  const [payAmount, setPayAmount] = useState<number>(invoice?.dueAmount || 0);
+  const [payAmount, setPayAmount] = useState<number>(invoice?.dueAmount );
   const [paymentMode, setPaymentMode] = useState("Cash");
   const [loading, setLoading] = useState(false);
   const staff = useAppSelector((state) => state.user);
@@ -77,7 +77,26 @@ export default function DuePaymentModal({ open, onClose, invoice, onSuccess }: P
     }
   };
 
-  const items = invoice.raw?.items || [];
+  const items = Array.isArray(invoice.raw?.items)
+    ? invoice.raw.items
+    : Array.isArray(invoice.items)
+      ? invoice.items
+      : [];
+
+  const formatInr = (value: number) =>
+    `₹${Number(value || 0).toLocaleString("en-IN", {
+      maximumFractionDigits: 2,
+    })}`;
+
+  const lineAmount = (item: any) => {
+    const qty = Number(item.qty || 0);
+    const unitPrice = Number(item.unitPrice ?? item.price ?? 0);
+    const discount = Number(item.discount || 0);
+    if (Number.isFinite(Number(item.lineTotal))) {
+      return Number(item.lineTotal);
+    }
+    return Math.max(0, qty * unitPrice - discount);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
@@ -98,29 +117,52 @@ export default function DuePaymentModal({ open, onClose, invoice, onSuccess }: P
           <div className="border-r border-gray-100 p-6">
             <h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500">Invoice Items</h4>
             <div className="max-h-60 overflow-y-auto space-y-3 pr-2">
-              {items.map((item: any, idx: number) => (
-                <div key={idx} className="flex justify-between text-sm">
-                  <div className="flex-1 pr-2">
-                    <div className="font-medium text-gray-800 truncate">{item.productName}</div>
-                    <div className="text-xs text-gray-500">{item.qty} x ₹{item.unitPrice}</div>
-                  </div>
-                  <div className="font-semibold text-gray-700">₹{item.qty * item.unitPrice - (item.discount || 0)}</div>
+              {items.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-6 text-center text-xs text-gray-400">
+                  No products found on this invoice.
                 </div>
-              ))}
+              ) : (
+                items.map((item: any, idx: number) => {
+                  const name =
+                    item.productName || item.name || item.description || "Item";
+                  const qty = Number(item.qty || 0);
+                  const unitPrice = Number(item.unitPrice ?? item.price ?? 0);
+                  const discount = Number(item.discount || 0);
+                  return (
+                    <div
+                      key={item._id || `${name}-${idx}`}
+                      className="flex justify-between gap-3 text-sm"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-gray-800">
+                          {name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {qty} × {formatInr(unitPrice)}
+                          {discount > 0 ? ` · Disc ${formatInr(discount)}` : ""}
+                        </div>
+                      </div>
+                      <div className="shrink-0 font-semibold text-gray-700">
+                        {formatInr(lineAmount(item))}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
             
             <div className="mt-6 border-t border-dashed border-gray-200 pt-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Total Amount</span>
-                <span className="font-medium text-gray-800">₹{invoice.amount.toLocaleString()}</span>
+                <span className="font-medium text-gray-800">{formatInr(invoice.amount)}</span>
               </div>
               <div className="flex justify-between text-sm text-green-600">
                 <span>Already Paid</span>
-                <span className="font-medium">₹{(invoice.amount - invoice.dueAmount).toLocaleString()}</span>
+                <span className="font-medium">{formatInr(invoice.amount - invoice.dueAmount)}</span>
               </div>
               <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-bold text-amber-700">
                 <span>Current Due</span>
-                <span>₹{invoice.dueAmount.toLocaleString()}</span>
+                <span>{formatInr(invoice.dueAmount)}</span>
               </div>
             </div>
           </div>

@@ -6,7 +6,10 @@ import {
   handleCreateProduct,
   type CatalogueLookupItem,
 } from "@/services/apiClient";
-import { getUsageLimitForCategory } from "../../utils/membershipInvoiceUtils";
+import {
+  calcCatalogueProductDiscount,
+  getUsageLimitForCategory,
+} from "../../utils/membershipInvoiceUtils";
 import CreateProductModal from "./Modal/CreateProductModal";
 import Swal from "sweetalert2";
 
@@ -35,6 +38,8 @@ type Props = {
   membershipPlans?: any[];
   membershipPlanId?: string | null;
   onAddDirectItem?: (item: Omit<InvoiceItem, "id">) => void;
+  /** View invoice: hide catalogue / add UI; show sold line items only */
+  readOnly?: boolean;
 };
 
 const inputStyle =
@@ -71,6 +76,7 @@ export default function ProductsServicesSection({
   membershipPlans = [],
   membershipPlanId = null,
   onAddDirectItem,
+  readOnly = false,
 }: Props) {
   const [catalogueItems, setCatalogueItems] = useState<CatalogueLookupItem[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -90,6 +96,7 @@ export default function ProductsServicesSection({
   };
 
   useEffect(() => {
+    if (readOnly) return;
     const controller = new AbortController();
     const fetchGridItems = async () => {
       try {
@@ -112,17 +119,23 @@ export default function ProductsServicesSection({
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [draft.name]);
+  }, [draft.name, readOnly]);
 
   const getCalculatedItemBenefits = (item: CatalogueLookupItem, qty: number) => {
     const sellingPrice = Number(item.sellingPrice ?? 0);
     const membershipCategory = item.category || "General";
     const lineCategory = item.lineCategory || item.sourceType || "product";
+    const productDiscount = calcCatalogueProductDiscount(
+      sellingPrice,
+      qty,
+      item.discountType,
+      item.discountValue,
+    );
 
-    // CSP products never get product / membership discount
+    // CSP: always apply catalogue product discount; never membership cashback/discount
     if (item.isCsp) {
       return {
-        discount: 0,
+        discount: productDiscount,
         cashback: 0,
         category: lineCategory,
       };
@@ -146,13 +159,7 @@ export default function ProductsServicesSection({
           (sellingPrice * qty * Number(limit.cashback)) / 100;
       }
     } else {
-      const dValue = Number(item.discountValue ?? 0);
-      const dType = item.discountType ?? "flat";
-      if (dType === "percentage") {
-        calculatedDiscount = (sellingPrice * qty * dValue) / 100;
-      } else {
-        calculatedDiscount = dValue * qty;
-      }
+      calculatedDiscount = productDiscount;
     }
 
     return {
@@ -185,6 +192,8 @@ export default function ProductsServicesSection({
         category,
         isCsp: Boolean(item.isCsp),
         cspLabel: item.cspLabel || null,
+        productDiscountType: item.discountType,
+        productDiscountValue: Number(item.discountValue ?? 0),
       });
     }
   };
@@ -232,7 +241,7 @@ export default function ProductsServicesSection({
   };
 
   useEffect(() => {
-    if (!dropdownOpen) return;
+    if (readOnly || !dropdownOpen) return;
     const term = draft.name.trim();
 
     const controller = new AbortController();
@@ -244,7 +253,7 @@ export default function ProductsServicesSection({
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [draft.name, dropdownOpen]);
+  }, [draft.name, dropdownOpen, readOnly]);
 
   const resolveMembershipPlan = () =>
     membershipPlans.find(
@@ -264,8 +273,17 @@ export default function ProductsServicesSection({
 
     let calculatedDiscount = 0;
     let calculatedCashback = 0;
+    const productDiscount = calcCatalogueProductDiscount(
+      sellingPrice,
+      qty,
+      item.discountType,
+      item.discountValue,
+    );
 
-    if (!isCsp) {
+    if (isCsp) {
+      // CSP: catalogue product discount always applies; no membership benefits
+      calculatedDiscount = productDiscount;
+    } else {
       const plan = resolveMembershipPlan();
       const limit =
         getUsageLimitForCategory(plan?.usageLimits, lineCategory) ||
@@ -280,13 +298,7 @@ export default function ProductsServicesSection({
             (sellingPrice * qty * Number(limit.cashback)) / 100;
         }
       } else {
-        const dValue = Number(item.discountValue ?? 0);
-        const dType = item.discountType ?? "flat";
-        if (dType === "percentage") {
-          calculatedDiscount = (sellingPrice * qty * dValue) / 100;
-        } else {
-          calculatedDiscount = dValue * qty;
-        }
+        calculatedDiscount = productDiscount;
       }
     }
 
@@ -394,9 +406,17 @@ export default function ProductsServicesSection({
   return (
     <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-800">Products & Services</h2>
+        <h2 className="text-sm font-semibold text-gray-800">
+          {readOnly ? "Sold Products & Items" : "Products & Services"}
+        </h2>
+        {readOnly && (
+          <span className="text-xs text-gray-500">
+            {items.length} item{items.length === 1 ? "" : "s"}
+          </span>
+        )}
       </div>
 
+      {!readOnly && (
       <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
         <div className="relative md:col-span-4" ref={searchContainerRef}>
           <input
@@ -496,22 +516,16 @@ export default function ProductsServicesSection({
         />
         <input
           value={draft.discount}
-          onChange={(e) => {
-            if (draft.isCsp === "true") return;
-            onDraftChange("discount", e.target.value);
-          }}
+          onChange={(e) => onDraftChange("discount", e.target.value)}
           type="number"
           min={0}
-          placeholder={draft.isCsp === "true" ? "No discount (CSP)" : "Discount"}
-          disabled={draft.isCsp === "true"}
+          placeholder="Discount"
           title={
             draft.isCsp === "true"
-              ? "CSP products do not get product or membership discount"
+              ? "Product discount (membership discount does not apply to CSP)"
               : undefined
           }
-          className={`${inputStyle} md:col-span-1 ${
-            draft.isCsp === "true" ? "cursor-not-allowed bg-slate-50 text-slate-400" : ""
-          }`}
+          className={`${inputStyle} md:col-span-1`}
         />
         <input
           value={draft.cashback}
@@ -528,8 +542,10 @@ export default function ProductsServicesSection({
           <Plus size={14} /> Add
         </button>
       </div>
+      )}
 
-      {/* Instamart Catalogue Grid */}
+      {!readOnly && (
+      /* Instamart Catalogue Grid */
       <div className="border-t border-gray-100 pt-4 mt-4 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -688,6 +704,7 @@ export default function ProductsServicesSection({
           </div>
         )}
       </div>
+      )}
 
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="min-w-full text-sm">
@@ -699,14 +716,21 @@ export default function ProductsServicesSection({
               <th className="px-3 py-2 text-right">Discount</th>
               <th className="px-3 py-2 text-right">Cashback</th>
               <th className="px-3 py-2 text-right">Total</th>
-              <th className="px-3 py-2 text-center">Action</th>
+              {!readOnly && (
+                <th className="px-3 py-2 text-center">Action</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-gray-500">
-                  Search or add products to start creating invoice.
+                <td
+                  colSpan={readOnly ? 6 : 7}
+                  className="px-3 py-10 text-center text-gray-500"
+                >
+                  {readOnly
+                    ? "No products were sold on this invoice."
+                    : "Search or add products to start creating invoice."}
                 </td>
               </tr>
             ) : (
@@ -725,67 +749,79 @@ export default function ProductsServicesSection({
                       </div>
                     </td>
                     <td className="px-3 py-2">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onUpdateItemQty(item.id, item.qty - 1)}
-                          className="rounded-full border border-gray-200 p-1 text-gray-600 hover:bg-gray-50"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        <span className="w-8 text-center font-medium">{item.qty}</span>
-                        <button
-                          type="button"
-                          onClick={() => onUpdateItemQty(item.id, item.qty + 1)}
-                          className="rounded-full border border-gray-200 p-1 text-gray-600 hover:bg-gray-50"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      </div>
+                      {readOnly ? (
+                        <div className="text-center font-medium">{item.qty}</div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onUpdateItemQty(item.id, item.qty - 1)}
+                            className="rounded-full border border-gray-200 p-1 text-gray-600 hover:bg-gray-50"
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <span className="w-8 text-center font-medium">{item.qty}</span>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateItemQty(item.id, item.qty + 1)}
+                            className="rounded-full border border-gray-200 p-1 text-gray-600 hover:bg-gray-50"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right">₹ {item.unitPrice.toFixed(2)}</td>
                     <td className="px-3 py-2 text-right">
-                      <div className="flex justify-end">
-                        <input
-                          type="number"
-                          min={0}
-                          value={item.discount}
-                          disabled={Boolean(item.isCsp)}
-                          title={
-                            item.isCsp
-                              ? "CSP products do not get product or membership discount"
-                              : undefined
-                          }
-                          onChange={(e) => {
-                            if (item.isCsp) return;
-                            onUpdateItemDiscount(item.id, Number(e.target.value));
-                          }}
-                          className={`w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500 ${
-                            item.isCsp ? "cursor-not-allowed bg-slate-50 text-slate-400" : ""
-                          }`}
-                        />
-                      </div>
+                      {readOnly ? (
+                        <span>₹ {Number(item.discount || 0).toFixed(2)}</span>
+                      ) : (
+                        <div className="flex justify-end">
+                          <input
+                            type="number"
+                            min={0}
+                            value={item.discount}
+                            title={
+                              item.isCsp
+                                ? "Product discount (membership discount does not apply to CSP)"
+                                : undefined
+                            }
+                            onChange={(e) =>
+                              onUpdateItemDiscount(item.id, Number(e.target.value))
+                            }
+                            className="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <div className="flex justify-end">
-                        <input
-                          type="number"
-                          min={0}
-                          value={item.cashback}
-                          onChange={(e) => onUpdateItemCashback?.(item.id, Number(e.target.value))}
-                          className="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500"
-                        />
-                      </div>
+                      {readOnly ? (
+                        <span>₹ {Number(item.cashback || 0).toFixed(2)}</span>
+                      ) : (
+                        <div className="flex justify-end">
+                          <input
+                            type="number"
+                            min={0}
+                            value={item.cashback}
+                            onChange={(e) =>
+                              onUpdateItemCashback?.(item.id, Number(e.target.value))
+                            }
+                            className="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right font-semibold">₹ {lineTotal.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-center">
-                      <button
-                        onClick={() => onRemoveItem(item.id)}
-                        className="rounded bg-red-50 p-1.5 text-red-600 hover:bg-red-100"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
+                    {!readOnly && (
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          onClick={() => onRemoveItem(item.id)}
+                          className="rounded bg-red-50 p-1.5 text-red-600 hover:bg-red-100"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })
@@ -794,7 +830,7 @@ export default function ProductsServicesSection({
         </table>
       </div>
 
-      {showCreateModal && (
+      {!readOnly && showCreateModal && (
         <CreateProductModal
           onClose={() => setShowCreateModal(false)}
           onSubmit={submitNewProduct}
