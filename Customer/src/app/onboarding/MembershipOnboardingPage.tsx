@@ -725,17 +725,19 @@ export default function MembershipOnboardingPage() {
         <div className="relative mb-6 flex items-center justify-between">
           {!isOnboarding ? (
             <>
-              <button
-                type="button"
-                onClick={() => navigate('/home')}
-                className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
-                aria-label="Go back"
-              >
-                <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
-              </button>
-              <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[18px] font-extrabold text-[#111111]">
-                Membership
-              </h1>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate('/home')}
+                  className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
+                  aria-label="Go back"
+                >
+                  <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+                </button>
+                <h1 className="text-[18px] font-extrabold text-[#111111]">
+                  Membership
+                </h1>
+              </div>
               <button
                 type="button"
                 onClick={() => {
