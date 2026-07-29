@@ -888,6 +888,9 @@ export type MembershipPlanPayload = {
   description?: string;
   pricing?: {
     period?: string;
+    /** Original list / MRP before plan discount */
+    grossAmount?: number;
+    /** Selling price after discount (what customer pays) */
     amount?: number;
     taxPercent?: number;
     discountType?: string;

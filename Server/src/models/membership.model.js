@@ -27,7 +27,8 @@ const membershipSchema = new mongoose.Schema(
         default: "Monthly",
         trim: true,
       },
-      amount: { type: Number, default: 0 },
+      amount: { type: Number, default: 0 }, // Selling price (after plan discount)
+      grossAmount: { type: Number, default: 0 }, // Original list / MRP before discount
       taxPercent: { type: Number, default: 0 },
       discountType: { type: String, default: "Percentage", trim: true },
       discountPercent: { type: Number, default: 0 },

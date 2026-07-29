@@ -154,8 +154,6 @@ export default function HomeScreen() {
                   `INV-${invoice?.invoiceNumber ?? index + 1}`,
               ),
               billedBy: String(
-                invoice?.createdBy?.m_staff_id ||
-                  invoice?.salesPersonName ||
                   invoice?.createdBy?.m_staff_name ||
                   "—",
               ),

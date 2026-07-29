@@ -209,15 +209,26 @@ export default function ManagePlanScreen() {
         ),
       },
       {
-        header: "Price",
+        header: "Selling Price",
         id: "price",
         accessorFn: (r) => Number(r.pricing?.amount ?? 0),
-        size: 120,
-        Cell: ({ cell }) => (
-          <span className="font-semibold tabular-nums text-slate-900">
-            ₹ {Number(cell.getValue() ?? 0).toLocaleString("en-IN")}
-          </span>
-        ),
+        size: 130,
+        Cell: ({ row, cell }) => {
+          const selling = Number(cell.getValue() ?? 0);
+          const gross = Number(row.original.pricing?.grossAmount ?? 0);
+          return (
+            <div className="flex flex-col">
+              <span className="font-semibold tabular-nums text-slate-900">
+                ₹ {selling.toLocaleString("en-IN")}
+              </span>
+              {gross > selling ? (
+                <span className="text-[11px] tabular-nums text-slate-400 line-through">
+                  ₹ {gross.toLocaleString("en-IN")}
+                </span>
+              ) : null}
+            </div>
+          );
+        },
       },
       {
         header: "Status",

@@ -105,6 +105,8 @@ const initialState: PlanFormState = {
   description: "",
   pricing: {
     period: "Monthly",
+    // Original selling / list price (before plan discount)
+    grossAmount: 0,
     amount: 0,
     taxPercent: 0,
     discountType: "Percentage",
@@ -127,12 +129,12 @@ const initialState: PlanFormState = {
   internalNotes: "",
 };
 
-const planTypes = ["Professional", "Business", "Personal"] as const;
+
 const periods = ["Monthly", "Yearly", "Lifetime", "Till School Life"] as const;
 const themeKeys = ["blue", "purple", "green", "orange"] as const;
 const iconKeys = ["user", "star", "graduation", "crown"] as const;
 const discountTypes = ["Percentage", "Flat"] as const;
-const insightLevels = ["Basic", "Advanced"] as const;
+
 
 /** Always available for membership discounts (catalogue line types + food/space) */
 const FIXED_USAGE_CATEGORIES = [
@@ -213,17 +215,34 @@ export default function AddnewPlansModal({
         insightsLevel: String(initialPlan.insightsLevel ?? prev.insightsLevel),
         status: (initialPlan.status ?? prev.status) as "Active" | "Inactive",
         internalNotes: String(initialPlan.internalNotes ?? prev.internalNotes),
-        pricing: {
-          ...prev.pricing,
-          ...(initialPlan.pricing ?? {}),
-          amount: Number(initialPlan.pricing?.amount ?? prev.pricing.amount),
-          taxPercent: Number(
-            initialPlan.pricing?.taxPercent ?? prev.pricing.taxPercent,
-          ),
-          discountPercent: Number(
-            initialPlan.pricing?.discountPercent ?? prev.pricing.discountPercent,
-          ),
-        },
+        pricing: (() => {
+          // grossAmount = original list; amount = selling price after discount
+          const storedGross = Number(initialPlan.pricing?.grossAmount ?? 0);
+          const storedAmount = Number(initialPlan.pricing?.amount ?? 0);
+          const originalList =
+            storedGross > 0
+              ? storedGross
+              : storedAmount; // legacy plans only had amount as list price
+          return {
+            ...prev.pricing,
+            ...(initialPlan.pricing ?? {}),
+            period: String(
+              initialPlan.pricing?.period ?? prev.pricing.period,
+            ),
+            grossAmount: originalList,
+            amount: storedGross > 0 ? storedAmount : originalList,
+            taxPercent: Number(
+              initialPlan.pricing?.taxPercent ?? prev.pricing.taxPercent,
+            ),
+            discountType: String(
+              initialPlan.pricing?.discountType ?? prev.pricing.discountType,
+            ),
+            discountPercent: Number(
+              initialPlan.pricing?.discountPercent ??
+                prev.pricing.discountPercent,
+            ),
+          };
+        })(),
         usageLimits: (() => {
           const merged: UsageLimits = {
             ...prev.usageLimits,
@@ -280,26 +299,31 @@ export default function AddnewPlansModal({
   }, [open, initialPlan]);
 
   const computed = useMemo(() => {
-    const amount = Number(form.pricing.amount || 0);
+    // grossAmount = original list / MRP; netAmount = selling price after discount
+    const grossAmount = Math.max(0, Number(form.pricing.grossAmount || 0));
     const taxPercent = Number(form.pricing.taxPercent || 0);
     const discountType = form.pricing.discountType;
     const discountValue = Number(form.pricing.discountPercent || 0);
 
     const discountAmount =
-      discountType === "Percentage"
-        ? (amount * discountValue) / 100
+      discountType === "Percentage" || discountType === "percentage"
+        ? (grossAmount * discountValue) / 100
         : discountValue;
 
-    const base = amount / (1 + taxPercent / 100);
-    const taxAmount = amount - base;
+    const sellingPrice = Math.max(0, grossAmount - discountAmount);
+    // Tax breakdown on the selling price (what customer pays)
+    const base = sellingPrice / (1 + taxPercent / 100);
+    const taxAmount = sellingPrice - base;
     return {
       baseAmount: base,
       taxAmount,
       discountAmount,
-      grossAmount: Math.max(0, amount - discountAmount),
+      grossAmount,
+      sellingPrice,
+      netAmount: sellingPrice,
     };
   }, [
-    form.pricing.amount,
+    form.pricing.grossAmount,
     form.pricing.taxPercent,
     form.pricing.discountType,
     form.pricing.discountPercent,
@@ -429,7 +453,10 @@ export default function AddnewPlansModal({
       description: form.description.trim(),
       pricing: {
         period: form.pricing.period,
-        amount: Number(form.pricing.amount || 0),
+        // Original list / MRP
+        grossAmount: Number(form.pricing.grossAmount || 0),
+        // Selling price = net after discount (what customer pays)
+        amount: Number(computed.netAmount || 0),
         taxPercent: Number(form.pricing.taxPercent || 0),
         discountType: form.pricing.discountType,
         discountPercent: Number(form.pricing.discountPercent || 0),
@@ -593,49 +620,6 @@ export default function AddnewPlansModal({
                   </div>
                 </div>
               </section>
-
-              <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
-                  <ClipboardList size={18} className="text-slate-400" />
-                  <div className="text-base font-semibold text-slate-900">
-                    Additional Details
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Plan Type
-                    </label>
-                    <select
-                      value={form.planType}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, planType: e.target.value }))
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                    >
-                      {planTypes.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Description
-                    </label>
-                    <input
-                      value={form.description}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, description: e.target.value }))
-                      }
-                      placeholder="Plan description..."
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                    />
-                  </div>
-                </div>
-              </section>
-
               <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <DollarSign size={18} className="text-slate-400" />
@@ -667,14 +651,18 @@ export default function AddnewPlansModal({
                     </select>
                   </div>
                   <InputField
-                    label="Amount"
-                    value={String(form.pricing.amount)}
-                    onChange={(v) =>
+                    label="Gross Amount (Original)"
+                    value={String(form.pricing.grossAmount)}
+                    onChange={(v) => {
+                      const next = Number(v || 0);
                       setForm((p) => ({
                         ...p,
-                        pricing: { ...p.pricing, amount: Number(v || 0) },
-                      }))
-                    }
+                        pricing: {
+                          ...p.pricing,
+                          grossAmount: next,
+                        },
+                      }));
+                    }}
                     type="number"
                     placeholder="0"
                     rightElement={<span className="text-xs">₹</span>}
@@ -749,10 +737,17 @@ export default function AddnewPlansModal({
                       )
                     }
                   />
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm">
-                    <div className="text-slate-500">Gross Amount</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">
-                      ₹{computed.grossAmount.toLocaleString("en-IN")}
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm">
+                    <div className="text-emerald-700/80">Selling Price</div>
+                    <div className="mt-1 text-lg font-semibold text-emerald-800 tabular-nums">
+                      ₹{computed.sellingPrice.toLocaleString("en-IN")}
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500">
+                      Gross (original): ₹
+                      {computed.grossAmount.toLocaleString("en-IN")}
+                      {computed.discountAmount > 0
+                        ? ` − discount ₹${computed.discountAmount.toLocaleString("en-IN")}`
+                        : ""}
                     </div>
                   </div>
                 </div>
@@ -1062,42 +1057,6 @@ export default function AddnewPlansModal({
                   </div>
                 </div>
               </section>
-
-              <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
-                  <ShieldCheck size={18} className="text-slate-400" />
-                  <div className="text-base font-semibold text-slate-900">
-                    Features & Status
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Insights Level
-                    </label>
-                    <select
-                      value={form.insightsLevel}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          insightsLevel: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                    >
-                      {insightLevels.map((l) => (
-                        <option key={l} value={l}>
-                          {l}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                
-                </div>
-              </section>
-
               <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <ClipboardList size={18} className="text-slate-400" />

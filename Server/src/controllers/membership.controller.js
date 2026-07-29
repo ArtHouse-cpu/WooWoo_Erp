@@ -15,6 +15,43 @@ const toPlainUsageLimits = (usageLimits) => {
   return {};
 };
 
+/** Normalize plan pricing: grossAmount = original list, amount = selling (after discount). */
+const normalizePricing = (pricing = {}) => {
+  const period = String(pricing?.period ?? 'Monthly').trim();
+  const taxPercent = Number(pricing?.taxPercent ?? 0);
+  const discountType = String(pricing?.discountType ?? 'Percentage').trim();
+  const discountPercent = Number(pricing?.discountPercent ?? 0);
+
+  const hasGross =
+    pricing?.grossAmount !== undefined &&
+    pricing?.grossAmount !== null &&
+    Number.isFinite(Number(pricing.grossAmount)) &&
+    Number(pricing.grossAmount) > 0;
+
+  // Original list / MRP
+  const grossAmount = Math.max(
+    0,
+    Number(hasGross ? pricing.grossAmount : pricing?.amount ?? 0) || 0,
+  );
+
+  const discountAmount =
+    String(discountType).toLowerCase() === 'flat'
+      ? discountPercent
+      : (grossAmount * discountPercent) / 100;
+
+  // Selling price = net after discount (what customer pays)
+  const amount = Math.max(0, grossAmount - discountAmount);
+
+  return {
+    period,
+    grossAmount,
+    amount,
+    taxPercent,
+    discountType,
+    discountPercent,
+  };
+};
+
 const serializeMembership = (doc) => {
   const plain =
     typeof doc?.toObject === 'function'
@@ -23,6 +60,10 @@ const serializeMembership = (doc) => {
   plain.usageLimits = toPlainUsageLimits(
     plain.usageLimits ?? doc?.usageLimits,
   );
+  if (plain.pricing && typeof plain.pricing === 'object') {
+    const normalized = normalizePricing(plain.pricing);
+    plain.pricing = normalized;
+  }
   return plain;
 };
 
@@ -84,13 +125,7 @@ export const createMembership = async (req, res) => {
       priority: Number(priority ?? 0),
       planType: String(planType ?? 'Professional').trim(),
       description: String(description ?? '').trim(),
-      pricing: {
-        period: String(pricing?.period ?? 'Monthly').trim(),
-        amount: Number(pricing?.amount ?? 0),
-        taxPercent: Number(pricing?.taxPercent ?? 0),
-        discountType: String(pricing?.discountType ?? 'Percentage').trim(),
-        discountPercent: Number(pricing?.discountPercent ?? 0),
-      },
+      pricing: normalizePricing(pricing),
       usageLimits: usageLimits ?? undefined,
       insightsLevel: String(insightsLevel ?? 'Basic').trim(),
       status: String(status ?? 'Active').trim(),
@@ -175,13 +210,7 @@ export const updateMembership = async (req, res) => {
       patch.customerDisplay = normalizeCustomerDisplay(body.customerDisplay);
     }
     if (body.pricing !== undefined) {
-      patch.pricing = {
-        period: String(body.pricing?.period ?? 'Monthly').trim(),
-        amount: Number(body.pricing?.amount ?? 0),
-        taxPercent: Number(body.pricing?.taxPercent ?? 0),
-        discountType: String(body.pricing?.discountType ?? 'Percentage').trim(),
-        discountPercent: Number(body.pricing?.discountPercent ?? 0),
-      };
+      patch.pricing = normalizePricing(body.pricing);
     }
 
     if (patch.planId) {
