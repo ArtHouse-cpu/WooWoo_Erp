@@ -36,6 +36,7 @@ export const PERMISSIONS = Object.freeze({
   SUBSCRIPTION_CREATE: 'subscription.create',
   SUBSCRIPTION_UPDATE: 'subscription.update',
   SUBSCRIPTION_DELETE: 'subscription.delete',
+  SUBSCRIPTION_BULK_CREATE: 'subscription.bulk.create',
 
   // Purchases
   PURCHASE_READ: 'purchase.read',
@@ -135,6 +136,7 @@ export const PERMISSION_CATALOG = Object.freeze([
   {key: PERMISSIONS.CREDIT_NOTE_CREATE, module: 'sales', label: 'Create credit notes'},
   {key: PERMISSIONS.SUBSCRIPTION_READ, module: 'sales', label: 'View subscriptions'},
   {key: PERMISSIONS.SUBSCRIPTION_CREATE, module: 'sales', label: 'Create subscriptions'},
+  {key: PERMISSIONS.SUBSCRIPTION_BULK_CREATE, module: 'sales', label: 'Create bulk subscriptions'},
   {key: PERMISSIONS.SUBSCRIPTION_UPDATE, module: 'sales', label: 'Update subscriptions'},
   {key: PERMISSIONS.SUBSCRIPTION_DELETE, module: 'sales', label: 'Delete subscriptions'},
 

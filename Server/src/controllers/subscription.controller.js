@@ -767,3 +767,289 @@ export const deleteSubscription = async (req, res) => {
     });
   }
 };
+
+const normalizeBulkPhone = raw => {
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    const digits = String(Math.trunc(Math.abs(raw)));
+    return digits.length > 10 ? digits.slice(-10) : digits;
+  }
+  const digits = String(raw ?? '').replace(/\D/g, '');
+  return digits.length > 10 ? digits.slice(-10) : digits;
+};
+
+const toBulkIsoDate = value => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    // Excel serial date
+    const epoch = Date.UTC(1899, 11, 30);
+    const d = new Date(epoch + value * 86400000);
+    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  const text = String(value ?? '').trim();
+  if (!text) return '';
+  const parsed = new Date(text);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  return text;
+};
+
+const resolveMembershipFromExcel = async membershipPlanRaw => {
+  const key = String(membershipPlanRaw ?? '').trim();
+  if (!key) return null;
+
+  const escaped = escapeRegex(key);
+  const plan = await Membership.findOne({
+    $or: [
+      {planId: new RegExp(`^${escaped}$`, 'i')},
+      {displayName: new RegExp(`^${escaped}$`, 'i')},
+    ],
+  }).lean();
+
+  return plan || null;
+};
+
+const mapExcelRowToCreateBody = async (excelRow, req) => {
+  const customerName = String(excelRow?.customerName ?? '').trim();
+  const customerPhone = normalizeBulkPhone(excelRow?.customerPhone);
+  const membershipPlanKey = String(excelRow?.membershipPlan ?? '').trim();
+  const startDate = toBulkIsoDate(excelRow?.startDate);
+  const endDate = toBulkIsoDate(excelRow?.endDate);
+  const salesPersonName =
+    String(excelRow?.salesPersonName ?? '').trim() ||
+    String(req.user?.name || req.user?.m_staff_name || 'Admin').trim();
+  const amount = Math.max(0, Number(excelRow?.amount ?? 0) || 0);
+  const statusRaw = String(excelRow?.status ?? 'active').trim().toLowerCase();
+  const status = [
+    'draft',
+    'active',
+    'completed',
+    'expired',
+    'error',
+    'cancelled',
+  ].includes(statusRaw)
+    ? statusRaw
+    : 'active';
+  const repeatTypeRaw = String(excelRow?.repeatType ?? 'yearly')
+    .trim()
+    .toLowerCase();
+  const repeatType = ['weekly', 'monthly', 'yearly', 'lifetime'].includes(
+    repeatTypeRaw,
+  )
+    ? repeatTypeRaw
+    : 'yearly';
+  const notes = String(excelRow?.notes ?? '').trim();
+
+  if (!customerName) throw new Error('customerName is required');
+  if (!/^[6-9]\d{9}$/.test(customerPhone)) {
+    throw new Error('customerPhone must be a valid 10-digit Indian mobile');
+  }
+  if (!membershipPlanKey) throw new Error('membershipPlan is required');
+  if (!startDate) throw new Error('startDate is required');
+  if (!endDate) throw new Error('endDate is required');
+
+  const plan = await resolveMembershipFromExcel(membershipPlanKey);
+  if (!plan) {
+    throw new Error(`Membership plan not found: ${membershipPlanKey}`);
+  }
+
+  const unitPrice =
+    amount > 0 ? amount : Math.max(0, Number(plan.pricing?.amount ?? 0) || 0);
+  const planLabel = String(plan.displayName || plan.planId || membershipPlanKey);
+  const membershipType = String(plan.planId || plan.displayName || 'general')
+    .trim()
+    .toLowerCase();
+  const junior = isJuniorMembership(membershipType);
+
+  // Ensure customer exists (createSubscription only updates existing customers)
+  let customer = await Customer.findOne({
+    mobile: customerPhone,
+    isDeleted: {$ne: true},
+  });
+  if (!customer) {
+    customer = await Customer.create({
+      name: customerName,
+      mobile: customerPhone,
+      membershipType: 'none',
+      createdBy: {
+        m_staff_id: req.user?.userId ?? null,
+        m_staff_name: req.user?.name ?? req.user?.m_staff_name ?? null,
+        m_staff_email: req.user?.email ?? null,
+      },
+    });
+  }
+
+  const students = [];
+  if (junior) {
+    const studentName = String(excelRow?.studentName ?? '').trim();
+    const classStd = String(excelRow?.classStd ?? '').trim();
+    const relation = String(excelRow?.relation ?? '').trim();
+    const parentName =
+      String(excelRow?.parentName ?? '').trim() || customerName;
+    const studentId = String(excelRow?.studentId ?? '').trim();
+    const schoolName = String(excelRow?.schoolName ?? '').trim();
+    const dob = toBulkIsoDate(excelRow?.dob) || null;
+
+    if (!studentName || !classStd || !relation || !parentName) {
+      throw new Error(
+        'Junior plan requires studentName, classStd, relation, parentName',
+      );
+    }
+    if (!studentId) {
+      throw new Error('Junior plan requires studentId');
+    }
+
+    students.push({
+      studentName,
+      schoolName,
+      dob,
+      classStd,
+      relation,
+      parentName,
+      studentId,
+    });
+  }
+
+  return {
+    customerName: customer.name || customerName,
+    customerPhone,
+    membershipId: String(plan._id),
+    membershipPlanId: String(plan.planId || ''),
+    membershipType,
+    priority: Number(plan.priority ?? 0) || 0,
+    invoiceDate: startDate,
+    dueDate: endDate,
+    repeatType,
+    repeatEvery: repeatType === 'lifetime' ? null : 1,
+    repeatUnit:
+      repeatType === 'lifetime'
+        ? null
+        : repeatType === 'yearly'
+          ? 'year'
+          : 'month',
+    salesPersonName,
+    notes,
+    items: [
+      {
+        productName: planLabel,
+        qty: 1,
+        unitPrice,
+        discount: 0,
+        category: 'membership',
+      },
+    ],
+    students,
+    subTotal: unitPrice,
+    discountTotal: 0,
+    grandTotal: unitPrice,
+    status,
+    createdBy: {
+      m_staff_id: req.user?.userId ?? null,
+      m_staff_name: req.user?.name ?? req.user?.m_staff_name ?? null,
+      m_staff_email: req.user?.email ?? null,
+    },
+  };
+};
+
+/**
+ * POST /subscriptions/bulk
+ * Body: { subscriptions: ExcelRow[] }
+ */
+export const bulkCreateSubscriptions = async (req, res) => {
+  try {
+    const {subscriptions} = req.body || {};
+
+    if (!subscriptions || !Array.isArray(subscriptions)) {
+      return res.status(400).json({
+        success: false,
+        message: 'No subscriptions array provided.',
+      });
+    }
+
+    if (!subscriptions.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'subscriptions array is empty.',
+      });
+    }
+
+    const results = [];
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (let index = 0; index < subscriptions.length; index += 1) {
+      const excelRow = subscriptions[index];
+      try {
+        const body = await mapExcelRowToCreateBody(excelRow, req);
+
+        let createResult = null;
+        const fakeRes = {
+          status(code) {
+            this.statusCode = code;
+            return this;
+          },
+          json(payload) {
+            createResult = {
+              statusCode: this.statusCode || 200,
+              payload,
+            };
+            return createResult;
+          },
+        };
+
+        await createSubscription({...req, body}, fakeRes);
+
+        if (createResult?.payload?.success) {
+          successCount += 1;
+          results.push({
+            index,
+            success: true,
+            customerPhone: body.customerPhone,
+            subscriptionCode: createResult.payload?.subscription?.subscriptionCode,
+            message: createResult.payload?.message || 'Created',
+          });
+        } else {
+          failedCount += 1;
+          results.push({
+            index,
+            success: false,
+            customerPhone: body.customerPhone,
+            message:
+              createResult?.payload?.message ||
+              (Array.isArray(createResult?.payload?.errors)
+                ? createResult.payload.errors.join(' ')
+                : 'Failed to create subscription'),
+          });
+        }
+      } catch (rowError) {
+        failedCount += 1;
+        results.push({
+          index,
+          success: false,
+          customerPhone: normalizeBulkPhone(excelRow?.customerPhone),
+          message: rowError?.message || 'Failed to process row',
+        });
+      }
+    }
+
+    const httpStatus =
+      failedCount === 0 ? 201 : successCount === 0 ? 400 : 200;
+
+    return res.status(httpStatus).json({
+      success: failedCount === 0,
+      message: `Processed ${subscriptions.length} row(s): ${successCount} created, ${failedCount} failed.`,
+      summary: {
+        total: subscriptions.length,
+        successful: successCount,
+        failed: failedCount,
+      },
+      results,
+    });
+  } catch (error) {
+    console.error('Bulk upload error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to bulk upload subscriptions.',
+    });
+  }
+};

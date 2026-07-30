@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -86,12 +87,17 @@ export default function SubscriptionScreen() {
   const [selectedActionRow, setSelectedActionRow] =
     useState<SubscriptionRow | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"create" | "edit" | "view" | "upgrade">(
-    "create",
-  );
+  const [modalMode, setModalMode] = useState<
+    "create" | "edit" | "view" | "upgrade" | "bulk"
+  >("create");
   const [modalData, setModalData] = useState<any>(null);
   const [membershipPlans, setMembershipPlans] = useState<
-    Array<{ planId: string; displayName: string; priority: number; _id?: string }>
+    Array<{
+      planId: string;
+      displayName: string;
+      priority: number;
+      _id?: string;
+    }>
   >([]);
 
   useEffect(() => {
@@ -721,7 +727,7 @@ export default function SubscriptionScreen() {
         <div className="flex items-center gap-2">
           <Can permission={PERMISSIONS.SUBSCRIPTION_CREATE}>
             <button
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 cursor-pointer "
               onClick={() => {
                 setModalMode("create");
                 setModalData(null);
@@ -729,6 +735,23 @@ export default function SubscriptionScreen() {
               }}
             >
               + Create Subscription
+            </button>
+          </Can>
+          <Can
+            anyOf={[
+              PERMISSIONS.SUBSCRIPTION_BULK_CREATE,
+              PERMISSIONS.SUBSCRIPTION_CREATE,
+            ]}
+          >
+            <button
+              className="rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 cursor-pointer "
+              onClick={() => {
+                setModalMode("bulk");
+                setModalData(null);
+                setIsModalOpen(true);
+              }}
+            >
+              + Bulk Create Subscription
             </button>
           </Can>
         </div>

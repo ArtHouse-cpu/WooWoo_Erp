@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { useAppSelector } from "@/store/hooks";
@@ -10,16 +11,104 @@ import {
   handleUpdateCustomer,
   handleUpdateSubscription,
   handleGetCustomers,
+  handleBulkCreateSubscriptions ,
   type CustomerPayload,
   type CreateSubscriptionPayload,
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import { printThermalReceipt } from "@/utils/printUtils";
-import { Camera, Printer, X } from "lucide-react";
+import { Camera, Download, Printer, X } from "lucide-react";
 
 const today = new Date().toISOString().split("T")[0];
 const SUBSCRIPTION_SEQ_KEY = "wooerp-subscription-seq";
+
+/** Exact header row for bulk subscription Excel (do not rename). */
+const BULK_SUBSCRIPTION_HEADERS = [
+  "customerName",
+  "customerPhone",
+  "membershipPlan",
+  "startDate",
+  "endDate",
+  "salesPersonName",
+  "amount",
+  "status",
+  "repeatType",
+  "notes",
+  "studentName",
+  "classStd",
+  "relation",
+  "parentName",
+  "studentId",
+  "schoolName",
+  "dob",
+] as const;
+
+const BULK_SUBSCRIPTION_SAMPLE_ROWS: Array<Array<string | number>> = [
+  [
+    "Rahul Anand",
+    "9876543210",
+    "Premium",
+    "2026-07-30",
+    "2027-07-29",
+    "Admin",
+    1999,
+    "active",
+    "yearly",
+    "Sample adult plan — delete before upload",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ],
+  [
+    "Amit Kumar",
+    "9123456780",
+    "Junior",
+    "2026-07-30",
+    "2027-07-29",
+    "Admin",
+    499,
+    "active",
+    "yearly",
+    "Sample Junior plan — delete before upload",
+    "Aarav Kumar",
+    "8",
+    "Father",
+    "Amit Kumar",
+    "STU001",
+    "Delhi Public School",
+    "2014-05-12",
+  ],
+];
+
+function downloadBulkSubscriptionTemplate() {
+  const aoa: Array<Array<string | number>> = [
+    [...BULK_SUBSCRIPTION_HEADERS],
+    ...BULK_SUBSCRIPTION_SAMPLE_ROWS,
+  ];
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Keep phone / studentId as text so Excel does not use scientific notation
+  ["B2", "B3", "O3"].forEach((addr) => {
+    if (sheet[addr]) {
+      sheet[addr].t = "s";
+      sheet[addr].v = String(sheet[addr].v);
+      sheet[addr].z = "@";
+    }
+  });
+
+  sheet["!cols"] = BULK_SUBSCRIPTION_HEADERS.map((h) => ({
+    wch: Math.max(14, h.length + 2),
+  }));
+
+  const book = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(book, sheet, "Subscriptions");
+  XLSX.writeFile(book, "subscription-bulk-import-template.xlsx");
+}
 
 const getNextSubscriptionNumber = (): string => {
   const fallback = 1000;
@@ -34,7 +123,7 @@ const getNextSubscriptionNumber = (): string => {
   }
 };
 
-type Mode = "create" | "edit" | "view" | "upgrade";
+type Mode = "create" | "edit" | "view" | "upgrade" | "bulk";
 type RepeatType = "weekly" | "monthly" | "yearly";
 type MembershipOption = {
   _id: string;
@@ -69,12 +158,16 @@ const createEmptyStudent = (): StudentForm => ({
   formImageUpload: "",
 });
 
-const isJuniorPlan = (plan?: Pick<MembershipOption, "planId" | "displayName"> | null) => {
+const isJuniorPlan = (
+  plan?: Pick<MembershipOption, "planId" | "displayName"> | null,
+) => {
   const text = `${plan?.planId ?? ""} ${plan?.displayName ?? ""}`.toLowerCase();
   return text.includes("junior") || text.includes("junoir");
 };
 
-const getCustomerMembershipType = (plan?: Pick<MembershipOption, "planId" | "displayName"> | null) => {
+const getCustomerMembershipType = (
+  plan?: Pick<MembershipOption, "planId" | "displayName"> | null,
+) => {
   const raw = `${plan?.planId ?? ""} ${plan?.displayName ?? ""}`.toLowerCase();
   if (raw.includes("junior") || raw.includes("junoir")) return "junior";
   if (raw.includes("premium")) return "premium";
@@ -84,7 +177,9 @@ const getCustomerMembershipType = (plan?: Pick<MembershipOption, "planId" | "dis
 };
 
 const parseDurationToDays = (periodRaw: string): number => {
-  const period = String(periodRaw ?? "").trim().toLowerCase();
+  const period = String(periodRaw ?? "")
+    .trim()
+    .toLowerCase();
   if (!period || period === "monthly" || period === "month") return 30;
   if (period === "weekly" || period === "week") return 7;
   if (period === "yearly" || period === "year") return 365;
@@ -101,7 +196,10 @@ const parseDurationToDays = (periodRaw: string): number => {
   return value * 30;
 };
 
-const computeEndDateFromPeriod = (startDateValue: string, periodRaw: string) => {
+const computeEndDateFromPeriod = (
+  startDateValue: string,
+  periodRaw: string,
+) => {
   if (!startDateValue) return today;
   const start = new Date(startDateValue);
   if (Number.isNaN(start.getTime())) return startDateValue;
@@ -114,7 +212,7 @@ export default function CreateSubscriptionScreen({
   onClose,
   initialData,
   initialMode,
-  onSave
+  onSave,
 }: {
   onClose?: () => void;
   initialData?: any;
@@ -123,7 +221,88 @@ export default function CreateSubscriptionScreen({
 } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [mode, setMode] = useState<Mode>("create");
+  const [mode, setMode] = useState<Mode>(initialMode || "create");
+
+  const [bulkData, setBulkData] = useState<any[]>([]);
+  const [isParsing, setIsParsing] = useState(false);
+  const [bulkParseError, setBulkParseError] = useState("");
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsParsing(true);
+    setBulkParseError("");
+    setBulkData([]);
+
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      try {
+        const buffer = event.target?.result;
+        if (!buffer) {
+          setBulkParseError("Could not read file.");
+          return;
+        }
+
+        const workbook = XLSX.read(buffer, {
+          type: "array",
+          cellDates: true,
+        });
+        const sheetName =
+          workbook.SheetNames.find(
+            (n) => n.trim().toLowerCase() === "subscriptions",
+          ) || workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        if (!worksheet) {
+          setBulkParseError("No worksheet found in the Excel file.");
+          return;
+        }
+
+        const jsonResult = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+          worksheet,
+          { defval: "", raw: true },
+        );
+
+        if (!jsonResult.length) {
+          setBulkParseError(
+            "No data rows found. Keep the header row and add member rows below it.",
+          );
+          return;
+        }
+
+        const firstKeys = Object.keys(jsonResult[0] || {}).map((k) =>
+          String(k).trim().toLowerCase(),
+        );
+        const hasExpectedHeader = BULK_SUBSCRIPTION_HEADERS.some((h) =>
+          firstKeys.includes(h.toLowerCase()),
+        );
+        if (!hasExpectedHeader) {
+          setBulkParseError(
+            `Header row missing or wrong. Expected columns like: ${BULK_SUBSCRIPTION_HEADERS.slice(0, 7).join(", ")}…`,
+          );
+          return;
+        }
+
+        setBulkData(jsonResult);
+      } catch {
+        setBulkParseError(
+          "Could not read Excel file. Use .xlsx / .xls / .csv.",
+        );
+      } finally {
+        setIsParsing(false);
+      }
+    };
+
+    reader.onerror = () => {
+      setBulkParseError("Failed to read the selected file.");
+      setIsParsing(false);
+    };
+
+    reader.readAsArrayBuffer(file);
+    // allow re-selecting the same file
+    e.target.value = "";
+  };
   const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
   const [subscriptionNo, setSubscriptionNo] = useState(
     getNextSubscriptionNumber(),
@@ -159,7 +338,9 @@ export default function CreateSubscriptionScreen({
   const [memberships, setMemberships] = useState<MembershipOption[]>([]);
   const [loadingMemberships, setLoadingMemberships] = useState(false);
   const [selectedMembershipId, setSelectedMembershipId] = useState("");
-  const [students, setStudents] = useState<StudentForm[]>([createEmptyStudent()]);
+  const [students, setStudents] = useState<StudentForm[]>([
+    createEmptyStudent(),
+  ]);
   const [endDateManuallyEdited, setEndDateManuallyEdited] = useState(false);
   /** Customer's current membership priority (Junior treated as 0 for upgrades) */
   const [customerPriority, setCustomerPriority] = useState(0);
@@ -202,7 +383,8 @@ export default function CreateSubscriptionScreen({
         setSubscriptionId(String(doc._id));
       }
       if (nextMode !== "upgrade") {
-        if (doc.subscriptionCode) setSubscriptionNo(String(doc.subscriptionCode));
+        if (doc.subscriptionCode)
+          setSubscriptionNo(String(doc.subscriptionCode));
         else if (doc.invoiceCode) setSubscriptionNo(String(doc.invoiceCode));
       }
       setCustomer(doc.customerName || "");
@@ -285,7 +467,12 @@ export default function CreateSubscriptionScreen({
     const mType = String(
       selectedCustomer?.membershipType ?? membership ?? "",
     ).toLowerCase();
-    if (!mType || mType === "none" || mType.includes("junior") || mType.includes("junoir")) {
+    if (
+      !mType ||
+      mType === "none" ||
+      mType.includes("junior") ||
+      mType.includes("junoir")
+    ) {
       return 0;
     }
     const fromCustomer = Number(selectedCustomer?.priority ?? customerPriority);
@@ -313,7 +500,10 @@ export default function CreateSubscriptionScreen({
 
   useEffect(() => {
     if (!selectedMembership || endDateManuallyEdited) return;
-    const computedEndDate = computeEndDateFromPeriod(startDate, selectedMembership.period);
+    const computedEndDate = computeEndDateFromPeriod(
+      startDate,
+      selectedMembership.period,
+    );
     setEndDate(computedEndDate);
   }, [selectedMembership, startDate, endDateManuallyEdited]);
 
@@ -323,13 +513,17 @@ export default function CreateSubscriptionScreen({
     }
   }, [juniorSelected]);
 
-  const buildPayload = (status: "draft" | "active"): CreateSubscriptionPayload => {
+  const buildPayload = (
+    status: "draft" | "active",
+  ): CreateSubscriptionPayload => {
     const repeatUnit: "month" | "year" | null =
       repeatType === "yearly" ? "year" : "month";
     const repeatEvery = repeatType === "weekly" ? 1 : 1;
 
     const membershipTypeRaw =
-      selectedMembership?.planId || selectedMembership?.displayName || "general";
+      selectedMembership?.planId ||
+      selectedMembership?.displayName ||
+      "general";
     return {
       customerName: customer.trim(),
       customerPhone: phone.trim(),
@@ -436,7 +630,11 @@ export default function CreateSubscriptionScreen({
       for (let i = 0; i < students.length; i += 1) {
         const s = students[i];
         const classNumber = Number(s.classStd);
-        if (!s.studentName.trim() || !s.schoolName.trim() || !s.classStd.trim()) {
+        if (
+          !s.studentName.trim() ||
+          !s.schoolName.trim() ||
+          !s.classStd.trim()
+        ) {
           Swal.fire(
             "Incomplete student details",
             `Please fill student name, school name and class for student ${i + 1}.`,
@@ -567,6 +765,8 @@ export default function CreateSubscriptionScreen({
     }
   };
 
+  
+
   const handleSaveSubscription = async (payment: {
     mode: string;
     paymentStatus: "full" | "partial";
@@ -595,10 +795,16 @@ export default function CreateSubscriptionScreen({
       setSaving(true);
       const couponDiscount = Number(payment.coupon?.discountAmount ?? 0);
       const referralDiscount = Number(payment.referral?.discountAmount ?? 0);
-      const appliedDiscountTotal = Math.max(0, discountTotal + couponDiscount + referralDiscount);
+      const appliedDiscountTotal = Math.max(
+        0,
+        discountTotal + couponDiscount + referralDiscount,
+      );
       const payableTotal = Math.max(
         0,
-        Number(payment.finalAmount ?? Math.max(0, grandTotal - couponDiscount - referralDiscount)),
+        Number(
+          payment.finalAmount ??
+            Math.max(0, grandTotal - couponDiscount - referralDiscount),
+        ),
       );
       const payload: CreateSubscriptionPayload = {
         ...buildPayload("active"),
@@ -641,13 +847,15 @@ export default function CreateSubscriptionScreen({
           totalDue: payment.paymentBreakdown.dueAmount,
           totalQty: 1,
         });
-        Swal.fire("Updated", "Subscription updated successfully.", "success").then(
-          () => {
-            if (onSave) onSave();
-            if (onClose) onClose();
-            else navigate(-1);
-          }
-        );
+        Swal.fire(
+          "Updated",
+          "Subscription updated successfully.",
+          "success",
+        ).then(() => {
+          if (onSave) onSave();
+          if (onClose) onClose();
+          else navigate(-1);
+        });
         return;
       }
       const response = await handleCreateSubscription(payload);
@@ -721,9 +929,12 @@ export default function CreateSubscriptionScreen({
     value: string,
   ) => {
     setStudents((prev) =>
-      prev.map((student, i) => (i === index ? { ...student, [field]: value } : student)),
+      prev.map((student, i) =>
+        i === index ? { ...student, [field]: value } : student,
+      ),
     );
   };
+  
 
   const addStudent = () => {
     setStudents((prev) => [...prev, createEmptyStudent()]);
@@ -747,467 +958,606 @@ export default function CreateSubscriptionScreen({
       }}
     >
       <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b bg-gray-50 px-6 py-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-800">
-              {mode === "edit"
-                ? "Edit Subscription"
-                : mode === "upgrade"
-                  ? "Upgrade Subscription"
-                  : mode === "view"
-                    ? "View Subscription"
-                    : "Create Subscription"}
-            </h2>
-            <p className="text-xs text-gray-500">
-              {mode === "upgrade"
-                ? "Only higher-priority plans (and Junior) are available"
-                : (
-                  <>
-                    Invoice No:{" "}
-                    <span className="font-semibold">{subscriptionNo}</span>
-                  </>
-                )}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (onClose) onClose();
-              else navigate(-1);
-            }}
-            className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-black"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="space-y-5 p-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-600">
-                Customer
-              </label>
-              <input
-                value={customer}
-                onChange={(e) => {
-                  setCustomer(e.target.value);
-                  setSelectedCustomerId("");
-                  setPhone("");
-                  setMembership("-");
-                  setCustomerDropdownOpen(true);
-                }}
-                onFocus={() => setCustomerDropdownOpen(true)}
-                placeholder="Search customer by name or phone"
-                className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-              />
-              {customerDropdownOpen && (loadingCustomers || customers.length > 0) && (
-                <div className="mt-1 max-h-48 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg z-20 relative">
-                  {loadingCustomers ? (
-                    <div className="p-2 text-sm text-gray-500">Searching...</div>
-                  ) : (
-                    customers.map((selectedCustomer) => {
-                      const mType = String(
-                        selectedCustomer.membershipType ?? "none",
-                      ).trim();
-                      const hasMembership =
-                        Boolean(mType) &&
-                        mType !== "-" &&
-                        mType.toLowerCase() !== "none";
-                      return (
-                        <button
-                          key={selectedCustomer._id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCustomerId(selectedCustomer._id);
-                            setCustomer(selectedCustomer.name);
-                            setPhone(selectedCustomer.mobile);
-                            setMembership(hasMembership ? mType : "none");
-                            const isJuniorCust =
-                              mType.toLowerCase().includes("junior") ||
-                              mType.toLowerCase().includes("junoir");
-                            setCustomerPriority(
-                              isJuniorCust || !hasMembership
-                                ? 0
-                                : Math.max(
-                                    0,
-                                    Number(selectedCustomer.priority ?? 0) || 0,
-                                  ),
-                            );
-                            setCustomerDropdownOpen(false);
-                            if (mode === "upgrade") {
-                              setSelectedMembershipId("");
-                            }
-                          }}
-                          className="flex w-full items-center justify-between gap-3 border-b border-gray-100 px-3 py-2.5 text-left text-sm hover:bg-gray-50 last:border-0"
-                        >
-                          <div className="min-w-0">
-                            <div className="truncate font-medium text-gray-800">
-                              {selectedCustomer.name}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {selectedCustomer.mobile}
-                            </div>
-                          </div>
-                          {hasMembership ? (
-                            <span className="shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
-                              {mType}
-                            </span>
-                          ) : (
-                            <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                              No plan
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-              {selectedCustomerId &&
-                membership &&
-                membership !== "-" &&
-                membership.toLowerCase() !== "none" && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-[11px] text-gray-500">Current membership</span>
-                    <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
-                      {membership}
-                    </span>
-                  </div>
-                )}
+        {mode === "bulk" ? (
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">
+                Bulk Upload Subscriptions
+              </h2>
               <button
-                type="button"
-                onClick={() => setShowCreateCustomerModal(true)}
-                className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                onClick={() => {
+                  if (onClose) onClose();
+                  else navigate(-1);
+                }}
+                className="p-1 hover:bg-gray-100 rounded-full"
               >
-                + Add New Customer
+                <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-600">
-                Phone Number
-              </label>
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Customer phone number"
-                className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-600">
-                Created By
-              </label>
-              <input
-                value={salesPerson}
-                disabled
-                className="h-10 w-full rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-600"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-600">
-                Start Date
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  setEndDateManuallyEdited(false);
-                }}
-                className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-600">
-                End Date
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                min={startDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value);
-                  setEndDateManuallyEdited(true);
-                }}
-                className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-600">
-              Membership Plan
-              {mode === "upgrade" && effectiveCustomerPriority > 0 ? (
-                <span className="ml-2 font-normal text-violet-600">
-                  (current priority: {effectiveCustomerPriority})
-                </span>
-              ) : null}
-            </label>
-            <select
-              value={selectedMembershipId}
-              onChange={(e) => {
-                setSelectedMembershipId(e.target.value);
-                setEndDateManuallyEdited(false);
-              }}
-              disabled={mode === "view"}
-              className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+            <p className="text-sm text-gray-600 mb-2">
+              Download the template, keep the header row exactly as-is, fill
+              member rows, then upload the file.
+            </p>
+            <button
+              type="button"
+              onClick={downloadBulkSubscriptionTemplate}
+              className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
             >
-              <option value="">
-                {loadingMemberships
-                  ? "Loading memberships..."
-                  : mode === "upgrade"
-                    ? "Select upgrade plan"
-                    : "Select membership plan"}
-              </option>
-              {selectableMemberships.map((m) => (
-                <option key={m._id} value={m._id}>
-                  {`${m.displayName} • ₹${m.amount.toLocaleString("en-IN")} / ${m.period} • P${m.priority} • ${m.planId}`}
-                </option>
-              ))}
-            </select>
-            {mode === "upgrade" &&
-              !loadingMemberships &&
-              selectableMemberships.length === 0 && (
-                <p className="mt-1 text-xs text-amber-600">
-                  No higher-priority plans available for this customer. Junior
-                  is always listed when configured.
-                </p>
-              )}
-          </div>
+              <Download size={16} />
+              Download Template
+            </button>
 
-          {juniorSelected && (
-            <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-orange-800">
-                  Junior Student Details
-                </h3>
-                <button
-                  type="button"
-                  onClick={addStudent}
-                  className="rounded-md bg-orange-600 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-700"
-                >
-                  + Add More Student
-                </button>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleFileUpload}
+              className="mb-4 block w-full text-sm text-slate-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700
+                hover:file:bg-blue-100"
+            />
+
+            {isParsing && (
+              <p className="text-sm text-blue-500">Parsing file...</p>
+            )}
+
+            {bulkParseError ? (
+              <div className="mb-4 rounded border border-red-100 bg-red-50 p-3 text-sm text-red-700">
+                {bulkParseError}
+              </div>
+            ) : null}
+
+            {bulkData.length > 0 && (
+              <div className="mb-4 rounded bg-green-50 p-3 text-sm font-medium text-green-700">
+                Successfully parsed {bulkData.length} subscriptions. Ready to
+                upload!
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  if (onClose) onClose();
+                  else navigate(-1);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={bulkData.length === 0}
+                onClick={async () => {
+                  try {
+                    const response = await handleBulkCreateSubscriptions({
+                      subscriptions: bulkData,
+                    });
+                    const failed = Number(response?.summary?.failed ?? 0);
+                    Swal.fire(
+                      failed > 0 ? "Partial success" : "Success",
+                      response?.message || "Bulk upload finished.",
+                      failed > 0 ? "warning" : "success",
+                    );
+                    if (failed === 0) onClose?.();
+                  } catch (error: unknown) {
+                    const err = error as {
+                      response?: { data?: { message?: string } };
+                    };
+                    Swal.fire(
+                      "Error",
+                      err?.response?.data?.message ||
+                        "Failed to upload bulk subscriptions",
+                      "error",
+                    );
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                Upload to Database
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between border-b bg-gray-50 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">
+                  {mode === "edit"
+                    ? "Edit Subscription"
+                    : mode === "upgrade"
+                      ? "Upgrade Subscription"
+                      : mode === "view"
+                        ? "View Subscription"
+                        : "Create Subscription"}
+                </h2>
+                <p className="text-xs text-gray-500">
+                  {mode === "upgrade" ? (
+                    "Only higher-priority plans (and Junior) are available"
+                  ) : (
+                    <>
+                      Invoice No:{" "}
+                      <span className="font-semibold">{subscriptionNo}</span>
+                    </>
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onClose) onClose();
+                  else navigate(-1);
+                }}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-black"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-5 p-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">
+                    Customer
+                  </label>
+                  <input
+                    value={customer}
+                    onChange={(e) => {
+                      setCustomer(e.target.value);
+                      setSelectedCustomerId("");
+                      setPhone("");
+                      setMembership("-");
+                      setCustomerDropdownOpen(true);
+                    }}
+                    onFocus={() => setCustomerDropdownOpen(true)}
+                    placeholder="Search customer by name or phone"
+                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                  />
+                  {customerDropdownOpen &&
+                    (loadingCustomers || customers.length > 0) && (
+                      <div className="mt-1 max-h-48 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg z-20 relative">
+                        {loadingCustomers ? (
+                          <div className="p-2 text-sm text-gray-500">
+                            Searching...
+                          </div>
+                        ) : (
+                          customers.map((selectedCustomer) => {
+                            const mType = String(
+                              selectedCustomer.membershipType ?? "none",
+                            ).trim();
+                            const hasMembership =
+                              Boolean(mType) &&
+                              mType !== "-" &&
+                              mType.toLowerCase() !== "none";
+                            return (
+                              <button
+                                key={selectedCustomer._id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCustomerId(selectedCustomer._id);
+                                  setCustomer(selectedCustomer.name);
+                                  setPhone(selectedCustomer.mobile);
+                                  setMembership(hasMembership ? mType : "none");
+                                  const isJuniorCust =
+                                    mType.toLowerCase().includes("junior") ||
+                                    mType.toLowerCase().includes("junoir");
+                                  setCustomerPriority(
+                                    isJuniorCust || !hasMembership
+                                      ? 0
+                                      : Math.max(
+                                          0,
+                                          Number(
+                                            selectedCustomer.priority ?? 0,
+                                          ) || 0,
+                                        ),
+                                  );
+                                  setCustomerDropdownOpen(false);
+                                  if (mode === "upgrade") {
+                                    setSelectedMembershipId("");
+                                  }
+                                }}
+                                className="flex w-full items-center justify-between gap-3 border-b border-gray-100 px-3 py-2.5 text-left text-sm hover:bg-gray-50 last:border-0"
+                              >
+                                <div className="min-w-0">
+                                  <div className="truncate font-medium text-gray-800">
+                                    {selectedCustomer.name}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {selectedCustomer.mobile}
+                                  </div>
+                                </div>
+                                {hasMembership ? (
+                                  <span className="shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
+                                    {mType}
+                                  </span>
+                                ) : (
+                                  <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                    No plan
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  {selectedCustomerId &&
+                    membership &&
+                    membership !== "-" &&
+                    membership.toLowerCase() !== "none" && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-[11px] text-gray-500">
+                          Current membership
+                        </span>
+                        <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
+                          {membership}
+                        </span>
+                      </div>
+                    )}
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateCustomerModal(true)}
+                    className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    + Add New Customer
+                  </button>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">
+                    Phone Number
+                  </label>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Customer phone number"
+                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
               </div>
 
-              {students.map((student, index) => (
-                <div
-                  key={`student-${index}`}
-                  className="space-y-3 rounded-md border border-orange-200 bg-white p-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-gray-700">
-                      Student {index + 1}
-                    </p>
-                    {students.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeStudent(index)}
-                        className="text-xs font-semibold text-red-600 hover:text-red-700"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <input
-                      value={student.studentName}
-                      onChange={(e) =>
-                        updateStudent(index, "studentName", e.target.value)
-                      }
-                      placeholder="Student Name"
-                      className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                    />
-                    <input
-                      value={student.schoolName}
-                      onChange={(e) =>
-                        updateStudent(index, "schoolName", e.target.value)
-                      }
-                      placeholder="School Name"
-                      className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                    />
-                    <div className="flex flex-col">
-                      <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
-                        DOB
-                      </label>
-                      <input
-                        type="date"
-                        value={student.dob}
-                        onChange={(e) => updateStudent(index, "dob", e.target.value)}
-                        className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <div className="flex flex-col">
-                      <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
-                        Gender
-                      </label>
-                      <select
-                        value={student.gender}
-                        onChange={(e) => updateStudent(index, "gender", e.target.value)}
-                        className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                      >
-                        <option value="">Select Gender</option>
-                        <option value="Boy">Boy</option>
-                        <option value="Girl">Girl</option>
-                      </select>
-                    </div>
-                    <div className="flex flex-col">
-                      <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
-                        Class / STD
-                      </label>
-                      <input
-                        type="number"
-                        value={student.classStd}
-                        onChange={(e) =>
-                          updateStudent(index, "classStd", e.target.value)
-                        }
-                        placeholder="Class / STD"
-                        className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                      />
-                    </div>
-                    <input
-                      value={student.relation}
-                      onChange={(e) =>
-                        updateStudent(index, "relation", e.target.value)
-                      }
-                      placeholder="Relation"
-                      className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                    />
-                    <input
-                      value={student.parentName}
-                      onChange={(e) =>
-                        updateStudent(index, "parentName", e.target.value)
-                      }
-                      placeholder="Parent Name"
-                      className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                    />
-                    <div className="md:col-span-1">
-                      <label className="mb-1 block text-xs font-semibold text-gray-600">
-                        Student ID Photo
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={student.studentIdUpload}
-                          onChange={(e) =>
-                            updateStudent(index, "studentIdUpload", e.target.value)
-                          }
-                          placeholder="ID Photo (URL/Upload)"
-                          className="h-10 flex-1 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                        />
-                        <button
-                          type="button"
-                          className="flex h-10 items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3 text-gray-600 hover:bg-gray-100"
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.accept = "image/*";
-                            input.onchange = (e) => {
-                              const file = (e.target as HTMLInputElement).files?.[0];
-                              if (file) {
-                                updateStudent(index, "studentIdUpload", file.name);
-                              }
-                            };
-                            input.click();
-                          }}
-                        >
-                          <Camera size={18} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="md:col-span-1">
-                      <label className="mb-1 block text-xs font-semibold text-gray-600">
-                        Form Image
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={student.formImageUpload}
-                          onChange={(e) =>
-                            updateStudent(index, "formImageUpload", e.target.value)
-                          }
-                          placeholder="Form Image (URL/Upload)"
-                          className="h-10 flex-1 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                        />
-                        <button
-                          type="button"
-                          className="flex h-10 items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3 text-gray-600 hover:bg-gray-100"
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.accept = "image/*";
-                            input.onchange = (e) => {
-                              const file = (e.target as HTMLInputElement).files?.[0];
-                              if (file) {
-                                updateStudent(index, "formImageUpload", file.name);
-                              }
-                            };
-                            input.click();
-                          }}
-                        >
-                          <Camera size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">
+                    Created By
+                  </label>
+                  <input
+                    value={salesPerson}
+                    disabled
+                    className="h-10 w-full rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-600"
+                  />
                 </div>
-              ))}
-            </div>
-          )}
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setEndDateManuallyEdited(false);
+                    }}
+                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-600">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    min={startDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      setEndDateManuallyEdited(true);
+                    }}
+                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-600">
-              Notes
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="min-h-[72px] w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
-              placeholder="Add notes for this subscription..."
-            />
-          </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Membership Plan
+                  {mode === "upgrade" && effectiveCustomerPriority > 0 ? (
+                    <span className="ml-2 font-normal text-violet-600">
+                      (current priority: {effectiveCustomerPriority})
+                    </span>
+                  ) : null}
+                </label>
+                <select
+                  value={selectedMembershipId}
+                  onChange={(e) => {
+                    setSelectedMembershipId(e.target.value);
+                    setEndDateManuallyEdited(false);
+                  }}
+                  disabled={mode === "view"}
+                  className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                >
+                  <option value="">
+                    {loadingMemberships
+                      ? "Loading memberships..."
+                      : mode === "upgrade"
+                        ? "Select upgrade plan"
+                        : "Select membership plan"}
+                  </option>
+                  {selectableMemberships.map((m) => (
+                    <option key={m._id} value={m._id}>
+                      {`${m.displayName} • ₹${m.amount.toLocaleString("en-IN")} / ${m.period} • P${m.priority} • ${m.planId}`}
+                    </option>
+                  ))}
+                </select>
+                {mode === "upgrade" &&
+                  !loadingMemberships &&
+                  selectableMemberships.length === 0 && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      No higher-priority plans available for this customer.
+                      Junior is always listed when configured.
+                    </p>
+                  )}
+              </div>
 
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Invoice Number</span>
-              <span className="font-semibold text-gray-800">{subscriptionNo}</span>
-            </div>
-            <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="text-gray-600">Total Amount</span>
-              <span className="text-lg font-semibold text-gray-900">
-                ₹ {grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-          </div>
-        </div>
+              {juniorSelected && (
+                <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-orange-800">
+                      Junior Student Details
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={addStudent}
+                      className="rounded-md bg-orange-600 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-700"
+                    >
+                      + Add More Student
+                    </button>
+                  </div>
 
-        <div className="flex items-center justify-end gap-3 border-t bg-gray-50 px-6 py-4">
-          <button
-            type="button"
-            onClick={() => {
-              if (onClose) onClose();
-              else navigate(-1);
-            }}
-            className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (validateBeforeCheckout()) setOpenCheckout(true);
-            }}
-            disabled={saving || mode === "view"}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Printer size={16} />
-            Checkout
-          </button>
-        </div>
+                  {students.map((student, index) => (
+                    <div
+                      key={`student-${index}`}
+                      className="space-y-3 rounded-md border border-orange-200 bg-white p-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-gray-700">
+                          Student {index + 1}
+                        </p>
+                        {students.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeStudent(index)}
+                            className="text-xs font-semibold text-red-600 hover:text-red-700"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <input
+                          value={student.studentName}
+                          onChange={(e) =>
+                            updateStudent(index, "studentName", e.target.value)
+                          }
+                          placeholder="Student Name"
+                          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                        />
+                        <input
+                          value={student.schoolName}
+                          onChange={(e) =>
+                            updateStudent(index, "schoolName", e.target.value)
+                          }
+                          placeholder="School Name"
+                          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                        />
+                        <div className="flex flex-col">
+                          <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
+                            DOB
+                          </label>
+                          <input
+                            type="date"
+                            value={student.dob}
+                            onChange={(e) =>
+                              updateStudent(index, "dob", e.target.value)
+                            }
+                            className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
+                            Gender
+                          </label>
+                          <select
+                            value={student.gender}
+                            onChange={(e) =>
+                              updateStudent(index, "gender", e.target.value)
+                            }
+                            className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                          >
+                            <option value="">Select Gender</option>
+                            <option value="Boy">Boy</option>
+                            <option value="Girl">Girl</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
+                            Class / STD
+                          </label>
+                          <input
+                            type="number"
+                            value={student.classStd}
+                            onChange={(e) =>
+                              updateStudent(index, "classStd", e.target.value)
+                            }
+                            placeholder="Class / STD"
+                            className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <input
+                          value={student.relation}
+                          onChange={(e) =>
+                            updateStudent(index, "relation", e.target.value)
+                          }
+                          placeholder="Relation"
+                          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                        />
+                        <input
+                          value={student.parentName}
+                          onChange={(e) =>
+                            updateStudent(index, "parentName", e.target.value)
+                          }
+                          placeholder="Parent Name"
+                          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                        />
+                        <div className="md:col-span-1">
+                          <label className="mb-1 block text-xs font-semibold text-gray-600">
+                            Student ID Photo
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={student.studentIdUpload}
+                              onChange={(e) =>
+                                updateStudent(
+                                  index,
+                                  "studentIdUpload",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="ID Photo (URL/Upload)"
+                              className="h-10 flex-1 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                            />
+                            <button
+                              type="button"
+                              className="flex h-10 items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3 text-gray-600 hover:bg-gray-100"
+                              onClick={() => {
+                                const input = document.createElement("input");
+                                input.type = "file";
+                                input.accept = "image/*";
+                                input.onchange = (e) => {
+                                  const file = (e.target as HTMLInputElement)
+                                    .files?.[0];
+                                  if (file) {
+                                    updateStudent(
+                                      index,
+                                      "studentIdUpload",
+                                      file.name,
+                                    );
+                                  }
+                                };
+                                input.click();
+                              }}
+                            >
+                              <Camera size={18} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="md:col-span-1">
+                          <label className="mb-1 block text-xs font-semibold text-gray-600">
+                            Form Image
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={student.formImageUpload}
+                              onChange={(e) =>
+                                updateStudent(
+                                  index,
+                                  "formImageUpload",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Form Image (URL/Upload)"
+                              className="h-10 flex-1 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                            />
+                            <button
+                              type="button"
+                              className="flex h-10 items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3 text-gray-600 hover:bg-gray-100"
+                              onClick={() => {
+                                const input = document.createElement("input");
+                                input.type = "file";
+                                input.accept = "image/*";
+                                input.onchange = (e) => {
+                                  const file = (e.target as HTMLInputElement)
+                                    .files?.[0];
+                                  if (file) {
+                                    updateStudent(
+                                      index,
+                                      "formImageUpload",
+                                      file.name,
+                                    );
+                                  }
+                                };
+                                input.click();
+                              }}
+                            >
+                              <Camera size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Notes
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="min-h-[72px] w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  placeholder="Add notes for this subscription..."
+                />
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Invoice Number</span>
+                  <span className="font-semibold text-gray-800">
+                    {subscriptionNo}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Total Amount</span>
+                  <span className="text-lg font-semibold text-gray-900">
+                    ₹{" "}
+                    {grandTotal.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t bg-gray-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onClose) onClose();
+                  else navigate(-1);
+                }}
+                className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (validateBeforeCheckout()) setOpenCheckout(true);
+                }}
+                disabled={saving || mode === "view"}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Printer size={16} />
+                Checkout
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {showCreateCustomerModal && (

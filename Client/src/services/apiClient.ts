@@ -1836,3 +1836,12 @@ export const handleCreateAccessStaff = async (payload: {
   return response.data;
 };
 
+export const handleBulkCreateSubscriptions = async (payload: { subscriptions: any[] }) => {
+  try {
+    const response = await axiosInstance.post("/subscriptions/bulk", payload);
+    return response.data;
+  } catch (error) {
+    console.error("Error bulk uploading subscriptions:", error);
+    throw error;
+  }
+};
