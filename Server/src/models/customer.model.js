@@ -76,6 +76,12 @@ const customerSchema = new mongoose.Schema(
       ref: "Membership",
       default: null,
     },
+    /** Priority of the customer's current (non-Junior) membership plan */
+    priority: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
 
     // Last membership purchase pricing (portal checkout)
     membershipPurchase: {

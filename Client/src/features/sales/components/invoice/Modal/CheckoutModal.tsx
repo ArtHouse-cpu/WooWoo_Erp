@@ -53,6 +53,8 @@ type Props = {
   initialCustomerId?: string | null;
   initialMembershipDiscount?: number;
   initialCashbackTotal?: number;
+  /** When true, checkout shows/credits 0 cashback (e.g. membership purchase). */
+  disableCashback?: boolean;
   extraCharges?: Array<{ label: string; amount: number }>;
   membershipPlans?: MembershipPlanPayload[];
   onConfirmPayment?: (payload: {
@@ -237,6 +239,7 @@ export default function CheckoutModal({
   initialCustomerId = null,
   initialMembershipDiscount = 0,
   initialCashbackTotal = 0,
+  disableCashback = false,
   extraCharges = [],
   membershipPlans = DEFAULT_MEMBERSHIP_PLANS,
   onConfirmPayment,
@@ -605,7 +608,6 @@ export default function CheckoutModal({
         category: item.category,
         discount: Number(item.discount ?? 0),
         cashback: Number(item.cashback ?? 0),
-        // CSP products: never include in membership discount / cashback summary
         isCsp: Boolean(item.isCsp),
       })),
     );
@@ -636,9 +638,6 @@ export default function CheckoutModal({
       ),
     [items],
   );
-
-  // Prefer actual line totals (includes catalogue product discount on CSP).
-  // Membership summary is CSP-aware (skips CSP lines for membership %).
   const cartHasCsp = items.some((item) => Boolean(item.isCsp));
   const displayLineDiscount = lineDiscountsTotal > 0 ? lineDiscountsTotal : 0;
   const displayMembershipDiscount = cartHasCsp
@@ -656,15 +655,17 @@ export default function CheckoutModal({
       ? "Product Discount"
       : "Membership Discount";
 
-  const displayCashbackTotal = cartHasCsp
-    ? lineCashbackTotal > 0
-      ? lineCashbackTotal
-      : summary.cashbackTotal
-    : initialCashbackTotal > 0
-      ? initialCashbackTotal
-      : lineCashbackTotal > 0
+  const displayCashbackTotal = disableCashback
+    ? 0
+    : cartHasCsp
+      ? lineCashbackTotal > 0
         ? lineCashbackTotal
-        : summary.cashbackTotal;
+        : summary.cashbackTotal
+      : initialCashbackTotal > 0
+        ? initialCashbackTotal
+        : lineCashbackTotal > 0
+          ? lineCashbackTotal
+          : summary.cashbackTotal;
 
   const itemsSubtotal = useMemo(
     () =>

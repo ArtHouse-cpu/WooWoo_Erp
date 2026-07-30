@@ -75,6 +75,64 @@ const isJuniorMembership = value => {
   return v.includes('junior') || v.includes('junoir');
 };
 
+/** Resolve plan priority from payload or Membership catalogue. */
+const resolveMembershipPriority = async ({
+  membershipId,
+  membershipPlanId,
+  membershipType,
+  priorityFromBody,
+}) => {
+  const fromBody = Number(priorityFromBody);
+  if (Number.isFinite(fromBody) && fromBody >= 0) return fromBody;
+
+  const query = {};
+  if (membershipId && mongoose.Types.ObjectId.isValid(String(membershipId))) {
+    query._id = membershipId;
+  } else if (membershipPlanId) {
+    query.planId = String(membershipPlanId).trim().toLowerCase();
+  } else if (membershipType) {
+    query.planId = String(membershipType).trim().toLowerCase();
+  }
+  if (!Object.keys(query).length) return 0;
+
+  const plan = await Membership.findOne(query).select('priority').lean();
+  return Math.max(0, Number(plan?.priority ?? 0) || 0);
+};
+
+/**
+ * Customer's effective priority for upgrade rules.
+ * Junior membership priority does not restrict upgrades (treated as 0).
+ */
+const getCustomerUpgradePriority = async customerPhone => {
+  const customer = await Customer.findOne({
+    mobile: String(customerPhone || '').trim(),
+    isDeleted: {$ne: true},
+  })
+    .select('priority membershipType membershipPlanId')
+    .lean();
+
+  if (!customer) return 0;
+  if (isJuniorMembership(customer.membershipType)) return 0;
+
+  const stored = Number(customer.priority ?? 0);
+  if (Number.isFinite(stored) && stored > 0) return stored;
+
+  if (customer.membershipPlanId) {
+    const plan = await Membership.findById(customer.membershipPlanId)
+      .select('priority')
+      .lean();
+    return Math.max(0, Number(plan?.priority ?? 0) || 0);
+  }
+
+  const type = String(customer.membershipType || '').trim().toLowerCase();
+  if (type && type !== 'none') {
+    const plan = await Membership.findOne({planId: type}).select('priority').lean();
+    return Math.max(0, Number(plan?.priority ?? 0) || 0);
+  }
+
+  return 0;
+};
+
 /** Human-readable validity for WhatsApp `newmembership` {{3}}. */
 const formatSubscriptionValidity = ({startDate, endDate, repeatUnit, repeatType}) => {
   const unit = String(repeatUnit || '').trim().toLowerCase();
@@ -126,28 +184,26 @@ export const createSubscription = async (req, res) => {
     const membershipType = String(parsed.data.membershipType ?? '').trim().toLowerCase();
     const juniorMembership = isJuniorMembership(membershipType);
 
-    const activeSubscriptionQuery = {
-      customerPhone: parsed.data.customerPhone,
-      status: {$in: ['active', 'completed']},
-    };
-    const existingSubscriptions = await Subscription.find(activeSubscriptionQuery)
-      .select('membershipType endDate dueDate')
-      .lean();
-    const now = new Date();
-    const hasActiveNonJunior = existingSubscriptions.some(existing => {
-      const existingType = String(existing?.membershipType ?? '').trim().toLowerCase();
-      const end = existing?.endDate ?? existing?.dueDate;
-      const endDate = end ? new Date(end) : null;
-      const notExpired = !endDate || Number.isNaN(endDate.getTime()) || endDate >= now;
-      return notExpired && !isJuniorMembership(existingType);
+    const newPriority = await resolveMembershipPriority({
+      membershipId: parsed.data.membershipId,
+      membershipPlanId: parsed.data.membershipPlanId,
+      membershipType,
+      priorityFromBody: parsed.data.priority,
     });
 
-    if (!juniorMembership && hasActiveNonJunior) {
-      return res.status(409).json({
-        success: false,
-        message:
-          'Customer already has an active non-Junior membership. Only Junior memberships can be purchased additionally.',
-      });
+    // Junior: always allowed (priority rules do not apply).
+    // Non-Junior: only allow if newPriority > customer's current priority.
+    if (!juniorMembership) {
+      const currentPriority = await getCustomerUpgradePriority(
+        parsed.data.customerPhone,
+      );
+      if (currentPriority > 0 && newPriority <= currentPriority) {
+        return res.status(409).json({
+          success: false,
+          message:
+            'Membership upgrade not allowed. Choose a plan with a higher priority than the customer\'s current membership. (Same or lower priority plans, and downgrades, are blocked. Junior membership is always allowed.)',
+        });
+      }
     }
 
     let referralDiscount = 0;
@@ -219,6 +275,7 @@ export const createSubscription = async (req, res) => {
       membershipId: parsed.data.membershipId,
       membershipPlanId: parsed.data.membershipPlanId,
       membershipType: membershipType || 'general',
+      priority: newPriority,
       invoiceDate: parsed.data.invoiceDate,
       dueDate: parsed.data.dueDate,
       startDate: parsed.data.startDate,
@@ -302,14 +359,52 @@ export const createSubscription = async (req, res) => {
       }
     }
 
-    const normalizedCustomerMembership = juniorMembership
-      ? 'junior'
-      : membershipType || 'general';
-    await Customer.findOneAndUpdate(
-      {mobile: parsed.data.customerPhone},
-      {$set: {membershipType: normalizedCustomerMembership}},
-      {new: false},
-    );
+    const customerForMembership = await Customer.findOne({
+      mobile: parsed.data.customerPhone,
+      isDeleted: {$ne: true},
+    })
+      .select('_id membershipType priority membershipPlanId')
+      .lean();
+
+    if (juniorMembership) {
+      // Junior does not overwrite a higher / non-Junior membership on the customer.
+      const existingType = String(customerForMembership?.membershipType || 'none')
+        .trim()
+        .toLowerCase();
+      const hasMainMembership =
+        existingType &&
+        existingType !== 'none' &&
+        !isJuniorMembership(existingType);
+      if (!hasMainMembership) {
+        await Customer.findOneAndUpdate(
+          {mobile: parsed.data.customerPhone},
+          {
+            $set: {
+              membershipType: 'junior',
+              priority: newPriority,
+              ...(parsed.data.membershipId &&
+              mongoose.Types.ObjectId.isValid(parsed.data.membershipId)
+                ? {membershipPlanId: parsed.data.membershipId}
+                : {}),
+            },
+          },
+        );
+      }
+    } else {
+      await Customer.findOneAndUpdate(
+        {mobile: parsed.data.customerPhone},
+        {
+          $set: {
+            membershipType: membershipType || 'general',
+            priority: newPriority,
+            ...(parsed.data.membershipId &&
+            mongoose.Types.ObjectId.isValid(parsed.data.membershipId)
+              ? {membershipPlanId: parsed.data.membershipId}
+              : {}),
+          },
+        },
+      );
+    }
 
     try {
       const customer = await Customer.findOne({
@@ -365,10 +460,8 @@ export const createSubscription = async (req, res) => {
               const meta = resolvePlanMeta(plan);
               membershipLabel = meta.label || membershipLabel;
               validity = meta.validity || validity;
-              planWalletCashback = Math.max(
-                0,
-                Number(plan.walletCashback?.amount ?? 0) || 0,
-              );
+              // Temporarily disabled: do not credit purchase cashback on membership create
+              planWalletCashback = 0;
             }
           }
         } catch (planError) {
@@ -378,17 +471,9 @@ export const createSubscription = async (req, res) => {
           );
         }
 
-        const envCashback = Number(
-          process.env.WHATSAPP_MEMBERSHIP_CASHBACK ||
-            process.env.MEMBERSHIP_WELCOME_CASHBACK ||
-            0,
-        );
-        const safeCashback =
-          planWalletCashback > 0
-            ? planWalletCashback
-            : Number.isFinite(envCashback) && envCashback > 0
-              ? envCashback
-              : 0;
+        // Temporarily disabled: membership purchase cashback is always ₹0
+        // (re-enable by restoring plan.walletCashback.amount + env fallback below)
+        const safeCashback = 0;
 
         const customer = await Customer.findOne({
           mobile: parsed.data.customerPhone,
@@ -536,7 +621,7 @@ export const updateSubscription = async (req, res) => {
       });
     }
 
-    if (parsed.data.customerPhone || parsed.data.membershipType || parsed.data.endDate) {
+    if (parsed.data.customerPhone || parsed.data.membershipType || parsed.data.endDate || parsed.data.priority !== undefined) {
       const existing = await Subscription.findById(id).lean();
       if (!existing) {
         return res.status(404).json({success: false, message: 'Subscription not found.'});
@@ -549,27 +634,36 @@ export const updateSubscription = async (req, res) => {
       const juniorMembership = isJuniorMembership(nextMembershipType);
 
       if (!juniorMembership) {
-        const now = new Date();
-        const otherSubscriptions = await Subscription.find({
-          _id: {$ne: id},
-          customerPhone: nextCustomerPhone,
-          status: {$in: ['active', 'completed']},
-        })
-          .select('membershipType endDate dueDate')
-          .lean();
-        const hasActiveNonJunior = otherSubscriptions.some(other => {
-          const otherType = String(other?.membershipType ?? '').toLowerCase();
-          const end = other?.endDate ?? other?.dueDate;
-          const endDate = end ? new Date(end) : null;
-          const notExpired = !endDate || Number.isNaN(endDate.getTime()) || endDate >= now;
-          return notExpired && !isJuniorMembership(otherType);
+        const newPriority = await resolveMembershipPriority({
+          membershipId: parsed.data.membershipId ?? existing.membershipId,
+          membershipPlanId:
+            parsed.data.membershipPlanId ?? existing.membershipPlanId,
+          membershipType: nextMembershipType,
+          priorityFromBody:
+            parsed.data.priority !== undefined
+              ? parsed.data.priority
+              : existing.priority,
         });
+        const currentPriority = await getCustomerUpgradePriority(nextCustomerPhone);
+        // Allow keeping same plan on edit; block only when changing to lower/equal priority from a different plan
+        const existingPriority = Math.max(0, Number(existing.priority ?? 0) || 0);
+        const changingPlan =
+          String(parsed.data.membershipId ?? existing.membershipId) !==
+            String(existing.membershipId) ||
+          String(parsed.data.membershipPlanId ?? existing.membershipPlanId) !==
+            String(existing.membershipPlanId) ||
+          nextMembershipType !== String(existing.membershipType || '').toLowerCase();
 
-        if (hasActiveNonJunior) {
+        if (
+          changingPlan &&
+          currentPriority > 0 &&
+          newPriority <= currentPriority &&
+          newPriority !== existingPriority
+        ) {
           return res.status(409).json({
             success: false,
             message:
-              'Customer already has an active non-Junior membership. Only Junior memberships can be purchased additionally.',
+              'Membership upgrade not allowed. New plan priority must be higher than the customer\'s current membership priority.',
           });
         }
       }
@@ -585,16 +679,54 @@ export const updateSubscription = async (req, res) => {
       return res.status(404).json({success: false, message: 'Subscription not found.'});
     }
 
-    if (parsed.data.customerPhone || parsed.data.membershipType) {
+    if (parsed.data.customerPhone || parsed.data.membershipType || parsed.data.priority !== undefined) {
       const membershipType = String(
         parsed.data.membershipType ?? subscription.membershipType ?? 'general',
       )
         .trim()
         .toLowerCase();
-      await Customer.findOneAndUpdate(
-        {mobile: parsed.data.customerPhone ?? subscription.customerPhone},
-        {$set: {membershipType: isJuniorMembership(membershipType) ? 'junior' : membershipType}},
+      const juniorMembership = isJuniorMembership(membershipType);
+      const priority = Math.max(
+        0,
+        Number(
+          parsed.data.priority ??
+            subscription.priority ??
+            0,
+        ) || 0,
       );
+
+      if (juniorMembership) {
+        const customer = await Customer.findOne({
+          mobile: parsed.data.customerPhone ?? subscription.customerPhone,
+        })
+          .select('membershipType')
+          .lean();
+        const existingType = String(customer?.membershipType || 'none').toLowerCase();
+        const hasMain =
+          existingType &&
+          existingType !== 'none' &&
+          !isJuniorMembership(existingType);
+        if (!hasMain) {
+          await Customer.findOneAndUpdate(
+            {mobile: parsed.data.customerPhone ?? subscription.customerPhone},
+            {$set: {membershipType: 'junior', priority}},
+          );
+        }
+      } else {
+        await Customer.findOneAndUpdate(
+          {mobile: parsed.data.customerPhone ?? subscription.customerPhone},
+          {
+            $set: {
+              membershipType,
+              priority,
+              ...(subscription.membershipId &&
+              mongoose.Types.ObjectId.isValid(subscription.membershipId)
+                ? {membershipPlanId: subscription.membershipId}
+                : {}),
+            },
+          },
+        );
+      }
     }
 
     return res.status(200).json({

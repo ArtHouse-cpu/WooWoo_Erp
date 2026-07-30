@@ -97,7 +97,7 @@ const findCustomerByMobile = async (mobile, excludeId = null) => {
     query._id = {$ne: excludeId};
   }
   return Customer.findOne(query)
-    .select('_id name mobile email membershipType')
+    .select('_id name mobile email membershipType membershipPlanId priority')
     .lean();
 };
 
@@ -405,7 +405,7 @@ const getCustomers = async (req, res) => {
     // List payload must stay light — exclude heavy/nested fields that blow up
     // empty-search responses (profileImage base64, coupon history, etc.)
     const listProjection =
-      'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId walletAmount closingBalance cashbackBalance affiliateBalance referralCode referredBy status createdAt updatedAt createdBy';
+      'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId priority walletAmount closingBalance cashbackBalance affiliateBalance referralCode referredBy status createdAt updatedAt createdBy';
 
     const [customers, total] = await Promise.all([
       Customer.find(query)
@@ -496,6 +496,23 @@ const editCustomer = async (req, res) => {
         return res.status(400).json({success: false, message: 'Invalid membership type.'});
       }
       update.membershipType = membership;
+    }
+
+    if (b.priority !== undefined) {
+      const p = Number(b.priority);
+      if (Number.isNaN(p) || p < 0) {
+        return res.status(400).json({success: false, message: 'Invalid priority.'});
+      }
+      update.priority = p;
+    }
+
+    if (b.membershipPlanId !== undefined) {
+      const planId = b.membershipPlanId;
+      if (planId === null || planId === '') {
+        update.membershipPlanId = null;
+      } else if (mongoose.Types.ObjectId.isValid(String(planId))) {
+        update.membershipPlanId = planId;
+      }
     }
 
     if (b.adharNumber !== undefined) {

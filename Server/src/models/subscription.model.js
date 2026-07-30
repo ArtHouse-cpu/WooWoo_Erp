@@ -98,6 +98,13 @@ const subscriptionSchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
+    /** Snapshot of membership plan priority at purchase / upgrade time */
+    priority: {
+      type: Number,
+      default: 0,
+      min: 0,
+      index: true,
+    },
     invoiceDate: {
       type: Date,
       required: true,
