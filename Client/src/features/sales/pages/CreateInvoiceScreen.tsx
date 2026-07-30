@@ -6,6 +6,7 @@ import InvoiceDetailsSection from "../components/invoice/InvoiceDetailsSection";
 import InvoiceSummaryCard from "../components/invoice/InvoiceSummaryCard";
 import NotesSection from "../components/invoice/NotesSection";
 import ProductsServicesSection from "../components/invoice/ProductsServicesSection";
+import ProductSidebar from "../components/ProductSidebar";
 import type { InvoiceItem } from "../components/invoice/types";
 import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -17,6 +18,7 @@ import {
   handleGetMemberships,
   type CustomerPayload,
   type MembershipPlanPayload,
+  type CatalogueLookupItem,
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
@@ -247,6 +249,87 @@ export default function CreateInvoiceScreen() {
         return { ...item, cashback: newCashback };
       }),
     );
+  };
+
+  const handleAddSidebarItem = (item: CatalogueLookupItem) => {
+    if (item.trackStock && Number(item.stockQty ?? 0) <= 0) {
+      Swal.fire(
+        "Out of stock",
+        `${item.productName || item.name} is currently out of stock.`,
+        "warning",
+      );
+      return;
+    }
+
+    const price = Number(item.sellingPrice ?? 0);
+    const membershipCategory = item.category || "General";
+    const lineCategory = item.lineCategory || item.sourceType || "product";
+    const isCsp = Boolean(item.isCsp);
+    const productDiscountType = item.discountType;
+    const productDiscountValue = Number(item.discountValue ?? 0);
+    const productDiscount = calcCatalogueProductDiscount(
+      price,
+      1,
+      productDiscountType,
+      productDiscountValue,
+    );
+    const benefits = getMembershipBenefitsForItem(
+      price,
+      1,
+      membershipCategory,
+      membership,
+      membershipPlanId,
+      isCsp,
+    );
+
+    setItems((prev) => [
+      ...prev,
+      {
+        id: prev.length > 0 ? Math.max(...prev.map((i) => i.id)) + 1 : 1,
+        productName: item.productName || item.name || "",
+        qty: 1,
+        unitPrice: price,
+        discount: isCsp ? productDiscount : benefits.discount || productDiscount || 0,
+        cashback: isCsp ? 0 : benefits.cashback || 0,
+        image: item.imageUrl || (item as any).images?.[0] || "",
+        category: lineCategory,
+        isCsp,
+        cspLabel: isCsp ? "CSP" : null,
+        productDiscountType,
+        productDiscountValue,
+      },
+    ]);
+  };
+
+  const handleRemoveSidebarItem = (itemName: string) => {
+    setItems((prev) => prev.filter((i) => i.productName.toLowerCase() !== itemName.toLowerCase()));
+  };
+
+  const handleIncrementSidebarItem = (item: CatalogueLookupItem, existingQty: number) => {
+    const matchedItem = items.find((i) => i.productName.toLowerCase() === (item.productName || item.name || "").toLowerCase());
+    if (matchedItem) {
+      // Check stock limit for incrementing
+      if (item.trackStock && Number(item.stockQty ?? 0) <= existingQty) {
+        Swal.fire(
+          "Insufficient stock",
+          `${item.productName || item.name} has only ${item.stockQty} qty available.`,
+          "warning",
+        );
+        return;
+      }
+      updateItemQty(matchedItem.id, existingQty + 1);
+    }
+  };
+
+  const handleDecrementSidebarItem = (itemName: string, existingQty: number) => {
+    const matchedItem = items.find((i) => i.productName.toLowerCase() === itemName.toLowerCase());
+    if (matchedItem) {
+      if (existingQty <= 1) {
+        removeItem(matchedItem.id);
+      } else {
+        updateItemQty(matchedItem.id, existingQty - 1);
+      }
+    }
   };
 
   const subTotal = useMemo(
@@ -629,155 +712,168 @@ export default function CreateInvoiceScreen() {
         isSaving={saving}
         mode={mode}
       />
-      <div className={mode === "view" ? "pointer-events-none opacity-90" : ""}>
-      <InvoiceDetailsSection
-        customer={customer}
-        phone={phone}
-        membership={membership}
-        customerOptions={customers}
-        loadingCustomers={loadingCustomers}
-        customerDropdownOpen={customerDropdownOpen}
-        invoiceDate={invoiceDate}
-        dueDate={dueDate}
-        dueDateMin={today}
-        salesPerson={salesPerson}
-        onCustomerChange={(value) => {
-          setCustomer(value);
-          setPhone("");
-          setMembership("none");
-          setMembershipPlanId(null);
-          setCustomerId(null);
-        }}
-        onPickCustomer={(selectedCustomer) => {
-          const mType = selectedCustomer.membershipType ?? "none";
-          const mId = toMembershipPlanId(selectedCustomer.membershipPlanId);
-          setCustomer(selectedCustomer.name);
-          setPhone(selectedCustomer.mobile);
-          setMembership(mType);
-          setMembershipPlanId(mId);
-          setCustomerId(selectedCustomer._id);
-          setCustomers([]);
-          setCustomerDropdownOpen(false);
+      <div className={`${mode === "view" ? "pointer-events-none opacity-90" : ""} grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]`}>
+        <div className="space-y-4">
+          <InvoiceDetailsSection
+            customer={customer}
+            phone={phone}
+            membership={membership}
+            customerOptions={customers}
+            loadingCustomers={loadingCustomers}
+            customerDropdownOpen={customerDropdownOpen}
+            invoiceDate={invoiceDate}
+            dueDate={dueDate}
+            dueDateMin={today}
+            salesPerson={salesPerson}
+            onCustomerChange={(value) => {
+              setCustomer(value);
+              setPhone("");
+              setMembership("none");
+              setMembershipPlanId(null);
+              setCustomerId(null);
+            }}
+            onPickCustomer={(selectedCustomer) => {
+              const mType = selectedCustomer.membershipType ?? "none";
+              const mId = toMembershipPlanId(selectedCustomer.membershipPlanId);
+              setCustomer(selectedCustomer.name);
+              setPhone(selectedCustomer.mobile);
+              setMembership(mType);
+              setMembershipPlanId(mId);
+              setCustomerId(selectedCustomer._id);
+              setCustomers([]);
+              setCustomerDropdownOpen(false);
 
-          // Auto-apply membership discounts (CSP keeps product discount; no membership)
-          setItems(prev => prev.map(item => {
-            if (item.isCsp) {
-              const productDiscount = calcCatalogueProductDiscount(
-                item.unitPrice,
-                item.qty,
-                item.productDiscountType,
-                item.productDiscountValue,
-              );
-              return {
-                ...item,
-                discount:
-                  productDiscount > 0 ? productDiscount : item.discount,
-                cashback: 0,
-              };
-            }
-            const benefits = getMembershipBenefitsForItem(item.unitPrice, item.qty, item.category || "General", mType, mId, false);
-            return {
-                ...item,
-                discount: benefits.discount,
-                cashback: benefits.cashback
-            };
-          }));
-        }}
-        onOpenCreateCustomer={() => setShowCreateCustomerModal(true)}
-        onOpenCustomerDropdown={() => setCustomerDropdownOpen(true)}
-        onCloseCustomerDropdown={() => setCustomerDropdownOpen(false)}
-        onPhoneChange={setPhone}
-        onInvoiceDateChange={setInvoiceDate}
-        onDueDateChange={setDueDate}
-      />
-      {showCreateCustomerModal && (
-        <CreateCustomerModal
-          onClose={() => setShowCreateCustomerModal(false)}
-          onSubmit={handleCreateCustomerSubmit}
-          loading={creatingCustomer}
-        />
-      )}
-      <ProductsServicesSection
-        draft={draft}
-        items={items}
-        readOnly={mode === "view"}
-        membershipType={membership}
-        membershipPlans={membershipPlans}
-        membershipPlanId={membershipPlanId}
-        onDraftChange={(field, value) => {
-          if (field === "name") setDraftName(value);
-          if (field === "qty") setDraftQty(value);
-          if (field === "price") setDraftPrice(value);
-          if (field === "discount") setDraftDiscount(value);
-          if (field === "image") setDraftImage(value);
-          if (field === "isCsp") {
-            const next = value === "true";
-            setDraftIsCsp(next);
-            if (next) {
-              setDraftCashback("0");
-            }
-          }
-          if (field === "category") {
-            setDraftCategory(value);
-            // Re-calculate membership discount when category is selected (not for CSP)
-            if (!draftIsCsp) {
-              const benefits = getMembershipBenefitsForItem(Number(draftPrice), Number(draftQty), value, membership, membershipPlanId, false);
-              if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
-              if (benefits.cashback > 0) setDraftCashback(String(benefits.cashback));
-            } else {
-              setDraftCashback("0");
-            }
-          }
-          if (field === "cashback") {
-            if (!draftIsCsp) setDraftCashback(value);
-          }
-        }}
-        onAddItem={addItem}
-        onRemoveItem={removeItem}
-        onUpdateItemQty={updateItemQty}
-        onUpdateItemDiscount={updateItemDiscount}
-        onUpdateItemCashback={updateItemCashback}
-        onAddDirectItem={(newItem) => {
-          setItems((prev) => {
-            const nextId = prev.length > 0 ? Math.max(...prev.map((i) => i.id)) + 1 : 1;
-            const isCsp = Boolean(newItem.isCsp);
-            return [
-              ...prev,
-              {
-                ...newItem,
-                id: nextId,
-                discount: Number(newItem.discount || 0),
-                cashback: isCsp ? 0 : Number(newItem.cashback || 0),
-                isCsp,
-                productDiscountType: (newItem as any).productDiscountType,
-                productDiscountValue: (newItem as any).productDiscountValue,
-              },
-            ];
-          });
-        }}
-      />
-
-      {/* <PaymentSection /> */}
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <NotesSection notes={notes} onChange={setNotes} />
-        <InvoiceSummaryCard
-          subTotal={subTotal}
-          discountTotal={discountTotal}
-          cashbackTotal={cashbackTotal}
-          extraCharges={extraCharges}
-          onExtraChargesChange={setExtraCharges}
-          grandTotal={grandTotal}
-          onSave={
-            mode !== "view"
-              ? () => {
-                  if (validateBeforeCheckout()) setOpenCheckout(true);
+              // Auto-apply membership discounts (CSP keeps product discount; no membership)
+              setItems(prev => prev.map(item => {
+                if (item.isCsp) {
+                  const productDiscount = calcCatalogueProductDiscount(
+                    item.unitPrice,
+                    item.qty,
+                    item.productDiscountType,
+                    item.productDiscountValue,
+                  );
+                  return {
+                    ...item,
+                    discount:
+                      productDiscount > 0 ? productDiscount : item.discount,
+                    cashback: 0,
+                  };
                 }
-              : () => {}
-          }
-          isSaving={saving}
-        />
-      </div>
+                const benefits = getMembershipBenefitsForItem(item.unitPrice, item.qty, item.category || "General", mType, mId, false);
+                return {
+                    ...item,
+                    discount: benefits.discount,
+                    cashback: benefits.cashback
+                };
+              }));
+            }}
+            onOpenCreateCustomer={() => setShowCreateCustomerModal(true)}
+            onOpenCustomerDropdown={() => setCustomerDropdownOpen(true)}
+            onCloseCustomerDropdown={() => setCustomerDropdownOpen(false)}
+            onPhoneChange={setPhone}
+            onInvoiceDateChange={setInvoiceDate}
+            onDueDateChange={setDueDate}
+          />
+          {showCreateCustomerModal && (
+            <CreateCustomerModal
+              onClose={() => setShowCreateCustomerModal(false)}
+              onSubmit={handleCreateCustomerSubmit}
+              loading={creatingCustomer}
+            />
+          )}
+          <ProductsServicesSection
+            draft={draft}
+            items={items}
+            readOnly={mode === "view"}
+            membershipType={membership}
+            membershipPlans={membershipPlans}
+            membershipPlanId={membershipPlanId}
+            onDraftChange={(field, value) => {
+              if (field === "name") setDraftName(value);
+              if (field === "qty") setDraftQty(value);
+              if (field === "price") setDraftPrice(value);
+              if (field === "discount") setDraftDiscount(value);
+              if (field === "image") setDraftImage(value);
+              if (field === "isCsp") {
+                const next = value === "true";
+                setDraftIsCsp(next);
+                if (next) {
+                  setDraftCashback("0");
+                }
+              }
+              if (field === "category") {
+                setDraftCategory(value);
+                // Re-calculate membership discount when category is selected (not for CSP)
+                if (!draftIsCsp) {
+                  const benefits = getMembershipBenefitsForItem(Number(draftPrice), Number(draftQty), value, membership, membershipPlanId, false);
+                  if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
+                  if (benefits.cashback > 0) setDraftCashback(String(benefits.cashback));
+                } else {
+                  setDraftCashback("0");
+                }
+              }
+              if (field === "cashback") {
+                if (!draftIsCsp) setDraftCashback(value);
+              }
+            }}
+            onAddItem={addItem}
+            onRemoveItem={removeItem}
+            onUpdateItemQty={updateItemQty}
+            onUpdateItemDiscount={updateItemDiscount}
+            onUpdateItemCashback={updateItemCashback}
+            onAddDirectItem={(newItem) => {
+              setItems((prev) => {
+                const nextId = prev.length > 0 ? Math.max(...prev.map((i) => i.id)) + 1 : 1;
+                const isCsp = Boolean(newItem.isCsp);
+                return [
+                  ...prev,
+                  {
+                    ...newItem,
+                    id: nextId,
+                    discount: Number(newItem.discount || 0),
+                    cashback: isCsp ? 0 : Number(newItem.cashback || 0),
+                    isCsp,
+                    productDiscountType: (newItem as any).productDiscountType,
+                    productDiscountValue: (newItem as any).productDiscountValue,
+                  },
+                ];
+              });
+            }}
+          />
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+            <NotesSection notes={notes} onChange={setNotes} />
+            <InvoiceSummaryCard
+              subTotal={subTotal}
+              discountTotal={discountTotal}
+              cashbackTotal={cashbackTotal}
+              extraCharges={extraCharges}
+              onExtraChargesChange={setExtraCharges}
+              grandTotal={grandTotal}
+              onSave={
+                mode !== "view"
+                  ? () => {
+                      if (validateBeforeCheckout()) setOpenCheckout(true);
+                    }
+                  : () => {}
+              }
+              isSaving={saving}
+            />
+          </div>
+        </div>
+
+        {mode !== "view" && (
+          <aside className="lg:block hidden lg:sticky lg:top-[80px] h-[calc(100vh-140px)]">
+            <ProductSidebar
+              cartItems={items}
+              onAddItem={handleAddSidebarItem}
+              onRemoveItem={handleRemoveSidebarItem}
+              onIncrementItem={handleIncrementSidebarItem}
+              onDecrementItem={handleDecrementSidebarItem}
+              title="All Products & Services"
+            />
+          </aside>
+        )}
       </div>
       <CheckoutModal
         open={openCheckout}
