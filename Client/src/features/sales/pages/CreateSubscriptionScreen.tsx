@@ -540,14 +540,14 @@ export default function CreateSubscriptionScreen({
       notes: notes.trim(),
       items: selectedMembership
         ? [
-            {
-              productName: selectedMembership.displayName,
-              qty: 1,
-              unitPrice: selectedMembership.amount,
-              discount: 0,
-              category: "membership",
-            },
-          ]
+          {
+            productName: selectedMembership.displayName,
+            qty: 1,
+            unitPrice: selectedMembership.amount,
+            discount: 0,
+            category: "membership",
+          },
+        ]
         : [],
       subTotal,
       discountTotal,
@@ -560,9 +560,9 @@ export default function CreateSubscriptionScreen({
       },
       students: juniorSelected
         ? students.map((student) => ({
-            ...student,
-            dob: student.dob || null,
-          }))
+          ...student,
+          dob: student.dob || null,
+        }))
         : [],
     };
   };
@@ -1085,10 +1085,26 @@ export default function CreateSubscriptionScreen({
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  if (onClose) onClose();
-                  else navigate(-1);
-                }}
+                onClick={async () => {
+                  const result = await Swal.fire({
+                title: "Are you sure?",
+                text: "Any unsaved changes will be lost.",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonColor: "#4F46E5",
+                cancelButtonColor: "#6B7280",
+                confirmButtonText: "Yes, Close",
+                cancelButtonText: "Cancel",
+              });
+
+              if (result.isConfirmed) {
+                if (onClose) {
+                  onClose();
+                    } else {
+                  navigate(-1);
+                    }
+              }
+            }}
                 className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-black"
               >
                 <X size={18} />
@@ -1575,16 +1591,15 @@ export default function CreateSubscriptionScreen({
         items={
           selectedMembership
             ? [
-                {
-                  id: 1,
-                  name: selectedMembership.displayName,
-                  qty: 1,
-                  price: selectedMembership.amount,
-                  discount: 0,
-                  cashback: 0,
-                  category: "membership",
-                },
-              ]
+              {
+                id: 1,
+                name: selectedMembership.displayName,
+                qty: 1,
+                price: selectedMembership.amount,
+                discount: 0,
+                category: "membership",
+              },
+            ]
             : []
         }
         initialCustomerName={customer}

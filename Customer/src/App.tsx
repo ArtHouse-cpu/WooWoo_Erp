@@ -33,6 +33,8 @@ import RefundTermsPage from './app/legal/RefundTermsPage';
 import {useAuthStore} from './store/authStore';
 import {getPostAuthPath} from './utils/onboarding';
 import ActivityPage from './app/activity/ActivityPage';
+import HelpScreen from './app/help/HelpScreen'
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -101,7 +103,10 @@ export default function App() {
             <Route path="/spaceterms" element={<SpaceTermsPage />} />
             <Route path="/communityguidelines" element={<CommunityGuidelinesPage />} />
             <Route path="/refundterms" element={<RefundTermsPage />} />
+            <Route path="/help" element={< HelpScreen/>} />
             <Route path="*" element={<RootRedirect />} />
+            
+
           </Routes>
         </AuthBootstrap>
         <Toaster richColors position="top-center" />

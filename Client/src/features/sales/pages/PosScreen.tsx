@@ -240,6 +240,10 @@ export default function PosScreen() {
     });
   }, [activeTab, data, search]);
 
+
+
+
+
   const columns = useMemo(
     () => [
       {
