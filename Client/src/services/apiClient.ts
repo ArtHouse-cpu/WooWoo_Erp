@@ -476,6 +476,8 @@ export type CreateSubscriptionPayload = {
   membershipId?: string;
   membershipPlanId?: string;
   membershipType?: string;
+  /** Membership plan priority at purchase / upgrade time */
+  priority?: number;
   repeatType?: "weekly" | "monthly" | "yearly" | "lifetime";
   repeatEvery?: number | null;
   repeatUnit?: "month" | "year" | null;
@@ -567,6 +569,8 @@ export type CustomerPayload = {
   mobile: string;
   membershipType?: string|null;
   membershipPlanId?: string|null;
+  /** Priority of customer's current membership plan */
+  priority?: number|null;
   email?: string;
   gstin?: string;
   companyName?: string;

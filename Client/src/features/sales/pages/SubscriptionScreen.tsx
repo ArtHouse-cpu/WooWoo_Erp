@@ -3,7 +3,16 @@ import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
-import {  Eye, Search, Edit, XCircle, Trash2, Download,Ellipsis } from "lucide-react";
+import {
+  Eye,
+  Search,
+  Edit,
+  XCircle,
+  Trash2,
+  Download,
+  Ellipsis,
+  ArrowUpCircle,
+} from "lucide-react";
 import Swal from "sweetalert2";
 import {
   handleDeleteSubscription,
@@ -54,7 +63,10 @@ const tabs: Array<SubscriptionStatus | "all"> = [
   "cancelled",
 ];
 
-function paymentStatusForWhatsApp(raw: Record<string, unknown>, rowStatus: string): string {
+function paymentStatusForWhatsApp(
+  raw: Record<string, unknown>,
+  rowStatus: string,
+): string {
   const paymentStatus = String(raw.paymentStatus ?? "").toLowerCase();
   if (paymentStatus === "full") return "Paid";
   if (paymentStatus === "partial") return "Partially Paid";
@@ -74,18 +86,27 @@ export default function SubscriptionScreen() {
   const [selectedActionRow, setSelectedActionRow] =
     useState<SubscriptionRow | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<"create" | "edit" | "view">("create");
+  const [modalMode, setModalMode] = useState<"create" | "edit" | "view" | "upgrade">(
+    "create",
+  );
   const [modalData, setModalData] = useState<any>(null);
+  const [membershipPlans, setMembershipPlans] = useState<
+    Array<{ planId: string; displayName: string; priority: number; _id?: string }>
+  >([]);
 
   useEffect(() => {
     const fetchMemberships = async () => {
       try {
         const response = await handleGetMemberships({ status: "All" });
-        const list = Array.isArray(response?.memberships) ? response.memberships : [];
+        const list = Array.isArray(response?.memberships)
+          ? response.memberships
+          : [];
         setMemberships(
           list
             .map((membership: any) => ({
-              planId: String(membership?.planId ?? "").trim().toLowerCase(),
+              planId: String(membership?.planId ?? "")
+                .trim()
+                .toLowerCase(),
               displayName: String(membership?.displayName ?? "").trim(),
               status: String(membership?.status ?? "Active"),
             }))
@@ -93,14 +114,43 @@ export default function SubscriptionScreen() {
               Boolean(membership.planId && membership.displayName),
             ),
         );
+        setMembershipPlans(
+          list.map((membership: any) => ({
+            _id: String(membership?._id ?? ""),
+            planId: String(membership?.planId ?? "")
+              .trim()
+              .toLowerCase(),
+            displayName: String(membership?.displayName ?? "").trim(),
+            priority: Math.max(0, Number(membership?.priority ?? 0) || 0),
+          })),
+        );
       } catch {
         setMemberships([]);
+        setMembershipPlans([]);
       }
     };
     void fetchMemberships();
   }, []);
 
-  const handleAction = async (action: "view" | "edit" | "delete") => {
+  const resolveRowPriority = (raw: any): number => {
+    const stored = Number(raw?.priority ?? 0);
+    if (Number.isFinite(stored) && stored > 0) return stored;
+    const type = String(raw?.membershipType ?? raw?.membershipPlanId ?? "")
+      .trim()
+      .toLowerCase();
+    if (!type || type.includes("junior") || type.includes("junoir")) return 0;
+    const match = membershipPlans.find(
+      (p) =>
+        p.planId === type ||
+        p.displayName.toLowerCase().includes(type) ||
+        String(raw?.membershipId ?? "") === p._id,
+    );
+    return Math.max(0, Number(match?.priority ?? 0) || 0);
+  };
+
+  const handleAction = async (
+    action: "view" | "edit" | "delete" | "upgrade",
+  ) => {
     if (!selectedActionRow) return;
     const { _id, raw } = selectedActionRow;
 
@@ -111,6 +161,22 @@ export default function SubscriptionScreen() {
     } else if (action === "edit") {
       setModalMode("edit");
       setModalData(raw);
+      setIsModalOpen(true);
+    } else if (action === "upgrade") {
+      if (selectedActionRow.status === "cancelled") {
+        Swal.fire(
+          "Cannot upgrade",
+          "Cancelled subscriptions cannot be upgraded.",
+          "warning",
+        );
+        return;
+      }
+      const currentPriority = resolveRowPriority(raw);
+      setModalMode("upgrade");
+      setModalData({
+        ...raw,
+        priority: currentPriority,
+      });
       setIsModalOpen(true);
     } else if (action === "delete") {
       const confirm = await Swal.fire({
@@ -174,10 +240,12 @@ export default function SubscriptionScreen() {
         handleGetMemberships({ status: "All" }),
       ]);
 
-      const membershipList = Array.isArray(membershipRes?.memberships) 
+      const membershipList = Array.isArray(membershipRes?.memberships)
         ? membershipRes.memberships.map((m: any) => ({
-            planId: String(m?.planId ?? "").trim().toLowerCase(),
-            status: String(m?.status ?? "Active")
+            planId: String(m?.planId ?? "")
+              .trim()
+              .toLowerCase(),
+            status: String(m?.status ?? "Active"),
           }))
         : [];
 
@@ -187,9 +255,17 @@ export default function SubscriptionScreen() {
 
       const rows: SubscriptionRow[] = subscriptions.map(
         (subscription: any, index: number) => {
-          const planId = String(subscription?.membershipPlanId || subscription?.membershipType || "").trim().toLowerCase();
-          const matchedPlan = membershipList.find((m: any) => m.planId === planId);
-          
+          const planId = String(
+            subscription?.membershipPlanId ||
+              subscription?.membershipType ||
+              "",
+          )
+            .trim()
+            .toLowerCase();
+          const matchedPlan = membershipList.find(
+            (m: any) => m.planId === planId,
+          );
+
           let status = toStatus(subscription?.status);
           if (matchedPlan?.status === "Inactive") {
             status = "inactive";
@@ -197,39 +273,44 @@ export default function SubscriptionScreen() {
 
           return {
             id: index + 1,
-            amount: Number(subscription?.grandTotal ?? subscription?.amount ?? 0),
+            amount: Number(
+              subscription?.grandTotal ?? subscription?.amount ?? 0,
+            ),
             subscriptionCode: String(
               subscription?.subscriptionCode ??
-              `SUB-${subscription?.subscriptionNumber ?? index + 1001}`,
+                `SUB-${subscription?.subscriptionNumber ?? index + 1001}`,
             ),
             customer: String(
               subscription?.customerName ?? subscription?.name ?? "",
             ),
             phone: String(
-              subscription?.customerPhone ?? subscription?.mobile ?? subscription?.phone ?? "",
+              subscription?.customerPhone ??
+                subscription?.mobile ??
+                subscription?.phone ??
+                "",
             ),
             period: `${formatDate(subscription?.startDate ?? subscription?.invoiceDate ?? subscription?.createdAt)} - ${formatDate(subscription?.endDate ?? subscription?.dueDate ?? subscription?.createdAt)}`,
-            repeatUnit: String(
-              subscription?.repeatUnit ?? "1 year",
-            ),
-            repeatEvery: String(
-              subscription?.repeatEvery ?? "1",
-            ),
+            repeatUnit: String(subscription?.repeatUnit ?? "1 year"),
+            repeatEvery: String(subscription?.repeatEvery ?? "1"),
             invoiceCount: Number(
               subscription?.invoiceCount ?? subscription?.noOfInvoices ?? 0,
             ),
             upcomingOn: formatDate(
               subscription?.upcomingDate ??
-              subscription?.nextInvoiceDate ??
-              subscription?.createdAt,
+                subscription?.nextInvoiceDate ??
+                subscription?.createdAt,
             ),
             upcomingTime: formatDateTime(
               subscription?.upcomingDate ??
-              subscription?.nextInvoiceDate ??
-              subscription?.createdAt,
+                subscription?.nextInvoiceDate ??
+                subscription?.createdAt,
             ),
             status,
-            subscriptionType: String(subscription?.membershipType || subscription?.items?.[0]?.productName || "general").toLowerCase(),
+            subscriptionType: String(
+              subscription?.membershipType ||
+                subscription?.items?.[0]?.productName ||
+                "general",
+            ).toLowerCase(),
             _id: String(subscription?._id ?? ""),
             raw: subscription,
           };
@@ -412,7 +493,7 @@ export default function SubscriptionScreen() {
               onClick={() => setSelectedActionRow(row.original)}
               className="flex items-center gap-1 rounded-md bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-200"
             >
-              <Ellipsis  size={14} /> 
+              <Ellipsis size={14} />
             </button>
           </div>
         ),
@@ -428,8 +509,9 @@ export default function SubscriptionScreen() {
           const handleWhatsAppShare = async () => {
             const raw = (subscription.raw ?? {}) as Record<string, unknown>;
             const customerName =
-              String(subscription.customer || raw.customerName || "Customer").trim() ||
-              "Customer";
+              String(
+                subscription.customer || raw.customerName || "Customer",
+              ).trim() || "Customer";
 
             const docCode = String(
               raw.subscriptionCode ??
@@ -497,14 +579,19 @@ export default function SubscriptionScreen() {
                 const aborted =
                   error instanceof Error && error.name === "AbortError";
                 if (aborted) return;
-                console.warn("Share sheet failed, opening WhatsApp Web:", error);
+                console.warn(
+                  "Share sheet failed, opening WhatsApp Web:",
+                  error,
+                );
               }
             }
 
             const digits = normalizeIndianWhatsAppDigits(
               String(subscription.phone || raw.customerPhone || ""),
             );
-            const waBase = digits ? `https://wa.me/${digits}` : "https://wa.me/";
+            const waBase = digits
+              ? `https://wa.me/${digits}`
+              : "https://wa.me/";
             window.open(
               `${waBase}?text=${encodeURIComponent(message)}`,
               "_blank",
@@ -776,6 +863,25 @@ export default function SubscriptionScreen() {
                     </div>
                     <div className="text-xs text-gray-500">
                       Modify subscription details
+                    </div>
+                  </div>
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.SUBSCRIPTION_CREATE}>
+                <button
+                  onClick={() => handleAction("upgrade")}
+                  disabled={selectedActionRow.status === "cancelled"}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-violet-100 bg-violet-50/50 p-3 text-left transition-colors ${selectedActionRow.status === "cancelled" ? "cursor-not-allowed opacity-50" : "hover:bg-violet-50"}`}
+                >
+                  <div className="rounded-full bg-violet-100 p-2 text-violet-600">
+                    <ArrowUpCircle size={18} />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-violet-800">
+                      Upgrade Subscription
+                    </div>
+                    <div className="text-xs text-violet-600/80">
+                      Move to a higher-priority plan (Junior always allowed)
                     </div>
                   </div>
                 </button>

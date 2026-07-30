@@ -144,12 +144,15 @@ export function validateSubscriptionCreateBody(body) {
     repeatEvery,
     repeatUnit,
     membershipId,
+    priority,
     membershipPlanId,
     membershipType,
     students,
     referral,
     coupon,
   } = body ?? {};
+
+  console.log('body', body);
 
   if (!customerName || !String(customerName).trim()) errors.push('Customer name is required.');
   if (!customerPhone || !String(customerPhone).trim()) {
@@ -188,6 +191,10 @@ export function validateSubscriptionCreateBody(body) {
 
   const allowedStatus = ['draft', 'active', 'completed', 'expired', 'error', 'cancelled'];
   const normalizedStatus = allowedStatus.includes(status) ? status : 'active';
+  const normalizedPriority = Number(priority);
+  const safePriority = Number.isFinite(normalizedPriority)
+    ? Math.max(0, normalizedPriority)
+    : 0;
 
   return {
     ok: true,
@@ -197,6 +204,7 @@ export function validateSubscriptionCreateBody(body) {
       membershipId: String(membershipId ?? '').trim(),
       membershipPlanId: String(membershipPlanId ?? '').trim(),
       membershipType: normalizedMembershipType || 'general',
+      priority: safePriority,
       invoiceDate: invoiceDateObj,
       dueDate: dueDateObj,
       startDate: invoiceDateObj,
@@ -233,6 +241,7 @@ export function validateSubscriptionUpdateBody(body) {
     grandTotal,
     status,
     createdBy,
+    priority,
     repeatType,
     repeatEvery,
     repeatUnit,
@@ -289,6 +298,11 @@ export function validateSubscriptionUpdateBody(body) {
   }
   if (membershipType !== undefined) {
     update.membershipType = normalizeMembershipType(membershipType || 'general');
+  }
+  if (priority !== undefined) {
+    const n = Number(priority);
+    if (Number.isNaN(n) || n < 0) errors.push('Invalid priority.');
+    else update.priority = n;
   }
   if (students !== undefined) {
     const currentMembershipType = update.membershipType ?? normalizeMembershipType(membershipType);

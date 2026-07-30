@@ -34,7 +34,7 @@ const getNextSubscriptionNumber = (): string => {
   }
 };
 
-type Mode = "create" | "edit" | "view";
+type Mode = "create" | "edit" | "view" | "upgrade";
 type RepeatType = "weekly" | "monthly" | "yearly";
 type MembershipOption = {
   _id: string;
@@ -42,6 +42,7 @@ type MembershipOption = {
   displayName: string;
   amount: number;
   period: string;
+  priority: number;
 };
 
 type StudentForm = {
@@ -148,6 +149,7 @@ export default function CreateSubscriptionScreen({
       companyName?: string;
       membershipType?: string;
       membershipPlanId?: string;
+      priority?: number;
     }>
   >([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
@@ -159,6 +161,8 @@ export default function CreateSubscriptionScreen({
   const [selectedMembershipId, setSelectedMembershipId] = useState("");
   const [students, setStudents] = useState<StudentForm[]>([createEmptyStudent()]);
   const [endDateManuallyEdited, setEndDateManuallyEdited] = useState(false);
+  /** Customer's current membership priority (Junior treated as 0 for upgrades) */
+  const [customerPriority, setCustomerPriority] = useState(0);
 
   useEffect(() => {
     type Line = {
@@ -190,16 +194,39 @@ export default function CreateSubscriptionScreen({
 
     const applyDoc = (doc: Doc, nextMode: Mode) => {
       setMode(nextMode);
-      if (doc._id) setSubscriptionId(String(doc._id));
-      if (doc.subscriptionCode) setSubscriptionNo(String(doc.subscriptionCode));
-      else if (doc.invoiceCode) setSubscriptionNo(String(doc.invoiceCode));
+      if (nextMode === "upgrade") {
+        // Upgrade creates a new subscription for a higher-priority plan
+        setSubscriptionId(null);
+        setSubscriptionNo(getNextSubscriptionNumber());
+      } else if (doc._id) {
+        setSubscriptionId(String(doc._id));
+      }
+      if (nextMode !== "upgrade") {
+        if (doc.subscriptionCode) setSubscriptionNo(String(doc.subscriptionCode));
+        else if (doc.invoiceCode) setSubscriptionNo(String(doc.invoiceCode));
+      }
       setCustomer(doc.customerName || "");
       setSelectedCustomerId("");
       setPhone(doc.customerPhone || "");
-      if (doc.invoiceDate) {
+      const docMembershipType = String(
+        (doc as any).membershipType ?? "",
+      ).toLowerCase();
+      if (docMembershipType) {
+        setMembership(docMembershipType);
+      }
+      const docPriority = Number((doc as any).priority ?? 0);
+      const isJuniorCust =
+        docMembershipType.includes("junior") ||
+        docMembershipType.includes("junoir");
+      setCustomerPriority(
+        isJuniorCust || !docMembershipType || docMembershipType === "none"
+          ? 0
+          : Math.max(0, docPriority || 0),
+      );
+      if (doc.invoiceDate && nextMode !== "upgrade") {
         setStartDate(new Date(doc.invoiceDate).toISOString().split("T")[0]);
       }
-      if (doc.dueDate) {
+      if (doc.dueDate && nextMode !== "upgrade") {
         setEndDate(new Date(doc.dueDate).toISOString().split("T")[0]);
       }
       const rawType = String(doc.repeatType ?? "").toLowerCase();
@@ -213,22 +240,27 @@ export default function CreateSubscriptionScreen({
       } else {
         setRepeatType("monthly");
       }
-      setNotes(doc.notes || "");
-      if (doc.membershipId) setSelectedMembershipId(String(doc.membershipId));
-      if (Array.isArray(doc.students) && doc.students.length > 0) {
-        setStudents(
-          doc.students.map((s) => ({
-            studentName: String(s.studentName ?? ""),
-            schoolName: String(s.schoolName ?? ""),
-            dob: s.dob ? String(s.dob).split("T")[0] : "",
-            gender: String(s.gender ?? ""),
-            classStd: String(s.classStd ?? ""),
-            relation: String(s.relation ?? ""),
-            parentName: String(s.parentName ?? ""),
-            studentIdUpload: String(s.studentIdUpload ?? ""),
-            formImageUpload: String(s.formImageUpload ?? ""),
-          })),
-        );
+      setNotes(nextMode === "upgrade" ? "" : doc.notes || "");
+      if (nextMode === "upgrade") {
+        setSelectedMembershipId("");
+        setStudents([createEmptyStudent()]);
+      } else {
+        if (doc.membershipId) setSelectedMembershipId(String(doc.membershipId));
+        if (Array.isArray(doc.students) && doc.students.length > 0) {
+          setStudents(
+            doc.students.map((s) => ({
+              studentName: String(s.studentName ?? ""),
+              schoolName: String(s.schoolName ?? ""),
+              dob: s.dob ? String(s.dob).split("T")[0] : "",
+              gender: String(s.gender ?? ""),
+              classStd: String(s.classStd ?? ""),
+              relation: String(s.relation ?? ""),
+              parentName: String(s.parentName ?? ""),
+              studentIdUpload: String(s.studentIdUpload ?? ""),
+              formImageUpload: String(s.formImageUpload ?? ""),
+            })),
+          );
+        }
       }
     };
 
@@ -247,6 +279,34 @@ export default function CreateSubscriptionScreen({
     [customers, selectedCustomerId],
   );
   const juniorSelected = isJuniorPlan(selectedMembership);
+
+  /** Effective customer priority for upgrade rules (Junior = 0). */
+  const effectiveCustomerPriority = useMemo(() => {
+    const mType = String(
+      selectedCustomer?.membershipType ?? membership ?? "",
+    ).toLowerCase();
+    if (!mType || mType === "none" || mType.includes("junior") || mType.includes("junoir")) {
+      return 0;
+    }
+    const fromCustomer = Number(selectedCustomer?.priority ?? customerPriority);
+    if (Number.isFinite(fromCustomer) && fromCustomer > 0) return fromCustomer;
+    const match = memberships.find(
+      (m) =>
+        m.planId.toLowerCase() === mType ||
+        m.displayName.toLowerCase().includes(mType),
+    );
+    return Math.max(0, Number(match?.priority ?? 0) || 0);
+  }, [selectedCustomer, membership, customerPriority, memberships]);
+
+  /** Plans available in the dropdown (upgrade mode filters by priority). */
+  const selectableMemberships = useMemo(() => {
+    if (mode !== "upgrade") return memberships;
+    return memberships.filter((m) => {
+      if (isJuniorPlan(m)) return true;
+      return Number(m.priority) > effectiveCustomerPriority;
+    });
+  }, [mode, memberships, effectiveCustomerPriority]);
+
   const subTotal = selectedMembership?.amount ?? 0;
   const discountTotal = 0;
   const grandTotal = subTotal;
@@ -278,6 +338,7 @@ export default function CreateSubscriptionScreen({
       membershipId: selectedMembership?._id ?? "",
       membershipPlanId: selectedMembership?.planId ?? "",
       membershipType: membershipTypeRaw,
+      priority: Math.max(0, Number(selectedMembership?.priority ?? 0) || 0),
       repeatType,
       repeatEvery,
       repeatUnit,
@@ -345,21 +406,24 @@ export default function CreateSubscriptionScreen({
       );
       return false;
     }
-    const currentCustomerMembership = String(
-      selectedCustomer?.membershipType ?? "",
-    ).toLowerCase();
-    const customerHasNonJuniorMembership =
-      Boolean(currentCustomerMembership) &&
-      currentCustomerMembership !== "none" &&
-      currentCustomerMembership !== "junior";
-    if (!juniorSelected && customerHasNonJuniorMembership) {
-      Swal.fire(
-        "Membership rule",
-        "Customer already has a non-Junior membership. Additional purchase is allowed only for Junior membership.",
-        "warning",
+    if (!juniorSelected) {
+      const newPriority = Math.max(
+        0,
+        Number(selectedMembership?.priority ?? 0) || 0,
       );
-      return false;
+      if (
+        effectiveCustomerPriority > 0 &&
+        newPriority <= effectiveCustomerPriority
+      ) {
+        Swal.fire(
+          "Upgrade not allowed",
+          `Choose a membership with a higher priority than the customer's current plan (current priority: ${effectiveCustomerPriority}). Same or lower priority plans are blocked. Junior membership is always allowed.`,
+          "warning",
+        );
+        return false;
+      }
     }
+
     if (juniorSelected) {
       if (students.length === 0) {
         Swal.fire(
@@ -454,6 +518,7 @@ export default function CreateSubscriptionScreen({
             displayName: String(m?.displayName ?? m?.planId ?? "Membership"),
             amount: Number(m?.pricing?.amount ?? 0),
             period: String(m?.pricing?.period ?? "monthly"),
+            priority: Math.max(0, Number(m?.priority ?? 0) || 0),
           }))
           .filter((m: MembershipOption) => Boolean(m._id));
         setMemberships(mapped);
@@ -551,6 +616,11 @@ export default function CreateSubscriptionScreen({
         if (selectedCustomerId && selectedMembership) {
           await handleUpdateCustomer(selectedCustomerId, {
             membershipType: getCustomerMembershipType(selectedMembership),
+            membershipPlanId: selectedMembership._id,
+            priority: Math.max(
+              0,
+              Number(selectedMembership.priority ?? 0) || 0,
+            ),
           });
         }
         printThermalReceipt({
@@ -582,9 +652,26 @@ export default function CreateSubscriptionScreen({
       }
       const response = await handleCreateSubscription(payload);
       if (selectedCustomerId && selectedMembership) {
-        await handleUpdateCustomer(selectedCustomerId, {
-          membershipType: getCustomerMembershipType(selectedMembership),
-        });
+        const nextType = getCustomerMembershipType(selectedMembership);
+        // Don't overwrite a main membership with Junior on the client either
+        const existingType = String(
+          selectedCustomer?.membershipType ?? membership ?? "none",
+        ).toLowerCase();
+        const hasMain =
+          existingType &&
+          existingType !== "none" &&
+          !existingType.includes("junior") &&
+          !existingType.includes("junoir");
+        if (!(nextType === "junior" && hasMain)) {
+          await handleUpdateCustomer(selectedCustomerId, {
+            membershipType: nextType,
+            membershipPlanId: selectedMembership._id,
+            priority: Math.max(
+              0,
+              Number(selectedMembership.priority ?? 0) || 0,
+            ),
+          });
+        }
       }
       const savedCode = String(
         response?.subscription?.subscriptionCode ?? subscriptionNo,
@@ -663,10 +750,23 @@ export default function CreateSubscriptionScreen({
         <div className="flex items-center justify-between border-b bg-gray-50 px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-800">
-              {mode === "edit" ? "Edit Subscription" : "Create Subscription"}
+              {mode === "edit"
+                ? "Edit Subscription"
+                : mode === "upgrade"
+                  ? "Upgrade Subscription"
+                  : mode === "view"
+                    ? "View Subscription"
+                    : "Create Subscription"}
             </h2>
             <p className="text-xs text-gray-500">
-              Invoice No: <span className="font-semibold">{subscriptionNo}</span>
+              {mode === "upgrade"
+                ? "Only higher-priority plans (and Junior) are available"
+                : (
+                  <>
+                    Invoice No:{" "}
+                    <span className="font-semibold">{subscriptionNo}</span>
+                  </>
+                )}
             </p>
           </div>
           <button
@@ -722,7 +822,21 @@ export default function CreateSubscriptionScreen({
                             setCustomer(selectedCustomer.name);
                             setPhone(selectedCustomer.mobile);
                             setMembership(hasMembership ? mType : "none");
+                            const isJuniorCust =
+                              mType.toLowerCase().includes("junior") ||
+                              mType.toLowerCase().includes("junoir");
+                            setCustomerPriority(
+                              isJuniorCust || !hasMembership
+                                ? 0
+                                : Math.max(
+                                    0,
+                                    Number(selectedCustomer.priority ?? 0) || 0,
+                                  ),
+                            );
                             setCustomerDropdownOpen(false);
+                            if (mode === "upgrade") {
+                              setSelectedMembershipId("");
+                            }
                           }}
                           className="flex w-full items-center justify-between gap-3 border-b border-gray-100 px-3 py-2.5 text-left text-sm hover:bg-gray-50 last:border-0"
                         >
@@ -827,6 +941,11 @@ export default function CreateSubscriptionScreen({
           <div>
             <label className="mb-1 block text-xs font-semibold text-gray-600">
               Membership Plan
+              {mode === "upgrade" && effectiveCustomerPriority > 0 ? (
+                <span className="ml-2 font-normal text-violet-600">
+                  (current priority: {effectiveCustomerPriority})
+                </span>
+              ) : null}
             </label>
             <select
               value={selectedMembershipId}
@@ -834,19 +953,30 @@ export default function CreateSubscriptionScreen({
                 setSelectedMembershipId(e.target.value);
                 setEndDateManuallyEdited(false);
               }}
+              disabled={mode === "view"}
               className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
             >
               <option value="">
                 {loadingMemberships
                   ? "Loading memberships..."
-                  : "Select membership plan"}
+                  : mode === "upgrade"
+                    ? "Select upgrade plan"
+                    : "Select membership plan"}
               </option>
-              {memberships.map((m) => (
+              {selectableMemberships.map((m) => (
                 <option key={m._id} value={m._id}>
-                  {`${m.displayName} • ₹${m.amount.toLocaleString("en-IN")} / ${m.period} • ${m.planId}`}
+                  {`${m.displayName} • ₹${m.amount.toLocaleString("en-IN")} / ${m.period} • P${m.priority} • ${m.planId}`}
                 </option>
               ))}
             </select>
+            {mode === "upgrade" &&
+              !loadingMemberships &&
+              selectableMemberships.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">
+                  No higher-priority plans available for this customer. Junior
+                  is always listed when configured.
+                </p>
+              )}
           </div>
 
           {juniorSelected && (
@@ -1091,6 +1221,7 @@ export default function CreateSubscriptionScreen({
       <CheckoutModal
         open={openCheckout}
         grandTotal={grandTotal}
+        disableCashback
         items={
           selectedMembership
             ? [
@@ -1100,6 +1231,7 @@ export default function CreateSubscriptionScreen({
                   qty: 1,
                   price: selectedMembership.amount,
                   discount: 0,
+                  cashback: 0,
                   category: "membership",
                 },
               ]
@@ -1109,6 +1241,7 @@ export default function CreateSubscriptionScreen({
         initialCustomerPhone={phone}
         initialCustomerId={selectedCustomerId || null}
         initialMembership={selectedMembership?.displayName ?? ""}
+        initialCashbackTotal={0}
         onClose={() => setOpenCheckout(false)}
         onConfirmPayment={async (payment) => {
           setOpenCheckout(false);
