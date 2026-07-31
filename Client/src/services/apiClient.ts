@@ -1391,7 +1391,7 @@ export type CspEnrollment = {
   customerId?: string | { _id?: string; name?: string; mobile?: string };
   vendorId?: string | { _id?: string; name?: string; mobile?: string };
   status?: "active" | "inactive";
-  sellerSharePercent?: number;
+  sailorSharePercent?: number;
   platformSharePercent?: number;
   displayName?: string;
   mobile?: string;
@@ -1429,7 +1429,7 @@ export const handleEnrollCsp = async (payload: {
   city?: string;
   state?: string;
   pincode?: string;
-  sellerSharePercent?: number;
+  sailorSharePercent?: number;
   platformSharePercent?: number;
 }) => {
   const response = await axiosInstance.post("/csp/enroll", payload);
@@ -1444,7 +1444,7 @@ export const handleUpdateCsp = async (
   id: string,
   payload: {
     status?: "active" | "inactive";
-    sellerSharePercent?: number;
+    sailorSharePercent?: number;
     platformSharePercent?: number;
     displayName?: string;
     mobile?: string;

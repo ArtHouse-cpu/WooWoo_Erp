@@ -44,7 +44,7 @@ const invoiceItemSchema = new mongoose.Schema(
     },
     cspEnrollmentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'CustomerSellerProgram',
+      ref: 'CustomersailorProgram',
       default: null,
     },
     cspCustomerId: {
@@ -52,7 +52,7 @@ const invoiceItemSchema = new mongoose.Schema(
       ref: 'Customer',
       default: null,
     },
-    cspSellerAmount: {
+    cspsailorAmount: {
       type: Number,
       default: 0,
       min: 0,

@@ -4,7 +4,7 @@ import Coupon from '../models/coupon.model.js';
 import Invoice from '../models/invoice.model.js';
 import Wallet from '../models/wallet.model.js';
 import Product from '../models/product.model.js';
-import CustomerSellerProgram from '../models/customerSellerProgram.model.js';
+import CustomersailorProgram from '../models/customersailorProgram.model.js';
 import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
 import { appendTransaction } from './wallet.controller.js';
 import { validateCouponForOrder } from './coupon.controller.js';
@@ -13,8 +13,8 @@ import { creditReferralDiscountToInviter, markReferralDiscountUsed } from '../mo
 import { sendActivityUpdateWhatsApp } from '../modules/customer/services/whatsapp.service.js';
 import { normalizeMobile } from '../modules/customer/utils/normalize.js';
 
-const getCspSellerSharePercent = () => {
-  const n = Number(process.env.CSP_SELLER_SHARE_PERCENT ?? 70);
+const getCspsailorSharePercent = () => {
+  const n = Number(process.env.CSP_sailor_SHARE_PERCENT ?? 70);
   return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 70;
 };
 
@@ -399,16 +399,16 @@ const enrichItemsWithCsp = async items => {
     ),
   ];
   const enrollments = enrollmentIds.length
-    ? await CustomerSellerProgram.find({
+    ? await CustomersailorProgram.find({
         _id: {$in: enrollmentIds},
         status: 'active',
       })
-        .select('_id customerId vendorId sellerSharePercent status')
+        .select('_id customerId vendorId sailorSharePercent status')
         .lean()
     : [];
   const enrollmentMap = new Map(enrollments.map(e => [String(e._id), e]));
 
-  const defaultShare = getCspSellerSharePercent();
+  const defaultShare = getCspsailorSharePercent();
 
   return (items || []).map(item => {
     const key = String(item.productName || '').trim().toLowerCase();
@@ -420,7 +420,7 @@ const enrichItemsWithCsp = async items => {
         isCsp: false,
         cspEnrollmentId: null,
         cspCustomerId: null,
-        cspSellerAmount: 0,
+        cspsailorAmount: 0,
       };
     }
 
@@ -434,19 +434,19 @@ const enrichItemsWithCsp = async items => {
         isCsp: false,
         cspEnrollmentId: null,
         cspCustomerId: null,
-        cspSellerAmount: 0,
+        cspsailorAmount: 0,
       };
     }
 
     const share =
-      Number.isFinite(Number(enrollment.sellerSharePercent))
-        ? Number(enrollment.sellerSharePercent)
+      Number.isFinite(Number(enrollment.sailorSharePercent))
+        ? Number(enrollment.sailorSharePercent)
         : defaultShare;
     // CSP sailor share on net line after product discount
     const discount = Math.max(0, Number(item.discount ?? 0));
     const gross = Math.max(0, Number(item.qty ?? 0) * Number(item.unitPrice ?? 0));
     const base = roundMoney(Math.max(0, gross - discount));
-    const cspSellerAmount = roundMoney((base * share) / 100);
+    const cspsailorAmount = roundMoney((base * share) / 100);
 
     return {
       ...item,
@@ -456,18 +456,18 @@ const enrichItemsWithCsp = async items => {
       cspCustomerId: enrollment.customerId || product.cspCustomerId || null,
       discount,
       lineTotal: base,
-      cspSellerAmount,
+      cspsailorAmount,
     };
   });
 };
 
 /** Credit 70% (or enrollment %) of CSP line totals to sailor customer wallets. */
-const creditCspSellerShares = async ({items, invoiceCode, createdBy}) => {
+const creditCspsailorShares = async ({items, invoiceCode, createdBy}) => {
   const ref = String(invoiceCode || '').trim();
   if (!ref) return;
 
   const cspItems = (items || []).filter(
-    i => i?.isCsp && Number(i.cspSellerAmount) > 0 && i.cspCustomerId,
+    i => i?.isCsp && Number(i.cspsailorAmount) > 0 && i.cspCustomerId,
   );
   if (!cspItems.length) return;
 
@@ -480,7 +480,7 @@ const creditCspSellerShares = async ({items, invoiceCode, createdBy}) => {
       amount: 0,
       productNames: [],
     };
-    prev.amount = roundMoney(prev.amount + Number(item.cspSellerAmount));
+    prev.amount = roundMoney(prev.amount + Number(item.cspsailorAmount));
     prev.productNames.push(String(item.productName || 'item'));
     byCustomer.set(key, prev);
   }
@@ -532,12 +532,12 @@ const creditCspSellerShares = async ({items, invoiceCode, createdBy}) => {
 };
 
 /** Reverse CSP credits for an invoice (cancel/delete). */
-const reverseCspSellerShares = async ({invoice, createdBy}) => {
+const reverseCspsailorShares = async ({invoice, createdBy}) => {
   const ref = String(invoice?.invoiceCode || '').trim();
   if (!ref || !Array.isArray(invoice?.items)) return;
 
   const cspItems = invoice.items.filter(
-    i => i?.isCsp && Number(i.cspSellerAmount) > 0 && i.cspCustomerId,
+    i => i?.isCsp && Number(i.cspsailorAmount) > 0 && i.cspCustomerId,
   );
   if (!cspItems.length) return;
 
@@ -548,7 +548,7 @@ const reverseCspSellerShares = async ({invoice, createdBy}) => {
       customerId: item.cspCustomerId,
       amount: 0,
     };
-    prev.amount = roundMoney(prev.amount + Number(item.cspSellerAmount));
+    prev.amount = roundMoney(prev.amount + Number(item.cspsailorAmount));
     byCustomer.set(key, prev);
   }
 
@@ -929,7 +929,7 @@ const createInvoice = async (req, res) => {
     // CSP sailor share (70% default) — platform 30% is not walleted
     if (invoice.status !== 'draft' && invoice.status !== 'cancelled') {
       try {
-        await creditCspSellerShares({
+        await creditCspsailorShares({
           items: enrichedItems,
           invoiceCode,
           createdBy: actor,
@@ -1093,7 +1093,7 @@ const deleteInvoice = async (req, res) => {
     }
 
     try {
-      await reverseCspSellerShares({
+      await reverseCspsailorShares({
         invoice,
         createdBy: buildCreatedBy(req),
       });
@@ -1390,7 +1390,7 @@ const cancelInvoice = async (req, res) => {
     }
 
     try {
-      await reverseCspSellerShares({
+      await reverseCspsailorShares({
         invoice,
         createdBy: buildCreatedBy(req),
       });

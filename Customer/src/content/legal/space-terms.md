@@ -375,7 +375,7 @@ Commercial sales, pop-ups, exhibitions with sales, ticketed activities, or lead-
 
 The Booker is responsible for taxes, licences, invoices, consumer obligations, and legal requirements arising from their independent commercial activity.
 
-WOOWOO is not a party to a transaction between the Booker and the Booker's customer merely because the transaction occurs in a booked Space, unless WOOWOO expressly acts as a seller, agent, or contracting party.
+WOOWOO is not a party to a transaction between the Booker and the Booker's customer merely because the transaction occurs in a booked Space, unless WOOWOO expressly acts as a sailor, agent, or contracting party.
 
 ## 30. EXTERNAL VENDORS AND SERVICE PROVIDERS
 

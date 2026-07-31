@@ -161,7 +161,7 @@ export default function CspScreen() {
         Cell: ({ row }) => row.original.vendor?.name || "—",
       },
       {
-        accessorKey: "sellerSharePercent",
+        accessorKey: "sailorSharePercent",
         header: "Sailor %",
         Cell: ({ cell }) => `${Number(cell.getValue() ?? 70)}%`,
       },
@@ -257,7 +257,7 @@ export default function CspScreen() {
             <h2 className="text-lg font-semibold text-slate-900">Enroll CSP Sailor</h2>
             <p className="mt-1 text-sm text-slate-500">
               Only <span className="font-medium text-slate-700">Premium</span> members
-              can become CSP sellers. A vendor record is linked automatically.
+              can become CSP sailors. A vendor record is linked automatically.
             </p>
             <label className="mt-4 mb-1 block text-sm font-medium text-slate-700">
               Premium Customer *

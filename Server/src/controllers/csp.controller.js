@@ -1,10 +1,10 @@
 import mongoose from 'mongoose';
 import Customer from '../models/customer.model.js';
 import Vendor from '../models/vendor.model.js';
-import CustomerSellerProgram from '../models/customerSellerProgram.model.js';
+import CustomersailorProgram from '../models/customersailorProgram.model.js';
 
-const getSellerSharePercent = () => {
-  const n = Number(process.env.CSP_SELLER_SHARE_PERCENT ?? 70);
+const getsailorSharePercent = () => {
+  const n = Number(process.env.CSP_sailor_SHARE_PERCENT ?? 70);
   return Number.isFinite(n) && n >= 0 && n <= 100 ? n : 70;
 };
 
@@ -41,7 +41,7 @@ const isPremiumMembership = membershipType => {
 const assertPremiumForCsp = customer => {
   if (!isPremiumMembership(customer?.membershipType)) {
     const error = new Error(
-      'Only customers with Premium membership can become CSP sellers. Activate Premium membership first.',
+      'Only customers with Premium membership can become CSP sailors. Activate Premium membership first.',
     );
     error.status = 400;
     throw error;
@@ -106,7 +106,7 @@ export const getCSP = async (req, res) => {
     }
 
     const rows = await populateEnrollment(
-      CustomerSellerProgram.find(query).sort({createdAt: -1}),
+      CustomersailorProgram.find(query).sort({createdAt: -1}),
     );
 
     return res.status(200).json({
@@ -142,7 +142,7 @@ export const enrollCsp = async (req, res) => {
       city,
       state,
       pincode,
-      sellerSharePercent,
+      sailorSharePercent,
       platformSharePercent,
     } = req.body || {};
 
@@ -191,13 +191,13 @@ export const enrollCsp = async (req, res) => {
       });
     }
 
-    const existingActive = await CustomerSellerProgram.findOne({
+    const existingActive = await CustomersailorProgram.findOne({
       customerId: customer._id,
       status: 'active',
     });
     if (existingActive) {
       const populated = await populateEnrollment(
-        CustomerSellerProgram.findById(existingActive._id),
+        CustomersailorProgram.findById(existingActive._id),
       );
       return res.status(409).json({
         success: false,
@@ -250,7 +250,7 @@ export const enrollCsp = async (req, res) => {
       }
     }
 
-    const vendorActive = await CustomerSellerProgram.findOne({
+    const vendorActive = await CustomersailorProgram.findOne({
       vendorId: vendor._id,
       status: 'active',
     });
@@ -261,25 +261,25 @@ export const enrollCsp = async (req, res) => {
       });
     }
 
-    const sellerShare = Number.isFinite(Number(sellerSharePercent))
-      ? Number(sellerSharePercent)
-      : getSellerSharePercent();
+    const sailorShare = Number.isFinite(Number(sailorSharePercent))
+      ? Number(sailorSharePercent)
+      : getsailorSharePercent();
     const platformShare = Number.isFinite(Number(platformSharePercent))
       ? Number(platformSharePercent)
       : getPlatformSharePercent();
 
-    const enrollment = await CustomerSellerProgram.create({
+    const enrollment = await CustomersailorProgram.create({
       customerId: customer._id,
       vendorId: vendor._id,
       status: 'active',
-      sellerSharePercent: sellerShare,
+      sailorSharePercent: sailorShare,
       platformSharePercent: platformShare,
       displayName: String(customer.name || '').trim(),
       mobile: String(customer.mobile || '').trim(),
     });
 
     const populated = await populateEnrollment(
-      CustomerSellerProgram.findById(enrollment._id),
+      CustomersailorProgram.findById(enrollment._id),
     );
 
     return res.status(201).json({
@@ -316,7 +316,7 @@ export const updateCsp = async (req, res) => {
       });
     }
 
-    const enrollment = await CustomerSellerProgram.findById(id);
+    const enrollment = await CustomersailorProgram.findById(id);
     if (!enrollment) {
       return res.status(404).json({
         success: false,
@@ -326,7 +326,7 @@ export const updateCsp = async (req, res) => {
 
     const {
       status,
-      sellerSharePercent,
+      sailorSharePercent,
       platformSharePercent,
       displayName,
       mobile,
@@ -355,7 +355,7 @@ export const updateCsp = async (req, res) => {
           });
         }
 
-        const clashCustomer = await CustomerSellerProgram.findOne({
+        const clashCustomer = await CustomersailorProgram.findOne({
           _id: {$ne: enrollment._id},
           customerId: enrollment.customerId,
           status: 'active',
@@ -366,7 +366,7 @@ export const updateCsp = async (req, res) => {
             message: 'Another active CSP enrollment exists for this customer.',
           });
         }
-        const clashVendor = await CustomerSellerProgram.findOne({
+        const clashVendor = await CustomersailorProgram.findOne({
           _id: {$ne: enrollment._id},
           vendorId: enrollment.vendorId,
           status: 'active',
@@ -381,15 +381,15 @@ export const updateCsp = async (req, res) => {
       enrollment.status = next;
     }
 
-    if (sellerSharePercent !== undefined) {
-      const n = Number(sellerSharePercent);
+    if (sailorSharePercent !== undefined) {
+      const n = Number(sailorSharePercent);
       if (!Number.isFinite(n) || n < 0 || n > 100) {
         return res.status(400).json({
           success: false,
-          message: 'sellerSharePercent must be 0–100.',
+          message: 'sailorSharePercent must be 0–100.',
         });
       }
-      enrollment.sellerSharePercent = n;
+      enrollment.sailorSharePercent = n;
     }
 
     if (platformSharePercent !== undefined) {
@@ -412,7 +412,7 @@ export const updateCsp = async (req, res) => {
 
     await enrollment.save();
     const populated = await populateEnrollment(
-      CustomerSellerProgram.findById(enrollment._id),
+      CustomersailorProgram.findById(enrollment._id),
     );
 
     return res.status(200).json({

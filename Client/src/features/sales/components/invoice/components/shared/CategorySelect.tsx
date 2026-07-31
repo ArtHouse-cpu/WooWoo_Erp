@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Pencil, Trash2 } from "lucide-react"; // Import Icons
+import Swal from "sweetalert2"; // Import SweetAlert
 import {
   handleCreateCategories,
   handleCreateSubCategory,
   handleGetCategories,
   handleGetSubCategories,
+  handleUpdateCategory, // Add update Category
+  handleDeleteCategory, // Add delete Category
+  handleUpdateSubCategory, // Add update Subcategory
+  handleDeleteSubCategory, // Add delete Subcategory
 } from "@/services/apiClient";
 
 type Category = {
@@ -41,6 +47,8 @@ type SingleSelectCreatableProps = {
   isCreating: boolean;
   onChange: (id: string) => void;
   onCreate: (name: string) => Promise<boolean>;
+  onEdit?: (id: string, currentName: string) => Promise<boolean>; // Add Edit prop
+  onDelete?: (id: string) => Promise<boolean>;                   // Add Delete prop
 };
 
 function SingleSelectCreatable({
@@ -53,6 +61,8 @@ function SingleSelectCreatable({
   isCreating,
   onChange,
   onCreate,
+  onEdit,     // Destructure here
+  onDelete,   // Destructure here
 }: SingleSelectCreatableProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -108,18 +118,52 @@ function SingleSelectCreatable({
 
           <div className="max-h-52 overflow-auto border-t border-gray-200 py-1">
             {filteredOptions.map((item) => (
-              <button
+              <div
                 key={item._id}
-                type="button"
-                onClick={() => {
-                  onChange(item._id);
-                  setOpen(false);
-                }}
-                className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50"
+                className="flex items-center justify-between px-3 py-1.5 hover:bg-blue-50 group"
               >
-                {item.name}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(item._id);
+                    setOpen(false);
+                  }}
+                  className="flex-1 text-left text-sm text-gray-700 outline-none"
+                >
+                  {item.name}
+                </button>
+                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {onEdit && (
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation(); // Stop dropdown selection click trigger
+                        await onEdit(item._id, item.name);
+                      }}
+                      className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-blue-600 transition"
+                      title="Edit"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
+                  {onDelete && (
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation(); // Stop dropdown selection click trigger
+                        await onDelete(item._id);
+                      }}
+                      className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-red-600 transition"
+                      title="Delete"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
             ))}
+            
+            
 
             {showCreateAction && (
               <button
@@ -239,6 +283,118 @@ export default function CategorySelect({
     }
   };
 
+  const editCategory = async (id: string, currentName: string) => {
+    const { value: newName } = await Swal.fire({
+      title: "Edit Category",
+      input: "text",
+      inputValue: currentName,
+      showCancelButton: true,
+      inputValidator: (value) => {
+        if (!value.trim()) return "Category name cannot be empty!";
+      },
+    });
+
+    if (newName) {
+      try {
+        await handleUpdateCategory(id, newName.trim());
+        setCategories((prev) =>
+          prev.map((c) => (c._id === id ? { ...c, name: newName.trim() } : c)),
+        );
+        if (categoryValue === id) {
+          onCategoryChange(id, newName.trim());
+        }
+        Swal.fire("Success", "Category updated successfully", "success");
+        return true;
+      } catch (error: any) {
+        Swal.fire("Error", error.response?.data?.message || "Failed to update category", "error");
+      }
+    }
+    return false;
+  };
+
+  const deleteCategory = async (id: string) => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "This category and its nested subcategories will be deleted permanently.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#EF4444",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await handleDeleteCategory(id);
+        setCategories((prev) => prev.filter((c) => c._id !== id));
+        setSubCategories((prev) => prev.filter((s) => s.categoryId !== id));
+        if (categoryValue === id) {
+          onCategoryChange("", "");
+          onSubCategoryChange?.("", "");
+        }
+        Swal.fire("Deleted!", "Category has been deleted.", "success");
+        return true;
+      } catch (error: any) {
+        Swal.fire("Error", error.response?.data?.message || "Failed to delete category", "error");
+      }
+    }
+    return false;
+  };
+
+  const editSubCategory = async (id: string, currentName: string) => {
+    const { value: newName } = await Swal.fire({
+      title: "Edit Subcategory",
+      input: "text",
+      inputValue: currentName,
+      showCancelButton: true,
+      inputValidator: (value) => {
+        if (!value.trim()) return "Subcategory name cannot be empty!";
+      },
+    });
+
+    if (newName) {
+      try {
+        await handleUpdateSubCategory(id, newName.trim(), categoryValue);
+        setSubCategories((prev) =>
+          prev.map((s) => (s._id === id ? { ...s, name: newName.trim() } : s)),
+        );
+        if (subCategoryValue === id) {
+          onSubCategoryChange?.(id, newName.trim());
+        }
+        Swal.fire("Success", "Subcategory updated successfully", "success");
+        return true;
+      } catch (error: any) {
+        Swal.fire("Error", error.response?.data?.message || "Failed to update subcategory", "error");
+      }
+    }
+    return false;
+  };
+
+  const deleteSubCategory = async (id: string) => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "This subcategory will be deleted permanently.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#EF4444",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await handleDeleteSubCategory(id);
+        setSubCategories((prev) => prev.filter((s) => s._id !== id));
+        if (subCategoryValue === id) {
+          onSubCategoryChange?.("", "");
+        }
+        Swal.fire("Deleted!", "Subcategory has been deleted.", "success");
+        return true;
+      } catch (error: any) {
+        Swal.fire("Error", error.response?.data?.message || "Failed to delete subcategory", "error");
+      }
+    }
+    return false;
+  };
+
   return (
     <div className="space-y-4">
       <span>
@@ -256,6 +412,8 @@ export default function CategorySelect({
           onSubCategoryChange?.("", "");
         }}
         onCreate={createCategory}
+        onEdit={editCategory}
+        onDelete={deleteCategory}
       />
 
       <SingleSelectCreatable
@@ -271,6 +429,8 @@ export default function CategorySelect({
           onSubCategoryChange?.(id, name);
         }}
         onCreate={createSubCategory}
+        onEdit={editSubCategory}
+        onDelete={deleteSubCategory}
       />
       </span>
     </div>

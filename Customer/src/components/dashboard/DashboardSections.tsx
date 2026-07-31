@@ -299,7 +299,7 @@ export function ProgramsSection({
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-[15px] font-black text-[#111111] leading-tight">
-              Creative Seller Program
+              Creative sailor Program
             </h3>
             <p className="mt-1 text-[11px] font-extrabold text-slate-400 leading-none">
               CSP
