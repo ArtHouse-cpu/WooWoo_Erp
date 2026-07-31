@@ -17,6 +17,5 @@ export default function App() {
   if (loading) {
     return <FullPageLoader />;
   }
-
   return <RouterProvider router={router} />;
 }

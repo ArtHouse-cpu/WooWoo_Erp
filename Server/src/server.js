@@ -32,6 +32,7 @@ import customerAuthRoutes from './modules/customer/routes/auth.routes.js';
 import {customerErrorHandler} from './modules/customer/middlewares/errorHandler.js';
 import path from 'path';
 import {fileURLToPath} from 'url';
+import sentAnnouncement from './routes/sendAnnouncement.router.js';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);
@@ -103,15 +104,15 @@ app.use('/access', accessRoutes);
 
 //CSP APIs
 app.use('/csp', cspRouters);
-
-
 // Customer portal auth APIs — isolated namespace (does not conflict with admin /customer)
 app.use('/api/customer', customerAuthRoutes);
-
+//send whatsapp announcement
+app.use('/api/announcement', sentAnnouncement);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 connectDB();
+
 
 app.get('/', (req, res) => {
   res.send('🚀 Server is live and running...');

@@ -101,6 +101,10 @@ export const PERMISSIONS = {
   WALLET_MANAGE: "wallet.manage",
   COUPON_READ: "coupon.read",
   COUPON_MANAGE: "coupon.manage",
+
+  // Announcements (WhatsApp blasts)
+  ANNOUNCEMENT_READ: "announcement.read",
+  ANNOUNCEMENT_CREATE: "announcement.create",
   AFFILIATE_READ: "affiliate.read",
   AFFILIATE_MANAGE: "affiliate.manage",
   AFFILIATE_PAYOUT: "affiliate.payout",
@@ -403,6 +407,16 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
   { key: PERMISSIONS.WALLET_MANAGE, module: "wallet", label: "Manage wallets" },
   { key: PERMISSIONS.COUPON_READ, module: "coupons", label: "View coupons" },
   {
+    key: PERMISSIONS.ANNOUNCEMENT_READ,
+    module: "announcements",
+    label: "View announcements",
+  },
+  {
+    key: PERMISSIONS.ANNOUNCEMENT_CREATE,
+    module: "announcements",
+    label: "Send announcements",
+  },
+  {
     key: PERMISSIONS.COUPON_MANAGE,
     module: "coupons",
     label: "Manage coupons",
@@ -466,6 +480,7 @@ export const MENU_PERMISSION_MAP: Record<string, Permission | Permission[]> = {
   "/guests": PERMISSIONS.GUEST_READ,
   "/wallet": PERMISSIONS.WALLET_READ,
   "/coupons": PERMISSIONS.COUPON_READ,
+  "/announcements": PERMISSIONS.ANNOUNCEMENT_READ,
   "/affiliate-program": PERMISSIONS.AFFILIATE_READ,
   "/access": PERMISSIONS.ACCESS_READ,
 };

@@ -22,6 +22,7 @@ import {
   UtensilsCrossed,
   Utensils,
   type LucideIcon,
+  Megaphone,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -179,6 +180,7 @@ const MENU_GROUPS: MenuGroup[] = [
 
 const TOP_LINKS: TopLink[] = [
   { key: "foodBill", label: "Food Billing", icon: Utensils, path: "/foodBill" },
+  { key: "announcement", label: "Announcements", icon: Megaphone , path: "/announcements" },
   { key: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
   { key: "coupons", label: "Coupons", icon: Percent, path: "/coupons" },
   {

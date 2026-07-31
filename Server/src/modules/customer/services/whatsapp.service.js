@@ -1,4 +1,10 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import {toE164} from '../utils/normalize.js';
+
+const __whatsappServiceDir = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__whatsappServiceDir, '../../../../../');
 
 const GRAPH_API_VERSION = process.env.WHATSAPP_API_VERSION || 'v21.0';
 
@@ -998,4 +1004,217 @@ export const sendActivityUpdateWhatsApp = async ({
     meta: lastError,
     bodyValues,
   };
+};
+
+
+/** Templates known to require an IMAGE header component on send */
+export const announcementRequiresImageHeader = (templateName = '') => {
+  const configured = String(
+    process.env.WHATSAPP_ANNOUNCEMENT_IMAGE_TEMPLATES || 'newcafe',
+  )
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return configured.includes(String(templateName || '').trim().toLowerCase());
+};
+
+const getWhatsAppCreds = () => {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN?.replace(
+    /^["']|["']$/g,
+    '',
+  ).trim();
+  const version = process.env.WHATSAPP_API_VERSION || 'v21.0';
+  return { phoneNumberId, accessToken, version };
+};
+
+const mimeFromPath = (filePath) => {
+  const ext = path.extname(filePath || '').toLowerCase();
+  if (ext === '.png') return 'image/png';
+  if (ext === '.webp') return 'image/webp';
+  return 'image/jpeg';
+};
+
+/**
+ * Upload a local image to WhatsApp Cloud API media.
+ * Returns media id usable in template IMAGE headers for ~30 days.
+ */
+export const uploadWhatsAppImageMedia = async (filePath) => {
+  const { phoneNumberId, accessToken, version } = getWhatsAppCreds();
+  if (!phoneNumberId || !accessToken) {
+    throw new Error('Missing WhatsApp credentials for media upload');
+  }
+  if (!filePath || !fs.existsSync(filePath)) {
+    throw new Error(`Image file not found: ${filePath || '(empty)'}`);
+  }
+
+  const mime = mimeFromPath(filePath);
+  const buf = fs.readFileSync(filePath);
+  const blob = new Blob([buf], { type: mime });
+  const form = new FormData();
+  form.append('messaging_product', 'whatsapp');
+  form.append('type', mime);
+  form.append('file', blob, path.basename(filePath));
+
+  const res = await fetch(
+    `https://graph.facebook.com/${version}/${phoneNumberId}/media`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    },
+  );
+  const data = await res.json();
+  if (!res.ok || !data?.id) {
+    throw new Error(data?.error?.message || 'WhatsApp media upload failed');
+  }
+  return String(data.id);
+};
+
+/** Default local header image for IMAGE templates (e.g. newcafe) */
+export const DEFAULT_ANNOUNCEMENT_HEADER_IMAGE = path.join(
+  REPO_ROOT,
+  'Client/src/assets/images/logo/newcafe.jpeg',
+);
+
+const defaultAnnouncementImageCandidates = () => [
+  process.env.WHATSAPP_ANNOUNCEMENT_HEADER_IMAGE_FILE?.trim(),
+  DEFAULT_ANNOUNCEMENT_HEADER_IMAGE,
+  path.join(REPO_ROOT, 'Customer/public/raipur_store.jpg'),
+].filter(Boolean);
+
+/**
+ * Resolve header media once per announcement batch.
+ * Prefer public HTTPS link; otherwise upload a default local image → media id.
+ */
+export const resolveAnnouncementHeaderMedia = async ({
+  headerImageLink = '',
+  headerImageId = '',
+  templateName = '',
+} = {}) => {
+  const link =
+    String(headerImageLink || '').trim() ||
+    String(process.env.WHATSAPP_ANNOUNCEMENT_HEADER_IMAGE || '').trim();
+  const existingId = String(headerImageId || '').trim();
+
+  if (link) return { headerImageLink: link, headerImageId: '' };
+  if (existingId) return { headerImageLink: '', headerImageId: existingId };
+
+  if (!announcementRequiresImageHeader(templateName)) {
+    return { headerImageLink: '', headerImageId: '' };
+  }
+
+  const filePath = defaultAnnouncementImageCandidates().find((p) =>
+    fs.existsSync(p),
+  );
+  if (!filePath) {
+    throw new Error(
+      `Template "${templateName}" requires an IMAGE header. Provide headerImageLink (public HTTPS URL) or set WHATSAPP_ANNOUNCEMENT_HEADER_IMAGE.`,
+    );
+  }
+
+  const mediaId = await uploadWhatsAppImageMedia(filePath);
+  return { headerImageLink: '', headerImageId: mediaId };
+};
+
+export const sendWhatsAppTemplateMessage = async ({
+  to,
+  templateName,
+  languageCode = 'en_US',
+  bodyParams = [], // ["Rahul", "Premium"] → {{1}} {{2}}
+  headerImageLink = '', // public HTTPS URL for IMAGE-header templates
+  headerImageId = '', // WhatsApp media id (preferred when no public URL)
+}) => {
+  const { phoneNumberId, accessToken, version } = getWhatsAppCreds();
+
+  if (!phoneNumberId || !accessToken) {
+    // stub mode for local learning without Meta
+    console.log('[Announcement][WhatsApp stub]', {
+      to,
+      templateName,
+      bodyParams,
+      headerImageLink,
+      headerImageId,
+    });
+    return { delivered: false, stub: true };
+  }
+
+  const recipient = toWhatsAppRecipient(to); // you already have this
+  if (!recipient) throw new Error('Invalid WhatsApp recipient');
+
+  let imageLink = String(headerImageLink || '').trim();
+  let imageId = String(headerImageId || '').trim();
+
+  // Safety net: IMAGE templates must never send without a header
+  if (
+    announcementRequiresImageHeader(templateName) &&
+    !imageLink &&
+    !imageId
+  ) {
+    const resolved = await resolveAnnouncementHeaderMedia({ templateName });
+    imageLink = resolved.headerImageLink;
+    imageId = resolved.headerImageId;
+  }
+
+  const components = [];
+
+  if (imageId || imageLink) {
+    components.push({
+      type: 'header',
+      parameters: [
+        {
+          type: 'image',
+          image: imageId ? { id: imageId } : { link: imageLink },
+        },
+      ],
+    });
+  }
+
+  if (bodyParams.length) {
+    components.push({
+      type: 'body',
+      parameters: bodyParams.map((text) => ({
+        type: 'text',
+        text: String(text),
+      })),
+    });
+  }
+
+  if (
+    announcementRequiresImageHeader(templateName) &&
+    !components.some((c) => c.type === 'header')
+  ) {
+    throw new Error(
+      `Template "${templateName}" requires IMAGE header but none was resolved`,
+    );
+  }
+
+  const res = await fetch(
+    `https://graph.facebook.com/${version}/${phoneNumberId}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: recipient,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          ...(components.length ? { components } : {}),
+        },
+      }),
+    },
+  );
+
+  const data = await res.json();
+  if (!res.ok) {
+    const details = data?.error?.error_data?.details;
+    const msg = data?.error?.message || 'WhatsApp API failed';
+    throw new Error(details ? `${msg} — ${details}` : msg);
+  }
+  return { delivered: true, messageId: data?.messages?.[0]?.id };
 };

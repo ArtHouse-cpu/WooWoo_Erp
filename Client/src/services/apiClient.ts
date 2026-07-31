@@ -1845,3 +1845,26 @@ export const handleBulkCreateSubscriptions = async (payload: { subscriptions: an
     throw error;
   }
 };
+
+export type CreateAnnouncementPayload = {
+  templateName: string;
+  audienceType: "all" | "selected";
+  selectedCustomerIds?: string[];
+  whatsappTemplateName: string;
+  languageCode?: string;
+  templateParams?: string[];
+  /** Public HTTPS image URL — required for Meta IMAGE-header templates */
+  headerImageLink?: string;
+};
+
+export const handleGetAnnouncements = async (signal?: AbortSignal) => {
+  const response = await axiosInstance.get("/api/announcement", { signal });
+  return response.data;
+};
+
+export const handleCreateAnnouncement = async (
+  payload: CreateAnnouncementPayload,
+) => {
+  const response = await axiosInstance.post("/api/announcement", payload);
+  return response.data;
+};
