@@ -328,9 +328,9 @@ Participation in an Event does not automatically authorise the sale of products,
 
 Sales, stalls, pop-ups, and commercial exhibitions may require written approval or a separate stall, vendor, or exhibition arrangement.
 
-Independent sellers are responsible for their own product representations, taxes, invoices, consumer obligations, licences, and legal compliance.
+Independent sailors are responsible for their own product representations, taxes, invoices, consumer obligations, licences, and legal compliance.
 
-WOOWOO is not automatically the seller or contracting party in an independent participant-to-customer transaction merely because the transaction occurs at a WOOWOO Event.
+WOOWOO is not automatically the sailor or contracting party in an independent participant-to-customer transaction merely because the transaction occurs at a WOOWOO Event.
 
 ## 28. COMPETITIONS, CHALLENGES AND PRIZES
 

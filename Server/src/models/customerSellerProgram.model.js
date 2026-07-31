@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const customerSellerProgramSchema = new mongoose.Schema(
+const customersailorProgramSchema = new mongoose.Schema(
   {
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -20,7 +20,7 @@ const customerSellerProgramSchema = new mongoose.Schema(
       default: 'active',
       index: true,
     },
-    sellerSharePercent: {
+    sailorSharePercent: {
       type: Number,
       min: 0,
       max: 100,
@@ -47,7 +47,7 @@ const customerSellerProgramSchema = new mongoose.Schema(
   {timestamps: true},
 );
 
-customerSellerProgramSchema.index(
+customersailorProgramSchema.index(
   {customerId: 1},
   {
     unique: true,
@@ -55,7 +55,7 @@ customerSellerProgramSchema.index(
   },
 );
 
-customerSellerProgramSchema.index(
+customersailorProgramSchema.index(
   {vendorId: 1},
   {
     unique: true,
@@ -64,6 +64,6 @@ customerSellerProgramSchema.index(
 );
 
 export default mongoose.model(
-  'CustomerSellerProgram',
-  customerSellerProgramSchema,
+  'CustomersailorProgram',
+  customersailorProgramSchema,
 );

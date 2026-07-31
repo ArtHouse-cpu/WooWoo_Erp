@@ -116,7 +116,7 @@ const productSchema = new mongoose.Schema(
     },
     cspEnrollmentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'CustomerSellerProgram',
+      ref: 'CustomersailorProgram',
       default: null,
       index: true,
     },

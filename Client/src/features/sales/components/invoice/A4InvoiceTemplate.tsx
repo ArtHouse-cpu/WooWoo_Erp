@@ -18,12 +18,12 @@ const BORDER = "#111827";
 const TEXT_MUTED = "#6b7280";
 const TITLE_GREY = "#d1d5db";
 
-const SELLER_LEGAL_NAME = "WOOWOO ART HOUSE";
-const SELLER_ADDRESS_LINES = [
+const sailor_LEGAL_NAME = "WOOWOO ART HOUSE";
+const sailor_ADDRESS_LINES = [
   "#20 Commercial Complex, Nehru Nagar East",
   "Bhilai, Durg, Chhattisgarh — 490020",
 ];
-const SELLER_CONTACT = "+91 8073988123 • myyarthouse@gmail.com";
+const sailor_CONTACT = "+91 8073988123 • myyarthouse@gmail.com";
 
 const FONT_STACK =
   'Arial, Helvetica, "Segoe UI", Roboto, "Noto Sans", sans-serif';
@@ -581,7 +581,7 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: "28px" }}>
-            For {SELLER_LEGAL_NAME}:
+            For {sailor_LEGAL_NAME}:
           </div>
           {signatureSrc ? (
             <img
@@ -613,7 +613,7 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
       >
         <div style={{ fontSize: "11px", color: TEXT_MUTED, maxWidth: "52%" }}>
           Pay / enquiries: visit store or contact{" "}
-          <span style={{ color: BORDER }}>{SELLER_CONTACT}</span>
+          <span style={{ color: BORDER }}>{sailor_CONTACT}</span>
           . Please quote invoice number{" "}
           <strong>{invoiceNo}</strong> for support.
         </div>
@@ -753,13 +753,13 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
             lineHeight: 1.45,
           }}
         >
-          This is a computer-generated invoice for {SELLER_LEGAL_NAME}. Tax break-up
+          This is a computer-generated invoice for {sailor_LEGAL_NAME}. Tax break-up
           is shown where applicable as supplied in your billing records. Subject to
           applicable laws in India.
         </div>
       </div>
 
-      {/* Seller block footer */}
+      {/* sailor block footer */}
       <div
         style={{
           marginTop: "18px",
@@ -769,11 +769,11 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
           lineHeight: 1.5,
         }}
       >
-        <strong style={{ color: BORDER }}>{SELLER_LEGAL_NAME}</strong>
+        <strong style={{ color: BORDER }}>{sailor_LEGAL_NAME}</strong>
         <br />
-        {SELLER_ADDRESS_LINES.join(" • ")}
+        {sailor_ADDRESS_LINES.join(" • ")}
         <br />
-        {SELLER_CONTACT}
+        {sailor_CONTACT}
       </div>
     </div>
   );

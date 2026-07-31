@@ -384,7 +384,7 @@ if (action === "set_minimum") {
 
  const handleViewHistory = async (row: WalletRow) => {
   const rawTransactions = Array.isArray(row.raw?.transactions)
-    ? row.raw.transactions
+    ? [...row.raw.transactions].reverse()
     : [];
 
   const totalCredit = rawTransactions.reduce((sum: number, t: any) => {
