@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const customersailorProgramSchema = new mongoose.Schema(
+const customerSailorProgramSchema = new mongoose.Schema(
   {
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -47,7 +47,7 @@ const customersailorProgramSchema = new mongoose.Schema(
   {timestamps: true},
 );
 
-customersailorProgramSchema.index(
+customerSailorProgramSchema.index(
   {customerId: 1},
   {
     unique: true,
@@ -55,7 +55,7 @@ customersailorProgramSchema.index(
   },
 );
 
-customersailorProgramSchema.index(
+customerSailorProgramSchema.index(
   {vendorId: 1},
   {
     unique: true,
@@ -64,6 +64,6 @@ customersailorProgramSchema.index(
 );
 
 export default mongoose.model(
-  'CustomersailorProgram',
-  customersailorProgramSchema,
+  'CustomerSailorProgram',
+  customerSailorProgramSchema,
 );

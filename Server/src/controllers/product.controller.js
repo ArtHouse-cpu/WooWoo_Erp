@@ -1,5 +1,5 @@
 import Product from '../models/product.model.js';
-import CustomersailorProgram from '../models/customersailorProgram.model.js';
+import CustomersailorProgram from '../models/customerSellerProgram.model.js';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';

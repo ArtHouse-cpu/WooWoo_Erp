@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import Customer from '../models/customer.model.js';
 import Vendor from '../models/vendor.model.js';
-import CustomersailorProgram from '../models/customersailorProgram.model.js';
+import CustomersailorProgram from '../models/customerSellerProgram.model.js';
 
 const getsailorSharePercent = () => {
   const n = Number(process.env.CSP_sailor_SHARE_PERCENT ?? 70);

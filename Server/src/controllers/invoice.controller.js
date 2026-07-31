@@ -4,7 +4,7 @@ import Coupon from '../models/coupon.model.js';
 import Invoice from '../models/invoice.model.js';
 import Wallet from '../models/wallet.model.js';
 import Product from '../models/product.model.js';
-import CustomersailorProgram from '../models/customersailorProgram.model.js';
+import CustomerSailorProgram from '../models/customerSellerProgram.model.js';
 import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
 import { appendTransaction } from './wallet.controller.js';
 import { validateCouponForOrder } from './coupon.controller.js';
