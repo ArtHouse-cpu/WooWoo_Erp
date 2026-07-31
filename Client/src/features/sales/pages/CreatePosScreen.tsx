@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, Printer, ShoppingCart, Trash2, User } from "lucide-react";
+import { X, ShoppingCart, Trash2, User, FileText } from "lucide-react";
 import Swal from "sweetalert2";
 import {
   handleCreateProduct,
@@ -25,7 +25,8 @@ import {
   toMembershipPlanId,
 } from "../utils/membershipInvoiceUtils";
 import { creditWalletCashback } from "../utils/walletCashback";
-import { printThermalReceipt } from "@/utils/printUtils";
+import { useNavigate } from "react-router-dom";
+
 
 const todayStr = new Date().toISOString().split("T")[0];
 const INVOICE_SEQ_KEY = "wooerp-invoice-seq";
@@ -66,6 +67,7 @@ export default function CreatePosScreen({
   open?: boolean;
   onClose?: () => void;
 }) {
+  const navigate = useNavigate();
   const [internalOpen, setInternalOpen] = useState(true);
   const isOpen = open ?? internalOpen;
   const requestClose = () => {
@@ -101,11 +103,9 @@ export default function CreatePosScreen({
 
   const [items, setItems] = useState<PosItem[]>([]);
 
-   const[showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
- const handleRequestClose =() => {
-  setShowExitConfirm(true);
- };
+
 
   useEffect(() => {
     const ac = new AbortController();
@@ -456,40 +456,71 @@ export default function CreatePosScreen({
         payment.customerId,
       );
 
-      Swal.fire("Success", "POS Transaction completed.", "success");
+      await Swal.fire("Success", "POS Transaction completed.", "success");
       setItems([]);
       setOpenCheckout(false);
+      requestClose(); //close the pos billing modal
     } catch (error: any) {
       Swal.fire("Error", "Could not complete transaction.", "error");
     } finally {
       setSaving(false);
     }
   };
+  const handleSaveDraft = async () => {
+    try {
+      setSaving(true);
 
-  const handlePrintPosReceipt = () => {
-    if (items.length === 0) {
-      Swal.fire("No items", "Please add at least one item before printing.", "warning");
-      return;
+      await handleCreateInvoice({
+        customerName: customer.trim() || "Walk-in Customer",
+        customerPhone: phone.trim(),
+        invoiceDate: todayStr,
+        dueDate: todayStr,
+        salesPersonName: staff.m_staff_name || "POS",
+        notes: "POS Draft Transaction",
+        items: items.map((item) => ({
+          productName: item.name,
+          qty: item.qty,
+          unitPrice: item.price,
+          discount: item.discount,
+          category: item.category || "General",
+        })),
+        subTotal,
+        discountTotal,
+        extraCharges,
+        grandTotal,
+        status: "draft",
+        mode: "Draft",
+        paymentStatus: "partial",
+        paymentBreakdown: {
+          cash: 0,
+          upi: 0,
+          card: 0,
+          wallet: 0,
+          paidAmount: 0,
+          dueAmount: grandTotal,
+          changeAmount: 0,
+        },
+        pendingAmount: grandTotal,
+        createdBy: {
+          m_staff_id: staff.m_staff_id,
+          m_staff_name: staff.m_staff_name,
+          m_staff_email: staff.m_staff_email,
+        },
+      });
+
+      await Swal.fire("Success", "Draft POS Transaction saved.", "success");
+      setItems([]);
+      requestClose(); // Automatically close the modal on success
+    } catch (error: any) {
+      Swal.fire("Error", "Could not save draft.", "error");
+    } finally {
+      setSaving(false);
     }
-    printThermalReceipt({
-      invoiceNo: `DRAFT-${invoiceNo || new Date().toISOString().slice(0, 10).replace(/-/g, "")}`,
-      customerName: customer.trim() || "Walk-in Customer",
-      customerPhone: phone.trim(),
-      items: items.map((item) => ({
-        name: item.name,
-        qty: item.qty,
-        price: item.price,
-        discount: item.discount,
-      })),
-      totalMRP: subTotal,
-      discountTotal,
-      cashbackAmount: cashbackTotal,
-      finalAmount: grandTotal,
-      totalDue: grandTotal,
-      totalQty: items.reduce((sum, item) => sum + item.qty, 0),
-      extraCharges,
-    });
   };
+
+
+
+
 
   const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
     try {
@@ -593,65 +624,100 @@ export default function CreatePosScreen({
     return () => controller.abort();
   }, [debouncedSearchText]);
 
+  const handleRequestClose = async () => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "any unsaved changes will be lost.",
+      icon: "warning",
+      showCancelButton: true,
+      showDenyButton: true,          // Enable the 3rd button
+      confirmButtonColor: "#EF4444", // Red for exit
+      denyButtonColor: "#4F46E5",    // Indigo for Save Draft
+      cancelButtonColor: "#6B7280",  // Gray for cancel
+      confirmButtonText: "Yes, Close",
+      denyButtonText: "Save Draft",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      if (onClose) {
+        onClose();
+      } else {
+        navigate(-1);
+      }
+    } else if (result.isDenied) {
+      await handleSaveDraft();
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
+
     <>
+
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
         onMouseDown={(e) => {
-          if(e.currentTarget == e.target){
+          if (e.currentTarget == e.target) {
             handleRequestClose();
           }
         }}
       >
+
         <div className="max-h-[92vh] w-[95%] max-w-7xl overflow-auto rounded-2xl bg-white p-6 shadow-2xl">
           {/* Header */}
           <div className="flex justify-between items-center border-b pb-3">
             <h2 className="text-xl font-semibold">POS Billing</h2>
-            <button 
+            <button
               type="button"
               onClick={handleRequestClose}
-              className="rounded-md p-1 text-gray-600 hover:bg-gray-100"
+              className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-black"
             >
-              <X />
+
+              <X size={18} />
+
             </button>
           </div>
+
 
           {/* confirmation popup */}
 
           {showExitConfirm && (
-  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-    <div className="w-[360px] rounded-xl bg-white p-6 shadow-xl">
-      <h3 className="text-lg font-semibold">
-        Exit POS Billing
-      </h3>
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+              <div className="w-[360px] rounded-xl bg-white p-6 shadow-xl">
+                <h3 className="text-lg font-semibold">
+                  Exit POS Billing
+                </h3>
 
-      <p className="mt-2 text-sm text-gray-600">
-        Are you sure you want to exit?
-      </p>
+                <p className="mt-2 text-sm text-gray-600">
+                  Are you sure you want to exit?
+                </p>
 
-      <div className="mt-6 flex justify-end gap-3">
-        <button
-          onClick={() => setShowExitConfirm(false)}
-          className="rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-100"
-        >
-          No
-        </button>
 
-        <button
-          onClick={() => {
-            setShowExitConfirm(false);
-            requestClose(); 
-          }}
-          className="rounded-lg bg-red-500 px-4 py-2 text-white hover:bg-red-600"
-        >
-          Yes
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+                <div className="mt-6 flex justify-end gap-3">
+
+                  <button
+                    onClick={() => setShowExitConfirm(false)}
+                    className="rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-100"
+                  >
+                    No
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowExitConfirm(false);
+                      requestClose();
+                    }}
+                    className="rounded-lg bg-red-500 px-4 py-2 text-white hover:bg-red-600"
+                  >
+                    Yes
+                  </button>
+
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Main Layout Grid */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px] mt-4">
@@ -669,7 +735,7 @@ export default function CreatePosScreen({
                     + Create New Customer
                   </button>
                 </div>
-                
+
                 <div className="relative mt-2">
                   <div className="flex items-center gap-3">
                     <div className="relative flex-1">
@@ -680,79 +746,79 @@ export default function CreatePosScreen({
                           setCustomer(e.target.value);
                           setCustomerDropdownOpen(true);
                           if (!e.target.value) {
-                              setPhone("");
-                              setMembership("none");
-                              setMembershipPlanId(null);
-                              setCustomerId(null);
+                            setPhone("");
+                            setMembership("none");
+                            setMembershipPlanId(null);
+                            setCustomerId(null);
                           }
                         }}
                         placeholder="Search customer by name or phone..."
                         className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all"
                       />
-                      
+
                       {customerDropdownOpen && (loadingCustomers || customers.length > 0) && (
                         <div className="absolute top-full left-0 right-0 z-[60] mt-1 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
                           {loadingCustomers ? (
                             <div className="px-4 py-3 text-sm text-slate-500">Searching customers...</div>
                           ) : (
                             customers.map((c) => (
-                            <button
-                              key={c._id}
-                              type="button"
-                              onClick={() => {
-                                const mType = c.membershipType ?? "none";
-                                const mId = toMembershipPlanId(c.membershipPlanId);
-                                setCustomer(c.name);
-                                setPhone(c.mobile);
-                                setMembership(mType);
-                                setMembershipPlanId(mId);
-                                setCustomerId(c._id);
-                                setCustomers([]);
-                                setCustomerDropdownOpen(false);
+                              <button
+                                key={c._id}
+                                type="button"
+                                onClick={() => {
+                                  const mType = c.membershipType ?? "none";
+                                  const mId = toMembershipPlanId(c.membershipPlanId);
+                                  setCustomer(c.name);
+                                  setPhone(c.mobile);
+                                  setMembership(mType);
+                                  setMembershipPlanId(mId);
+                                  setCustomerId(c._id);
+                                  setCustomers([]);
+                                  setCustomerDropdownOpen(false);
 
-                                // Auto-apply membership discounts (CSP keeps product discount; no membership)
-                                setItems(prev => prev.map(item => {
-                                  if (item.isCsp) {
-                                    const productDiscount = calcCatalogueProductDiscount(
-                                      item.price,
-                                      item.qty,
-                                      item.productDiscountType,
-                                      item.productDiscountValue,
-                                    );
+                                  // Auto-apply membership discounts (CSP keeps product discount; no membership)
+                                  setItems(prev => prev.map(item => {
+                                    if (item.isCsp) {
+                                      const productDiscount = calcCatalogueProductDiscount(
+                                        item.price,
+                                        item.qty,
+                                        item.productDiscountType,
+                                        item.productDiscountValue,
+                                      );
+                                      return {
+                                        ...item,
+                                        discount:
+                                          productDiscount > 0
+                                            ? productDiscount
+                                            : item.discount,
+                                        cashback: 0,
+                                      };
+                                    }
+                                    const benefits = getMembershipBenefitsForItem(item.price, item.qty, item.category || "General", mType, mId, false);
                                     return {
-                                      ...item,
-                                      discount:
-                                        productDiscount > 0
-                                          ? productDiscount
-                                          : item.discount,
-                                      cashback: 0,
-                                    };
-                                  }
-                                  const benefits = getMembershipBenefitsForItem(item.price, item.qty, item.category || "General", mType, mId, false);
-                                  return {
                                       ...item,
                                       discount: benefits.discount || 0,
                                       cashback: benefits.cashback || 0
-                                  };
-                                }));
-                              }}
-                              className="flex w-full items-center justify-between px-4 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0"
-                            >
-                              <div className="text-left">
-                                <div className="text-sm font-bold text-slate-700">{c.name}</div>
-                                <div className="text-xs text-slate-500">{c.mobile}</div>
-                              </div>
-                              {c.membershipType && c.membershipType !== "none" && (
-                                <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-600 uppercase">
-                                  {c.membershipType}
-                                </span>
-                              )}
-                            </button>
-                          )))}
+                                    };
+                                  }));
+                                }}
+                                className="flex w-full items-center justify-between px-4 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0"
+                              >
+                                <div className="text-left">
+                                  <div className="text-sm font-bold text-slate-700">{c.name}</div>
+                                  <div className="text-xs text-slate-500">{c.mobile}</div>
+                                </div>
+                                {c.membershipType && c.membershipType !== "none" && (
+                                  <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-600 uppercase">
+                                    {c.membershipType}
+                                  </span>
+                                )}
+                              </button>
+                            )))}
                         </div>
                       )}
                     </div>
-                    
+
                     {customer && (
                       <div className="flex items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50/50 px-4 py-2">
                         <div className="text-xs">
@@ -958,7 +1024,7 @@ export default function CreatePosScreen({
                   </div>
 
                   {/* Center: Actions */}
-                 
+
 
                   {/* Right: Total */}
                   <div className="text-right">
@@ -974,18 +1040,18 @@ export default function CreatePosScreen({
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Extra Charges</span>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => setExtraCharges([...extraCharges, { label: "New Charge", amount: 0 }])}
                         className="text-[10px] font-bold text-indigo-600 hover:underline"
                       >
                         + ADD CHARGE
                       </button>
                     </div>
-                    
+
                     {extraCharges.map((charge, idx) => (
                       <div key={idx} className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-                        <input 
+                        <input
                           type="text"
                           value={charge.label}
                           onChange={(e) => {
@@ -997,7 +1063,7 @@ export default function CreatePosScreen({
                         />
                         <div className="flex items-center gap-1">
                           <span className="text-slate-400 text-xs">₹</span>
-                          <input 
+                          <input
                             type="number"
                             value={charge.amount || ""}
                             onChange={(e) => {
@@ -1007,8 +1073,8 @@ export default function CreatePosScreen({
                             }}
                             className="w-20 bg-transparent border-b border-slate-200 focus:border-indigo-600 outline-none text-right text-xs font-bold text-slate-700"
                           />
-                          <button 
-                            type="button" 
+                          <button
+                            type="button"
                             onClick={() => {
                               const next = [...extraCharges];
                               next.splice(idx, 1);
@@ -1024,16 +1090,18 @@ export default function CreatePosScreen({
                   </div>
                 </div>
 
-                {/* Bottom Row (Print + Checkout CTA) */}
+
+                {/* Bottom Row (Checkout CTA) */}
+                {/* Bottom Row (Draft + Checkout CTA) */}
                 <div className="flex justify-end gap-3">
                   <button
                     type="button"
-                    onClick={handlePrintPosReceipt}
+                    onClick={handleSaveDraft}
                     disabled={items.length === 0 || saving}
                     className="bg-white text-slate-700 border border-slate-200 px-6 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-slate-50 transition shadow-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
                   >
-                    <Printer size={18} />
-                    Print
+                    <FileText size={18} />
+                    Save Draft
                   </button>
                   <button
                     type="button"
@@ -1051,6 +1119,7 @@ export default function CreatePosScreen({
                 </div>
               </div>
             </div>
+
 
             <aside className="h-[60vh] lg:h-[70vh] sticky top-0 overflow-hidden">
               <ProductSidebar

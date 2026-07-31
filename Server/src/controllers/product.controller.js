@@ -1,5 +1,5 @@
 import Product from '../models/product.model.js';
-import CustomerSellerProgram from '../models/customerSellerProgram.model.js';
+import CustomersailorProgram from '../models/customersailorProgram.model.js';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
@@ -31,7 +31,7 @@ const resolveCspFields = async ({ isCspRaw, cspEnrollmentIdRaw }) => {
     throw error;
   }
 
-  const enrollment = await CustomerSellerProgram.findOne({
+  const enrollment = await CustomersailorProgram.findOne({
     _id: enrollmentId,
     status: 'active',
   }).lean();
@@ -62,7 +62,7 @@ const withCspLabel = async products => {
 
   let enrollmentMap = new Map();
   if (enrollmentIds.length) {
-    const rows = await CustomerSellerProgram.find({
+    const rows = await CustomersailorProgram.find({
       _id: {$in: enrollmentIds},
     })
       .populate('customerId', 'name mobile')

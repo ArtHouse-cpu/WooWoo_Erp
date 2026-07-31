@@ -13,8 +13,6 @@ import {
   SquarePen,
   Trash2,
 } from "lucide-react";
-import CategoryListModal from "@/features/catalogue/components/CategoryListModal";
-import CategorySidebar from "@/features/catalogue/components/CategorySidebar";
 import {
   handleGetProducts,
   handleCreateProduct,
@@ -40,11 +38,10 @@ type ProductRow = {
 
 
 export default function ProductScreen() {
-  const [openCategoryListModal, setOpenCategoryListModal] = useState(false);
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showCategorySidebar, setShowCategorySidebar] = useState(false);
+ 
   const [editProduct, setEditProduct] = useState<any | null>(null);
 
   const fetchData = async (signal?: AbortSignal) => {
@@ -266,26 +263,6 @@ export default function ProductScreen() {
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-semibold ">Products List</h1>
         <div className="flex gap-3">
-          {/* <div
-            className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
-            onClick={() => setOpenCategoryListModal(true)}
-          >
-            Category
-          </div> */}
-          {openCategoryListModal && (
-            <CategoryListModal
-              onClose={() => setOpenCategoryListModal(false)}
-            />
-          )}
-          <Can permission={PERMISSIONS.CATEGORY_MANAGE}>
-            <button
-              type="button"
-              onClick={() => setShowCategorySidebar(true)}
-              className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
-            >
-              + Add Category
-            </button>
-          </Can>
           <Can permission={PERMISSIONS.PRODUCT_CREATE}>
             <button
               type="button"
@@ -295,13 +272,7 @@ export default function ProductScreen() {
               + Add Product
             </button>
           </Can>
-          {showCategorySidebar && (
-            <CategorySidebar
-              isOpen={showCategorySidebar}
-              onClose={() => setShowCategorySidebar(false)}
-              onRefreshProducts={fetchData}
-            />
-          )}
+         
           {showCreateModal && (
             <CreateProductModal
               onClose={() => {

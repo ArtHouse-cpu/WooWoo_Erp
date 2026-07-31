@@ -104,7 +104,7 @@ export function ProgramsBottomSheet({isOpen, onClose, initialTab = 'csp'}: Progr
       type: 'video',
       image: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=400&q=80',
       tag: 'VIDEO',
-      title: 'Creative Sellers',
+      title: 'Creative sailors',
       hasPlayButton: true,
     },
     {
@@ -307,7 +307,7 @@ export function ProgramsBottomSheet({isOpen, onClose, initialTab = 'csp'}: Progr
                 </div>
                 <div className="min-w-0">
                   <div className="text-[11.5px] font-black leading-none">CSP</div>
-                  <div className={`mt-0.5 truncate text-[9px] font-bold ${activeTab === 'csp' ? 'text-[#C2410C]' : 'text-slate-400'}`}>Creative Seller Program</div>
+                  <div className={`mt-0.5 truncate text-[9px] font-bold ${activeTab === 'csp' ? 'text-[#C2410C]' : 'text-slate-400'}`}>Creative sailor Program</div>
                 </div>
               </button>
 
@@ -419,7 +419,7 @@ export function ProgramsBottomSheet({isOpen, onClose, initialTab = 'csp'}: Progr
                         <Users className="h-4.5 w-4.5" strokeWidth={2.25} />
                       </div>
                       <div className="text-[13px] font-black text-slate-900 leading-none">50+</div>
-                      <div className="mt-1 text-[8.5px] font-extrabold text-[#7C2D12] leading-tight">Creative Sellers</div>
+                      <div className="mt-1 text-[8.5px] font-extrabold text-[#7C2D12] leading-tight">Creative sailors</div>
                     </div>
                     {/* Stat 2 */}
                     <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F0FDF4] border border-[#DCFCE7] text-center">
@@ -485,7 +485,7 @@ export function ProgramsBottomSheet({isOpen, onClose, initialTab = 'csp'}: Progr
                         {activeTab === 'csp' ? '01' : '02'}
                       </span>
                       <h4 className="text-[15px] font-black text-slate-900 leading-none">
-                        {activeTab === 'csp' ? 'Creative Seller Program' : 'House Affiliate Program'}
+                        {activeTab === 'csp' ? 'Creative sailor Program' : 'House Affiliate Program'}
                       </h4>
                     </div>
 
