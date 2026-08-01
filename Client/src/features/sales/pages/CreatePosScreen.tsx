@@ -19,8 +19,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import { useAppSelector } from "@/store/hooks";
 import {
-  calcCatalogueProductDiscount,
-  membershipBenefitsForLine,
+  calcStackedLineBenefits,
   resolveMembershipPlan,
   toMembershipPlanId,
 } from "../utils/membershipInvoiceUtils";
@@ -58,6 +57,8 @@ type PosItem = {
   /** Catalogue discount metadata for CSP / product discount recalc on qty change */
   productDiscountType?: string;
   productDiscountValue?: number;
+  productDiscountAmount?: number;
+  membershipDiscountAmount?: number;
 };
 
 export default function CreatePosScreen({
@@ -115,16 +116,26 @@ export default function CreatePosScreen({
     return () => ac.abort();
   }, []);
 
-  const getMembershipBenefitsForItem = (
+  const stackLineBenefits = (
     price: number,
     qty: number,
     category: string,
     mType: string,
     mId?: string | null,
     isCsp?: boolean,
+    discountType?: string,
+    discountValue?: number,
   ) => {
     const plan = resolveMembershipPlan(membershipPlans, mType, mId);
-    return membershipBenefitsForLine(price, qty, category, plan, { isCsp });
+    return calcStackedLineBenefits({
+      unitPrice: price,
+      qty,
+      category,
+      plan,
+      discountType,
+      discountValue,
+      isCsp,
+    });
   };
 
   const handleChange = (
@@ -138,31 +149,22 @@ export default function CreatePosScreen({
 
         const updated = { ...it, [field]: Number(value) };
         if (field === "qty" || field === "price") {
-          if (updated.isCsp) {
-            const productDiscount = calcCatalogueProductDiscount(
-              updated.price,
-              updated.qty,
-              updated.productDiscountType,
-              updated.productDiscountValue,
-            );
-            return {
-              ...updated,
-              discount: productDiscount,
-              cashback: 0,
-            };
-          }
-          const benefits = getMembershipBenefitsForItem(
+          const stacked = stackLineBenefits(
             updated.price,
             updated.qty,
             updated.category || "General",
             membership,
             membershipPlanId,
-            false,
+            Boolean(updated.isCsp),
+            updated.productDiscountType,
+            updated.productDiscountValue,
           );
           return {
             ...updated,
-            discount: benefits.discount || updated.discount,
-            cashback: benefits.cashback || updated.cashback,
+            discount: stacked.discount,
+            cashback: stacked.cashback,
+            productDiscountAmount: stacked.productDiscount,
+            membershipDiscountAmount: stacked.membershipDiscount,
           };
         }
         return updated;
@@ -200,7 +202,6 @@ export default function CreatePosScreen({
     }
 
     const price = Number(selectedProduct?.sellingPrice ?? 0);
-    const membershipCategory = selectedProduct?.category || "General";
     const lineCategory =
       selectedProduct?.lineCategory ||
       selectedProduct?.sourceType ||
@@ -208,19 +209,15 @@ export default function CreatePosScreen({
     const isCsp = Boolean(selectedProduct?.isCsp);
     const productDiscountType = selectedProduct?.discountType;
     const productDiscountValue = Number(selectedProduct?.discountValue ?? 0);
-    const productDiscount = calcCatalogueProductDiscount(
+    const stacked = stackLineBenefits(
       price,
       qty,
-      productDiscountType,
-      productDiscountValue,
-    );
-    const benefits = getMembershipBenefitsForItem(
-      price,
-      qty,
-      membershipCategory,
+      lineCategory || selectedProduct?.category || "General",
       membership,
       membershipPlanId,
       isCsp,
+      productDiscountType,
+      productDiscountValue,
     );
 
     setItems((prev) => [
@@ -230,8 +227,8 @@ export default function CreatePosScreen({
         name,
         qty,
         price,
-        discount: isCsp ? productDiscount : benefits.discount || productDiscount || 0,
-        cashback: isCsp ? 0 : benefits.cashback || 0,
+        discount: stacked.discount,
+        cashback: stacked.cashback,
         category: lineCategory,
         stockQty: selectedProduct?.trackStock
           ? Number(selectedProduct?.stockQty ?? 0)
@@ -240,6 +237,8 @@ export default function CreatePosScreen({
         isCsp,
         productDiscountType,
         productDiscountValue,
+        productDiscountAmount: stacked.productDiscount,
+        membershipDiscountAmount: stacked.membershipDiscount,
       },
     ]);
 
@@ -281,24 +280,19 @@ export default function CreatePosScreen({
     } else {
       const qty = 1;
       const price = Number(p.sellingPrice ?? 0);
-      const membershipCategory = p.category || "General";
       const lineCategory = p.lineCategory || p.sourceType || "product";
       const isCsp = Boolean(p.isCsp);
       const productDiscountType = p.discountType;
       const productDiscountValue = Number(p.discountValue ?? 0);
-      const productDiscount = calcCatalogueProductDiscount(
+      const stacked = stackLineBenefits(
         price,
         qty,
-        productDiscountType,
-        productDiscountValue,
-      );
-      const benefits = getMembershipBenefitsForItem(
-        price,
-        qty,
-        membershipCategory,
+        lineCategory || p.category || "General",
         membership,
         membershipPlanId,
         isCsp,
+        productDiscountType,
+        productDiscountValue,
       );
 
       setItems((prev) => [
@@ -308,14 +302,16 @@ export default function CreatePosScreen({
           name,
           qty,
           price,
-          discount: isCsp ? productDiscount : benefits.discount || productDiscount || 0,
-          cashback: isCsp ? 0 : benefits.cashback || 0,
+          discount: stacked.discount,
+          cashback: stacked.cashback,
           category: lineCategory,
           stockQty: p.trackStock ? Number(p.stockQty ?? 0) : undefined,
           image: p.imageUrl || (p as any).images?.[0] || "",
           isCsp,
           productDiscountType,
           productDiscountValue,
+          productDiscountAmount: stacked.productDiscount,
+          membershipDiscountAmount: stacked.membershipDiscount,
         },
       ]);
     }
@@ -368,6 +364,26 @@ export default function CreatePosScreen({
     [items],
   );
 
+  const productDiscountTotal = useMemo(
+    () =>
+      items.reduce(
+        (sum, item) => sum + Number(item.productDiscountAmount ?? 0),
+        0,
+      ),
+    [items],
+  );
+
+  const membershipDiscountTotal = useMemo(
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum +
+          (item.isCsp ? 0 : Number(item.membershipDiscountAmount ?? 0)),
+        0,
+      ),
+    [items],
+  );
+
   const cashbackTotal = useMemo(
     () => items.reduce((sum, item) => sum + (item.cashback || 0), 0),
     [items],
@@ -409,6 +425,29 @@ export default function CreatePosScreen({
   const handleSave = async (payment: any) => {
     try {
       setSaving(true);
+      const waiveMembership = Boolean(payment.waiveMembershipForCoupon);
+      const lineItems = items.map((item) => {
+        const productOnly = Number(item.productDiscountAmount ?? 0);
+        const membershipOnly = item.isCsp
+          ? 0
+          : Number(item.membershipDiscountAmount ?? 0);
+        const discount = waiveMembership
+          ? productOnly > 0
+            ? productOnly
+            : Math.max(0, Number(item.discount || 0) - membershipOnly)
+          : Number(item.discount || 0);
+        return {
+          productName: item.name,
+          qty: item.qty,
+          unitPrice: item.price,
+          discount,
+          category: item.category || "General",
+        };
+      });
+      const lineDiscountTotal = lineItems.reduce(
+        (sum, item) => sum + Number(item.discount || 0),
+        0,
+      );
       const response = await handleCreateInvoice({
         customerName: customer.trim() || "Walk-in Customer",
         customerPhone: phone.trim(),
@@ -416,16 +455,10 @@ export default function CreatePosScreen({
         dueDate: todayStr,
         salesPersonName: staff.m_staff_name || "POS",
         notes: "POS Transaction",
-        items: items.map((item) => ({
-          productName: item.name,
-          qty: item.qty,
-          unitPrice: item.price,
-          discount: item.discount,
-          category: item.category || "General",
-        })),
+        items: lineItems,
         subTotal,
         discountTotal:
-          discountTotal +
+          lineDiscountTotal +
           Number(payment.coupon?.discountAmount ?? 0) +
           Number(payment.referral?.discountAmount ?? 0),
         extraCharges,
@@ -776,31 +809,29 @@ export default function CreatePosScreen({
                                   setCustomers([]);
                                   setCustomerDropdownOpen(false);
 
-                                  // Auto-apply membership discounts (CSP keeps product discount; no membership)
-                                  setItems(prev => prev.map(item => {
-                                    if (item.isCsp) {
-                                      const productDiscount = calcCatalogueProductDiscount(
+                                  setItems((prev) =>
+                                    prev.map((item) => {
+                                      const stacked = stackLineBenefits(
                                         item.price,
                                         item.qty,
+                                        item.category || "General",
+                                        mType,
+                                        mId,
+                                        Boolean(item.isCsp),
                                         item.productDiscountType,
                                         item.productDiscountValue,
                                       );
                                       return {
                                         ...item,
-                                        discount:
-                                          productDiscount > 0
-                                            ? productDiscount
-                                            : item.discount,
-                                        cashback: 0,
+                                        discount: stacked.discount,
+                                        cashback: stacked.cashback,
+                                        productDiscountAmount:
+                                          stacked.productDiscount,
+                                        membershipDiscountAmount:
+                                          stacked.membershipDiscount,
                                       };
-                                    }
-                                    const benefits = getMembershipBenefitsForItem(item.price, item.qty, item.category || "General", mType, mId, false);
-                                    return {
-                                      ...item,
-                                      discount: benefits.discount || 0,
-                                      cashback: benefits.cashback || 0
-                                    };
-                                  }));
+                                    }),
+                                  );
                                 }}
                                 className="flex w-full items-center justify-between px-4 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0"
                               >
@@ -1150,17 +1181,22 @@ export default function CreatePosScreen({
           <CheckoutModal
             open={openCheckout}
             grandTotal={grandTotal}
-            items={items.map(it => ({
+            items={items.map((it) => ({
               ...it,
               productName: it.name,
-              unitPrice: it.price
+              unitPrice: it.price,
+              productDiscountAmount: Number(it.productDiscountAmount ?? 0),
+              membershipDiscountAmount: it.isCsp
+                ? 0
+                : Number(it.membershipDiscountAmount ?? 0),
             }))}
             initialCustomerName={customer}
             initialCustomerPhone={phone}
             initialCustomerId={customerId}
             initialMembership={membership}
             initialMembershipPlanId={membershipPlanId}
-            initialMembershipDiscount={discountTotal}
+            initialMembershipDiscount={membershipDiscountTotal}
+            initialProductDiscount={productDiscountTotal}
             initialCashbackTotal={cashbackTotal}
             extraCharges={extraCharges}
             membershipPlans={membershipPlans}

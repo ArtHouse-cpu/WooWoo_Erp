@@ -50,6 +50,27 @@ const resolveCustomer = async ({ customerId, customerPhone }) => {
   return null;
 };
 
+/** Total spendable for checkout/invoice/WhatsApp: general + cashback + affiliate */
+const getSpendableWalletBalance = (wallet, customer) => {
+  // Prefer wallet document (updated by debit/credit), then customer fields.
+  const toNum = value => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const general = toNum(
+    wallet?.walletAmount ?? customer?.walletAmount ?? customer?.closingBalance,
+  );
+  const cashback = toNum(
+    wallet?.cashbackBalance ?? customer?.cashbackBalance,
+  );
+  const affiliate = toNum(
+    wallet?.affiliateBalance ?? customer?.affiliateBalance,
+  );
+
+  return Math.max(0, general + cashback + affiliate);
+};
+
 const appendTransaction = async (
   wallet,
   {
@@ -158,6 +179,126 @@ const appendTransaction = async (
         : bucket === "cashback"
           ? cashbackBalance
           : generalBalance,
+    affiliateBalanceAfter: affiliateBalance,
+    cashbackBalanceAfter: cashbackBalance,
+  });
+
+  await wallet.save();
+  await syncCustomerWalletBuckets(wallet.customerId, {
+    walletAmount: generalBalance,
+    affiliateBalance,
+    cashbackBalance,
+  });
+  return wallet;
+};
+
+/**
+ * Debit purchase amount across wallet buckets (cashback → general → affiliate)
+ * but record ONE history line for the full bill amount.
+ */
+const debitWalletForPurchase = async (
+  wallet,
+  {
+    amount,
+    note = "",
+    referenceType = "invoice",
+    referenceId = "",
+    createdBy = {},
+  } = {},
+) => {
+  const totalAmount = Math.round((Number(amount) || 0) * 100) / 100;
+  if (!(totalAmount > 0) || !wallet) return wallet;
+
+  // Sync live customer bucket balances onto wallet before multi-bucket debit
+  const customer = await Customer.findById(wallet.customerId)
+    .select("walletAmount affiliateBalance cashbackBalance")
+    .lean();
+
+  let generalBalance = Number(
+    wallet.walletAmount ?? customer?.walletAmount ?? 0,
+  );
+  let cashbackBalance = Number(
+    customer?.cashbackBalance ?? wallet.cashbackBalance ?? 0,
+  );
+  let affiliateBalance = Number(
+    customer?.affiliateBalance ?? wallet.affiliateBalance ?? 0,
+  );
+
+  const previousTotal =
+    generalBalance + cashbackBalance + affiliateBalance;
+  if (totalAmount > previousTotal + 0.01) {
+    throw new Error("Wallet amount exceeds available balance.");
+  }
+
+  // Idempotent: same invoice/payment should not debit twice
+  const refId = String(referenceId ?? "").trim();
+  if (refId) {
+    const alreadyDebited = (wallet.transactions || []).some(
+      (tx) =>
+        String(tx.referenceId || "").trim() === refId &&
+        String(tx.type || "").toLowerCase() === "debit" &&
+        String(tx.referenceType || "").toLowerCase() ===
+          String(referenceType || "invoice").toLowerCase(),
+    );
+    if (alreadyDebited) return wallet;
+  }
+
+  let remaining = totalAmount;
+  let fromCashback = 0;
+  let fromGeneral = 0;
+  let fromAffiliate = 0;
+
+  const takeCashback = Math.min(cashbackBalance, remaining);
+  cashbackBalance -= takeCashback;
+  fromCashback = takeCashback;
+  remaining = Math.round((remaining - takeCashback) * 100) / 100;
+
+  const takeGeneral = Math.min(generalBalance, remaining);
+  generalBalance -= takeGeneral;
+  fromGeneral = takeGeneral;
+  remaining = Math.round((remaining - takeGeneral) * 100) / 100;
+
+  const takeAffiliate = Math.min(affiliateBalance, remaining);
+  affiliateBalance -= takeAffiliate;
+  fromAffiliate = takeAffiliate;
+  remaining = Math.round((remaining - takeAffiliate) * 100) / 100;
+
+  if (remaining > 0.01) {
+    throw new Error("Wallet amount exceeds available balance.");
+  }
+
+  wallet.walletAmount = generalBalance;
+  wallet.cashbackBalance = cashbackBalance;
+  wallet.affiliateBalance = affiliateBalance;
+
+  const primaryBucket =
+    fromCashback >= fromGeneral && fromCashback >= fromAffiliate
+      ? "cashback"
+      : fromAffiliate > fromGeneral
+        ? "affiliate"
+        : "general";
+
+  const parts = [];
+  if (fromCashback > 0) parts.push(`cashback ₹${fromCashback}`);
+  if (fromGeneral > 0) parts.push(`general ₹${fromGeneral}`);
+  if (fromAffiliate > 0) parts.push(`withdrawable ₹${fromAffiliate}`);
+
+  const baseNote =
+    String(note || "").trim() ||
+    `Wallet used for ${referenceType || "purchase"} ${refId}`.trim();
+  const detailNote =
+    parts.length > 1 ? `${baseNote} (${parts.join(" + ")})` : baseNote;
+
+  wallet.transactions.push({
+    type: "debit",
+    amount: totalAmount,
+    walletType: primaryBucket,
+    note: detailNote,
+    referenceType: String(referenceType ?? "").trim(),
+    referenceId: refId,
+    createdBy,
+    previousBalance: previousTotal,
+    closingBalance: generalBalance + cashbackBalance + affiliateBalance,
     affiliateBalanceAfter: affiliateBalance,
     cashbackBalanceAfter: cashbackBalance,
   });
@@ -306,9 +447,9 @@ const getWalletById = async (req, res) => {
     let wallet = null;
 
     if (mongoose.Types.ObjectId.isValid(id)) {
-      wallet = await Wallet.findById(id);
+      wallet = await Wallet.findById(id).lean();
       if (!wallet) {
-        wallet = await Wallet.findOne({ customerId: id });
+        wallet = await Wallet.findOne({ customerId: id }).lean();
       }
     }
 
@@ -319,10 +460,24 @@ const getWalletById = async (req, res) => {
       });
     }
 
+    const generalBalance = Number(wallet.walletAmount ?? 0);
+    const affiliateBalance = Number(wallet.affiliateBalance ?? 0);
+    const cashbackBalance = Number(wallet.cashbackBalance ?? 0);
+    const totalBalance = generalBalance + affiliateBalance + cashbackBalance;
+
     return res.status(200).json({
       success: true,
       message: "Wallet fetched successfully.",
-      wallet,
+      wallet: {
+        ...wallet,
+        generalBalance,
+        affiliateBalance,
+        cashbackBalance,
+        withdrawableBalance: affiliateBalance,
+        totalBalance,
+        // Keep walletAmount as total for checkout/UI consumers that read this field
+        walletAmount: totalBalance,
+      },
     });
   } catch (error) {
     console.error("getWalletById error:", error);
@@ -563,7 +718,9 @@ export {
   appendTransaction,
   bulkUpdateWallets,
   createWallet,
+  debitWalletForPurchase,
   deleteWallet,
+  getSpendableWalletBalance,
   getWalletById,
   getWallets,
   syncCustomerWalletAmount,

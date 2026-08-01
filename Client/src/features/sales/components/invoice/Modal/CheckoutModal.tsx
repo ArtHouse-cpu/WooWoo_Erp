@@ -38,6 +38,8 @@ type CheckoutItem = {
   image?: string;
   category?: string;
   isCsp?: boolean;
+  productDiscountAmount?: number;
+  membershipDiscountAmount?: number;
 };
 
 type Props = {
@@ -52,6 +54,8 @@ type Props = {
   initialMembershipPlanId?: string | null;
   initialCustomerId?: string | null;
   initialMembershipDiscount?: number;
+  /** Catalogue / product-level discount total (separate from membership). */
+  initialProductDiscount?: number;
   initialCashbackTotal?: number;
   /** When true, checkout shows/credits 0 cashback (e.g. membership purchase). */
   disableCashback?: boolean;
@@ -88,6 +92,8 @@ type Props = {
     } | null;
     cashbackTotal: number;
     membershipDiscount: number;
+    /** True when user chose coupon instead of membership discount */
+    waiveMembershipForCoupon?: boolean;
     extraCharges: Array<{ label: string; amount: number }>;
     customerId?: string | null;
   }) => Promise<void>;
@@ -226,6 +232,50 @@ function Badge({
   );
 }
 
+/** Prefer total spendable balance (general + cashback + affiliate). */
+function resolveWalletBalance(
+  wallet: Record<string, unknown> | null | undefined,
+  fallback = 0,
+): number {
+  if (!wallet || typeof wallet !== "object") {
+    return Number.isFinite(Number(fallback)) ? Math.max(0, Number(fallback)) : 0;
+  }
+
+  const total = Number(wallet.totalBalance);
+  if (Number.isFinite(total)) return Math.max(0, total);
+
+  const general = Number(
+    wallet.generalBalance ?? wallet.walletAmount ?? wallet.balance ?? 0,
+  );
+  const cashback = Number(wallet.cashbackBalance ?? 0);
+  const affiliate = Number(
+    wallet.affiliateBalance ?? wallet.withdrawableBalance ?? 0,
+  );
+
+  // Raw wallet docs store buckets separately; list API already sums into walletAmount.
+  if (
+    wallet.generalBalance !== undefined ||
+    wallet.cashbackBalance !== undefined ||
+    wallet.affiliateBalance !== undefined
+  ) {
+    const sum =
+      (Number.isFinite(general) ? general : 0) +
+      (Number.isFinite(cashback) ? cashback : 0) +
+      (Number.isFinite(affiliate) ? affiliate : 0);
+    return Math.max(0, sum);
+  }
+
+  const amount = Number(
+    wallet.walletAmount ??
+      wallet.balance ??
+      wallet.currentBalance ??
+      wallet.availableBalance ??
+      wallet.closingBalance ??
+      fallback,
+  );
+  return Number.isFinite(amount) ? Math.max(0, amount) : 0;
+}
+
 export default function CheckoutModal({
   open,
   onClose,
@@ -238,6 +288,7 @@ export default function CheckoutModal({
   initialMembershipPlanId = null,
   initialCustomerId = null,
   initialMembershipDiscount = 0,
+  initialProductDiscount = 0,
   initialCashbackTotal = 0,
   disableCashback = false,
   extraCharges = [],
@@ -270,6 +321,9 @@ export default function CheckoutModal({
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponLabel, setCouponLabel] = useState("");
+  /** When true, membership line discount is removed so coupon can apply instead */
+  const [waiveMembershipForCoupon, setWaiveMembershipForCoupon] =
+    useState(false);
   const [promoType, setPromoType] = useState<"coupon" | "referral">("coupon");
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [loadingPromo, setLoadingPromo] = useState(false);
@@ -347,10 +401,13 @@ export default function CheckoutModal({
             }
           : null,
       );
+      // Reset until wallet fetch completes for the prefilled customer
+      setWalletBalance(0);
       setInstructionNotes("");
       setCouponCode("");
       setCouponDiscount(0);
       setCouponLabel("");
+      setWaiveMembershipForCoupon(false);
       setPromoType("coupon");
       setPromoCodeInput("");
       setLoadingPromo(false);
@@ -372,6 +429,66 @@ export default function CheckoutModal({
     initialMembershipPlanId,
   ]);
 
+  // Prefill from Create Invoice / POS: load wallet when customer is already selected
+  useEffect(() => {
+    if (!open) return;
+    const customerId = String(initialCustomerId ?? "").trim();
+    const phone = String(initialCustomerPhone ?? "").trim();
+    if (!customerId && !phone) {
+      setWalletBalance(0);
+      return;
+    }
+
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        let amount = 0;
+
+        if (customerId) {
+          try {
+            const response = await handleGetWalletById(
+              customerId,
+              controller.signal,
+            );
+            const wallet =
+              response?.wallet ?? response?.data ?? response ?? null;
+            amount = resolveWalletBalance(wallet, 0);
+          } catch {
+            // Fall through to search by phone
+          }
+        }
+
+        if (amount <= 0 && phone) {
+          const walletResponse = await handleGetWallets(
+            { search: phone, limit: 5 },
+            controller.signal,
+          );
+          const walletItems = Array.isArray(walletResponse?.wallets)
+            ? walletResponse.wallets
+            : Array.isArray(walletResponse?.data)
+              ? walletResponse.data
+              : [];
+          const match =
+            walletItems.find(
+              (w: any) =>
+                String(w?.customerId ?? "") === customerId ||
+                String(w?.customerPhone ?? "").trim() === phone ||
+                String(w?.customer?.mobile ?? "").trim() === phone,
+            ) ?? walletItems[0];
+          amount = resolveWalletBalance(match, 0);
+        }
+
+        if (!controller.signal.aborted) {
+          setWalletBalance(amount);
+        }
+      } catch {
+        if (!controller.signal.aborted) setWalletBalance(0);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [open, initialCustomerId, initialCustomerPhone]);
+
   const clearReferralDiscount = () => {
     setReferralDiscount(0);
     setReferralLabel("Referral Discount");
@@ -387,6 +504,7 @@ export default function CheckoutModal({
     setCouponCode("");
     setCouponDiscount(0);
     setCouponLabel("");
+    setWaiveMembershipForCoupon(false);
     if (promoType === "coupon") setPromoCodeInput("");
   };
 
@@ -408,9 +526,67 @@ export default function CheckoutModal({
     setLoadingPromo(true);
     try {
       if (promoType === "coupon") {
+        const membershipOnCart = items.reduce(
+          (sum, item) =>
+            sum +
+            (item.isCsp
+              ? 0
+              : Number(item.membershipDiscountAmount ?? 0)),
+          0,
+        );
+        const activeMembership =
+          membershipOnCart > 0
+            ? membershipOnCart
+            : Math.max(0, Number(initialMembershipDiscount || 0));
+
+        let useCouponInsteadOfMembership = waiveMembershipForCoupon;
+        if (activeMembership > 0 && !waiveMembershipForCoupon) {
+          const choice = await Swal.fire({
+            icon: "question",
+            title: "Choose one discount",
+            html: `
+              <p style="text-align:left;margin:0 0 12px;font-size:14px;color:#334155">
+                Membership discount (<strong>₹${activeMembership.toFixed(2)}</strong>) is already applied on this bill.
+                <br/><br/>
+                Coupon discount and membership discount <strong>cannot be used together</strong>.
+                Which one do you want to apply?
+              </p>
+            `,
+            showDenyButton: true,
+            showCancelButton: true,
+            confirmButtonText: "Use Coupon Discount",
+            denyButtonText: "Keep Membership Discount",
+            cancelButtonText: "Cancel",
+            confirmButtonColor: "#7c3aed",
+            denyButtonColor: "#4f46e5",
+            reverseButtons: true,
+          });
+
+          if (choice.isDismissed) {
+            return;
+          }
+          if (choice.isDenied) {
+            clearCouponDiscount();
+            await Swal.fire({
+              icon: "info",
+              title: "Membership discount kept",
+              text: "Coupon was not applied. Membership discount remains on this bill.",
+              timer: 2200,
+              showConfirmButton: false,
+            });
+            return;
+          }
+          useCouponInsteadOfMembership = true;
+        }
+
+        // If replacing membership, validate coupon against amount without membership discount
+        const orderAmountForCoupon = useCouponInsteadOfMembership
+          ? Math.max(0, Number(grandTotal || 0) + activeMembership)
+          : Math.max(0, Number(grandTotal || 0));
+
         const response = await handleValidateCoupon({
           code,
-          orderAmount: grandTotal,
+          orderAmount: orderAmountForCoupon,
           customerPhone: customerSearch.trim() || undefined,
         });
         const discount = Number(response?.discountAmount ?? 0);
@@ -423,6 +599,7 @@ export default function CheckoutModal({
           );
           return;
         }
+        setWaiveMembershipForCoupon(useCouponInsteadOfMembership);
         setCouponDiscount(discount);
         setCouponCode(code);
         setCouponLabel(
@@ -437,9 +614,13 @@ export default function CheckoutModal({
         });
         await Swal.fire({
           icon: "success",
-          title: "Coupon applied",
-          text: `${code}: −₹${discount.toFixed(2)}`,
-          timer: 1600,
+          title: useCouponInsteadOfMembership
+            ? "Coupon applied (membership removed)"
+            : "Coupon applied",
+          text: useCouponInsteadOfMembership
+            ? `${code}: −₹${discount.toFixed(2)}. Membership discount was removed for this bill.`
+            : `${code}: −₹${discount.toFixed(2)}`,
+          timer: 2200,
           showConfirmButton: false,
         });
         return;
@@ -629,6 +810,26 @@ export default function CheckoutModal({
     [items],
   );
 
+  const lineProductDiscountTotal = useMemo(
+    () =>
+      items.reduce(
+        (sum, item) => sum + Number(item.productDiscountAmount ?? 0),
+        0,
+      ),
+    [items],
+  );
+
+  const lineMembershipDiscountTotal = useMemo(
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum +
+          (item.isCsp ? 0 : Number(item.membershipDiscountAmount ?? 0)),
+        0,
+      ),
+    [items],
+  );
+
   const lineCashbackTotal = useMemo(
     () =>
       items.reduce(
@@ -639,21 +840,42 @@ export default function CheckoutModal({
     [items],
   );
   const cartHasCsp = items.some((item) => Boolean(item.isCsp));
-  const displayLineDiscount = lineDiscountsTotal > 0 ? lineDiscountsTotal : 0;
-  const displayMembershipDiscount = cartHasCsp
-    ? displayLineDiscount > 0
-      ? displayLineDiscount
-      : summary.membershipDiscount
-    : initialMembershipDiscount > 0
-      ? initialMembershipDiscount
-      : displayLineDiscount > 0
-        ? displayLineDiscount
-        : summary.membershipDiscount;
-  const discountSummaryLabel =
-    cartHasCsp ||
-    (displayLineDiscount > 0 && Number(summary.membershipDiscount || 0) <= 0)
-      ? "Product Discount"
-      : "Membership Discount";
+
+  // Keep Product Discount and Membership Discount separate in the UI
+  const displayProductDiscount =
+    lineProductDiscountTotal > 0
+      ? lineProductDiscountTotal
+      : initialProductDiscount > 0
+        ? initialProductDiscount
+        : // Fallback: CSP lines or product-only carts where split amounts were not stored
+          cartHasCsp && lineDiscountsTotal > 0
+            ? lineDiscountsTotal
+            : lineDiscountsTotal > 0 &&
+                lineMembershipDiscountTotal <= 0 &&
+                Number(summary.membershipDiscount || 0) <= 0 &&
+                Number(initialMembershipDiscount || 0) <= 0
+              ? lineDiscountsTotal
+              : 0;
+
+  const rawMembershipDiscount =
+    lineMembershipDiscountTotal > 0
+      ? lineMembershipDiscountTotal
+      : initialMembershipDiscount > 0
+        ? initialMembershipDiscount
+        : Number(summary.membershipDiscount || 0) > 0
+          ? Number(summary.membershipDiscount || 0)
+          : 0;
+
+  const displayMembershipDiscount = waiveMembershipForCoupon
+    ? 0
+    : rawMembershipDiscount;
+
+  // When coupon replaces membership, add membership amount back into payable base
+  const payableBase = Math.max(
+    0,
+    Number(grandTotal || 0) +
+      (waiveMembershipForCoupon ? rawMembershipDiscount : 0),
+  );
 
   const displayCashbackTotal = disableCashback
     ? 0
@@ -677,7 +899,7 @@ export default function CheckoutModal({
   );
 
   useEffect(() => {
-    const payable = Math.max(0, grandTotal - couponDiscount - referralDiscount);
+    const payable = Math.max(0, payableBase - couponDiscount - referralDiscount);
 
     if (paymentStatus === "full") {
       if (isMultiMode) {
@@ -686,7 +908,13 @@ export default function CheckoutModal({
         setCashGiven(payable);
       }
     }
-  }, [paymentStatus, isMultiMode, grandTotal, couponDiscount, referralDiscount]);
+  }, [
+    paymentStatus,
+    isMultiMode,
+    payableBase,
+    couponDiscount,
+    referralDiscount,
+  ]);
 
   useEffect(() => {
     if (!open) return;
@@ -805,7 +1033,7 @@ export default function CheckoutModal({
     const nextWalletBalance =
       walletMap[String(customer?._id ?? "").trim()] ??
       walletMap[String(customer?.mobile ?? "").trim()] ??
-      Number(customer?.walletAmount ?? customer?.closingBalance ?? 0);
+      resolveWalletBalance(customer, Number(customer?.closingBalance ?? 0));
 
     setSelectedCustomer(customer);
     setCustomerSearch(customer.mobile || "");
@@ -822,14 +1050,7 @@ export default function CheckoutModal({
         try {
           const response = await handleGetWalletById(customerId, controller.signal);
           const wallet = response?.wallet ?? response?.data ?? response ?? null;
-          const amount = Number(
-            wallet?.walletAmount ??
-              wallet?.balance ??
-              wallet?.currentBalance ??
-              wallet?.availableBalance ??
-              nextWalletBalance,
-          );
-          if (Number.isFinite(amount)) setWalletBalance(amount);
+          setWalletBalance(resolveWalletBalance(wallet, nextWalletBalance));
         } catch {
           setWalletBalance(nextWalletBalance);
         }
@@ -842,7 +1063,10 @@ export default function CheckoutModal({
     [items],
   );
 
-  const finalPayable = Math.max(0, grandTotal - couponDiscount - referralDiscount);
+  const finalPayable = Math.max(
+    0,
+    payableBase - couponDiscount - referralDiscount,
+  );
   const isPartialPayment = paymentStatus === "partial";
   const totalPaid = isMultiMode
     ? splitPayments.cash +
@@ -978,6 +1202,7 @@ export default function CheckoutModal({
       notes: instructionNotes.trim(),
       cashbackTotal: displayCashbackTotal,
       membershipDiscount: displayMembershipDiscount,
+      waiveMembershipForCoupon,
       extraCharges: extraCharges,
       customerId:
         selectedCustomer?._id ?? initialCustomerId ?? null,
@@ -1173,11 +1398,25 @@ export default function CheckoutModal({
 
               <div className="mt-6 space-y-3 border-t border-slate-100 pt-4">
                 <SummaryLine label="Subtotal" value={formatInr(itemsSubtotal)} />
+                {displayProductDiscount > 0 && (
+                  <SummaryLine
+                    label="Product Discount"
+                    value={`− ${formatInr(displayProductDiscount)}`}
+                    tone="discount"
+                  />
+                )}
                 {displayMembershipDiscount > 0 && (
-                  <SummaryLine 
-                    label={discountSummaryLabel} 
-                    value={`− ${formatInr(displayMembershipDiscount)}`} 
-                    tone="discount" 
+                  <SummaryLine
+                    label="Membership Discount"
+                    value={`− ${formatInr(displayMembershipDiscount)}`}
+                    tone="discount"
+                  />
+                )}
+                {waiveMembershipForCoupon && rawMembershipDiscount > 0 && (
+                  <SummaryLine
+                    label="Membership Discount (removed for coupon)"
+                    value={formatInr(0)}
+                    tone="muted"
                   />
                 )}
                 {couponDiscount > 0 && (
@@ -1291,11 +1530,19 @@ export default function CheckoutModal({
                   <Badge variant={membership ? "indigo" : "default"}>
                     {membership || "General Customer"}
                   </Badge>
+                  {displayProductDiscount > 0 && (
+                    <span className="text-[11px] font-medium text-sky-700">
+                      Product discount applied
+                    </span>
+                  )}
                   {displayMembershipDiscount > 0 && (
                     <span className="text-[11px] font-medium text-indigo-600">
-                      {displayLineDiscount > 0
-                        ? "Product discount applied"
-                        : "Membership discount applied"}
+                      Membership discount applied
+                    </span>
+                  )}
+                  {waiveMembershipForCoupon && couponDiscount > 0 && (
+                    <span className="text-[11px] font-medium text-violet-700">
+                      Coupon chosen instead of membership
                     </span>
                   )}
                   <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-amber-600">

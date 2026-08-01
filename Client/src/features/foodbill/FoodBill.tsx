@@ -310,6 +310,9 @@ export default function FoodBill() {
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponLabel, setCouponLabel] = useState("");
+  /** Coupon and membership discount are mutually exclusive */
+  const [waiveMembershipForCoupon, setWaiveMembershipForCoupon] =
+    useState(false);
   // Referral discount (auto from referredBy + optional manual code)
   const [referralDiscount, setReferralDiscount] = useState(0);
   const [referralCodeApplied, setReferralCodeApplied] = useState("");
@@ -343,6 +346,7 @@ export default function FoodBill() {
     setCouponCode("");
     setCouponDiscount(0);
     setCouponLabel("");
+    setWaiveMembershipForCoupon(false);
   };
 
   const fetchCustomers = async (
@@ -731,9 +735,12 @@ export default function FoodBill() {
     cart,
   ]);
 
-  const membershipDiscount = Number(
+  const rawMembershipDiscount = Number(
     membershipSummary.membershipDiscount || 0,
   );
+  const membershipDiscount = waiveMembershipForCoupon
+    ? 0
+    : rawMembershipDiscount;
   const membershipCashback = Number(membershipSummary.cashbackTotal || 0);
   const membershipPlan = membershipSummary.plan;
   const membershipBenefitTotal = Math.round(
@@ -942,9 +949,54 @@ export default function FoodBill() {
     setLoadingPromo(true);
     try {
       if (promoType === "coupon") {
+        const activeMembership = Number(rawMembershipDiscount || 0);
+        let useCouponInsteadOfMembership = waiveMembershipForCoupon;
+        if (activeMembership > 0 && !waiveMembershipForCoupon) {
+          const choice = await Swal.fire({
+            icon: "question",
+            title: "Choose one discount",
+            html: `
+              <p style="text-align:left;margin:0 0 12px;font-size:14px;color:#334155">
+                Membership discount (<strong>₹${activeMembership.toFixed(2)}</strong>) is already applied.
+                <br/><br/>
+                Coupon discount and membership discount <strong>cannot be used together</strong>.
+                Which one do you want to apply?
+              </p>
+            `,
+            showDenyButton: true,
+            showCancelButton: true,
+            confirmButtonText: "Use Coupon Discount",
+            denyButtonText: "Keep Membership Discount",
+            cancelButtonText: "Cancel",
+            confirmButtonColor: "#7c3aed",
+            denyButtonColor: "#4f46e5",
+            reverseButtons: true,
+          });
+
+          if (choice.isDismissed) {
+            return;
+          }
+          if (choice.isDenied) {
+            clearCouponDiscount();
+            await Swal.fire({
+              icon: "info",
+              title: "Membership discount kept",
+              text: "Coupon was not applied. Membership discount remains on this bill.",
+              timer: 2200,
+              showConfirmButton: false,
+            });
+            return;
+          }
+          useCouponInsteadOfMembership = true;
+        }
+
+        const orderAmountForCoupon = useCouponInsteadOfMembership
+          ? Math.max(0, Math.round(subtotal))
+          : Math.max(0, roundedBeforeReferral);
+
         const response = await handleValidateCoupon({
           code,
-          orderAmount: Math.max(0, roundedBeforeReferral),
+          orderAmount: orderAmountForCoupon,
           customerPhone: selectedCustomer.phone || undefined,
         });
         const discount = Number(response?.discountAmount ?? 0);
@@ -957,6 +1009,7 @@ export default function FoodBill() {
           );
           return;
         }
+        setWaiveMembershipForCoupon(useCouponInsteadOfMembership);
         setCouponDiscount(discount);
         setCouponCode(code);
         setCouponLabel(
@@ -970,9 +1023,13 @@ export default function FoodBill() {
         });
         await Swal.fire({
           icon: "success",
-          title: "Coupon applied",
-          text: `${code}: −₹${discount.toFixed(2)}`,
-          timer: 1600,
+          title: useCouponInsteadOfMembership
+            ? "Coupon applied (membership removed)"
+            : "Coupon applied",
+          text: useCouponInsteadOfMembership
+            ? `${code}: −₹${discount.toFixed(2)}. Membership discount was removed for this bill.`
+            : `${code}: −₹${discount.toFixed(2)}`,
+          timer: 2200,
           showConfirmButton: false,
         });
         return;
@@ -1260,13 +1317,17 @@ export default function FoodBill() {
         referral?.inviterName ?? referralInviterName ?? "",
       );
       const appliedCouponDiscount = Number(couponDiscount || 0);
-      const appliedMembershipDiscount = Number(membershipDiscount || 0);
+      const appliedMembershipDiscount = waiveMembershipForCoupon
+        ? 0
+        : Number(membershipDiscount || 0);
       // Server recomputes grandTotal from line discounts + coupon + referral.
       // Put membership (incl. round-off to match UI) on each item.discount.
-      const membershipDiscountForInvoice = Math.max(
-        0,
-        Math.round((subtotal - roundedBeforeReferral) * 100) / 100,
-      );
+      const membershipDiscountForInvoice = waiveMembershipForCoupon
+        ? 0
+        : Math.max(
+            0,
+            Math.round((subtotal - roundedBeforeReferral) * 100) / 100,
+          );
       const payableTotal = Math.max(
         0,
         roundedBeforeReferral -
@@ -1275,6 +1336,15 @@ export default function FoodBill() {
       );
 
       const invoiceItems = (() => {
+        if (waiveMembershipForCoupon) {
+          return cart.map((line) => ({
+            productName: line.item.name,
+            qty: line.quantity,
+            unitPrice: line.item.price,
+            discount: 0,
+            category: "Food" as const,
+          }));
+        }
         const lines = cart.map((line) => {
           const fromPlan = membershipBenefitsForLine(
             line.item.price,
@@ -1985,9 +2055,11 @@ export default function FoodBill() {
                       </span>
                     </div>
                     <div className="flex justify-between text-[11px] text-emerald-800">
-                      <span>discount:</span>
+                      <span>Membership discount:</span>
                       <span className="font-semibold text-green-600">
-                        ₹{membershipDiscount.toFixed(2)}
+                        {waiveMembershipForCoupon
+                          ? "₹0.00 (removed for coupon)"
+                          : `₹${membershipDiscount.toFixed(2)}`}
                       </span>
                     </div>
                     <div className="flex justify-between text-[11px] text-emerald-800">

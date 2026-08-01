@@ -281,6 +281,66 @@ export function membershipBenefitsForLine(
   return { discount, cashback };
 }
 
+/**
+ * Stack catalogue product discount + membership category discount on one line.
+ * Both can apply; total is capped at line total.
+ */
+export function calcStackedLineBenefits(params: {
+  unitPrice: number;
+  qty: number;
+  category: string;
+  plan?: MembershipPlanPayload;
+  discountType?: string | null;
+  discountValue?: number | null;
+  isCsp?: boolean;
+}): {
+  productDiscount: number;
+  membershipDiscount: number;
+  discount: number;
+  cashback: number;
+} {
+  const unitPrice = Number(params.unitPrice) || 0;
+  const qty = Number(params.qty) || 0;
+  const lineTotal = unitPrice * qty;
+  const productDiscount = calcCatalogueProductDiscount(
+    unitPrice,
+    qty,
+    params.discountType,
+    params.discountValue,
+  );
+
+  if (params.isCsp) {
+    return {
+      productDiscount,
+      membershipDiscount: 0,
+      discount: Math.min(lineTotal, productDiscount),
+      cashback: 0,
+    };
+  }
+
+  const membership = membershipBenefitsForLine(
+    unitPrice,
+    qty,
+    params.category,
+    params.plan,
+    { isCsp: false },
+  );
+
+  const membershipDiscount = Number(membership.discount) || 0;
+  const cashback = Number(membership.cashback) || 0;
+  const discount = Math.min(
+    lineTotal,
+    Math.max(0, productDiscount) + Math.max(0, membershipDiscount),
+  );
+
+  return {
+    productDiscount: Math.max(0, productDiscount),
+    membershipDiscount: Math.max(0, membershipDiscount),
+    discount,
+    cashback,
+  };
+}
+
 export function summarizeMembershipForCart(
   plans: MembershipPlanPayload[],
   membershipType: string,

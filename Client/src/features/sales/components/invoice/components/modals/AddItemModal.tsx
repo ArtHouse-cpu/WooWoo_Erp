@@ -79,33 +79,49 @@ type Props = {
   initialData?: Partial<AddItemFormValues>;
 };
 
+const buildDefaultValues = (
+  initialData?: Partial<AddItemFormValues>,
+): AddItemFormValues => {
+  const rawCspId = (initialData as any)?.cspEnrollmentId;
+  const cspEnrollmentId =
+    rawCspId && typeof rawCspId === "object"
+      ? String(rawCspId._id || rawCspId.id || "")
+      : String(rawCspId || "");
+
+  return {
+    type: initialData?.type || "product",
+    productName: initialData?.productName || "",
+    brandName: (initialData as any)?.brandName || "",
+    serviceName: initialData?.serviceName || "",
+    sellingPrice: Number(initialData?.sellingPrice || 0),
+    purchasePrice: Number(initialData?.purchasePrice || 0),
+    stockQty: Number(initialData?.stockQty || 0),
+    stockStatus: initialData?.stockStatus || "in_stock",
+    primaryUnit: initialData?.primaryUnit || "",
+    itemCode: initialData?.itemCode || "",
+    barcode: initialData?.barcode || "",
+    category: initialData?.category || "",
+    categoryId: String((initialData as any)?.categoryId || ""),
+    subCategory: initialData?.subCategory || "",
+    subCategoryId: String((initialData as any)?.subCategoryId || ""),
+    description: initialData?.description || "",
+    discountType: initialData?.discountType || "flat",
+    discountValue: Number(initialData?.discountValue || 0),
+    variants: initialData?.variants || [],
+    images: initialData?.images || [],
+    isCsp:
+      (initialData as any)?.isCsp === "yes" ||
+      (initialData as any)?.isCsp === true
+        ? "yes"
+        : "no",
+    cspEnrollmentId,
+  };
+};
+
 export default function AddItemModal({ onClose, onSubmit, loading, initialData }: Props) {
   const methods = useForm<AddItemFormValues>({
     resolver: zodResolver(schema) as any,
-    defaultValues: {
-      type: initialData?.type || "product",
-      productName: initialData?.productName || "",
-      brandName: (initialData as any)?.brandName || "",
-      serviceName: initialData?.serviceName || "",
-      sellingPrice: initialData?.sellingPrice || 0,
-      purchasePrice: initialData?.purchasePrice || 0,
-      stockQty: initialData?.stockQty || 0,
-      stockStatus: initialData?.stockStatus || "in_stock",
-      primaryUnit: initialData?.primaryUnit || "",
-      itemCode: initialData?.itemCode || "",
-      barcode: initialData?.barcode || "",
-      category: initialData?.category || "",
-      categoryId: (initialData as any)?.categoryId || "",
-      subCategory: initialData?.subCategory || "",
-      subCategoryId: (initialData as any)?.subCategoryId || "",
-      description: initialData?.description || "",
-      discountType: initialData?.discountType || "flat",
-      discountValue: initialData?.discountValue || 0,
-      variants: initialData?.variants || [],
-      images: initialData?.images || [],
-      isCsp: (initialData as any)?.isCsp === "yes" || (initialData as any)?.isCsp === true ? "yes" : "no",
-      cspEnrollmentId: (initialData as any)?.cspEnrollmentId || "",
-    },
+    defaultValues: buildDefaultValues(initialData),
   });
 
   const { handleSubmit, watch, formState, reset, setFocus, control } = methods;
@@ -114,6 +130,12 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
   const itemType = watch("type");
   const [showVariantModal, setShowVariantModal] = useState(false);
   const [editVariantIndex, setEditVariantIndex] = useState<number | null>(null);
+
+  // Re-apply saved product values when opening edit modal
+  useEffect(() => {
+    if (!initialData) return;
+    reset(buildDefaultValues(initialData));
+  }, [initialData, reset]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

@@ -1,7 +1,11 @@
 import Announcement from '../models/announcement.model.js';
 import Customer from '../models/customer.model.js';
 import { enqueueAnnouncementRecipient } from '../queue/announcement.queue.js';
-import { resolveAnnouncementHeaderMedia } from '../modules/customer/services/whatsapp.service.js';
+import {
+  announcementRequiresImageHeader,
+  normalizeWhatsAppTemplateName,
+  resolveAnnouncementHeaderMedia,
+} from '../modules/customer/services/whatsapp.service.js';
 
 export const createAnnouncement = async (req, res) => {
   try {
@@ -22,21 +26,45 @@ export const createAnnouncement = async (req, res) => {
       });
     }
 
-    const metaTemplate = whatsappTemplateName.trim();
+    // Never send display labels like "new cafe" to Meta — normalize to newcafe.
+    const metaTemplate = normalizeWhatsAppTemplateName(whatsappTemplateName);
     const lang = String(languageCode || 'en').trim() || 'en';
 
-    // Resolve IMAGE header once for the whole batch (link or uploaded media id).
-    // newcafe and other IMAGE-header templates fail with #132012 without this.
+    if (!/^[a-z0-9_]+$/.test(metaTemplate)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Invalid WhatsApp template name. Use the exact Meta name (e.g. newcafe), lowercase with no spaces.',
+      });
+    }
+
+    // Resolve IMAGE header once for the whole batch.
+    // newcafe always uploads Client/src/assets/images/logo/newcafe.jpeg
+    // (unless an explicit HTTPS headerImageLink is provided).
     let headerMedia;
     try {
       headerMedia = await resolveAnnouncementHeaderMedia({
         headerImageLink,
         templateName: metaTemplate,
+        // Force the project asset for IMAGE templates so All/Selected both send newcafe.jpeg
+        forceDefaultImage: !String(headerImageLink || '').trim(),
       });
     } catch (mediaErr) {
       return res.status(400).json({
         success: false,
         message: mediaErr?.message || 'Failed to resolve announcement header image',
+      });
+    }
+
+    if (
+      announcementRequiresImageHeader(metaTemplate) &&
+      !headerMedia?.headerImageId &&
+      !headerMedia?.headerImageLink
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Failed to attach newcafe.jpeg IMAGE header. Check Client/src/assets/images/logo/newcafe.jpeg exists.',
       });
     }
 

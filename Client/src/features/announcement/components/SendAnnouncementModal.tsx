@@ -4,6 +4,7 @@ import Swal from "sweetalert2";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
   handleCreateAnnouncement,
+  handleGetAllCustomers,
   handleGetCustomers,
   type CreateAnnouncementPayload,
 } from "@/services/apiClient";
@@ -27,7 +28,8 @@ export default function SendAnnouncementModal({
   onSent,
 }: Props) {
   const [templateName, setTemplateName] = useState("");
-  const [whatsappTemplateName, setWhatsappTemplateName] = useState("");
+  // Exact Meta template name (no spaces). Default matches approved template.
+  const [whatsappTemplateName, setWhatsappTemplateName] = useState("newcafe");
   const [languageCode, setLanguageCode] = useState("en");
   const [templateParamsRaw, setTemplateParamsRaw] = useState("");
   const [headerImageLink, setHeaderImageLink] = useState("");
@@ -37,8 +39,23 @@ export default function SendAnnouncementModal({
   const [customerSearch, setCustomerSearch] = useState("");
   const debouncedSearch = useDebounce(customerSearch.trim(), 300);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  /** Keeps names for selected chips even after search/list changes */
+  const [customerDirectory, setCustomerDirectory] = useState<
+    Record<string, CustomerOption>
+  >({});
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const mergeDirectory = (list: CustomerOption[]) => {
+    setCustomerDirectory((prev) => {
+      const next = { ...prev };
+      for (const c of list) {
+        if (c?._id) next[c._id] = c;
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -52,7 +69,9 @@ export default function SendAnnouncementModal({
           50,
           1,
         );
-        setCustomers(Array.isArray(res?.customers) ? res.customers : []);
+        const list = Array.isArray(res?.customers) ? res.customers : [];
+        setCustomers(list);
+        mergeDirectory(list);
       } catch {
         if (!controller.signal.aborted) setCustomers([]);
       } finally {
@@ -64,12 +83,16 @@ export default function SendAnnouncementModal({
   }, [open, debouncedSearch]);
 
   const selectedCustomers = useMemo(() => {
-    const map = new Map(customers.map((c) => [c._id, c]));
-    // keep previously selected even if not in current search page
-    return selectedIds
-      .map((id) => map.get(id) || ({ _id: id, name: id, mobile: "" }))
-      .filter(Boolean);
-  }, [customers, selectedIds]);
+    return selectedIds.map(
+      (id) =>
+        customerDirectory[id] ||
+        customers.find((c) => c._id === id) || {
+          _id: id,
+          name: id,
+          mobile: "",
+        },
+    );
+  }, [customerDirectory, customers, selectedIds]);
 
   const toggleCustomer = (id: string) => {
     setSelectedIds((prev) =>
@@ -79,20 +102,48 @@ export default function SendAnnouncementModal({
 
   const selectAllVisible = () => {
     const ids = customers.map((c) => c._id);
+    mergeDirectory(customers);
     setSelectedIds((prev) => [...new Set([...prev, ...ids])]);
+  };
+
+  /** Fetch every matching customer, select all — then uncheck unwanted ones */
+  const selectAllCustomers = async () => {
+    try {
+      setSelectingAll(true);
+      const res = await handleGetAllCustomers(debouncedSearch);
+      const list: CustomerOption[] = Array.isArray(res?.customers)
+        ? res.customers
+        : [];
+      if (!list.length) {
+        Swal.fire("No customers", "No customers found to select.", "info");
+        return;
+      }
+      mergeDirectory(list);
+      setCustomers(list);
+      setSelectedIds(list.map((c) => c._id));
+    } catch {
+      Swal.fire(
+        "Select all failed",
+        "Could not load all customers. Try again.",
+        "error",
+      );
+    } finally {
+      setSelectingAll(false);
+    }
   };
 
   const clearSelected = () => setSelectedIds([]);
 
   const resetForm = () => {
     setTemplateName("");
-    setWhatsappTemplateName("");
+    setWhatsappTemplateName("newcafe");
     setLanguageCode("en");
     setTemplateParamsRaw("");
     setHeaderImageLink("");
     setAudienceType("selected");
     setSelectedIds([]);
     setCustomerSearch("");
+    setCustomerDirectory({});
   };
 
   const handleClose = () => {
@@ -101,9 +152,17 @@ export default function SendAnnouncementModal({
     onClose();
   };
 
+  /** Meta names: lowercase letters/numbers/underscore only ("new cafe" → "newcafe") */
+  const normalizeMetaTemplateName = (raw: string) =>
+    raw
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "")
+      .replace(/[^a-z0-9_]/g, "");
+
   const handleSubmit = async () => {
-    const displayName = templateName.trim() || whatsappTemplateName.trim();
-    const metaName = whatsappTemplateName.trim();
+    const metaName = normalizeMetaTemplateName(whatsappTemplateName);
+    const displayName = templateName.trim() || metaName;
 
     if (!displayName || !metaName) {
       Swal.fire(
@@ -112,6 +171,11 @@ export default function SendAnnouncementModal({
         "warning",
       );
       return;
+    }
+
+    if (metaName !== whatsappTemplateName.trim()) {
+      // Keep UI in sync if user typed "new cafe" / "New Cafe"
+      setWhatsappTemplateName(metaName);
     }
 
     if (audienceType === "selected" && selectedIds.length === 0) {
@@ -210,9 +274,18 @@ export default function SendAnnouncementModal({
               <input
                 value={whatsappTemplateName}
                 onChange={(e) => setWhatsappTemplateName(e.target.value)}
+                onBlur={() =>
+                  setWhatsappTemplateName(
+                    normalizeMetaTemplateName(whatsappTemplateName) || "newcafe",
+                  )
+                }
                 placeholder="Exact Meta name, e.g. newcafe"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
               />
+              <p className="mt-1 text-[11px] text-slate-400">
+                Must match Meta exactly — no spaces (use <code>newcafe</code>, not
+                &quot;new cafe&quot;).
+              </p>
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-slate-600">
@@ -238,18 +311,18 @@ export default function SendAnnouncementModal({
             </div>
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs font-semibold text-slate-600">
-                Header image URL (HTTPS) — optional for newcafe
+                Header image URL (HTTPS) — optional override
               </label>
               <input
                 value={headerImageLink}
                 onChange={(e) => setHeaderImageLink(e.target.value)}
-                placeholder="Leave empty to auto-use default store image for IMAGE templates"
+                placeholder="Leave empty to send Client/.../newcafe.jpeg"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400"
               />
               <p className="mt-1 text-[11px] text-slate-400">
-                Meta template <code>newcafe</code> requires an IMAGE header. If
-                empty, the server uploads{' '}
-                <code>Client/src/assets/images/logo/newcafe.jpeg</code>.
+                By default every <code>newcafe</code> send uses{' '}
+                <code>Client/src/assets/images/logo/newcafe.jpeg</code> as the
+                WhatsApp IMAGE header (All and Selected).
               </p>
             </div>
           </div>
@@ -293,23 +366,38 @@ export default function SendAnnouncementModal({
                     ({selectedIds.length} selected)
                   </span>
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void selectAllCustomers()}
+                    disabled={selectingAll || loadingCustomers}
+                    className="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-50"
+                    title="Select every customer, then uncheck the ones you want to skip"
+                  >
+                    {selectingAll ? "Selecting all..." : "Select all"}
+                  </button>
                   <button
                     type="button"
                     onClick={selectAllVisible}
-                    className="text-xs font-semibold text-blue-600 hover:underline"
+                    disabled={loadingCustomers || customers.length === 0}
+                    className="text-xs font-semibold text-blue-600 hover:underline disabled:opacity-50"
                   >
                     Select visible
                   </button>
                   <button
                     type="button"
                     onClick={clearSelected}
-                    className="text-xs font-semibold text-slate-500 hover:underline"
+                    disabled={selectedIds.length === 0}
+                    className="text-xs font-semibold text-slate-500 hover:underline disabled:opacity-50"
                   >
                     Clear
                   </button>
                 </div>
               </div>
+              <p className="mb-2 text-[11px] text-slate-400">
+                Use <b>Select all</b>, then uncheck customers you do not want to
+                message.
+              </p>
 
               <div className="relative mb-3">
                 <Search
@@ -346,9 +434,13 @@ export default function SendAnnouncementModal({
                 </div>
               ) : null}
 
-              <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-100">
-                {loadingCustomers ? (
-                  <p className="p-3 text-sm text-slate-500">Loading customers...</p>
+              <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-100">
+                {loadingCustomers || selectingAll ? (
+                  <p className="p-3 text-sm text-slate-500">
+                    {selectingAll
+                      ? "Loading all customers..."
+                      : "Loading customers..."}
+                  </p>
                 ) : customers.length === 0 ? (
                   <p className="p-3 text-sm text-slate-500">No customers found.</p>
                 ) : (

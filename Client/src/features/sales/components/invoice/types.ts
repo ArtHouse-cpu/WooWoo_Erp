@@ -19,6 +19,9 @@ export type InvoiceItem = {
   /** Catalogue discount metadata for recalc on qty change */
   productDiscountType?: string;
   productDiscountValue?: number;
+  /** Split amounts so checkout can show Product vs Membership discount clearly */
+  productDiscountAmount?: number;
+  membershipDiscountAmount?: number;
 };
 
 /** API / POS raw invoice shape used by PDF and print templates */

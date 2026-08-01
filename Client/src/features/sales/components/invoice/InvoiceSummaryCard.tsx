@@ -6,6 +6,8 @@ type ExtraCharge = {
 type Props = {
   subTotal: number;
   discountTotal: number;
+  productDiscountTotal?: number;
+  membershipDiscountTotal?: number;
   cashbackTotal?: number;
   extraCharges?: ExtraCharge[];
   onExtraChargesChange?: (val: ExtraCharge[]) => void;
@@ -17,6 +19,8 @@ type Props = {
 export default function InvoiceSummaryCard({
   subTotal,
   discountTotal,
+  productDiscountTotal = 0,
+  membershipDiscountTotal = 0,
   cashbackTotal = 0,
   extraCharges = [],
   onExtraChargesChange,
@@ -47,10 +51,27 @@ export default function InvoiceSummaryCard({
           <span>Sub Total</span>
           <span>₹ {subTotal.toFixed(2)}</span>
         </div>
-        <div className="flex items-center justify-between text-gray-600">
-          <span>Discount</span>
-          <span>- ₹ {discountTotal.toFixed(2)}</span>
-        </div>
+        {productDiscountTotal > 0 || membershipDiscountTotal > 0 ? (
+          <>
+            {productDiscountTotal > 0 && (
+              <div className="flex items-center justify-between text-sky-700">
+                <span>Product Discount</span>
+                <span>- ₹ {productDiscountTotal.toFixed(2)}</span>
+              </div>
+            )}
+            {membershipDiscountTotal > 0 && (
+              <div className="flex items-center justify-between text-indigo-700">
+                <span>Membership Discount</span>
+                <span>- ₹ {membershipDiscountTotal.toFixed(2)}</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex items-center justify-between text-gray-600">
+            <span>Discount</span>
+            <span>- ₹ {discountTotal.toFixed(2)}</span>
+          </div>
+        )}
         {cashbackTotal > 0 && (
           <div className="flex items-center justify-between text-emerald-600 font-medium">
             <span>Cashback (Credit to Wallet)</span>

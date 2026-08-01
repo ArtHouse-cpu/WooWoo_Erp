@@ -49,8 +49,8 @@ const BULK_SUBSCRIPTION_SAMPLE_ROWS: Array<Array<string | number>> = [
     "Rahul Anand",
     "9876543210",
     "Premium",
-    "2026-07-30",
-    "2027-07-29",
+    "29 Jul 2026",
+    "28 Jul 2027",
     "Admin",
     1999,
     "active",
@@ -68,22 +68,190 @@ const BULK_SUBSCRIPTION_SAMPLE_ROWS: Array<Array<string | number>> = [
     "Amit Kumar",
     "9123456780",
     "Junior",
-    "2026-07-30",
-    "2027-07-29",
+    "29 Jul 2026",
+    "28 Jul 2027",
     "Admin",
     499,
     "active",
     "yearly",
-    "Sample Junior plan — delete before upload",
+    "Junior with student details",
     "Aarav Kumar",
     "8",
     "Father",
     "Amit Kumar",
     "STU001",
     "Delhi Public School",
-    "2014-05-12",
+    "12 May 2014",
+  ],
+  [
+    "Priya Sharma",
+    "9988776655",
+    "Junior",
+    "29 Jul 2026",
+    "28 Jul 2027",
+    "Admin",
+    499,
+    "active",
+    "yearly",
+    "Junior with blank student fields — allowed",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
   ],
 ];
+
+const BULK_DATE_FIELDS = ["startDate", "endDate", "dob"] as const;
+
+const MONTH_INDEX: Record<string, number> = {
+  jan: 0,
+  january: 0,
+  feb: 1,
+  february: 1,
+  mar: 2,
+  march: 2,
+  apr: 3,
+  april: 3,
+  may: 4,
+  jun: 5,
+  june: 5,
+  jul: 6,
+  july: 6,
+  aug: 7,
+  august: 7,
+  sep: 8,
+  sept: 8,
+  september: 8,
+  oct: 9,
+  october: 9,
+  nov: 10,
+  november: 10,
+  dec: 11,
+  december: 11,
+};
+
+const toYmd = (year: number, monthIndex: number, day: number) => {
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(monthIndex) ||
+    !Number.isInteger(day) ||
+    monthIndex < 0 ||
+    monthIndex > 11 ||
+    day < 1 ||
+    day > 31
+  ) {
+    return "";
+  }
+  const dt = new Date(Date.UTC(year, monthIndex, day));
+  if (
+    dt.getUTCFullYear() !== year ||
+    dt.getUTCMonth() !== monthIndex ||
+    dt.getUTCDate() !== day
+  ) {
+    return "";
+  }
+  return `${String(year).padStart(4, "0")}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+};
+
+/** Parse Excel dates like "29 Jul 2026" into YYYY-MM-DD for the API. */
+const parseBulkExcelDate = (value: unknown): string => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return toYmd(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    // Excel serial date
+    const epoch = Date.UTC(1899, 11, 30);
+    const d = new Date(epoch + Math.round(value) * 86400000);
+    if (!Number.isNaN(d.getTime())) {
+      return toYmd(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    }
+  }
+
+  const text = String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (!text) return "";
+
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) return toYmd(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+
+  // Preferred: 29 Jul 2026 | 29-Jul-2026 | 29/Jul/2026
+  const dmyMonth = text.match(
+    /^(\d{1,2})[ \/\-]([A-Za-z]{3,9})[ \/\-](\d{4})$/,
+  );
+  if (dmyMonth) {
+    const monthIndex = MONTH_INDEX[dmyMonth[2].toLowerCase()];
+    if (monthIndex !== undefined) {
+      return toYmd(Number(dmyMonth[3]), monthIndex, Number(dmyMonth[1]));
+    }
+  }
+
+  const dmyNum = text.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyNum) {
+    return toYmd(Number(dmyNum[3]), Number(dmyNum[2]) - 1, Number(dmyNum[1]));
+  }
+
+  return text;
+};
+
+const BULK_HEADER_ALIASES: Record<string, string> = {
+  customername: "customerName",
+  name: "customerName",
+  customerphone: "customerPhone",
+  phone: "customerPhone",
+  mobile: "customerPhone",
+  membershipplan: "membershipPlan",
+  membership: "membershipPlan",
+  plan: "membershipPlan",
+  startdate: "startDate",
+  start: "startDate",
+  enddate: "endDate",
+  end: "endDate",
+  salespersonname: "salesPersonName",
+  salesperson: "salesPersonName",
+  amount: "amount",
+  status: "status",
+  activity: "status",
+  activitystatus: "status",
+  repeattype: "repeatType",
+  repeatedtype: "repeatType",
+  repeat: "repeatType",
+  notes: "notes",
+  studentname: "studentName",
+  classstd: "classStd",
+  classstandard: "classStd",
+  class: "classStd",
+  relation: "relation",
+  parentname: "parentName",
+  parentsname: "parentName",
+  studentid: "studentId",
+  schoolname: "schoolName",
+  dob: "dob",
+  dateofbirth: "dob",
+};
+
+const normalizeBulkRow = (row: Record<string, unknown>) => {
+  const next: Record<string, unknown> = {};
+  for (const [rawKey, value] of Object.entries(row || {})) {
+    const compact = String(rawKey)
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_\-./]+/g, "");
+    const key = BULK_HEADER_ALIASES[compact] || String(rawKey).trim();
+    if (next[key] === undefined || next[key] === "" || next[key] === null) {
+      next[key] = value;
+    }
+  }
+  for (const field of BULK_DATE_FIELDS) {
+    if (next[field] !== undefined && next[field] !== "") {
+      next[field] = parseBulkExcelDate(next[field]);
+    }
+  }
+  return next;
+};
 
 function downloadBulkSubscriptionTemplate() {
   const aoa: Array<Array<string | number>> = [
@@ -92,14 +260,16 @@ function downloadBulkSubscriptionTemplate() {
   ];
   const sheet = XLSX.utils.aoa_to_sheet(aoa);
 
-  // Keep phone / studentId as text so Excel does not use scientific notation
-  ["B2", "B3", "O3"].forEach((addr) => {
-    if (sheet[addr]) {
-      sheet[addr].t = "s";
-      sheet[addr].v = String(sheet[addr].v);
-      sheet[addr].z = "@";
-    }
-  });
+  // Keep phone / studentId / dates as text so Excel keeps "29 Jul 2026"
+  ["B2", "B3", "B4", "D2", "D3", "D4", "E2", "E3", "E4", "O3", "Q3"].forEach(
+    (addr) => {
+      if (sheet[addr]) {
+        sheet[addr].t = "s";
+        sheet[addr].v = String(sheet[addr].v);
+        sheet[addr].z = "@";
+      }
+    },
+  );
 
   sheet["!cols"] = BULK_SUBSCRIPTION_HEADERS.map((h) => ({
     wch: Math.max(14, h.length + 2),
@@ -226,6 +396,9 @@ export default function CreateSubscriptionScreen({
   const [bulkData, setBulkData] = useState<any[]>([]);
   const [isParsing, setIsParsing] = useState(false);
   const [bulkParseError, setBulkParseError] = useState("");
+  const [bulkUploadErrors, setBulkUploadErrors] = useState<
+    Array<{ index: number; customerPhone?: string; message: string }>
+  >([]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -233,6 +406,7 @@ export default function CreateSubscriptionScreen({
 
     setIsParsing(true);
     setBulkParseError("");
+    setBulkUploadErrors([]);
     setBulkData([]);
 
     const reader = new FileReader();
@@ -284,7 +458,7 @@ export default function CreateSubscriptionScreen({
           return;
         }
 
-        setBulkData(jsonResult);
+        setBulkData(jsonResult.map((row) => normalizeBulkRow(row)));
       } catch {
         setBulkParseError(
           "Could not read Excel file. Use .xlsx / .xls / .csv.",
@@ -979,6 +1153,27 @@ export default function CreateSubscriptionScreen({
               Download the template, keep the header row exactly as-is, fill
               member rows, then upload the file.
             </p>
+            <p className="mb-2 text-xs text-slate-600">
+              <span className="font-semibold text-slate-800">Required:</span>{" "}
+              customerName, customerPhone, membershipPlan, startDate, endDate,
+              salesPersonName, amount, status (activity), repeatType (e.g.
+              yearly).
+            </p>
+            <p className="mb-2 text-xs text-slate-600">
+              <span className="font-semibold text-slate-800">Optional</span>{" "}
+              (can be blank, including Junior): studentName, classStd,
+              relation, parentName, studentId, schoolName, dob, notes.
+            </p>
+            <p className="mb-2 text-xs text-amber-700">
+              Duplicates are blocked automatically: same phone + membership +
+              start/end dates + amount (already in DB or repeated in this file)
+              will be skipped.
+            </p>
+            <p className="mb-4 text-xs text-slate-500">
+              Date format for <code>startDate</code>, <code>endDate</code>, and{" "}
+              <code>dob</code>: <b>29 Jul 2026</b> (day month year). Also
+              accepts <code>29-Jul-2026</code> or Excel date cells.
+            </p>
             <button
               type="button"
               onClick={downloadBulkSubscriptionTemplate}
@@ -1017,6 +1212,26 @@ export default function CreateSubscriptionScreen({
               </div>
             )}
 
+            {bulkUploadErrors.length > 0 ? (
+              <div className="mb-4 max-h-48 overflow-y-auto rounded border border-rose-100 bg-rose-50 p-3 text-xs text-rose-800">
+                <p className="mb-2 font-semibold">
+                  Skipped / errors ({bulkUploadErrors.length})
+                </p>
+                <ul className="space-y-1">
+                  {bulkUploadErrors.slice(0, 40).map((err) => (
+                    <li key={`${err.index}-${err.customerPhone || ""}`}>
+                      Row {err.index + 1}
+                      {err.customerPhone ? ` (${err.customerPhone})` : ""}:{" "}
+                      {err.message}
+                    </li>
+                  ))}
+                  {bulkUploadErrors.length > 40 ? (
+                    <li>…and {bulkUploadErrors.length - 40} more</li>
+                  ) : null}
+                </ul>
+              </div>
+            ) : null}
+
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => {
@@ -1031,23 +1246,71 @@ export default function CreateSubscriptionScreen({
                 disabled={bulkData.length === 0}
                 onClick={async () => {
                   try {
+                    setBulkUploadErrors([]);
                     const response = await handleBulkCreateSubscriptions({
                       subscriptions: bulkData,
                     });
                     const failed = Number(response?.summary?.failed ?? 0);
+                    const skipped = Number(response?.summary?.skipped ?? 0);
+                    const failedRows = Array.isArray(response?.results)
+                      ? response.results.filter(
+                          (r: { success?: boolean }) => !r.success,
+                        )
+                      : [];
+                    setBulkUploadErrors(failedRows);
+                    const icon =
+                      failed > 0
+                        ? "warning"
+                        : skipped > 0
+                          ? "info"
+                          : "success";
                     Swal.fire(
-                      failed > 0 ? "Partial success" : "Success",
+                      failed > 0
+                        ? "Partial success"
+                        : skipped > 0
+                          ? "Upload finished (duplicates skipped)"
+                          : "Success",
                       response?.message || "Bulk upload finished.",
-                      failed > 0 ? "warning" : "success",
+                      icon,
                     );
                     if (failed === 0) onClose?.();
                   } catch (error: unknown) {
                     const err = error as {
-                      response?: { data?: { message?: string } };
+                      response?: {
+                        data?: {
+                          message?: string;
+                          results?: Array<{
+                            index: number;
+                            success?: boolean;
+                            skipped?: boolean;
+                            duplicate?: boolean;
+                            customerPhone?: string;
+                            message?: string;
+                          }>;
+                        };
+                      };
                     };
+                    const failedRows = Array.isArray(err?.response?.data?.results)
+                      ? err.response!.data!.results!.filter((r) => !r.success)
+                      : [];
+                    setBulkUploadErrors(
+                      failedRows.map((r) => ({
+                        index: Number(r.index ?? 0),
+                        customerPhone: r.customerPhone,
+                        message: r.message || "Failed",
+                      })),
+                    );
+                    const sample = failedRows
+                      .slice(0, 3)
+                      .map(
+                        (r) =>
+                          `Row ${(Number(r.index) || 0) + 1}: ${r.message || "Failed"}`,
+                      )
+                      .join("\n");
                     Swal.fire(
                       "Error",
-                      err?.response?.data?.message ||
+                      sample ||
+                        err?.response?.data?.message ||
                         "Failed to upload bulk subscriptions",
                       "error",
                     );

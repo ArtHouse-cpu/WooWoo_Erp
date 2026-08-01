@@ -193,7 +193,8 @@ export const createSubscription = async (req, res) => {
 
     // Junior: always allowed (priority rules do not apply).
     // Non-Junior: only allow if newPriority > customer's current priority.
-    if (!juniorMembership) {
+    // Bulk historical import skips this gate (allowPastEndDate flag).
+    if (!juniorMembership && !req.body?.allowPastEndDate) {
       const currentPriority = await getCustomerUpgradePriority(
         parsed.data.customerPhone,
       );
@@ -545,7 +546,10 @@ export const createSubscription = async (req, res) => {
 export const getSubscriptions = async (req, res) => {
   try {
     const search = String(req.query.search ?? '').trim();
-    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+    // Admin subscription table needs the full list; allow up to 10k (was capped at 200).
+    const limit = Math.min(Math.max(Number(req.query.limit) || 2000, 1), 10000);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const skip = (page - 1) * limit;
     const status = String(req.query.status ?? '').trim().toLowerCase();
 
     const query = {};
@@ -560,15 +564,23 @@ export const getSubscriptions = async (req, res) => {
       ];
     }
 
-    const subscriptions = await Subscription.find(query)
-      .sort({createdAt: -1})
-      .limit(limit)
-      .lean();
+    const [subscriptions, total] = await Promise.all([
+      Subscription.find(query)
+        .sort({createdAt: -1})
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Subscription.countDocuments(query),
+    ]);
 
     return res.status(200).json({
       success: true,
       message: 'Subscriptions fetched successfully.',
       subscriptions,
+      total,
+      page,
+      limit,
+      hasMore: skip + subscriptions.length < total,
     });
   } catch (error) {
     console.error('getSubscriptions error:', error);
@@ -777,21 +789,106 @@ const normalizeBulkPhone = raw => {
   return digits.length > 10 ? digits.slice(-10) : digits;
 };
 
+const MONTH_INDEX = {
+  jan: 0,
+  january: 0,
+  feb: 1,
+  february: 1,
+  mar: 2,
+  march: 2,
+  apr: 3,
+  april: 3,
+  may: 4,
+  jun: 5,
+  june: 5,
+  jul: 6,
+  july: 6,
+  aug: 7,
+  august: 7,
+  sep: 8,
+  sept: 8,
+  september: 8,
+  oct: 9,
+  october: 9,
+  nov: 10,
+  november: 10,
+  dec: 11,
+  december: 11,
+};
+
+const toYmd = (year, monthIndex, day) => {
+  const y = Number(year);
+  const m = Number(monthIndex);
+  const d = Number(day);
+  if (
+    !Number.isInteger(y) ||
+    !Number.isInteger(m) ||
+    !Number.isInteger(d) ||
+    m < 0 ||
+    m > 11 ||
+    d < 1 ||
+    d > 31
+  ) {
+    return '';
+  }
+  const dt = new Date(Date.UTC(y, m, d));
+  if (
+    dt.getUTCFullYear() !== y ||
+    dt.getUTCMonth() !== m ||
+    dt.getUTCDate() !== d
+  ) {
+    return '';
+  }
+  return `${String(y).padStart(4, '0')}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+};
+
+/**
+ * Bulk Excel dates — prefer human format like "29 Jul 2026".
+ * Also accepts Date, Excel serial, ISO YYYY-MM-DD, DD-MMM-YYYY, DD/MM/YYYY.
+ */
 const toBulkIsoDate = value => {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
+    return toYmd(value.getFullYear(), value.getMonth(), value.getDate());
   }
+
   if (typeof value === 'number' && Number.isFinite(value)) {
-    // Excel serial date
+    // Excel serial date (days since 1899-12-30)
     const epoch = Date.UTC(1899, 11, 30);
-    const d = new Date(epoch + value * 86400000);
-    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    const d = new Date(epoch + Math.round(value) * 86400000);
+    if (!Number.isNaN(d.getTime())) {
+      return toYmd(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    }
   }
-  const text = String(value ?? '').trim();
+
+  const text = String(value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ');
   if (!text) return '';
-  const parsed = new Date(text);
-  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
-  return text;
+
+  // ISO: 2026-07-29
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (iso) {
+    return toYmd(iso[1], Number(iso[2]) - 1, iso[3]);
+  }
+
+  // Preferred Excel text: 29 Jul 2026 | 29-Jul-2026 | 29/Jul/2026
+  const dmyMonth = text.match(
+    /^(\d{1,2})[ \/\-]([A-Za-z]{3,9})[ \/\-](\d{4})$/,
+  );
+  if (dmyMonth) {
+    const monthIndex = MONTH_INDEX[dmyMonth[2].toLowerCase()];
+    if (monthIndex !== undefined) {
+      return toYmd(dmyMonth[3], monthIndex, dmyMonth[1]);
+    }
+  }
+
+  // Numeric DMY: 29/07/2026 or 29-07-2026
+  const dmyNum = text.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyNum) {
+    return toYmd(dmyNum[3], Number(dmyNum[2]) - 1, dmyNum[1]);
+  }
+
+  return '';
 };
 
 const resolveMembershipFromExcel = async membershipPlanRaw => {
@@ -809,7 +906,143 @@ const resolveMembershipFromExcel = async membershipPlanRaw => {
   return plan || null;
 };
 
-const mapExcelRowToCreateBody = async (excelRow, req) => {
+/** Map Excel header variants → expected camelCase keys */
+const BULK_HEADER_ALIASES = {
+  customername: 'customerName',
+  name: 'customerName',
+  customerphone: 'customerPhone',
+  phone: 'customerPhone',
+  mobile: 'customerPhone',
+  membershipplan: 'membershipPlan',
+  membership: 'membershipPlan',
+  plan: 'membershipPlan',
+  startdate: 'startDate',
+  start: 'startDate',
+  enddate: 'endDate',
+  end: 'endDate',
+  salespersonname: 'salesPersonName',
+  salesperson: 'salesPersonName',
+  amount: 'amount',
+  status: 'status',
+  activity: 'status',
+  activitystatus: 'status',
+  repeattype: 'repeatType',
+  repeatedtype: 'repeatType',
+  repeat: 'repeatType',
+  notes: 'notes',
+  studentname: 'studentName',
+  classstd: 'classStd',
+  classstandard: 'classStd',
+  class: 'classStd',
+  relation: 'relation',
+  parentname: 'parentName',
+  parentsname: 'parentName',
+  studentid: 'studentId',
+  schoolname: 'schoolName',
+  dob: 'dob',
+  dateofbirth: 'dob',
+};
+
+const normalizeBulkExcelRow = row => {
+  const out = {};
+  if (!row || typeof row !== 'object') return out;
+  for (const [rawKey, value] of Object.entries(row)) {
+    const compact = String(rawKey || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_\-./]+/g, '');
+    const key = BULK_HEADER_ALIASES[compact] || String(rawKey).trim();
+    // Prefer first non-empty value if duplicate aliases collide
+    if (out[key] === undefined || out[key] === '' || out[key] === null) {
+      out[key] = value;
+    }
+  }
+  return out;
+};
+
+/** UTC day window for YYYY-MM-DD comparison against Date fields */
+const utcDayRange = isoDate => {
+  const day = String(isoDate || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const start = new Date(`${day}T00:00:00.000Z`);
+  const end = new Date(`${day}T00:00:00.000Z`);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return {start, end};
+};
+
+/** Stable key used to block re-upload of the same membership row */
+const buildBulkDuplicateKey = ({
+  customerPhone,
+  membershipType,
+  membershipPlanId,
+  startDate,
+  endDate,
+  grandTotal,
+}) => {
+  const phone = normalizeBulkPhone(customerPhone);
+  const type = String(membershipType || '')
+    .trim()
+    .toLowerCase();
+  const planId = String(membershipPlanId || '')
+    .trim()
+    .toLowerCase();
+  const start = String(startDate || '').trim();
+  const end = String(endDate || '').trim();
+  const amount = Math.round((Number(grandTotal) || 0) * 100) / 100;
+  return `${phone}|${type}|${planId}|${start}|${end}|${amount}`;
+};
+
+/**
+ * Find an existing subscription that matches a bulk row
+ * (same phone + plan/type + start/end day + amount).
+ */
+const findExistingBulkDuplicate = async body => {
+  const phone = normalizeBulkPhone(body?.customerPhone);
+  const membershipType = String(body?.membershipType || '')
+    .trim()
+    .toLowerCase();
+  const membershipPlanId = String(body?.membershipPlanId || '')
+    .trim()
+    .toLowerCase();
+  const amount = Math.round((Number(body?.grandTotal) || 0) * 100) / 100;
+  const startRange = utcDayRange(body?.invoiceDate || body?.startDate);
+  const endRange = utcDayRange(body?.dueDate || body?.endDate);
+
+  if (!phone || !startRange || !endRange) return null;
+
+  const query = {
+    customerPhone: phone,
+    grandTotal: amount,
+    $and: [
+      {
+        $or: [
+          {startDate: {$gte: startRange.start, $lt: startRange.end}},
+          {invoiceDate: {$gte: startRange.start, $lt: startRange.end}},
+        ],
+      },
+      {
+        $or: [
+          {endDate: {$gte: endRange.start, $lt: endRange.end}},
+          {dueDate: {$gte: endRange.start, $lt: endRange.end}},
+        ],
+      },
+    ],
+  };
+  if (membershipType) query.membershipType = membershipType;
+  if (membershipPlanId) {
+    query.membershipPlanId = new RegExp(
+      `^${escapeRegex(membershipPlanId)}$`,
+      'i',
+    );
+  }
+
+  return Subscription.findOne(query)
+    .select('subscriptionCode customerPhone membershipType startDate endDate')
+    .lean();
+};
+
+const mapExcelRowToCreateBody = async (excelRowRaw, req) => {
+  const excelRow = normalizeBulkExcelRow(excelRowRaw);
   const customerName = String(excelRow?.customerName ?? '').trim();
   const customerPhone = normalizeBulkPhone(excelRow?.customerPhone);
   const membershipPlanKey = String(excelRow?.membershipPlan ?? '').trim();
@@ -820,7 +1053,7 @@ const mapExcelRowToCreateBody = async (excelRow, req) => {
     String(req.user?.name || req.user?.m_staff_name || 'Admin').trim();
   const amount = Math.max(0, Number(excelRow?.amount ?? 0) || 0);
   const statusRaw = String(excelRow?.status ?? 'active').trim().toLowerCase();
-  const status = [
+  let status = [
     'draft',
     'active',
     'completed',
@@ -830,6 +1063,16 @@ const mapExcelRowToCreateBody = async (excelRow, req) => {
   ].includes(statusRaw)
     ? statusRaw
     : 'active';
+
+  // Historical imports: past end dates become expired instead of failing validation
+  if (endDate) {
+    const end = new Date(`${endDate}T00:00:00.000Z`);
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    if (!Number.isNaN(end.getTime()) && end < today && status === 'active') {
+      status = 'expired';
+    }
+  }
   const repeatTypeRaw = String(excelRow?.repeatType ?? 'yearly')
     .trim()
     .toLowerCase();
@@ -879,35 +1122,37 @@ const mapExcelRowToCreateBody = async (excelRow, req) => {
     });
   }
 
+  // Junior student/parent columns are optional in bulk — blank cells are allowed.
   const students = [];
   if (junior) {
     const studentName = String(excelRow?.studentName ?? '').trim();
     const classStd = String(excelRow?.classStd ?? '').trim();
     const relation = String(excelRow?.relation ?? '').trim();
-    const parentName =
-      String(excelRow?.parentName ?? '').trim() || customerName;
+    const parentName = String(excelRow?.parentName ?? '').trim();
     const studentId = String(excelRow?.studentId ?? '').trim();
     const schoolName = String(excelRow?.schoolName ?? '').trim();
     const dob = toBulkIsoDate(excelRow?.dob) || null;
+    const hasAnyStudentData = Boolean(
+      studentName ||
+        classStd ||
+        relation ||
+        parentName ||
+        studentId ||
+        schoolName ||
+        dob,
+    );
 
-    if (!studentName || !classStd || !relation || !parentName) {
-      throw new Error(
-        'Junior plan requires studentName, classStd, relation, parentName',
-      );
+    if (hasAnyStudentData) {
+      students.push({
+        studentName,
+        schoolName,
+        dob,
+        classStd,
+        relation,
+        parentName: parentName || customerName,
+        studentId,
+      });
     }
-    if (!studentId) {
-      throw new Error('Junior plan requires studentId');
-    }
-
-    students.push({
-      studentName,
-      schoolName,
-      dob,
-      classStd,
-      relation,
-      parentName,
-      studentId,
-    });
   }
 
   return {
@@ -943,6 +1188,10 @@ const mapExcelRowToCreateBody = async (excelRow, req) => {
     discountTotal: 0,
     grandTotal: unitPrice,
     status,
+    // Bulk may import historical memberships with past end dates
+    allowPastEndDate: true,
+    // Bulk junior rows may omit student / parent / DOB columns
+    allowOptionalJuniorStudents: true,
     createdBy: {
       m_staff_id: req.user?.userId ?? null,
       m_staff_name: req.user?.name ?? req.user?.m_staff_name ?? null,
@@ -976,11 +1225,46 @@ export const bulkCreateSubscriptions = async (req, res) => {
     const results = [];
     let successCount = 0;
     let failedCount = 0;
+    let skippedCount = 0;
+    /** Prevent same-file duplicates within one upload batch */
+    const seenInBatch = new Set();
 
     for (let index = 0; index < subscriptions.length; index += 1) {
-      const excelRow = subscriptions[index];
+      const excelRow = normalizeBulkExcelRow(subscriptions[index]);
       try {
         const body = await mapExcelRowToCreateBody(excelRow, req);
+        const dupKey = buildBulkDuplicateKey(body);
+
+        if (seenInBatch.has(dupKey)) {
+          skippedCount += 1;
+          results.push({
+            index,
+            success: false,
+            skipped: true,
+            duplicate: true,
+            customerPhone: body.customerPhone,
+            message:
+              'Duplicate in this file — same phone, membership, dates and amount already processed in an earlier row. Skipped.',
+          });
+          continue;
+        }
+
+        const existing = await findExistingBulkDuplicate(body);
+        if (existing) {
+          skippedCount += 1;
+          results.push({
+            index,
+            success: false,
+            skipped: true,
+            duplicate: true,
+            customerPhone: body.customerPhone,
+            subscriptionCode: existing.subscriptionCode,
+            message: `Duplicate — already exists as ${existing.subscriptionCode || 'subscription'} (same phone, membership, dates and amount). Skipped.`,
+          });
+          continue;
+        }
+
+        seenInBatch.add(dupKey);
 
         let createResult = null;
         const fakeRes = {
@@ -1005,10 +1289,13 @@ export const bulkCreateSubscriptions = async (req, res) => {
             index,
             success: true,
             customerPhone: body.customerPhone,
-            subscriptionCode: createResult.payload?.subscription?.subscriptionCode,
+            subscriptionCode:
+              createResult.payload?.subscription?.subscriptionCode,
             message: createResult.payload?.message || 'Created',
           });
         } else {
+          // Allow retry of this key if create failed
+          seenInBatch.delete(dupKey);
           failedCount += 1;
           results.push({
             index,
@@ -1033,14 +1320,21 @@ export const bulkCreateSubscriptions = async (req, res) => {
     }
 
     const httpStatus =
-      failedCount === 0 ? 201 : successCount === 0 ? 400 : 200;
+      failedCount === 0 && (successCount > 0 || skippedCount > 0)
+        ? successCount > 0
+          ? 201
+          : 200
+        : successCount === 0
+          ? 400
+          : 200;
 
     return res.status(httpStatus).json({
       success: failedCount === 0,
-      message: `Processed ${subscriptions.length} row(s): ${successCount} created, ${failedCount} failed.`,
+      message: `Processed ${subscriptions.length} row(s): ${successCount} created, ${skippedCount} duplicate skipped, ${failedCount} failed.`,
       summary: {
         total: subscriptions.length,
         successful: successCount,
+        skipped: skippedCount,
         failed: failedCount,
       },
       results,

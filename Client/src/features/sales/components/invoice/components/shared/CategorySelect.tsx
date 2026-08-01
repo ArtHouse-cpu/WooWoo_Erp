@@ -31,8 +31,12 @@ type SelectOption = {
 
 type Props = {
   categoryValue: string;
+  /** Product stores category as name — used to resolve ID when editing */
+  categoryName?: string;
   onCategoryChange: (categoryId: string, categoryName: string) => void;
   subCategoryValue?: string;
+  /** Product stores shop/sub category as name — used to resolve ID when editing */
+  subCategoryName?: string;
   onSubCategoryChange?: (subCategoryId: string, subCategoryName: string) => void;
   disabled?: boolean;
 };
@@ -80,7 +84,12 @@ function SingleSelectCreatable({
   }, []);
 
   const normalizedQuery = query.trim().toLowerCase();
-  const selected = options.find((item) => item._id === value);
+  const selected =
+    options.find((item) => item._id === value) ||
+    options.find(
+      (item) =>
+        item.name.trim().toLowerCase() === String(value || "").trim().toLowerCase(),
+    );
   const filteredOptions = options.filter((item) =>
     item.name.toLowerCase().includes(normalizedQuery),
   );
@@ -194,8 +203,10 @@ function SingleSelectCreatable({
 
 export default function CategorySelect({
   categoryValue,
+  categoryName = "",
   onCategoryChange,
   subCategoryValue = "",
+  subCategoryName = "",
   onSubCategoryChange,
   disabled = false,
 }: Props) {
@@ -203,6 +214,10 @@ export default function CategorySelect({
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [isCreatingSubCategory, setIsCreatingSubCategory] = useState(false);
+  const onCategoryChangeRef = useRef(onCategoryChange);
+  const onSubCategoryChangeRef = useRef(onSubCategoryChange);
+  onCategoryChangeRef.current = onCategoryChange;
+  onSubCategoryChangeRef.current = onSubCategoryChange;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -224,13 +239,65 @@ export default function CategorySelect({
     return () => controller.abort();
   }, []);
 
+  // Prefill category ID from saved product category name on edit
+  useEffect(() => {
+    if (!categories.length) return;
+    const byId = categories.find((c) => c._id === categoryValue);
+    if (byId) return;
+
+    const hint = String(categoryName || categoryValue || "").trim();
+    if (!hint) return;
+
+    const byName = categories.find(
+      (c) => c.name.trim().toLowerCase() === hint.toLowerCase(),
+    );
+    if (byName && byName._id !== categoryValue) {
+      onCategoryChangeRef.current(byName._id, byName.name);
+    }
+  }, [categories, categoryValue, categoryName]);
+
+  // Prefill shop/sub category ID from saved product subCategory name on edit
+  useEffect(() => {
+    if (!subCategories.length) return;
+    const byId = subCategories.find((s) => s._id === subCategoryValue);
+    if (byId) return;
+
+    const hint = String(subCategoryName || subCategoryValue || "").trim();
+    if (!hint) return;
+
+    const byName = subCategories.find((s) => {
+      const nameMatch = s.name.trim().toLowerCase() === hint.toLowerCase();
+      if (!nameMatch) return false;
+      if (!categoryValue) return true;
+      return (
+        s.categoryId === categoryValue ||
+        String(s.category || "").toLowerCase() ===
+          String(categoryName || "").trim().toLowerCase()
+      );
+    });
+    if (byName && byName._id !== subCategoryValue) {
+      onSubCategoryChangeRef.current?.(byName._id, byName.name);
+    }
+  }, [
+    subCategories,
+    subCategoryValue,
+    subCategoryName,
+    categoryValue,
+    categoryName,
+  ]);
+
   const subCategoriesBySelectedCategory = useMemo(
     () =>
       subCategories.filter((subCat) => {
         if (!categoryValue) return true;
-        return subCat.categoryId === categoryValue || subCat.category === categoryValue;
+        return (
+          subCat.categoryId === categoryValue ||
+          subCat.category === categoryValue ||
+          String(subCat.category || "").trim().toLowerCase() ===
+            String(categoryName || "").trim().toLowerCase()
+        );
       }),
-    [subCategories, categoryValue],
+    [subCategories, categoryValue, categoryName],
   );
 
   const createCategory = async (rawName: string) => {
@@ -399,7 +466,7 @@ export default function CategorySelect({
     <div className="space-y-4">
       <span>
       <SingleSelectCreatable
-        label="Categories *"
+        label="Category *"
         value={categoryValue}
         options={categories}
         placeholder="Select category"
@@ -417,10 +484,10 @@ export default function CategorySelect({
       />
 
       <SingleSelectCreatable
-        label="Sub Categories *"
+        label="Shop Category *"
         value={subCategoryValue}
         options={subCategoriesBySelectedCategory}
-        placeholder={categoryValue ? "Select sub category" : "Select category first"}
+        placeholder={categoryValue ? "Select shop category" : "Select category first"}
         disabled={disabled || !categoryValue}
         canCreate={!!categoryValue}
         isCreating={isCreatingSubCategory}

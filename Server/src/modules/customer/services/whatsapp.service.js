@@ -1007,15 +1007,36 @@ export const sendActivityUpdateWhatsApp = async ({
 };
 
 
+/**
+ * Meta template names are lowercase [a-z0-9_]+ only.
+ * UI display labels like "new cafe" / "New Cafe" must become "newcafe".
+ */
+export const normalizeWhatsAppTemplateName = (raw = '') => {
+  const normalized = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^a-z0-9_]/g, '');
+  return (
+    normalized ||
+    String(process.env.WHATSAPP_ANNOUNCEMENT_TEMPLATE_NAME || 'newcafe')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[^a-z0-9_]/g, '') ||
+    'newcafe'
+  );
+};
+
 /** Templates known to require an IMAGE header component on send */
 export const announcementRequiresImageHeader = (templateName = '') => {
   const configured = String(
     process.env.WHATSAPP_ANNOUNCEMENT_IMAGE_TEMPLATES || 'newcafe',
   )
     .split(',')
-    .map((s) => s.trim().toLowerCase())
+    .map((s) => normalizeWhatsAppTemplateName(s))
     .filter(Boolean);
-  return configured.includes(String(templateName || '').trim().toLowerCase());
+  return configured.includes(normalizeWhatsAppTemplateName(templateName));
 };
 
 const getWhatsAppCreds = () => {
@@ -1071,50 +1092,80 @@ export const uploadWhatsAppImageMedia = async (filePath) => {
   return String(data.id);
 };
 
-/** Default local header image for IMAGE templates (e.g. newcafe) */
+/** Locked header image for IMAGE templates (newcafe) */
 export const DEFAULT_ANNOUNCEMENT_HEADER_IMAGE = path.join(
   REPO_ROOT,
   'Client/src/assets/images/logo/newcafe.jpeg',
 );
 
-const defaultAnnouncementImageCandidates = () => [
-  process.env.WHATSAPP_ANNOUNCEMENT_HEADER_IMAGE_FILE?.trim(),
-  DEFAULT_ANNOUNCEMENT_HEADER_IMAGE,
-  path.join(REPO_ROOT, 'Customer/public/raipur_store.jpg'),
-].filter(Boolean);
+const isHttpsImageUrl = (value = '') =>
+  /^https:\/\/.+\.(jpe?g|png|webp)(\?.*)?$/i.test(String(value).trim()) ||
+  /^https:\/\/.+/i.test(String(value).trim());
 
 /**
  * Resolve header media once per announcement batch.
- * Prefer public HTTPS link; otherwise upload a default local image → media id.
+ * IMAGE templates (newcafe) always upload
+ * Client/src/assets/images/logo/newcafe.jpeg unless an explicit HTTPS URL is given.
  */
 export const resolveAnnouncementHeaderMedia = async ({
   headerImageLink = '',
   headerImageId = '',
   templateName = '',
+  forceDefaultImage = false,
 } = {}) => {
-  const link =
-    String(headerImageLink || '').trim() ||
-    String(process.env.WHATSAPP_ANNOUNCEMENT_HEADER_IMAGE || '').trim();
+  const explicitLink = String(headerImageLink || '').trim();
+  const envLink = String(
+    process.env.WHATSAPP_ANNOUNCEMENT_HEADER_IMAGE || '',
+  ).trim();
   const existingId = String(headerImageId || '').trim();
+  const requiresImage = announcementRequiresImageHeader(templateName);
 
-  if (link) return { headerImageLink: link, headerImageId: '' };
-  if (existingId) return { headerImageLink: '', headerImageId: existingId };
-
-  if (!announcementRequiresImageHeader(templateName)) {
-    return { headerImageLink: '', headerImageId: '' };
+  if (!requiresImage && !explicitLink && !existingId) {
+    return {
+      headerImageLink: '',
+      headerImageId: '',
+      sourceFile: '',
+    };
   }
 
-  const filePath = defaultAnnouncementImageCandidates().find((p) =>
-    fs.existsSync(p),
-  );
-  if (!filePath) {
+  // Optional override only when a real HTTPS URL is provided.
+  const link = !forceDefaultImage && isHttpsImageUrl(explicitLink)
+    ? explicitLink
+    : !forceDefaultImage && !explicitLink && isHttpsImageUrl(envLink)
+      ? envLink
+      : '';
+
+  if (link) {
+    console.log('[Announcement] Using header image URL:', link);
+    return { headerImageLink: link, headerImageId: '', sourceFile: '' };
+  }
+
+  if (existingId && !forceDefaultImage && !requiresImage) {
+    return { headerImageLink: '', headerImageId: existingId, sourceFile: '' };
+  }
+
+  // Always send the project asset for newcafe / IMAGE-header templates.
+  const filePath =
+    process.env.WHATSAPP_ANNOUNCEMENT_HEADER_IMAGE_FILE?.trim() ||
+    DEFAULT_ANNOUNCEMENT_HEADER_IMAGE;
+
+  if (!fs.existsSync(filePath)) {
     throw new Error(
-      `Template "${templateName}" requires an IMAGE header. Provide headerImageLink (public HTTPS URL) or set WHATSAPP_ANNOUNCEMENT_HEADER_IMAGE.`,
+      `Announcement IMAGE header file missing: ${filePath}. Expected Client/src/assets/images/logo/newcafe.jpeg`,
     );
   }
 
   const mediaId = await uploadWhatsAppImageMedia(filePath);
-  return { headerImageLink: '', headerImageId: mediaId };
+  console.log('[Announcement] Uploaded header image for WhatsApp', {
+    templateName: normalizeWhatsAppTemplateName(templateName),
+    sourceFile: filePath,
+    mediaId,
+  });
+  return {
+    headerImageLink: '',
+    headerImageId: mediaId,
+    sourceFile: filePath,
+  };
 };
 
 export const sendWhatsAppTemplateMessage = async ({

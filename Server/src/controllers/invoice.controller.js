@@ -6,7 +6,11 @@ import Wallet from '../models/wallet.model.js';
 import Product from '../models/product.model.js';
 import CustomerSailorProgram from '../models/customerSellerProgram.model.js';
 import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
-import { appendTransaction } from './wallet.controller.js';
+import {
+  appendTransaction,
+  debitWalletForPurchase,
+  getSpendableWalletBalance,
+} from './wallet.controller.js';
 import { validateCouponForOrder } from './coupon.controller.js';
 import { validateReferralDiscountForOrder } from './affiliate.controller.js';
 import { creditReferralDiscountToInviter, markReferralDiscountUsed } from '../modules/customer/services/referral.service.js';
@@ -239,19 +243,31 @@ const notifyActivityUpdateWhatsApp = async ({
 
     const cashbackAmt = Math.max(0, Number(cashbackTotal ?? 0));
 
-    // Live wallet after debit + cashback credit (already posted before notify)
-    let walletBalance = Number(customer?.walletAmount ?? 0);
+    // Live TOTAL wallet after debit + cashback credit (general + cashback + affiliate).
+    // Using only customer.walletAmount shows "general" and misses cashback — WhatsApp
+    // "Updated Wallet Balance" looked wrong after cashback bills.
+    let walletBalance = getSpendableWalletBalance(null, customer);
     let membershipType = customer?.membershipType || membershipTypeHint;
     if (customer?._id) {
-      const fresh = await Customer.findById(customer._id)
-        .select('walletAmount closingBalance membershipType name')
-        .lean();
+      const [fresh, walletDoc] = await Promise.all([
+        Customer.findById(customer._id)
+          .select(
+            'walletAmount closingBalance cashbackBalance affiliateBalance membershipType name',
+          )
+          .lean(),
+        Wallet.findOne({customerId: customer._id})
+          .select('walletAmount cashbackBalance affiliateBalance')
+          .lean(),
+      ]);
       if (fresh) {
-        walletBalance = Number(fresh.walletAmount ?? fresh.closingBalance ?? 0);
         if (fresh.membershipType) membershipType = fresh.membershipType;
       }
+      walletBalance = getSpendableWalletBalance(walletDoc, fresh || customer);
     }
-    walletBalance = Math.max(0, walletBalance);
+    walletBalance = Math.max(
+      0,
+      Math.round((Number(walletBalance) + Number.EPSILON) * 100) / 100,
+    );
 
     const detailsUrlParam = String(
       process.env.WHATSAPP_ACTIVITY_DETAILS_URL_PARAM || invoice.invoiceCode || '',
@@ -311,13 +327,29 @@ const applyWalletDelta = async ({
       customerName: String(customer.name ?? '').trim(),
       customerPhone: String(customer.mobile ?? '').trim(),
       walletAmount: 0,
+      cashbackBalance: 0,
+      affiliateBalance: 0,
       transactions: [],
     });
   }
 
+  // amount > 0 means customer is paying with wallet (debit across buckets)
+  if (numericAmount > 0) {
+    await debitWalletForPurchase(wallet, {
+      amount: numericAmount,
+      note,
+      referenceType: 'invoice',
+      referenceId: invoiceCode,
+      createdBy,
+    });
+    return;
+  }
+
+  // Refund / credit back to general bucket
   await appendTransaction(wallet, {
-    type: numericAmount > 0 ? 'debit' : 'credit',
+    type: 'credit',
     amount: Math.abs(numericAmount),
+    walletType: 'general',
     note,
     referenceType: 'invoice',
     referenceId: invoiceCode,
@@ -816,13 +848,11 @@ const createInvoice = async (req, res) => {
       }
 
       const existingWallet = await Wallet.findOne({ customerId: customer._id });
-      const availableWallet = Number(
-        existingWallet?.walletAmount ?? customer.walletAmount ?? customer.closingBalance ?? 0,
-      );
-      if (walletAmount > availableWallet) {
+      const availableWallet = getSpendableWalletBalance(existingWallet, customer);
+      if (walletAmount > availableWallet + 0.01) {
         return res.status(400).json({
           success: false,
-          message: 'Wallet amount exceeds available balance.',
+          message: `Wallet amount exceeds available balance. Available: ₹${availableWallet.toFixed(2)}`,
         });
       }
     }
@@ -1294,13 +1324,11 @@ const updateInvoice = async (req, res) => {
       }
 
       const wallet = await Wallet.findOne({ customerId: customer._id });
-      const availableWallet = Number(
-        wallet?.walletAmount ?? customer.walletAmount ?? customer.closingBalance ?? 0,
-      );
-      if (walletDelta > 0 && walletDelta > availableWallet) {
+      const availableWallet = getSpendableWalletBalance(wallet, customer);
+      if (walletDelta > 0 && walletDelta > availableWallet + 0.01) {
         return res.status(400).json({
           success: false,
-          message: "Wallet amount exceeds available balance.",
+          message: `Wallet amount exceeds available balance. Available: ₹${availableWallet.toFixed(2)}`,
         });
       }
 

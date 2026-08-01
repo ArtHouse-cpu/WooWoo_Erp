@@ -18,7 +18,7 @@ import Swal from "sweetalert2";
 import {
   handleDeleteSubscription,
   handleGetMemberships,
-  handleGetSubscriptions,
+  handleGetAllSubscriptions,
 } from "@/services/apiClient";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
@@ -242,7 +242,7 @@ export default function SubscriptionScreen() {
     setLoading(true);
     try {
       const [response, membershipRes] = await Promise.all([
-        handleGetSubscriptions(search.trim(), 200),
+        handleGetAllSubscriptions(search.trim()),
         handleGetMemberships({ status: "All" }),
       ]);
 
@@ -675,11 +675,34 @@ export default function SubscriptionScreen() {
       isLoading: loading,
     },
     enableTopToolbar: false,
-    enableBottomToolbar: false,
+    enableBottomToolbar: true,
+    enablePagination: true,
     enableColumnActions: false,
     enableDensityToggle: false,
     enableFullScreenToggle: false,
     enableHiding: false,
+    paginationDisplayMode: "pages",
+    positionPagination: "bottom",
+    initialState: {
+      pagination: { pageIndex: 0, pageSize: 25 },
+      density: "compact",
+    },
+    muiPaginationProps: {
+      rowsPerPageOptions: [10, 25, 50, 100],
+      showFirstButton: true,
+      showLastButton: true,
+      color: "primary",
+      shape: "rounded",
+      variant: "outlined",
+      size: "small",
+    },
+    muiBottomToolbarProps: {
+      sx: {
+        backgroundColor: "#ffffff",
+        borderTop: "1px solid #e5e7eb",
+        minHeight: "56px",
+      },
+    },
     muiTableHeadCellProps: {
       sx: {
         fontWeight: 700,

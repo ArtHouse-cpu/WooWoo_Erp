@@ -529,15 +529,45 @@ export type CreateSubscriptionPayload = {
 
 export const handleGetSubscriptions = async (
   search = "",
-  limit = 100,
+  limit = 5000,
   signal?: AbortSignal,
+  page = 1,
 ) => {
   const response = await axiosInstance.get("/subscriptions", {
-    params: { search: search.trim(), limit },
+    params: { search: search.trim(), limit, page },
     signal,
   });
-  console.log(response.data);
   return response.data;
+};
+
+/** Fetch every matching subscription by paging until exhausted */
+export const handleGetAllSubscriptions = async (
+  search = "",
+  signal?: AbortSignal,
+  pageSize = 2000,
+) => {
+  const size = Math.min(Math.max(Number(pageSize) || 2000, 1), 10000);
+  const all: any[] = [];
+  let page = 1;
+  let total = Infinity;
+
+  while (all.length < total) {
+    const data = await handleGetSubscriptions(search, size, signal, page);
+    const batch = Array.isArray(data?.subscriptions) ? data.subscriptions : [];
+    total = Number.isFinite(Number(data?.total))
+      ? Number(data.total)
+      : batch.length;
+    all.push(...batch);
+    if (!batch.length || batch.length < size || data?.hasMore === false) break;
+    page += 1;
+    if (page > 100) break; // safety
+  }
+
+  return {
+    success: true,
+    subscriptions: all,
+    total: Number.isFinite(total) ? total : all.length,
+  };
 };
 
 export const handleGetSubscriptionById = async (id: string, signal?: AbortSignal) => {

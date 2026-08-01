@@ -382,12 +382,73 @@ if (action === "set_minimum") {
     }
   };
 
+ /** Merge split bucket debits/credits for the same invoice into one history row */
+ const groupWalletTransactions = (transactions: any[]) => {
+   const grouped: any[] = [];
+   const indexByKey = new Map<string, number>();
+
+   for (const entry of transactions) {
+     const type = String(entry?.type ?? entry?.mode ?? "ENTRY").toUpperCase();
+     const referenceId = String(entry?.referenceId ?? "").trim();
+     const referenceType = String(entry?.referenceType ?? "")
+       .trim()
+       .toLowerCase();
+     const amount = toAmount(entry?.amount, entry?.value);
+
+     // Group invoice (and similar) splits that share the same reference
+     const canGroup =
+       Boolean(referenceId) &&
+       (referenceType === "invoice" ||
+         /invoice/i.test(String(entry?.note ?? "")));
+
+     if (!canGroup) {
+       grouped.push({ ...entry, amount, _parts: 1 });
+       continue;
+     }
+
+     const key = `${type}|${referenceType}|${referenceId}`;
+     const existingIndex = indexByKey.get(key);
+     if (existingIndex === undefined) {
+       indexByKey.set(key, grouped.length);
+       grouped.push({
+         ...entry,
+         amount,
+         _parts: 1,
+         // Prefer a clean note without per-bucket suffix noise
+         note:
+           String(entry?.note ?? entry?.remark ?? "")
+             .replace(/\s*\([^)]*cashback[^)]*\)\s*$/i, "")
+             .replace(/\s*\([^)]*general[^)]*\)\s*$/i, "")
+             .trim() ||
+           `Wallet used for invoice ${referenceId}`,
+       });
+     } else {
+       const existing = grouped[existingIndex];
+       existing.amount =
+         Math.round((toAmount(existing.amount) + amount) * 100) / 100;
+       existing._parts = Number(existing._parts || 1) + 1;
+       // Keep earliest/latest metadata from first entry; amount is summed
+       if (
+         !existing.createdAt &&
+         (entry?.createdAt || entry?.date)
+       ) {
+         existing.createdAt = entry.createdAt || entry.date;
+       }
+     }
+   }
+
+   return grouped;
+ };
+
  const handleViewHistory = async (row: WalletRow) => {
   const rawTransactions = Array.isArray(row.raw?.transactions)
     ? [...row.raw.transactions].reverse()
     : [];
 
-  const totalCredit = rawTransactions.reduce((sum: number, t: any) => {
+  // Show one line per invoice payment (e.g. ₹52.6 + ₹49.4 → ₹102)
+  const displayTransactions = groupWalletTransactions(rawTransactions);
+
+  const totalCredit = displayTransactions.reduce((sum: number, t: any) => {
     const type = String(t?.type ?? t?.mode ?? "").toUpperCase();
     const amount = toAmount(t?.amount, t?.value);
 
@@ -396,7 +457,7 @@ if (action === "set_minimum") {
       : sum;
   }, 0);
 
-  const totalDebit = rawTransactions.reduce((sum: number, t: any) => {
+  const totalDebit = displayTransactions.reduce((sum: number, t: any) => {
     const type = String(t?.type ?? t?.mode ?? "").toUpperCase();
     const amount = toAmount(t?.amount, t?.value);
 
@@ -406,8 +467,8 @@ if (action === "set_minimum") {
   }, 0);
 
   const historyHtml =
-    rawTransactions.length > 0
-      ? rawTransactions
+    displayTransactions.length > 0
+      ? displayTransactions
           .map((entry: any, index: number) => {
             const amount = toAmount(entry?.amount, entry?.value);
 
@@ -464,7 +525,7 @@ if (action === "set_minimum") {
               <div class="relative pl-6">
                 
                 ${
-                  index !== rawTransactions.length - 1
+                  index !== displayTransactions.length - 1
                     ? `<div class="absolute left-[11px] top-8 h-full w-[2px] bg-slate-200"></div>`
                     : ""
                 }
@@ -610,73 +671,65 @@ if (action === "set_minimum") {
 
           </div>
 
-          <!-- Summary -->
-          <div class="grid grid-cols-2 gap-3 mt-5 sm:grid-cols-4">
-
-            <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
-              <p class="text-xs font-medium text-slate-500 uppercase">
-                Total Wallet
+          <!-- Summary: Total Balance · Withdrawable · Minimum · Credit · Debit -->
+          <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Total Balance
               </p>
-
-              <h3 class="text-xl font-bold text-slate-800 mt-1">
+              <h3 class="mt-1.5 text-xl font-bold tabular-nums text-slate-900">
                 ₹${Number(row.walletAmount || 0).toLocaleString("en-IN")}
               </h3>
-            </div>
-
-            <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
-              <p class="text-xs font-medium text-slate-500 uppercase">
-                General
+              <p class="mt-1 text-[11px] text-slate-400">
+                General + cashback + affiliate
               </p>
-
-              <h3 class="text-xl font-bold text-slate-800 mt-1">
-                ₹${Number(row.generalBalance ?? 0).toLocaleString("en-IN")}
-              </h3>
             </div>
 
-            <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
-              <p class="text-xs font-medium text-emerald-600 uppercase">
-                Withdrawable
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                Withdrawable Balance
               </p>
-
-              <h3 class="text-xl font-bold text-emerald-700 mt-1">
-                ₹${Number(row.withdrawableBalance ?? row.affiliateBalance ?? 0).toLocaleString("en-IN")}
+              <h3 class="mt-1.5 text-xl font-bold tabular-nums text-emerald-800">
+                ₹${Number(
+                  row.withdrawableBalance ?? row.affiliateBalance ?? 0,
+                ).toLocaleString("en-IN")}
               </h3>
-            </div>
-
-            <div class="rounded-2xl bg-indigo-50 border border-indigo-100 p-4">
-              <p class="text-xs font-medium text-indigo-600 uppercase">
-                Cashback
+              <p class="mt-1 text-[11px] text-emerald-600/80">
+                Affiliate earnings
               </p>
-
-              <h3 class="text-xl font-bold text-indigo-700 mt-1">
-                ₹${Number(row.cashbackBalance || 0).toLocaleString("en-IN")}
-              </h3>
             </div>
 
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                Minimum Balance
+              </p>
+              <h3 class="mt-1.5 text-xl font-bold tabular-nums text-amber-800">
+                ₹${Number(instruction.minimumBalance || 0).toLocaleString("en-IN")}
+              </h3>
+              <p class="mt-1 text-[11px] text-amber-700/80">
+                Debits cannot go below this
+              </p>
+            </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-3 mt-3">
-
-            <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-3">
-              <p class="text-xs font-medium text-emerald-600 uppercase">
+          <div class="mt-3 grid grid-cols-2 gap-3">
+            <div class="rounded-2xl border border-emerald-200 bg-white p-4 text-left">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
                 Total Credit
               </p>
-
-              <h3 class="text-lg font-bold text-emerald-700 mt-1">
-                ₹${totalCredit.toLocaleString("en-IN")}
+              <h3 class="mt-1.5 text-lg font-bold tabular-nums text-emerald-700">
+                +₹${totalCredit.toLocaleString("en-IN")}
               </h3>
             </div>
 
-            <div class="rounded-2xl bg-rose-50 border border-rose-100 p-3">
-              <p class="text-xs font-medium text-rose-600 uppercase">
+            <div class="rounded-2xl border border-rose-200 bg-white p-4 text-left">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-rose-600">
                 Total Debit
               </p>
-
-              <h3 class="text-lg font-bold text-rose-700 mt-1">
-                ₹${totalDebit.toLocaleString("en-IN")}
+              <h3 class="mt-1.5 text-lg font-bold tabular-nums text-rose-700">
+                -₹${totalDebit.toLocaleString("en-IN")}
               </h3>
             </div>
-
           </div>
         </div>
 

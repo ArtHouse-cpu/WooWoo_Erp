@@ -10,7 +10,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { handleGetCategories, type MembershipPlanPayload } from "@/services/apiClient";
+import { type MembershipPlanPayload } from "@/services/apiClient";
 
 type UsageLimits = Record<string, { discount: number; cashback: number }>;
 
@@ -159,54 +159,12 @@ export default function AddnewPlansModal({
   initialPlan,
 }: Props) {
   const [form, setForm] = useState<PlanFormState>(initialState);
-  const [categories, setCategories] = useState<{ _id: string; name: string }[]>(
-    [...FIXED_USAGE_CATEGORIES],
+
+  /** Only Food / Space / Products / Services — no extra catalogue categories */
+  const usageLimitCategories = useMemo(
+    () => FIXED_USAGE_CATEGORIES.map((c) => ({ _id: c._id, name: c.name })),
+    [],
   );
-
-  /** Food / Space / Products / Services first, then other catalogue categories */
-  const usageLimitCategories = useMemo(() => {
-    const seen = new Set<string>();
-    const merged: { _id: string; name: string }[] = [];
-    const skipCatalogueDuplicates = new Set([
-      "food",
-      "foods",
-      "space",
-      "spaces",
-      "product",
-      "products",
-      "service",
-      "services",
-    ]);
-    for (const cat of [...FIXED_USAGE_CATEGORIES, ...categories]) {
-      const name = String(cat.name || "").trim();
-      if (!name) continue;
-      const key = name.toLowerCase();
-      // Avoid duplicate cards when catalogue already has Product/Service names
-      if (
-        !FIXED_USAGE_CATEGORIES.some((f) => f.name.toLowerCase() === key) &&
-        skipCatalogueDuplicates.has(key)
-      ) {
-        continue;
-      }
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push({ _id: String(cat._id || key), name });
-    }
-    return merged;
-  }, [categories]);
-
-  useEffect(() => {
-    if (!open) return;
-    const controller = new AbortController();
-    handleGetCategories(controller.signal)
-      .then((res) => {
-        if (res && Array.isArray(res.categories)) {
-          setCategories(res.categories);
-        }
-      })
-      .catch((err) => console.log("Error fetching categories:", err));
-    return () => controller.abort();
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -780,13 +738,15 @@ export default function AddnewPlansModal({
                 </div>
 
                 <p className="mb-4 text-xs text-slate-500">
-                  Set member Discount % and Cashback % per category.{" "}
-                  <span className="font-semibold text-orange-700">Food</span>,{" "}
-                  <span className="font-semibold text-orange-700">Space</span>,{" "}
+                  Set membership Discount % and Cashback % for these 4 areas
+                  only.{" "}
                   <span className="font-semibold text-orange-700">Products</span>{" "}
-                  and{" "}
+                  applies to all catalogue products;{" "}
                   <span className="font-semibold text-orange-700">Services</span>{" "}
-                  apply on food bills, space bookings, and catalogue sales.
+                  to all services;{" "}
+                  <span className="font-semibold text-orange-700">Food</span> /{" "}
+                  <span className="font-semibold text-orange-700">Space</span>{" "}
+                  likewise. Catalogue product discounts can still stack on top.
                 </p>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

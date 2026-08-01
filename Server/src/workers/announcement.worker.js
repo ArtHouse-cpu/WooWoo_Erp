@@ -8,7 +8,10 @@ import {
 } from '../queue/announcement.queue.js';
 import { redisConnection } from '../queue/redisConnection.js';
 import Announcement from '../models/announcement.model.js';
-import { sendWhatsAppTemplateMessage } from '../modules/customer/services/whatsapp.service.js';
+import {
+  normalizeWhatsAppTemplateName,
+  sendWhatsAppTemplateMessage,
+} from '../modules/customer/services/whatsapp.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,19 +40,41 @@ const worker = new Worker(
       headerImageId,
     } = job.data;
 
+    // Source of truth from DB so All/Selected never drift, and normalize
+    // display-like values ("new cafe") → Meta name ("newcafe").
+    const announcement = announcementId
+      ? await Announcement.findById(announcementId).lean()
+      : null;
+
+    const templateName = normalizeWhatsAppTemplateName(
+      announcement?.whatsappMetaTemplateName || whatsappTemplateName,
+    );
+    const lang =
+      String(announcement?.languageCode || languageCode || 'en').trim() || 'en';
+    const imageLink = String(
+      announcement?.headerImageLink || headerImageLink || '',
+    ).trim();
+    const imageId = String(
+      announcement?.headerImageId || headerImageId || '',
+    ).trim();
+    const bodyParams = Array.isArray(announcement?.templateParams)
+      ? announcement.templateParams
+      : Array.isArray(templateParams)
+        ? templateParams
+        : [];
+
     await sendWhatsAppTemplateMessage({
       to: phone,
-      templateName: whatsappTemplateName,
-      languageCode,
+      templateName,
+      languageCode: lang,
       // Only send body params the UI/API provided.
       // Static templates (e.g. newcafe) expect 0 params — do not invent values.
-      bodyParams: Array.isArray(templateParams)
-        ? templateParams.map((p) => String(p ?? '').trim()).filter(Boolean)
-        : [],
+      bodyParams: bodyParams
+        .map((p) => String(p ?? '').trim())
+        .filter(Boolean),
       // IMAGE-header templates (e.g. newcafe) require image link or media id.
-      // createAnnouncement resolves this once; worker also has a safety net.
-      headerImageLink: String(headerImageLink || '').trim(),
-      headerImageId: String(headerImageId || '').trim(),
+      headerImageLink: imageLink,
+      headerImageId: imageId,
     });
 
     const updated = await Announcement.findByIdAndUpdate(

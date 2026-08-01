@@ -7,8 +7,8 @@ import {
   type CatalogueLookupItem,
 } from "@/services/apiClient";
 import {
-  calcCatalogueProductDiscount,
-  getUsageLimitForCategory,
+  calcStackedLineBenefits,
+  resolveMembershipPlan,
 } from "../../utils/membershipInvoiceUtils";
 import CreateProductModal from "./Modal/CreateProductModal";
 import Swal from "sweetalert2";
@@ -121,51 +121,31 @@ export default function ProductsServicesSection({
     };
   }, [draft.name, readOnly]);
 
+  const getPlan = () =>
+    resolveMembershipPlan(membershipPlans, membershipType, membershipPlanId);
+
   const getCalculatedItemBenefits = (item: CatalogueLookupItem, qty: number) => {
     const sellingPrice = Number(item.sellingPrice ?? 0);
-    const membershipCategory = item.category || "General";
     const lineCategory = item.lineCategory || item.sourceType || "product";
-    const productDiscount = calcCatalogueProductDiscount(
-      sellingPrice,
+    // Prefer line type (product/service/food/space) so plan Products/Services limits apply
+    const benefitCategory =
+      lineCategory || item.category || "General";
+    const stacked = calcStackedLineBenefits({
+      unitPrice: sellingPrice,
       qty,
-      item.discountType,
-      item.discountValue,
-    );
-
-    // CSP: always apply catalogue product discount; never membership cashback/discount
-    if (item.isCsp) {
-      return {
-        discount: productDiscount,
-        cashback: 0,
-        category: lineCategory,
-      };
-    }
-
-    let calculatedDiscount = 0;
-    let calculatedCashback = 0;
-    const plan = resolveMembershipPlan();
-
-    // Prefer Products / Services / Food / Space via sourceType so plan usageLimits apply
-    const limit =
-      getUsageLimitForCategory(plan?.usageLimits, lineCategory) ||
-      getUsageLimitForCategory(plan?.usageLimits, membershipCategory);
-
-    if (limit && (limit.discount || limit.cashback)) {
-      if (limit.discount) {
-        calculatedDiscount = (sellingPrice * qty * Number(limit.discount)) / 100;
-      }
-      if (limit.cashback) {
-        calculatedCashback =
-          (sellingPrice * qty * Number(limit.cashback)) / 100;
-      }
-    } else {
-      calculatedDiscount = productDiscount;
-    }
+      category: benefitCategory,
+      plan: getPlan(),
+      discountType: item.discountType,
+      discountValue: item.discountValue,
+      isCsp: Boolean(item.isCsp),
+    });
 
     return {
-      discount: calculatedDiscount,
-      cashback: calculatedCashback,
+      discount: stacked.discount,
+      cashback: stacked.cashback,
       category: lineCategory,
+      productDiscountAmount: stacked.productDiscount,
+      membershipDiscountAmount: stacked.membershipDiscount,
     };
   };
 
@@ -179,7 +159,13 @@ export default function ProductsServicesSection({
       return;
     }
 
-    const { discount, cashback, category } = getCalculatedItemBenefits(item, 1);
+    const {
+      discount,
+      cashback,
+      category,
+      productDiscountAmount,
+      membershipDiscountAmount,
+    } = getCalculatedItemBenefits(item, 1);
 
     if (onAddDirectItem) {
       onAddDirectItem({
@@ -194,6 +180,8 @@ export default function ProductsServicesSection({
         cspLabel: item.cspLabel || null,
         productDiscountType: item.discountType,
         productDiscountValue: Number(item.discountValue ?? 0),
+        productDiscountAmount,
+        membershipDiscountAmount,
       });
     }
   };
@@ -255,60 +243,28 @@ export default function ProductsServicesSection({
     };
   }, [draft.name, dropdownOpen, readOnly]);
 
-  const resolveMembershipPlan = () =>
-    membershipPlans.find(
-      (p) =>
-        (membershipPlanId && p._id === membershipPlanId) ||
-        p.planId?.toLowerCase() === membershipType.toLowerCase() ||
-        p.planType?.toLowerCase() === membershipType.toLowerCase() ||
-        p.displayName?.toLowerCase() === membershipType.toLowerCase(),
-    );
-
   const applyItemToDraft = (item: CatalogueLookupItem | any) => {
     const qty = Number(draft.qty || 1);
     const sellingPrice = Number(item.sellingPrice ?? 0);
-    const membershipCategory = item.category || "General";
     const lineCategory = item.lineCategory || item.sourceType || "product";
     const isCsp = Boolean(item.isCsp);
-
-    let calculatedDiscount = 0;
-    let calculatedCashback = 0;
-    const productDiscount = calcCatalogueProductDiscount(
-      sellingPrice,
+    const stacked = calcStackedLineBenefits({
+      unitPrice: sellingPrice,
       qty,
-      item.discountType,
-      item.discountValue,
-    );
-
-    if (isCsp) {
-      // CSP: catalogue product discount always applies; no membership benefits
-      calculatedDiscount = productDiscount;
-    } else {
-      const plan = resolveMembershipPlan();
-      const limit =
-        getUsageLimitForCategory(plan?.usageLimits, lineCategory) ||
-        getUsageLimitForCategory(plan?.usageLimits, membershipCategory);
-
-      if (limit && (limit.discount || limit.cashback)) {
-        if (limit.discount) {
-          calculatedDiscount = (sellingPrice * qty * Number(limit.discount)) / 100;
-        }
-        if (limit.cashback) {
-          calculatedCashback =
-            (sellingPrice * qty * Number(limit.cashback)) / 100;
-        }
-      } else {
-        calculatedDiscount = productDiscount;
-      }
-    }
+      category: lineCategory || item.category || "General",
+      plan: getPlan(),
+      discountType: item.discountType,
+      discountValue: item.discountValue,
+      isCsp,
+    });
 
     const displayName = item.productName || item.name || "";
     // Set category first (parent may recalculate membership), then lock discount/cashback.
     onDraftChange("category", lineCategory);
     onDraftChange("name", displayName);
     onDraftChange("price", String(sellingPrice));
-    onDraftChange("discount", String(calculatedDiscount));
-    onDraftChange("cashback", String(calculatedCashback));
+    onDraftChange("discount", String(stacked.discount));
+    onDraftChange("cashback", String(stacked.cashback));
     onDraftChange("isCsp", isCsp ? "true" : "false");
     onDraftChange(
       "image",

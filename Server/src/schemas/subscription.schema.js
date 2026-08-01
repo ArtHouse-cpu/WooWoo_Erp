@@ -88,9 +88,16 @@ const normalizeItems = (items, errors) => {
   return normalized.map(({_idx, ...rest}) => rest);
 };
 
-const normalizeStudents = (students, errors, isJunior) => {
+const normalizeStudents = (
+  students,
+  errors,
+  isJunior,
+  {allowOptionalJuniorStudents = false} = {},
+) => {
   if (!isJunior) return [];
   if (!Array.isArray(students) || students.length === 0) {
+    // Bulk junior import may leave student/parent columns blank
+    if (allowOptionalJuniorStudents) return [];
     errors.push('At least one student is required for Junior membership.');
     return [];
   }
@@ -108,15 +115,28 @@ const normalizeStudents = (students, errors, isJunior) => {
       studentIdUpload: String(student?.studentIdUpload ?? '').trim(),
     };
 
-    if (!normalized.studentName) errors.push(`Student name is required at row ${idx + 1}.`);
-    if (!normalized.classStd ) {
-      errors.push(`Class/STD must be less than or equal to class 12 at row ${idx + 1}.`);
+    if (!allowOptionalJuniorStudents) {
+      if (!normalized.studentName) {
+        errors.push(`Student name is required at row ${idx + 1}.`);
+      }
+      if (!normalized.classStd) {
+        errors.push(
+          `Class/STD must be less than or equal to class 12 at row ${idx + 1}.`,
+        );
+      }
+      if (!normalized.relation) {
+        errors.push(`Relation is required at row ${idx + 1}.`);
+      }
+      if (!normalized.parentName) {
+        errors.push(`Parent name is required at row ${idx + 1}.`);
+      }
+      if (!normalized.studentId && !normalized.studentIdUpload) {
+        errors.push(
+          `Student ID or Photo Upload is required at row ${idx + 1}.`,
+        );
+      }
     }
-    if (!normalized.relation) errors.push(`Relation is required at row ${idx + 1}.`);
-    if (!normalized.parentName) errors.push(`Parent name is required at row ${idx + 1}.`);
-    if (!normalized.studentId && !normalized.studentIdUpload) {
-      errors.push(`Student ID or Photo Upload is required at row ${idx + 1}.`);
-    }
+
     if (normalized.dob && Number.isNaN(normalized.dob.getTime())) {
       errors.push(`Invalid DOB at row ${idx + 1}.`);
     }
@@ -150,9 +170,9 @@ export function validateSubscriptionCreateBody(body) {
     students,
     referral,
     coupon,
+    allowPastEndDate,
+    allowOptionalJuniorStudents,
   } = body ?? {};
-
-  console.log('body', body);
 
   if (!customerName || !String(customerName).trim()) errors.push('Customer name is required.');
   if (!customerPhone || !String(customerPhone).trim()) {
@@ -162,11 +182,29 @@ export function validateSubscriptionCreateBody(body) {
   }
   if (!salesPersonName || !String(salesPersonName).trim()) errors.push('Sales person is required.');
 
-  const invoiceDateObj = invoiceDate ? new Date(invoiceDate) : null;
-  const dueDateObj = dueDate ? new Date(dueDate) : invoiceDateObj;
-  if (!invoiceDateObj || Number.isNaN(invoiceDateObj.getTime())) errors.push('Valid start date is required.');
-  if (!dueDateObj || Number.isNaN(dueDateObj.getTime())) errors.push('Valid end date is required.');
-  if (invoiceDateObj && dueDateObj && dueDateObj < getStartOfToday()) {
+  // Parse YYYY-MM-DD as UTC calendar date to avoid timezone day-shift.
+  const parseDateOnly = value => {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+    const text = String(value ?? '').trim();
+    const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) {
+      return new Date(Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3])));
+    }
+    const d = text ? new Date(text) : null;
+    return d && !Number.isNaN(d.getTime()) ? d : null;
+  };
+
+  const invoiceDateObj = parseDateOnly(invoiceDate);
+  const dueDateObj = parseDateOnly(dueDate) || invoiceDateObj;
+  if (!invoiceDateObj) errors.push('Valid start date is required.');
+  if (!dueDateObj) errors.push('Valid end date is required.');
+  // Bulk import of historical memberships may have past end dates.
+  if (
+    !allowPastEndDate &&
+    invoiceDateObj &&
+    dueDateObj &&
+    dueDateObj < getStartOfToday()
+  ) {
     errors.push('End date cannot be before today.');
   }
   if (invoiceDateObj && dueDateObj && dueDateObj < invoiceDateObj) {
@@ -176,7 +214,9 @@ export function validateSubscriptionCreateBody(body) {
   const normalizedItems = normalizeItems(items, errors);
   const normalizedMembershipType = normalizeMembershipType(membershipType || membershipPlanId);
   const isJunior = isJuniorMembership(normalizedMembershipType);
-  const normalizedStudents = normalizeStudents(students, errors, isJunior);
+  const normalizedStudents = normalizeStudents(students, errors, isJunior, {
+    allowOptionalJuniorStudents: Boolean(allowOptionalJuniorStudents),
+  });
 
   const st = Number(subTotal);
   const dt = Number(discountTotal ?? 0);

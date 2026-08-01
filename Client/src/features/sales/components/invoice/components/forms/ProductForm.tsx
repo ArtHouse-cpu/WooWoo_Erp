@@ -31,13 +31,19 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
   const discountValue = watch("discountValue");
   const stockStatus = watch("stockStatus");
   const isCsp = watch("isCsp");
+  const categoryId = watch("categoryId");
+  const categoryName = watch("category");
+  const subCategoryId = watch("subCategoryId");
+  const subCategoryName = watch("subCategory");
+  const cspEnrollmentId = watch("cspEnrollmentId");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         setLoadingCsp(true);
-        const res = await handleGetCspEnrollments({ status: "active" });
+        // Include inactive so edit can still show the saved sailor
+        const res = await handleGetCspEnrollments({ status: "all" });
         if (cancelled) return;
         const rows = Array.isArray(res?.enrollments)
           ? res.enrollments
@@ -57,6 +63,20 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
     };
   }, []);
 
+  // Keep CSP select value aligned after options load (ObjectId → string)
+  useEffect(() => {
+    if (!cspEnrollmentId || !cspOptions.length) return;
+    const match = cspOptions.find(
+      (row) => String(row._id) === String(cspEnrollmentId),
+    );
+    if (match) {
+      const normalized = String(match._id);
+      if (normalized !== cspEnrollmentId) {
+        setValue("cspEnrollmentId", normalized, { shouldValidate: true });
+      }
+    }
+  }, [cspOptions, cspEnrollmentId, setValue]);
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -69,15 +89,17 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
           <input {...register("brandName")} placeholder="e.g. Nike, Apple" className="w-full rounded-lg border border-gray-300 p-2.5 text-sm" />
         </div>
         <CategorySelect
-          categoryValue={watch("categoryId")}
+          categoryValue={categoryId || ""}
+          categoryName={categoryName || ""}
           onCategoryChange={(id, name) => {
-            setValue("categoryId", id);
-            setValue("category", name);
+            setValue("categoryId", id, { shouldDirty: true });
+            setValue("category", name, { shouldDirty: true });
           }}
-          subCategoryValue={watch("subCategoryId")}
+          subCategoryValue={subCategoryId || ""}
+          subCategoryName={subCategoryName || ""}
           onSubCategoryChange={(id, name) => {
-            setValue("subCategoryId", id);
-            setValue("subCategory", name);
+            setValue("subCategoryId", id, { shouldDirty: true });
+            setValue("subCategory", name, { shouldDirty: true });
           }}
         />
       </div>
@@ -102,21 +124,39 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">CSP Sailor *</label>
             <select
-              {...register("cspEnrollmentId")}
+              value={String(cspEnrollmentId || "")}
+              onChange={(e) =>
+                setValue("cspEnrollmentId", e.target.value, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                })
+              }
               className="w-full rounded-lg border border-gray-300 p-2.5 text-sm"
               disabled={loadingCsp}
             >
               <option value="">{loadingCsp ? "Loading sailors…" : "Select CSP sailor"}</option>
               {cspOptions.map((row) => (
-                <option key={row._id} value={row._id}>
-                  {row.label || `CSP · ${row.displayName || row.customer?.name || "Sailor"}`}
-                  {row.mobile ? ` (${row.mobile})` : ""}
+                <option key={row._id} value={String(row._id)}>
+                  {row.label ||
+                    `CSP · ${
+                      row.displayName ||
+                      row.customer?.name ||
+                      (typeof row.customerId === "object"
+                        ? row.customerId?.name
+                        : "") ||
+                      "Sailor"
+                    }`}
+                  {row.mobile
+                    ? ` (${row.mobile})`
+                    : typeof row.customerId === "object" && row.customerId?.mobile
+                      ? ` (${row.customerId.mobile})`
+                      : ""}
                 </option>
               ))}
             </select>
             {!loadingCsp && cspOptions.length === 0 && (
               <p className="mt-1 text-xs text-amber-600">
-                No active CSP sailors. Enroll one under Network → CSP.
+                No CSP sailors found. Enroll one under Network → CSP.
               </p>
             )}
           </div>

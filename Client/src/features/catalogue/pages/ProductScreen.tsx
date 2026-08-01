@@ -287,9 +287,19 @@ export default function ProductScreen() {
                       ...editProduct,
                       type: "product",
                       barcode: editProduct.barCode || editProduct.barcode || "",
+                      category: String(editProduct.category || ""),
+                      categoryId: String(editProduct.categoryId || ""),
+                      subCategory: String(editProduct.subCategory || ""),
+                      subCategoryId: String(editProduct.subCategoryId || ""),
                       isCsp: editProduct.isCsp ? "yes" : "no",
                       cspEnrollmentId: editProduct.cspEnrollmentId
-                        ? String(editProduct.cspEnrollmentId)
+                        ? String(
+                            typeof editProduct.cspEnrollmentId === "object"
+                              ? editProduct.cspEnrollmentId._id ||
+                                  editProduct.cspEnrollmentId.id ||
+                                  ""
+                              : editProduct.cspEnrollmentId,
+                          )
                         : "",
                       images: [],
                     }
