@@ -64,7 +64,7 @@ const schema = baseSchema.superRefine((value, ctx) => {
   if (value.type === "product" && value.isCsp === "yes" && !String(value.cspEnrollmentId || "").trim()) {
     ctx.addIssue({
       code: "custom",
-      message: "Select a CSP sailor when CSP is Yes",
+      message: "Select a CSP seller when CSP is Yes",
       path: ["cspEnrollmentId"],
     });
   }

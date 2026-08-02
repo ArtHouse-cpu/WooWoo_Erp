@@ -92,6 +92,13 @@ const invoiceSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    /** Exact CRM customer linked at invoice create (prefer over name search). */
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Customer',
+      default: null,
+      index: true,
+    },
     invoiceDate: {
       type: Date,
       required: true,

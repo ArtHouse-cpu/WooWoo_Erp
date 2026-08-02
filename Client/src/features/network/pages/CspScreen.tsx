@@ -98,7 +98,7 @@ export default function CspScreen() {
       }
       Swal.fire(
         "Enrolled",
-        res.message || "CSP sailor enrolled (Customer + Vendor linked).",
+        res.message || "CSP seller enrolled (Customer + Vendor linked).",
         "success",
       );
       setShowEnroll(false);
@@ -108,7 +108,7 @@ export default function CspScreen() {
       const msg =
         error?.response?.data?.message ||
         error?.message ||
-        "Failed to enroll CSP sailor.";
+        "Failed to enroll CSP seller.";
       Swal.fire("Error", msg, "error");
     } finally {
       setEnrolling(false);
@@ -137,7 +137,7 @@ export default function CspScreen() {
         Cell: ({ row }) => (
           <span className="font-semibold text-slate-800">
             {row.original.label ||
-              `CSP · ${row.original.displayName || row.original.customer?.name || "Sailor"}`}
+              `CSP · ${row.original.displayName || row.original.customer?.name || "Seller"}`}
           </span>
         ),
       },
@@ -162,7 +162,7 @@ export default function CspScreen() {
       },
       {
         accessorKey: "sailorSharePercent",
-        header: "Sailor %",
+        header: "Seller %",
         Cell: ({ cell }) => `${Number(cell.getValue() ?? 70)}%`,
       },
       {
@@ -216,11 +216,11 @@ export default function CspScreen() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">
-            Customer Sailor Program (CSP)
+            Customer Seller Program (CSP)
           </h1>
           <p className="text-sm text-slate-500">
-            Enroll Premium customers as sailors. A vendor record is linked
-            automatically. CSP products credit 70% to the sailor wallet on invoice.
+            Enroll Premium customers as sellers. A vendor record is linked
+            automatically. CSP products credit 70% to the seller wallet on invoice.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -243,7 +243,7 @@ export default function CspScreen() {
               onClick={() => setShowEnroll(true)}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
-              Enroll Sailor
+              Enroll Seller
             </button>
           </Can>
         </div>
@@ -254,10 +254,10 @@ export default function CspScreen() {
       {showEnroll && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <h2 className="text-lg font-semibold text-slate-900">Enroll CSP Sailor</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Enroll CSP Seller</h2>
             <p className="mt-1 text-sm text-slate-500">
               Only <span className="font-medium text-slate-700">Premium</span> members
-              can become CSP sailors. A vendor record is linked automatically.
+              can become CSP sellers. A vendor record is linked automatically.
             </p>
             <label className="mt-4 mb-1 block text-sm font-medium text-slate-700">
               Premium Customer *

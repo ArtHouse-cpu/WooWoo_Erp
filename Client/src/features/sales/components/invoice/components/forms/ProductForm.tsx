@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import { Pencil, Plus, Trash2, Wand2 } from "lucide-react";
 import CategorySelect from "../shared/CategorySelect";
@@ -42,7 +42,7 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
     (async () => {
       try {
         setLoadingCsp(true);
-        // Include inactive so edit can still show the saved sailor
+        // Include inactive so edit can still show the saved seller
         const res = await handleGetCspEnrollments({ status: "all" });
         if (cancelled) return;
         const rows = Array.isArray(res?.enrollments)
@@ -52,7 +52,7 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
             : [];
         setCspOptions(rows);
       } catch (error) {
-        console.error("Failed to load CSP sailors:", error);
+        console.error("Failed to load CSP sellers:", error);
         if (!cancelled) setCspOptions([]);
       } finally {
         if (!cancelled) setLoadingCsp(false);
@@ -106,7 +106,7 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">CSP (Customer Sailor Program)</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">CSP (Customer Seller Program)</label>
           <select
             value={isCsp || "no"}
             onChange={(e) => {
@@ -122,7 +122,7 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
         </div>
         {isCsp === "yes" && (
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">CSP Sailor *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">CSP Seller *</label>
             <select
               value={String(cspEnrollmentId || "")}
               onChange={(e) =>
@@ -134,7 +134,7 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
               className="w-full rounded-lg border border-gray-300 p-2.5 text-sm"
               disabled={loadingCsp}
             >
-              <option value="">{loadingCsp ? "Loading sailors…" : "Select CSP sailor"}</option>
+              <option value="">{loadingCsp ? "Loading sellers…" : "Select CSP seller"}</option>
               {cspOptions.map((row) => (
                 <option key={row._id} value={String(row._id)}>
                   {row.label ||
@@ -144,7 +144,7 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
                       (typeof row.customerId === "object"
                         ? row.customerId?.name
                         : "") ||
-                      "Sailor"
+                      "Seller"
                     }`}
                   {row.mobile
                     ? ` (${row.mobile})`
@@ -156,7 +156,7 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
             </select>
             {!loadingCsp && cspOptions.length === 0 && (
               <p className="mt-1 text-xs text-amber-600">
-                No CSP sailors found. Enroll one under Network → CSP.
+                No CSP sellers found. Enroll one under Network → CSP.
               </p>
             )}
           </div>

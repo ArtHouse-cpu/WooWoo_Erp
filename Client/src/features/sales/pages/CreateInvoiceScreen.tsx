@@ -14,6 +14,7 @@ import {
   handleCreateInvoice,
   handleUpdateInvoice,
   handleGetCustomers,
+  handleGetCustomerById,
   handleGetMemberships,
   type CustomerPayload,
   type MembershipPlanPayload,
@@ -70,7 +71,7 @@ export default function CreateInvoiceScreen() {
     Array<{ _id: string; name: string; mobile: string; companyName?: string; membershipType?: string; membershipPlanId?: string }>
   >([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
-  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(true);
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
 
@@ -102,6 +103,14 @@ export default function CreateInvoiceScreen() {
         if (inv.invoiceCode) setInvoiceNo(inv.invoiceCode);
         setCustomer(inv.customerName || "");
         setPhone(inv.customerPhone || "");
+        const linkedCustomerId =
+          typeof inv.customerId === "object" && inv.customerId
+            ? String(inv.customerId._id ?? "")
+            : String(inv.customerId ?? "");
+        setCustomerId(linkedCustomerId || null);
+        // Never open name-search dropdown when opening an existing invoice
+        setCustomerDropdownOpen(false);
+        setCustomers([]);
         if (inv.invoiceDate) setInvoiceDate(new Date(inv.invoiceDate).toISOString().split("T")[0]);
         if (inv.dueDate) setDueDate(new Date(inv.dueDate).toISOString().split("T")[0]);
         setNotes(inv.notes || "");
@@ -124,6 +133,70 @@ export default function CreateInvoiceScreen() {
         if (inv.extraCharges) setExtraCharges(inv.extraCharges);
     }
   }, [location.state]);
+
+  /** Resolve exact CRM customer for view/edit (by invoice customerId, else exact phone). */
+  useEffect(() => {
+    if (mode === "create") return;
+    const phoneTerm = phone.trim();
+    const linkedId = String(customerId ?? "").trim();
+    if (!linkedId && !phoneTerm) return;
+
+    const controller = new AbortController();
+    const applyMatch = (match: {
+      _id?: string;
+      name?: string;
+      mobile?: string;
+      membershipType?: string;
+      membershipPlanId?: string;
+    }) => {
+      setCustomer(String(match.name || customer));
+      setPhone(String(match.mobile || phone));
+      setMembership(String(match.membershipType ?? "none"));
+      setMembershipPlanId(toMembershipPlanId(match.membershipPlanId));
+      if (match._id) setCustomerId(String(match._id));
+      setCustomers([]);
+      setCustomerDropdownOpen(false);
+    };
+
+    const resolveExactCustomer = async () => {
+      try {
+        if (linkedId) {
+          const byId = await handleGetCustomerById(
+            linkedId,
+            controller.signal,
+          );
+          if (byId?.customer?._id) {
+            applyMatch(byId.customer);
+            return;
+          }
+        }
+
+        // Legacy invoices without customerId: match by phone only (never by name)
+        if (!phoneTerm) return;
+        const response = await handleGetCustomers(
+          phoneTerm,
+          controller.signal,
+          50,
+          1,
+        );
+        const list = Array.isArray(response?.customers)
+          ? response.customers
+          : [];
+        const digits = phoneTerm.replace(/\D/g, "");
+        const match = list.find((c: { mobile?: string }) => {
+          const m = String(c.mobile ?? "").replace(/\D/g, "");
+          return m === digits || m.endsWith(digits) || digits.endsWith(m);
+        });
+        if (match) applyMatch(match);
+      } catch {
+        // keep invoice-stored name/phone
+      }
+    };
+
+    void resolveExactCustomer();
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, invoiceId, customerId]);
   const draft = {
     name: draftName,
     qty: draftQty,
@@ -338,6 +411,7 @@ export default function CreateInvoiceScreen() {
       const draftPayload = {
         customerName: customer.trim(),
         customerPhone: phone.trim(),
+        customerId: customerId || undefined,
         invoiceDate,
         dueDate,
         salesPersonName: salesPerson,
@@ -483,6 +557,7 @@ export default function CreateInvoiceScreen() {
         await handleUpdateInvoice(invoiceId, {
           customerName: customer.trim(),
           customerPhone: phone.trim(),
+          customerId: payment.customerId || customerId || undefined,
           invoiceDate,
           dueDate,
           salesPersonName: salesPerson,
@@ -515,6 +590,7 @@ export default function CreateInvoiceScreen() {
         const response = await handleCreateInvoice({
           customerName: customer.trim(),
           customerPhone: phone.trim(),
+          customerId: payment.customerId || customerId || undefined,
           invoiceDate,
           dueDate,
           salesPersonName: salesPerson,
@@ -588,6 +664,8 @@ export default function CreateInvoiceScreen() {
   const debouncedCustomer = useDebounce(customer.trim(), 250);
 
   useEffect(() => {
+    // View Invoice: never search/list customers by name
+    if (mode === "view") return;
     if (!customerDropdownOpen) return;
 
     const term = debouncedCustomer;
@@ -603,7 +681,7 @@ export default function CreateInvoiceScreen() {
     return () => {
       controller.abort();
     };
-  }, [debouncedCustomer, customerDropdownOpen]);
+  }, [debouncedCustomer, customerDropdownOpen, mode]);
 
   const handleCreateCustomerSubmit = async (args: {
     payload: CustomerPayload;
@@ -661,13 +739,16 @@ export default function CreateInvoiceScreen() {
             customer={customer}
             phone={phone}
             membership={membership}
+            membershipPlanId={membershipPlanId}
+            membershipPlans={membershipPlans}
             customerOptions={customers}
             loadingCustomers={loadingCustomers}
-            customerDropdownOpen={customerDropdownOpen}
+            customerDropdownOpen={mode !== "view" && customerDropdownOpen}
             invoiceDate={invoiceDate}
             dueDate={dueDate}
             dueDateMin={today}
             salesPerson={salesPerson}
+            readOnly={mode === "view"}
             onCustomerChange={(value) => {
               setCustomer(value);
               setPhone("");

@@ -55,7 +55,18 @@ const membershipSchema = new mongoose.Schema(
       badgeLabel: { type: String, default: "", trim: true },
       themeKey: {
         type: String,
-        enum: ["blue", "purple", "green", "orange"],
+        enum: [
+          "blue",
+          "purple",
+          "green",
+          "orange",
+          "yellow",
+          "violet",
+          "emerald",
+          "teal",
+          "indigo",
+          "rose",
+        ],
         default: "blue",
       },
       iconKey: {

@@ -15,10 +15,12 @@ import {
 import CreateProductModal from "../components/invoice/Modal/CreateProductModal";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import ProductSidebar from "../components/ProductSidebar";
+import MembershipBadge from "../components/invoice/MembershipBadge";
 import { useDebounce } from "@/hooks/useDebounce";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import { useAppSelector } from "@/store/hooks";
 import {
+  calcCatalogueProductDiscount,
   calcStackedLineBenefits,
   resolveMembershipPlan,
   toMembershipPlanId,
@@ -451,6 +453,7 @@ export default function CreatePosScreen({
       const response = await handleCreateInvoice({
         customerName: customer.trim() || "Walk-in Customer",
         customerPhone: phone.trim(),
+        customerId: payment.customerId || customerId || undefined,
         invoiceDate: todayStr,
         dueDate: todayStr,
         salesPersonName: staff.m_staff_name || "POS",
@@ -506,6 +509,7 @@ export default function CreatePosScreen({
       await handleCreateInvoice({
         customerName: customer.trim() || "Walk-in Customer",
         customerPhone: phone.trim(),
+        customerId: customerId || undefined,
         invoiceDate: todayStr,
         dueDate: todayStr,
         salesPersonName: staff.m_staff_name || "POS",
@@ -840,9 +844,13 @@ export default function CreatePosScreen({
                                   <div className="text-xs text-slate-500">{c.mobile}</div>
                                 </div>
                                 {c.membershipType && c.membershipType !== "none" && (
-                                  <span className="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-600 uppercase">
-                                    {c.membershipType}
-                                  </span>
+                                  <MembershipBadge
+                                    membershipType={c.membershipType}
+                                    membershipPlanId={toMembershipPlanId(
+                                      c.membershipPlanId,
+                                    )}
+                                    membershipPlans={membershipPlans}
+                                  />
                                 )}
                               </button>
                             )))}
@@ -857,9 +865,11 @@ export default function CreatePosScreen({
                           <div className="text-indigo-600 font-medium">{phone}</div>
                         </div>
                         {membership !== "none" && (
-                          <div className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white uppercase">
-                            {membership}
-                          </div>
+                          <MembershipBadge
+                            membershipType={membership}
+                            membershipPlanId={membershipPlanId}
+                            membershipPlans={membershipPlans}
+                          />
                         )}
                       </div>
                     )}
@@ -936,7 +946,32 @@ export default function CreatePosScreen({
                             </span>
                           </span>
                           <span className="text-xs text-gray-500">
-                            ₹{p.sellingPrice ?? 0}
+                            {(() => {
+                              const original = Number(p.sellingPrice ?? 0) || 0;
+                              const productDiscount = calcCatalogueProductDiscount(
+                                original,
+                                1,
+                                p.discountType,
+                                p.discountValue,
+                              );
+                              const finalPrice = Math.max(
+                                0,
+                                original - productDiscount,
+                              );
+                              if (productDiscount > 0 && finalPrice < original) {
+                                return (
+                                  <>
+                                    <s className="text-gray-400">
+                                      ₹{original.toLocaleString("en-IN")}
+                                    </s>{" "}
+                                    <span className="font-semibold text-emerald-700">
+                                      ₹{finalPrice.toLocaleString("en-IN")}
+                                    </span>
+                                  </>
+                                );
+                              }
+                              return `₹${original.toLocaleString("en-IN")}`;
+                            })()}
                             {p.trackStock && p.stockQty != null
                               ? ` | Qty: ${p.stockQty}`
                               : ""}

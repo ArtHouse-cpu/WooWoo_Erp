@@ -396,11 +396,11 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
   },
   { key: PERMISSIONS.PARTNER_READ, module: "network", label: "View partners" },
   { key: PERMISSIONS.GUEST_READ, module: "network", label: "View guests" },
-  { key: PERMISSIONS.CSP_READ, module: "network", label: "View CSP sailors" },
+  { key: PERMISSIONS.CSP_READ, module: "network", label: "View CSP sellers" },
   {
     key: PERMISSIONS.CSP_WRITE,
     module: "network",
-    label: "Enroll / manage CSP sailors",
+    label: "Enroll / manage CSP sellers",
   },
 
   { key: PERMISSIONS.WALLET_READ, module: "wallet", label: "View wallets" },

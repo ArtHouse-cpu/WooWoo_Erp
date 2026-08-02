@@ -119,6 +119,37 @@ function formatInr(value: number) {
   })}`;
 }
 
+/** Product-catalogue discount for a checkout line (not membership). */
+function getLineProductDiscount(item: CheckoutItem): number {
+  const productDisc = Number(item.productDiscountAmount ?? 0);
+  if (productDisc > 0) return productDisc;
+  const membershipDisc = item.isCsp
+    ? 0
+    : Number(item.membershipDiscountAmount ?? 0);
+  const lineDisc = Number(item.discount ?? 0);
+  // When split amounts are missing, treat full line discount as product discount
+  if (membershipDisc <= 0 && lineDisc > 0) return lineDisc;
+  return Math.max(0, lineDisc - membershipDisc);
+}
+
+function getCheckoutLinePricing(item: CheckoutItem) {
+  const qty = Number(item.qty || 0);
+  const unitPrice = Number(item.price || 0);
+  const originalLine = Math.max(0, qty * unitPrice);
+  const productDiscount = getLineProductDiscount(item);
+  const discountedLine = Math.max(0, originalLine - productDiscount);
+  const discountedUnit = qty > 0 ? discountedLine / qty : 0;
+  return {
+    qty,
+    unitPrice,
+    originalLine,
+    productDiscount,
+    discountedLine,
+    discountedUnit,
+    hasProductDiscount: productDiscount > 0.001,
+  };
+}
+
 type SummaryTone = "default" | "muted" | "discount" | "cashback" | "total" | "due" | "change";
 
 function SummaryLine({
@@ -889,10 +920,11 @@ export default function CheckoutModal({
           ? lineCashbackTotal
           : summary.cashbackTotal;
 
+  /** Subtotal after product discounts (membership still listed separately below). */
   const itemsSubtotal = useMemo(
     () =>
       items.reduce(
-        (acc, item) => acc + Number(item.qty || 0) * Number(item.price || 0),
+        (acc, item) => acc + getCheckoutLinePricing(item).discountedLine,
         0,
       ),
     [items],
@@ -1210,6 +1242,7 @@ export default function CheckoutModal({
     const payload = {
       customerName: customerName.trim(),
       customerPhone: customerSearch.trim(),
+      customerId: selectedCustomer?._id ?? initialCustomerId ?? undefined,
       invoiceDate: today,
       dueDate: today,
       salesPersonName: staff.m_staff_name ?? "POS Sales",
@@ -1367,8 +1400,7 @@ export default function CheckoutModal({
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
               <ul className="divide-y divide-slate-100">
                 {items.map((item, i) => {
-                  const lineTotal =
-                    Number(item.qty || 0) * Number(item.price || 0)
+                  const pricing = getCheckoutLinePricing(item);
 
                   return (
                     <li key={item.id ?? i} className="py-3 first:pt-0">
@@ -1378,19 +1410,51 @@ export default function CheckoutModal({
                             {item.name}
                           </p>
                           <p className="text-xs text-slate-500">
-                            {Number(item.qty)} × {formatInr(Number(item.price || 0))}
+                            {pricing.qty} ×{" "}
+                            {pricing.hasProductDiscount ? (
+                              <span className="inline-flex flex-wrap items-baseline gap-1">
+                                <span className="sr-only">
+                                  Original {formatInr(pricing.unitPrice)}, sale{" "}
+                                  {formatInr(pricing.discountedUnit)}
+                                </span>
+                                <s
+                                  aria-hidden="true"
+                                  className="text-slate-400 decoration-slate-400"
+                                >
+                                  {formatInr(pricing.unitPrice)}
+                                </s>
+                                <span aria-hidden="true" className="text-slate-400">
+                                  →
+                                </span>
+                                <span
+                                  aria-hidden="true"
+                                  className="font-semibold text-emerald-700"
+                                >
+                                  {formatInr(pricing.discountedUnit)}
+                                </span>
+                              </span>
+                            ) : (
+                              formatInr(pricing.unitPrice)
+                            )}
                           </p>
                         </div>
-                        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
-                          {formatInr(lineTotal)}
-                        </p>
+                        <div className="shrink-0 text-right">
+                          {pricing.hasProductDiscount ? (
+                            <>
+                              {/* <p className="text-[11px] text-slate-400 line-through tabular-nums"> */}
+                                {/* {formatInr(pricing.originalLine)} */}
+                              {/* </p> */}
+                              <p className="text-sm font-semibold tabular-nums text-emerald-700">
+                                {formatInr(pricing.discountedLine)}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-sm font-semibold tabular-nums text-slate-900">
+                              {formatInr(pricing.discountedLine)}
+                            </p>
+                          )}
+                        </div>
                       </div>
-
-                      {/* {Number(item.discount ?? 0) > 0 && (
-                        <p className="mt-0.5 text-[11px] font-medium text-indigo-600">
-                          Discount: −{formatInr(Number(item.discount ?? 0))}
-                        </p>
-                      )} */}
                     </li>
                   );
                 })}

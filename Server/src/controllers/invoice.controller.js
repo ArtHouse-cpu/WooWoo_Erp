@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Counter from '../models/counter.model.js';
 import Customer from '../models/customer.model.js';
 import Coupon from '../models/coupon.model.js';
@@ -72,7 +73,17 @@ const buildCreatedBy = (req, fallback = {}) => ({
   m_staff_email: fallback?.m_staff_email ?? req.user?.email ?? null,
 });
 
-const findCustomerForInvoice = async ({ customerPhone, customerName }) => {
+const findCustomerForInvoice = async ({
+  customerId,
+  customerPhone,
+  customerName,
+}) => {
+  const id = String(customerId ?? '').trim();
+  if (id && mongoose.Types.ObjectId.isValid(id)) {
+    const byId = await Customer.findById(id);
+    if (byId) return byId;
+  }
+
   const phone = String(customerPhone ?? '').trim();
   const digits = normalizeMobile(phone) || phone.replace(/\D/g, '');
   if (digits) {
@@ -635,6 +646,7 @@ const createInvoice = async (req, res) => {
     const {
       customerName,
       customerPhone,
+      customerId: bodyCustomerId,
       invoiceDate,
       dueDate,
       salesPersonName,
@@ -756,7 +768,11 @@ const createInvoice = async (req, res) => {
     let appliedCoupon = null;
     let couponDiscount = 0;
     const preCouponAmount = Math.max(0, computedSubTotal - itemDiscountTotal);
-    const customer = await findCustomerForInvoice({ customerPhone, customerName });
+    const customer = await findCustomerForInvoice({
+      customerId: bodyCustomerId,
+      customerPhone,
+      customerName,
+    });
 
     if (coupon?.code) {
       const couponValidation = await validateCouponForOrder({
@@ -863,6 +879,7 @@ const createInvoice = async (req, res) => {
       invoiceCode,
       customerName: String(customerName).trim(),
       customerPhone: String(customerPhone).trim(),
+      customerId: customer?._id ?? (bodyCustomerId || null),
       invoiceDate: invoiceDateObj,
       dueDate: dueDateObj,
       salesPersonName: String(salesPersonName).trim(),
@@ -1158,6 +1175,7 @@ const updateInvoice = async (req, res) => {
     const {
       customerName,
       customerPhone,
+      customerId: bodyCustomerId,
       invoiceDate,
       dueDate,
       salesPersonName,
@@ -1180,6 +1198,12 @@ const updateInvoice = async (req, res) => {
     if (!existingInvoice) {
       return res.status(404).json({ success: false, message: "Invoice not found" });
     }
+
+    const resolvedCustomer = await findCustomerForInvoice({
+      customerId: bodyCustomerId ?? existingInvoice.customerId,
+      customerPhone: customerPhone ?? existingInvoice.customerPhone,
+      customerName: customerName ?? existingInvoice.customerName,
+    });
 
     const invoiceDateObj = invoiceDate ? new Date(invoiceDate) : undefined;
     const dueDateObj = dueDate ? new Date(dueDate) : undefined;
@@ -1235,6 +1259,15 @@ const updateInvoice = async (req, res) => {
     const updateData = {};
     if (customerName !== undefined) updateData.customerName = String(customerName).trim();
     if (customerPhone !== undefined) updateData.customerPhone = String(customerPhone).trim();
+    if (bodyCustomerId !== undefined || resolvedCustomer?._id) {
+      updateData.customerId =
+        resolvedCustomer?._id ??
+        (bodyCustomerId
+          ? mongoose.Types.ObjectId.isValid(String(bodyCustomerId))
+            ? bodyCustomerId
+            : null
+          : existingInvoice.customerId);
+    }
     if (invoiceDateObj !== undefined) updateData.invoiceDate = invoiceDateObj;
     if (dueDateObj !== undefined) updateData.dueDate = dueDateObj;
     if (salesPersonName !== undefined) updateData.salesPersonName = String(salesPersonName).trim();

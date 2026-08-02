@@ -1,7 +1,50 @@
 import { useEffect, useState } from "react";
 import { Plus, Minus, Search, Package, Briefcase, Frame, Utensils } from "lucide-react";
 import { handleCatalogueLookup, type CatalogueLookupItem } from "@/services/apiClient";
-import Swal from "sweetalert2";
+import { calcCatalogueProductDiscount } from "../utils/membershipInvoiceUtils";
+
+const formatInr = (amount: number) =>
+  `₹${Number(amount || 0).toLocaleString("en-IN")}`;
+
+function CataloguePrice({ item }: { item: CatalogueLookupItem }) {
+  const original = Number(item.sellingPrice ?? 0) || 0;
+  const productDiscount = calcCatalogueProductDiscount(
+    original,
+    1,
+    item.discountType,
+    item.discountValue,
+  );
+  const finalPrice = Math.max(0, original - productDiscount);
+  const hasDiscount = productDiscount > 0 && finalPrice < original;
+
+  if (!hasDiscount) {
+    return (
+      <span className="text-[11px] font-extrabold text-slate-900">
+        {formatInr(original)}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-baseline gap-1.5">
+      <span className="sr-only">
+        Original price {formatInr(original)}, sale price {formatInr(finalPrice)}
+      </span>
+      <s
+        aria-hidden="true"
+        className="text-[10px] font-semibold text-slate-400 decoration-slate-400"
+      >
+        {formatInr(original)}
+      </s>
+      <span
+        aria-hidden="true"
+        className="rounded bg-emerald-50 px-1 py-0.5 text-[11px] font-extrabold text-emerald-700 ring-1 ring-emerald-100"
+      >
+        {formatInr(finalPrice)}
+      </span>
+    </span>
+  );
+}
 
 type ProductSidebarProps = {
   cartItems: any[];
@@ -182,10 +225,8 @@ export default function ProductSidebar({
                   <div className="truncate text-xs font-bold text-slate-800 leading-tight">
                     {item.productName || item.name}
                   </div>
-                  <div className="mt-0.5 flex items-center gap-1.5">
-                    <span className="text-[11px] font-extrabold text-slate-900">
-                      ₹{item.sellingPrice.toLocaleString("en-IN")}
-                    </span>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                    <CataloguePrice item={item} />
                     {item.trackStock && item.stockQty != null && (
                       <span className={`text-[9px] font-bold ${item.stockQty <= 0 ? "text-red-500 bg-red-50 px-1 rounded" : "text-slate-400"}`}>
                         {item.stockQty <= 0 ? "OUT OF STOCK" : `Stock: ${item.stockQty}`}

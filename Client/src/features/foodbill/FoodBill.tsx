@@ -1436,6 +1436,11 @@ export default function FoodBill() {
       const response = await handleCreateInvoice({
         customerName: selectedCustomer.name,
         customerPhone: selectedCustomer.phone,
+        customerId:
+          selectedCustomer.id &&
+          selectedCustomer.id !== WALK_IN_CUSTOMER.id
+            ? selectedCustomer.id
+            : undefined,
         invoiceDate: today,
         dueDate: today,
         salesPersonName: staff?.m_staff_name ?? "Food Bill",

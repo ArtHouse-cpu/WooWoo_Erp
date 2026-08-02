@@ -104,11 +104,30 @@ export function getUsageLimitForCategory(
   const exact = Object.keys(limits).find((k) => k.toLowerCase() === lower);
   if (exact) return limits[exact];
 
+  // Invoice/POS default line category "General" (and empty) = catalogue Products benefits
+  const isDefaultProductCategory =
+    !lower ||
+    lower === "general" ||
+    lower === "catalogue" ||
+    lower === "store" ||
+    lower === "product" ||
+    lower === "products";
+
   // Fuzzy match: Food / Space / Products / Services / Store line categories
   const aliasGroups: string[][] = [
     ["food", "foods", "meal", "restaurant", "canteen"],
     ["space", "spaces", "booking", "room"],
-    ["product", "products", "store", "supply", "sheets", "stationary", "stationery"],
+    [
+      "product",
+      "products",
+      "store",
+      "supply",
+      "sheets",
+      "stationary",
+      "stationery",
+      "general",
+      "catalogue",
+    ],
     ["service", "services"],
   ];
   for (const group of aliasGroups) {
@@ -126,8 +145,14 @@ export function getUsageLimitForCategory(
     if (key) return limits[key];
   }
 
-  if (limits.General) return limits.General;
-  if (limits.general) return limits.general;
+  if (isDefaultProductCategory) {
+    const productsKey = Object.keys(limits).find((k) => {
+      const nk = k.toLowerCase();
+      return nk === "products" || nk === "product" || nk.includes("store");
+    });
+    if (productsKey) return limits[productsKey];
+  }
+
   return undefined;
 }
 
@@ -145,6 +170,8 @@ function isSpaceCategory(category: string) {
 
 function isProductCategory(category: string) {
   const lower = String(category || "").trim().toLowerCase();
+  // "General" is the invoice/POS default for catalogue products
+  if (!lower || lower === "general" || lower === "catalogue") return true;
   return [
     "product",
     "products",
@@ -176,8 +203,9 @@ function findLimitRow(
 }
 
 /**
- * Resolve discount % and cashback % for a line.
- * Prefers usageLimits[category], then customerDisplay food/space/store badges.
+ * Resolve discount % and cashback % for a line from the subscribed membership plan.
+ * Category usageLimits (Food / Space / Products / Services) are the source of truth.
+ * customerDisplay.cashbackPercent is the Food badge only — never apply it to Products.
  */
 export function resolveBenefitPercents(
   category: string,
@@ -189,23 +217,7 @@ export function resolveBenefitPercents(
   let discountPercent = Number(limit?.discount ?? 0) || 0;
   let cashbackPercent = Number(limit?.cashback ?? 0) || 0;
 
-  const display = plan.customerDisplay;
-  if (display) {
-    if (discountPercent <= 0) {
-      if (isFoodCategory(category)) {
-        discountPercent = Number(display.foodDiscountPercent ?? 0) || 0;
-      } else if (isSpaceCategory(category)) {
-        discountPercent = Number(display.spaceDiscountPercent ?? 0) || 0;
-      } else if (isProductCategory(category)) {
-        discountPercent = Number(display.storeDiscountPercent ?? 0) || 0;
-      }
-    }
-    if (cashbackPercent <= 0) {
-      cashbackPercent = Number(display.cashbackPercent ?? 0) || 0;
-    }
-  }
-
-  // Last resort: canonical usageLimits rows (Food / Space / Products / Services)
+  // Prefer canonical usageLimits rows when category match was weak / incomplete
   if (discountPercent <= 0 || cashbackPercent <= 0) {
     const limits = normalizeUsageLimits(plan.usageLimits);
     let row: UsageLimit | undefined;
@@ -225,6 +237,23 @@ export function resolveBenefitPercents(
       if (cashbackPercent <= 0) {
         cashbackPercent = Number(row.cashback ?? 0) || 0;
       }
+    }
+  }
+
+  const display = plan.customerDisplay;
+  if (display) {
+    if (discountPercent <= 0) {
+      if (isFoodCategory(category)) {
+        discountPercent = Number(display.foodDiscountPercent ?? 0) || 0;
+      } else if (isSpaceCategory(category)) {
+        discountPercent = Number(display.spaceDiscountPercent ?? 0) || 0;
+      } else if (isProductCategory(category)) {
+        discountPercent = Number(display.storeDiscountPercent ?? 0) || 0;
+      }
+    }
+    // customerDisplay.cashbackPercent mirrors Food usage cashback only
+    if (cashbackPercent <= 0 && isFoodCategory(category)) {
+      cashbackPercent = Number(display.cashbackPercent ?? 0) || 0;
     }
   }
 
@@ -370,4 +399,170 @@ export function summarizeMembershipForCart(
     cashbackTotal += fromPlan.cashback;
   }
   return { membershipDiscount, cashbackTotal, plan };
+}
+
+/** Persistable membership type key for a plan (planId preferred). */
+export function getCustomerMembershipTypeFromPlan(
+  plan?: Pick<MembershipPlanPayload, "planId" | "displayName"> | null,
+): string {
+  const planId = String(plan?.planId ?? "").trim();
+  if (planId) return planId.toLowerCase();
+  const display = String(plan?.displayName ?? "").trim();
+  if (!display) return "none";
+  return display
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function isEmptyMembership(membershipType?: string | null): boolean {
+  const t = String(membershipType ?? "")
+    .trim()
+    .toLowerCase();
+  return !t || t === "none" || t === "-" || t === "n/a";
+}
+
+/** Billing period strings that must not be shown as membership-type badges. */
+const PERIOD_LIKE_LABELS = new Set([
+  "yearly",
+  "year",
+  "annual",
+  "annually",
+  "monthly",
+  "month",
+  "weekly",
+  "week",
+  "daily",
+  "day",
+  "lifetime",
+  "quarterly",
+  "quarter",
+  "till school life",
+  "school life",
+  "one time",
+  "onetime",
+  "one-time",
+]);
+
+function isPeriodLikeLabel(label: string): boolean {
+  const n = String(label ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  if (!n) return false;
+  if (PERIOD_LIKE_LABELS.has(n)) return true;
+  // e.g. "Yearly Plan", "Monthly Membership period"
+  return [...PERIOD_LIKE_LABELS].some(
+    (p) => n === p || n.startsWith(`${p} `) || n.endsWith(` ${p}`),
+  );
+}
+
+/**
+ * Human label for invoice / POS badges = membership TYPE (General, Premium, Lifetime…),
+ * never billing/repeat period (Yearly, Monthly…).
+ */
+export function getMembershipBadgeLabel(
+  plans: MembershipPlanPayload[],
+  membershipType?: string | null,
+  membershipPlanId?: unknown,
+): string {
+  if (isEmptyMembership(membershipType) && !toMembershipPlanId(membershipPlanId)) {
+    return "NONE";
+  }
+  const plan = resolveMembershipPlan(
+    plans,
+    String(membershipType ?? ""),
+    membershipPlanId,
+  );
+  if (plan) {
+    const badge = String(plan.customerDisplay?.badgeLabel ?? "").trim();
+    const display = String(plan.displayName ?? "").trim();
+    const planId = String(plan.planId ?? "").trim();
+    // Custom badge only if it is a membership name, not a period like "Yearly"
+    if (badge && !isPeriodLikeLabel(badge)) return badge;
+    if (display) return display;
+    if (planId) return planId;
+    const rawType = String(membershipType ?? "").trim();
+    if (rawType && !isPeriodLikeLabel(rawType)) return rawType;
+    return display || planId || "NONE";
+  }
+  const raw = String(membershipType ?? "").trim();
+  if (!raw || isPeriodLikeLabel(raw)) return "NONE";
+  return raw;
+}
+
+const THEME_CLASS: Record<string, string> = {
+  blue: "bg-blue-100 text-blue-700",
+  purple: "bg-purple-100 text-purple-700",
+  green: "bg-green-100 text-green-700",
+  orange: "bg-orange-100 text-orange-700",
+  yellow: "bg-yellow-100 text-yellow-700",
+  violet: "bg-violet-100 text-violet-700",
+  emerald: "bg-emerald-100 text-emerald-700",
+  red: "bg-red-100 text-red-700",
+  slate: "bg-slate-100 text-slate-700",
+  gray: "bg-gray-100 text-gray-700",
+  amber: "bg-amber-100 text-amber-800",
+  teal: "bg-teal-100 text-teal-700",
+  indigo: "bg-indigo-100 text-indigo-700",
+  rose: "bg-rose-100 text-rose-700",
+};
+
+/** Stable fallback themes for classic planIds + hash for any new plan. */
+const KNOWN_PLAN_THEME: Record<string, keyof typeof THEME_CLASS> = {
+  none: "gray",
+  general: "gray",
+  premium: "purple",
+  pro: "blue",
+  special: "green",
+  junior: "yellow",
+  elite: "violet",
+  lifetime: "emerald",
+};
+
+const THEME_PALETTE = Object.keys(THEME_CLASS) as Array<keyof typeof THEME_CLASS>;
+
+function hashThemeKey(seed: string): keyof typeof THEME_CLASS {
+  let hash = 0;
+  const s = seed.toLowerCase();
+  for (let i = 0; i < s.length; i += 1) {
+    hash = s.charCodeAt(i) + ((hash << 5) - hash);
+    hash |= 0;
+  }
+  return THEME_PALETTE[Math.abs(hash) % THEME_PALETTE.length];
+}
+
+export function getMembershipBadgeClassName(
+  plans: MembershipPlanPayload[],
+  membershipType?: string | null,
+  membershipPlanId?: unknown,
+): string {
+  if (isEmptyMembership(membershipType) && !toMembershipPlanId(membershipPlanId)) {
+    return THEME_CLASS.gray;
+  }
+
+  const plan = resolveMembershipPlan(
+    plans,
+    String(membershipType ?? ""),
+    membershipPlanId,
+  );
+  const themeFromPlan = String(plan?.customerDisplay?.themeKey ?? "")
+    .trim()
+    .toLowerCase();
+  if (themeFromPlan && THEME_CLASS[themeFromPlan]) {
+    return THEME_CLASS[themeFromPlan];
+  }
+
+  const planId = String(plan?.planId ?? membershipType ?? "")
+    .trim()
+    .toLowerCase();
+  if (KNOWN_PLAN_THEME[planId]) {
+    return THEME_CLASS[KNOWN_PLAN_THEME[planId]];
+  }
+
+  // New Manage Plans entries (e.g. Lifetime) get a stable color from planId/name
+  const seed =
+    planId ||
+    String(plan?.displayName ?? membershipType ?? "membership").trim();
+  return THEME_CLASS[hashThemeKey(seed)];
 }

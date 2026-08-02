@@ -126,6 +126,8 @@ export type CreateInvoiceItemPayload = {
 export type CreateInvoicePayload = {
   customerName: string;
   customerPhone: string;
+  /** Exact CRM customer linked to this invoice (preferred over name search). */
+  customerId?: string | null;
   invoiceDate: string;
   dueDate: string;
   salesPersonName: string;
@@ -680,6 +682,26 @@ export const handleGetCustomers = async (
   }
 };
 
+/** Fetch one CRM customer by id (exact record; not a name search). */
+export const handleGetCustomerById = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get(`/customer/${id}`, { signal });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    customer?: {
+      _id: string;
+      name: string;
+      mobile: string;
+      companyName?: string;
+      membershipType?: string;
+      membershipPlanId?: string;
+    };
+  };
+};
+
 /** Fetch every matching customer by paging until exhausted */
 export const handleGetAllCustomers = async (
   search = "",
@@ -943,7 +965,17 @@ export type MembershipPlanPayload = {
   customerDisplay?: {
     showInApp?: boolean;
     badgeLabel?: string;
-    themeKey?: "blue" | "purple" | "green" | "orange";
+    themeKey?:
+      | "blue"
+      | "purple"
+      | "green"
+      | "orange"
+      | "yellow"
+      | "violet"
+      | "emerald"
+      | "teal"
+      | "indigo"
+      | "rose";
     iconKey?: "user" | "star" | "graduation" | "crown";
     cashbackPercent?: number;
     storeDiscountPercent?: number;

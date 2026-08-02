@@ -2,6 +2,7 @@ import express from 'express';
 import {
   createCustomer,
   getCustomers,
+  getCustomerById,
   uploadCustomerImage,
   deleteCustomer,
   editCustomer,
@@ -32,6 +33,11 @@ router.get(
   '/check-phone',
   requireAnyPermission(PERMISSIONS.CUSTOMER_READ, PERMISSIONS.CUSTOMER_CREATE),
   checkCustomerPhone,
+);
+router.get(
+  '/:id',
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
+  getCustomerById,
 );
 router.post(
   '/check-phone',

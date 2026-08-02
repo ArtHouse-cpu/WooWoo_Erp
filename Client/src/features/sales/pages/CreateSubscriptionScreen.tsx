@@ -17,6 +17,7 @@ import {
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
+import { getCustomerMembershipTypeFromPlan } from "../utils/membershipInvoiceUtils";
 import { printThermalReceipt } from "@/utils/printUtils";
 import { Camera, Download, Printer, X } from "lucide-react";
 
@@ -337,14 +338,7 @@ const isJuniorPlan = (
 
 const getCustomerMembershipType = (
   plan?: Pick<MembershipOption, "planId" | "displayName"> | null,
-) => {
-  const raw = `${plan?.planId ?? ""} ${plan?.displayName ?? ""}`.toLowerCase();
-  if (raw.includes("junior") || raw.includes("junoir")) return "junior";
-  if (raw.includes("premium")) return "premium";
-  if (raw.includes("special")) return "special";
-  if (raw.includes("pro")) return "pro";
-  return "general";
-};
+) => getCustomerMembershipTypeFromPlan(plan);
 
 const parseDurationToDays = (periodRaw: string): number => {
   const period = String(periodRaw ?? "")
@@ -1496,6 +1490,47 @@ export default function CreateSubscriptionScreen({
                 </div>
               </div>
 
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  Membership Plan
+                  {mode === "upgrade" && effectiveCustomerPriority > 0 ? (
+                    <span className="ml-2 font-normal text-violet-600">
+                      (current priority: {effectiveCustomerPriority})
+                    </span>
+                  ) : null}
+                </label>
+                <select
+                  value={selectedMembershipId}
+                  onChange={(e) => {
+                    setSelectedMembershipId(e.target.value);
+                    setEndDateManuallyEdited(false);
+                  }}
+                  disabled={mode === "view"}
+                  className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                >
+                  <option value="">
+                    {loadingMemberships
+                      ? "Loading memberships..."
+                      : mode === "upgrade"
+                        ? "Select upgrade plan"
+                        : "Select membership plan"}
+                  </option>
+                  {selectableMemberships.map((m) => (
+                    <option key={m._id} value={m._id}>
+                      {`${m.displayName} • ₹${m.amount.toLocaleString("en-IN")} / ${m.period} • P${m.priority} • ${m.planId}`}
+                    </option>
+                  ))}
+                </select>
+                {mode === "upgrade" &&
+                  !loadingMemberships &&
+                  selectableMemberships.length === 0 && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      No higher-priority plans available for this customer.
+                      Junior is always listed when configured.
+                    </p>
+                  )}
+              </div>
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-gray-600">
@@ -1536,47 +1571,6 @@ export default function CreateSubscriptionScreen({
                     className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-600">
-                  Membership Plan
-                  {mode === "upgrade" && effectiveCustomerPriority > 0 ? (
-                    <span className="ml-2 font-normal text-violet-600">
-                      (current priority: {effectiveCustomerPriority})
-                    </span>
-                  ) : null}
-                </label>
-                <select
-                  value={selectedMembershipId}
-                  onChange={(e) => {
-                    setSelectedMembershipId(e.target.value);
-                    setEndDateManuallyEdited(false);
-                  }}
-                  disabled={mode === "view"}
-                  className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                >
-                  <option value="">
-                    {loadingMemberships
-                      ? "Loading memberships..."
-                      : mode === "upgrade"
-                        ? "Select upgrade plan"
-                        : "Select membership plan"}
-                  </option>
-                  {selectableMemberships.map((m) => (
-                    <option key={m._id} value={m._id}>
-                      {`${m.displayName} • ₹${m.amount.toLocaleString("en-IN")} / ${m.period} • P${m.priority} • ${m.planId}`}
-                    </option>
-                  ))}
-                </select>
-                {mode === "upgrade" &&
-                  !loadingMemberships &&
-                  selectableMemberships.length === 0 && (
-                    <p className="mt-1 text-xs text-amber-600">
-                      No higher-priority plans available for this customer.
-                      Junior is always listed when configured.
-                    </p>
-                  )}
               </div>
 
               {juniorSelected && (

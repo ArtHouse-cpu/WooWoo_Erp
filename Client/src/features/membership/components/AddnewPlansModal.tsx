@@ -7,7 +7,6 @@ import {
   Layers3,
   Plus,
   ShieldCheck,
-  Wallet,
   X,
 } from "lucide-react";
 import { type MembershipPlanPayload } from "@/services/apiClient";
@@ -34,7 +33,17 @@ type PlanFormState = Required<
   customerDisplay: {
     showInApp: boolean;
     badgeLabel: string;
-    themeKey: "blue" | "purple" | "green" | "orange";
+    themeKey:
+      | "blue"
+      | "purple"
+      | "green"
+      | "orange"
+      | "yellow"
+      | "violet"
+      | "emerald"
+      | "teal"
+      | "indigo"
+      | "rose";
     iconKey: "user" | "star" | "graduation" | "crown";
     cashbackPercent: number;
     storeDiscountPercent: number;
@@ -138,7 +147,18 @@ const initialState: PlanFormState = {
 
 
 const periods = ["Monthly", "Yearly", "Lifetime", "Till School Life"] as const;
-const themeKeys = ["blue", "purple", "green", "orange"] as const;
+const themeKeys = [
+  "blue",
+  "purple",
+  "green",
+  "orange",
+  "yellow",
+  "violet",
+  "emerald",
+  "teal",
+  "indigo",
+  "rose",
+] as const;
 const iconKeys = ["user", "star", "graduation", "crown"] as const;
 const discountTypes = ["Percentage", "Flat"] as const;
 
@@ -459,9 +479,11 @@ export default function AddnewPlansModal({
               servicesLimit?.cashback ??
               form.customerDisplay.cashbackPercent,
           ) || 0,
+        // Membership TYPE name for Invoice/POS badges — not billing period (Yearly/Monthly)
         badgeLabel:
           form.customerDisplay.badgeLabel.trim() ||
-          form.pricing.period,
+          form.displayName.trim() ||
+          form.planId.trim(),
         features: form.customerDisplay.features.filter((item) => item.label.trim()),
       },
       insightsLevel: form.insightsLevel,
@@ -727,6 +749,30 @@ export default function AddnewPlansModal({
                     </div>
                   </div>
                 </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
+                  <InputField
+                    label="Wallet Cashback on Purchase (₹)"
+                    value={String(form.walletCashback.amount)}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        walletCashback: {
+                          amount: Math.max(0, Number(v || 0)),
+                        },
+                      }))
+                    }
+                    type="number"
+                    placeholder="e.g. 50"
+                    rightElement={<span className="text-xs">₹</span>}
+                  />
+                  <div className="md:col-span-2 flex items-end">
+                    <p className="text-xs text-slate-500 pb-2">
+                      Fixed amount credited to the member wallet when this plan
+                      is purchased. Leave 0 if no purchase cashback.
+                    </p>
+                  </div>
+                </div>
               </section>
 
               <section className="rounded-2xl border border-orange-100 bg-orange-50/40 p-6 shadow-sm">
@@ -812,33 +858,6 @@ export default function AddnewPlansModal({
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-6 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
-                  <Wallet size={18} className="text-emerald-600" />
-                  <div className="text-base font-semibold text-slate-900">
-                    Wallet Cashback on Purchase
-                  </div>
-                </div>
-              
-                <div className="max-w-sm">
-                  <InputField
-                    label="Cashback Amount"
-                    value={String(form.walletCashback.amount)}
-                    onChange={(v) =>
-                      setForm((p) => ({
-                        ...p,
-                        walletCashback: {
-                          amount: Math.max(0, Number(v || 0)),
-                        },
-                      }))
-                    }
-                    type="number"
-                    placeholder="e.g. 50"
-                    rightElement={<span className="text-xs">₹</span>}
-                  />
-                </div>
-              </section>
-
               <section className="rounded-2xl border border-violet-100 bg-violet-50/40 p-6 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <ShieldCheck size={18} className="text-violet-500" />
@@ -851,7 +870,7 @@ export default function AddnewPlansModal({
                 </p>
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                   <InputField
-                    label="Badge Label"
+                    label="Badge Label (membership type)"
                     value={form.customerDisplay.badgeLabel}
                     onChange={(v) =>
                       setForm((p) => ({
@@ -859,7 +878,11 @@ export default function AddnewPlansModal({
                         customerDisplay: { ...p.customerDisplay, badgeLabel: v },
                       }))
                     }
-                    placeholder={form.pricing.period || "Lifetime"}
+                    placeholder={
+                      form.displayName.trim() ||
+                      form.planId.trim() ||
+                      "e.g. Premium"
+                    }
                   />
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">Theme Color</label>

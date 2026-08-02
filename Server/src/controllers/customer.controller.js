@@ -381,6 +381,47 @@ const createCustomer = async (req, res) => {
   }
 };
 
+const CUSTOMER_LIST_PROJECTION =
+  'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId priority walletAmount closingBalance cashbackBalance affiliateBalance referralCode referredBy status createdAt updatedAt createdBy';
+
+const getCustomerById = async (req, res) => {
+  try {
+    const {id} = req.params;
+    if (!id || !mongoose.Types.ObjectId.isValid(String(id))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid customer id is required.',
+      });
+    }
+
+    const customer = await Customer.findOne({
+      _id: id,
+      isDeleted: {$ne: true},
+    })
+      .select(CUSTOMER_LIST_PROJECTION)
+      .lean();
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Customer not found.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Customer fetched successfully.',
+      customer,
+    });
+  } catch (error) {
+    console.error('getCustomerById error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch customer.',
+    });
+  }
+};
+
 const getCustomers = async (req, res) => {
   try {
     const search = String(req.query.search ?? '').trim();
@@ -404,12 +445,9 @@ const getCustomers = async (req, res) => {
 
     // List payload must stay light — exclude heavy/nested fields that blow up
     // empty-search responses (profileImage base64, coupon history, etc.)
-    const listProjection =
-      'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId priority walletAmount closingBalance cashbackBalance affiliateBalance referralCode referredBy status createdAt updatedAt createdBy';
-
     const [customers, total] = await Promise.all([
       Customer.find(query)
-        .select(listProjection)
+        .select(CUSTOMER_LIST_PROJECTION)
         .sort({createdAt: -1})
         .skip(skip)
         .limit(limit)
@@ -910,6 +948,7 @@ const importCustomers = async (req, res) => {
 export {
   createCustomer,
   getCustomers,
+  getCustomerById,
   editCustomer,
   deleteCustomer,
   importCustomers,
