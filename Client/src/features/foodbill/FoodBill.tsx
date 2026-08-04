@@ -2205,7 +2205,7 @@ export default function FoodBill() {
                       </div>
                     </div>
                   ) : null}
-                  {referralDiscount > 0 || referralCodeApplied ? (
+                  {referralDiscount > 0 ? (
                     <div className="flex items-center justify-between gap-2 text-[10px] text-violet-700">
                       <span className="truncate font-semibold">
                         {referralLabel}
@@ -2229,6 +2229,28 @@ export default function FoodBill() {
                           <X size={12} />
                         </button>
                       </div>
+                    </div>
+                  ) : referralCodeApplied ? (
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-violet-700">
+                      <span className="truncate font-semibold">
+                        {referralStatusMessage ||
+                          referralLabel ||
+                          "Referral applied (no buyer discount)"}
+                        {referralCodeApplied
+                          ? ` (${referralCodeApplied})`
+                          : ""}
+                        {referralInviterName
+                          ? ` · ${referralInviterName}`
+                          : ""}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={clearReferralDiscount}
+                        className="shrink-0 text-gray-400 hover:text-rose-500"
+                        title="Remove referral"
+                      >
+                        <X size={12} />
+                      </button>
                     </div>
                   ) : selectedCustomer.id !== WALK_IN_CUSTOMER.id ? (
                     <p className="text-[10px] text-violet-500">

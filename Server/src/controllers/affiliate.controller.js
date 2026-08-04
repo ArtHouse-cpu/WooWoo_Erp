@@ -1062,26 +1062,35 @@ export const validateReferralDiscountForOrder = async ({
   let discountAlreadyUsed = buyer.referralDiscountUsed === true;
   if (!discountAlreadyUsed) {
     const phone = String(buyer.mobile || customerPhone || '').trim();
-    const priorInvoice = await Invoice.findOne({
-      status: {$ne: 'cancelled'},
-      'referral.discountAmount': {$gt: 0},
-      $or: [
-        ...(phone ? [{customerPhone: phone}] : []),
-        {customerName: String(buyer.name || '').trim()},
-      ],
-    })
-      .select('_id invoiceCode')
-      .lean();
+    const buyerId = buyer._id;
+    const invoiceIdentity = [
+      ...(buyerId
+        ? [{customerId: buyerId}, {'referral.buyerId': buyerId}]
+        : []),
+      ...(phone ? [{customerPhone: phone}] : []),
+    ];
 
-    const priorSubscription = !priorInvoice
-      ? await Subscription.findOne({
-          status: {$nin: ['cancelled']},
-          'referral.discountAmount': {$gt: 0},
-          ...(phone ? {customerPhone: phone} : {}),
-        })
-          .select('_id subscriptionCode')
-          .lean()
-      : null;
+    const priorInvoice =
+      invoiceIdentity.length > 0
+        ? await Invoice.findOne({
+            status: {$ne: 'cancelled'},
+            'referral.discountAmount': {$gt: 0},
+            $or: invoiceIdentity,
+          })
+            .select('_id invoiceCode')
+            .lean()
+        : null;
+
+    const priorSubscription =
+      !priorInvoice && phone
+        ? await Subscription.findOne({
+            status: {$nin: ['cancelled']},
+            'referral.discountAmount': {$gt: 0},
+            customerPhone: phone,
+          })
+            .select('_id subscriptionCode')
+            .lean()
+        : null;
 
     if (priorInvoice || priorSubscription) {
       discountAlreadyUsed = true;
@@ -1113,6 +1122,11 @@ export const validateReferralDiscountForOrder = async ({
     buyerDiscountAmount: discountEligible ? Number(segment.discountAmount || 0) : 0,
   }));
 
+  const ruleLabel =
+    segments.length === 1
+      ? String(primary.label || 'Referral').trim()
+      : 'Referral';
+
   return {
     ok: true,
     discountEligible,
@@ -1125,10 +1139,9 @@ export const validateReferralDiscountForOrder = async ({
     inviterId: inviter._id,
     discountType: primary.commissionType || 'percentage',
     discountValue: Number(primary.commissionValue || 0),
-    label:
-      segments.length === 1
-        ? `${primary.label} Referral Discount`
-        : 'Referral Discount',
+    label: discountEligible
+      ? `${ruleLabel} Referral Discount`
+      : `${ruleLabel} (commission only)`,
     buyerId: buyer._id,
     message: discountAlreadyUsed
       ? 'Referral discount already used on this account. Referrer will still earn commission.'

@@ -1,4 +1,5 @@
 import Product from '../models/product.model.js';
+import Category from '../models/category.model.js';
 import CustomersailorProgram from '../models/customerSellerProgram.model.js';
 import multer from 'multer';
 import fs from 'fs';
@@ -6,6 +7,90 @@ import path from 'path';
 import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import mongoose from 'mongoose';
+
+/**
+ * Case-insensitive name lookup without giant $regex patterns
+ * (MongoDB rejects regex patterns that are too long).
+ */
+const findByLowerNames = async (Model, field, names, selectFields) => {
+  const lowers = [
+    ...new Set(
+      names
+        .map((n) => String(n || '').trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ];
+  if (!lowers.length) return [];
+
+  const CHUNK = 400;
+  const results = [];
+  for (let i = 0; i < lowers.length; i += CHUNK) {
+    const chunk = lowers.slice(i, i + CHUNK);
+    const docs = await Model.find({
+      $expr: {
+        $in: [{ $toLower: `$${field}` }, chunk],
+      },
+    })
+      .select(selectFields)
+      .lean();
+    results.push(...docs);
+  }
+  return results;
+};
+
+/**
+ * Ensure category names exist in Category collection (same as POST /api/categories).
+ * Returns Map<lowerName, canonicalName>.
+ */
+const ensureCategoriesExist = async (names = []) => {
+  const unique = [
+    ...new Set(
+      names
+        .map((n) => String(n || '').trim())
+        .filter(Boolean),
+    ),
+  ];
+  const nameByLower = new Map();
+  if (!unique.length) return nameByLower;
+
+  const existing = await findByLowerNames(Category, 'name', unique, 'name');
+
+  for (const cat of existing) {
+    nameByLower.set(String(cat.name).trim().toLowerCase(), cat.name);
+  }
+
+  const missing = unique.filter(
+    (name) => !nameByLower.has(name.toLowerCase()),
+  );
+
+  if (missing.length) {
+    try {
+      const created = await Category.insertMany(
+        missing.map((name) => ({ name })),
+        { ordered: false },
+      );
+      for (const cat of created) {
+        nameByLower.set(String(cat.name).trim().toLowerCase(), cat.name);
+      }
+    } catch (error) {
+      // Parallel uploads / unique race — re-read whatever exists now
+      const again = await findByLowerNames(Category, 'name', missing, 'name');
+      for (const cat of again) {
+        nameByLower.set(String(cat.name).trim().toLowerCase(), cat.name);
+      }
+      // Keep requested casing for any still-missing (shouldn't happen often)
+      for (const name of missing) {
+        const key = name.toLowerCase();
+        if (!nameByLower.has(key)) nameByLower.set(key, name);
+      }
+      if (error?.code !== 11000 && error?.name !== 'MongoBulkWriteError') {
+        console.error('ensureCategoriesExist error:', error);
+      }
+    }
+  }
+
+  return nameByLower;
+};
 
 const parseBool = raw => {
   if (typeof raw === 'boolean') return raw;
@@ -113,6 +198,7 @@ const storage = multer.diskStorage({
 
 export const upload = multer({ storage });
 
+//create product 
 export const createProduct = async (req, res) => {
   try {
     const {
@@ -236,6 +322,345 @@ export const createProduct = async (req, res) => {
     });
   }
 };
+export const uploadBulkProducts = async (req, res) => {
+  try {
+    const rawProducts = Array.isArray(req.body)
+      ? req.body
+      : Array.isArray(req.body?.products)
+        ? req.body.products
+        : [];
+
+    if (!rawProducts.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'No products found',
+      });
+    }
+
+    const toNumber = (value, fallback = 0) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    const normalizeKey = (value) =>
+      String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+
+    /** Prefer itemCode → barcode → name+variant for identity. */
+    const buildIdentity = ({ productName, variantName, itemCode, barCode }) => {
+      const code = normalizeKey(itemCode);
+      if (code) return { type: 'itemCode', key: `item:${code}`, label: `Item Code "${itemCode}"` };
+
+      const barcode = normalizeKey(barCode);
+      if (barcode) {
+        return {
+          type: 'barCode',
+          key: `barcode:${barcode}`,
+          label: `Barcode "${barCode}"`,
+        };
+      }
+
+      const name = normalizeKey(productName);
+      const variant = normalizeKey(variantName);
+      return {
+        type: 'nameVariant',
+        key: `name:${name}|variant:${variant}`,
+        label: variant
+          ? `Product "${productName}" / Variant "${variantName}"`
+          : `Product "${productName}"`,
+      };
+    };
+
+    const products = [];
+    const invalidRows = [];
+    const duplicateRows = [];
+    const seenInFile = new Map(); // identity key → first row number
+
+    // Auto-create any Excel categories via Category collection (POST /api/categories equivalent)
+    const categoryNamesFromFile = rawProducts
+      .map((row) =>
+        String(row?.category ?? row?.Category ?? row?.categoryName ?? '').trim(),
+      )
+      .filter(Boolean);
+    const categoryMap = await ensureCategoriesExist(categoryNamesFromFile);
+
+    rawProducts.forEach((row, index) => {
+      const excelRow = index + 1;
+      const productName = String(
+        row?.productName ?? row?.Product ?? row?.name ?? '',
+      ).trim();
+      const sellingPrice = toNumber(
+        row?.sellingPrice ?? row?.unitPrice ?? row?.['Unit Price'],
+        NaN,
+      );
+      const purchasePrice = toNumber(
+        row?.purchasePrice ?? row?.['Purchase Price'],
+        0,
+      );
+      const stockQty = Math.max(
+        0,
+        Math.floor(toNumber(row?.stockQty ?? row?.qty ?? row?.Qty, 0)),
+      );
+      const categoryRaw = String(
+        row?.category ?? row?.Category ?? row?.categoryName ?? '',
+      ).trim();
+      const itemCode = String(row?.itemCode ?? row?.['Item Code'] ?? '').trim();
+      const barCode = String(
+        row?.barCode ?? row?.barcode ?? row?.Barcode ?? '',
+      ).trim();
+      const variantName = String(row?.variant ?? row?.Variant ?? '').trim();
+
+      if (!productName || !(sellingPrice > 0) || !categoryRaw) {
+        invalidRows.push({
+          row: excelRow,
+          productName: productName || null,
+          reason: !productName
+            ? 'Product name is required'
+            : !(sellingPrice > 0)
+              ? 'Selling / Unit Price must be greater than 0'
+              : 'Category is required (will not default to General)',
+        });
+        return;
+      }
+
+      const category =
+        categoryMap.get(categoryRaw.toLowerCase()) || categoryRaw;
+
+      const identity = buildIdentity({
+        productName,
+        variantName,
+        itemCode,
+        barCode,
+      });
+
+      if (seenInFile.has(identity.key)) {
+        duplicateRows.push({
+          row: excelRow,
+          productName,
+          reason: `Duplicate in file (${identity.label}). First seen on row ${seenInFile.get(identity.key)}.`,
+        });
+        return;
+      }
+      seenInFile.set(identity.key, excelRow);
+
+      let variants = [];
+      if (Array.isArray(row?.variants)) {
+        variants = row.variants
+          .map((v) => ({
+            name: String(v?.name ?? '').trim(),
+            sellingPrice: toNumber(v?.sellingPrice, sellingPrice),
+            purchasePrice: toNumber(v?.purchasePrice, purchasePrice),
+            barcode: String(v?.barcode ?? v?.barCode ?? '').trim(),
+          }))
+          .filter((v) => v.name);
+      } else if (variantName) {
+        variants = [
+          {
+            name: variantName,
+            sellingPrice,
+            purchasePrice,
+            barcode: barCode,
+          },
+        ];
+      }
+
+      products.push({
+        type: 'product',
+        itemType: 'product',
+        productName,
+        brandName: String(row?.brandName ?? '').trim(),
+        serviceName: '',
+        sellingPrice,
+        purchasePrice,
+        itemCode,
+        barCode,
+        category,
+        subCategory: String(row?.subCategory ?? '').trim(),
+        description: String(row?.description ?? '').trim(),
+        discountType: row?.discountType === 'percentage' ? 'percentage' : 'flat',
+        discountValue: Math.max(0, toNumber(row?.discountValue, 0)),
+        stockQty,
+        stockStatus: stockQty > 0 ? 'in_stock' : 'out_of_stock',
+        primaryUnit: '',
+        variants,
+        images: Array.isArray(row?.images) ? row.images : [],
+        imageUrl: null,
+        isCsp: false,
+        cspEnrollmentId: null,
+        _identity: identity,
+        _excelRow: excelRow,
+      });
+    });
+
+    // Check against existing DB products
+    const itemCodes = [
+      ...new Set(
+        products
+          .map((p) => String(p.itemCode || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    const barCodes = [
+      ...new Set(
+        products
+          .map((p) => String(p.barCode || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    const productNames = [
+      ...new Set(
+        products
+          .map((p) => String(p.productName || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+
+    const orClauses = [];
+    if (itemCodes.length) orClauses.push({ itemCode: { $in: itemCodes } });
+    if (barCodes.length) orClauses.push({ barCode: { $in: barCodes } });
+
+    // Prefer exact $in for codes; names use $toLower chunks (no giant regex)
+    let existingProducts = [];
+    if (orClauses.length) {
+      existingProducts = await Product.find({ $or: orClauses })
+        .select('productName itemCode barCode variants')
+        .lean();
+    }
+    if (productNames.length) {
+      const byName = await findByLowerNames(
+        Product,
+        'productName',
+        productNames,
+        'productName itemCode barCode variants',
+      );
+      const seenIds = new Set(existingProducts.map((p) => String(p._id)));
+      for (const doc of byName) {
+        const id = String(doc._id);
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          existingProducts.push(doc);
+        }
+      }
+    }
+
+    const existingIdentities = new Set();
+    for (const existing of existingProducts) {
+      const existingVariants = Array.isArray(existing.variants)
+        ? existing.variants
+        : [];
+      if (existingVariants.length > 0) {
+        for (const variant of existingVariants) {
+          const id = buildIdentity({
+            productName: existing.productName,
+            variantName: variant?.name,
+            itemCode: existing.itemCode,
+            barCode: existing.barCode || variant?.barcode,
+          });
+          existingIdentities.add(id.key);
+        }
+      } else {
+        const id = buildIdentity({
+          productName: existing.productName,
+          variantName: '',
+          itemCode: existing.itemCode,
+          barCode: existing.barCode,
+        });
+        existingIdentities.add(id.key);
+      }
+
+      // Also index bare itemCode / barcode so either match blocks insert
+      const code = normalizeKey(existing.itemCode);
+      if (code) existingIdentities.add(`item:${code}`);
+      const barcode = normalizeKey(existing.barCode);
+      if (barcode) existingIdentities.add(`barcode:${barcode}`);
+      const nameOnly = normalizeKey(existing.productName);
+      if (nameOnly) existingIdentities.add(`name:${nameOnly}|variant:`);
+    }
+
+    const toInsert = [];
+    for (const product of products) {
+      const identity = product._identity;
+      const excelRow = product._excelRow;
+      delete product._identity;
+      delete product._excelRow;
+
+      if (existingIdentities.has(identity.key)) {
+        duplicateRows.push({
+          row: excelRow,
+          productName: product.productName,
+          reason: `Already exists in catalogue (${identity.label}).`,
+        });
+        continue;
+      }
+
+      // Mark so later rows in same request can't collide with ones we're inserting
+      existingIdentities.add(identity.key);
+      toInsert.push(product);
+    }
+
+    if (!toInsert.length) {
+      return res.status(400).json({
+        success: false,
+        message:
+          duplicateRows.length > 0
+            ? 'All rows are duplicates or invalid. Nothing imported.'
+            : 'No valid products to import',
+        invalidRows,
+        duplicateRows,
+        summary: {
+          total: rawProducts.length,
+          created: 0,
+          failed: invalidRows.length + duplicateRows.length,
+          skippedDuplicates: duplicateRows.length,
+          invalidRows,
+          duplicateRows,
+        },
+      });
+    }
+
+    const insertedProducts = await Product.insertMany(toInsert, {
+      ordered: false,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `${insertedProducts.length} products imported successfully`,
+      products: insertedProducts,
+      summary: {
+        total: rawProducts.length,
+        created: insertedProducts.length,
+        failed: invalidRows.length + duplicateRows.length,
+        skippedDuplicates: duplicateRows.length,
+        invalidRows,
+        duplicateRows,
+      },
+    });
+  } catch (error) {
+    console.error('uploadBulkProducts error:', error);
+
+    // Partial success when ordered:false hits a validation error mid-batch
+    if (error?.name === 'MongoBulkWriteError' && Array.isArray(error?.insertedDocs)) {
+      const created = error.insertedDocs.length;
+      return res.status(207).json({
+        success: created > 0,
+        message: `Imported ${created} product(s) with some failures`,
+        products: error.insertedDocs,
+        summary: {
+          created,
+          failed: Number(error?.writeErrors?.length || 0),
+          errors: (error.writeErrors || []).map((e) => e?.errmsg || e?.message),
+        },
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: error?.message || 'Failed to import products',
+    });
+  }
+};
 
 export const getProducts = async (req, res) => {
   try {
@@ -253,7 +678,7 @@ export const getProducts = async (req, res) => {
       };
     }
 
-    const products = await Product.find(query).sort({ createdAt: -1 }).limit(50);
+    const products = await Product.find(query).sort({ createdAt: -1 }).limit(6000);
     const productNames = products.map((p) => String(p.productName ?? '').trim()).filter(Boolean);
     const stockMap = await computeStockByProductNames({ names: productNames });
 

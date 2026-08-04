@@ -5,6 +5,27 @@ import WalletSettings from "../models/walletSettings.model.js";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/**
+ * Merge customer denormalized bucket with wallet ledger bucket.
+ * `??` is wrong here because 0 is a real value and can hide the other side
+ * (e.g. customer.cashbackBalance=0 while wallet.cashbackBalance=200).
+ * Rules: non-zero wins over zero; if both non-zero and differ, prefer wallet (ledger).
+ */
+const pickBucketBalance = (customerVal, walletVal) => {
+  const c = Number(customerVal);
+  const w = Number(walletVal);
+  const cOk = Number.isFinite(c);
+  const wOk = Number.isFinite(w);
+  if (cOk && wOk) {
+    if (c === 0 && w !== 0) return w;
+    if (w === 0 && c !== 0) return c;
+    return w;
+  }
+  if (wOk) return w;
+  if (cOk) return c;
+  return 0;
+};
+
 const buildCreatedBy = (req, fallback = {}) => ({
   m_staff_id: fallback?.m_staff_id ?? req.user?.userId ?? null,
   m_staff_name: fallback?.m_staff_name ?? req.user?.name ?? null,
@@ -92,20 +113,22 @@ const resolveCustomer = async ({ customerId, customerPhone }) => {
 
 /** Total spendable for checkout/invoice/WhatsApp: general + cashback + affiliate */
 const getSpendableWalletBalance = (wallet, customer) => {
-  // Prefer wallet document (updated by debit/credit), then customer fields.
   const toNum = value => {
     const n = Number(value);
     return Number.isFinite(n) ? n : 0;
   };
 
   const general = toNum(
-    wallet?.walletAmount ?? customer?.walletAmount ?? customer?.closingBalance,
+    pickBucketBalance(
+      customer?.walletAmount ?? customer?.closingBalance,
+      wallet?.walletAmount,
+    ),
   );
   const cashback = toNum(
-    wallet?.cashbackBalance ?? customer?.cashbackBalance,
+    pickBucketBalance(customer?.cashbackBalance, wallet?.cashbackBalance),
   );
   const affiliate = toNum(
-    wallet?.affiliateBalance ?? customer?.affiliateBalance,
+    pickBucketBalance(customer?.affiliateBalance, wallet?.affiliateBalance),
   );
 
   return Math.max(0, general + cashback + affiliate);
@@ -157,19 +180,22 @@ const appendTransaction = async (
     }
   }
 
-  // Prefer customer bucket balances (source of truth for withdrawable / cashback)
+  // Merge customer + wallet buckets (0 must not hide the other side)
   const customer = await Customer.findById(wallet.customerId)
     .select("walletAmount affiliateBalance cashbackBalance")
     .lean();
 
-  let generalBalance = Number(
-    wallet.walletAmount ?? customer?.walletAmount ?? 0,
+  let generalBalance = pickBucketBalance(
+    customer?.walletAmount,
+    wallet.walletAmount,
   );
-  let affiliateBalance = Number(
-    customer?.affiliateBalance ?? wallet.affiliateBalance ?? 0,
+  let affiliateBalance = pickBucketBalance(
+    customer?.affiliateBalance,
+    wallet.affiliateBalance,
   );
-  let cashbackBalance = Number(
-    customer?.cashbackBalance ?? wallet.cashbackBalance ?? 0,
+  let cashbackBalance = pickBucketBalance(
+    customer?.cashbackBalance,
+    wallet.cashbackBalance,
   );
 
   const previousBalance =
@@ -261,14 +287,17 @@ const debitWalletForPurchase = async (
     .select("walletAmount affiliateBalance cashbackBalance")
     .lean();
 
-  let generalBalance = Number(
-    wallet.walletAmount ?? customer?.walletAmount ?? 0,
+  let generalBalance = pickBucketBalance(
+    customer?.walletAmount,
+    wallet.walletAmount,
   );
-  let cashbackBalance = Number(
-    customer?.cashbackBalance ?? wallet.cashbackBalance ?? 0,
+  let cashbackBalance = pickBucketBalance(
+    customer?.cashbackBalance,
+    wallet.cashbackBalance,
   );
-  let affiliateBalance = Number(
-    customer?.affiliateBalance ?? wallet.affiliateBalance ?? 0,
+  let affiliateBalance = pickBucketBalance(
+    customer?.affiliateBalance,
+    wallet.affiliateBalance,
   );
 
   const previousTotal =
@@ -405,15 +434,17 @@ const getWallets = async (req, res) => {
 
     const combinedWallets = customers.map(c => {
       const w = walletMap[c._id.toString()];
-      // Prefer live wallet document buckets, fall back to customer fields
-      const generalBalance = Number(
-        (w ? w.walletAmount : undefined) ?? c.walletAmount ?? 0,
+      const generalBalance = pickBucketBalance(
+        c.walletAmount,
+        w?.walletAmount,
       );
-      const affiliateBalance = Number(
-        (w ? w.affiliateBalance : undefined) ?? c.affiliateBalance ?? 0,
+      const affiliateBalance = pickBucketBalance(
+        c.affiliateBalance,
+        w?.affiliateBalance,
       );
-      const cashbackBalance = Number(
-        (w ? w.cashbackBalance : undefined) ?? c.cashbackBalance ?? 0,
+      const cashbackBalance = pickBucketBalance(
+        c.cashbackBalance,
+        w?.cashbackBalance,
       );
       const totalBalance = generalBalance + affiliateBalance + cashbackBalance;
       return {
@@ -476,7 +507,9 @@ const createWallet = async (req, res) => {
         customerId: customer._id,
         customerName: String(customer.name ?? customerName ?? "").trim(),
         customerPhone: String(customer.mobile ?? customerPhone ?? "").trim(),
-        walletAmount: 0,
+        walletAmount: Math.max(0, Number(customer.walletAmount ?? 0) || 0),
+        cashbackBalance: Math.max(0, Number(customer.cashbackBalance ?? 0) || 0),
+        affiliateBalance: Math.max(0, Number(customer.affiliateBalance ?? 0) || 0),
         transactions: [],
       });
     }
@@ -527,10 +560,115 @@ const getWalletById = async (req, res) => {
       });
     }
 
-    const generalBalance = Number(wallet.walletAmount ?? 0);
-    const affiliateBalance = Number(wallet.affiliateBalance ?? 0);
-    const cashbackBalance = Number(wallet.cashbackBalance ?? 0);
+    const customer = await Customer.findById(wallet.customerId)
+      .select('walletAmount affiliateBalance cashbackBalance name mobile welcomeBonusCredited')
+      .lean();
+
+    let generalBalance = pickBucketBalance(
+      customer?.walletAmount,
+      wallet.walletAmount,
+    );
+    const affiliateBalance = pickBucketBalance(
+      customer?.affiliateBalance,
+      wallet.affiliateBalance,
+    );
+    const cashbackBalance = pickBucketBalance(
+      customer?.cashbackBalance,
+      wallet.cashbackBalance,
+    );
+
+    // One-time heal: membership cashback used to wipe signup ₹ when wallet was created at 0.
+    // Restore welcome bonus when flagged as credited but missing from general + ledger.
+    if (
+      customer?.welcomeBonusCredited &&
+      generalBalance <= 0
+    ) {
+      const welcomeAmount = (() => {
+        const n = Number(
+          process.env.WHATSAPP_ACCOUNT_CREATED_CASHBACK ||
+            process.env.ACCOUNT_WELCOME_CASHBACK ||
+            21,
+        );
+        return Number.isFinite(n) && n > 0 ? n : 21;
+      })();
+      const txs = Array.isArray(wallet.transactions) ? wallet.transactions : [];
+      const hasWelcomeCredit = txs.some(
+        tx =>
+          String(tx.type || '').toLowerCase() === 'credit' &&
+          (String(tx.referenceType || '') === 'WelcomeBonus' ||
+            /welcome|signup/i.test(String(tx.note || ''))),
+      );
+      const hasGeneralDebit = txs.some(
+        tx =>
+          String(tx.type || '').toLowerCase() === 'debit' &&
+          String(tx.walletType || 'general').toLowerCase() === 'general',
+      );
+      if (!hasWelcomeCredit && !hasGeneralDebit && welcomeAmount > 0) {
+        try {
+          const liveWallet = await Wallet.findById(wallet._id);
+          if (liveWallet) {
+            liveWallet.walletAmount = 0;
+            liveWallet.cashbackBalance = cashbackBalance;
+            liveWallet.affiliateBalance = affiliateBalance;
+            await appendTransaction(liveWallet, {
+              type: 'credit',
+              amount: welcomeAmount,
+              note: 'Signup welcome bonus (restored)',
+              referenceType: 'WelcomeBonus',
+              referenceId: `welcome:${customer._id}`,
+              walletType: 'general',
+              createdBy: {
+                m_staff_id: null,
+                m_staff_name: 'System',
+                m_staff_email: null,
+              },
+            });
+            generalBalance = welcomeAmount;
+            wallet.transactions = liveWallet.transactions;
+          }
+        } catch (healError) {
+          console.error(
+            '[Wallet] welcome bonus restore failed:',
+            healError?.message || healError,
+          );
+        }
+      }
+    }
+
     const totalBalance = generalBalance + affiliateBalance + cashbackBalance;
+
+    // Heal stale empty wallet doc if customer still has balances
+    if (
+      wallet._id &&
+      (Number(wallet.walletAmount ?? 0) !== generalBalance ||
+        Number(wallet.cashbackBalance ?? 0) !== cashbackBalance ||
+        Number(wallet.affiliateBalance ?? 0) !== affiliateBalance)
+    ) {
+      await Wallet.updateOne(
+        {_id: wallet._id},
+        {
+          $set: {
+            walletAmount: generalBalance,
+            cashbackBalance,
+            affiliateBalance,
+          },
+        },
+      );
+    }
+
+    // Keep customer denormalized buckets aligned with merged totals
+    if (
+      wallet.customerId &&
+      (Number(customer?.walletAmount ?? 0) !== generalBalance ||
+        Number(customer?.cashbackBalance ?? 0) !== cashbackBalance ||
+        Number(customer?.affiliateBalance ?? 0) !== affiliateBalance)
+    ) {
+      await syncCustomerWalletBuckets(wallet.customerId, {
+        walletAmount: generalBalance,
+        cashbackBalance,
+        affiliateBalance,
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -701,7 +839,7 @@ if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
   });
 }
 
-    const customers = await Customer.find({}).select("_id name mobile").lean();
+    const customers = await Customer.find({}).select("_id name mobile walletAmount").lean();
     if (customers.length === 0) {
       return res.status(200).json({
         success: true,
@@ -718,7 +856,10 @@ if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
     for (const customer of customers) {
       const key = String(customer._id);
       const wallet = walletMap.get(key);
-      const currentBalance = Number(wallet?.walletAmount ?? 0);
+      const currentBalance = pickBucketBalance(
+        customer.walletAmount,
+        wallet?.walletAmount,
+      );
 
       if (normalizedType === "debit" && !wallet) {
         invalidCustomers.push({
@@ -762,7 +903,9 @@ if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
           customerId: customer._id,
           customerName: String(customer.name ?? "").trim(),
           customerPhone: String(customer.mobile ?? "").trim(),
-          walletAmount: 0,
+          walletAmount: Math.max(0, Number(customer.walletAmount ?? 0) || 0),
+          cashbackBalance: Math.max(0, Number(customer.cashbackBalance ?? 0) || 0),
+          affiliateBalance: Math.max(0, Number(customer.affiliateBalance ?? 0) || 0),
           transactions: [],
         });
       }

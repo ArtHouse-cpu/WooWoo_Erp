@@ -60,6 +60,7 @@ export const PERMISSIONS = Object.freeze({
   PRODUCT_CREATE: 'product.create',
   PRODUCT_UPDATE: 'product.update',
   PRODUCT_DELETE: 'product.delete',
+  PRODUCT_BULK_CREATE: 'product.bulk.create',
 
   // Catalogue — Services
   SERVICE_READ: 'service.read',
@@ -164,6 +165,7 @@ export const PERMISSION_CATALOG = Object.freeze([
   // Catalogue
   {key: PERMISSIONS.PRODUCT_READ, module: 'catalogue', label: 'View products'},
   {key: PERMISSIONS.PRODUCT_CREATE, module: 'catalogue', label: 'Create products'},
+  {key: PERMISSIONS.PRODUCT_BULK_CREATE, module: 'catalogue', label: 'Create bulk products'},
   {key: PERMISSIONS.PRODUCT_UPDATE, module: 'catalogue', label: 'Update products'},
   {key: PERMISSIONS.PRODUCT_DELETE, module: 'catalogue', label: 'Delete products'},
   {key: PERMISSIONS.SERVICE_READ, module: 'catalogue', label: 'View services'},

@@ -9,6 +9,7 @@ import Swal from "sweetalert2";
 import {
   handleBulkWalletUpdate,
   handleCreateWallet,
+  handleGetWalletById,
   handleGetWalletInstructions,
   handleGetWallets,
   handleUpdateWallet,
@@ -75,11 +76,12 @@ function toWalletRow(entry: any): WalletRow {
     entry?.cashbackBalance,
     customer?.cashbackBalance,
   );
+  // Always derive total from buckets when split fields exist so a stale
+  // walletAmount (general-only) cannot under-report spendable balance.
   const totalBalance = hasSplit
-    ? toAmount(
-        entry?.totalBalance,
-        generalBalance + cashbackBalance + affiliateBalance,
-      )
+    ? Math.round(
+        (generalBalance + cashbackBalance + affiliateBalance) * 100,
+      ) / 100
     : generalBalance;
 
   return {
@@ -468,8 +470,22 @@ export default function WalletScreen() {
  };
 
  const handleViewHistory = async (row: WalletRow) => {
-  const rawTransactions = Array.isArray(row.raw?.transactions)
-    ? [...row.raw.transactions].reverse()
+  let viewRow = row;
+  const walletRecordId = getWalletRecordId(row) || String(row.customerId || "").trim();
+  if (walletRecordId) {
+    try {
+      const response = await handleGetWalletById(walletRecordId);
+      const fresh = response?.wallet ?? response?.data ?? response;
+      if (fresh && typeof fresh === "object") {
+        viewRow = toWalletRow(fresh);
+      }
+    } catch {
+      // Fall back to list-row snapshot if detail fetch fails
+    }
+  }
+
+  const rawTransactions = Array.isArray(viewRow.raw?.transactions)
+    ? [...viewRow.raw.transactions].reverse()
     : [];
 
   // Show one line per invoice payment (e.g. ₹52.6 + ₹49.4 → ₹102)
@@ -683,7 +699,7 @@ export default function WalletScreen() {
 
             <div>
               <h2 class="text-xl font-bold text-slate-800">
-                ${row.customerName}
+                ${viewRow.customerName}
               </h2>
 
               <p class="text-sm text-slate-500 mt-1">
@@ -705,7 +721,7 @@ export default function WalletScreen() {
                 Total Balance
               </p>
               <h3 class="mt-1.5 text-xl font-bold tabular-nums text-slate-900">
-                ₹${Number(row.walletAmount || 0).toLocaleString("en-IN")}
+                ₹${Number(viewRow.walletAmount || 0).toLocaleString("en-IN")}
               </h3>
               <p class="mt-1 text-[11px] text-slate-400">
                 General + cashback + affiliate
@@ -718,7 +734,7 @@ export default function WalletScreen() {
               </p>
               <h3 class="mt-1.5 text-xl font-bold tabular-nums text-emerald-800">
                 ₹${Number(
-                  row.withdrawableBalance ?? row.affiliateBalance ?? 0,
+                  viewRow.withdrawableBalance ?? viewRow.affiliateBalance ?? 0,
                 ).toLocaleString("en-IN")}
               </h3>
               <p class="mt-1 text-[11px] text-emerald-600/80">

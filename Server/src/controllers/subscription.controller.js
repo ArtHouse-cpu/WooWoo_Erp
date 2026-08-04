@@ -17,7 +17,7 @@ import {resolvePlanMeta} from '../services/membershipPlan.service.js';
 import {appendTransaction} from './wallet.controller.js';
 
 /** Credit fixed plan wallet cashback when membership is purchased (idempotent). */
-const creditPlanPurchaseCashback = async ({
+export const creditPlanPurchaseCashback = async ({
   customer,
   subscriptionCode,
   amount,
@@ -33,7 +33,10 @@ const creditPlanPurchaseCashback = async ({
       customerId: customer._id,
       customerName: String(customer.name ?? '').trim(),
       customerPhone: String(customer.mobile ?? '').trim(),
-      walletAmount: 0,
+      // Seed from customer so signup/welcome balance is not wiped
+      walletAmount: Math.max(0, Number(customer.walletAmount ?? 0) || 0),
+      cashbackBalance: Math.max(0, Number(customer.cashbackBalance ?? 0) || 0),
+      affiliateBalance: Math.max(0, Number(customer.affiliateBalance ?? 0) || 0),
       transactions: [],
     });
   }
@@ -461,8 +464,38 @@ export const createSubscription = async (req, res) => {
               const meta = resolvePlanMeta(plan);
               membershipLabel = meta.label || membershipLabel;
               validity = meta.validity || validity;
-              // Temporarily disabled: do not credit purchase cashback on membership create
-              planWalletCashback = 0;
+              planWalletCashback = Math.max(
+                0,
+                Number(plan?.walletCashback?.amount ?? 0) || 0,
+              );
+            }
+          }
+          // Fallback: resolve by membership type / planId slug when ids were missing
+          if (!(planWalletCashback > 0)) {
+            const typeKey = String(
+              parsed.data.membershipType ||
+                parsed.data.membershipPlanId ||
+                '',
+            )
+              .trim()
+              .toLowerCase();
+            if (typeKey && typeKey !== 'none' && typeKey !== 'general') {
+              const escaped = typeKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const planByType = await Membership.findOne({
+                $or: [
+                  {planId: typeKey},
+                  {planId: new RegExp(`^${escaped}$`, 'i')},
+                ],
+              }).lean();
+              if (planByType) {
+                const meta = resolvePlanMeta(planByType);
+                membershipLabel = meta.label || membershipLabel;
+                validity = meta.validity || validity;
+                planWalletCashback = Math.max(
+                  0,
+                  Number(planByType?.walletCashback?.amount ?? 0) || 0,
+                );
+              }
             }
           }
         } catch (planError) {
@@ -472,9 +505,18 @@ export const createSubscription = async (req, res) => {
           );
         }
 
-        // Temporarily disabled: membership purchase cashback is always ₹0
-        // (re-enable by restoring plan.walletCashback.amount + env fallback below)
-        const safeCashback = 0;
+        const envCashback = Number(
+          process.env.WHATSAPP_MEMBERSHIP_CASHBACK ||
+            process.env.MEMBERSHIP_WELCOME_CASHBACK ||
+            0,
+        );
+        // Prefer plan wallet cashback; fall back to env welcome cashback for WhatsApp/credit
+        const safeCashback =
+          planWalletCashback > 0
+            ? planWalletCashback
+            : Number.isFinite(envCashback) && envCashback > 0
+              ? envCashback
+              : 0;
 
         const customer = await Customer.findOne({
           mobile: parsed.data.customerPhone,
@@ -482,12 +524,12 @@ export const createSubscription = async (req, res) => {
           .select('_id name whatsappNumber mobile')
           .lean();
 
-        if (planWalletCashback > 0 && customer) {
+        if (safeCashback > 0 && customer) {
           try {
             await creditPlanPurchaseCashback({
               customer,
               subscriptionCode,
-              amount: planWalletCashback,
+              amount: safeCashback,
               planName: membershipLabel,
               createdBy: parsed.data.createdBy,
             });
@@ -511,7 +553,7 @@ export const createSubscription = async (req, res) => {
                 name: customer?.name || parsed.data.customerName || 'Member',
                 membershipLabel,
                 validity,
-                cashbackLabel: `₹${safeCashback}`,
+                cashbackLabel: String(safeCashback),
               });
             } catch (waError) {
               console.error(

@@ -58,7 +58,7 @@ type Props = {
   /** Catalogue / product-level discount total (separate from membership). */
   initialProductDiscount?: number;
   initialCashbackTotal?: number;
-  /** When true, checkout shows/credits 0 cashback (e.g. membership purchase). */
+  /** When true, do not auto-credit cashback from checkout (server credits it). Still shows initialCashbackTotal. */
   disableCashback?: boolean;
   extraCharges?: Array<{ label: string; amount: number }>;
   membershipPlans?: MembershipPlanPayload[];
@@ -937,7 +937,7 @@ export default function CheckoutModal({
   );
 
   const displayCashbackTotal = disableCashback
-    ? 0
+    ? Math.max(0, Number(initialCashbackTotal) || 0)
     : cartHasCsp
       ? lineCashbackTotal > 0
         ? lineCashbackTotal
@@ -1028,15 +1028,7 @@ export default function CheckoutModal({
 
         const nextWalletMap = walletItems.reduce(
           (acc: Record<string, number>, wallet: any) => {
-            const amountCandidates = [
-              wallet?.walletAmount,
-              wallet?.balance,
-              wallet?.currentBalance,
-              wallet?.availableBalance,
-              wallet?.customer?.walletAmount,
-            ];
-            const amount =
-              amountCandidates.find((value) => Number.isFinite(Number(value))) ?? 0;
+            const amount = resolveWalletBalance(wallet, 0);
             const keys = [
               wallet?.customerId,
               wallet?.customer?._id,
@@ -1047,7 +1039,7 @@ export default function CheckoutModal({
               .map((value) => String(value ?? "").trim())
               .filter(Boolean);
             keys.forEach((key) => {
-              acc[key] = Number(amount);
+              acc[key] = amount;
             });
             return acc;
           },
@@ -1359,7 +1351,7 @@ export default function CheckoutModal({
       const response = await handleCreateInvoice(payload);
       const invoiceCode = response?.invoice?.invoiceCode ?? "N/A";
 
-      if (displayCashbackTotal > 0) {
+      if (!disableCashback && displayCashbackTotal > 0) {
         try {
           await creditWalletCashback({
             customerId:
@@ -1562,6 +1554,14 @@ export default function CheckoutModal({
                   </div>
                 </div>
 
+                {displayCashbackTotal > 0 && (
+                  <SummaryLine
+                    label="Wallet Cashback"
+                    value={`+ ${formatInr(displayCashbackTotal)}`}
+                    tone="cashback"
+                  />
+                )}
+
                 <div className="space-y-2 pt-2">
                   <SummaryLine label="Paid" value={formatInr(totalPaid)} tone="total" />
                   <SummaryLine label="Due" value={formatInr(dueAmount)} tone="due" />
@@ -1571,7 +1571,7 @@ export default function CheckoutModal({
                 {displayCashbackTotal > 0 && (
                   <div className="mt-4 rounded-lg bg-emerald-50 p-3 text-center">
                     <p className="text-[11px] font-bold text-emerald-700">
-                      +{formatInr(displayCashbackTotal)} cashback will be credited
+                      +{formatInr(displayCashbackTotal)} cashback will be credited to wallet
                     </p>
                   </div>
                 )}
@@ -1753,7 +1753,7 @@ export default function CheckoutModal({
                   </div>
                 ) : null}
 
-                {referralDiscount > 0 || referralCodeApplied ? (
+                {referralDiscount > 0 ? (
                   <div className="flex items-center justify-between gap-2 text-xs text-violet-700">
                     <span className="truncate font-semibold">
                       {referralLabel}
@@ -1773,6 +1773,24 @@ export default function CheckoutModal({
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
+                  </div>
+                ) : referralCodeApplied ? (
+                  <div className="flex items-center justify-between gap-2 text-xs text-violet-700">
+                    <span className="truncate font-semibold">
+                      {referralStatusMessage ||
+                        referralLabel ||
+                        "Referral applied (no buyer discount)"}
+                      {referralCodeApplied ? ` (${referralCodeApplied})` : ""}
+                      {referralInviterName ? ` · ${referralInviterName}` : ""}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearReferralDiscount}
+                      className="shrink-0 text-slate-400 hover:text-rose-500"
+                      title="Remove referral"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 ) : (
                   <p className="text-[11px] text-violet-500">

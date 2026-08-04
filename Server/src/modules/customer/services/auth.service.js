@@ -17,6 +17,8 @@ import {
   resolvePlanMeta,
 } from '../../../services/membershipPlan.service.js';
 import {creditInviteReward} from './referral.service.js';
+import Wallet from '../../../models/wallet.model.js';
+import {creditPlanPurchaseCashback} from '../../../controllers/subscription.controller.js';
 import {
   generateAccessToken,
   createRefreshToken,
@@ -56,11 +58,71 @@ const getWelcomeBonusAmount = () => {
   return Number.isFinite(amount) && amount > 0 ? amount : 21;
 };
 
-const applyWelcomeBonus = customer => {
+const applyWelcomeBonus = async customer => {
   if (customer.welcomeBonusCredited) return 0;
   const amount = getWelcomeBonusAmount();
-  customer.walletAmount = Number(customer.walletAmount || 0) + amount;
+  if (!(amount > 0) || !customer?._id) return 0;
+
   customer.welcomeBonusCredited = true;
+  customer.walletAmount = Number(customer.walletAmount || 0) + amount;
+
+  try {
+    let wallet = await Wallet.findOne({customerId: customer._id});
+    if (!wallet) {
+      wallet = await Wallet.create({
+        customerId: customer._id,
+        customerName: String(customer.name ?? '').trim(),
+        customerPhone: String(customer.mobile ?? '').trim(),
+        // Seed with pre-bonus balance; appendTransaction adds the welcome credit
+        walletAmount: Math.max(0, Number(customer.walletAmount || 0) - amount),
+        cashbackBalance: Math.max(0, Number(customer.cashbackBalance ?? 0) || 0),
+        affiliateBalance: Math.max(0, Number(customer.affiliateBalance ?? 0) || 0),
+        transactions: [],
+      });
+    }
+
+    const ref = `welcome:${customer._id}`;
+    const alreadyCredited = (wallet.transactions || []).some(
+      tx =>
+        String(tx.referenceId || '').trim() === ref ||
+        (/welcome|signup/i.test(String(tx.note || '')) &&
+          String(tx.type || '').toLowerCase() === 'credit'),
+    );
+
+    if (!alreadyCredited) {
+      // Customer already includes the bonus above — seed wallet general to pre-bonus
+      // so appendTransaction lands on the correct closing balance.
+      const preBonusGeneral = Math.max(
+        0,
+        Number(customer.walletAmount || 0) - amount,
+      );
+      wallet.walletAmount = preBonusGeneral;
+      const {appendTransaction} = await import(
+        '../../../controllers/wallet.controller.js'
+      );
+      await appendTransaction(wallet, {
+        type: 'credit',
+        amount,
+        note: 'Signup welcome bonus',
+        referenceType: 'WelcomeBonus',
+        referenceId: ref,
+        walletType: 'general',
+        createdBy: {
+          m_staff_id: null,
+          m_staff_name: 'System',
+          m_staff_email: null,
+        },
+      });
+      // appendTransaction already synced customer.walletAmount; keep in-memory in sync
+      customer.walletAmount = preBonusGeneral + amount;
+    }
+  } catch (error) {
+    console.error(
+      '[WelcomeBonus] wallet ledger credit failed:',
+      error?.message || error,
+    );
+  }
+
   return amount;
 };
 
@@ -70,8 +132,8 @@ const notifyAccountCreated = async customer => {
     return {whatsapp: {delivered: false, skipped: true}, cashback: 0};
   }
 
-  const credited = applyWelcomeBonus(customer);
-  const cashbackLabel = `₹${getWelcomeBonusAmount()}`;
+  const credited = await applyWelcomeBonus(customer);
+  const cashbackLabel = String(getWelcomeBonusAmount());
 
   let whatsapp = null;
   try {
@@ -322,7 +384,7 @@ export const verifyLoginOtp = async (res, payload, meta = {}) => {
       referredAt: referredBy ? new Date() : null,
     });
     // Credit welcome bonus now; WhatsApp waits until Create Account (real name)
-    applyWelcomeBonus(customer);
+    await applyWelcomeBonus(customer);
     await customer.save();
     try {
       await creditInviteReward({
@@ -790,14 +852,21 @@ export const activateMembership = async (customerId, payload = {}) => {
     throw error;
   }
 
-  const cashbackAmount = Number(
+  const planCashback = Math.max(
+    0,
+    Number(membershipPlan?.walletCashback?.amount ?? 0) || 0,
+  );
+  const envCashback = Number(
     process.env.WHATSAPP_MEMBERSHIP_CASHBACK ||
       process.env.MEMBERSHIP_WELCOME_CASHBACK ||
-      50,
+      0,
   );
-  const safeCashback = Number.isFinite(cashbackAmount) && cashbackAmount > 0
-    ? cashbackAmount
-    : 50;
+  const safeCashback =
+    planCashback > 0
+      ? planCashback
+      : Number.isFinite(envCashback) && envCashback > 0
+        ? envCashback
+        : 0;
 
   customer.membershipType = membershipType;
   if (membershipPlan?._id) {
@@ -805,7 +874,7 @@ export const activateMembership = async (customerId, payload = {}) => {
   }
   customer.onboardingCompleted = true;
   customer.profileSetupCompleted = true;
-  customer.walletAmount = Number(customer.walletAmount || 0) + safeCashback;
+  // Do NOT bump general walletAmount here — cashback goes to cashbackBalance via ledger
   customer.membershipPurchase = {
     orderAmount,
     discountAmount,
@@ -838,6 +907,37 @@ export const activateMembership = async (customerId, payload = {}) => {
   }
 
   await customer.save();
+
+  let responseCustomer = customer;
+  if (safeCashback > 0) {
+    try {
+      const referenceId =
+        String(paymentOrder?.txnid || paymentOrder?._id || '').trim() ||
+        `membership:${customer._id}:${membershipType}`;
+      await creditPlanPurchaseCashback({
+        customer: {
+          _id: customer._id,
+          name: customer.name,
+          mobile: customer.mobile,
+        },
+        subscriptionCode: referenceId,
+        amount: safeCashback,
+        planName: planMeta.label || membershipType,
+        createdBy: {
+          m_staff_id: null,
+          m_staff_name: 'Customer Portal',
+          m_staff_email: null,
+        },
+      });
+      const refreshed = await findActiveCustomer({_id: customerId});
+      if (refreshed) responseCustomer = refreshed;
+    } catch (walletError) {
+      console.error(
+        '[Membership] wallet cashback credit error:',
+        walletError?.message || walletError,
+      );
+    }
+  }
 
   try {
     await creditInviteReward({
@@ -877,7 +977,7 @@ export const activateMembership = async (customerId, payload = {}) => {
     }
   }
 
-  const cashbackLabel = `₹${safeCashback}`;
+  const cashbackLabel = String(safeCashback);
   let whatsapp = null;
   try {
     whatsapp = await sendMembershipPurchaseWhatsApp({
@@ -893,7 +993,7 @@ export const activateMembership = async (customerId, payload = {}) => {
   }
 
   return {
-    customer: customer.toSafeObject(),
+    customer: responseCustomer.toSafeObject(),
     cashback: safeCashback,
     pricing: {
       orderAmount,

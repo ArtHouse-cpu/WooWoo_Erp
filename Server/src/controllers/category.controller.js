@@ -30,19 +30,51 @@ export const addCategories = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid categories" });
     }
 
-    const existingNames = await Category.find({
-      name: { $in: categories.map((c) => c.name) },
-    }).distinct("name");
+    const names = categories
+      .map((c) => String(c?.name || "").trim())
+      .filter(Boolean);
 
-    const newCategories = categories.filter(
-      (c) => !existingNames.includes(c.name)
+    if (!names.length) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one category name is required",
+      });
+    }
+
+    const lowers = [
+      ...new Set(names.map((n) => n.toLowerCase())),
+    ];
+
+    // Avoid giant $regex — MongoDB rejects patterns over ~16KB
+    const existing = await Category.find({
+      $expr: {
+        $in: [{ $toLower: "$name" }, lowers],
+      },
+    })
+      .select("name")
+      .lean();
+
+    const existingLower = new Set(
+      existing.map((c) => String(c.name).trim().toLowerCase()),
     );
 
-    const created = await Category.insertMany(newCategories);
+    const newCategories = names
+      .filter((name) => !existingLower.has(name.toLowerCase()))
+      .filter(
+        (name, index, arr) =>
+          arr.findIndex((n) => n.toLowerCase() === name.toLowerCase()) ===
+          index,
+      )
+      .map((name) => ({ name }));
+
+    const created = newCategories.length
+      ? await Category.insertMany(newCategories)
+      : [];
 
     return res.status(201).json({
       success: true,
       categories: created,
+      existing,
     });
   } catch (error) {
     console.error("addCategories error:", error);

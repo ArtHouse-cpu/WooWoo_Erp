@@ -25,6 +25,22 @@ const categoryLabels = {
 const statusIsEarned = status =>
   ['approved', 'credited', 'Approved', 'Paid'].includes(status);
 
+/** Prefer non-zero bucket; if both differ and both > 0, prefer wallet ledger. */
+const pickBucketBalance = (customerVal, walletVal) => {
+  const c = Number(customerVal);
+  const w = Number(walletVal);
+  const cOk = Number.isFinite(c);
+  const wOk = Number.isFinite(w);
+  if (cOk && wOk) {
+    if (c === 0 && w !== 0) return w;
+    if (w === 0 && c !== 0) return c;
+    return w;
+  }
+  if (wOk) return w;
+  if (cOk) return c;
+  return 0;
+};
+
 const normalizeCategory = record => {
   if (record.category) return record.category;
   const legacy = String(record.orderType || 'other').toLowerCase();
@@ -71,10 +87,88 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
 
   const usePrimaryCommissions = commissions.length > 0;
   const earningRecords = usePrimaryCommissions ? commissions : legacyCommissions;
-  const generalBalance = Number(customer.walletAmount ?? wallet?.walletAmount ?? 0);
-  const affiliateBalance = Number(customer.affiliateBalance || 0);
+
+  let liveWallet = wallet;
+  let generalBalance = pickBucketBalance(
+    customer.walletAmount,
+    wallet?.walletAmount,
+  );
+  let affiliateBalance = pickBucketBalance(
+    customer.affiliateBalance,
+    wallet?.affiliateBalance,
+  );
+  let cashbackBalance = pickBucketBalance(
+    customer.cashbackBalance,
+    wallet?.cashbackBalance,
+  );
+
+  // Restore signup welcome ₹ wiped by older membership-cashback wallet create
+  if (customer.welcomeBonusCredited && generalBalance <= 0) {
+    const welcomeAmount = (() => {
+      const n = Number(
+        process.env.WHATSAPP_ACCOUNT_CREATED_CASHBACK ||
+          process.env.ACCOUNT_WELCOME_CASHBACK ||
+          21,
+      );
+      return Number.isFinite(n) && n > 0 ? n : 21;
+    })();
+    const txs = Array.isArray(wallet?.transactions) ? wallet.transactions : [];
+    const hasWelcomeCredit = txs.some(
+      tx =>
+        String(tx.type || '').toLowerCase() === 'credit' &&
+        (String(tx.referenceType || '') === 'WelcomeBonus' ||
+          /welcome|signup/i.test(String(tx.note || ''))),
+    );
+    const hasGeneralDebit = txs.some(
+      tx =>
+        String(tx.type || '').toLowerCase() === 'debit' &&
+        String(tx.walletType || 'general').toLowerCase() === 'general',
+    );
+    if (!hasWelcomeCredit && !hasGeneralDebit && welcomeAmount > 0) {
+      try {
+        const {appendTransaction} = await import(
+          '../../../controllers/wallet.controller.js'
+        );
+        let mutableWallet = await Wallet.findOne({customerId});
+        if (!mutableWallet) {
+          mutableWallet = await Wallet.create({
+            customerId,
+            customerName: String(customer.name ?? '').trim(),
+            customerPhone: String(customer.mobile ?? '').trim(),
+            walletAmount: 0,
+            cashbackBalance,
+            affiliateBalance,
+            transactions: [],
+          });
+        } else {
+          mutableWallet.walletAmount = 0;
+          mutableWallet.cashbackBalance = cashbackBalance;
+          mutableWallet.affiliateBalance = affiliateBalance;
+        }
+        liveWallet = await appendTransaction(mutableWallet, {
+          type: 'credit',
+          amount: welcomeAmount,
+          note: 'Signup welcome bonus (restored)',
+          referenceType: 'WelcomeBonus',
+          referenceId: `welcome:${customerId}`,
+          walletType: 'general',
+          createdBy: {
+            m_staff_id: null,
+            m_staff_name: 'System',
+            m_staff_email: null,
+          },
+        });
+        generalBalance = welcomeAmount;
+      } catch (error) {
+        console.error(
+          '[WalletDashboard] welcome bonus restore failed:',
+          error?.message || error,
+        );
+      }
+    }
+  }
+
   const affiliateReserved = Number(customer.affiliateReserved || 0);
-  const cashbackBalance = Number(customer.cashbackBalance || 0);
 
   const earnedRecords = earningRecords.filter(record =>
     statusIsEarned(record.status),
@@ -107,7 +201,7 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
     };
   });
 
-  const walletTransactions = (wallet?.transactions || []).map(transaction => {
+  const walletTransactions = (liveWallet?.transactions || wallet?.transactions || []).map(transaction => {
     const refType = String(transaction.referenceType || '').trim();
     const isCsp = refType === 'CspSale';
     const walletType = String(transaction.walletType || 'general').toLowerCase();

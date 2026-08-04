@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
+import { ChevronDown, Search, X } from "lucide-react";
 import Swal from "sweetalert2";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -23,16 +24,38 @@ type CustomerOption = {
   membershipType?: string;
 };
 
+const enrollmentCustomerId = (row: CspEnrollment): string => {
+  if (typeof row.customerId === "string" && row.customerId.trim()) {
+    return row.customerId.trim();
+  }
+  if (
+    row.customerId &&
+    typeof row.customerId === "object" &&
+    row.customerId._id
+  ) {
+    return String(row.customerId._id).trim();
+  }
+  if (row.customer?._id) return String(row.customer._id).trim();
+  return "";
+};
+
 export default function CspScreen() {
   const [rows, setRows] = useState<CspEnrollment[]>([]);
   const [loading, setLoading] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
   const [showEnroll, setShowEnroll] = useState(false);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [enrolledCustomerIds, setEnrolledCustomerIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">(
     "active",
   );
+  const searchWrapRef = useRef<HTMLDivElement>(null);
 
   const fetchRows = async () => {
     try {
@@ -58,10 +81,34 @@ export default function CspScreen() {
 
   useEffect(() => {
     if (!showEnroll) return;
+
+    let cancelled = false;
     (async () => {
       try {
-        const res = await handleGetAllCustomers();
-        const list = Array.isArray(res?.customers) ? res.customers : [];
+        setLoadingCustomers(true);
+        const [customerRes, enrollmentRes] = await Promise.all([
+          handleGetAllCustomers(),
+          handleGetCspEnrollments({ status: "all" }),
+        ]);
+
+        if (cancelled) return;
+
+        const enrollmentList = Array.isArray(enrollmentRes?.enrollments)
+          ? enrollmentRes.enrollments
+          : Array.isArray(enrollmentRes?.csps)
+            ? enrollmentRes.csps
+            : [];
+
+        const enrolledIds = new Set(
+          enrollmentList
+            .map((row) => enrollmentCustomerId(row))
+            .filter(Boolean),
+        );
+        setEnrolledCustomerIds(enrolledIds);
+
+        const list = Array.isArray(customerRes?.customers)
+          ? customerRes.customers
+          : [];
         setCustomers(
           list
             .filter(
@@ -80,10 +127,82 @@ export default function CspScreen() {
         );
       } catch (error) {
         console.error("Failed to load customers:", error);
-        setCustomers([]);
+        if (!cancelled) {
+          setCustomers([]);
+          setEnrolledCustomerIds(new Set());
+        }
+      } finally {
+        if (!cancelled) setLoadingCustomers(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [showEnroll]);
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (
+        searchWrapRef.current &&
+        !searchWrapRef.current.contains(event.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [dropdownOpen]);
+
+  const availableCustomers = useMemo(
+    () =>
+      customers.filter((customer) => !enrolledCustomerIds.has(customer._id)),
+    [customers, enrolledCustomerIds],
+  );
+
+  const filteredCustomers = useMemo(() => {
+    const term = customerSearch.trim().toLowerCase();
+    if (!term) return availableCustomers;
+    return availableCustomers.filter((customer) => {
+      const name = String(customer.name || "").toLowerCase();
+      const mobile = String(customer.mobile || "").toLowerCase();
+      const email = String(customer.email || "").toLowerCase();
+      return (
+        name.includes(term) || mobile.includes(term) || email.includes(term)
+      );
+    });
+  }, [availableCustomers, customerSearch]);
+
+  const selectedCustomer = useMemo(
+    () =>
+      availableCustomers.find((customer) => customer._id === selectedCustomerId) ||
+      null,
+    [availableCustomers, selectedCustomerId],
+  );
+
+  const closeEnrollModal = () => {
+    setShowEnroll(false);
+    setSelectedCustomerId("");
+    setCustomerSearch("");
+    setDropdownOpen(false);
+  };
+
+  const handleSelectCustomer = (customer: CustomerOption) => {
+    setSelectedCustomerId(customer._id);
+    setCustomerSearch(
+      `${customer.name || "Customer"}${
+        customer.mobile ? ` (${customer.mobile})` : ""
+      } · Premium`,
+    );
+    setDropdownOpen(false);
+  };
+
+  const clearSelectedCustomer = () => {
+    setSelectedCustomerId("");
+    setCustomerSearch("");
+    setDropdownOpen(true);
+  };
 
   const handleEnroll = async () => {
     if (!selectedCustomerId) {
@@ -101,8 +220,7 @@ export default function CspScreen() {
         res.message || "CSP seller enrolled (Customer + Vendor linked).",
         "success",
       );
-      setShowEnroll(false);
-      setSelectedCustomerId("");
+      closeEnrollModal();
       await fetchRows();
     } catch (error: any) {
       const msg =
@@ -153,7 +271,8 @@ export default function CspScreen() {
       {
         id: "customer",
         header: "Customer",
-        Cell: ({ row }) => row.original.customer?.name || row.original.displayName || "—",
+        Cell: ({ row }) =>
+          row.original.customer?.name || row.original.displayName || "—",
       },
       {
         id: "vendor",
@@ -235,9 +354,7 @@ export default function CspScreen() {
             <option value="inactive">Inactive</option>
             <option value="all">All</option>
           </select>
-          <Can
-            anyOf={[PERMISSIONS.CSP_WRITE, PERMISSIONS.CUSTOMER_CREATE]}
-          >
+          <Can anyOf={[PERMISSIONS.CSP_WRITE, PERMISSIONS.CUSTOMER_CREATE]}>
             <button
               type="button"
               onClick={() => setShowEnroll(true)}
@@ -254,38 +371,108 @@ export default function CspScreen() {
       {showEnroll && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <h2 className="text-lg font-semibold text-slate-900">Enroll CSP Seller</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Enroll CSP Seller
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Only <span className="font-medium text-slate-700">Premium</span> members
-              can become CSP sellers. A vendor record is linked automatically.
+              Only <span className="font-medium text-slate-700">Premium</span>{" "}
+              members can become CSP sellers. Already enrolled sellers are hidden
+              from this list.
             </p>
+
             <label className="mt-4 mb-1 block text-sm font-medium text-slate-700">
               Premium Customer *
             </label>
-            <select
-              value={selectedCustomerId}
-              onChange={(e) => setSelectedCustomerId(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 p-2.5 text-sm"
-            >
-              <option value="">Select Premium customer</option>
-              {customers.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name} {c.mobile ? `(${c.mobile})` : ""} · Premium
-                </option>
-              ))}
-            </select>
-            {customers.length === 0 && (
-              <p className="mt-2 text-xs text-amber-600">
-                No Premium customers found. Activate Premium membership first, then enroll.
+            <div ref={searchWrapRef} className="relative">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => {
+                    setCustomerSearch(e.target.value);
+                    setDropdownOpen(true);
+                    if (selectedCustomerId) setSelectedCustomerId("");
+                  }}
+                  onFocus={() => setDropdownOpen(true)}
+                  placeholder="Search by name, mobile, or email..."
+                  className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-16 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                  autoComplete="off"
+                />
+                <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+                  {(selectedCustomerId || customerSearch) && (
+                    <button
+                      type="button"
+                      onClick={clearSelectedCustomer}
+                      className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                      title="Clear"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+
+              {dropdownOpen && (
+                <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-xl">
+                  {loadingCustomers ? (
+                    <div className="p-4 text-center text-xs text-slate-400">
+                      Loading Premium customers…
+                    </div>
+                  ) : filteredCustomers.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-slate-500">
+                      {availableCustomers.length === 0
+                        ? "No available Premium customers to enroll."
+                        : "No matches for your search."}
+                    </div>
+                  ) : (
+                    filteredCustomers.map((customer) => (
+                      <button
+                        key={customer._id}
+                        type="button"
+                        onClick={() => handleSelectCustomer(customer)}
+                        className={`flex w-full flex-col border-b border-slate-50 p-3 text-left last:border-0 hover:bg-slate-50 ${
+                          selectedCustomerId === customer._id
+                            ? "bg-blue-50"
+                            : ""
+                        }`}
+                      >
+                        <span className="text-sm font-semibold text-slate-800">
+                          {customer.name || "Customer"}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {customer.mobile || "No mobile"}
+                          {customer.email ? ` · ${customer.email}` : ""} · Premium
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {selectedCustomer && (
+              <p className="mt-2 text-xs text-emerald-700">
+                Selected: {selectedCustomer.name}
+                {selectedCustomer.mobile
+                  ? ` (${selectedCustomer.mobile})`
+                  : ""}
               </p>
             )}
+
+            {!loadingCustomers && availableCustomers.length === 0 && (
+              <p className="mt-2 text-xs text-amber-600">
+                {customers.length === 0
+                  ? "No Premium customers found. Activate Premium membership first, then enroll."
+                  : "All Premium customers are already enrolled as CSP sellers."}
+              </p>
+            )}
+
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setShowEnroll(false);
-                  setSelectedCustomerId("");
-                }}
+                onClick={closeEnrollModal}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm"
                 disabled={enrolling}
               >
@@ -294,7 +481,7 @@ export default function CspScreen() {
               <button
                 type="button"
                 onClick={handleEnroll}
-                disabled={enrolling}
+                disabled={enrolling || !selectedCustomerId}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
               >
                 {enrolling ? "Enrolling…" : "Enroll"}

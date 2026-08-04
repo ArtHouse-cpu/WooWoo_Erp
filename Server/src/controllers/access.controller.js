@@ -33,6 +33,39 @@ const getNextStaffId = async () => {
   return `STF${String(counter.value).padStart(6, '0')}`;
 };
 
+const toStaffDto = async (userDoc) => {
+  const populated =
+    userDoc?.roleId && typeof userDoc.roleId === 'object' && userDoc.roleId?.name
+      ? userDoc
+      : await User.findById(userDoc._id)
+          .select(staffProjection)
+          .populate('roleId', 'name slug permissions isSystem isActive')
+          .lean();
+
+  const permissions = await resolveUserPermissions(populated);
+
+  return {
+    _id: populated._id,
+    m_staff_id: populated.m_staff_id,
+    fullName: populated.fullName,
+    email: populated.email,
+    phoneNumber: populated.phoneNumber,
+    legacyRole: populated.role,
+    role: populated.roleId
+      ? {
+          id: String(populated.roleId._id),
+          name: populated.roleId.name,
+          slug: populated.roleId.slug,
+          isSystem: populated.roleId.isSystem,
+          permissionCount: Array.isArray(populated.roleId.permissions)
+            ? populated.roleId.permissions.length
+            : 0,
+        }
+      : null,
+    permissionCount: permissions.length,
+  };
+};
+
 /**
  * GET /access/permissions — catalog for Access UI.
  */
@@ -383,37 +416,194 @@ export const createStaff = async (req, res) => {
       .populate('roleId', 'name slug permissions isSystem isActive')
       .lean();
 
-    const permissions = await resolveUserPermissions(populated);
-
     return res.status(201).json({
       success: true,
       message: 'Staff account created.',
-      staff: {
-        _id: populated._id,
-        m_staff_id: populated.m_staff_id,
-        fullName: populated.fullName,
-        email: populated.email,
-        phoneNumber: populated.phoneNumber,
-        legacyRole: populated.role,
-        role: populated.roleId
-          ? {
-              id: String(populated.roleId._id),
-              name: populated.roleId.name,
-              slug: populated.roleId.slug,
-              isSystem: populated.roleId.isSystem,
-              permissionCount: Array.isArray(populated.roleId.permissions)
-                ? populated.roleId.permissions.length
-                : 0,
-            }
-          : null,
-        permissionCount: permissions.length,
-      },
+      staff: await toStaffDto(populated),
     });
   } catch (error) {
     console.error('createStaff error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to create staff account.',
+    });
+  }
+};
+
+/**
+ * PATCH /access/staff/:id
+ * Body: { fullName?, email?, phone?, password?, roleId? }
+ * Password is optional — omit to keep current password.
+ */
+export const updateStaff = async (req, res) => {
+  try {
+    const {id} = req.params;
+    const {fullName, email, phone, password, roleId} = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({success: false, message: 'Invalid staff id.'});
+    }
+
+    const staff = await User.findById(id);
+    if (!staff) {
+      return res.status(404).json({success: false, message: 'Staff not found.'});
+    }
+
+    if (fullName !== undefined) {
+      const name = String(fullName || '').trim();
+      if (!name) {
+        return res.status(400).json({
+          success: false,
+          message: 'Name is required.',
+        });
+      }
+      staff.fullName = name;
+    }
+
+    if (email !== undefined) {
+      const emailNorm = String(email).trim().toLowerCase();
+      if (!isEmail(emailNorm)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid email address.',
+        });
+      }
+      const emailTaken = await User.findOne({
+        email: emailNorm,
+        _id: {$ne: staff._id},
+      });
+      if (emailTaken) {
+        return res.status(409).json({
+          success: false,
+          message: 'Another account already uses this email.',
+        });
+      }
+      staff.email = emailNorm;
+    }
+
+    if (phone !== undefined) {
+      const phoneNorm = normalizePhone(phone);
+      if (!phoneNorm) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid phone number. Use 10 digits.',
+        });
+      }
+      const phoneTaken = await User.findOne({
+        phoneNumber: phoneNorm,
+        _id: {$ne: staff._id},
+      });
+      if (phoneTaken) {
+        return res.status(409).json({
+          success: false,
+          message: 'Another account already uses this phone.',
+        });
+      }
+      staff.phoneNumber = phoneNorm;
+    }
+
+    if (password !== undefined && String(password).trim() !== '') {
+      if (String(password).length < 8) {
+        return res.status(400).json({
+          success: false,
+          message: 'Password must be at least 8 characters.',
+        });
+      }
+      staff.passwordHash = await bcrypt.hash(String(password), SALT_ROUNDS);
+    }
+
+    if (roleId !== undefined) {
+      if (roleId === null || roleId === '') {
+        if (String(req.user?.userId) === String(staff._id)) {
+          return res.status(400).json({
+            success: false,
+            message: 'You cannot clear your own role (would lock you out).',
+          });
+        }
+        staff.roleId = null;
+        staff.role = 'user';
+      } else {
+        if (!mongoose.Types.ObjectId.isValid(roleId)) {
+          return res
+            .status(400)
+            .json({success: false, message: 'Invalid role id.'});
+        }
+        const nextRole = await Role.findOne({_id: roleId, isActive: true});
+        if (!nextRole) {
+          return res
+            .status(404)
+            .json({success: false, message: 'Role not found.'});
+        }
+        if (String(req.user?.userId) === String(staff._id)) {
+          const nextPerms = normalizePermissionList(nextRole.permissions || []);
+          if (!nextPerms.includes('access.manage')) {
+            return res.status(400).json({
+              success: false,
+              message:
+                'You cannot assign yourself a role without access.manage.',
+            });
+          }
+        }
+        staff.roleId = nextRole._id;
+        staff.role =
+          nextRole.slug === 'super_admin' || nextRole.slug === 'admin'
+            ? 'admin'
+            : 'user';
+      }
+    }
+
+    staff.updatedAt = new Date();
+    await staff.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Staff updated.',
+      staff: await toStaffDto(staff),
+    });
+  } catch (error) {
+    console.error('updateStaff error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update staff.',
+    });
+  }
+};
+
+/**
+ * DELETE /access/staff/:id
+ */
+export const deleteStaff = async (req, res) => {
+  try {
+    const {id} = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({success: false, message: 'Invalid staff id.'});
+    }
+
+    if (String(req.user?.userId) === String(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot delete your own account.',
+      });
+    }
+
+    const staff = await User.findById(id);
+    if (!staff) {
+      return res.status(404).json({success: false, message: 'Staff not found.'});
+    }
+
+    await User.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Staff deleted.',
+      staffId: id,
+    });
+  } catch (error) {
+    console.error('deleteStaff error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete staff.',
     });
   }
 };

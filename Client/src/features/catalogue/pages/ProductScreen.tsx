@@ -18,9 +18,13 @@ import {
   handleCreateProduct,
   handleUpdateProduct,
   handleDeleteProduct,
+  handleBulkUploadProducts,
+  handleCreateCategories,
 } from "@/services/apiClient";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
-import UploadBulkProductModal from "@/features/sales/components/invoice/Modal/UploadBulkProductModal";
+import UploadBulkProductModal, {
+  type ProductBulkImportRow,
+} from "@/features/sales/components/invoice/Modal/UploadBulkProductModal";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
 
@@ -43,7 +47,7 @@ export default function ProductScreen() {
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showBulkCreateModal, setBulkCreateModal] = useState(false);
- 
+  const [bulkImporting, setBulkImporting] = useState(false);
   const [editProduct, setEditProduct] = useState<any | null>(null);
 
   const fetchData = async (signal?: AbortSignal) => {
@@ -86,6 +90,140 @@ export default function ProductScreen() {
     } finally {
       setLoading(false);
       setEditProduct(null);
+    }
+  };
+
+  const handleBulkImportProducts = async (rows: ProductBulkImportRow[]) => {
+    if (!rows.length) return;
+
+    try {
+      setBulkImporting(true);
+
+      const payload = rows.map((row) => ({
+        productName: row.productName,
+        variant: row.variant || "",
+        category: String(row.category || "").trim(),
+        categoryName: String(row.category || "").trim(),
+        barcode: row.barcode || "",
+        barCode: row.barcode || "",
+        sellingPrice: row.sellingPrice,
+        unitPrice: row.sellingPrice,
+        itemCode: row.itemCode || "",
+        stockQty: row.stockQty || 0,
+        qty: row.stockQty || 0,
+        purchasePrice: row.purchasePrice || 0,
+        variants: row.variant
+          ? [
+              {
+                name: row.variant,
+                sellingPrice: row.sellingPrice,
+                purchasePrice: row.purchasePrice || 0,
+                barcode: row.barcode || "",
+              },
+            ]
+          : [],
+      }));
+
+      const missingCategory = payload.find((row) => !row.category);
+      if (missingCategory) {
+        await Swal.fire(
+          "Category required",
+          `"${missingCategory.productName}" has no Category. Fill Category in Excel — it will be auto-created if new.`,
+          "warning",
+        );
+        return;
+      }
+
+      // Pre-create unique categories via POST /api/categories (backend also ensures this)
+      const uniqueCategories = [
+        ...new Set(payload.map((row) => row.category).filter(Boolean)),
+      ];
+      if (uniqueCategories.length) {
+        try {
+          await handleCreateCategories({
+            categories: uniqueCategories.map((name) => ({ name })),
+          });
+        } catch (catError) {
+          console.error("Category pre-create failed:", catError);
+        }
+      }
+
+      const response = await handleBulkUploadProducts(payload);
+      await fetchData();
+      setBulkCreateModal(false);
+
+      const created = Number(
+        response?.summary?.created ?? response?.products?.length ?? 0,
+      );
+      const failed = Number(response?.summary?.failed ?? 0);
+      const skippedDuplicates = Number(
+        response?.summary?.skippedDuplicates ?? 0,
+      );
+      const invalidRows = Array.isArray(response?.summary?.invalidRows)
+        ? response.summary.invalidRows
+        : [];
+      const duplicateRows = Array.isArray(response?.summary?.duplicateRows)
+        ? response.summary.duplicateRows
+        : Array.isArray(response?.duplicateRows)
+          ? response.duplicateRows
+          : [];
+
+      const issueLines = [...invalidRows, ...duplicateRows]
+        .slice(0, 25)
+        .map(
+          (r: { row?: number; productName?: string; reason?: string }) =>
+            `Row ${r.row ?? "?"} (${r.productName || "—"}): ${r.reason || "Skipped"}`,
+        )
+        .join("\n");
+
+      if (failed > 0 || skippedDuplicates > 0 || issueLines) {
+        await Swal.fire({
+          icon: created > 0 ? "warning" : "error",
+          title: "Bulk import finished",
+          html: `<p class="text-sm text-left mb-2">Created <b>${created}</b> · Duplicates skipped <b>${skippedDuplicates || duplicateRows.length}</b> · Failed <b>${failed}</b></p>
+            ${issueLines ? `<pre class="text-left text-xs max-h-48 overflow-auto whitespace-pre-wrap">${issueLines.replace(/</g, "&lt;")}</pre>` : ""}`,
+        });
+        return;
+      }
+
+      await Swal.fire(
+        "Import complete",
+        response?.message ||
+          `Created ${created} product${created === 1 ? "" : "s"} successfully.`,
+        "success",
+      );
+    } catch (error: any) {
+      const data = error?.response?.data;
+      const duplicateRows = Array.isArray(data?.duplicateRows)
+        ? data.duplicateRows
+        : Array.isArray(data?.summary?.duplicateRows)
+          ? data.summary.duplicateRows
+          : [];
+      const invalidRows = Array.isArray(data?.invalidRows)
+        ? data.invalidRows
+        : Array.isArray(data?.summary?.invalidRows)
+          ? data.summary.invalidRows
+          : [];
+      const issueLines = [...invalidRows, ...duplicateRows]
+        .slice(0, 25)
+        .map(
+          (r: { row?: number; productName?: string; reason?: string }) =>
+            `Row ${r.row ?? "?"} (${r.productName || "—"}): ${r.reason || "Skipped"}`,
+        )
+        .join("\n");
+
+      await Swal.fire({
+        icon: "error",
+        title: "Import failed",
+        html: issueLines
+          ? `<p class="text-sm text-left mb-2">${(data?.message || "Could not bulk upload products.").replace(/</g, "&lt;")}</p>
+             <pre class="text-left text-xs max-h-48 overflow-auto whitespace-pre-wrap">${issueLines.replace(/</g, "&lt;")}</pre>`
+          : (data?.message ||
+              error?.message ||
+              "Could not bulk upload products."),
+      });
+    } finally {
+      setBulkImporting(false);
     }
   };
 
@@ -274,7 +412,9 @@ export default function ProductScreen() {
               + Add Product
             </button>
           </Can>
-          {/* <Can permission={PERMISSIONS.PRODUCT_BULK_CREATE}> */}
+          <Can
+            anyOf={[PERMISSIONS.PRODUCT_CREATE, PERMISSIONS.PRODUCT_BULK_CREATE]}
+          >
             <button
               type="button"
               onClick={() => setBulkCreateModal(true)}
@@ -282,8 +422,8 @@ export default function ProductScreen() {
             >
               + Bulk Upload
             </button>
-          {/* </Can> */}
-         
+          </Can>
+
           {showCreateModal && (
             <CreateProductModal
               onClose={() => {
@@ -318,40 +458,13 @@ export default function ProductScreen() {
               }
             />
           )}
-          {/* {showBulkCreateModal && (
+          {showBulkCreateModal && (
             <UploadBulkProductModal
-              onClose={() => {
-                setBulkCreateModal(false);
-                setEditProduct(null);
-              }}
-              onSubmit={handleSubmitProduct}
-              loading={loading}
-              initialData={
-                editProduct
-                  ? {
-                      ...editProduct,
-                      type: "product",
-                      barcode: editProduct.barCode || editProduct.barcode || "",
-                      category: String(editProduct.category || ""),
-                      categoryId: String(editProduct.categoryId || ""),
-                      subCategory: String(editProduct.subCategory || ""),
-                      subCategoryId: String(editProduct.subCategoryId || ""),
-                      isCsp: editProduct.isCsp ? "yes" : "no",
-                      cspEnrollmentId: editProduct.cspEnrollmentId
-                        ? String(
-                            typeof editProduct.cspEnrollmentId === "object"
-                              ? editProduct.cspEnrollmentId._id ||
-                                  editProduct.cspEnrollmentId.id ||
-                                  ""
-                              : editProduct.cspEnrollmentId,
-                          )
-                        : "",
-                      images: [],
-                    }
-                  : undefined
-              }
+              onClose={() => setBulkCreateModal(false)}
+              loading={bulkImporting}
+              onImport={handleBulkImportProducts}
             />
-          )} */}
+          )}
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-3">

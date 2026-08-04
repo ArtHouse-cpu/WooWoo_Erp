@@ -10,6 +10,8 @@ import {
   listStaff,
   assignStaffRole,
   createStaff,
+  updateStaff,
+  deleteStaff,
 } from '../controllers/access.controller.js';
 
 const router = express.Router();
@@ -32,6 +34,16 @@ router.patch(
   '/staff/:id/role',
   requirePermission(PERMISSIONS.ACCESS_MANAGE),
   assignStaffRole,
+);
+router.patch(
+  '/staff/:id',
+  requirePermission(PERMISSIONS.ACCESS_MANAGE),
+  updateStaff,
+);
+router.delete(
+  '/staff/:id',
+  requirePermission(PERMISSIONS.ACCESS_MANAGE),
+  deleteStaff,
 );
 
 export default router;

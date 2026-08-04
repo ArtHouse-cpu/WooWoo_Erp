@@ -351,7 +351,7 @@ const createCustomer = async (req, res) => {
         await sendNewAccountWhatsApp({
           to: whatsappTo,
           name: updatedCustomer?.name || customer.name || 'Member',
-          cashbackLabel: '₹25',
+          cashbackLabel: '25',
         });
       } catch (waError) {
         console.error(

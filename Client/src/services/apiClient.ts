@@ -1596,6 +1596,54 @@ export const handleCreateProduct = async (formData: FormData) => {
   }
 };
 
+export type ProductBulkUploadRow = {
+  productName: string;
+  variant?: string;
+  category?: string;
+  barcode?: string;
+  barCode?: string;
+  sellingPrice: number;
+  unitPrice?: number;
+  itemCode?: string;
+  stockQty?: number;
+  qty?: number;
+  purchasePrice?: number;
+  variants?: Array<{
+    name: string;
+    sellingPrice: number;
+    purchasePrice: number;
+    barcode?: string;
+  }>;
+};
+
+export const handleBulkUploadProducts = async (
+  products: ProductBulkUploadRow[],
+) => {
+  try {
+    const response = await axiosInstance.post("/product/bulkUpload", {
+      products,
+    });
+    return response.data;
+  } catch (error) {
+    console.log("Error bulk uploading products:", error);
+    throw error;
+  }
+};
+
+export const handleBulkUpload=async(formData:FormData)=>{
+  try {
+    const response = await axiosInstance.post("/product/bulkUpload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.log("Error creating product:", error);
+    throw error;
+  }
+}
+
 export const handleUpdateProduct = async (id: string, formData: FormData) => {
   try {
     const response = await axiosInstance.patch(`/product/${id}`, formData, {
@@ -1905,6 +1953,25 @@ export const handleCreateAccessStaff = async (payload: {
   roleId?: string | null;
 }) => {
   const response = await axiosInstance.post("/access/staff", payload);
+  return response.data;
+};
+
+export const handleUpdateAccessStaff = async (
+  staffId: string,
+  payload: {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+    roleId?: string | null;
+  },
+) => {
+  const response = await axiosInstance.patch(`/access/staff/${staffId}`, payload);
+  return response.data;
+};
+
+export const handleDeleteAccessStaff = async (staffId: string) => {
+  const response = await axiosInstance.delete(`/access/staff/${staffId}`);
   return response.data;
 };
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
-import { Loader2, RefreshCw, Shield, Users } from "lucide-react";
+import { Loader2, RefreshCw, Shield, SquarePen, Trash2, Users } from "lucide-react";
 import {
   PERMISSION_CATALOG,
   PERMISSIONS,
@@ -12,9 +12,11 @@ import Can from "@/components/rbac/Can";
 import {
   handleAssignStaffRole,
   handleCreateAccessStaff,
+  handleDeleteAccessStaff,
   handleGetAccessRoles,
   handleGetAccessStaff,
   handleUpdateAccessRole,
+  handleUpdateAccessStaff,
   type AccessRole,
   type AccessStaffRow,
 } from "@/services/apiClient";
@@ -102,6 +104,7 @@ export default function AccessScreen() {
     await loadAll(search);
   };
 
+
   const onAssignRole = async (staffId: string, roleId: string) => {
     try {
       setAssigningId(staffId);
@@ -167,6 +170,167 @@ export default function AccessScreen() {
       );
     } finally {
       setCreating(false);
+    }
+  };
+
+  const phoneForForm = (phone?: string) => {
+    const digits = String(phone || "").replace(/\D/g, "");
+    if (digits.length === 12 && digits.startsWith("91")) return digits.slice(2);
+    if (digits.length > 10) return digits.slice(-10);
+    return digits;
+  };
+
+  const onEditStaff = async (row: AccessStaffRow) => {
+    if (!canManage) return;
+
+    const roleOptions = [
+      `<option value="">Unassigned</option>`,
+      ...roles.map(
+        (r) =>
+          `<option value="${String(r._id)}" ${
+            String(row.role?.id || "") === String(r._id) ? "selected" : ""
+          }>${r.name}</option>`,
+      ),
+    ].join("");
+
+    const result = await Swal.fire({
+      title: "Edit staff",
+      html: `
+        <div class="mt-2 flex flex-col gap-3 text-left">
+          <div>
+            <label class="mb-1 block text-xs font-medium text-slate-600">Full name</label>
+            <input id="edit-staff-name" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="${String(row.fullName || "").replace(/"/g, "&quot;")}" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-slate-600">Email</label>
+            <input id="edit-staff-email" type="email" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="${String(row.email || "").replace(/"/g, "&quot;")}" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-slate-600">Phone (10 digits)</label>
+            <input id="edit-staff-phone" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="${phoneForForm(row.phoneNumber)}" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-slate-600">Role</label>
+            <select id="edit-staff-role" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm">
+              ${roleOptions}
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-medium text-slate-600">New password (optional)</label>
+            <input id="edit-staff-password" type="password" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" placeholder="Leave blank to keep current" />
+          </div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Save",
+      confirmButtonColor: "#2563eb",
+      focusConfirm: false,
+      preConfirm: () => {
+        const fullName = (
+          document.getElementById("edit-staff-name") as HTMLInputElement | null
+        )?.value?.trim();
+        const email = (
+          document.getElementById("edit-staff-email") as HTMLInputElement | null
+        )?.value?.trim();
+        const phone = (
+          document.getElementById("edit-staff-phone") as HTMLInputElement | null
+        )?.value?.trim();
+        const roleId = (
+          document.getElementById("edit-staff-role") as HTMLSelectElement | null
+        )?.value;
+        const password = (
+          document.getElementById(
+            "edit-staff-password",
+          ) as HTMLInputElement | null
+        )?.value;
+
+        if (!fullName || !email || !phone) {
+          Swal.showValidationMessage("Name, email, and phone are required.");
+          return undefined;
+        }
+        if (password && password.length < 8) {
+          Swal.showValidationMessage(
+            "Password must be at least 8 characters (or leave blank).",
+          );
+          return undefined;
+        }
+        return {
+          fullName,
+          email,
+          phone,
+          roleId: roleId || null,
+          password: password || undefined,
+        };
+      },
+    });
+
+    if (!result.isConfirmed || !result.value) return;
+
+    try {
+      const res = await handleUpdateAccessStaff(row._id, result.value);
+      if (res?.staff) {
+        setStaff((prev) =>
+          prev.map((s) =>
+            String(s._id) === String(row._id) ? res.staff : s,
+          ),
+        );
+      }
+      await Swal.fire({
+        icon: "success",
+        title: "Staff updated",
+        timer: 1400,
+        showConfirmButton: false,
+      });
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Update failed",
+        err?.response?.data?.message ?? "Could not update staff.",
+        "error",
+      );
+    }
+  };
+
+  const onDeleteStaff = async (row: AccessStaffRow) => {
+    if (!canManage) return;
+
+    if (String(authUser?._id || "") === String(row._id)) {
+      await Swal.fire(
+        "Not allowed",
+        "You cannot delete your own account.",
+        "warning",
+      );
+      return;
+    }
+
+    const confirm = await Swal.fire({
+      title: "Delete staff?",
+      html: `Remove <b>${String(row.fullName || "this staff").replace(/</g, "&lt;")}</b>?<br/><span class="text-xs text-slate-500">This cannot be undone.</span>`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete",
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#64748b",
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      await handleDeleteAccessStaff(row._id);
+      setStaff((prev) => prev.filter((s) => String(s._id) !== String(row._id)));
+      await Swal.fire({
+        icon: "success",
+        title: "Staff deleted",
+        timer: 1400,
+        showConfirmButton: false,
+      });
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Delete failed",
+        err?.response?.data?.message ?? "Could not delete staff.",
+        "error",
+      );
     }
   };
 
@@ -397,18 +561,19 @@ export default function AccessScreen() {
                   <th className="px-2 py-2">Contact</th>
                   <th className="px-2 py-2">Current role</th>
                   <th className="px-2 py-2">Assign role</th>
+                  <th className="px-2 py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && !staff.length ? (
                   <tr>
-                    <td colSpan={4} className="px-2 py-8 text-center text-gray-400">
+                    <td colSpan={5} className="px-2 py-8 text-center text-gray-400">
                       Loading staff...
                     </td>
                   </tr>
                 ) : staff.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-2 py-8 text-center text-gray-400">
+                    <td colSpan={5} className="px-2 py-8 text-center text-gray-400">
                       No staff found.
                     </td>
                   </tr>
@@ -462,6 +627,28 @@ export default function AccessScreen() {
                             ))}
                           </select>
                         </Can>
+                      </td>
+                      <td className="px-2 py-3">
+                        <div className="flex items-center gap-2">
+                          <Can permission={PERMISSIONS.ACCESS_MANAGE}>
+                            <button
+                              type="button"
+                              title="Edit staff"
+                              onClick={() => void onEditStaff(row)}
+                              className="inline-flex items-center justify-center rounded-lg bg-green-100 p-2 text-green-700 transition hover:bg-green-200"
+                            >
+                              <SquarePen size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              title="Delete staff"
+                              onClick={() => void onDeleteStaff(row)}
+                              className="inline-flex items-center justify-center rounded-lg bg-red-100 p-2 text-red-600 transition hover:bg-red-200"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </Can>
+                        </div>
                       </td>
                     </tr>
                   ))

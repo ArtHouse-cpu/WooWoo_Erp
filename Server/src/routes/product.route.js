@@ -1,7 +1,18 @@
 import express from 'express';
-import {createProduct, getProducts, upload, deleteProduct, updateProduct} from '../controllers/product.controller.js';
+import {
+  createProduct,
+  getProducts,
+  upload,
+  deleteProduct,
+  updateProduct,
+  uploadBulkProducts,
+} from '../controllers/product.controller.js';
 import {authenticateUser} from '../middlewares/auth.middleware.js';
-import {attachStaffContext, requirePermission} from '../middlewares/authorize.middleware.js';
+import {
+  attachStaffContext,
+  requireAnyPermission,
+  requirePermission,
+} from '../middlewares/authorize.middleware.js';
 import {PERMISSIONS} from '../constants/permissions.js';
 
 const router = express.Router();
@@ -14,6 +25,14 @@ router.post(
   requirePermission(PERMISSIONS.PRODUCT_CREATE),
   upload.array('images', 10),
   createProduct,
+);
+router.post(
+  '/bulkUpload',
+  requireAnyPermission(
+    PERMISSIONS.PRODUCT_BULK_CREATE,
+    PERMISSIONS.PRODUCT_CREATE,
+  ),
+  uploadBulkProducts,
 );
 router.patch(
   '/:id',

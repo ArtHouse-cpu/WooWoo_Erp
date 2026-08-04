@@ -365,10 +365,43 @@ export const sendWhatsAppOtp = async ({to, otp}) => {
   throw error;
 };
 
+/** Plain amount for Meta templates that already include ₹ in the body text. */
+const formatAmountPlain = value => {
+  const n = Number(
+    typeof value === 'string' ? String(value).replace(/[^\d.]/g, '') : value,
+  );
+  if (!Number.isFinite(n) || n < 0) return '0';
+  const rounded = Math.round((n + Number.EPSILON) * 100) / 100;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return rounded.toFixed(2);
+};
+
+/**
+ * Meta membership/account templates already print ₹ before {{n}}.
+ * Passing "₹200" produces "₹₹200". Always send digits unless env overrides.
+ */
+const resolveCashbackTemplateParam = (cashbackLabel, {fallbackEnvKeys = []} = {}) => {
+  const includeSymbol = /^(1|true|yes)$/i.test(
+    String(process.env.WHATSAPP_CASHBACK_INCLUDE_SYMBOL || '').trim(),
+  );
+  let amount = Number(String(cashbackLabel ?? '').replace(/[^\d.]/g, ''));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    for (const key of fallbackEnvKeys) {
+      const envVal = Number(process.env[key] || 0);
+      if (Number.isFinite(envVal) && envVal > 0) {
+        amount = envVal;
+        break;
+      }
+    }
+  }
+  const plain = formatAmountPlain(Number.isFinite(amount) && amount > 0 ? amount : 0);
+  return includeSymbol ? `₹${plain}` : plain;
+};
+
 /**
  * Send membership activation WhatsApp.
  * Customer portal template: `membershippurchase` (fallback: membershipchange, newmembership).
- * Body: {{1}} name, {{2}} plan, {{3}} validity, {{4}} cashback (e.g. ₹50)
+ * Body: {{1}} name, {{2}} plan, {{3}} validity, {{4}} cashback — Meta text already has ₹.
  * Buttons: optional URL params (static URLs need none).
  */
 export const sendMembershipPurchaseWhatsApp = async ({
@@ -402,31 +435,33 @@ export const sendMembershipPurchaseWhatsApp = async ({
   }
 
   let lastError = null;
-  const amountOnly = String(cashbackLabel || '').replace(/[^\d.]/g, '') || '50';
+  // Meta template text already has ₹ before the cashback placeholder (₹{{4}}).
+  // Prefer plain digits so users never see "₹₹200" / "₹₹0".
+  const cashbackParam = resolveCashbackTemplateParam(cashbackLabel, {
+    fallbackEnvKeys: [
+      'WHATSAPP_MEMBERSHIP_CASHBACK',
+      'MEMBERSHIP_WELCOME_CASHBACK',
+    ],
+  });
+  const plainAmount = formatAmountPlain(cashbackParam);
   const bodyModes = [
     [
       String(name || 'Member'),
       String(membershipLabel || 'Membership'),
       String(validity || 'Yearly'),
-      String(cashbackLabel || `₹${amountOnly}`),
+      cashbackParam,
     ],
     [
       String(name || 'Member'),
       String(membershipLabel || 'Membership'),
       String(validity || 'Yearly'),
-      `₹${amountOnly}`,
+      plainAmount,
     ],
     [
       String(name || 'Member'),
       String(membershipLabel || 'Membership'),
       String(validity || 'Yearly'),
-      `${amountOnly} coins`,
-    ],
-    [
-      String(name || 'Member'),
-      String(membershipLabel || 'Membership'),
-      String(validity || 'Yearly'),
-      amountOnly,
+      `${plainAmount} coins`,
     ],
   ];
 
@@ -630,14 +665,20 @@ export const sendAccountCreatedWhatsApp = async ({to, name, cashbackLabel}) => {
 
   let lastError = null;
 
-  const amountOnly = String(cashbackLabel || '').replace(/[^\d.]/g, '') || '25';
+  // Meta `accountcreated` body already includes ₹ before the cashback placeholder.
+  const cashbackParam = resolveCashbackTemplateParam(cashbackLabel, {
+    fallbackEnvKeys: [
+      'WHATSAPP_ACCOUNT_CREATED_CASHBACK',
+      'ACCOUNT_WELCOME_CASHBACK',
+      'WHATSAPP_WELCOME_CASHBACK',
+    ],
+  });
+  const plainAmount = formatAmountPlain(cashbackParam);
 
-  // Prefer ₹ format used by Customer portal `accountcreated`
   const bodyModes = [
-    [String(name || 'Member'), String(cashbackLabel || `₹${amountOnly}`)],
-    [String(name || 'Member'), `₹${amountOnly}`],
-    [String(name || 'Member'), `${amountOnly} coins`],
-    [String(name || 'Member'), amountOnly],
+    [String(name || 'Member'), cashbackParam],
+    [String(name || 'Member'), plainAmount],
+    [String(name || 'Member'), `${plainAmount} coins`],
     [String(name || 'Member')],
   ];
 
@@ -779,15 +820,6 @@ export const sendAccountCreatedWhatsApp = async ({to, name, cashbackLabel}) => {
 
 /** Alias used by Admin Add Customer. */
 export const sendNewAccountWhatsApp = sendAccountCreatedWhatsApp;
-
-/** Plain amount for Meta templates that already include ₹ in the body text. */
-const formatAmountPlain = value => {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return '0';
-  const rounded = Math.round((n + Number.EPSILON) * 100) / 100;
-  if (Number.isInteger(rounded)) return String(rounded);
-  return rounded.toFixed(2);
-};
 
 /**
  * Live Meta body is: "As a {{6}} Member, you received:"

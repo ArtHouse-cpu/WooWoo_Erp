@@ -303,6 +303,8 @@ type MembershipOption = {
   amount: number;
   period: string;
   priority: number;
+  /** Fixed ₹ credited to wallet when this plan is purchased */
+  walletCashbackAmount: number;
 };
 
 type StudentForm = {
@@ -885,6 +887,10 @@ export default function CreateSubscriptionScreen({
             amount: Number(m?.pricing?.amount ?? 0),
             period: String(m?.pricing?.period ?? "monthly"),
             priority: Math.max(0, Number(m?.priority ?? 0) || 0),
+            walletCashbackAmount: Math.max(
+              0,
+              Number(m?.walletCashback?.amount ?? 0) || 0,
+            ),
           }))
           .filter((m: MembershipOption) => Boolean(m._id));
         setMemberships(mapped);
@@ -1517,7 +1523,11 @@ export default function CreateSubscriptionScreen({
                   </option>
                   {selectableMemberships.map((m) => (
                     <option key={m._id} value={m._id}>
-                      {`${m.displayName} • ₹${m.amount.toLocaleString("en-IN")} / ${m.period} • P${m.priority} • ${m.planId}`}
+                      {`${m.displayName} • ₹${m.amount.toLocaleString("en-IN")} / ${m.period} • P${m.priority}${
+                        m.walletCashbackAmount > 0
+                          ? ` • Cashback ₹${m.walletCashbackAmount.toLocaleString("en-IN")}`
+                          : ""
+                      } • ${m.planId}`}
                     </option>
                   ))}
                 </select>
@@ -1855,6 +1865,7 @@ export default function CreateSubscriptionScreen({
                 price: selectedMembership.amount,
                 discount: 0,
                 category: "membership",
+                cashback: selectedMembership.walletCashbackAmount,
               },
             ]
             : []
@@ -1863,7 +1874,9 @@ export default function CreateSubscriptionScreen({
         initialCustomerPhone={phone}
         initialCustomerId={selectedCustomerId || null}
         initialMembership={selectedMembership?.displayName ?? ""}
-        initialCashbackTotal={0}
+        initialCashbackTotal={
+          selectedMembership?.walletCashbackAmount ?? 0
+        }
         onClose={() => setOpenCheckout(false)}
         onConfirmPayment={async (payment) => {
           setOpenCheckout(false);
