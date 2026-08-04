@@ -20,6 +20,7 @@ import {
   handleDeleteProduct,
 } from "@/services/apiClient";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
+import UploadBulkProductModal from "@/features/sales/components/invoice/Modal/UploadBulkProductModal";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
 
@@ -41,6 +42,7 @@ export default function ProductScreen() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showBulkCreateModal, setBulkCreateModal] = useState(false);
  
   const [editProduct, setEditProduct] = useState<any | null>(null);
 
@@ -272,6 +274,15 @@ export default function ProductScreen() {
               + Add Product
             </button>
           </Can>
+          {/* <Can permission={PERMISSIONS.PRODUCT_BULK_CREATE}> */}
+            <button
+              type="button"
+              onClick={() => setBulkCreateModal(true)}
+              className="w-[120px] bg-black text-white py-2 px-1 rounded  text-[14px] font-semibold transition text-center border-radius-[50px] cursor-pointer"
+            >
+              + Bulk Upload
+            </button>
+          {/* </Can> */}
          
           {showCreateModal && (
             <CreateProductModal
@@ -307,6 +318,40 @@ export default function ProductScreen() {
               }
             />
           )}
+          {/* {showBulkCreateModal && (
+            <UploadBulkProductModal
+              onClose={() => {
+                setBulkCreateModal(false);
+                setEditProduct(null);
+              }}
+              onSubmit={handleSubmitProduct}
+              loading={loading}
+              initialData={
+                editProduct
+                  ? {
+                      ...editProduct,
+                      type: "product",
+                      barcode: editProduct.barCode || editProduct.barcode || "",
+                      category: String(editProduct.category || ""),
+                      categoryId: String(editProduct.categoryId || ""),
+                      subCategory: String(editProduct.subCategory || ""),
+                      subCategoryId: String(editProduct.subCategoryId || ""),
+                      isCsp: editProduct.isCsp ? "yes" : "no",
+                      cspEnrollmentId: editProduct.cspEnrollmentId
+                        ? String(
+                            typeof editProduct.cspEnrollmentId === "object"
+                              ? editProduct.cspEnrollmentId._id ||
+                                  editProduct.cspEnrollmentId.id ||
+                                  ""
+                              : editProduct.cspEnrollmentId,
+                          )
+                        : "",
+                      images: [],
+                    }
+                  : undefined
+              }
+            />
+          )} */}
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-3">

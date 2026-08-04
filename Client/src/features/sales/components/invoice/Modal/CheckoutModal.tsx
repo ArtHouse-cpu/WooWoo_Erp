@@ -17,6 +17,7 @@ import {
   handleGetCustomers,
   handleGetWallets,
   handleGetWalletById,
+  handleGetWalletInstructions,
   handleGetMemberships,
   handleValidateCoupon,
   handleValidateReferralDiscount,
@@ -307,6 +308,16 @@ function resolveWalletBalance(
   return Number.isFinite(amount) ? Math.max(0, amount) : 0;
 }
 
+/** Max wallet payment while keeping the configured minimum balance. */
+function getMaxWalletPaymentAmount(
+  spendableBalance: number,
+  minimumBalance = 0,
+) {
+  const available = Math.max(0, Number(spendableBalance) || 0);
+  const minBal = Math.max(0, Number(minimumBalance) || 0);
+  return Math.max(0, available - minBal);
+}
+
 export default function CheckoutModal({
   open,
   onClose,
@@ -348,6 +359,7 @@ export default function CheckoutModal({
   const [customerName, setCustomerName] = useState("");
   const [membership, setMembership] = useState("");
   const [walletBalance, setWalletBalance] = useState(0);
+  const [minimumWalletBalance, setMinimumWalletBalance] = useState(0);
   const [instructionNotes, setInstructionNotes] = useState("");
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
@@ -413,6 +425,22 @@ export default function CheckoutModal({
         }
       })
       .catch(() => {});
+    return () => ac.abort();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const ac = new AbortController();
+    void handleGetWalletInstructions(ac.signal)
+      .then((res) => {
+        const min = Number(
+          res?.minimumBalance ?? res?.instructions?.minimumBalance ?? 0,
+        );
+        setMinimumWalletBalance(Number.isFinite(min) && min > 0 ? min : 0);
+      })
+      .catch(() => {
+        setMinimumWalletBalance(0);
+      });
     return () => ac.abort();
   }, [open]);
 
@@ -1181,6 +1209,28 @@ export default function CheckoutModal({
         "warning",
       );
       return;
+    }
+
+    const walletPaymentAmount = isMultiMode
+      ? Number(splitPayments.wallet || 0)
+      : paymentMode === "Wallet"
+        ? Number(cashGiven || 0)
+        : 0;
+    if (walletPaymentAmount > 0) {
+      const maxPayable = getMaxWalletPaymentAmount(
+        walletBalance,
+        minimumWalletBalance,
+      );
+      if (walletPaymentAmount > maxPayable + 0.01) {
+        Swal.fire(
+          "Minimum wallet balance required",
+          `Wallet payment would leave balance below the minimum of ₹${minimumWalletBalance.toFixed(2)}. ` +
+            `Available for payment: ₹${maxPayable.toFixed(2)} ` +
+            `(balance ₹${walletBalance.toFixed(2)} − minimum ₹${minimumWalletBalance.toFixed(2)}).`,
+          "warning",
+        );
+        return;
+      }
     }
     if (paymentStatus === "full" && dueAmount > 0) {
       Swal.fire(

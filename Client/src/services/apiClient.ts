@@ -925,6 +925,16 @@ export const handleBulkWalletUpdate = async (
   }
 };
 
+export const handleGetWalletInstructions = async (signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/wallet/instructions", { signal });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching wallet instructions:", error);
+    throw error;
+  }
+};
+
 export const handleDeleteWallet = async (id: string) => {
   try {
     const response = await axiosInstance.delete(`/wallet/${id}`);

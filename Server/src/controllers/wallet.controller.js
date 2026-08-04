@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Customer from "../models/customer.model.js";
 import Wallet from "../models/wallet.model.js";
+import WalletSettings from "../models/walletSettings.model.js";
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -9,6 +10,45 @@ const buildCreatedBy = (req, fallback = {}) => ({
   m_staff_name: fallback?.m_staff_name ?? req.user?.name ?? null,
   m_staff_email: fallback?.m_staff_email ?? req.user?.email ?? null,
 });
+
+/** Read global minimum wallet balance (always ≥ 0). */
+const getMinimumWalletBalance = async () => {
+  const doc = await WalletSettings.findOne({key: 'default'})
+    .select('minimumBalance')
+    .lean();
+  const n = Number(doc?.minimumBalance ?? 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
+/** Persist global minimum wallet balance from Wallet Instructions. */
+const setMinimumWalletBalance = async (minimumBalance, updatedBy = {}) => {
+  const value = Math.max(0, Number(minimumBalance) || 0);
+  const doc = await WalletSettings.findOneAndUpdate(
+    {key: 'default'},
+    {
+      $set: {
+        minimumBalance: value,
+        updatedBy: {
+          m_staff_id: updatedBy?.m_staff_id ?? null,
+          m_staff_name: updatedBy?.m_staff_name ?? null,
+          m_staff_email: updatedBy?.m_staff_email ?? null,
+        },
+      },
+    },
+    {upsert: true, new: true, setDefaultsOnInsert: true},
+  );
+  return Math.max(0, Number(doc?.minimumBalance ?? value) || 0);
+};
+
+/**
+ * Max amount that may be taken from wallet while keeping minimumBalance.
+ * Rule: Wallet Balance − Payment Amount ≥ Minimum Wallet Balance
+ */
+const getMaxWalletPaymentAmount = (spendableBalance, minimumBalance = 0) => {
+  const available = Math.max(0, Number(spendableBalance) || 0);
+  const minBal = Math.max(0, Number(minimumBalance) || 0);
+  return Math.max(0, available - minBal);
+};
 
 const syncCustomerWalletAmount = async (customerId, walletAmount) => {
   if (!mongoose.Types.ObjectId.isValid(String(customerId))) return;
@@ -80,7 +120,7 @@ const appendTransaction = async (
     referenceType = "",
     referenceId = "",
     createdBy = {},
-    minimumBalance = 0,
+    minimumBalance,
     walletType = "general",
   },
 ) => {
@@ -88,7 +128,13 @@ const appendTransaction = async (
   if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
     throw new Error("Valid transaction amount is required.");
   }
-  const minimumAllowedBalance = Math.max(Number(minimumBalance) || 0, 0);
+  const txTypeEarly = String(type ?? "credit").toLowerCase();
+  const minimumAllowedBalance =
+    minimumBalance !== undefined && minimumBalance !== null
+      ? Math.max(Number(minimumBalance) || 0, 0)
+      : txTypeEarly === "debit"
+        ? await getMinimumWalletBalance()
+        : 0;
   const bucket = ["affiliate", "cashback", "general"].includes(
     String(walletType || "general").toLowerCase(),
   )
@@ -96,7 +142,7 @@ const appendTransaction = async (
     : "general";
 
   const refId = String(referenceId ?? "").trim();
-  const txType = String(type ?? "credit").toLowerCase();
+  const txType = txTypeEarly;
   // Prevent double membership cashback (server create + client credit)
   if (refId && txType === "credit" && /cashback/i.test(String(note ?? ""))) {
     const duplicate = (wallet.transactions || []).some(
@@ -204,6 +250,7 @@ const debitWalletForPurchase = async (
     referenceType = "invoice",
     referenceId = "",
     createdBy = {},
+    minimumBalance,
   } = {},
 ) => {
   const totalAmount = Math.round((Number(amount) || 0) * 100) / 100;
@@ -228,6 +275,19 @@ const debitWalletForPurchase = async (
     generalBalance + cashbackBalance + affiliateBalance;
   if (totalAmount > previousTotal + 0.01) {
     throw new Error("Wallet amount exceeds available balance.");
+  }
+
+  const minBal =
+    minimumBalance !== undefined && minimumBalance !== null
+      ? Math.max(0, Number(minimumBalance) || 0)
+      : await getMinimumWalletBalance();
+  const maxPayable = getMaxWalletPaymentAmount(previousTotal, minBal);
+  if (totalAmount > maxPayable + 0.01) {
+    throw new Error(
+      `Wallet payment would leave balance below the minimum of ₹${minBal.toFixed(2)}. ` +
+        `Available for payment: ₹${maxPayable.toFixed(2)} ` +
+        `(balance ₹${previousTotal.toFixed(2)} − minimum ₹${minBal.toFixed(2)}).`,
+    );
   }
 
   // Idempotent: same invoice/payment should not debit twice
@@ -265,6 +325,13 @@ const debitWalletForPurchase = async (
 
   if (remaining > 0.01) {
     throw new Error("Wallet amount exceeds available balance.");
+  }
+
+  const closingTotal = generalBalance + cashbackBalance + affiliateBalance;
+  if (closingTotal + 0.01 < minBal) {
+    throw new Error(
+      `Final wallet balance cannot be less than minimum balance ₹${minBal.toFixed(2)}.`,
+    );
   }
 
   wallet.walletAmount = generalBalance;
@@ -599,23 +666,33 @@ const bulkUpdateWallets = async (req, res) => {
     } = req.body ?? {};
     console.log("This is bulk update:",req.body);
     const normalizedType = String(type).toLowerCase();
-const numericAmount = Number(amount);
-const minimumAllowedBalance = Math.max(Number(minimumBalance) || 0, 0);
+    const numericAmount = Number(amount);
+    const fromBodyMinimum = Math.max(Number(minimumBalance) || 0, 0);
+    const persistedMinimum = await getMinimumWalletBalance();
+    // Debits must always respect the saved global minimum; body may be stricter.
+    const minimumAllowedBalance =
+      normalizedType === "debit"
+        ? Math.max(fromBodyMinimum, persistedMinimum)
+        : fromBodyMinimum;
 
-if (!["credit", "debit", "set_minimum"].includes(normalizedType)) {
-  return res.status(400).json({
-    success: false,
-    message: "Transaction type is invalid.",
-  });
-}
+    if (!["credit", "debit", "set_minimum"].includes(normalizedType)) {
+      return res.status(400).json({
+        success: false,
+        message: "Transaction type is invalid.",
+      });
+    }
 
-if (normalizedType === "set_minimum") {
-  return res.status(200).json({
-    success: true,
-    message: "Minimum balance updated successfully.",
-    minimumBalance: minimumAllowedBalance,
-  });
-}
+    if (normalizedType === "set_minimum") {
+      const savedMinimum = await setMinimumWalletBalance(
+        fromBodyMinimum,
+        buildCreatedBy(req, createdBy),
+      );
+      return res.status(200).json({
+        success: true,
+        message: "Minimum balance updated successfully.",
+        minimumBalance: savedMinimum,
+      });
+    }
 
 if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
   return res.status(400).json({
@@ -714,15 +791,39 @@ if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
   }
 };
 
+const getWalletInstructions = async (req, res) => {
+  try {
+    const minimumBalance = await getMinimumWalletBalance();
+    return res.status(200).json({
+      success: true,
+      message: 'Wallet instructions fetched successfully.',
+      instructions: {
+        minimumBalance,
+      },
+      minimumBalance,
+    });
+  } catch (error) {
+    console.error('getWalletInstructions error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch wallet instructions.',
+    });
+  }
+};
+
 export {
   appendTransaction,
   bulkUpdateWallets,
   createWallet,
   debitWalletForPurchase,
   deleteWallet,
+  getMaxWalletPaymentAmount,
+  getMinimumWalletBalance,
   getSpendableWalletBalance,
   getWalletById,
+  getWalletInstructions,
   getWallets,
+  setMinimumWalletBalance,
   syncCustomerWalletAmount,
   updateWallet,
 };

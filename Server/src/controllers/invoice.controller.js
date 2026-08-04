@@ -10,6 +10,8 @@ import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
 import {
   appendTransaction,
   debitWalletForPurchase,
+  getMaxWalletPaymentAmount,
+  getMinimumWalletBalance,
   getSpendableWalletBalance,
 } from './wallet.controller.js';
 import { validateCouponForOrder } from './coupon.controller.js';
@@ -865,10 +867,24 @@ const createInvoice = async (req, res) => {
 
       const existingWallet = await Wallet.findOne({ customerId: customer._id });
       const availableWallet = getSpendableWalletBalance(existingWallet, customer);
+      const minimumBalance = await getMinimumWalletBalance();
+      const maxPayable = getMaxWalletPaymentAmount(
+        availableWallet,
+        minimumBalance,
+      );
       if (walletAmount > availableWallet + 0.01) {
         return res.status(400).json({
           success: false,
           message: `Wallet amount exceeds available balance. Available: ₹${availableWallet.toFixed(2)}`,
+        });
+      }
+      if (walletAmount > maxPayable + 0.01) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Wallet payment would leave balance below the minimum of ₹${minimumBalance.toFixed(2)}. ` +
+            `Available for payment: ₹${maxPayable.toFixed(2)} ` +
+            `(balance ₹${availableWallet.toFixed(2)} − minimum ₹${minimumBalance.toFixed(2)}).`,
         });
       }
     }

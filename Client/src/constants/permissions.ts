@@ -56,6 +56,7 @@ export const PERMISSIONS = {
   // Catalogue — Products
   PRODUCT_READ: "product.read",
   PRODUCT_CREATE: "product.create",
+  PRODUCT_BULK_CREATE: "product.bulk.create",
   PRODUCT_UPDATE: "product.update",
   PRODUCT_DELETE: "product.delete",
 
@@ -301,6 +302,11 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
     key: PERMISSIONS.PRODUCT_DELETE,
     module: "catalogue",
     label: "Delete products",
+  },
+  {
+    key: PERMISSIONS.PRODUCT_BULK_CREATE,
+    module: "catalogue",
+    label: "Create bulk products",
   },
   {
     key: PERMISSIONS.SERVICE_READ,

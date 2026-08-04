@@ -51,6 +51,7 @@ import {
   handleGetFoods,
   handleGetMemberships,
   handleGetWalletById,
+  handleGetWalletInstructions,
   handleUpdateFood,
   handleValidateCoupon,
   handleValidateReferralDiscount,
@@ -297,6 +298,7 @@ export default function FoodBill() {
     wallet: 0,
   });
   const [walletBalance, setWalletBalance] = useState(0);
+  const [minimumWalletBalance, setMinimumWalletBalance] = useState(0);
   const [billNote, setBillNote] = useState<string>("");
   const [savingBill, setSavingBill] = useState(false);
   const [membershipPlans, setMembershipPlans] = useState<
@@ -475,6 +477,20 @@ export default function FoodBill() {
         setMembershipPlans(rows);
       })
       .catch(() => setMembershipPlans([]));
+    return () => controller.abort();
+  }, []);
+
+  // Global minimum wallet balance (Wallet Instructions)
+  useEffect(() => {
+    const controller = new AbortController();
+    handleGetWalletInstructions(controller.signal)
+      .then((res) => {
+        const min = Number(
+          res?.minimumBalance ?? res?.instructions?.minimumBalance ?? 0,
+        );
+        setMinimumWalletBalance(Number.isFinite(min) && min > 0 ? min : 0);
+      })
+      .catch(() => setMinimumWalletBalance(0));
     return () => controller.abort();
   }, []);
 
@@ -1122,6 +1138,28 @@ export default function FoodBill() {
           controller.signal,
         );
         const wallet = response?.wallet ?? response?.data ?? response ?? null;
+        const total = Number(wallet?.totalBalance);
+        if (Number.isFinite(total)) {
+          setWalletBalance(Math.max(0, total));
+          return;
+        }
+        const general = Number(
+          wallet?.generalBalance ?? wallet?.walletAmount ?? wallet?.balance ?? 0,
+        );
+        const cashback = Number(wallet?.cashbackBalance ?? 0);
+        const affiliate = Number(
+          wallet?.affiliateBalance ?? wallet?.withdrawableBalance ?? 0,
+        );
+        if (
+          wallet?.generalBalance !== undefined ||
+          wallet?.cashbackBalance !== undefined ||
+          wallet?.affiliateBalance !== undefined
+        ) {
+          setWalletBalance(
+            Math.max(0, general + cashback + affiliate),
+          );
+          return;
+        }
         const amount = Number(
           wallet?.walletAmount ??
             wallet?.balance ??
@@ -1205,6 +1243,22 @@ export default function FoodBill() {
         "warning",
       );
       return;
+    }
+    if (walletUsed > 0) {
+      const maxPayable = Math.max(
+        0,
+        walletBalance - Math.max(0, minimumWalletBalance),
+      );
+      if (walletUsed > maxPayable + 0.01) {
+        Swal.fire(
+          "Minimum wallet balance required",
+          `Wallet payment would leave balance below the minimum of ₹${minimumWalletBalance.toFixed(2)}. ` +
+            `Available for payment: ₹${maxPayable.toFixed(2)} ` +
+            `(balance ₹${walletBalance.toFixed(2)} − minimum ₹${minimumWalletBalance.toFixed(2)}).`,
+          "warning",
+        );
+        return;
+      }
     }
     if (
       (paymentMethod === "Wallet" || (isMultiMode && walletUsed > 0)) &&

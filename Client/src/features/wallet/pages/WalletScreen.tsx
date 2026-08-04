@@ -9,6 +9,7 @@ import Swal from "sweetalert2";
 import {
   handleBulkWalletUpdate,
   handleCreateWallet,
+  handleGetWalletInstructions,
   handleGetWallets,
   handleUpdateWallet,
 } from "@/services/apiClient";
@@ -139,9 +140,30 @@ export default function WalletScreen() {
     }
   };
 
+  const fetchWalletInstructions = async () => {
+    try {
+      const response = await handleGetWalletInstructions();
+      const minimumBalance = Math.max(
+        0,
+        Number(
+          response?.minimumBalance ??
+            response?.instructions?.minimumBalance ??
+            0,
+        ) || 0,
+      );
+      setInstruction({ minimumBalance });
+    } catch {
+      // Keep local default (0) if instructions cannot be loaded
+    }
+  };
+
   useEffect(() => {
     void fetchWalletRows();
   }, [search]);
+
+  useEffect(() => {
+    void fetchWalletInstructions();
+  }, []);
 
   const handleSetInstruction = async () => {
     const result = await Swal.fire({
@@ -214,40 +236,45 @@ export default function WalletScreen() {
     if (!result.isConfirmed || !result.value) return;
 
     const { action, minimumBalance, bulkAmount, note } = result.value;
-   setInstruction({ minimumBalance });
 
-if (action === "set_minimum") {
-  try {
-    await handleBulkWalletUpdate({
-      type: "set_minimum",
-      amount: bulkAmount,
-        note,
-        minimumBalance,
-        createdBy: {
-          m_staff_id: staff.m_staff_id,
-          m_staff_name: staff.m_staff_name,
-          m_staff_email: staff.m_staff_email,
-        },
-    });
-// console.log("minimumBalance", minimumBalance); 
-    await fetchWalletRows();
+    if (action === "set_minimum") {
+      try {
+        const response = await handleBulkWalletUpdate({
+          type: "set_minimum",
+          amount: bulkAmount,
+          note,
+          minimumBalance,
+          createdBy: {
+            m_staff_id: staff.m_staff_id,
+            m_staff_name: staff.m_staff_name,
+            m_staff_email: staff.m_staff_email,
+          },
+        });
+        const savedMinimum = Math.max(
+          0,
+          Number(response?.minimumBalance ?? minimumBalance) || 0,
+        );
+        setInstruction({ minimumBalance: savedMinimum });
+        await fetchWalletRows();
 
-    await Swal.fire(
-      "Instruction Saved",
-      `Minimum balance set to ₹ ${minimumBalance.toLocaleString("en-IN")}.`,
-      "success",
-    );
-  } catch (error: any) {
-    await Swal.fire(
-      "Update failed",
-      error?.response?.data?.message ??
-        "Could not update minimum balance.",
-      "error",
-    );
-  }
+        await Swal.fire(
+          "Instruction Saved",
+          `Minimum balance set to ₹ ${savedMinimum.toLocaleString("en-IN")}.`,
+          "success",
+        );
+      } catch (error: any) {
+        await Swal.fire(
+          "Update failed",
+          error?.response?.data?.message ??
+            "Could not update minimum balance.",
+          "error",
+        );
+      }
 
-  return;
-}
+      return;
+    }
+
+    setInstruction({ minimumBalance });
 
     try {
       await handleBulkWalletUpdate({
