@@ -1551,6 +1551,8 @@ export type CatalogueLookupItem = {
   name: string;
   productName: string;
   sellingPrice: number;
+  /** Cost / buy price — used by Create Purchase Quick Select */
+  purchasePrice?: number;
   stockQty: number | null;
   trackStock: boolean;
   category: string;

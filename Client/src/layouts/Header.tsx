@@ -106,11 +106,11 @@ export default function Header({
             type="button"
             onClick={() => setIsPosOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 text-xs font-semibold md:px-4 md:py-2 md:text-sm"
-            aria-label="Quick Bill"
-            title="Quick Bill"
+            aria-label="POS Bill"
+            title="POS Bill"
           >
             <FilePlus2 size={16} />
-            <span className="hidden sm:inline">Quick Bill</span>
+            <span className="hidden sm:inline">POS BILL</span>
           </button>
         )}
         <button

@@ -1,11 +1,17 @@
-import { useMemo, useRef, useState, type HTMLInputTypeAttribute } from "react";
+import { useEffect, useMemo, useRef, useState, type HTMLInputTypeAttribute } from "react";
 import { Camera, X, UserRound, MapPin, Building2, Wallet, Contact2 } from "lucide-react";
 import { type CustomerPayload } from "@/services/apiClient";
 
 type Props = {
   onClose: () => void;
-  onSubmit: (args: { payload: CustomerPayload; profileImageFile?: File | null }) => Promise<void>;
+  onSubmit: (args: {
+    payload: CustomerPayload;
+    profileImageFile?: File | null;
+  }) => Promise<void>;
   loading: boolean;
+  /** Prefill for edit mode */
+  initialValues?: Partial<CustomerPayload> | null;
+  mode?: "create" | "edit";
 };
 
 type FormState = Required<Omit<CustomerPayload, "createdBy">>;
@@ -62,7 +68,7 @@ function InputField({
   );
 }
 
-const initialState: FormState = {
+const emptyState: FormState = {
   name: "",
   mobile: "",
   email: "",
@@ -89,25 +95,77 @@ const initialState: FormState = {
   profileImage: "",
 };
 
-export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
-  const [form, setForm] = useState<FormState>(initialState);
+function formatDobForInput(value?: string | null): string {
+  if (!value) return "";
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function buildFormState(initial?: Partial<CustomerPayload> | null): FormState {
+  if (!initial) return { ...emptyState };
+  return {
+    ...emptyState,
+    name: String(initial.name ?? ""),
+    mobile: String(initial.mobile ?? ""),
+    email: String(initial.email ?? ""),
+    gstin: String(initial.gstin ?? ""),
+    companyName: String(initial.companyName ?? ""),
+    address: String(initial.address ?? ""),
+    pincode: String(initial.pincode ?? ""),
+    city: String(initial.city ?? ""),
+    state: String(initial.state ?? ""),
+    country: String(initial.country ?? "India") || "India",
+    membershipType: String(initial.membershipType ?? "general") || "general",
+    adharNumber: String(initial.adharNumber ?? ""),
+    dob: formatDobForInput(initial.dob),
+    gender: String(initial.gender ?? ""),
+    whatsappNumber: String(initial.whatsappNumber ?? ""),
+    AlternateMobile: String(initial.AlternateMobile ?? ""),
+    IFSCcode: String(initial.IFSCcode ?? ""),
+    bankName: String(initial.bankName ?? ""),
+    branchName: String(initial.branchName ?? ""),
+    accountNumber: String(initial.accountNumber ?? ""),
+    panNumber: String(initial.panNumber ?? ""),
+    accountHolderName: String(initial.accountHolderName ?? ""),
+    UPIID: String(initial.UPIID ?? ""),
+    profileImage: String(initial.profileImage ?? ""),
+  };
+}
+
+export default function AddVendorModal({
+  onClose,
+  onSubmit,
+  loading,
+  initialValues = null,
+  mode = "create",
+}: Props) {
+  const isEdit = mode === "edit";
+  const [form, setForm] = useState<FormState>(() => buildFormState(initialValues));
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  // Membership is not applicable for vendors; keep vendor modal focused.
+
+  useEffect(() => {
+    setForm(buildFormState(initialValues));
+    setProfileImageFile(null);
+    if (fileRef.current) fileRef.current.value = "";
+  }, [initialValues, mode]);
 
   const initials = useMemo(() => {
     const cleaned = String(form.name ?? "").trim();
-    if (!cleaned) return "C";
+    if (!cleaned) return "V";
     const parts = cleaned.split(/\s+/).filter(Boolean);
-    const first = parts[0]?.[0] ?? "C";
+    const first = parts[0]?.[0] ?? "V";
     const second = parts.length > 1 ? parts[parts.length - 1]?.[0] : "";
     return (first + second).toUpperCase();
   }, [form.name]);
 
   const previewUrl = useMemo(() => {
-    if (!profileImageFile) return "";
-    return URL.createObjectURL(profileImageFile);
-  }, [profileImageFile]);
+    if (profileImageFile) return URL.createObjectURL(profileImageFile);
+    return String(form.profileImage || "").trim();
+  }, [profileImageFile, form.profileImage]);
 
   const update = (key: FormKey, value: string) => {
     let nextValue = value;
@@ -141,16 +199,20 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm transition-opacity">
       <div className="relative flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/5 transition-all">
-
-        {/* Header */}
         <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
               <UserRound size={20} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Create New Vendor</h2>
-              <p className="text-sm text-slate-500">Add a new vendor to your database.</p>
+              <h2 className="text-lg font-bold text-slate-900">
+                {isEdit ? "Edit Vendor" : "Create New Vendor"}
+              </h2>
+              <p className="text-sm text-slate-500">
+                {isEdit
+                  ? "Update vendor details and save changes."
+                  : "Add a new vendor to your database."}
+              </p>
             </div>
           </div>
           <button
@@ -168,18 +230,19 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
           }}
           className="contents"
         >
-          {/* Form Body */}
           <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
             <div className="space-y-8">
-
-              {/* Profile Photo */}
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <div className="h-16 w-16 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 ring-2 ring-white shadow-sm">
                         {previewUrl ? (
-                          <img src={previewUrl} alt="Profile preview" className="h-full w-full object-cover" />
+                          <img
+                            src={previewUrl}
+                            alt="Profile preview"
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-lg font-semibold text-white">
                             {initials}
@@ -207,19 +270,22 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
                       />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-800">Profile photo</div>
+                      <div className="text-sm font-semibold text-slate-800">
+                        Profile photo
+                      </div>
                       <div className="text-sm text-slate-500">
                         Upload JPG/PNG/WebP (max 2MB).
                       </div>
                     </div>
                   </div>
 
-                  {profileImageFile && (
+                  {(profileImageFile || form.profileImage) && (
                     <button
                       type="button"
                       disabled={loading}
                       onClick={() => {
                         setProfileImageFile(null);
+                        update("profileImage", "");
                         if (fileRef.current) fileRef.current.value = "";
                       }}
                       className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
@@ -230,11 +296,12 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
                 </div>
               </section>
 
-              {/* Section 1: Basic Information */}
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <Contact2 size={18} className="text-slate-400" />
-                  <h3 className="text-base font-semibold text-slate-800">Contact Information</h3>
+                  <h3 className="text-base font-semibold text-slate-800">
+                    Contact Information
+                  </h3>
                 </div>
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                   <InputField label="Name" value={form.name} keyName="name" onValueChange={update} placeholder="Full name" required />
@@ -244,9 +311,10 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
                   <InputField label="WhatsApp Number" value={form.whatsappNumber} keyName="whatsappNumber" onValueChange={update} placeholder="WhatsApp number" maxLength={10} />
                   <InputField label="Alternate Mobile" value={form.AlternateMobile} keyName="AlternateMobile" onValueChange={update} placeholder="Backup contact" maxLength={10} />
                   <InputField label="Date of Birth" value={form.dob} keyName="dob" onValueChange={update} type="date" />
-
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Gender</label>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Gender
+                    </label>
                     <select
                       value={form.gender}
                       onChange={(e) => update("gender", e.target.value)}
@@ -261,11 +329,12 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
                 </div>
               </section>
 
-              {/* Section 2: Identity & Company */}
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <Building2 size={18} className="text-slate-400" />
-                  <h3 className="text-base font-semibold text-slate-800">Identity & Business</h3>
+                  <h3 className="text-base font-semibold text-slate-800">
+                    Identity & Business
+                  </h3>
                 </div>
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                   <InputField label="Pan Number" value={form.panNumber} keyName="panNumber" onValueChange={update} placeholder="PAN details" maxLength={10} />
@@ -274,11 +343,12 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
                 </div>
               </section>
 
-              {/* Section 3: Bank Details */}
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <Wallet size={18} className="text-slate-400" />
-                  <h3 className="text-base font-semibold text-slate-800">Bank Details</h3>
+                  <h3 className="text-base font-semibold text-slate-800">
+                    Bank Details
+                  </h3>
                 </div>
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                   <InputField label="Account Holder Name" value={form.accountHolderName} keyName="accountHolderName" onValueChange={update} placeholder="Name as per bank" />
@@ -290,11 +360,12 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
                 </div>
               </section>
 
-              {/* Section 4: Address */}
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center gap-2">
                   <MapPin size={18} className="text-slate-400" />
-                  <h3 className="text-base font-semibold text-slate-800">Location</h3>
+                  <h3 className="text-base font-semibold text-slate-800">
+                    Location
+                  </h3>
                 </div>
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                   <div className="md:col-span-2 lg:col-span-3">
@@ -306,11 +377,9 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
                   <InputField label="Country" value={form.country} keyName="country" onValueChange={update} placeholder="e.g. India" />
                 </div>
               </section>
-
             </div>
           </div>
 
-          {/* Footer */}
           <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-white px-6 py-5">
             <button
               type="button"
@@ -325,11 +394,16 @@ export default function AddVendorModal({ onClose, onSubmit, loading }: Props) {
               disabled={loading || !form.name.trim() || !form.mobile.trim()}
               className="flex items-center justify-center rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? "Saving..." : "Create Vendor"}
+              {loading
+                ? isEdit
+                  ? "Updating..."
+                  : "Saving..."
+                : isEdit
+                  ? "Update Vendor"
+                  : "Create Vendor"}
             </button>
           </div>
         </form>
-
       </div>
     </div>
   );

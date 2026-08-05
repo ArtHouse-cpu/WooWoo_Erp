@@ -153,6 +153,55 @@ export default function CreatePurchaseOrderScreen() {
     setDraftImage("");
   };
 
+  const addDirectItem = (item: Omit<InvoiceItem, "id">) => {
+    setItems((prev) => {
+      const existing = prev.find(
+        (row) =>
+          row.productName.toLowerCase() ===
+          String(item.productName || "").toLowerCase(),
+      );
+      if (existing) {
+        return prev.map((row) =>
+          row.id === existing.id
+            ? { ...row, qty: row.qty + Number(item.qty || 1) }
+            : row,
+        );
+      }
+      return [
+        ...prev,
+        {
+          id: prev.length + 1,
+          productName: item.productName,
+          qty: Number(item.qty || 1),
+          unitPrice: Number(item.unitPrice || 0),
+          discount: Number(item.discount || 0),
+          cashback: 0,
+          image: item.image || "",
+        },
+      ];
+    });
+  };
+
+  const updateItemQty = (id: number, newQty: number) => {
+    if (newQty <= 0) {
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      return;
+    }
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, qty: newQty } : item)),
+    );
+  };
+
+  const updateItemDiscount = (id: number, newDiscount: number) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, discount: Math.max(0, Number(newDiscount) || 0) }
+          : item,
+      ),
+    );
+  };
+
   const removeItem = (id: number) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
   };
@@ -399,6 +448,9 @@ export default function CreatePurchaseOrderScreen() {
           }}
           onAddItem={addItem}
           onRemoveItem={removeItem}
+          onUpdateItemQty={updateItemQty}
+          onUpdateItemDiscount={updateItemDiscount}
+          onAddDirectItem={addDirectItem}
         />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">

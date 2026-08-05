@@ -4,7 +4,7 @@ import {
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
-import { Eye, FileSpreadsheet, Trash2 } from "lucide-react";
+import { Eye, FileSpreadsheet, Trash2,SquarePen } from "lucide-react";
 import Swal from "sweetalert2";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -19,6 +19,7 @@ import {
   handleDeleteVendor,
   handleGetVendors,
   handleImportVendors,
+  handleUpdateVendor,
   type CustomerPayload,
   type VendorImportRow,
   type VendorPayload,
@@ -76,9 +77,38 @@ function toVendorPayload(payload: CustomerPayload): VendorPayload {
   };
 }
 
+function vendorToFormValues(vendor: VendorRow): Partial<CustomerPayload> {
+  return {
+    name: vendor.name ?? "",
+    mobile: vendor.mobile ?? "",
+    email: vendor.email ?? "",
+    gstin: vendor.gstin ?? "",
+    companyName: vendor.companyName ?? "",
+    address: String(vendor.address || vendor.billingAddress1 || "").trim(),
+    pincode: vendor.pincode ?? "",
+    city: vendor.city ?? "",
+    state: vendor.state ?? "",
+    country: vendor.country || "India",
+    adharNumber: vendor.adharNumber ?? "",
+    dob: vendor.dob ?? "",
+    gender: normalizeVendorGender(vendor.gender),
+    whatsappNumber: vendor.whatsappNumber ?? "",
+    AlternateMobile: vendor.AlternateMobile ?? "",
+    IFSCcode: vendor.IFSCcode ?? "",
+    bankName: vendor.bankName ?? "",
+    branchName: vendor.branchName ?? "",
+    accountNumber: vendor.accountNumber ?? "",
+    panNumber: vendor.panNumber ?? "",
+    accountHolderName: vendor.accountHolderName ?? "",
+    UPIID: vendor.UPIID ?? "",
+  };
+}
+
 export default function VendorScreen() {
   const [openCreateVendorModal, setOpenCreateVendorModal] = useState(false);
   const [creatingVendor, setCreatingVendor] = useState(false);
+  const [editingVendor, setEditingVendor] = useState<VendorRow | null>(null);
+  const [updatingVendor, setUpdatingVendor] = useState(false);
   const [openImportVendorModal, setOpenImportVendorModal] = useState(false);
   const [importingVendor, setImportingVendor] = useState(false);
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
@@ -135,6 +165,37 @@ export default function VendorScreen() {
       );
     } finally {
       setCreatingVendor(false);
+    }
+  };
+
+  const handleUpdateVendorSubmit = async ({
+    payload,
+  }: {
+    payload: CustomerPayload;
+    profileImageFile?: File | null;
+  }) => {
+    if (!editingVendor?._id) return;
+    try {
+      setUpdatingVendor(true);
+      await handleUpdateVendor(editingVendor._id, toVendorPayload(payload));
+      setEditingVendor(null);
+      await fetchVendors();
+      await Swal.fire({
+        title: "Updated",
+        text: "Vendor updated successfully.",
+        icon: "success",
+        timer: 1400,
+        showConfirmButton: false,
+      });
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      Swal.fire(
+        "Update failed",
+        err?.response?.data?.message ?? "Could not update vendor. Try again.",
+        "error",
+      );
+    } finally {
+      setUpdatingVendor(false);
     }
   };
 
@@ -320,45 +381,66 @@ export default function VendorScreen() {
         size: 90,
         enableSorting: false,
         Cell: ({ row }) => (
-          <Can permission={PERMISSIONS.VENDOR_DELETE}>
-            <button
-              type="button"
-              onClick={async () => {
-                const result = await Swal.fire({
-                  title: "Delete vendor?",
-                  text: "This action cannot be undone.",
-                  icon: "warning",
-                  showCancelButton: true,
-                  confirmButtonText: "Delete",
-                  confirmButtonColor: "#dc2626",
-                });
-                if (!result.isConfirmed) return;
-                try {
-                  await handleDeleteVendor(row.original._id);
-                  await fetchVendors();
-                  await Swal.fire({
-                    title: "Deleted",
-                    text: "Vendor removed.",
-                    icon: "success",
-                    timer: 1400,
-                    showConfirmButton: false,
+          <div className="flex items-center gap-2">
+            <Can permission={PERMISSIONS.VENDOR_UPDATE}>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenCreateVendorModal(false);
+                  setEditingVendor(row.original);
+                }}
+                className="rounded bg-blue-100 px-3 py-2 text-sm hover:bg-blue-200"
+                title="Edit Vendor"
+              >
+                <SquarePen color="blue" size={18} />
+              </button>
+            </Can>
+
+            <Can permission={PERMISSIONS.VENDOR_DELETE}>
+              <button
+                type="button"
+                onClick={async () => {
+                  const result = await Swal.fire({
+                    title: "Delete vendor?",
+                    text: "This action cannot be undone.",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonText: "Delete",
+                    confirmButtonColor: "#dc2626",
                   });
-                } catch (error: unknown) {
-                  const err = error as {
-                    response?: { data?: { message?: string } };
-                  };
-                  Swal.fire(
-                    "Error",
-                    err.response?.data?.message ?? "Failed to delete vendor.",
-                    "error",
-                  );
-                }
-              }}
-              className="rounded bg-red-100 px-3 py-2 text-sm hover:bg-red-200"
-            >
-              <Trash2 color="red" size={18} />
-            </button>
-          </Can>
+
+                  if (!result.isConfirmed) return;
+
+                  try {
+                    await handleDeleteVendor(row.original._id);
+                    await fetchVendors();
+
+                    await Swal.fire({
+                      title: "Deleted",
+                      text: "Vendor removed.",
+                      icon: "success",
+                      timer: 1400,
+                      showConfirmButton: false,
+                    });
+                  } catch (error: unknown) {
+                    const err = error as {
+                      response?: { data?: { message?: string } };
+                    };
+
+                    Swal.fire(
+                      "Error",
+                      err.response?.data?.message ?? "Failed to delete vendor.",
+                      "error",
+                    );
+                  }
+                }}
+                className="rounded bg-red-100 px-3 py-2 text-sm hover:bg-red-200"
+                title="Delete Vendor"
+              >
+                <Trash2 color="red" size={18} />
+              </button>
+            </Can>
+          </div>
         ),
       },
     ],
@@ -405,7 +487,10 @@ export default function VendorScreen() {
             <button
               type="button"
               className="rounded-lg bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-900"
-              onClick={() => setOpenCreateVendorModal(true)}
+              onClick={() => {
+                setEditingVendor(null);
+                setOpenCreateVendorModal(true);
+              }}
             >
               Create New Vendor
             </button>
@@ -417,9 +502,20 @@ export default function VendorScreen() {
 
       {openCreateVendorModal ? (
         <AddVendorModal
+          mode="create"
           onClose={() => setOpenCreateVendorModal(false)}
           onSubmit={handleCreateVendorSubmit}
           loading={creatingVendor}
+        />
+      ) : null}
+
+      {editingVendor ? (
+        <AddVendorModal
+          mode="edit"
+          initialValues={vendorToFormValues(editingVendor)}
+          onClose={() => setEditingVendor(null)}
+          onSubmit={handleUpdateVendorSubmit}
+          loading={updatingVendor}
         />
       ) : null}
 
