@@ -131,6 +131,9 @@ export type CreateInvoicePayload = {
   invoiceDate: string;
   dueDate: string;
   salesPersonName: string;
+  /** Name selected from Invoiced By master at checkout */
+  invoicedBy?: string;
+  invoicedById?: string | null;
   notes: string;
   items: CreateInvoiceItemPayload[];
   subTotal: number;
@@ -209,6 +212,50 @@ export const handleCreateInvoice = async (payload: CreateInvoicePayload) => {
     console.log("Error creating invoice:", error);
     throw error;
   }
+};
+
+export type InvoicedByRow = {
+  _id: string;
+  name: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const handleGetInvoicedBy = async (signal?: AbortSignal) => {
+  const response = await axiosInstance.get("/invoiceBy", { signal });
+  return response.data as {
+    success: boolean;
+    invoicedBy: InvoicedByRow[];
+    message?: string;
+  };
+};
+
+export const handleCreateInvoicedBy = async (payload: { name: string }) => {
+  const response = await axiosInstance.post("/invoiceBy", payload);
+  return response.data as {
+    success: boolean;
+    invoicedBy?: InvoicedByRow;
+    message?: string;
+  };
+};
+
+export const handleUpdateInvoicedBy = async (id: string, payload: { name: string }) => {
+  const response = await axiosInstance.patch(`/invoiceBy/${id}`, payload);
+  return response.data as {
+    success: boolean;
+    invoicedBy?: InvoicedByRow;
+    message?: string;
+  };
+};
+
+export const handleDeleteInvoicedBy = async (id: string) => {
+  const response = await axiosInstance.delete(`/invoiceBy/${id}`);
+  return response.data as {
+    success: boolean;
+    invoicedBy?: InvoicedByRow;
+    message?: string;
+  };
 };
 
 export const handleGetInvoices = async (
@@ -1530,16 +1577,71 @@ export const handleUpdateCsp = async (
   };
 };
 
-export const handleGetProducts = async (search = "", signal?: AbortSignal) => {
+export const handleGetProducts = async (
+  search = "",
+  signal?: AbortSignal,
+  type?: "product" | "service",
+) => {
   try {
     const response = await axiosInstance.get("/product", {
-      params: { search: search.trim() },
+      params: {
+        search: search.trim(),
+        ...(type ? { type } : {}),
+      },
       signal,
     });
-    // console.log(response.data);
     return response.data;
   } catch (error) {
     console.log("Error fetching products:", error);
+    throw error;
+  }
+};
+
+export const handleGetServices = async (search = "", signal?: AbortSignal) => {
+  try {
+    const response = await axiosInstance.get("/services", {
+      params: { search: search.trim() },
+      signal,
+    });
+    return response.data;
+  } catch (error) {
+    console.log("Error fetching services:", error);
+    throw error;
+  }
+};
+
+export const handleCreateService = async (formData: FormData) => {
+  try {
+    formData.set("type", "service");
+    const response = await axiosInstance.post("/services", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  } catch (error) {
+    console.log("Error creating service:", error);
+    throw error;
+  }
+};
+
+export const handleUpdateService = async (id: string, formData: FormData) => {
+  try {
+    formData.set("type", "service");
+    const response = await axiosInstance.patch(`/services/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  } catch (error) {
+    console.log("Error updating service:", error);
+    throw error;
+  }
+};
+
+export const handleDeleteService = async (id: string) => {
+  try {
+    const response = await axiosInstance.delete(`/services/${id}`);
+    return response.data;
+  } catch (error) {
+    console.log("Error deleting service:", error);
     throw error;
   }
 };

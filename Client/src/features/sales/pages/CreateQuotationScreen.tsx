@@ -196,7 +196,8 @@ export default function CreateQuotationScreen() {
         customerPhone: finalPhone,
         quotationDate,
         dueDate,
-        salesPersonName: salesPerson,
+        salesPersonName:
+          String(paymentPayload?.invoicedBy || "").trim() || salesPerson,
         notes: (paymentPayload?.notes || notes).trim(),
         items: items.map((item) => ({
           productName: item.productName,

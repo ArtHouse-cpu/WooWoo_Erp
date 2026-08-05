@@ -53,7 +53,7 @@ export default function ProductScreen() {
   const fetchData = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const prodRes = await handleGetProducts("", signal);
+      const prodRes = await handleGetProducts("", signal, "product");
       
       const productList = Array.isArray(prodRes?.products)
         ? prodRes.products

@@ -456,7 +456,11 @@ export default function CreatePosScreen({
         customerId: payment.customerId || customerId || undefined,
         invoiceDate: todayStr,
         dueDate: todayStr,
-        salesPersonName: staff.m_staff_name || "POS",
+        salesPersonName:
+          String(payment.invoicedBy || "").trim() || staff.m_staff_name || "POS",
+        invoicedBy:
+          String(payment.invoicedBy || "").trim() || staff.m_staff_name || "POS",
+        invoicedById: payment.invoicedById || null,
         notes: "POS Transaction",
         items: lineItems,
         subTotal,

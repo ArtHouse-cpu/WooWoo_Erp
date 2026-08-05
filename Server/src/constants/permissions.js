@@ -111,6 +111,9 @@ export const PERMISSIONS = Object.freeze({
   AFFILIATE_READ: 'affiliate.read',
   AFFILIATE_MANAGE: 'affiliate.manage',
   AFFILIATE_PAYOUT: 'affiliate.payout',
+
+  // INVOICEDBY_READ: 'invoicedby.read',
+  // INVOICEDBY_WRITE: 'invoicedby.write',
 });
 
 /** Flat list of every permission key (for seeding / validation). */
@@ -238,7 +241,6 @@ export const MENU_PERMISSION_MAP = Object.freeze({
   '/products': PERMISSIONS.PRODUCT_READ,
   '/create-new-product': PERMISSIONS.PRODUCT_CREATE,
   '/services': PERMISSIONS.SERVICE_READ,
-  '/create-new-service': PERMISSIONS.SERVICE_CREATE,
   '/spaces': PERMISSIONS.SPACE_READ,
   '/foods': PERMISSIONS.FOOD_READ,
   '/manage-plans': PERMISSIONS.MEMBERSHIP_PLAN_READ,

@@ -670,6 +670,8 @@ const createInvoice = async (req, res) => {
       membershipDiscount,
       activityType,
       membershipType,
+      invoicedBy,
+      invoicedById,
     } = req.body;
 
     console.log(req.body);
@@ -899,6 +901,11 @@ const createInvoice = async (req, res) => {
       invoiceDate: invoiceDateObj,
       dueDate: dueDateObj,
       salesPersonName: String(salesPersonName).trim(),
+      invoicedBy: String(invoicedBy ?? salesPersonName ?? '').trim(),
+      invoicedById:
+        invoicedById && mongoose.Types.ObjectId.isValid(String(invoicedById))
+          ? String(invoicedById)
+          : null,
       notes: String(notes ?? '').trim(),
       status: status === 'draft' ? 'draft' : 'final',
       items: enrichedItems,
@@ -1208,6 +1215,8 @@ const updateInvoice = async (req, res) => {
       coupon,
       newPayment,
       extraCharges,
+      invoicedBy,
+      invoicedById,
     } = req.body;
 
     const existingInvoice = await Invoice.findById(id);
@@ -1287,6 +1296,13 @@ const updateInvoice = async (req, res) => {
     if (invoiceDateObj !== undefined) updateData.invoiceDate = invoiceDateObj;
     if (dueDateObj !== undefined) updateData.dueDate = dueDateObj;
     if (salesPersonName !== undefined) updateData.salesPersonName = String(salesPersonName).trim();
+    if (invoicedBy !== undefined) updateData.invoicedBy = String(invoicedBy).trim();
+    if (invoicedById !== undefined) {
+      updateData.invoicedById =
+        invoicedById && mongoose.Types.ObjectId.isValid(String(invoicedById))
+          ? String(invoicedById)
+          : null;
+    }
     if (notes !== undefined) updateData.notes = String(notes).trim();
     if (normalizedItems !== undefined) updateData.items = normalizedItems;
     if (subTotal !== undefined) updateData.subTotal = Number(subTotal);

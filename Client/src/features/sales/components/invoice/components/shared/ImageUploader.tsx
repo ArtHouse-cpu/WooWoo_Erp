@@ -5,9 +5,15 @@ type Props = {
   files: File[];
   onFilesChange: (files: File[]) => void;
   disabled?: boolean;
+  label?: string;
 };
 
-export default function ImageUploader({ files, onFilesChange, disabled = false }: Props) {
+export default function ImageUploader({
+  files,
+  onFilesChange,
+  disabled = false,
+  label = "Images",
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const previews = useMemo(
@@ -27,7 +33,7 @@ export default function ImageUploader({ files, onFilesChange, disabled = false }
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium text-gray-700">Images</label>
+      <label className="block text-sm font-medium text-gray-700">{label}</label>
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {

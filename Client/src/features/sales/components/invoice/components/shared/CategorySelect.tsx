@@ -33,6 +33,10 @@ type Props = {
   categoryValue: string;
   /** Product stores category as name — used to resolve ID when editing */
   categoryName?: string;
+  /** Override category field label (default: Category *) */
+  categoryLabel?: string;
+  /** Hide shop/sub category dropdown */
+  hideSubCategory?: boolean;
   onCategoryChange: (categoryId: string, categoryName: string) => void;
   subCategoryValue?: string;
   /** Product stores shop/sub category as name — used to resolve ID when editing */
@@ -204,6 +208,8 @@ function SingleSelectCreatable({
 export default function CategorySelect({
   categoryValue,
   categoryName = "",
+  categoryLabel = "Category *",
+  hideSubCategory = false,
   onCategoryChange,
   subCategoryValue = "",
   subCategoryName = "",
@@ -464,9 +470,8 @@ export default function CategorySelect({
 
   return (
     <div className="space-y-4">
-      <span>
       <SingleSelectCreatable
-        label="Category *"
+        label={categoryLabel}
         value={categoryValue}
         options={categories}
         placeholder="Select category"
@@ -483,23 +488,26 @@ export default function CategorySelect({
         onDelete={deleteCategory}
       />
 
-      <SingleSelectCreatable
-        label="Shop Category *"
-        value={subCategoryValue}
-        options={subCategoriesBySelectedCategory}
-        placeholder={categoryValue ? "Select shop category" : "Select category first"}
-        disabled={disabled || !categoryValue}
-        canCreate={!!categoryValue}
-        isCreating={isCreatingSubCategory}
-        onChange={(id) => {
-          const name = subCategories.find((s) => s._id === id)?.name || "";
-          onSubCategoryChange?.(id, name);
-        }}
-        onCreate={createSubCategory}
-        onEdit={editSubCategory}
-        onDelete={deleteSubCategory}
-      />
-      </span>
+      {!hideSubCategory && (
+        <SingleSelectCreatable
+          label="Shop Category *"
+          value={subCategoryValue}
+          options={subCategoriesBySelectedCategory}
+          placeholder={
+            categoryValue ? "Select shop category" : "Select category first"
+          }
+          disabled={disabled || !categoryValue}
+          canCreate={!!categoryValue}
+          isCreating={isCreatingSubCategory}
+          onChange={(id) => {
+            const name = subCategories.find((s) => s._id === id)?.name || "";
+            onSubCategoryChange?.(id, name);
+          }}
+          onCreate={createSubCategory}
+          onEdit={editSubCategory}
+          onDelete={deleteSubCategory}
+        />
+      )}
     </div>
   );
 }

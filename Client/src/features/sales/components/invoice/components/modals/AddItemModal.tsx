@@ -77,10 +77,15 @@ type Props = {
   onSubmit: (formData: FormData) => Promise<void>;
   loading: boolean;
   initialData?: Partial<AddItemFormValues>;
+  /** Lock item type and hide the Product/Service toggle */
+  lockType?: "product" | "service";
+  /** Explicit create vs edit — controls modal title (preferred over inferring from initialData) */
+  mode?: "create" | "edit";
 };
 
 const buildDefaultValues = (
   initialData?: Partial<AddItemFormValues>,
+  lockType?: "product" | "service",
 ): AddItemFormValues => {
   const rawCspId = (initialData as any)?.cspEnrollmentId;
   const cspEnrollmentId =
@@ -89,17 +94,23 @@ const buildDefaultValues = (
       : String(rawCspId || "");
 
   return {
-    type: initialData?.type || "product",
+    type: lockType || initialData?.type || "product",
     productName: initialData?.productName || "",
     brandName: (initialData as any)?.brandName || "",
-    serviceName: initialData?.serviceName || "",
+    serviceName:
+      initialData?.serviceName ||
+      (lockType === "service" ? initialData?.productName || "" : "") ||
+      "",
     sellingPrice: Number(initialData?.sellingPrice || 0),
     purchasePrice: Number(initialData?.purchasePrice || 0),
     stockQty: Number(initialData?.stockQty || 0),
     stockStatus: initialData?.stockStatus || "in_stock",
     primaryUnit: initialData?.primaryUnit || "",
     itemCode: initialData?.itemCode || "",
-    barcode: initialData?.barcode || "",
+    barcode:
+      initialData?.barcode ||
+      String((initialData as any)?.barCode || "") ||
+      "",
     category: initialData?.category || "",
     categoryId: String((initialData as any)?.categoryId || ""),
     subCategory: initialData?.subCategory || "",
@@ -118,10 +129,26 @@ const buildDefaultValues = (
   };
 };
 
-export default function AddItemModal({ onClose, onSubmit, loading, initialData }: Props) {
+export default function AddItemModal({
+  onClose,
+  onSubmit,
+  loading,
+  initialData,
+  lockType,
+  mode,
+}: Props) {
+  const isEditMode =
+    mode === "edit" ||
+    (mode !== "create" &&
+      Boolean(
+        initialData &&
+          ((initialData as { _id?: string })._id ||
+            (initialData.productName && initialData.productName.trim()) ||
+            (initialData.serviceName && initialData.serviceName.trim())),
+      ));
   const methods = useForm<AddItemFormValues>({
     resolver: zodResolver(schema) as any,
-    defaultValues: buildDefaultValues(initialData),
+    defaultValues: buildDefaultValues(initialData, lockType),
   });
 
   const { handleSubmit, watch, formState, reset, setFocus, control } = methods;
@@ -133,9 +160,15 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
 
   // Re-apply saved product values when opening edit modal
   useEffect(() => {
-    if (!initialData) return;
-    reset(buildDefaultValues(initialData));
-  }, [initialData, reset]);
+    if (!initialData && !lockType) return;
+    reset(buildDefaultValues(initialData, lockType));
+  }, [initialData, lockType, reset]);
+
+  useEffect(() => {
+    if (lockType && itemType !== lockType) {
+      methods.setValue("type", lockType);
+    }
+  }, [lockType, itemType, methods]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -146,16 +179,38 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
 
   const variantInitial = editVariantIndex !== null ? watch("variants")[editVariantIndex] : null;
 
+  const modalTitle =
+    itemType === "service"
+      ? isEditMode
+        ? "Edit Services"
+        : "Create Services"
+      : isEditMode
+        ? "Edit Product"
+        : "Add New Product";
+
+  const modalSubtitle =
+    itemType === "service"
+      ? isEditMode
+        ? "Update service details and save changes."
+        : "Add a new service offering to your catalogue."
+      : isEditMode
+        ? "Update product details for your inventory."
+        : "Manage tangible product details for your inventory.";
+
   const submit = handleSubmit(async (values) => {
     if (loading) return;
+    const resolvedType = lockType || values.type;
     const payload = new FormData();
-    payload.append("type", values.type);
-    payload.append("productName", values.type === "product" ? values.productName : values.serviceName);
+    payload.append("type", resolvedType);
+    payload.append(
+      "productName",
+      resolvedType === "product" ? values.productName : values.serviceName,
+    );
     payload.append("brandName", values.brandName || "");
-    payload.append("serviceName", values.serviceName);
+    payload.append("serviceName", values.serviceName || values.productName || "");
     payload.append("sellingPrice", String(values.sellingPrice));
     payload.append("purchasePrice", String(values.purchasePrice));
-    payload.append("stockQty", String(values.type === "product" ? values.stockQty : 0));
+    payload.append("stockQty", String(resolvedType === "product" ? values.stockQty : 0));
     payload.append("stockStatus", values.stockStatus);
     payload.append("primaryUnit", values.primaryUnit);
     payload.append("itemCode", values.itemCode);
@@ -166,10 +221,13 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
     payload.append("discountType", values.discountType);
     payload.append("discountValue", String(values.discountValue));
     payload.append("variants", JSON.stringify(values.variants));
-    payload.append("isCsp", values.type === "product" && values.isCsp === "yes" ? "true" : "false");
+    payload.append(
+      "isCsp",
+      resolvedType === "product" && values.isCsp === "yes" ? "true" : "false",
+    );
     payload.append(
       "cspEnrollmentId",
-      values.type === "product" && values.isCsp === "yes"
+      resolvedType === "product" && values.isCsp === "yes"
         ? String(values.cspEnrollmentId || "")
         : "",
     );
@@ -177,9 +235,18 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
     await onSubmit(payload);
     reset();
     onClose();
-    Swal.fire("Saved", "Item created successfully.", "success");
+    Swal.fire(
+      "Saved",
+      resolvedType === "service"
+        ? isEditMode
+          ? "Service updated successfully."
+          : "Service created successfully."
+        : isEditMode
+          ? "Product updated successfully."
+          : "Product created successfully.",
+      "success",
+    );
   });
-  console.log("formState", formState);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 sm:p-6 backdrop-blur-sm transition-opacity">
@@ -193,10 +260,10 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
             </div>
             <div>
               <h2 className="text-xl font-semibold text-slate-900">
-                {initialData ? (itemType === "product" ? "Edit Product" : "Edit Service") : (itemType === "product" ? "Add New Product" : "Add New Service")}
+                {modalTitle}
               </h2>
               <p className="mt-0.5 text-sm text-slate-500">
-                {itemType === "product" ? "Manage tangible product details for your inventory." : "Manage service offering or digital product details."}
+                {modalSubtitle}
               </p>
             </div>
           </div>
@@ -217,6 +284,7 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
               <div className="space-y-8">
                 
                 {/* Type Selector */}
+                {!lockType && (
                 <div>
                   <label className="mb-3 block text-sm font-medium text-slate-700">Item Type</label>
                   <div className="inline-flex w-full rounded-xl bg-slate-100/80 p-1 ring-1 ring-slate-200/50 sm:w-auto">
@@ -246,6 +314,7 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
                     </button>
                   </div>
                 </div>
+                )}
 
                 {/* Dynamic Form Content */}
                 <div className="rounded-2xl border border-slate-100 bg-white/50">
@@ -306,9 +375,11 @@ export default function AddItemModal({ onClose, onSubmit, loading, initialData }
                     Saving...
                   </>
                 ) : itemType === "product" ? (
-                  "Save Product"
+                  isEditMode ? "Update Product" : "Save Product"
+                ) : isEditMode ? (
+                  "Update Services"
                 ) : (
-                  "Save Service"
+                  "Create Services"
                 )}
               </button>
             </div>

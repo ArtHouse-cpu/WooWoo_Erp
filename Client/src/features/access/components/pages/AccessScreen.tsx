@@ -12,16 +12,20 @@ import Can from "@/components/rbac/Can";
 import {
   handleAssignStaffRole,
   handleCreateAccessStaff,
+  handleCreateInvoicedBy,
   handleDeleteAccessStaff,
+  handleDeleteInvoicedBy,
   handleGetAccessRoles,
   handleGetAccessStaff,
+  handleGetInvoicedBy,
   handleUpdateAccessRole,
   handleUpdateAccessStaff,
   type AccessRole,
   type AccessStaffRow,
+  type InvoicedByRow,
 } from "@/services/apiClient";
 
-type TabKey = "staff" | "roles" | "mine";
+type TabKey = "staff" | "roles" | "mine" | "InvoicedBy";
 
 /**
  * Step 10 — Access Control management UI.
@@ -50,6 +54,10 @@ export default function AccessScreen() {
     password: "",
     roleId: "",
   });
+  const [invoicedByList, setInvoicedByList] = useState<InvoicedByRow[]>([]);
+  const [loadingInvoicedBy, setLoadingInvoicedBy] = useState(false);
+  const [creatingInvoicedBy, setCreatingInvoicedBy] = useState(false);
+  const [newInvoicedByName, setNewInvoicedByName] = useState("");
 
   const modules = useMemo(
     () => [...new Set(PERMISSION_CATALOG.map((p) => p.module))],
@@ -94,6 +102,95 @@ export default function AccessScreen() {
   useEffect(() => {
     void loadAll("");
   }, [loadAll]);
+
+  const loadInvoicedBy = useCallback(async (signal?: AbortSignal) => {
+    try {
+      setLoadingInvoicedBy(true);
+      const res = await handleGetInvoicedBy(signal);
+      const list = Array.isArray(res?.invoicedBy) ? res.invoicedBy : [];
+      setInvoicedByList(list.filter((row) => row?._id && row?.name));
+    } catch (error: unknown) {
+      if ((error as { name?: string })?.name === "CanceledError") return;
+      const err = error as { response?: { data?: { message?: string } } };
+      Swal.fire(
+        "Failed to load",
+        err?.response?.data?.message ?? "Could not load Invoiced By list.",
+        "error",
+      );
+      setInvoicedByList([]);
+    } finally {
+      setLoadingInvoicedBy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab !== "InvoicedBy") return;
+    const controller = new AbortController();
+    void loadInvoicedBy(controller.signal);
+    return () => controller.abort();
+  }, [tab, loadInvoicedBy]);
+
+  const handleCreateInvoicedByName = async () => {
+    const name = newInvoicedByName.trim();
+    if (!name) {
+      await Swal.fire("Name required", "Enter an Invoiced By name.", "warning");
+      return;
+    }
+    try {
+      setCreatingInvoicedBy(true);
+      const res = await handleCreateInvoicedBy({ name });
+      if (res?.invoicedBy?._id) {
+        setNewInvoicedByName("");
+        await loadInvoicedBy();
+        await Swal.fire({
+          title: "Created",
+          text: `"${res.invoicedBy.name}" added.`,
+          icon: "success",
+          timer: 1400,
+          showConfirmButton: false,
+        });
+      }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Create failed",
+        err?.response?.data?.message ?? "Could not create Invoiced By.",
+        "error",
+      );
+    } finally {
+      setCreatingInvoicedBy(false);
+    }
+  };
+
+  const handleDeleteInvoicedByRow = async (row: InvoicedByRow) => {
+    const result = await Swal.fire({
+      title: "Delete Invoiced By?",
+      text: `"${row.name}" will be removed from the list.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc2626",
+      confirmButtonText: "Delete",
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await handleDeleteInvoicedBy(row._id);
+      await loadInvoicedBy();
+      await Swal.fire({
+        title: "Deleted",
+        text: "Invoiced By removed.",
+        icon: "success",
+        timer: 1400,
+        showConfirmButton: false,
+      });
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Delete failed",
+        err?.response?.data?.message ?? "Could not delete Invoiced By.",
+        "error",
+      );
+    }
+  };
 
   useEffect(() => {
     if (!selectedRole) return;
@@ -439,6 +536,7 @@ export default function AccessScreen() {
         {(
           [
             { key: "staff", label: "Staff roles", icon: Users },
+            { key: "InvoicedBy", label: "Invoiced By", icon: Users },
             { key: "roles", label: "Role permissions", icon: Shield },
             { key: "mine", label: "My permissions", icon: Shield },
           ] as const
@@ -815,6 +913,120 @@ export default function AccessScreen() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {tab === "InvoicedBy" && (
+        <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">
+                Invoiced By
+              </h2>
+              <p className="text-sm text-gray-500">
+                Names shown at checkout. Create here; checkout only selects from
+                this list.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadInvoicedBy()}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {loadingInvoicedBy ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <RefreshCw size={16} />
+              )}
+              Refresh
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-2 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+            <div className="min-w-[220px] flex-1">
+              <label className="mb-1 block text-xs font-semibold text-blue-900">
+                New name
+              </label>
+              <input
+                value={newInvoicedByName}
+                onChange={(e) => setNewInvoicedByName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleCreateInvoicedByName();
+                  }
+                }}
+                placeholder="e.g. Front Desk / Rahul"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={creatingInvoicedBy}
+              onClick={() => void handleCreateInvoicedByName()}
+              className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-60"
+            >
+              {creatingInvoicedBy ? "Creating..." : "Create"}
+            </button>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    #
+                  </th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Name
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {loadingInvoicedBy && invoicedByList.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="px-4 py-8 text-center text-gray-500"
+                    >
+                      Loading...
+                    </td>
+                  </tr>
+                ) : invoicedByList.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={3}
+                      className="px-4 py-8 text-center text-gray-500"
+                    >
+                      No Invoiced By names yet. Create one above.
+                    </td>
+                  </tr>
+                ) : (
+                  invoicedByList.map((row, index) => (
+                    <tr key={row._id} className="hover:bg-gray-50/80">
+                      <td className="px-4 py-2.5 text-gray-500">{index + 1}</td>
+                      <td className="px-4 py-2.5 font-medium text-gray-900">
+                        {row.name}
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteInvoicedByRow(row)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -527,6 +527,8 @@ export default function CreateInvoiceScreen() {
     waiveMembershipForCoupon?: boolean;
     extraCharges: Array<{ label: string; amount: number }>;
     customerId?: string | null;
+    invoicedById?: string | null;
+    invoicedBy?: string;
   }) => {
     try {
       setSaving(true);
@@ -560,7 +562,9 @@ export default function CreateInvoiceScreen() {
           customerId: payment.customerId || customerId || undefined,
           invoiceDate,
           dueDate,
-          salesPersonName: salesPerson,
+          salesPersonName: payment.invoicedBy?.trim() || salesPerson,
+          invoicedBy: payment.invoicedBy?.trim() || salesPerson,
+          invoicedById: payment.invoicedById || null,
           notes: notes.trim(),
           items: lineItems,
           subTotal,
@@ -593,7 +597,9 @@ export default function CreateInvoiceScreen() {
           customerId: payment.customerId || customerId || undefined,
           invoiceDate,
           dueDate,
-          salesPersonName: salesPerson,
+          salesPersonName: payment.invoicedBy?.trim() || salesPerson,
+          invoicedBy: payment.invoicedBy?.trim() || salesPerson,
+          invoicedById: payment.invoicedById || null,
           notes: notes.trim(),
           items: lineItems,
           subTotal,

@@ -964,6 +964,8 @@ export default function CreateSubscriptionScreen({
       inviterName?: string;
       label?: string;
     } | null;
+    invoicedById?: string | null;
+    invoicedBy?: string;
   }) => {
     try {
       setSaving(true);
@@ -982,6 +984,8 @@ export default function CreateSubscriptionScreen({
       );
       const payload: CreateSubscriptionPayload = {
         ...buildPayload("active"),
+        salesPersonName:
+          String(payment.invoicedBy || "").trim() || salesPerson,
         discountTotal: appliedDiscountTotal,
         grandTotal: payableTotal,
         subscriptionCode: subscriptionNo,

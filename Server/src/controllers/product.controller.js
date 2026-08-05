@@ -664,19 +664,35 @@ export const uploadBulkProducts = async (req, res) => {
 
 export const getProducts = async (req, res) => {
   try {
-    const { search } = req.query;
-    let query = {};
+    const { search, type } = req.query;
+    const clauses = [];
+
+    // Optional type filter: product | service (omit = all)
+    const typeFilter = String(type || '').trim().toLowerCase();
+    if (typeFilter === 'product' || typeFilter === 'service') {
+      clauses.push({
+        $or: [{ type: typeFilter }, { itemType: typeFilter }],
+      });
+    }
 
     if (search) {
-      const searchRegex = new RegExp(search, 'i');
-      query = {
+      const searchRegex = new RegExp(String(search).trim(), 'i');
+      clauses.push({
         $or: [
           { productName: searchRegex },
+          { serviceName: searchRegex },
           { itemCode: searchRegex },
-          { barCode: searchRegex }
-        ]
-      };
+          { barCode: searchRegex },
+        ],
+      });
     }
+
+    const query =
+      clauses.length === 0
+        ? {}
+        : clauses.length === 1
+          ? clauses[0]
+          : { $and: clauses };
 
     const products = await Product.find(query).sort({ createdAt: -1 }).limit(6000);
     const productNames = products.map((p) => String(p.productName ?? '').trim()).filter(Boolean);

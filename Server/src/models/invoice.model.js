@@ -112,6 +112,17 @@ const invoiceSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    /** Display name selected at checkout (Invoiced By master). */
+    invoicedBy: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    invoicedById: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'InvoicedBy',
+      default: null,
+    },
     notes: {
       type: String,
       default: '',

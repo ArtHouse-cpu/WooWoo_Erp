@@ -8,7 +8,6 @@ import {
 import {authenticateUser} from '../middlewares/auth.middleware.js';
 import {
   attachStaffContext,
-  requirePermission,
   requireAnyPermission,
 } from '../middlewares/authorize.middleware.js';
 import {PERMISSIONS} from '../constants/permissions.js';
@@ -31,8 +30,32 @@ router.get(
   ),
   getCategories,
 );
-router.post('/', requirePermission(PERMISSIONS.CATEGORY_MANAGE), addCategories);
-router.patch('/', requirePermission(PERMISSIONS.CATEGORY_MANAGE), updateCategories);
-router.delete('/:id', requirePermission(PERMISSIONS.CATEGORY_MANAGE), deleteCategory);
+router.post(
+  '/',
+  requireAnyPermission(
+    PERMISSIONS.CATEGORY_MANAGE,
+    PERMISSIONS.PRODUCT_CREATE,
+    PERMISSIONS.SERVICE_CREATE,
+  ),
+  addCategories,
+);
+router.patch(
+  '/',
+  requireAnyPermission(
+    PERMISSIONS.CATEGORY_MANAGE,
+    PERMISSIONS.PRODUCT_UPDATE,
+    PERMISSIONS.SERVICE_UPDATE,
+  ),
+  updateCategories,
+);
+router.delete(
+  '/:id',
+  requireAnyPermission(
+    PERMISSIONS.CATEGORY_MANAGE,
+    PERMISSIONS.PRODUCT_DELETE,
+    PERMISSIONS.SERVICE_DELETE,
+  ),
+  deleteCategory,
+);
 
 export default router;

@@ -8,7 +8,6 @@ import { NotfoundScreen } from "@/features/common";
 import {
   CreateNewMembershipScreen,
   CreateNewProductScreen,
-  CreateNewServiceScreen,
   MembershipScreen,
   ProductScreen,
   ServiceScreen,
@@ -69,7 +68,6 @@ export const router = createBrowserRouter([
           { path: "services", element: <ServiceScreen /> },
           { path: "membership", element: <MembershipScreen /> },
           { path: "create-new-product", element: <CreateNewProductScreen /> },
-          { path: "create-new-service", element: <CreateNewServiceScreen /> },
           {
             path: "create-new-membership",
             element: <CreateNewMembershipScreen />,

@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.route.js';
 import invoiceRoutes from './routes/invoice.route.js';
 import customerRoutes from './routes/customer.route.js';
 import productRoutes from './routes/product.route.js';
+import serviceRoutes from './routes/service.route.js';
 import categoryRoutes from './routes/category.route.js';
 import subCategoryRoutes from './routes/subCategory.route.js';
 import quotationRoutes from './routes/quotation.route.js';
@@ -27,7 +28,8 @@ import couponRoutes from './routes/coupon.route.js';
 import companyRoutes from './routes/company.route.js';
 import affiliateRoutes from './routes/affiliate.route.js';
 import accessRoutes from './routes/access.route.js';
-import cspRouters from './routes/csp.route.js'
+import cspRouters from './routes/csp.route.js';
+import invoiceByRoutes from './routes/invoicedBy.router.js';
 import customerAuthRoutes from './modules/customer/routes/auth.routes.js';
 import {customerErrorHandler} from './modules/customer/middlewares/errorHandler.js';
 import path from 'path';
@@ -82,6 +84,7 @@ app.use('/invoice', invoiceRoutes);
 app.use('/quotation', quotationRoutes);
 app.use('/customer', customerRoutes);
 app.use('/product', productRoutes);
+app.use('/services', serviceRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/subCategories', subCategoryRoutes);
 app.use('/returnsales', returnsalesRoutes);
@@ -101,6 +104,8 @@ app.use('/coupon', couponRoutes);
 app.use('/company', companyRoutes);
 app.use('/affiliate', affiliateRoutes);
 app.use('/access', accessRoutes);
+
+app.use('/invoiceBy', invoiceByRoutes);
 
 //CSP APIs
 app.use('/csp', cspRouters);

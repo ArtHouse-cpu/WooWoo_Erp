@@ -28,6 +28,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { printThermalReceipt } from "@/utils/printUtils";
 import { summarizeMembershipForCart } from "../../../utils/membershipInvoiceUtils";
 import { creditWalletCashback } from "../../../utils/walletCashback";
+import InvoicedByModal from "./InvoicedByModal";
 
 type CheckoutItem = {
   id?: number;
@@ -97,6 +98,9 @@ type Props = {
     waiveMembershipForCoupon?: boolean;
     extraCharges: Array<{ label: string; amount: number }>;
     customerId?: string | null;
+    /** Selected from Invoiced By master at checkout */
+    invoicedById?: string | null;
+    invoicedBy?: string;
   }) => Promise<void>;
 };
 
@@ -361,6 +365,10 @@ export default function CheckoutModal({
   const [walletBalance, setWalletBalance] = useState(0);
   const [minimumWalletBalance, setMinimumWalletBalance] = useState(0);
   const [instructionNotes, setInstructionNotes] = useState("");
+  const [invoicedById, setInvoicedById] = useState("");
+  const [invoicedByName, setInvoicedByName] = useState("");
+  /** Checkout payment UI only after Invoiced By popup is confirmed */
+  const [invoicedByConfirmed, setInvoicedByConfirmed] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponLabel, setCouponLabel] = useState("");
@@ -463,6 +471,9 @@ export default function CheckoutModal({
       // Reset until wallet fetch completes for the prefilled customer
       setWalletBalance(0);
       setInstructionNotes("");
+      setInvoicedById("");
+      setInvoicedByName("");
+      setInvoicedByConfirmed(false);
       setCouponCode("");
       setCouponDiscount(0);
       setCouponLabel("");
@@ -1174,6 +1185,14 @@ export default function CheckoutModal({
       Swal.fire("Phone required", "Please enter customer mobile number.", "warning");
       return;
     }
+    if (!invoicedById.trim() || !invoicedByName.trim()) {
+      Swal.fire(
+        "Invoiced By required",
+        "Please select who this bill is invoiced by.",
+        "warning",
+      );
+      return;
+    }
     if (!items.length) {
       Swal.fire("No items", "Please add at least one item.", "warning");
       return;
@@ -1280,6 +1299,8 @@ export default function CheckoutModal({
       extraCharges: extraCharges,
       customerId:
         selectedCustomer?._id ?? initialCustomerId ?? null,
+      invoicedById: invoicedById || null,
+      invoicedBy: invoicedByName.trim(),
     };
     const payload = {
       customerName: customerName.trim(),
@@ -1287,7 +1308,9 @@ export default function CheckoutModal({
       customerId: selectedCustomer?._id ?? initialCustomerId ?? undefined,
       invoiceDate: today,
       dueDate: today,
-      salesPersonName: staff.m_staff_name ?? "POS Sales",
+      salesPersonName: invoicedByName.trim() || staff.m_staff_name || "POS Sales",
+      invoicedBy: invoicedByName.trim(),
+      invoicedById: invoicedById || null,
       notes: instructionNotes.trim(),
       items: items.map((item) => ({
         productName: item.name,
@@ -1392,6 +1415,22 @@ export default function CheckoutModal({
   };
 
   if (!open) return null;
+
+  if (!invoicedByConfirmed) {
+    return (
+      <InvoicedByModal
+        open
+        initialInvoicedById={invoicedById}
+        initialInvoicedByName={invoicedByName}
+        onClose={onClose}
+        onContinue={({ invoicedById: id, invoicedBy: name }) => {
+          setInvoicedById(id);
+          setInvoicedByName(name);
+          setInvoicedByConfirmed(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div
@@ -1920,6 +1959,24 @@ export default function CheckoutModal({
                   </div>
                 )}
               </SectionCard>
+
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
+                  Invoiced By
+                </div>
+                <div className="mt-0.5 flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-slate-800">
+                    {invoicedByName || "—"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setInvoicedByConfirmed(false)}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
 
               <div>
                 <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-400">Notes</label>
