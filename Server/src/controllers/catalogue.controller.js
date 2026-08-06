@@ -25,12 +25,15 @@ const parentMatchesSearch = (product, searchRegex) => {
 
 /**
  * Expand a product into catalogue rows.
- * - Parent row when parent fields match (or no search / no variants).
- * - Variant rows as "Parent - Variant" so billing can search/select by variant name.
+ * Products WITH variants → only variant rows as "Parent - Variant"
+ *   (browse + search), so staff must pick the exact variant for POS/Invoice/Purchase.
+ * Products WITHOUT variants → single parent row.
  */
 const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
   const parentName = String(product.productName ?? '').trim();
-  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const variants = Array.isArray(product.variants)
+    ? product.variants.filter((v) => String(v?.name ?? '').trim())
+    : [];
   const isCsp = Boolean(product.isCsp);
   const parentHit = parentMatchesSearch(product, searchRegex);
   const rows = [];
@@ -79,20 +82,18 @@ const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
     });
   };
 
-  // Empty search / browse: keep parent-only rows (avoid exploding the grid).
-  if (!searchRegex) {
-    pushParent();
+  // No variants → sellable as parent product only.
+  if (variants.length === 0) {
+    if (!searchRegex || parentHit) pushParent();
     return rows;
   }
 
-  // Parent matched → parent + all variants (so billing can pick B or C from A).
-  if (parentHit) {
-    pushParent();
+  // Has variants → never offer bare parent; staff must pick a named variant.
+  if (!searchRegex || parentHit) {
     variants.forEach(pushVariant);
     return rows;
   }
 
-  // Only variant name/barcode matched → show those variant rows.
   variants.filter((v) => variantMatchesSearch(v, searchRegex)).forEach(pushVariant);
   return rows;
 };
@@ -104,7 +105,7 @@ const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
 export const lookupCatalogueItems = async (req, res) => {
   try {
     const search = String(req.query.search ?? '').trim();
-    const limitPerType = Math.min(Number(req.query.limit ?? 25) || 25, 50);
+    const limitPerType = Math.min(Number(req.query.limit ?? 40) || 40, 80);
     const searchRegex = search ? new RegExp(escapeRegex(search), 'i') : null;
 
     const productSearch = searchRegex
@@ -143,8 +144,9 @@ export const lookupCatalogueItems = async (req, res) => {
         : {}),
     };
 
+    // Fetch extra product parents because variants expand into multiple rows.
     const [productDocsRaw, spaceDocs, foodDocs] = await Promise.all([
-      Product.find(productSearch).sort({createdAt: -1}).limit(limitPerType * 2).lean(),
+      Product.find(productSearch).sort({createdAt: -1}).limit(limitPerType * 3).lean(),
       Space.find(spaceFilter).sort({createdAt: -1}).limit(limitPerType).lean(),
       Food.find(foodFilter).sort({createdAt: -1}).limit(limitPerType).lean(),
     ]);

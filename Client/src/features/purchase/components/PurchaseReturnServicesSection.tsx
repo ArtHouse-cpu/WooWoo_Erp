@@ -63,15 +63,13 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
     const expanded: any[] = [];
 
     for (const product of filteredProducts) {
-      const variants = Array.isArray(product.variants) ? product.variants : [];
+      const variants = Array.isArray(product.variants)
+        ? product.variants.filter((v: any) => String(v?.name || "").trim())
+        : [];
       const parentName = String(product.productName || "").trim();
 
-      if (!term) {
-        expanded.push(product);
-        continue;
-      }
-
       const parentHit =
+        !term ||
         parentName.toLowerCase().includes(term) ||
         String(product.itemCode || "")
           .toLowerCase()
@@ -80,40 +78,32 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
           .toLowerCase()
           .includes(term);
 
-      if (parentHit) {
-        expanded.push(product);
-        for (const variant of variants) {
-          const variantName = String(variant?.name || "").trim();
-          if (!variantName) continue;
-          expanded.push({
-            ...product,
-            _id: `${product._id}::${variantName}`,
-            productName: `${parentName} - ${variantName}`,
-            sellingPrice: Number(
-              variant.sellingPrice ?? product.sellingPrice ?? 0,
-            ),
-            purchasePrice: Number(
-              variant.purchasePrice ?? product.purchasePrice ?? 0,
-            ),
-            variantName,
-          });
-        }
+      // No variants → keep parent product row.
+      if (variants.length === 0) {
+        if (parentHit) expanded.push(product);
         continue;
       }
 
-      for (const variant of variants) {
+      // Has variants → only named variant rows (Parent - Variant).
+      const variantsToShow =
+        !term || parentHit
+          ? variants
+          : variants.filter((variant: any) => {
+              const variantName = String(variant?.name || "").trim();
+              const barcode = String(variant?.barcode || "").trim();
+              return (
+                variantName.toLowerCase().includes(term) ||
+                barcode.toLowerCase().includes(term)
+              );
+            });
+
+      for (const variant of variantsToShow) {
         const variantName = String(variant?.name || "").trim();
-        const barcode = String(variant?.barcode || "").trim();
-        if (
-          !variantName.toLowerCase().includes(term) &&
-          !barcode.toLowerCase().includes(term)
-        ) {
-          continue;
-        }
+        if (!variantName) continue;
         expanded.push({
           ...product,
-          _id: `${product._id}::${variantName || "variant"}`,
-          productName: `${parentName} - ${variantName || "Variant"}`,
+          _id: `${product._id}::${variantName}`,
+          productName: `${parentName} - ${variantName}`,
           sellingPrice: Number(
             variant.sellingPrice ?? product.sellingPrice ?? 0,
           ),
@@ -121,6 +111,7 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
             variant.purchasePrice ?? product.purchasePrice ?? 0,
           ),
           variantName,
+          parentProductName: parentName,
         });
       }
     }
@@ -208,7 +199,9 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
                     >
                       <div className="font-medium text-gray-800">{p.productName}</div>
                       <div className="text-xs text-gray-500">
-                        ₹{p.sellingPrice} {p.stockQty ? `|Qty: ${p.stockQty}` : ""}
+                        ₹{p.sellingPrice}
+                        {p.stockQty ? ` | Qty: ${p.stockQty}` : ""}
+                        {p.variantName ? " · Variant" : ""}
                       </div>
                     </div>
                   ))}

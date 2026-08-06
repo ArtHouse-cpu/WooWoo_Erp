@@ -130,7 +130,7 @@ export default function ProductSidebar({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search items..."
+            placeholder="Search items or variants..."
             className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2 text-xs focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
           />
         </div>
@@ -227,6 +227,11 @@ export default function ProductSidebar({
                   </div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                     <CataloguePrice item={item} />
+                    {item.variantName ? (
+                      <span className="rounded bg-violet-50 px-1 py-0.5 text-[8px] font-extrabold uppercase tracking-wide text-violet-700 ring-1 ring-violet-100">
+                        Variant
+                      </span>
+                    ) : null}
                     {item.trackStock && item.stockQty != null && (
                       <span className={`text-[9px] font-bold ${item.stockQty <= 0 ? "text-red-500 bg-red-50 px-1 rounded" : "text-slate-400"}`}>
                         {item.stockQty <= 0 ? "OUT OF STOCK" : `Stock: ${item.stockQty}`}

@@ -265,7 +265,7 @@ export default function ProductsServicesSection({
               setDropdownOpen(true);
             }}
             onFocus={() => setDropdownOpen(true)}
-            placeholder="Search product, space, service, food..."
+            placeholder="Search product or variant..."
             className={inputStyle}
           />
           {dropdownOpen && (
@@ -311,6 +311,7 @@ export default function ProductsServicesSection({
                             {p.trackStock && p.stockQty != null
                               ? ` | Stock: ${p.stockQty}`
                               : ""}
+                            {p.variantName ? " · Variant" : ""}
                           </div>
                         </div>
                       </div>
@@ -488,9 +489,13 @@ export default function ProductsServicesSection({
                         </div>
                       )}
                       <span
-                        className={`absolute bottom-0.5 left-0.5 rounded px-1 text-[8px] font-bold uppercase tracking-wider shadow-sm ${badge.className}`}
+                        className={`absolute bottom-0.5 left-0.5 rounded px-1 text-[8px] font-bold uppercase tracking-wider shadow-sm ${
+                          item.variantName
+                            ? "bg-violet-50 text-violet-700"
+                            : badge.className
+                        }`}
                       >
-                        {badge.label}
+                        {item.variantName ? "Variant" : badge.label}
                       </span>
                     </div>
 

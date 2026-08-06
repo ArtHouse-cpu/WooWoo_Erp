@@ -382,7 +382,7 @@ export default function ProductsServicesSection({
               setDropdownOpen(true);
             }}
             onFocus={() => setDropdownOpen(true)}
-            placeholder="Search product, space, service, food..."
+            placeholder="Search product or variant..."
             className={inputStyle}
           />
           {dropdownOpen && (
@@ -410,14 +410,21 @@ export default function ProductsServicesSection({
                             {p.productName || p.name}
                           </div>
                           <span
-                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.className}`}
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                              p.variantName
+                                ? "bg-violet-50 text-violet-700"
+                                : badge.className
+                            }`}
                           >
-                            {badge.label}
+                            {p.variantName ? "Variant" : badge.label}
                           </span>
                         </div>
                         <div className="text-xs text-gray-500">
                           ₹{p.sellingPrice}
                           {stockLabel}
+                          {p.variantName
+                            ? ` · ${p.parentProductName || "Product"}`
+                            : ""}
                         </div>
                       </div>
                     );
@@ -591,9 +598,13 @@ export default function ProductsServicesSection({
                       
                       {/* Source badge overlay */}
                       <span
-                        className={`absolute bottom-0.5 left-0.5 rounded px-1 py-0.2 text-[8px] font-bold uppercase tracking-wider shadow-sm ${badge.className}`}
+                        className={`absolute bottom-0.5 left-0.5 rounded px-1 py-0.2 text-[8px] font-bold uppercase tracking-wider shadow-sm ${
+                          item.variantName
+                            ? "bg-violet-50 text-violet-700"
+                            : badge.className
+                        }`}
                       >
-                        {badge.label}
+                        {item.variantName ? "Variant" : badge.label}
                       </span>
                     </div>
 
