@@ -25,8 +25,7 @@ const parentMatchesSearch = (product, searchRegex) => {
 
 /**
  * Expand a product into catalogue rows.
- * Products WITH variants → only variant rows as "Parent - Variant"
- *   (browse + search), so staff must pick the exact variant for POS/Invoice/Purchase.
+ * Products WITH variants → only variant rows as "Parent - Variant".
  * Products WITHOUT variants → single parent row.
  */
 const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
@@ -82,13 +81,11 @@ const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
     });
   };
 
-  // No variants → sellable as parent product only.
   if (variants.length === 0) {
     if (!searchRegex || parentHit) pushParent();
     return rows;
   }
 
-  // Has variants → never offer bare parent; staff must pick a named variant.
   if (!searchRegex || parentHit) {
     variants.forEach(pushVariant);
     return rows;
@@ -98,17 +95,83 @@ const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
   return rows;
 };
 
+const mapService = (service) => {
+  const name = String(service.serviceName || service.productName || '').trim();
+  return {
+    _id: service._id,
+    sourceId: service._id,
+    sourceType: 'service',
+    name,
+    productName: name,
+    sellingPrice: Number(service.sellingPrice ?? 0),
+    purchasePrice: Number(service.purchasePrice ?? service.sellingPrice ?? 0),
+    stockQty: null,
+    trackStock: false,
+    category: service.category || 'Services',
+    lineCategory: 'service',
+    imageUrl: service.imageUrl || service.images?.[0] || null,
+    unit: service.primaryUnit || '',
+    discountType: service.discountType || 'flat',
+    discountValue: Number(service.discountValue ?? 0),
+  };
+};
+
+const mapSpace = (space) => ({
+  _id: space._id,
+  sourceId: space._id,
+  sourceType: 'space',
+  name: String(space.name ?? '').trim(),
+  productName: String(space.name ?? '').trim(),
+  sellingPrice: Number(space.price ?? 0),
+  stockQty: null,
+  trackStock: false,
+  category: space.category || 'Space',
+  lineCategory: 'space',
+  imageUrl: space.imageUrl || null,
+  unit: 'Hour',
+  status: space.status,
+  capacity: space.capacity,
+  discountType: 'flat',
+  discountValue: 0,
+});
+
+const mapFood = (food) => ({
+  _id: food._id,
+  sourceId: food._id,
+  sourceType: 'food',
+  name: String(food.name ?? '').trim(),
+  productName: String(food.name ?? '').trim(),
+  sellingPrice: Number(food.price ?? 0),
+  stockQty: null,
+  trackStock: false,
+  category: food.category || 'Food',
+  lineCategory: 'food',
+  imageUrl: food.imageUrl || null,
+  unit: food.unit || 'Plate',
+  isVeg: food.isVeg !== false,
+  status: food.status || 'Active',
+  discountType: 'flat',
+  discountValue: 0,
+});
+
 /**
  * Unified catalogue lookup across products, services, spaces, and foods.
- * GET /catalogue/lookup?search=
+ * GET /catalogue/lookup?search=&limit=&page=&sourceType=
+ *
+ * Paginate parent products (variants expand after). Default page size 48.
  */
 export const lookupCatalogueItems = async (req, res) => {
   try {
     const search = String(req.query.search ?? '').trim();
-    const limitPerType = Math.min(Number(req.query.limit ?? 40) || 40, 80);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 48, 1), 100);
+    const skip = (page - 1) * limit;
+    const sourceType = String(req.query.sourceType || 'all')
+      .trim()
+      .toLowerCase();
     const searchRegex = search ? new RegExp(escapeRegex(search), 'i') : null;
 
-    const productSearch = searchRegex
+    const textSearch = searchRegex
       ? {
           $or: [
             {productName: searchRegex},
@@ -119,7 +182,18 @@ export const lookupCatalogueItems = async (req, res) => {
             {'variants.barcode': searchRegex},
           ],
         }
-      : {};
+      : null;
+
+    const productFilter = {
+      type: {$ne: 'service'},
+      itemType: {$ne: 'service'},
+      ...(textSearch || {}),
+    };
+
+    const serviceFilter = {
+      $or: [{type: 'service'}, {itemType: 'service'}],
+      ...(textSearch || {}),
+    };
 
     const spaceFilter = searchRegex
       ? {
@@ -144,28 +218,88 @@ export const lookupCatalogueItems = async (req, res) => {
         : {}),
     };
 
-    // Fetch extra product parents because variants expand into multiple rows.
-    const [productDocsRaw, spaceDocs, foodDocs] = await Promise.all([
-      Product.find(productSearch).sort({createdAt: -1}).limit(limitPerType * 3).lean(),
-      Space.find(spaceFilter).sort({createdAt: -1}).limit(limitPerType).lean(),
-      Food.find(foodFilter).sort({createdAt: -1}).limit(limitPerType).lean(),
-    ]);
+    const wantProducts = sourceType === 'all' || sourceType === 'product';
+    const wantServices = sourceType === 'all' || sourceType === 'service';
+    const wantSpaces = sourceType === 'all' || sourceType === 'space';
+    const wantFoods = sourceType === 'all' || sourceType === 'food';
 
-    const productDocs = [];
-    const serviceDocs = [];
-    for (const doc of productDocsRaw) {
-      const isService = doc.itemType === 'service' || doc.type === 'service';
-      if (isService) {
-        if (serviceDocs.length < limitPerType) serviceDocs.push(doc);
-      } else if (productDocs.length < limitPerType) {
-        productDocs.push(doc);
-      }
+    // For "all", only page products; include other types on page 1 only.
+    const includeAuxOnThisPage = sourceType !== 'all' || page === 1;
+    const auxLimit = sourceType === 'all' ? Math.min(limit, 24) : limit;
+    const auxSkip = sourceType === 'all' ? 0 : skip;
+
+    const tasks = [];
+
+    if (wantProducts) {
+      tasks.push(
+        Product.countDocuments(productFilter),
+        Product.find(productFilter)
+          .sort({createdAt: -1})
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+      );
+    } else {
+      tasks.push(Promise.resolve(0), Promise.resolve([]));
     }
+
+    if (wantServices && includeAuxOnThisPage) {
+      tasks.push(
+        Product.countDocuments(serviceFilter),
+        Product.find(serviceFilter)
+          .sort({createdAt: -1})
+          .skip(auxSkip)
+          .limit(auxLimit)
+          .lean(),
+      );
+    } else {
+      tasks.push(Promise.resolve(0), Promise.resolve([]));
+    }
+
+    if (wantSpaces && includeAuxOnThisPage) {
+      tasks.push(
+        Space.countDocuments(spaceFilter),
+        Space.find(spaceFilter)
+          .sort({createdAt: -1})
+          .skip(auxSkip)
+          .limit(auxLimit)
+          .lean(),
+      );
+    } else {
+      tasks.push(Promise.resolve(0), Promise.resolve([]));
+    }
+
+    if (wantFoods && includeAuxOnThisPage) {
+      tasks.push(
+        Food.countDocuments(foodFilter),
+        Food.find(foodFilter)
+          .sort({createdAt: -1})
+          .skip(auxSkip)
+          .limit(auxLimit)
+          .lean(),
+      );
+    } else {
+      tasks.push(Promise.resolve(0), Promise.resolve([]));
+    }
+
+    const [
+      productTotal,
+      productDocs,
+      serviceTotal,
+      serviceDocs,
+      spaceTotal,
+      spaceDocs,
+      foodTotal,
+      foodDocs,
+    ] = await Promise.all(tasks);
 
     const productNames = productDocs
       .map((p) => String(p.productName ?? '').trim())
       .filter(Boolean);
-    const stockMap = await computeStockByProductNames({names: productNames});
+    const stockMap =
+      productNames.length > 0
+        ? await computeStockByProductNames({names: productNames})
+        : new Map();
 
     const products = productDocs.flatMap((product) => {
       const name = String(product.productName ?? '').trim();
@@ -173,71 +307,22 @@ export const lookupCatalogueItems = async (req, res) => {
       return expandProductCatalogueRows(product, searchRegex, stockQty);
     });
 
-    const services = serviceDocs.map((service) => {
-      const name = String(
-        service.serviceName || service.productName || '',
-      ).trim();
-      return {
-        _id: service._id,
-        sourceId: service._id,
-        sourceType: 'service',
-        name,
-        productName: name,
-        sellingPrice: Number(service.sellingPrice ?? 0),
-        purchasePrice: Number(service.purchasePrice ?? service.sellingPrice ?? 0),
-        stockQty: null,
-        trackStock: false,
-        category: service.category || 'Services',
-        lineCategory: 'service',
-        imageUrl: service.imageUrl || service.images?.[0] || null,
-        unit: service.primaryUnit || '',
-        discountType: service.discountType || 'flat',
-        discountValue: Number(service.discountValue ?? 0),
-      };
-    });
-
-    const spaces = spaceDocs.map((space) => ({
-      _id: space._id,
-      sourceId: space._id,
-      sourceType: 'space',
-      name: String(space.name ?? '').trim(),
-      productName: String(space.name ?? '').trim(),
-      sellingPrice: Number(space.price ?? 0),
-      stockQty: null,
-      trackStock: false,
-      category: space.category || 'Space',
-      lineCategory: 'space',
-      imageUrl: space.imageUrl || null,
-      unit: 'Hour',
-      status: space.status,
-      capacity: space.capacity,
-      discountType: 'flat',
-      discountValue: 0,
-    }));
-
-    // Restaurant foods are made to order — availability is status, not stock qty
-    const foods = foodDocs.map((food) => ({
-      _id: food._id,
-      sourceId: food._id,
-      sourceType: 'food',
-      name: String(food.name ?? '').trim(),
-      productName: String(food.name ?? '').trim(),
-      sellingPrice: Number(food.price ?? 0),
-      stockQty: null,
-      trackStock: false,
-      category: food.category || 'Food',
-      lineCategory: 'food',
-      imageUrl: food.imageUrl || null,
-      unit: food.unit || 'Plate',
-      isVeg: food.isVeg !== false,
-      status: food.status || 'Active',
-      discountType: 'flat',
-      discountValue: 0,
-    }));
+    const services = serviceDocs.map(mapService);
+    const spaces = spaceDocs.map(mapSpace);
+    const foods = foodDocs.map(mapFood);
 
     const items = [...products, ...services, ...spaces, ...foods].sort((a, b) =>
       String(a.name).localeCompare(String(b.name)),
     );
+
+    // hasMore tracks the primary paginated collection for the active tab.
+    let primaryTotal = productTotal;
+    if (sourceType === 'service') primaryTotal = serviceTotal;
+    else if (sourceType === 'space') primaryTotal = spaceTotal;
+    else if (sourceType === 'food') primaryTotal = foodTotal;
+    else if (sourceType === 'all') primaryTotal = productTotal;
+
+    const hasMore = skip + limit < primaryTotal;
 
     return res.status(200).json({
       success: true,
@@ -249,6 +334,14 @@ export const lookupCatalogueItems = async (req, res) => {
         space: spaces.length,
         food: foods.length,
         total: items.length,
+      },
+      pagination: {
+        page,
+        limit,
+        skip,
+        hasMore,
+        total: primaryTotal,
+        sourceType,
       },
     });
   } catch (error) {

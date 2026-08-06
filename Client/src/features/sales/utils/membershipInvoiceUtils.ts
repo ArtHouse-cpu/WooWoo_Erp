@@ -87,6 +87,41 @@ export function resolveMembershipPlan(
   return fuzzy;
 }
 
+function isFoodCategory(category: string) {
+  const lower = String(category || "").trim().toLowerCase();
+  return ["food", "foods", "meal", "restaurant", "canteen"].some(
+    (g) => lower === g || lower.startsWith(`${g} `) || lower.endsWith(` ${g}`),
+  );
+}
+
+function isSpaceCategory(category: string) {
+  const lower = String(category || "").trim().toLowerCase();
+  return ["space", "spaces", "booking", "room"].some(
+    (g) => lower === g || lower.startsWith(`${g} `) || lower.endsWith(` ${g}`),
+  );
+}
+
+function isServiceCategory(category: string) {
+  const lower = String(category || "").trim().toLowerCase();
+  return ["service", "services"].some(
+    (g) => lower === g || lower.startsWith(`${g} `) || lower.endsWith(` ${g}`),
+  );
+}
+
+/**
+ * Map a line-item category to the membership usageLimits bucket.
+ * Catalogue products often store a custom category (Electronics, Art, …) —
+ * those must still use the Products cashback/discount row (not be skipped).
+ */
+export function canonicalBenefitCategory(category: string): string {
+  const raw = String(category ?? "").trim();
+  if (isFoodCategory(raw)) return "Food";
+  if (isSpaceCategory(raw)) return "Space";
+  if (isServiceCategory(raw)) return "Services";
+  // product / general / empty / any other catalogue category → Products
+  return "Products";
+}
+
 export function getUsageLimitForCategory(
   usageLimits:
     | Record<string, UsageLimit>
@@ -97,21 +132,13 @@ export function getUsageLimitForCategory(
   const limits = normalizeUsageLimits(usageLimits);
   if (!Object.keys(limits).length) return undefined;
 
-  const cat = String(category ?? "General").trim();
+  // Map catalogue / line categories → Food | Space | Services | Products
+  const cat = canonicalBenefitCategory(category);
   if (limits[cat]) return limits[cat];
 
   const lower = cat.toLowerCase();
   const exact = Object.keys(limits).find((k) => k.toLowerCase() === lower);
   if (exact) return limits[exact];
-
-  // Invoice/POS default line category "General" (and empty) = catalogue Products benefits
-  const isDefaultProductCategory =
-    !lower ||
-    lower === "general" ||
-    lower === "catalogue" ||
-    lower === "store" ||
-    lower === "product" ||
-    lower === "products";
 
   // Fuzzy match: Food / Space / Products / Services / Store line categories
   const aliasGroups: string[][] = [
@@ -145,7 +172,8 @@ export function getUsageLimitForCategory(
     if (key) return limits[key];
   }
 
-  if (isDefaultProductCategory) {
+  // Anything that canonicalized to Products (incl. custom catalogue categories)
+  if (cat === "Products") {
     const productsKey = Object.keys(limits).find((k) => {
       const nk = k.toLowerCase();
       return nk === "products" || nk === "product" || nk.includes("store");
@@ -154,38 +182,6 @@ export function getUsageLimitForCategory(
   }
 
   return undefined;
-}
-
-function isFoodCategory(category: string) {
-  const lower = String(category || "").trim().toLowerCase();
-  return ["food", "foods", "meal", "restaurant", "canteen"].some((g) =>
-    lower.includes(g),
-  );
-}
-
-function isSpaceCategory(category: string) {
-  const lower = String(category || "").trim().toLowerCase();
-  return ["space", "spaces", "booking", "room"].some((g) => lower.includes(g));
-}
-
-function isProductCategory(category: string) {
-  const lower = String(category || "").trim().toLowerCase();
-  // "General" is the invoice/POS default for catalogue products
-  if (!lower || lower === "general" || lower === "catalogue") return true;
-  return [
-    "product",
-    "products",
-    "store",
-    "supply",
-    "sheets",
-    "stationary",
-    "stationery",
-  ].some((g) => lower === g || lower.includes(g));
-}
-
-function isServiceCategory(category: string) {
-  const lower = String(category || "").trim().toLowerCase();
-  return ["service", "services"].some((g) => lower === g || lower.includes(g));
 }
 
 function findLimitRow(
@@ -205,7 +201,7 @@ function findLimitRow(
 /**
  * Resolve discount % and cashback % for a line from the subscribed membership plan.
  * Category usageLimits (Food / Space / Products / Services) are the source of truth.
- * customerDisplay.cashbackPercent is the Food badge only — never apply it to Products.
+ * customerDisplay.cashbackPercent is the Food badge; storeCashbackPercent is Products.
  */
 export function resolveBenefitPercents(
   category: string,
@@ -213,7 +209,8 @@ export function resolveBenefitPercents(
 ): { discountPercent: number; cashbackPercent: number } {
   if (!plan) return { discountPercent: 0, cashbackPercent: 0 };
 
-  const limit = getUsageLimitForCategory(plan.usageLimits, category);
+  const benefitCategory = canonicalBenefitCategory(category);
+  const limit = getUsageLimitForCategory(plan.usageLimits, benefitCategory);
   let discountPercent = Number(limit?.discount ?? 0) || 0;
   let cashbackPercent = Number(limit?.cashback ?? 0) || 0;
 
@@ -221,13 +218,13 @@ export function resolveBenefitPercents(
   if (discountPercent <= 0 || cashbackPercent <= 0) {
     const limits = normalizeUsageLimits(plan.usageLimits);
     let row: UsageLimit | undefined;
-    if (isFoodCategory(category)) {
+    if (benefitCategory === "Food") {
       row = findLimitRow(limits, ["food", "foods"]);
-    } else if (isSpaceCategory(category)) {
+    } else if (benefitCategory === "Space") {
       row = findLimitRow(limits, ["space", "spaces"]);
-    } else if (isServiceCategory(category)) {
+    } else if (benefitCategory === "Services") {
       row = findLimitRow(limits, ["services", "service"]);
-    } else if (isProductCategory(category)) {
+    } else {
       row = findLimitRow(limits, ["products", "product", "store"]);
     }
     if (row) {
@@ -240,20 +237,28 @@ export function resolveBenefitPercents(
     }
   }
 
-  const display = plan.customerDisplay;
+  const display = plan.customerDisplay as
+    | (NonNullable<MembershipPlanPayload["customerDisplay"]> & {
+        storeCashbackPercent?: number;
+      })
+    | undefined;
   if (display) {
     if (discountPercent <= 0) {
-      if (isFoodCategory(category)) {
+      if (benefitCategory === "Food") {
         discountPercent = Number(display.foodDiscountPercent ?? 0) || 0;
-      } else if (isSpaceCategory(category)) {
+      } else if (benefitCategory === "Space") {
         discountPercent = Number(display.spaceDiscountPercent ?? 0) || 0;
-      } else if (isProductCategory(category)) {
+      } else if (benefitCategory === "Products") {
         discountPercent = Number(display.storeDiscountPercent ?? 0) || 0;
       }
     }
-    // customerDisplay.cashbackPercent mirrors Food usage cashback only
-    if (cashbackPercent <= 0 && isFoodCategory(category)) {
-      cashbackPercent = Number(display.cashbackPercent ?? 0) || 0;
+    if (cashbackPercent <= 0) {
+      if (benefitCategory === "Food") {
+        cashbackPercent = Number(display.cashbackPercent ?? 0) || 0;
+      } else if (benefitCategory === "Products") {
+        // Mirror of storeDiscountPercent — Products cashback display fallback
+        cashbackPercent = Number(display.storeCashbackPercent ?? 0) || 0;
+      }
     }
   }
 

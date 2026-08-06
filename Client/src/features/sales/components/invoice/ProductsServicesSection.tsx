@@ -102,7 +102,10 @@ export default function ProductsServicesSection({
       try {
         setLoadingGrid(true);
         const term = draft.name.trim();
-        const response = await handleCatalogueLookup(term, controller.signal);
+        const response = await handleCatalogueLookup(term, controller.signal, {
+          page: 1,
+          limit: 48,
+        });
         setGridItems(Array.isArray(response?.items) ? response.items : []);
       } catch (error) {
         if (!isAbortError(error)) setGridItems([]);
@@ -219,7 +222,10 @@ export default function ProductsServicesSection({
   const fetchCatalogue = async (searchText = "", signal?: AbortSignal) => {
     try {
       setLoadingProducts(true);
-      const response = await handleCatalogueLookup(searchText, signal);
+      const response = await handleCatalogueLookup(searchText, signal, {
+        page: 1,
+        limit: 48,
+      });
       setCatalogueItems(Array.isArray(response?.items) ? response.items : []);
     } catch (error) {
       if (!isAbortError(error)) setCatalogueItems([]);

@@ -844,8 +844,36 @@ export default function CreateInvoiceScreen() {
             membershipPlanId={membershipPlanId}
             onDraftChange={(field, value) => {
               if (field === "name") setDraftName(value);
-              if (field === "qty") setDraftQty(value);
-              if (field === "price") setDraftPrice(value);
+              if (field === "qty") {
+                setDraftQty(value);
+                if (!draftIsCsp && draftCategory) {
+                  const benefits = getMembershipBenefitsForItem(
+                    Number(draftPrice),
+                    Number(value),
+                    draftCategory,
+                    membership,
+                    membershipPlanId,
+                    false,
+                  );
+                  if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
+                  setDraftCashback(String(benefits.cashback));
+                }
+              }
+              if (field === "price") {
+                setDraftPrice(value);
+                if (!draftIsCsp && draftCategory) {
+                  const benefits = getMembershipBenefitsForItem(
+                    Number(value),
+                    Number(draftQty),
+                    draftCategory,
+                    membership,
+                    membershipPlanId,
+                    false,
+                  );
+                  if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
+                  setDraftCashback(String(benefits.cashback));
+                }
+              }
               if (field === "discount") setDraftDiscount(value);
               if (field === "image") setDraftImage(value);
               if (field === "isCsp") {
@@ -857,11 +885,19 @@ export default function CreateInvoiceScreen() {
               }
               if (field === "category") {
                 setDraftCategory(value);
-                // Re-calculate membership discount when category is selected (not for CSP)
+                // Re-calculate membership benefits when category is selected (not for CSP)
                 if (!draftIsCsp) {
-                  const benefits = getMembershipBenefitsForItem(Number(draftPrice), Number(draftQty), value, membership, membershipPlanId, false);
+                  const benefits = getMembershipBenefitsForItem(
+                    Number(draftPrice),
+                    Number(draftQty),
+                    value,
+                    membership,
+                    membershipPlanId,
+                    false,
+                  );
                   if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
-                  if (benefits.cashback > 0) setDraftCashback(String(benefits.cashback));
+                  // Always set cashback (including 0) so stale values don't stick
+                  setDraftCashback(String(benefits.cashback));
                 } else {
                   setDraftCashback("0");
                 }

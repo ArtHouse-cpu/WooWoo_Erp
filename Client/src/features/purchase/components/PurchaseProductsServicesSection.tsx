@@ -112,7 +112,10 @@ export default function ProductsServicesSection({
       try {
         setLoadingGrid(true);
         const term = draft.name.trim();
-        const response = await handleCatalogueLookup(term, controller.signal);
+        const response = await handleCatalogueLookup(term, controller.signal, {
+          page: 1,
+          limit: 48,
+        });
         setGridItems(Array.isArray(response?.items) ? response.items : []);
       } catch (error) {
         if (!isAbortError(error)) setGridItems([]);
@@ -137,12 +140,10 @@ export default function ProductsServicesSection({
         const response = await handleCatalogueLookup(
           draft.name.trim(),
           controller.signal,
+          { page: 1, limit: 48, sourceType: "product" },
         );
         const list = Array.isArray(response?.items) ? response.items : [];
-        // Purchase dropdown defaults to products (cost price)
-        setCatalogueItems(
-          list.filter((item) => item.sourceType === "product"),
-        );
+        setCatalogueItems(list);
       } catch (error) {
         if (!isAbortError(error)) setCatalogueItems([]);
       } finally {

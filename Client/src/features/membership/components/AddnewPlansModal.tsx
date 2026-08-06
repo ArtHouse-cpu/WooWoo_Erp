@@ -46,6 +46,8 @@ type PlanFormState = Required<
       | "rose";
     iconKey: "user" | "star" | "graduation" | "crown";
     cashbackPercent: number;
+    /** Products usage cashback % (billing fallback, like storeDiscountPercent) */
+    storeCashbackPercent: number;
     storeDiscountPercent: number;
     spaceDiscountPercent: number;
     foodDiscountPercent: number;
@@ -132,6 +134,7 @@ const initialState: PlanFormState = {
     themeKey: "blue",
     iconKey: "user",
     cashbackPercent: 0,
+    storeCashbackPercent: 0,
     storeDiscountPercent: 0,
     spaceDiscountPercent: 0,
     foodDiscountPercent: 0,
@@ -255,6 +258,12 @@ export default function AddnewPlansModal({
           themeKey: (initialPlan.customerDisplay?.themeKey ?? prev.customerDisplay.themeKey) as PlanFormState["customerDisplay"]["themeKey"],
           iconKey: (initialPlan.customerDisplay?.iconKey ?? prev.customerDisplay.iconKey) as PlanFormState["customerDisplay"]["iconKey"],
           cashbackPercent: Number(initialPlan.customerDisplay?.cashbackPercent ?? prev.customerDisplay.cashbackPercent),
+          storeCashbackPercent: Number(
+            (initialPlan.customerDisplay as { storeCashbackPercent?: number } | undefined)
+              ?.storeCashbackPercent ??
+              (initialPlan.usageLimits as UsageLimits | undefined)?.Products?.cashback ??
+              prev.customerDisplay.storeCashbackPercent,
+          ),
           storeDiscountPercent: Number(initialPlan.customerDisplay?.storeDiscountPercent ?? prev.customerDisplay.storeDiscountPercent),
           spaceDiscountPercent: Number(
             initialPlan.customerDisplay?.spaceDiscountPercent ??
@@ -345,8 +354,13 @@ export default function AddnewPlansModal({
           customerDisplay.storeDiscountPercent = next;
         }
       }
-      if (field === "cashback" && key.toLowerCase() === "food") {
-        customerDisplay.cashbackPercent = next;
+      if (field === "cashback") {
+        if (key.toLowerCase() === "food") {
+          customerDisplay.cashbackPercent = next;
+        }
+        if (key.toLowerCase() === "products" || key.toLowerCase() === "product") {
+          customerDisplay.storeCashbackPercent = next;
+        }
       }
       return { ...prev, usageLimits, customerDisplay };
     });
@@ -431,13 +445,20 @@ export default function AddnewPlansModal({
         const n = k.toLowerCase();
         return n === "product" || n === "products" || n.includes("store");
       })?.[1];
-    const servicesLimit =
-      usageLimits.Services ||
-      usageLimits.Service ||
-      usageLimits.services ||
-      Object.entries(usageLimits).find(([k]) =>
-        k.toLowerCase().includes("service"),
-      )?.[1];
+
+    // Keep usageLimits.Products in sync with store display fields (discount + cashback)
+    const storeDiscount =
+      Number(
+        productsLimit?.discount ?? form.customerDisplay.storeDiscountPercent,
+      ) || 0;
+    const storeCashback =
+      Number(
+        productsLimit?.cashback ?? form.customerDisplay.storeCashbackPercent,
+      ) || 0;
+    usageLimits.Products = {
+      discount: storeDiscount,
+      cashback: storeCashback,
+    };
 
     await onSubmit({
       planId: form.planId.trim(),
@@ -472,12 +493,15 @@ export default function AddnewPlansModal({
           Number(
             productsLimit?.discount ?? form.customerDisplay.storeDiscountPercent,
           ) || 0,
+        /** Products cashback — separate from Food badge cashbackPercent */
+        storeCashbackPercent:
+          Number(
+            productsLimit?.cashback ?? form.customerDisplay.storeCashbackPercent,
+          ) || 0,
+        // Food-only display badge (do not fall through to Products/Services)
         cashbackPercent:
           Number(
-            foodLimit?.cashback ??
-              productsLimit?.cashback ??
-              servicesLimit?.cashback ??
-              form.customerDisplay.cashbackPercent,
+            foodLimit?.cashback ?? form.customerDisplay.cashbackPercent,
           ) || 0,
         // Membership TYPE name for Invoice/POS badges — not billing period (Yearly/Monthly)
         badgeLabel:
@@ -950,6 +974,31 @@ export default function AddnewPlansModal({
                     placeholder="5"
                   />
                   <InputField
+                    label="Store / Products Cashback (%)"
+                    value={String(form.customerDisplay.storeCashbackPercent)}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        customerDisplay: {
+                          ...p.customerDisplay,
+                          storeCashbackPercent: Math.max(0, Number(v || 0)),
+                        },
+                        usageLimits: {
+                          ...p.usageLimits,
+                          Products: {
+                            ...(p.usageLimits.Products || {
+                              discount: 0,
+                              cashback: 0,
+                            }),
+                            cashback: Math.max(0, Number(v || 0)),
+                          },
+                        },
+                      }))
+                    }
+                    type="number"
+                    placeholder="2"
+                  />
+                  <InputField
                     label="Food Discount (%)"
                     value={String(form.customerDisplay.foodDiscountPercent)}
                     onChange={(v) =>
@@ -1000,7 +1049,7 @@ export default function AddnewPlansModal({
                     placeholder="10"
                   />
                   <InputField
-                    label="Cashback (%) — display badge"
+                    label="Food Cashback (%) — display badge"
                     value={String(form.customerDisplay.cashbackPercent)}
                     onChange={(v) =>
                       setForm((p) => ({
@@ -1008,6 +1057,16 @@ export default function AddnewPlansModal({
                         customerDisplay: {
                           ...p.customerDisplay,
                           cashbackPercent: Math.max(0, Number(v || 0)),
+                        },
+                        usageLimits: {
+                          ...p.usageLimits,
+                          Food: {
+                            ...(p.usageLimits.Food || {
+                              discount: 0,
+                              cashback: 0,
+                            }),
+                            cashback: Math.max(0, Number(v || 0)),
+                          },
                         },
                       }))
                     }

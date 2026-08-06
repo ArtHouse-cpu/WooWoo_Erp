@@ -661,7 +661,10 @@ export default function CreatePosScreen({
     (async () => {
       try {
         setLoadingProducts(true);
-        const response = await handleCatalogueLookup(term, controller.signal);
+        const response = await handleCatalogueLookup(term, controller.signal, {
+          page: 1,
+          limit: 48,
+        });
         setProducts(Array.isArray(response?.items) ? response.items : []);
       } catch {
         setProducts([]);
@@ -1004,6 +1007,7 @@ export default function CreatePosScreen({
                       <th className="p-3">Qty</th>
                       <th className="p-3">Price</th>
                       <th className="p-3">Discount</th>
+                      <th className="p-3">Cashback</th>
                       <th className="p-3">Total</th>
                       <th className="p-3">Action</th>
                     </tr>
@@ -1067,6 +1071,24 @@ export default function CreatePosScreen({
                           />
                         </td>
 
+                        {/* Cashback */}
+                        <td className="p-3 text-center">
+                          <input
+                            type="number"
+                            value={item.cashback}
+                            disabled={Boolean(item.isCsp)}
+                            title={
+                              item.isCsp
+                                ? "Membership cashback does not apply to CSP"
+                                : undefined
+                            }
+                            onChange={(e) =>
+                              handleChange(item.id, "cashback", e.target.value)
+                            }
+                            className="w-20 border rounded px-2 py-1 text-center disabled:bg-gray-50 disabled:text-gray-400"
+                          />
+                        </td>
+
                         {/* Total */}
                         <td className="p-3 text-center font-semibold">
                           ₹{calculateTotal(item)}
@@ -1110,6 +1132,11 @@ export default function CreatePosScreen({
                     <div className="text-xl font-bold text-gray-900">
                       ₹ {grandTotal.toLocaleString("en-IN")}
                     </div>
+                    {cashbackTotal > 0 && (
+                      <div className="mt-1 text-xs font-medium text-emerald-600">
+                        +₹ {cashbackTotal.toFixed(2)} cashback
+                      </div>
+                    )}
                   </div>
                 </div>
 

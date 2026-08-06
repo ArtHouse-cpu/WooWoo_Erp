@@ -1054,6 +1054,8 @@ export type MembershipPlanPayload = {
       | "rose";
     iconKey?: "user" | "star" | "graduation" | "crown";
     cashbackPercent?: number;
+    /** Products usage cashback % mirrored for billing fallbacks */
+    storeCashbackPercent?: number;
     storeDiscountPercent?: number;
     spaceDiscountPercent?: number;
     foodDiscountPercent?: number;
@@ -1697,9 +1699,22 @@ export type CatalogueLookupItem = {
 export const handleCatalogueLookup = async (
   search = "",
   signal?: AbortSignal,
+  options: {
+    limit?: number;
+    page?: number;
+    sourceType?: "all" | "product" | "service" | "space" | "food" | string;
+  } = {},
 ) => {
+  const limit = options.limit ?? 48;
+  const page = options.page ?? 1;
+  const sourceType = options.sourceType ?? "all";
   const response = await axiosInstance.get("/catalogue/lookup", {
-    params: { search: search.trim() },
+    params: {
+      search: search.trim(),
+      limit,
+      page,
+      sourceType,
+    },
     signal,
   });
   return response.data as {
@@ -1707,6 +1722,14 @@ export const handleCatalogueLookup = async (
     message?: string;
     items: CatalogueLookupItem[];
     counts?: Record<string, number>;
+    pagination?: {
+      page: number;
+      limit: number;
+      skip: number;
+      hasMore: boolean;
+      total: number;
+      sourceType: string;
+    };
   };
 };
 

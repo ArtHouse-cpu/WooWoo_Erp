@@ -65,6 +65,20 @@ const serializeMembership = (doc) => {
     plain.pricing = normalized;
   }
   plain.walletCashback = normalizeWalletCashback(plain.walletCashback);
+
+  // Backfill Products cashback display field from usageLimits when missing
+  const display = plain.customerDisplay || {};
+  const productsLimit =
+    plain.usageLimits?.Products ||
+    plain.usageLimits?.products ||
+    plain.usageLimits?.Product;
+  const storeCashbackFromUsage = Number(productsLimit?.cashback ?? 0) || 0;
+  plain.customerDisplay = {
+    ...display,
+    storeCashbackPercent:
+      Number(display.storeCashbackPercent ?? 0) || storeCashbackFromUsage || 0,
+  };
+
   return plain;
 };
 
@@ -74,6 +88,8 @@ const normalizeCustomerDisplay = (input = {}) => ({
   themeKey: String(input.themeKey ?? 'blue').trim(),
   iconKey: String(input.iconKey ?? 'user').trim(),
   cashbackPercent: Math.max(0, Number(input.cashbackPercent ?? 0)),
+  /** Products / store cashback % (mirrors usageLimits.Products.cashback) */
+  storeCashbackPercent: Math.max(0, Number(input.storeCashbackPercent ?? 0)),
   storeDiscountPercent: Math.max(0, Number(input.storeDiscountPercent ?? 0)),
   spaceDiscountPercent: Math.max(0, Number(input.spaceDiscountPercent ?? 0)),
   foodDiscountPercent: Math.max(0, Number(input.foodDiscountPercent ?? 0)),

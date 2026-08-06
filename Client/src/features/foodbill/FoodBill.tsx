@@ -40,6 +40,7 @@ import CreateCustomerModal from "@/features/network/components/CreateCustomerMod
 import AddFoodModal, {
   type FoodFormPayload,
 } from "@/features/catalogue/components/AddFoodModal";
+import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAppSelector } from "@/store/hooks";
 import {
@@ -58,6 +59,7 @@ import {
   type CustomerPayload,
   type FoodPayload,
   type MembershipPlanPayload,
+  type VerifiedStaff,
 } from "@/services/apiClient";
 import {
   membershipBenefitsForLine,
@@ -301,6 +303,7 @@ export default function FoodBill() {
   const [minimumWalletBalance, setMinimumWalletBalance] = useState(0);
   const [billNote, setBillNote] = useState<string>("");
   const [savingBill, setSavingBill] = useState(false);
+  const [showStaffVerify, setShowStaffVerify] = useState(false);
   const [membershipPlans, setMembershipPlans] = useState<
     MembershipPlanPayload[]
   >([]);
@@ -1224,13 +1227,7 @@ export default function FoodBill() {
       return;
     }
 
-    const nowStr = new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    const today = new Date().toISOString().split("T")[0];
-
-    // Validate wallet usage before confirm
+    // Validate wallet usage before PIN verify
     const walletUsed = isMultiMode
       ? Number(splitPayments.wallet || 0)
       : paymentMethod === "Wallet"
@@ -1280,6 +1277,20 @@ export default function FoodBill() {
       return;
     }
 
+    // Staff PIN required before bill generation (same as POS / Invoice checkout).
+    setShowStaffVerify(true);
+  };
+
+  const completeGenerateBill = async (
+    verifiedStaff: VerifiedStaff,
+    verifiedAt: string,
+  ) => {
+    const nowStr = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const today = new Date().toISOString().split("T")[0];
+
     const previewPaid = isMultiMode
       ? splitTotalPaid
       : paymentMethod === "Cash"
@@ -1297,6 +1308,9 @@ export default function FoodBill() {
           <div class="flex justify-between text-xs text-gray-500 mb-2">
             <span>Food Bill → Invoice</span>
             <span>Date: Today, ${nowStr}</span>
+          </div>
+          <div class="mb-2 rounded-lg bg-indigo-50 px-2 py-1.5 text-xs text-indigo-800">
+            Invoice By: <b>${String(verifiedStaff.staffName || verifiedStaff.name || "").replace(/</g, "&lt;")}</b>
           </div>
           <hr class="border-dashed border-gray-300 my-2" />
           <div class="space-y-1 my-2">
@@ -1497,7 +1511,19 @@ export default function FoodBill() {
             : undefined,
         invoiceDate: today,
         dueDate: today,
-        salesPersonName: staff?.m_staff_name ?? "Food Bill",
+        salesPersonName:
+          verifiedStaff.staffName ||
+          verifiedStaff.name ||
+          staff?.m_staff_name ||
+          "Food Bill",
+        invoiceBy: {
+          staffId: String(verifiedStaff.staffId || verifiedStaff._id),
+          staffName: verifiedStaff.staffName || verifiedStaff.name,
+          employeeId:
+            verifiedStaff.employeeId || verifiedStaff.m_staff_id || "",
+          email: verifiedStaff.email || "",
+        },
+        verifiedAt: verifiedAt || new Date().toISOString(),
         notes,
         items: invoiceItems,
         subTotal: subtotal,
@@ -2594,6 +2620,15 @@ export default function FoodBill() {
           onSubmit={handleCreateCustomerSubmit}
         />
       ) : null}
+
+      <StaffVerifyModal
+        open={showStaffVerify}
+        onClose={() => setShowStaffVerify(false)}
+        onVerified={({ staff: verified, verifiedAt }) => {
+          setShowStaffVerify(false);
+          void completeGenerateBill(verified, verifiedAt);
+        }}
+      />
 
       <AddFoodModal
         open={showEditFoodModal}

@@ -1,7 +1,21 @@
-import { useEffect, useState } from "react";
-import { Plus, Minus, Search, Package, Briefcase, Frame, Utensils } from "lucide-react";
-import { handleCatalogueLookup, type CatalogueLookupItem } from "@/services/apiClient";
+import { useEffect, useRef, useState } from "react";
+import {
+  Plus,
+  Minus,
+  Search,
+  Package,
+  Briefcase,
+  Frame,
+  Utensils,
+  Loader2,
+} from "lucide-react";
+import {
+  handleCatalogueLookup,
+  type CatalogueLookupItem,
+} from "@/services/apiClient";
 import { calcCatalogueProductDiscount } from "../utils/membershipInvoiceUtils";
+
+const PAGE_SIZE = 48;
 
 const formatInr = (amount: number) =>
   `₹${Number(amount || 0).toLocaleString("en-IN")}`;
@@ -59,10 +73,26 @@ const SOURCE_BADGE: Record<
   CatalogueLookupItem["sourceType"],
   { label: string; className: string; icon: any }
 > = {
-  product: { label: "Product", className: "bg-slate-100 text-slate-700 border-slate-200", icon: Package },
-  service: { label: "Service", className: "bg-indigo-50 text-indigo-700 border-indigo-100", icon: Briefcase },
-  space: { label: "Space", className: "bg-emerald-50 text-emerald-700 border-emerald-100", icon: Frame },
-  food: { label: "Food", className: "bg-amber-50 text-amber-800 border-amber-100", icon: Utensils },
+  product: {
+    label: "Product",
+    className: "bg-slate-100 text-slate-700 border-slate-200",
+    icon: Package,
+  },
+  service: {
+    label: "Service",
+    className: "bg-indigo-50 text-indigo-700 border-indigo-100",
+    icon: Briefcase,
+  },
+  space: {
+    label: "Space",
+    className: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    icon: Frame,
+  },
+  food: {
+    label: "Food",
+    className: "bg-amber-50 text-amber-800 border-amber-100",
+    icon: Utensils,
+  },
 };
 
 export default function ProductSidebar({
@@ -74,68 +104,154 @@ export default function ProductSidebar({
   title = "Catalogue Sidebar",
 }: ProductSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [items, setItems] = useState<CatalogueLookupItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalAvailable, setTotalAvailable] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const requestIdRef = useRef(0);
+  // Bumps when search/type changes so in-flight "page 2" responses are ignored.
+  const listEpochRef = useRef(0);
 
   const handleImageError = (id: string) => {
     setImageErrors((prev) => ({ ...prev, [id]: true }));
   };
 
   useEffect(() => {
-    const controller = new AbortController();
-    const fetchItems = async () => {
-      try {
-        setLoading(true);
-        const response = await handleCatalogueLookup(searchTerm.trim(), controller.signal);
-        setItems(Array.isArray(response?.items) ? response.items : []);
-      } catch (err) {
-        // Ignore aborts
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const timeout = setTimeout(() => {
-      fetchItems();
-    }, 200);
-
-    return () => {
-      controller.abort();
-      clearTimeout(timeout);
-    };
+    const t = window.setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 250);
+    return () => window.clearTimeout(t);
   }, [searchTerm]);
 
-  const filteredItems = items.filter((item) => {
-    if (selectedType === "all") return true;
-    return item.sourceType === selectedType;
-  });
+  useEffect(() => {
+    listEpochRef.current += 1;
+    setPage(1);
+    setItems([]);
+    setHasMore(false);
+
+    const controller = new AbortController();
+    const epoch = listEpochRef.current;
+    const requestId = ++requestIdRef.current;
+
+    (async () => {
+      setLoading(true);
+      try {
+        const response = await handleCatalogueLookup(
+          debouncedSearch,
+          controller.signal,
+          {
+            page: 1,
+            limit: PAGE_SIZE,
+            sourceType: selectedType,
+          },
+        );
+        if (controller.signal.aborted || epoch !== listEpochRef.current) return;
+        if (requestId !== requestIdRef.current) return;
+
+        const nextItems = Array.isArray(response?.items) ? response.items : [];
+        setItems(nextItems);
+        setHasMore(Boolean(response?.pagination?.hasMore));
+        setTotalAvailable(Number(response?.pagination?.total ?? nextItems.length));
+      } catch {
+        if (!controller.signal.aborted && epoch === listEpochRef.current) {
+          setItems([]);
+          setHasMore(false);
+          setTotalAvailable(0);
+        }
+      } finally {
+        if (epoch === listEpochRef.current) setLoading(false);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [debouncedSearch, selectedType]);
+
+  useEffect(() => {
+    if (page <= 1) return;
+
+    const controller = new AbortController();
+    const epoch = listEpochRef.current;
+    const requestId = ++requestIdRef.current;
+
+    (async () => {
+      setLoadingMore(true);
+      try {
+        const response = await handleCatalogueLookup(
+          debouncedSearch,
+          controller.signal,
+          {
+            page,
+            limit: PAGE_SIZE,
+            sourceType: selectedType,
+          },
+        );
+        if (controller.signal.aborted || epoch !== listEpochRef.current) return;
+        if (requestId !== requestIdRef.current) return;
+
+        const nextItems = Array.isArray(response?.items) ? response.items : [];
+        setItems((prev) => {
+          const seen = new Set(prev.map((i) => `${i.sourceType}-${i._id}`));
+          const merged = [...prev];
+          for (const item of nextItems) {
+            const key = `${item.sourceType}-${item._id}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              merged.push(item);
+            }
+          }
+          return merged;
+        });
+        setHasMore(Boolean(response?.pagination?.hasMore));
+        setTotalAvailable(
+          Number(response?.pagination?.total ?? totalAvailable),
+        );
+      } catch {
+        // ignore aborted / stale
+      } finally {
+        if (epoch === listEpochRef.current) setLoadingMore(false);
+      }
+    })();
+
+    return () => controller.abort();
+    // totalAvailable intentionally omitted — only used as fallback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, debouncedSearch, selectedType]);
+
+  const loadMore = () => {
+    if (loading || loadingMore || !hasMore) return;
+    setPage((p) => p + 1);
+  };
 
   return (
-    <div className="flex h-full flex-col border border-slate-200 bg-white rounded-2xl shadow-sm overflow-hidden">
-      {/* Header */}
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 bg-slate-50/50 p-4">
-        <h3 className="text-sm font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
+        <h3 className="flex items-center gap-1.5 text-sm font-bold tracking-tight text-slate-800">
           <span>{title}</span>
           <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-            {filteredItems.length}
+            {items.length}
+            {totalAvailable > items.length ? ` / ${totalAvailable}` : ""}
           </span>
         </h3>
-        
-        {/* Search */}
+
         <div className="relative mt-3">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search items or variants..."
-            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2 text-xs focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-4 text-xs outline-none transition-all focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100"
           />
         </div>
 
-        {/* Filter categories */}
         <div className="mt-3 flex flex-wrap gap-1">
           {[
             { id: "all", label: "All" },
@@ -150,10 +266,10 @@ export default function ProductSidebar({
                 key={tab.id}
                 type="button"
                 onClick={() => setSelectedType(tab.id)}
-                className={`rounded-lg border px-2 py-1 text-[10px] font-bold tracking-tight transition-all uppercase ${
+                className={`rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-tight transition-all ${
                   isActive
-                    ? "bg-slate-800 border-slate-800 text-white shadow-sm"
-                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    ? "border-slate-800 bg-slate-800 text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 {tab.label}
@@ -163,124 +279,160 @@ export default function ProductSidebar({
         </div>
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-10 space-y-2">
+      <div className="custom-scrollbar flex-1 space-y-2 overflow-y-auto p-3">
+        {loading && items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center space-y-2 py-10">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600" />
-            <span className="text-[11px] font-medium text-slate-400">Loading catalogue...</span>
+            <span className="text-[11px] font-medium text-slate-400">
+              Loading catalogue...
+            </span>
           </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="text-center py-12 text-xs text-slate-400 font-medium">
+        ) : items.length === 0 ? (
+          <div className="py-12 text-center text-xs font-medium text-slate-400">
             No items found.
           </div>
         ) : (
-          filteredItems.map((item) => {
-            const badge = SOURCE_BADGE[item.sourceType] || SOURCE_BADGE.product;
-            const IconComponent = badge.icon;
-            
-            // Find item in cart
-            const cartItem = cartItems.find(
-              (c) =>
-                String(c.productName || c.name || "")
-                  .trim()
-                  .toLowerCase() === (item.productName || item.name || "").trim().toLowerCase()
-            );
-            const qtyInCart = cartItem?.qty || 0;
-            const hasImage = item.imageUrl && !imageErrors[item._id];
+          <>
+            {items.map((item) => {
+              const badge = SOURCE_BADGE[item.sourceType] || SOURCE_BADGE.product;
+              const IconComponent = badge.icon;
 
-            return (
-              <div
-                key={`${item.sourceType}-${item._id}`}
-                className={`flex items-center gap-3 border rounded-xl p-2 bg-white transition-all duration-200 ${
-                  qtyInCart > 0
-                    ? "border-indigo-200 shadow-sm bg-indigo-50/10"
-                    : "border-slate-100 hover:border-slate-200 hover:shadow-sm"
-                }`}
-              >
-                {/* Image */}
-                <div className="relative h-11 w-11 shrink-0 rounded-lg overflow-hidden border border-slate-100 bg-slate-50 flex items-center justify-center">
-                  {hasImage ? (
-                    <img
-                      src={item.imageUrl!}
-                      alt={item.productName || item.name}
-                      onError={() => handleImageError(item._id)}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-full w-full bg-slate-50 flex items-center justify-center text-slate-400">
-                      <IconComponent size={16} />
-                    </div>
-                  )}
-                  
-                  {qtyInCart > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[9px] font-bold text-white shadow-sm ring-1 ring-white">
-                      {qtyInCart}
-                    </span>
-                  )}
-                </div>
+              const cartItem = cartItems.find(
+                (c) =>
+                  String(c.productName || c.name || "")
+                    .trim()
+                    .toLowerCase() ===
+                  (item.productName || item.name || "").trim().toLowerCase(),
+              );
+              const qtyInCart = cartItem?.qty || 0;
+              const hasImage = item.imageUrl && !imageErrors[item._id];
 
-                {/* Details */}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-xs font-bold text-slate-800 leading-tight">
-                    {item.productName || item.name}
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                    <CataloguePrice item={item} />
-                    {item.variantName ? (
-                      <span className="rounded bg-violet-50 px-1 py-0.5 text-[8px] font-extrabold uppercase tracking-wide text-violet-700 ring-1 ring-violet-100">
-                        Variant
-                      </span>
-                    ) : null}
-                    {item.trackStock && item.stockQty != null && (
-                      <span className={`text-[9px] font-bold ${item.stockQty <= 0 ? "text-red-500 bg-red-50 px-1 rounded" : "text-slate-400"}`}>
-                        {item.stockQty <= 0 ? "OUT OF STOCK" : `Stock: ${item.stockQty}`}
+              return (
+                <div
+                  key={`${item.sourceType}-${item._id}`}
+                  className={`flex items-center gap-3 rounded-xl border bg-white p-2 transition-all duration-200 ${
+                    qtyInCart > 0
+                      ? "border-indigo-200 bg-indigo-50/10 shadow-sm"
+                      : "border-slate-100 hover:border-slate-200 hover:shadow-sm"
+                  }`}
+                >
+                  <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
+                    {hasImage ? (
+                      <img
+                        src={item.imageUrl!}
+                        alt={item.productName || item.name}
+                        onError={() => handleImageError(item._id)}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-slate-50 text-slate-400">
+                        <IconComponent size={16} />
+                      </div>
+                    )}
+
+                    {qtyInCart > 0 && (
+                      <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[9px] font-bold text-white shadow-sm ring-1 ring-white">
+                        {qtyInCart}
                       </span>
                     )}
                   </div>
-                  {item.isCsp && (
-                    <span className="mt-0.5 inline-block rounded bg-amber-100 px-1 py-0.2 text-[8px] font-extrabold text-amber-800 uppercase tracking-wide">
-                      {item.cspLabel || "CSP"}
-                    </span>
-                  )}
-                </div>
 
-                {/* Controls */}
-                <div className="shrink-0">
-                  {qtyInCart > 0 ? (
-                    <div className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white p-1">
-                      <button
-                        type="button"
-                        onClick={() => onDecrementItem(item.productName || item.name || "", qtyInCart)}
-                        className="flex h-5 w-5 items-center justify-center rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-                      >
-                        <Minus size={10} strokeWidth={3} />
-                      </button>
-                      <span className="text-xs font-bold px-0.5 text-slate-800 min-w-[12px] text-center">
-                        {qtyInCart}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => onIncrementItem(item, qtyInCart)}
-                        className="flex h-5 w-5 items-center justify-center rounded bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
-                      >
-                        <Plus size={10} strokeWidth={3} />
-                      </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-bold leading-tight text-slate-800">
+                      {item.productName || item.name}
                     </div>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={item.trackStock && Number(item.stockQty ?? 0) <= 0}
-                      onClick={() => onAddItem(item)}
-                      className="flex h-7 px-2.5 items-center justify-center gap-0.5 rounded-lg border border-indigo-600 bg-white text-[10px] font-bold uppercase tracking-wider text-indigo-600 hover:bg-indigo-600 hover:text-white transition disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-indigo-600"
-                    >
-                      <Plus size={10} strokeWidth={3} /> ADD
-                    </button>
-                  )}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <CataloguePrice item={item} />
+                      {item.variantName ? (
+                        <span className="rounded bg-violet-50 px-1 py-0.5 text-[8px] font-extrabold uppercase tracking-wide text-violet-700 ring-1 ring-violet-100">
+                          Variant
+                        </span>
+                      ) : null}
+                      {item.trackStock && item.stockQty != null && (
+                        <span
+                          className={`text-[9px] font-bold ${
+                            item.stockQty <= 0
+                              ? "rounded bg-red-50 px-1 text-red-500"
+                              : "text-slate-400"
+                          }`}
+                        >
+                          {item.stockQty <= 0
+                            ? "OUT OF STOCK"
+                            : `Stock: ${item.stockQty}`}
+                        </span>
+                      )}
+                    </div>
+                    {item.isCsp && (
+                      <span className="mt-0.5 inline-block rounded bg-amber-100 px-1 text-[8px] font-extrabold uppercase tracking-wide text-amber-800">
+                        {item.cspLabel || "CSP"}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="shrink-0">
+                    {qtyInCart > 0 ? (
+                      <div className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white p-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onDecrementItem(
+                              item.productName || item.name || "",
+                              qtyInCart,
+                            )
+                          }
+                          className="flex h-5 w-5 items-center justify-center rounded bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+                        >
+                          <Minus size={10} strokeWidth={3} />
+                        </button>
+                        <span className="min-w-[12px] px-0.5 text-center text-xs font-bold text-slate-800">
+                          {qtyInCart}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onIncrementItem(item, qtyInCart)}
+                          className="flex h-5 w-5 items-center justify-center rounded bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+                        >
+                          <Plus size={10} strokeWidth={3} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={
+                          item.trackStock && Number(item.stockQty ?? 0) <= 0
+                        }
+                        onClick={() => onAddItem(item)}
+                        className="flex h-7 items-center justify-center gap-0.5 rounded-lg border border-indigo-600 bg-white px-2.5 text-[10px] font-bold uppercase tracking-wider text-indigo-600 transition hover:bg-indigo-600 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-indigo-600"
+                      >
+                        <Plus size={10} strokeWidth={3} /> ADD
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-60"
+              >
+                {loadingMore ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : null}
+                {loadingMore
+                  ? "Loading..."
+                  : "Load more products"}
+              </button>
+            ) : items.length > 0 ? (
+              <p className="py-2 text-center text-[10px] font-medium text-slate-400">
+                End of list · use search to find any product
+              </p>
+            ) : null}
+          </>
         )}
       </div>
     </div>
