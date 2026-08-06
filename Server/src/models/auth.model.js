@@ -33,6 +33,30 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
     /**
+     * Staff billing PIN (bcrypt hash). Used to verify who physically bills,
+     * independent of the logged-in user (createdBy).
+     */
+    pinHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    pinEnabled: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    pinFailedAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    pinLockedUntil: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    /**
      * Legacy coarse role string (kept for backward compatibility).
      * Prefer `roleId` + Role.permissions for real RBAC.
      */

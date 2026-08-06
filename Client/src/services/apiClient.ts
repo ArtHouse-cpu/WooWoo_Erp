@@ -131,9 +131,14 @@ export type CreateInvoicePayload = {
   invoiceDate: string;
   dueDate: string;
   salesPersonName: string;
-  /** Name selected from Invoiced By master at checkout */
-  invoicedBy?: string;
-  invoicedById?: string | null;
+  /** Staff who verified via PIN at checkout (not the logged-in user). */
+  invoiceBy?: {
+    staffId?: string | null;
+    staffName?: string;
+    employeeId?: string;
+    email?: string;
+  } | null;
+  verifiedAt?: string | null;
   notes: string;
   items: CreateInvoiceItemPayload[];
   subTotal: number;
@@ -214,47 +219,61 @@ export const handleCreateInvoice = async (payload: CreateInvoicePayload) => {
   }
 };
 
-export type InvoicedByRow = {
+export type VerifiedStaff = {
   _id: string;
+  staffId: string;
   name: string;
-  isActive?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
+  staffName: string;
+  employeeId: string;
+  m_staff_id?: string;
+  email?: string;
 };
 
-export const handleGetInvoicedBy = async (signal?: AbortSignal) => {
-  const response = await axiosInstance.get("/invoiceBy", { signal });
+export const handleVerifyStaffPin = async (pin: string) => {
+  const response = await axiosInstance.post("/access/staff/verify-pin", { pin });
   return response.data as {
     success: boolean;
-    invoicedBy: InvoicedByRow[];
     message?: string;
+    staff?: VerifiedStaff;
+    verifiedAt?: string;
   };
 };
 
-export const handleCreateInvoicedBy = async (payload: { name: string }) => {
-  const response = await axiosInstance.post("/invoiceBy", payload);
+export const handleSetStaffPin = async (
+  staffId: string,
+  payload: { pin?: string } = {},
+) => {
+  const response = await axiosInstance.post(`/access/staff/${staffId}/pin`, payload);
   return response.data as {
     success: boolean;
-    invoicedBy?: InvoicedByRow;
     message?: string;
+    pin?: string;
+    staff?: AccessStaffRow;
   };
 };
 
-export const handleUpdateInvoicedBy = async (id: string, payload: { name: string }) => {
-  const response = await axiosInstance.patch(`/invoiceBy/${id}`, payload);
+export const handleUpdateStaffPin = async (
+  staffId: string,
+  payload: { enabled?: boolean; reset?: boolean; pin?: string },
+) => {
+  const response = await axiosInstance.patch(
+    `/access/staff/${staffId}/pin`,
+    payload,
+  );
   return response.data as {
     success: boolean;
-    invoicedBy?: InvoicedByRow;
     message?: string;
+    pin?: string;
+    staff?: AccessStaffRow;
   };
 };
 
-export const handleDeleteInvoicedBy = async (id: string) => {
-  const response = await axiosInstance.delete(`/invoiceBy/${id}`);
+export const handleClearStaffPin = async (staffId: string) => {
+  const response = await axiosInstance.delete(`/access/staff/${staffId}/pin`);
   return response.data as {
     success: boolean;
-    invoicedBy?: InvoicedByRow;
     message?: string;
+    staff?: AccessStaffRow;
   };
 };
 
@@ -1652,6 +1671,10 @@ export type CatalogueLookupItem = {
   sourceType: "product" | "service" | "space" | "food";
   name: string;
   productName: string;
+  /** Present when this row is a product variant line */
+  variantName?: string | null;
+  /** Parent product name when row is a variant */
+  parentProductName?: string | null;
   sellingPrice: number;
   /** Cost / buy price — used by Create Purchase Quick Select */
   purchasePrice?: number;
@@ -1668,6 +1691,7 @@ export type CatalogueLookupItem = {
   isVeg?: boolean;
   isCsp?: boolean;
   cspLabel?: string | null;
+  barcode?: string;
 };
 
 export const handleCatalogueLookup = async (
@@ -2004,6 +2028,8 @@ export type AccessStaffRow = {
   email: string;
   phoneNumber?: string;
   legacyRole?: string;
+  pinEnabled?: boolean;
+  pinSet?: boolean;
   role?: {
     id: string;
     name: string;

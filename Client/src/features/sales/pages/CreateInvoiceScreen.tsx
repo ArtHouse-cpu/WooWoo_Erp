@@ -527,8 +527,13 @@ export default function CreateInvoiceScreen() {
     waiveMembershipForCoupon?: boolean;
     extraCharges: Array<{ label: string; amount: number }>;
     customerId?: string | null;
-    invoicedById?: string | null;
-    invoicedBy?: string;
+    invoiceBy?: {
+      staffId: string;
+      staffName: string;
+      employeeId: string;
+      email?: string;
+    } | null;
+    verifiedAt?: string | null;
   }) => {
     try {
       setSaving(true);
@@ -562,9 +567,17 @@ export default function CreateInvoiceScreen() {
           customerId: payment.customerId || customerId || undefined,
           invoiceDate,
           dueDate,
-          salesPersonName: payment.invoicedBy?.trim() || salesPerson,
-          invoicedBy: payment.invoicedBy?.trim() || salesPerson,
-          invoicedById: payment.invoicedById || null,
+          salesPersonName:
+            payment.invoiceBy?.staffName?.trim() || salesPerson,
+          invoiceBy: payment.invoiceBy
+            ? {
+                staffId: payment.invoiceBy.staffId,
+                staffName: payment.invoiceBy.staffName,
+                employeeId: payment.invoiceBy.employeeId,
+                email: payment.invoiceBy.email,
+              }
+            : null,
+          verifiedAt: payment.verifiedAt || null,
           notes: notes.trim(),
           items: lineItems,
           subTotal,
@@ -597,9 +610,17 @@ export default function CreateInvoiceScreen() {
           customerId: payment.customerId || customerId || undefined,
           invoiceDate,
           dueDate,
-          salesPersonName: payment.invoicedBy?.trim() || salesPerson,
-          invoicedBy: payment.invoicedBy?.trim() || salesPerson,
-          invoicedById: payment.invoicedById || null,
+          salesPersonName:
+            payment.invoiceBy?.staffName?.trim() || salesPerson,
+          invoiceBy: payment.invoiceBy
+            ? {
+                staffId: payment.invoiceBy.staffId,
+                staffName: payment.invoiceBy.staffName,
+                employeeId: payment.invoiceBy.employeeId,
+                email: payment.invoiceBy.email,
+              }
+            : null,
+          verifiedAt: payment.verifiedAt || null,
           notes: notes.trim(),
           items: lineItems,
           subTotal,

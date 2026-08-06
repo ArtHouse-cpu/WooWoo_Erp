@@ -29,7 +29,6 @@ import companyRoutes from './routes/company.route.js';
 import affiliateRoutes from './routes/affiliate.route.js';
 import accessRoutes from './routes/access.route.js';
 import cspRouters from './routes/csp.route.js';
-import invoiceByRoutes from './routes/invoicedBy.router.js';
 import customerAuthRoutes from './modules/customer/routes/auth.routes.js';
 import {customerErrorHandler} from './modules/customer/middlewares/errorHandler.js';
 import path from 'path';
@@ -104,8 +103,6 @@ app.use('/coupon', couponRoutes);
 app.use('/company', companyRoutes);
 app.use('/affiliate', affiliateRoutes);
 app.use('/access', accessRoutes);
-
-app.use('/invoiceBy', invoiceByRoutes);
 
 //CSP APIs
 app.use('/csp', cspRouters);

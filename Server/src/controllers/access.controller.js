@@ -13,9 +13,66 @@ import {resolveUserPermissions} from '../utils/rbac.utils.js';
 const SALT_ROUNDS = 12;
 
 const staffProjection =
-  'm_staff_id fullName email phoneNumber role roleId createdAt updatedAt';
+  'm_staff_id fullName email phoneNumber role roleId pinEnabled createdAt updatedAt';
 
 const isEmail = s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s).trim());
+
+const PIN_MIN_LEN = 4;
+const PIN_MAX_LEN = 6;
+const PIN_MAX_ATTEMPTS = 5;
+const PIN_LOCK_MINUTES = 15;
+
+const isValidPin = (pin) => {
+  const value = String(pin ?? '').trim();
+  return /^\d+$/.test(value) && value.length >= PIN_MIN_LEN && value.length <= PIN_MAX_LEN;
+};
+
+const generateNumericPin = (length = 6) => {
+  let pin = '';
+  for (let i = 0; i < length; i += 1) {
+    pin += String(Math.floor(Math.random() * 10));
+  }
+  // Avoid leading-zero-only awkwardness; still allow zeros inside
+  if (pin[0] === '0') pin = `1${pin.slice(1)}`;
+  return pin;
+};
+
+/** Ensure no other staff already uses this plaintext PIN (bcrypt compare). */
+const isPinTakenByOther = async (plainPin, excludeUserId) => {
+  const others = await User.find({
+    pinHash: {$ne: null},
+    ...(excludeUserId ? {_id: {$ne: excludeUserId}} : {}),
+  })
+    .select('+pinHash')
+    .lean();
+
+  for (const other of others) {
+    if (!other.pinHash) continue;
+    // eslint-disable-next-line no-await-in-loop
+    if (await bcrypt.compare(plainPin, other.pinHash)) return true;
+  }
+  return false;
+};
+
+const allocateUniquePin = async (excludeUserId, preferredPin = '') => {
+  if (preferredPin) {
+    if (await isPinTakenByOther(preferredPin, excludeUserId)) {
+      const err = new Error('PIN_TAKEN');
+      throw err;
+    }
+    return preferredPin;
+  }
+
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const candidate = generateNumericPin(6);
+    // eslint-disable-next-line no-await-in-loop
+    if (!(await isPinTakenByOther(candidate, excludeUserId))) {
+      return candidate;
+    }
+  }
+  const err = new Error('PIN_ALLOC_FAILED');
+  throw err;
+};
 
 const normalizePhone = input => {
   const digits = String(input ?? '').replace(/\D/g, '');
@@ -33,12 +90,33 @@ const getNextStaffId = async () => {
   return `STF${String(counter.value).padStart(6, '0')}`;
 };
 
+/**
+ * Persist only PIN-related fields (and backfill m_staff_id if needed).
+ * Avoids full-document validation failing on legacy incomplete User rows.
+ */
+const persistStaffPinUpdate = async (staff, patch) => {
+  const set = {
+    ...patch,
+    updatedAt: new Date(),
+  };
+  if (!staff.m_staff_id) {
+    set.m_staff_id = await getNextStaffId();
+    staff.m_staff_id = set.m_staff_id;
+  }
+
+  await User.updateOne({_id: staff._id}, {$set: set});
+
+  Object.assign(staff, set);
+  return staff;
+};
+
 const toStaffDto = async (userDoc) => {
   const populated =
     userDoc?.roleId && typeof userDoc.roleId === 'object' && userDoc.roleId?.name
       ? userDoc
       : await User.findById(userDoc._id)
           .select(staffProjection)
+          .select('+pinHash')
           .populate('roleId', 'name slug permissions isSystem isActive')
           .lean();
 
@@ -51,6 +129,8 @@ const toStaffDto = async (userDoc) => {
     email: populated.email,
     phoneNumber: populated.phoneNumber,
     legacyRole: populated.role,
+    pinEnabled: Boolean(populated.pinEnabled),
+    pinSet: Boolean(populated.pinHash),
     role: populated.roleId
       ? {
           id: String(populated.roleId._id),
@@ -192,6 +272,7 @@ export const listStaff = async (req, res) => {
 
     const staff = await User.find(filter)
       .select(staffProjection)
+      .select('+pinHash')
       .populate('roleId', 'name slug permissions isSystem isActive')
       .sort({createdAt: -1})
       .lean();
@@ -206,6 +287,8 @@ export const listStaff = async (req, res) => {
           email: user.email,
           phoneNumber: user.phoneNumber,
           legacyRole: user.role,
+          pinEnabled: Boolean(user.pinEnabled),
+          pinSet: Boolean(user.pinHash),
           role: user.roleId
             ? {
                 id: String(user.roleId._id),
@@ -604,6 +687,292 @@ export const deleteStaff = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to delete staff.',
+    });
+  }
+};
+
+/**
+ * POST /access/staff/:id/pin
+ * Generate (or set) a Staff PIN. Returns plaintext PIN once — never stored.
+ * Body: { pin?: string } — omit to auto-generate a 6-digit PIN.
+ */
+export const setStaffPin = async (req, res) => {
+  try {
+    const {id} = req.params;
+    const {pin: rawPin} = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({success: false, message: 'Invalid staff id.'});
+    }
+
+    const staff = await User.findById(id).select('+pinHash');
+    if (!staff) {
+      return res.status(404).json({success: false, message: 'Staff not found.'});
+    }
+
+    let plainPin = String(rawPin ?? '').trim();
+    if (plainPin && !isValidPin(plainPin)) {
+      return res.status(400).json({
+        success: false,
+        message: `PIN must be ${PIN_MIN_LEN}-${PIN_MAX_LEN} digits.`,
+      });
+    }
+    try {
+      plainPin = await allocateUniquePin(staff._id, plainPin);
+    } catch (allocErr) {
+      if (allocErr?.message === 'PIN_TAKEN') {
+        return res.status(409).json({
+          success: false,
+          message: 'This PIN is already assigned to another staff member.',
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        message: 'Could not generate a unique Staff PIN. Try again.',
+      });
+    }
+    if (!isValidPin(plainPin)) {
+      return res.status(400).json({
+        success: false,
+        message: `PIN must be ${PIN_MIN_LEN}-${PIN_MAX_LEN} digits.`,
+      });
+    }
+
+    staff.pinHash = await bcrypt.hash(plainPin, SALT_ROUNDS);
+    staff.pinEnabled = true;
+    staff.pinFailedAttempts = 0;
+    staff.pinLockedUntil = null;
+    await persistStaffPinUpdate(staff, {
+      pinHash: staff.pinHash,
+      pinEnabled: true,
+      pinFailedAttempts: 0,
+      pinLockedUntil: null,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Staff PIN set. Share it securely — it will not be shown again.',
+      pin: plainPin,
+      staff: await toStaffDto(staff),
+    });
+  } catch (error) {
+    console.error('setStaffPin error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to set staff PIN.',
+    });
+  }
+};
+
+/**
+ * PATCH /access/staff/:id/pin
+ * Body: { enabled?: boolean, reset?: boolean, pin?: string }
+ */
+export const updateStaffPin = async (req, res) => {
+  try {
+    const {id} = req.params;
+    const {enabled, reset, pin: rawPin} = req.body || {};
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({success: false, message: 'Invalid staff id.'});
+    }
+
+    const staff = await User.findById(id).select(
+      '+pinHash +pinFailedAttempts +pinLockedUntil',
+    );
+    if (!staff) {
+      return res.status(404).json({success: false, message: 'Staff not found.'});
+    }
+
+    let plainPin = null;
+
+    if (reset === true || (rawPin !== undefined && String(rawPin).trim() !== '')) {
+      const preferred =
+        rawPin !== undefined && String(rawPin).trim() !== ''
+          ? String(rawPin).trim()
+          : '';
+      if (preferred && !isValidPin(preferred)) {
+        return res.status(400).json({
+          success: false,
+          message: `PIN must be ${PIN_MIN_LEN}-${PIN_MAX_LEN} digits.`,
+        });
+      }
+      try {
+        plainPin = await allocateUniquePin(staff._id, preferred);
+      } catch (allocErr) {
+        if (allocErr?.message === 'PIN_TAKEN') {
+          return res.status(409).json({
+            success: false,
+            message: 'This PIN is already assigned to another staff member.',
+          });
+        }
+        return res.status(500).json({
+          success: false,
+          message: 'Could not generate a unique Staff PIN. Try again.',
+        });
+      }
+      staff.pinHash = await bcrypt.hash(plainPin, SALT_ROUNDS);
+      staff.pinEnabled = true;
+      staff.pinFailedAttempts = 0;
+      staff.pinLockedUntil = null;
+    }
+
+    if (enabled !== undefined) {
+      const nextEnabled = Boolean(enabled);
+      if (nextEnabled && !staff.pinHash) {
+        return res.status(400).json({
+          success: false,
+          message: 'Generate a PIN before enabling it.',
+        });
+      }
+      staff.pinEnabled = nextEnabled;
+      if (!nextEnabled) {
+        staff.pinFailedAttempts = 0;
+        staff.pinLockedUntil = null;
+      }
+    }
+
+    await persistStaffPinUpdate(staff, {
+      pinHash: staff.pinHash ?? null,
+      pinEnabled: Boolean(staff.pinEnabled),
+      pinFailedAttempts: staff.pinFailedAttempts ?? 0,
+      pinLockedUntil: staff.pinLockedUntil ?? null,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: plainPin
+        ? 'Staff PIN updated. Share it securely — it will not be shown again.'
+        : 'Staff PIN settings updated.',
+      ...(plainPin ? {pin: plainPin} : {}),
+      staff: await toStaffDto(staff),
+    });
+  } catch (error) {
+    console.error('updateStaffPin error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update staff PIN.',
+    });
+  }
+};
+
+/**
+ * DELETE /access/staff/:id/pin — clear PIN (disable + remove hash).
+ */
+export const clearStaffPin = async (req, res) => {
+  try {
+    const {id} = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({success: false, message: 'Invalid staff id.'});
+    }
+
+    const staff = await User.findById(id).select('+pinHash');
+    if (!staff) {
+      return res.status(404).json({success: false, message: 'Staff not found.'});
+    }
+
+    staff.pinHash = null;
+    staff.pinEnabled = false;
+    staff.pinFailedAttempts = 0;
+    staff.pinLockedUntil = null;
+    await persistStaffPinUpdate(staff, {
+      pinHash: null,
+      pinEnabled: false,
+      pinFailedAttempts: 0,
+      pinLockedUntil: null,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Staff PIN cleared.',
+      staff: await toStaffDto(staff),
+    });
+  } catch (error) {
+    console.error('clearStaffPin error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to clear staff PIN.',
+    });
+  }
+};
+
+/**
+ * POST /access/staff/verify-pin
+ * Body: { pin: string }
+ * Verifies Staff PIN and returns staff details (never the PIN).
+ */
+export const verifyStaffPin = async (req, res) => {
+  try {
+    const pin = String(req.body?.pin ?? '').trim();
+    if (!isValidPin(pin)) {
+      return res.status(400).json({
+        success: false,
+        message: `PIN must be ${PIN_MIN_LEN}-${PIN_MAX_LEN} digits.`,
+      });
+    }
+
+    const candidates = await User.find({
+      pinEnabled: true,
+      pinHash: {$ne: null},
+    })
+      .select('+pinHash +pinFailedAttempts +pinLockedUntil m_staff_id fullName email')
+      .lean();
+
+    if (!candidates.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'No staff with an active PIN found. Ask an admin to set one.',
+      });
+    }
+
+    const now = Date.now();
+    let matched = null;
+
+    for (const candidate of candidates) {
+      if (
+        candidate.pinLockedUntil &&
+        new Date(candidate.pinLockedUntil).getTime() > now
+      ) {
+        continue;
+      }
+      const ok = await bcrypt.compare(pin, candidate.pinHash);
+      if (ok) {
+        matched = candidate;
+        break;
+      }
+    }
+
+    if (!matched) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid Staff PIN.',
+      });
+    }
+
+    await User.updateOne(
+      {_id: matched._id},
+      {$set: {pinFailedAttempts: 0, pinLockedUntil: null}},
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Staff verified.',
+      staff: {
+        _id: matched._id,
+        staffId: matched._id,
+        name: matched.fullName,
+        staffName: matched.fullName,
+        employeeId: matched.m_staff_id,
+        m_staff_id: matched.m_staff_id,
+        email: matched.email,
+      },
+      verifiedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('verifyStaffPin error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify Staff PIN.',
     });
   }
 };

@@ -112,15 +112,34 @@ const invoiceSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    /** Display name selected at checkout (Invoiced By master). */
-    invoicedBy: {
-      type: String,
-      default: '',
-      trim: true,
+    /**
+     * Staff who verified the bill via PIN (not the logged-in session user).
+     * createdBy remains the authenticated user from User Context.
+     */
+    invoiceBy: {
+      staffId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+      staffName: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      employeeId: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      email: {
+        type: String,
+        default: '',
+        trim: true,
+      },
     },
-    invoicedById: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'InvoicedBy',
+    verifiedAt: {
+      type: Date,
       default: null,
     },
     notes: {

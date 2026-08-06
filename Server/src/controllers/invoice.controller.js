@@ -670,8 +670,8 @@ const createInvoice = async (req, res) => {
       membershipDiscount,
       activityType,
       membershipType,
-      invoicedBy,
-      invoicedById,
+      invoiceBy,
+      verifiedAt,
     } = req.body;
 
     console.log(req.body);
@@ -891,6 +891,31 @@ const createInvoice = async (req, res) => {
       }
     }
 
+    const resolvedInvoiceBy = (() => {
+      const raw = invoiceBy && typeof invoiceBy === 'object' ? invoiceBy : {};
+      const staffId = raw.staffId || raw._id || null;
+      const staffName = String(raw.staffName || raw.name || '').trim();
+      const employeeId = String(raw.employeeId || raw.m_staff_id || '').trim();
+      const email = String(raw.email || '').trim();
+      if (!staffName && !staffId) return null;
+      return {
+        staffId:
+          staffId && mongoose.Types.ObjectId.isValid(String(staffId))
+            ? String(staffId)
+            : null,
+        staffName: staffName || String(salesPersonName || '').trim(),
+        employeeId,
+        email,
+      };
+    })();
+
+    if (status !== 'draft' && !resolvedInvoiceBy?.staffName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Staff PIN verification is required before creating the invoice.',
+      });
+    }
+
     const invoice = await Invoice.create({
       invoicePrefix,
       invoiceNumber: nextNumber,
@@ -900,11 +925,19 @@ const createInvoice = async (req, res) => {
       customerId: customer?._id ?? (bodyCustomerId || null),
       invoiceDate: invoiceDateObj,
       dueDate: dueDateObj,
-      salesPersonName: String(salesPersonName).trim(),
-      invoicedBy: String(invoicedBy ?? salesPersonName ?? '').trim(),
-      invoicedById:
-        invoicedById && mongoose.Types.ObjectId.isValid(String(invoicedById))
-          ? String(invoicedById)
+      salesPersonName: String(
+        resolvedInvoiceBy?.staffName || salesPersonName,
+      ).trim(),
+      invoiceBy: resolvedInvoiceBy || {
+        staffId: null,
+        staffName: '',
+        employeeId: '',
+        email: '',
+      },
+      verifiedAt: verifiedAt
+        ? new Date(verifiedAt)
+        : resolvedInvoiceBy
+          ? new Date()
           : null,
       notes: String(notes ?? '').trim(),
       status: status === 'draft' ? 'draft' : 'final',
@@ -1215,8 +1248,8 @@ const updateInvoice = async (req, res) => {
       coupon,
       newPayment,
       extraCharges,
-      invoicedBy,
-      invoicedById,
+      invoiceBy,
+      verifiedAt,
     } = req.body;
 
     const existingInvoice = await Invoice.findById(id);
@@ -1296,12 +1329,23 @@ const updateInvoice = async (req, res) => {
     if (invoiceDateObj !== undefined) updateData.invoiceDate = invoiceDateObj;
     if (dueDateObj !== undefined) updateData.dueDate = dueDateObj;
     if (salesPersonName !== undefined) updateData.salesPersonName = String(salesPersonName).trim();
-    if (invoicedBy !== undefined) updateData.invoicedBy = String(invoicedBy).trim();
-    if (invoicedById !== undefined) {
-      updateData.invoicedById =
-        invoicedById && mongoose.Types.ObjectId.isValid(String(invoicedById))
-          ? String(invoicedById)
-          : null;
+    if (invoiceBy !== undefined) {
+      const raw = invoiceBy && typeof invoiceBy === 'object' ? invoiceBy : {};
+      updateData.invoiceBy = {
+        staffId:
+          raw.staffId && mongoose.Types.ObjectId.isValid(String(raw.staffId))
+            ? String(raw.staffId)
+            : null,
+        staffName: String(raw.staffName || raw.name || '').trim(),
+        employeeId: String(raw.employeeId || raw.m_staff_id || '').trim(),
+        email: String(raw.email || '').trim(),
+      };
+      if (updateData.invoiceBy.staffName && !verifiedAt) {
+        updateData.verifiedAt = new Date();
+      }
+    }
+    if (verifiedAt !== undefined) {
+      updateData.verifiedAt = verifiedAt ? new Date(verifiedAt) : null;
     }
     if (notes !== undefined) updateData.notes = String(notes).trim();
     if (normalizedItems !== undefined) updateData.items = normalizedItems;

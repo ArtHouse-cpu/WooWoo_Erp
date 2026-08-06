@@ -683,6 +683,8 @@ export const getProducts = async (req, res) => {
           { serviceName: searchRegex },
           { itemCode: searchRegex },
           { barCode: searchRegex },
+          { 'variants.name': searchRegex },
+          { 'variants.barcode': searchRegex },
         ],
       });
     }

@@ -59,7 +59,73 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
       (item: any) => item.itemType === "product" && item.type === "product"
     );
 
-    setProducts(filteredProducts);
+    const term = searchText.trim().toLowerCase();
+    const expanded: any[] = [];
+
+    for (const product of filteredProducts) {
+      const variants = Array.isArray(product.variants) ? product.variants : [];
+      const parentName = String(product.productName || "").trim();
+
+      if (!term) {
+        expanded.push(product);
+        continue;
+      }
+
+      const parentHit =
+        parentName.toLowerCase().includes(term) ||
+        String(product.itemCode || "")
+          .toLowerCase()
+          .includes(term) ||
+        String(product.barCode || "")
+          .toLowerCase()
+          .includes(term);
+
+      if (parentHit) {
+        expanded.push(product);
+        for (const variant of variants) {
+          const variantName = String(variant?.name || "").trim();
+          if (!variantName) continue;
+          expanded.push({
+            ...product,
+            _id: `${product._id}::${variantName}`,
+            productName: `${parentName} - ${variantName}`,
+            sellingPrice: Number(
+              variant.sellingPrice ?? product.sellingPrice ?? 0,
+            ),
+            purchasePrice: Number(
+              variant.purchasePrice ?? product.purchasePrice ?? 0,
+            ),
+            variantName,
+          });
+        }
+        continue;
+      }
+
+      for (const variant of variants) {
+        const variantName = String(variant?.name || "").trim();
+        const barcode = String(variant?.barcode || "").trim();
+        if (
+          !variantName.toLowerCase().includes(term) &&
+          !barcode.toLowerCase().includes(term)
+        ) {
+          continue;
+        }
+        expanded.push({
+          ...product,
+          _id: `${product._id}::${variantName || "variant"}`,
+          productName: `${parentName} - ${variantName || "Variant"}`,
+          sellingPrice: Number(
+            variant.sellingPrice ?? product.sellingPrice ?? 0,
+          ),
+          purchasePrice: Number(
+            variant.purchasePrice ?? product.purchasePrice ?? 0,
+          ),
+          variantName,
+        });
+      }
+    }
+
+    setProducts(expanded);
   } catch {
     setProducts([]);
   } finally {

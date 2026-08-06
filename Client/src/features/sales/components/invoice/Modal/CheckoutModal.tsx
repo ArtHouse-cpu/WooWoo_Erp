@@ -28,7 +28,8 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { printThermalReceipt } from "@/utils/printUtils";
 import { summarizeMembershipForCart } from "../../../utils/membershipInvoiceUtils";
 import { creditWalletCashback } from "../../../utils/walletCashback";
-import InvoicedByModal from "./InvoicedByModal";
+import StaffVerifyModal from "./StaffVerifyModal";
+import type { VerifiedStaff } from "@/services/apiClient";
 
 type CheckoutItem = {
   id?: number;
@@ -98,9 +99,14 @@ type Props = {
     waiveMembershipForCoupon?: boolean;
     extraCharges: Array<{ label: string; amount: number }>;
     customerId?: string | null;
-    /** Selected from Invoiced By master at checkout */
-    invoicedById?: string | null;
-    invoicedBy?: string;
+    /** Staff verified via PIN before billing */
+    invoiceBy?: {
+      staffId: string;
+      staffName: string;
+      employeeId: string;
+      email?: string;
+    } | null;
+    verifiedAt?: string | null;
   }) => Promise<void>;
 };
 
@@ -365,10 +371,9 @@ export default function CheckoutModal({
   const [walletBalance, setWalletBalance] = useState(0);
   const [minimumWalletBalance, setMinimumWalletBalance] = useState(0);
   const [instructionNotes, setInstructionNotes] = useState("");
-  const [invoicedById, setInvoicedById] = useState("");
-  const [invoicedByName, setInvoicedByName] = useState("");
-  /** Checkout payment UI only after Invoiced By popup is confirmed */
-  const [invoicedByConfirmed, setInvoicedByConfirmed] = useState(false);
+  const [verifiedStaff, setVerifiedStaff] = useState<VerifiedStaff | null>(null);
+  const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
+  const [staffVerified, setStaffVerified] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponLabel, setCouponLabel] = useState("");
@@ -471,9 +476,9 @@ export default function CheckoutModal({
       // Reset until wallet fetch completes for the prefilled customer
       setWalletBalance(0);
       setInstructionNotes("");
-      setInvoicedById("");
-      setInvoicedByName("");
-      setInvoicedByConfirmed(false);
+      setVerifiedStaff(null);
+      setVerifiedAt(null);
+      setStaffVerified(false);
       setCouponCode("");
       setCouponDiscount(0);
       setCouponLabel("");
@@ -1185,10 +1190,10 @@ export default function CheckoutModal({
       Swal.fire("Phone required", "Please enter customer mobile number.", "warning");
       return;
     }
-    if (!invoicedById.trim() || !invoicedByName.trim()) {
+    if (!verifiedStaff?.staffId || !verifiedStaff?.staffName) {
       Swal.fire(
-        "Invoiced By required",
-        "Please select who this bill is invoiced by.",
+        "Staff verification required",
+        "Verify Staff PIN before completing this bill.",
         "warning",
       );
       return;
@@ -1257,6 +1262,16 @@ export default function CheckoutModal({
       return;
     }
 
+    if (!verifiedStaff) {
+      Swal.fire(
+        "Staff verification required",
+        "Verify Staff PIN before completing billing.",
+        "warning",
+      );
+      setStaffVerified(false);
+      return;
+    }
+
     const today = new Date().toISOString().split("T")[0];
     const normalizedMode = isMultiMode ? "MULTI" : paymentMode.toUpperCase();
     const paymentPayload = {
@@ -1299,8 +1314,13 @@ export default function CheckoutModal({
       extraCharges: extraCharges,
       customerId:
         selectedCustomer?._id ?? initialCustomerId ?? null,
-      invoicedById: invoicedById || null,
-      invoicedBy: invoicedByName.trim(),
+      invoiceBy: {
+        staffId: String(verifiedStaff.staffId || verifiedStaff._id),
+        staffName: verifiedStaff.staffName || verifiedStaff.name,
+        employeeId: verifiedStaff.employeeId || verifiedStaff.m_staff_id || "",
+        email: verifiedStaff.email || "",
+      },
+      verifiedAt: verifiedAt,
     };
     const payload = {
       customerName: customerName.trim(),
@@ -1308,9 +1328,18 @@ export default function CheckoutModal({
       customerId: selectedCustomer?._id ?? initialCustomerId ?? undefined,
       invoiceDate: today,
       dueDate: today,
-      salesPersonName: invoicedByName.trim() || staff.m_staff_name || "POS Sales",
-      invoicedBy: invoicedByName.trim(),
-      invoicedById: invoicedById || null,
+      salesPersonName:
+        verifiedStaff.staffName ||
+        verifiedStaff.name ||
+        staff.m_staff_name ||
+        "POS Sales",
+      invoiceBy: {
+        staffId: String(verifiedStaff.staffId || verifiedStaff._id),
+        staffName: verifiedStaff.staffName || verifiedStaff.name,
+        employeeId: verifiedStaff.employeeId || verifiedStaff.m_staff_id || "",
+        email: verifiedStaff.email || "",
+      },
+      verifiedAt: verifiedAt,
       notes: instructionNotes.trim(),
       items: items.map((item) => ({
         productName: item.name,
@@ -1416,17 +1445,15 @@ export default function CheckoutModal({
 
   if (!open) return null;
 
-  if (!invoicedByConfirmed) {
+  if (!staffVerified) {
     return (
-      <InvoicedByModal
+      <StaffVerifyModal
         open
-        initialInvoicedById={invoicedById}
-        initialInvoicedByName={invoicedByName}
         onClose={onClose}
-        onContinue={({ invoicedById: id, invoicedBy: name }) => {
-          setInvoicedById(id);
-          setInvoicedByName(name);
-          setInvoicedByConfirmed(true);
+        onVerified={({ staff: verified, verifiedAt: at }) => {
+          setVerifiedStaff(verified);
+          setVerifiedAt(at);
+          setStaffVerified(true);
         }}
       />
     );
@@ -1962,18 +1989,29 @@ export default function CheckoutModal({
 
               <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
-                  Invoiced By
+                  Invoice By (PIN verified)
                 </div>
                 <div className="mt-0.5 flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-slate-800">
-                    {invoicedByName || "—"}
-                  </span>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">
+                      {verifiedStaff?.staffName || verifiedStaff?.name || "—"}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {verifiedStaff?.employeeId ||
+                        verifiedStaff?.m_staff_id ||
+                        ""}
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setInvoicedByConfirmed(false)}
+                    onClick={() => {
+                      setStaffVerified(false);
+                      setVerifiedStaff(null);
+                      setVerifiedAt(null);
+                    }}
                     className="text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                   >
-                    Change
+                    Re-verify
                   </button>
                 </div>
               </div>

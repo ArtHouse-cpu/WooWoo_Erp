@@ -3,6 +3,100 @@ import Space from '../models/space.model.js';
 import Food from '../models/food.model.js';
 import {computeStockByProductNames} from '../utils/inventoryStock.utils.js';
 
+const escapeRegex = (value) =>
+  String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const variantMatchesSearch = (variant, searchRegex) => {
+  if (!searchRegex) return true;
+  const name = String(variant?.name ?? '');
+  const barcode = String(variant?.barcode ?? '');
+  return searchRegex.test(name) || searchRegex.test(barcode);
+};
+
+const parentMatchesSearch = (product, searchRegex) => {
+  if (!searchRegex) return true;
+  return (
+    searchRegex.test(String(product.productName ?? '')) ||
+    searchRegex.test(String(product.serviceName ?? '')) ||
+    searchRegex.test(String(product.itemCode ?? '')) ||
+    searchRegex.test(String(product.barCode ?? ''))
+  );
+};
+
+/**
+ * Expand a product into catalogue rows.
+ * - Parent row when parent fields match (or no search / no variants).
+ * - Variant rows as "Parent - Variant" so billing can search/select by variant name.
+ */
+const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
+  const parentName = String(product.productName ?? '').trim();
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const isCsp = Boolean(product.isCsp);
+  const parentHit = parentMatchesSearch(product, searchRegex);
+  const rows = [];
+
+  const base = {
+    sourceId: product._id,
+    sourceType: 'product',
+    parentProductName: parentName,
+    stockQty,
+    trackStock: true,
+    category: product.category || 'General',
+    lineCategory: 'product',
+    imageUrl: product.imageUrl || product.images?.[0] || null,
+    unit: product.primaryUnit || '',
+    discountType: product.discountType || 'flat',
+    discountValue: Number(product.discountValue ?? 0),
+    isCsp,
+    cspLabel: isCsp ? 'CSP' : null,
+  };
+
+  const pushParent = () => {
+    rows.push({
+      ...base,
+      _id: String(product._id),
+      name: parentName,
+      productName: parentName,
+      variantName: null,
+      sellingPrice: Number(product.sellingPrice ?? 0),
+      purchasePrice: Number(product.purchasePrice ?? 0),
+    });
+  };
+
+  const pushVariant = (variant) => {
+    const variantName = String(variant?.name ?? '').trim();
+    if (!variantName) return;
+    const displayName = `${parentName} - ${variantName}`;
+    rows.push({
+      ...base,
+      _id: `${String(product._id)}::${variantName}`,
+      name: displayName,
+      productName: displayName,
+      variantName,
+      sellingPrice: Number(variant.sellingPrice ?? product.sellingPrice ?? 0),
+      purchasePrice: Number(variant.purchasePrice ?? product.purchasePrice ?? 0),
+      barcode: String(variant.barcode ?? ''),
+    });
+  };
+
+  // Empty search / browse: keep parent-only rows (avoid exploding the grid).
+  if (!searchRegex) {
+    pushParent();
+    return rows;
+  }
+
+  // Parent matched → parent + all variants (so billing can pick B or C from A).
+  if (parentHit) {
+    pushParent();
+    variants.forEach(pushVariant);
+    return rows;
+  }
+
+  // Only variant name/barcode matched → show those variant rows.
+  variants.filter((v) => variantMatchesSearch(v, searchRegex)).forEach(pushVariant);
+  return rows;
+};
+
 /**
  * Unified catalogue lookup across products, services, spaces, and foods.
  * GET /catalogue/lookup?search=
@@ -11,7 +105,7 @@ export const lookupCatalogueItems = async (req, res) => {
   try {
     const search = String(req.query.search ?? '').trim();
     const limitPerType = Math.min(Number(req.query.limit ?? 25) || 25, 50);
-    const searchRegex = search ? new RegExp(search, 'i') : null;
+    const searchRegex = search ? new RegExp(escapeRegex(search), 'i') : null;
 
     const productSearch = searchRegex
       ? {
@@ -20,6 +114,8 @@ export const lookupCatalogueItems = async (req, res) => {
             {serviceName: searchRegex},
             {itemCode: searchRegex},
             {barCode: searchRegex},
+            {'variants.name': searchRegex},
+            {'variants.barcode': searchRegex},
           ],
         }
       : {};
@@ -65,36 +161,17 @@ export const lookupCatalogueItems = async (req, res) => {
     }
 
     const productNames = productDocs
-      .map(p => String(p.productName ?? '').trim())
+      .map((p) => String(p.productName ?? '').trim())
       .filter(Boolean);
     const stockMap = await computeStockByProductNames({names: productNames});
 
-    const products = productDocs.map(product => {
+    const products = productDocs.flatMap((product) => {
       const name = String(product.productName ?? '').trim();
       const stockQty = Number(stockMap.get(name) ?? product.stockQty ?? 0);
-      const isCsp = Boolean(product.isCsp);
-      return {
-        _id: product._id,
-        sourceId: product._id,
-        sourceType: 'product',
-        name,
-        productName: name,
-        sellingPrice: Number(product.sellingPrice ?? 0),
-        purchasePrice: Number(product.purchasePrice ?? 0),
-        stockQty,
-        trackStock: true,
-        category: product.category || 'General',
-        lineCategory: 'product',
-        imageUrl: product.imageUrl || product.images?.[0] || null,
-        unit: product.primaryUnit || '',
-        discountType: product.discountType || 'flat',
-        discountValue: Number(product.discountValue ?? 0),
-        isCsp,
-        cspLabel: isCsp ? 'CSP' : null,
-      };
+      return expandProductCatalogueRows(product, searchRegex, stockQty);
     });
 
-    const services = serviceDocs.map(service => {
+    const services = serviceDocs.map((service) => {
       const name = String(
         service.serviceName || service.productName || '',
       ).trim();
@@ -117,7 +194,7 @@ export const lookupCatalogueItems = async (req, res) => {
       };
     });
 
-    const spaces = spaceDocs.map(space => ({
+    const spaces = spaceDocs.map((space) => ({
       _id: space._id,
       sourceId: space._id,
       sourceType: 'space',
@@ -137,7 +214,7 @@ export const lookupCatalogueItems = async (req, res) => {
     }));
 
     // Restaurant foods are made to order — availability is status, not stock qty
-    const foods = foodDocs.map(food => ({
+    const foods = foodDocs.map((food) => ({
       _id: food._id,
       sourceId: food._id,
       sourceType: 'food',

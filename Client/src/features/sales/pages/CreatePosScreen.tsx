@@ -457,10 +457,18 @@ export default function CreatePosScreen({
         invoiceDate: todayStr,
         dueDate: todayStr,
         salesPersonName:
-          String(payment.invoicedBy || "").trim() || staff.m_staff_name || "POS",
-        invoicedBy:
-          String(payment.invoicedBy || "").trim() || staff.m_staff_name || "POS",
-        invoicedById: payment.invoicedById || null,
+          payment.invoiceBy?.staffName?.trim() ||
+          staff.m_staff_name ||
+          "POS",
+        invoiceBy: payment.invoiceBy
+          ? {
+              staffId: payment.invoiceBy.staffId,
+              staffName: payment.invoiceBy.staffName,
+              employeeId: payment.invoiceBy.employeeId,
+              email: payment.invoiceBy.email,
+            }
+          : null,
+        verifiedAt: payment.verifiedAt || null,
         notes: "POS Transaction",
         items: lineItems,
         subTotal,
