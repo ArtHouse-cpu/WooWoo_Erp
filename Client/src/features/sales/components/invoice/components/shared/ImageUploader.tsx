@@ -33,7 +33,11 @@ export default function ImageUploader({
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      {label ? (
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {label}
+        </label>
+      ) : null}
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
@@ -41,10 +45,12 @@ export default function ImageUploader({
           if (!disabled) addFiles(e.dataTransfer.files);
         }}
         onClick={() => !disabled && inputRef.current?.click()}
-        className="flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 transition hover:bg-gray-100"
+        className="flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 transition hover:border-blue-300 hover:bg-blue-50/40"
       >
-        <UploadCloud className="mb-1 text-gray-400" size={24} />
-        <span className="text-xs font-medium text-gray-500">Click or drag images</span>
+        <UploadCloud className="mb-1 text-slate-400" size={24} />
+        <span className="text-xs font-medium text-slate-500">
+          Click or drag images
+        </span>
       </div>
       <input
         ref={inputRef}

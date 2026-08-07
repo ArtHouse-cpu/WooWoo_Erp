@@ -16,42 +16,48 @@ export default function DiscountInput({
   disabled = false,
 }: Props) {
   return (
-    <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">Discount</label>
-      <div className="flex rounded-lg border border-gray-300 bg-white p-1">
+    <div className="space-y-3">
+      <div className="inline-flex w-full rounded-lg border border-slate-200 bg-slate-50 p-1">
         <button
           type="button"
           disabled={disabled}
           onClick={() => onTypeChange("flat")}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
-            valueType === "flat" ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100"
+          className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition ${
+            valueType === "flat"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-white hover:text-slate-900"
           }`}
         >
-          INR Flat
+          ₹ Flat
         </button>
         <button
           type="button"
           disabled={disabled}
           onClick={() => onTypeChange("percentage")}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+          className={`flex-1 rounded-md px-3 py-2 text-xs font-semibold transition ${
             valueType === "percentage"
-              ? "bg-blue-600 text-white"
-              : "text-gray-600 hover:bg-gray-100"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-slate-600 hover:bg-white hover:text-slate-900"
           }`}
         >
           %
         </button>
       </div>
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        disabled={disabled}
-        value={valueAmount}
-        onChange={(e) => onValueChange(Number(e.target.value) || 0)}
-        placeholder={valueType === "flat" ? "Discount in INR" : "Discount in %"}
-        className="w-full rounded-lg border border-gray-300 p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-      />
+      <div className="relative">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">
+          {valueType === "percentage" ? "%" : "₹"}
+        </span>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          disabled={disabled}
+          value={valueAmount}
+          onChange={(e) => onValueChange(Number(e.target.value) || 0)}
+          placeholder={valueType === "flat" ? "0.00" : "0"}
+          className="h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-7 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+        />
+      </div>
     </div>
   );
 }

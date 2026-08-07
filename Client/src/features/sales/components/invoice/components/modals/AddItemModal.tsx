@@ -311,7 +311,7 @@ export default function AddItemModal({
                 )}
 
                 {/* Dynamic Form Content */}
-                <div className="rounded-2xl border border-slate-100 bg-white/50">
+                <div className="min-w-0">
                   {itemType === "product" ? (
                     <ProductForm
                       onAddVariant={() => {
@@ -324,7 +324,9 @@ export default function AddItemModal({
                       }}
                     />
                   ) : (
-                    <ServiceForm />
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                      <ServiceForm />
+                    </div>
                   )}
                 </div>
 

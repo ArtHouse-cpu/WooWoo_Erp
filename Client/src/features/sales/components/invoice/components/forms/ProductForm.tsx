@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import { Pencil, Plus, Trash2, Wand2 } from "lucide-react";
 import CategorySelect from "../shared/CategorySelect";
@@ -20,8 +20,36 @@ const barcodeChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const generateBarcode = () =>
   `BC-${Array.from({ length: 8 }, () => barcodeChars[Math.floor(Math.random() * barcodeChars.length)]).join("")}`;
 
+const labelClass =
+  "mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500";
+const inputClass =
+  "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="mb-4 border-b border-slate-100 pb-3">
+        <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
+        {description ? (
+          <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
-  const { register, watch, setValue, control } = useFormContext<AddItemFormValues>();
+  const { register, watch, setValue, control } =
+    useFormContext<AddItemFormValues>();
   const { fields, remove } = useFieldArray({ control, name: "variants" });
   const [cspOptions, setCspOptions] = useState<CspEnrollment[]>([]);
   const [loadingCsp, setLoadingCsp] = useState(false);
@@ -41,7 +69,6 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
     (async () => {
       try {
         setLoadingCsp(true);
-        // Include inactive so edit can still show the saved seller
         const res = await handleGetCspEnrollments({ status: "all" });
         if (cancelled) return;
         const rows = Array.isArray(res?.enrollments)
@@ -62,7 +89,6 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
     };
   }, []);
 
-  // Keep CSP select value aligned after options load (ObjectId → string)
   useEffect(() => {
     if (!cspEnrollmentId || !cspOptions.length) return;
     const match = cspOptions.find(
@@ -77,195 +103,312 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
   }, [cspOptions, cspEnrollmentId, setValue]);
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Product Name *</label>
-          <input {...register("productName")} className="w-full rounded-lg border border-gray-300 p-2.5 text-sm" autoFocus />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Brand Name</label>
-          <input {...register("brandName")} placeholder="e.g. Nike, Apple" className="w-full rounded-lg border border-gray-300 p-2.5 text-sm" />
-        </div>
-        <CategorySelect
-          categoryValue={categoryId || ""}
-          categoryName={categoryName || ""}
-          onCategoryChange={(id, name) => {
-            setValue("categoryId", id, { shouldDirty: true });
-            setValue("category", name, { shouldDirty: true });
-          }}
-          subCategoryValue={subCategoryId || ""}
-          subCategoryName={subCategoryName || ""}
-          onSubCategoryChange={(id, name) => {
-            setValue("subCategoryId", id, { shouldDirty: true });
-            setValue("subCategory", name, { shouldDirty: true });
-          }}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">CSP (Customer Seller Program)</label>
-          <select
-            value={isCsp || "no"}
-            onChange={(e) => {
-              const next = e.target.value as "yes" | "no";
-              setValue("isCsp", next, { shouldValidate: true });
-              if (next === "no") setValue("cspEnrollmentId", "");
-            }}
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm"
-          >
-            <option value="no">No</option>
-            <option value="yes">Yes</option>
-          </select>
-        </div>
-        {isCsp === "yes" && (
+    <div className="space-y-4">
+      <Section
+        title="Basic details"
+        description="Name, brand, and how this product is classified."
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <label className={labelClass}>
+              Product Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              {...register("productName")}
+              placeholder="e.g. Canvas Tote Bag"
+              className={inputClass}
+              autoFocus
+            />
+          </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">CSP Seller *</label>
+            <label className={labelClass}>Brand Name</label>
+            <input
+              {...register("brandName")}
+              placeholder="e.g. Nike, Apple"
+              className={inputClass}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:[&>div]:grid md:[&>div]:grid-cols-2 md:[&>div]:gap-4 md:[&>div]:space-y-0 [&_label]:mb-1.5 [&_label]:block [&_label]:text-xs [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-slate-500 [&_button.flex]:h-10 [&_button.flex]:rounded-lg [&_button.flex]:border-slate-200">
+              <CategorySelect
+                categoryValue={categoryId || ""}
+                categoryName={categoryName || ""}
+                onCategoryChange={(id, name) => {
+                  setValue("categoryId", id, { shouldDirty: true });
+                  setValue("category", name, { shouldDirty: true });
+                }}
+                subCategoryValue={subCategoryId || ""}
+                subCategoryName={subCategoryName || ""}
+                onSubCategoryChange={(id, name) => {
+                  setValue("subCategoryId", id, { shouldDirty: true });
+                  setValue("subCategory", name, { shouldDirty: true });
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="Pricing"
+        description="Selling and purchase amounts in INR."
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>
+              Selling Price (INR) <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">
+                ₹
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                {...register("sellingPrice", { valueAsNumber: true })}
+                className={`${inputClass} pl-7`}
+              />
+            </div>
+          </div>
+          <div>
+            <label className={labelClass}>Purchase Price (INR)</label>
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">
+                ₹
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                {...register("purchasePrice", { valueAsNumber: true })}
+                className={`${inputClass} pl-7`}
+              />
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title="Identifiers"
+        description="SKU and barcode used for inventory and billing."
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>Item Code / SKU</label>
+            <input
+              placeholder="e.g. SKU-12345"
+              {...register("itemCode")}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Barcode</label>
+            <div className="flex gap-2">
+              <input
+                {...register("barcode")}
+                placeholder="Scan or generate"
+                className={`${inputClass} flex-1`}
+              />
+              <button
+                type="button"
+                title="Generate barcode"
+                onClick={() => setValue("barcode", generateBarcode())}
+                className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+              >
+                <Wand2 size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="CSP" description="Customer Seller Program settings.">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>CSP (Customer Seller Program)</label>
             <select
-              value={String(cspEnrollmentId || "")}
-              onChange={(e) =>
-                setValue("cspEnrollmentId", e.target.value, {
-                  shouldValidate: true,
-                  shouldDirty: true,
-                })
-              }
-              className="w-full rounded-lg border border-gray-300 p-2.5 text-sm"
-              disabled={loadingCsp}
+              value={isCsp || "no"}
+              onChange={(e) => {
+                const next = e.target.value as "yes" | "no";
+                setValue("isCsp", next, { shouldValidate: true });
+                if (next === "no") setValue("cspEnrollmentId", "");
+              }}
+              className={inputClass}
             >
-              <option value="">{loadingCsp ? "Loading sellers…" : "Select CSP seller"}</option>
-              {cspOptions.map((row) => (
-                <option key={row._id} value={String(row._id)}>
-                  {row.label ||
-                    `CSP · ${
-                      row.displayName ||
-                      row.customer?.name ||
-                      (typeof row.customerId === "object"
-                        ? row.customerId?.name
-                        : "") ||
-                      "Seller"
-                    }`}
-                  {row.mobile
-                    ? ` (${row.mobile})`
-                    : typeof row.customerId === "object" && row.customerId?.mobile
-                      ? ` (${row.customerId.mobile})`
-                      : ""}
-                </option>
-              ))}
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
             </select>
-            {!loadingCsp && cspOptions.length === 0 && (
-              <p className="mt-1 text-xs text-amber-600">
-                No CSP sellers found. Enroll one under Network → CSP.
-              </p>
-            )}
           </div>
-        )}
+          {isCsp === "yes" ? (
+            <div>
+              <label className={labelClass}>
+                CSP Seller <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={String(cspEnrollmentId || "")}
+                onChange={(e) =>
+                  setValue("cspEnrollmentId", e.target.value, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+                className={inputClass}
+                disabled={loadingCsp}
+              >
+                <option value="">
+                  {loadingCsp ? "Loading sellers…" : "Select CSP seller"}
+                </option>
+                {cspOptions.map((row) => (
+                  <option key={row._id} value={String(row._id)}>
+                    {row.label ||
+                      `CSP · ${
+                        row.displayName ||
+                        row.customer?.name ||
+                        (typeof row.customerId === "object"
+                          ? row.customerId?.name
+                          : "") ||
+                        "Seller"
+                      }`}
+                    {row.mobile
+                      ? ` (${row.mobile})`
+                      : typeof row.customerId === "object" &&
+                          row.customerId?.mobile
+                        ? ` (${row.customerId.mobile})`
+                        : ""}
+                  </option>
+                ))}
+              </select>
+              {!loadingCsp && cspOptions.length === 0 ? (
+                <p className="mt-1.5 text-xs text-amber-600">
+                  No CSP sellers found. Enroll one under Network → CSP.
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="hidden sm:block" aria-hidden />
+          )}
+        </div>
+      </Section>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <Section title="Discount" description="Optional catalogue discount.">
+          <DiscountInput
+            valueType={discountType}
+            valueAmount={discountValue}
+            onTypeChange={(type) => setValue("discountType", type)}
+            onValueChange={(value) => setValue("discountValue", value)}
+          />
+        </Section>
+
+        <Section title="Description" description="Optional product notes.">
+          <label className={labelClass}>Description</label>
+          <textarea
+            {...register("description")}
+            rows={4}
+            placeholder="Short description for this product…"
+            className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          />
+        </Section>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Selling Price (INR) *</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="e.g. 999.00"
-            {...register("sellingPrice", { valueAsNumber: true })}
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Purchase Price (INR)</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="e.g. 750.00"
-            {...register("purchasePrice", { valueAsNumber: true })}
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Item Code / SKU</label>
-          <input
-            placeholder="e.g. SKU-12345"
-            {...register("itemCode")}
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm"
-          />
-        </div>
-      </div>
+      <Section title="Images" description="Upload product photos.">
+        <ImageUploader
+          files={images}
+          onFilesChange={(next) => setValue("images", next)}
+          label=""
+        />
+      </Section>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Barcode</label>
-          <div className="flex gap-2">
-            <input {...register("barcode")} className="flex-1 rounded-lg border border-gray-300 p-2.5 text-sm" />
-            <button type="button" onClick={() => setValue("barcode", generateBarcode())} className="rounded-lg border border-gray-300 px-3 text-gray-600">
-              <Wand2 size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <DiscountInput
-        valueType={discountType}
-        valueAmount={discountValue}
-        onTypeChange={(type) => setValue("discountType", type)}
-        onValueChange={(value) => setValue("discountValue", value)}
-      />
-
-      <textarea {...register("description")} rows={3} placeholder="Description" className="w-full rounded-lg border border-gray-300 p-2.5 text-sm" />
-
-      <ImageUploader files={images} onFilesChange={(next) => setValue("images", next)} />
-
-      <div className="space-y-2 rounded-lg border border-gray-200 p-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold text-gray-800">Variants</h4>
-          <button type="button" onClick={onAddVariant} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white">
+      <Section
+        title="Variants"
+        description="Optional size/color options with their own prices."
+      >
+        <div className="mb-3 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onAddVariant}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
+          >
             <Plus size={14} /> Add Variant
           </button>
         </div>
         {fields.length === 0 ? (
-          <p className="text-xs text-gray-500">No variants added.</p>
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
+            <p className="text-sm text-slate-600">No variants added yet.</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Add variants if this product has sizes, colors, or packs.
+            </p>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs">
-              <thead className="bg-gray-50 text-gray-600">
-                <tr>
-                  <th className="px-2 py-2 text-left">Name</th>
-                  <th className="px-2 py-2 text-right">Selling Price</th>
-                  <th className="px-2 py-2 text-right">Purchase Price</th>
-                  <th className="px-2 py-2 text-left">Barcode</th>
-                  <th className="px-2 py-2 text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fields.map((field, idx) => {
-                  const variant = field as unknown as VariantInput;
-                  return (
-                    <tr key={field.id} className="border-t">
-                      <td className="px-2 py-2">{variant.name}</td>
-                      <td className="px-2 py-2 text-right">{variant.sellingPrice}</td>
-                      <td className="px-2 py-2 text-right">{variant.purchasePrice}</td>
-                      <td className="px-2 py-2">{variant.barcode}</td>
-                      <td className="px-2 py-2">
-                        <div className="flex justify-center gap-1">
-                          <button type="button" onClick={() => onEditVariant(idx)} className="rounded bg-gray-100 p-1">
-                            <Pencil size={12} />
-                          </button>
-                          <button type="button" onClick={() => remove(idx)} className="rounded bg-red-50 p-1 text-red-600">
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2.5 text-left font-semibold">Name</th>
+                    <th className="px-3 py-2.5 text-right font-semibold">
+                      Selling
+                    </th>
+                    <th className="px-3 py-2.5 text-right font-semibold">
+                      Purchase
+                    </th>
+                    <th className="px-3 py-2.5 text-left font-semibold">
+                      Barcode
+                    </th>
+                    <th className="px-3 py-2.5 text-center font-semibold">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {fields.map((field, idx) => {
+                    const variant = field as unknown as VariantInput;
+                    return (
+                      <tr key={field.id} className="hover:bg-slate-50/80">
+                        <td className="px-3 py-2.5 font-medium text-slate-800">
+                          {variant.name}
+                        </td>
+                        <td className="px-3 py-2.5 text-right text-slate-700">
+                          ₹{Number(variant.sellingPrice ?? 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2.5 text-right text-slate-700">
+                          ₹{Number(variant.purchasePrice ?? 0).toFixed(2)}
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-600">
+                          {variant.barcode || "—"}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => onEditVariant(idx)}
+                              className="rounded-md bg-slate-100 p-1.5 text-slate-600 transition hover:bg-slate-200"
+                              title="Edit variant"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => remove(idx)}
+                              className="rounded-md bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100"
+                              title="Remove variant"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
-      </div>
+      </Section>
     </div>
   );
 }
