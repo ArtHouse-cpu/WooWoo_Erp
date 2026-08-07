@@ -4,7 +4,7 @@ export const createTokenAndSetCookie = (res, payload) => {
   const {userId, phoneNumber} = payload;
   const token = jwt.sign({userId, phoneNumber}, process.env.JWT_SECRET, {
     algorithm: 'HS256',
-    expiresIn: '30d',
+    expiresIn: '10d',
   });
 
   const isProd = process.env.NODE_ENV === 'production';
@@ -13,7 +13,7 @@ export const createTokenAndSetCookie = (res, payload) => {
     httpOnly: true,
     secure: isProd,
     sameSite: 'lax',
-    maxAge: 30 * 24 * 60 * 60 * 1000,
+    maxAge: 240 * 60 * 60 * 1000,
   });
 
   return token;
