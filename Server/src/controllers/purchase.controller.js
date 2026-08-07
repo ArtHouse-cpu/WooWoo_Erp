@@ -182,35 +182,101 @@ export const updatePurchase = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid purchase id." });
     }
 
-    const updateData = { ...req.body };
-    if (updateData.invoiceDate) updateData.invoiceDate = new Date(updateData.invoiceDate);
-    if (updateData.vendorDate) updateData.vendorDate = new Date(updateData.vendorDate);
+    const body = req.body || {};
+    const $set = {};
 
-    let itemsList = updateData.items;
-    if (typeof itemsList === 'string') {
-      try {
-        itemsList = JSON.parse(itemsList);
-      } catch (e) {
-        itemsList = undefined;
+    if (body.invoiceNumber !== undefined) {
+      $set.invoiceNumber = String(body.invoiceNumber).trim();
+    }
+    if (body.invoiceDate) {
+      const d = new Date(body.invoiceDate);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ success: false, message: "Invalid invoice date." });
       }
+      $set.invoiceDate = d;
     }
-
-    if (updateData.manualDiscount !== undefined) {
-      updateData.manualDiscount = Math.max(
-        0,
-        Number(updateData.manualDiscount ?? 0) || 0,
-      );
+    if (body.vendorDate) {
+      const d = new Date(body.vendorDate);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ success: false, message: "Invalid vendor date." });
+      }
+      $set.vendorDate = d;
     }
-
-    if (updateData.manualDiscountType !== undefined) {
-      updateData.manualDiscountType =
-        String(updateData.manualDiscountType ?? "flat") === "percentage"
+    if (body.supplierName !== undefined) {
+      $set.supplierName = String(body.supplierName).trim();
+    }
+    if (body.supplierAddress !== undefined) {
+      $set.supplierAddress = String(body.supplierAddress).trim();
+    }
+    if (body.supplierContact !== undefined) {
+      $set.supplierContact = String(body.supplierContact).trim();
+    }
+    if (body.amount !== undefined) {
+      const amount = Number(body.amount);
+      if (!Number.isFinite(amount) || amount < 0) {
+        return res.status(400).json({ success: false, message: "Invalid amount." });
+      }
+      $set.amount = amount;
+    }
+    if (body.manualDiscount !== undefined) {
+      $set.manualDiscount = Math.max(0, Number(body.manualDiscount ?? 0) || 0);
+    }
+    if (body.manualDiscountType !== undefined) {
+      $set.manualDiscountType =
+        String(body.manualDiscountType ?? "flat") === "percentage"
           ? "percentage"
           : "flat";
     }
+    if (body.status !== undefined && String(body.status).trim()) {
+      $set.status = String(body.status).trim().toLowerCase();
+    }
+    if (body.paymentMode !== undefined && String(body.paymentMode).trim()) {
+      const raw = String(body.paymentMode).trim();
+      const allowed = ["Cash", "UPI", "Card", "Bank", "Credit", "Other"];
+      if (raw.toUpperCase() === "UPI") {
+        $set.paymentMode = "UPI";
+      } else {
+        const hit = allowed.find(
+          (m) => m.toLowerCase() === raw.toLowerCase(),
+        );
+        if (!hit) {
+          return res.status(400).json({
+            success: false,
+            message: `Invalid payment mode: ${raw}`,
+          });
+        }
+        $set.paymentMode = hit;
+      }
+    }
+    if (body.notes !== undefined) $set.notes = String(body.notes ?? "").trim();
+    if (body.purchaser !== undefined) {
+      $set.purchaser = String(body.purchaser ?? "").trim();
+    }
+    if (body.purchaserSignature !== undefined) {
+      $set.purchaserSignature = String(body.purchaserSignature ?? "").trim();
+    }
+    if (body.supplierSignature !== undefined) {
+      $set.supplierSignature = String(body.supplierSignature ?? "").trim();
+    }
+    if (body.purchaserDate) {
+      const d = new Date(body.purchaserDate);
+      if (!Number.isNaN(d.getTime())) $set.purchaserDate = d;
+    }
+    if (body.supplierDate) {
+      const d = new Date(body.supplierDate);
+      if (!Number.isNaN(d.getTime())) $set.supplierDate = d;
+    }
 
+    let itemsList = body.items;
+    if (typeof itemsList === "string") {
+      try {
+        itemsList = JSON.parse(itemsList);
+      } catch {
+        itemsList = undefined;
+      }
+    }
     if (Array.isArray(itemsList)) {
-      updateData.items = itemsList.map((item) => {
+      $set.items = itemsList.map((item) => {
         const qty = Number(item.qty);
         const unitPrice = Number(item.unitPrice);
         const discount = Number(item.discount ?? 0);
@@ -224,21 +290,45 @@ export const updatePurchase = async (req, res) => {
       });
     }
 
+    const updateOps = {};
+    if (Object.keys($set).length) updateOps.$set = $set;
+
     if (req.files && req.files.length > 0) {
-      const uploadPromises = req.files.map(file => uploadOnCloudinary(file.path));
+      const uploadPromises = req.files.map((file) =>
+        uploadOnCloudinary(file.path),
+      );
       const cloudinaryUrls = await Promise.all(uploadPromises);
-      const validUrls = cloudinaryUrls.filter(url => url !== null);
-      
-      if (!updateData.$push) updateData.$push = {};
-      updateData.$push.attachments = { $each: validUrls };
+      const validUrls = cloudinaryUrls.filter((url) => url !== null);
+      if (validUrls.length) {
+        updateOps.$push = { attachments: { $each: validUrls } };
+      }
     }
 
-    const purchase = await Purchase.findByIdAndUpdate(id, { $set: updateData }, { new: true });
+    if (!Object.keys(updateOps).length) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields to update.",
+      });
+    }
+
+    const purchase = await Purchase.findByIdAndUpdate(id, updateOps, {
+      new: true,
+      runValidators: true,
+    });
     if (!purchase) {
-      return res.status(404).json({ success: false, message: "Purchase not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Purchase not found." });
     }
     return res.status(200).json({ success: true, purchase });
   } catch (error) {
+    console.error("updatePurchase error:", error);
+    if (error?.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "A purchase with this invoice number already exists.",
+      });
+    }
     return res.status(500).json({ success: false, message: error.message });
   }
 };
