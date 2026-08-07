@@ -30,6 +30,7 @@ const roundMoney = value => {
   if (!Number.isFinite(n)) return 0;
   return Math.round((n + Number.EPSILON) * 100) / 100;
 };
+
 /** Products track inventory; space / service / food / membership do not. */
 const isInventoryTrackedCategory = raw => {
   const value = String(raw || '')
@@ -47,6 +48,43 @@ const isInventoryTrackedCategory = raw => {
     return false;
   }
   return true;
+};
+
+const assertSufficientPurchaseStock = async ({
+  items,
+  excludeInvoiceId = null,
+}) => {
+  const requestNames = (items || [])
+    .filter(item => isInventoryTrackedCategory(item.category))
+    .map(item => String(item.productName ?? '').trim())
+    .filter(Boolean);
+
+  if (!requestNames.length) return null;
+
+  const stockMap = await computeStockByProductNames({
+    names: requestNames,
+    excludeInvoiceId,
+  });
+  const requestedQtyMap = new Map();
+
+  for (const item of items) {
+    if (!isInventoryTrackedCategory(item.category)) continue;
+    const name = String(item.productName ?? '').trim();
+    const qty = Number(item.qty ?? 0);
+    requestedQtyMap.set(name, (requestedQtyMap.get(name) ?? 0) + qty);
+  }
+
+  for (const [name, requestedQty] of requestedQtyMap.entries()) {
+    const availableQty = Number(stockMap.get(name) ?? 0);
+    if (requestedQty > availableQty) {
+      return {
+        success: false,
+        message: `Insufficient stock for ${name}. Available from purchases: ${availableQty}, requested: ${requestedQty}.`,
+      };
+    }
+  }
+
+  return null;
 };
 
 const isSoftReferralSkipMessage = message =>
@@ -726,36 +764,18 @@ const createInvoice = async (req, res) => {
       };
     });
 
-    const requestNames = normalizedItems
-      .filter(item => isInventoryTrackedCategory(item.category))
-      .map(item => item.productName);
-    const stockMap = requestNames.length
-      ? await computeStockByProductNames({names: requestNames})
-      : new Map();
-    const requestedQtyMap = new Map();
-
-    for (const item of normalizedItems) {
-      if (!isInventoryTrackedCategory(item.category)) continue;
-      const name = String(item.productName ?? '').trim();
-      const qty = Number(item.qty ?? 0);
-      requestedQtyMap.set(name, (requestedQtyMap.get(name) ?? 0) + qty);
-    }
-
-    for (const [name, requestedQty] of requestedQtyMap.entries()) {
-      const availableQty = Number(stockMap.get(name) ?? 0);
-      if (requestedQty > availableQty) {
-        return res.status(400).json({
-          success: false,
-          message: `Insufficient stock for ${name}. Available: ${availableQty}, requested: ${requestedQty}.`,
-        });
-      }
-    }
-
     if (normalizedItems.some(item => !item.productName || item.qty <= 0 || item.unitPrice < 0 || item.discount < 0 || item.lineTotal < 0)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid invoice item values.',
       });
+    }
+
+    const stockError = await assertSufficientPurchaseStock({
+      items: normalizedItems,
+    });
+    if (stockError) {
+      return res.status(400).json(stockError);
     }
 
     const enrichedItems = await enrichItemsWithCsp(normalizedItems);
@@ -1285,32 +1305,12 @@ const updateInvoice = async (req, res) => {
     }
 
     if (normalizedItems && normalizedItems.length) {
-      const requestNames = normalizedItems
-        .filter(item => isInventoryTrackedCategory(item.category))
-        .map(item => item.productName);
-      const stockMap = requestNames.length
-        ? await computeStockByProductNames({
-            names: requestNames,
-            excludeInvoiceId: id,
-          })
-        : new Map();
-
-      const requestedQtyMap = new Map();
-      for (const item of normalizedItems) {
-        if (!isInventoryTrackedCategory(item.category)) continue;
-        const name = String(item.productName ?? '').trim();
-        const qty = Number(item.qty ?? 0);
-        requestedQtyMap.set(name, (requestedQtyMap.get(name) ?? 0) + qty);
-      }
-
-      for (const [name, requestedQty] of requestedQtyMap.entries()) {
-        const availableQty = Number(stockMap.get(name) ?? 0);
-        if (requestedQty > availableQty) {
-          return res.status(400).json({
-            success: false,
-            message: `Insufficient stock for ${name}. Available: ${availableQty}, requested: ${requestedQty}.`,
-          });
-        }
+      const stockError = await assertSufficientPurchaseStock({
+        items: normalizedItems,
+        excludeInvoiceId: id,
+      });
+      if (stockError) {
+        return res.status(400).json(stockError);
       }
     }
 

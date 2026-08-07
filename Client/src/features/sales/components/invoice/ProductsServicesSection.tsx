@@ -11,6 +11,7 @@ import {
   resolveMembershipPlan,
 } from "../../utils/membershipInvoiceUtils";
 import CreateProductModal from "./Modal/CreateProductModal";
+import CatalogueItemLabel from "@/features/sales/components/CatalogueItemLabel";
 import Swal from "sweetalert2";
 
 type DraftItem = {
@@ -156,7 +157,7 @@ export default function ProductsServicesSection({
     if (item.trackStock && Number(item.stockQty ?? 0) <= 0) {
       Swal.fire(
         "Out of stock",
-        `${item.productName || item.name} is currently out of stock.`,
+        `${item.productName || item.name} has no purchased quantity left to sell.`,
         "warning",
       );
       return;
@@ -193,7 +194,7 @@ export default function ProductsServicesSection({
     if (item.trackStock && Number(item.stockQty ?? 0) <= itemInCart.qty) {
       Swal.fire(
         "Insufficient stock",
-        `${item.productName || item.name} has only ${item.stockQty} qty available.`,
+        `${item.productName || item.name} has only ${item.stockQty} qty available from purchases.`,
         "warning",
       );
       return;
@@ -282,7 +283,7 @@ export default function ProductsServicesSection({
     if (item.trackStock && Number(item.stockQty ?? 0) <= 0) {
       Swal.fire(
         "Out of stock",
-        `${item.productName || item.name} is currently out of stock.`,
+        `${item.productName || item.name} has no purchased quantity left to sell.`,
         "warning",
       );
       return;
@@ -305,7 +306,7 @@ export default function ProductsServicesSection({
     if (selected?.trackStock && Number(selected.stockQty ?? 0) <= 0) {
       Swal.fire(
         "Out of stock",
-        `${selected.productName} is currently out of stock.`,
+        `${selected.productName} has no purchased quantity left to sell.`,
         "warning",
       );
       return;
@@ -317,7 +318,7 @@ export default function ProductsServicesSection({
     ) {
       Swal.fire(
         "Insufficient stock",
-        `${selected.productName} has only ${selected.stockQty} qty available.`,
+        `${selected.productName} has only ${selected.stockQty} qty available from purchases.`,
         "warning",
       );
       return;
@@ -411,10 +412,8 @@ export default function ProductsServicesSection({
                         onClick={() => handleSelectProduct(p)}
                         className="cursor-pointer px-3 py-2 text-sm hover:bg-gray-50"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="font-medium text-gray-800 truncate">
-                            {p.productName || p.name}
-                          </div>
+                        <div className="flex items-start justify-between gap-2">
+                          <CatalogueItemLabel item={p} className="min-w-0 flex-1" />
                           <span
                             className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                               p.variantName
@@ -425,12 +424,9 @@ export default function ProductsServicesSection({
                             {p.variantName ? "Variant" : badge.label}
                           </span>
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="mt-0.5 text-xs text-gray-500">
                           ₹{p.sellingPrice}
                           {stockLabel}
-                          {p.variantName
-                            ? ` · ${p.parentProductName || "Product"}`
-                            : ""}
                         </div>
                       </div>
                     );
@@ -566,7 +562,7 @@ export default function ProductsServicesSection({
               return (
                 <div
                   key={`${item.sourceType}-${item._id}`}
-                  className="flex-shrink-0 w-28 sm:w-32 group relative border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 rounded-xl bg-white p-2 flex flex-col justify-between whitespace-normal"
+                  className="flex-shrink-0 w-32 sm:w-36 group relative border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 rounded-xl bg-white p-2.5 flex flex-col justify-between whitespace-normal"
                 >
                   {/* Veg / Non-Veg badge */}
                   {item.sourceType === "food" && (
@@ -614,10 +610,12 @@ export default function ProductsServicesSection({
                       </span>
                     </div>
 
-                    {/* Item Name */}
-                    <div className="text-[10px] sm:text-xs font-semibold text-gray-800 line-clamp-2 min-h-[24px] group-hover:text-blue-600 transition-colors leading-tight" title={item.productName || item.name}>
-                      {item.productName || item.name}
-                    </div>
+                    {/* Clear product + variant title */}
+                    <CatalogueItemLabel
+                      item={item}
+                      compact
+                      className="mt-0.5 group-hover:[&>div]:text-blue-700"
+                    />
                     {item.isCsp && (
                       <span className="mt-0.5 inline-flex rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
                         {item.cspLabel || "CSP"}
@@ -635,8 +633,16 @@ export default function ProductsServicesSection({
                     <div className="flex items-baseline justify-between gap-1 flex-wrap">
                       <span className="text-[11px] sm:text-xs font-bold text-gray-900">₹{item.sellingPrice}</span>
                       {item.trackStock && item.stockQty != null && (
-                        <span className={`text-[8px] sm:text-[9px] font-medium ${item.stockQty <= 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                          {item.stockQty <= 0 ? "Out" : `Stock: ${item.stockQty}`}
+                        <span
+                          className={`text-[8px] sm:text-[9px] font-medium ${
+                            Number(item.stockQty) <= 0
+                              ? "text-red-500"
+                              : "text-gray-400"
+                          }`}
+                        >
+                          {Number(item.stockQty) <= 0
+                            ? "Out"
+                            : `Stock: ${item.stockQty}`}
                         </span>
                       )}
                     </div>

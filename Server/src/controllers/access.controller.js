@@ -9,6 +9,7 @@ import {
   isValidPermission,
 } from '../constants/permissions.js';
 import {resolveUserPermissions} from '../utils/rbac.utils.js';
+import {decryptPin, encryptPin} from '../utils/pinCrypto.js';
 
 const SALT_ROUNDS = 12;
 
@@ -116,7 +117,7 @@ const toStaffDto = async (userDoc) => {
       ? userDoc
       : await User.findById(userDoc._id)
           .select(staffProjection)
-          .select('+pinHash')
+          .select('+pinHash +pinEncrypted')
           .populate('roleId', 'name slug permissions isSystem isActive')
           .lean();
 
@@ -131,6 +132,8 @@ const toStaffDto = async (userDoc) => {
     legacyRole: populated.role,
     pinEnabled: Boolean(populated.pinEnabled),
     pinSet: Boolean(populated.pinHash),
+    /** true when admin can reveal PIN via View PIN */
+    pinViewable: Boolean(populated.pinEncrypted),
     role: populated.roleId
       ? {
           id: String(populated.roleId._id),
@@ -272,7 +275,7 @@ export const listStaff = async (req, res) => {
 
     const staff = await User.find(filter)
       .select(staffProjection)
-      .select('+pinHash')
+      .select('+pinHash +pinEncrypted')
       .populate('roleId', 'name slug permissions isSystem isActive')
       .sort({createdAt: -1})
       .lean();
@@ -289,6 +292,7 @@ export const listStaff = async (req, res) => {
           legacyRole: user.role,
           pinEnabled: Boolean(user.pinEnabled),
           pinSet: Boolean(user.pinHash),
+          pinViewable: Boolean(user.pinEncrypted),
           role: user.roleId
             ? {
                 id: String(user.roleId._id),
@@ -693,7 +697,7 @@ export const deleteStaff = async (req, res) => {
 
 /**
  * POST /access/staff/:id/pin
- * Generate (or set) a Staff PIN. Returns plaintext PIN once — never stored.
+ * Generate (or set) a Staff PIN. Returns plaintext PIN; also stores encrypted copy for View PIN.
  * Body: { pin?: string } — omit to auto-generate a 6-digit PIN.
  */
 export const setStaffPin = async (req, res) => {
@@ -705,7 +709,7 @@ export const setStaffPin = async (req, res) => {
       return res.status(400).json({success: false, message: 'Invalid staff id.'});
     }
 
-    const staff = await User.findById(id).select('+pinHash');
+    const staff = await User.findById(id).select('+pinHash +pinEncrypted');
     if (!staff) {
       return res.status(404).json({success: false, message: 'Staff not found.'});
     }
@@ -739,11 +743,13 @@ export const setStaffPin = async (req, res) => {
     }
 
     staff.pinHash = await bcrypt.hash(plainPin, SALT_ROUNDS);
+    staff.pinEncrypted = encryptPin(plainPin);
     staff.pinEnabled = true;
     staff.pinFailedAttempts = 0;
     staff.pinLockedUntil = null;
     await persistStaffPinUpdate(staff, {
       pinHash: staff.pinHash,
+      pinEncrypted: staff.pinEncrypted,
       pinEnabled: true,
       pinFailedAttempts: 0,
       pinLockedUntil: null,
@@ -751,7 +757,7 @@ export const setStaffPin = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Staff PIN set. Share it securely — it will not be shown again.',
+      message: 'Staff PIN set. You can view it anytime from Access → View PIN.',
       pin: plainPin,
       staff: await toStaffDto(staff),
     });
@@ -778,7 +784,7 @@ export const updateStaffPin = async (req, res) => {
     }
 
     const staff = await User.findById(id).select(
-      '+pinHash +pinFailedAttempts +pinLockedUntil',
+      '+pinHash +pinEncrypted +pinFailedAttempts +pinLockedUntil',
     );
     if (!staff) {
       return res.status(404).json({success: false, message: 'Staff not found.'});
@@ -812,6 +818,7 @@ export const updateStaffPin = async (req, res) => {
         });
       }
       staff.pinHash = await bcrypt.hash(plainPin, SALT_ROUNDS);
+      staff.pinEncrypted = encryptPin(plainPin);
       staff.pinEnabled = true;
       staff.pinFailedAttempts = 0;
       staff.pinLockedUntil = null;
@@ -834,6 +841,7 @@ export const updateStaffPin = async (req, res) => {
 
     await persistStaffPinUpdate(staff, {
       pinHash: staff.pinHash ?? null,
+      pinEncrypted: staff.pinEncrypted ?? null,
       pinEnabled: Boolean(staff.pinEnabled),
       pinFailedAttempts: staff.pinFailedAttempts ?? 0,
       pinLockedUntil: staff.pinLockedUntil ?? null,
@@ -842,7 +850,7 @@ export const updateStaffPin = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: plainPin
-        ? 'Staff PIN updated. Share it securely — it will not be shown again.'
+        ? 'Staff PIN updated. You can view it anytime from Access → View PIN.'
         : 'Staff PIN settings updated.',
       ...(plainPin ? {pin: plainPin} : {}),
       staff: await toStaffDto(staff),
@@ -866,17 +874,19 @@ export const clearStaffPin = async (req, res) => {
       return res.status(400).json({success: false, message: 'Invalid staff id.'});
     }
 
-    const staff = await User.findById(id).select('+pinHash');
+    const staff = await User.findById(id).select('+pinHash +pinEncrypted');
     if (!staff) {
       return res.status(404).json({success: false, message: 'Staff not found.'});
     }
 
     staff.pinHash = null;
+    staff.pinEncrypted = null;
     staff.pinEnabled = false;
     staff.pinFailedAttempts = 0;
     staff.pinLockedUntil = null;
     await persistStaffPinUpdate(staff, {
       pinHash: null,
+      pinEncrypted: null,
       pinEnabled: false,
       pinFailedAttempts: 0,
       pinLockedUntil: null,
@@ -892,6 +902,66 @@ export const clearStaffPin = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to clear staff PIN.',
+    });
+  }
+};
+
+/**
+ * GET /access/staff/:id/pin
+ * Reveal Staff PIN for Access managers (decrypts pinEncrypted).
+ */
+export const viewStaffPin = async (req, res) => {
+  try {
+    const {id} = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({success: false, message: 'Invalid staff id.'});
+    }
+
+    const staff = await User.findById(id)
+      .select('+pinHash +pinEncrypted fullName m_staff_id')
+      .lean();
+    if (!staff) {
+      return res.status(404).json({success: false, message: 'Staff not found.'});
+    }
+    if (!staff.pinHash) {
+      return res.status(404).json({
+        success: false,
+        message: 'No Staff PIN is set for this user.',
+      });
+    }
+    if (!staff.pinEncrypted) {
+      return res.status(409).json({
+        success: false,
+        message:
+          'This PIN was set before View PIN was available. Use Reset or Change PIN once, then you can view it.',
+        needsReset: true,
+      });
+    }
+
+    const pin = decryptPin(staff.pinEncrypted);
+    if (!pin || !isValidPin(pin)) {
+      return res.status(409).json({
+        success: false,
+        message:
+          'Could not decrypt this PIN. Use Reset or Change PIN once, then you can view it.',
+        needsReset: true,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      pin,
+      staff: {
+        _id: staff._id,
+        fullName: staff.fullName,
+        m_staff_id: staff.m_staff_id,
+      },
+    });
+  } catch (error) {
+    console.error('viewStaffPin error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to view staff PIN.',
     });
   }
 };

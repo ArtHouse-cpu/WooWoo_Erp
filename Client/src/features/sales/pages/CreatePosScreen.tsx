@@ -149,7 +149,22 @@ export default function CreatePosScreen({
       prev.map((it) => {
         if (it.id !== id) return it;
 
-        const updated = { ...it, [field]: Number(value) };
+        let nextValue = Number(value);
+        if (
+          field === "qty" &&
+          it.stockQty != null &&
+          Number.isFinite(Number(it.stockQty)) &&
+          nextValue > Number(it.stockQty)
+        ) {
+          Swal.fire(
+            "Insufficient stock",
+            `${it.name} has only ${it.stockQty} qty available from purchases.`,
+            "warning",
+          );
+          nextValue = Number(it.stockQty);
+        }
+
+        const updated = { ...it, [field]: nextValue };
         if (field === "qty" || field === "price") {
           const stacked = stackLineBenefits(
             updated.price,
@@ -197,7 +212,19 @@ export default function CreatePosScreen({
     ) {
       Swal.fire(
         "Out of stock",
-        `${selectedProduct.productName || name} is currently out of stock.`,
+        `${selectedProduct.productName || name} has no purchased quantity left to sell.`,
+        "warning",
+      );
+      return;
+    }
+
+    if (
+      selectedProduct?.trackStock &&
+      qty > Number(selectedProduct?.stockQty ?? 0)
+    ) {
+      Swal.fire(
+        "Insufficient stock",
+        `${selectedProduct.productName || name} has only ${selectedProduct.stockQty} qty available from purchases.`,
         "warning",
       );
       return;
@@ -258,7 +285,7 @@ export default function CreatePosScreen({
     if (p.trackStock && Number(p.stockQty ?? 0) <= 0) {
       Swal.fire(
         "Out of stock",
-        `${p.productName || p.name} is currently out of stock.`,
+        `${p.productName || p.name} has no purchased quantity left to sell.`,
         "warning",
       );
       return;
@@ -273,7 +300,7 @@ export default function CreatePosScreen({
       if (p.trackStock && Number(p.stockQty ?? 0) < newQty) {
         Swal.fire(
           "Insufficient stock",
-          `${name} has only ${p.stockQty} qty available.`,
+          `${name} has only ${p.stockQty} qty available from purchases.`,
           "warning",
         );
         return;
@@ -329,7 +356,7 @@ export default function CreatePosScreen({
       if (p.trackStock && Number(p.stockQty ?? 0) <= existingQty) {
         Swal.fire(
           "Insufficient stock",
-          `${p.productName || p.name} has only ${p.stockQty} qty available.`,
+          `${p.productName || p.name} has only ${p.stockQty} qty available from purchases.`,
           "warning",
         );
         return;

@@ -79,6 +79,20 @@ const purchaseSchema = new mongoose.Schema(
       min: 0,
     },
 
+    /** Bill-level manual discount value (₹ if flat, % if percentage) */
+    manualDiscount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    /** How to interpret manualDiscount */
+    manualDiscountType: {
+      type: String,
+      enum: ["flat", "percentage"],
+      default: "flat",
+    },
+
     paymentMode: {
       type: String,
       enum: ["Cash", "UPI", "Card", "Bank", "Credit", "Other"],

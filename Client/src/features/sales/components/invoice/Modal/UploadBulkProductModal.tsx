@@ -139,7 +139,7 @@ function mapSheetRows(rawRows: Record<string, unknown>[]): PreviewRow[] {
     const barcode = cellToString(pickField(row, "barcode"));
     const sellingPrice = normalizeAmount(pickField(row, "sellingPrice"));
     const itemCode = cellToString(pickField(row, "itemCode"));
-    const stockQty = Math.floor(normalizeAmount(pickField(row, "stockQty")));
+    const stockQty = 0; // Stock comes from purchases, not product master
     const purchasePrice = normalizeAmount(pickField(row, "purchasePrice"));
     const excelRow = index + 2;
 
@@ -192,7 +192,6 @@ export default function UploadBulkProductModal({
         "Barcode",
         "Unit Price",
         "Item Code",
-        "Qty",
         "Purchase Price",
       ],
       [
@@ -202,7 +201,6 @@ export default function UploadBulkProductModal({
         "8901234567890",
         499,
         "TOTE-L",
-        25,
         280,
       ],
       [
@@ -212,7 +210,6 @@ export default function UploadBulkProductModal({
         "8901234567891",
         299,
         "MUG-01",
-        40,
         150,
       ],
     ];
@@ -248,7 +245,7 @@ export default function UploadBulkProductModal({
       const hasAnyProduct = mapped.some((r) => r.productName);
       if (!hasAnyProduct) {
         setParseError(
-          "Could not find Product / Product Name column. Use headers like Product, Variant, Category, Barcode, Unit Price, Item Code, Qty, Purchase Price.",
+          "Could not find Product / Product Name column. Use headers like Product, Variant, Category, Barcode, Unit Price, Item Code, Purchase Price.",
         );
         return;
       }
@@ -297,7 +294,8 @@ export default function UploadBulkProductModal({
             </h3>
             <p className="mt-0.5 text-xs text-gray-500">
               Columns: Product, Variant, Category, Barcode, Unit Price, Item
-              Code, Qty, Purchase Price. Missing categories are auto-created.
+              Code, Purchase Price. Stock starts at 0 and updates from purchases
+              (Qty in Excel is ignored). Missing categories are auto-created.
             </p>
           </div>
           <button
@@ -364,7 +362,6 @@ export default function UploadBulkProductModal({
                     <th className="px-3 py-2 font-semibold">Barcode</th>
                     <th className="px-3 py-2 font-semibold">Unit Price</th>
                     <th className="px-3 py-2 font-semibold">Item Code</th>
-                    <th className="px-3 py-2 font-semibold">Qty</th>
                     <th className="px-3 py-2 font-semibold">Purchase</th>
                     <th className="px-3 py-2 font-semibold">Status</th>
                   </tr>
@@ -391,7 +388,6 @@ export default function UploadBulkProductModal({
                       <td className="px-3 py-2 text-gray-600">
                         {row.itemCode || "—"}
                       </td>
-                      <td className="px-3 py-2 text-gray-600">{row.stockQty}</td>
                       <td className="px-3 py-2 text-gray-600">
                         ₹{row.purchasePrice.toLocaleString("en-IN")}
                       </td>

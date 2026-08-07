@@ -4,6 +4,7 @@ import type { InvoiceItem } from "./types";
 import { handleGetProducts, handleCreateProduct } from "@/services/apiClient";
 import Swal from "sweetalert2";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
+import CatalogueItemLabel from "@/features/sales/components/CatalogueItemLabel";
 
 export type DraftItem = {
   name: string;
@@ -197,11 +198,17 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
                       onClick={() => handleSelectProduct(p)}
                       className="cursor-pointer px-3 py-2 text-sm hover:bg-gray-50"
                     >
-                      <div className="font-medium text-gray-800">{p.productName}</div>
-                      <div className="text-xs text-gray-500">
+                      <CatalogueItemLabel
+                        item={{
+                          productName: p.productName,
+                          name: p.productName,
+                          variantName: p.variantName,
+                          parentProductName: p.parentProductName,
+                        }}
+                      />
+                      <div className="mt-0.5 text-xs text-gray-500">
                         ₹{p.sellingPrice}
                         {p.stockQty ? ` | Qty: ${p.stockQty}` : ""}
-                        {p.variantName ? " · Variant" : ""}
                       </div>
                     </div>
                   ))}

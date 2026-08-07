@@ -1,7 +1,7 @@
 import Product from '../models/product.model.js';
 import Space from '../models/space.model.js';
 import Food from '../models/food.model.js';
-import {computeStockByProductNames} from '../utils/inventoryStock.utils.js';
+import {computeStockByProductNames, getProductStockNames} from '../utils/inventoryStock.utils.js';
 
 const escapeRegex = (value) =>
   String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -27,8 +27,9 @@ const parentMatchesSearch = (product, searchRegex) => {
  * Expand a product into catalogue rows.
  * Products WITH variants → only variant rows as "Parent - Variant".
  * Products WITHOUT variants → single parent row.
+ * stockByName: Map of line name → live stock (parent and each "Parent - Variant").
  */
-const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
+const expandProductCatalogueRows = (product, searchRegex, stockByName) => {
   const parentName = String(product.productName ?? '').trim();
   const variants = Array.isArray(product.variants)
     ? product.variants.filter((v) => String(v?.name ?? '').trim())
@@ -37,11 +38,18 @@ const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
   const parentHit = parentMatchesSearch(product, searchRegex);
   const rows = [];
 
+  const stockFor = (lineName) => {
+    if (!stockByName) return 0;
+    const exact = stockByName.get(lineName);
+    if (exact != null) return Number(exact) || 0;
+    const lower = stockByName.get(String(lineName).toLowerCase());
+    return Number(lower) || 0;
+  };
+
   const base = {
     sourceId: product._id,
     sourceType: 'product',
     parentProductName: parentName,
-    stockQty,
     trackStock: true,
     category: product.category || 'General',
     lineCategory: 'product',
@@ -60,6 +68,7 @@ const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
       name: parentName,
       productName: parentName,
       variantName: null,
+      stockQty: stockFor(parentName),
       sellingPrice: Number(product.sellingPrice ?? 0),
       purchasePrice: Number(product.purchasePrice ?? 0),
     });
@@ -75,6 +84,7 @@ const expandProductCatalogueRows = (product, searchRegex, stockQty) => {
       name: displayName,
       productName: displayName,
       variantName,
+      stockQty: stockFor(displayName),
       sellingPrice: Number(variant.sellingPrice ?? product.sellingPrice ?? 0),
       purchasePrice: Number(variant.purchasePrice ?? product.purchasePrice ?? 0),
       barcode: String(variant.barcode ?? ''),
@@ -293,19 +303,17 @@ export const lookupCatalogueItems = async (req, res) => {
       foodDocs,
     ] = await Promise.all(tasks);
 
-    const productNames = productDocs
-      .map((p) => String(p.productName ?? '').trim())
-      .filter(Boolean);
+    const productNames = [
+      ...new Set(productDocs.flatMap((p) => getProductStockNames(p))),
+    ];
     const stockMap =
       productNames.length > 0
         ? await computeStockByProductNames({names: productNames})
         : new Map();
 
-    const products = productDocs.flatMap((product) => {
-      const name = String(product.productName ?? '').trim();
-      const stockQty = Number(stockMap.get(name) ?? product.stockQty ?? 0);
-      return expandProductCatalogueRows(product, searchRegex, stockQty);
-    });
+    const products = productDocs.flatMap((product) =>
+      expandProductCatalogueRows(product, searchRegex, stockMap),
+    );
 
     const services = serviceDocs.map(mapService);
     const spaces = spaceDocs.map(mapSpace);

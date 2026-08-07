@@ -4,7 +4,7 @@ import CustomersailorProgram from '../models/customerSellerProgram.model.js';
 import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
-import { computeStockByProductNames } from '../utils/inventoryStock.utils.js';
+import { computeStockByProductNames, getProductStockNames, sumStockForNames } from '../utils/inventoryStock.utils.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import mongoose from 'mongoose';
 
@@ -295,8 +295,8 @@ export const createProduct = async (req, res) => {
       barCode,
       category,
       subCategory,
-      stockQty: itemType === "product" ? Number(stockQty || 0) : 0,
-      stockStatus: itemType === "product" ? stockStatus || "in_stock" : "in_stock",
+      stockQty: 0,
+      stockStatus: "out_of_stock",
       primaryUnit: itemType === "service" ? primaryUnit || "" : "",
       description: description || "",
       discountType: discountType || "flat",
@@ -399,10 +399,6 @@ export const uploadBulkProducts = async (req, res) => {
         row?.purchasePrice ?? row?.['Purchase Price'],
         0,
       );
-      const stockQty = Math.max(
-        0,
-        Math.floor(toNumber(row?.stockQty ?? row?.qty ?? row?.Qty, 0)),
-      );
       const categoryRaw = String(
         row?.category ?? row?.Category ?? row?.categoryName ?? '',
       ).trim();
@@ -481,8 +477,8 @@ export const uploadBulkProducts = async (req, res) => {
         description: String(row?.description ?? '').trim(),
         discountType: row?.discountType === 'percentage' ? 'percentage' : 'flat',
         discountValue: Math.max(0, toNumber(row?.discountValue, 0)),
-        stockQty,
-        stockStatus: stockQty > 0 ? 'in_stock' : 'out_of_stock',
+        stockQty: 0,
+        stockStatus: 'out_of_stock',
         primaryUnit: '',
         variants,
         images: Array.isArray(row?.images) ? row.images : [],
@@ -697,7 +693,9 @@ export const getProducts = async (req, res) => {
           : { $and: clauses };
 
     const products = await Product.find(query).sort({ createdAt: -1 }).limit(6000);
-    const productNames = products.map((p) => String(p.productName ?? '').trim()).filter(Boolean);
+    const productNames = [
+      ...new Set(products.flatMap((p) => getProductStockNames(p))),
+    ];
     const stockMap = await computeStockByProductNames({ names: productNames });
 
     const productsWithLiveStock = products.map((productDoc) => {
@@ -705,7 +703,7 @@ export const getProducts = async (req, res) => {
       const isService = product.itemType === "service" || product.type === "service";
       const liveStockQty = isService
         ? 0
-        : Number(stockMap.get(String(product.productName ?? "").trim()) ?? 0);
+        : sumStockForNames(stockMap, getProductStockNames(product));
 
       return {
         ...product,
@@ -821,7 +819,7 @@ export const updateProduct = async (req, res) => {
     existingProduct.brandName = brandName ?? existingProduct.brandName;
     existingProduct.category = category ?? existingProduct.category;
     existingProduct.subCategory = subCategory ?? existingProduct.subCategory;
-    existingProduct.stockStatus = stockStatus ?? existingProduct.stockStatus;
+    // Stock qty/status come from purchases/sales movements — do not overwrite from product form
     existingProduct.primaryUnit = primaryUnit ?? existingProduct.primaryUnit;
     existingProduct.description = description ?? existingProduct.description;
     existingProduct.discountType = discountType ?? existingProduct.discountType;
@@ -832,7 +830,7 @@ export const updateProduct = async (req, res) => {
       existingProduct.stockQty = 0;
       existingProduct.variants = [];
     } else {
-      existingProduct.stockQty = stockQty !== undefined ? Number(stockQty) : existingProduct.stockQty;
+      // Keep stored stockQty as-is; live inventory is computed from purchases/invoices
       if (variants) {
         try {
           existingProduct.variants = JSON.parse(variants);

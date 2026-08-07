@@ -41,6 +41,15 @@ const userSchema = new mongoose.Schema(
       default: null,
       select: false,
     },
+    /**
+     * AES-GCM encrypted PIN for admin "View PIN" on Access screen.
+     * Verification still uses pinHash (bcrypt). Never returned in list APIs.
+     */
+    pinEncrypted: {
+      type: String,
+      default: null,
+      select: false,
+    },
     pinEnabled: {
       type: Boolean,
       default: false,

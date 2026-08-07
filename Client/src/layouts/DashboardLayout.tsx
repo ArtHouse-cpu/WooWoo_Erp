@@ -2,7 +2,6 @@ import { Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
 import Header from "./Header";
 import LeftSideBar from "./LeftSideBar";
-import MobileBottomNav from "./MobileBottomNav";
 
 export default function DashboardLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -64,12 +63,10 @@ export default function DashboardLayout() {
           </div>
         </div>
 
-        <main className="min-w-0 flex-1 overflow-y-auto px-3 pb-24 pt-3 sm:px-4 md:px-5 lg:pb-6 lg:pt-4">
+        <main className="min-w-0 flex-1 overflow-y-auto px-3 pb-6 pt-3 sm:px-4 md:px-5 lg:pt-4">
           <Outlet />
         </main>
       </div>
-
-      <MobileBottomNav />
     </div>
   );
 }

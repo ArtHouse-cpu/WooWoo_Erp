@@ -14,7 +14,11 @@ import {
 } from "@/services/apiClient";
 import PurchaseProductServiceScreen from "../components/PurchaseProductsServicesSection";
 import CreatePurchaseOrderHeader from "../components/CreatePurchaseOrderHeader";
-import PurchaseOrderSummaryCard from "../components/PurchaseSummaryCard";
+import PurchaseOrderSummaryCard from "../components/PurchaseOrderSummaryCard";
+import {
+  computeManualDiscountAmount,
+  type ManualDiscountType,
+} from "../components/PurchaseSummaryCard";
 import NotesSection from "@/features/sales/components/invoice/NotesSection";
 import InvoiceDetailsSection from "@/features/sales/components/invoice/InvoiceDetailsSection";
 import AddVendorModal from "../Modal/AddVendorModal";
@@ -78,6 +82,9 @@ export default function CreatePurchaseOrderScreen() {
   const [draftDiscount, setDraftDiscount] = useState("0");
   const [draftImage, setDraftImage] = useState("");
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [manualDiscount, setManualDiscount] = useState(0);
+  const [manualDiscountType, setManualDiscountType] =
+    useState<ManualDiscountType>("flat");
 
   useEffect(() => {
     const state = location.state as { purchase?: any; mode?: Mode } | null;
@@ -96,6 +103,10 @@ export default function CreatePurchaseOrderScreen() {
       );
     }
     setNotes(String(purchase.notes ?? ""));
+    setManualDiscount(Math.max(0, Number(purchase.manualDiscount ?? 0) || 0));
+    setManualDiscountType(
+      purchase.manualDiscountType === "percentage" ? "percentage" : "flat",
+    );
     if (Array.isArray(purchase.items)) {
       setItems(
         purchase.items.map((item: any, idx: number) => ({
@@ -174,6 +185,10 @@ export default function CreatePurchaseOrderScreen() {
           productName: item.productName,
           qty: Number(item.qty || 1),
           unitPrice: Number(item.unitPrice || 0),
+          sellingPrice:
+            item.sellingPrice != null
+              ? Number(item.sellingPrice)
+              : undefined,
           discount: Number(item.discount || 0),
           cashback: 0,
           image: item.image || "",
@@ -214,7 +229,14 @@ export default function CreatePurchaseOrderScreen() {
     () => items.reduce((sum, item) => sum + item.discount, 0),
     [items],
   );
-  const grandTotal = subTotal - discountTotal;
+  const safeManualDiscount = Math.max(0, Number(manualDiscount) || 0);
+  const appliedManualDiscount = computeManualDiscountAmount(
+    subTotal,
+    discountTotal,
+    safeManualDiscount,
+    manualDiscountType,
+  );
+  const grandTotal = Math.max(0, subTotal - discountTotal - appliedManualDiscount);
 
   const fetchVendors = async (signal?: AbortSignal) => {
     try {
@@ -299,6 +321,8 @@ export default function CreatePurchaseOrderScreen() {
         purchaser: purchaser,
         vendorDate: purchaseDate,
         amount: grandTotal,
+        manualDiscount: safeManualDiscount,
+        manualDiscountType,
         status,
         paymentMode: payment?.mode
           ? (payment.mode.toUpperCase() === "UPI"
@@ -461,6 +485,15 @@ export default function CreatePurchaseOrderScreen() {
           <PurchaseOrderSummaryCard
             subTotal={subTotal}
             discountTotal={discountTotal}
+            manualDiscount={safeManualDiscount}
+            manualDiscountType={manualDiscountType}
+            onManualDiscountChange={
+              mode !== "view" ? setManualDiscount : undefined
+            }
+            onManualDiscountTypeChange={
+              mode !== "view" ? setManualDiscountType : undefined
+            }
+            readOnly={mode === "view"}
             grandTotal={grandTotal}
             onSave={
               mode !== "view"

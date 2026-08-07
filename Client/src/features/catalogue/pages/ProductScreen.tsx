@@ -39,7 +39,19 @@ type ProductRow = {
   isCsp?: boolean;
   cspLabel?: string | null;
   cspEnrollmentId?: string | null;
+  variants?: Array<{ name?: string } | string>;
 };
+
+function getVariantNames(product: ProductRow): string[] {
+  if (!Array.isArray(product.variants)) return [];
+  return product.variants
+    .map((v) =>
+      typeof v === "string"
+        ? v.trim()
+        : String(v?.name ?? "").trim(),
+    )
+    .filter(Boolean);
+}
 
 
 export default function ProductScreen() {
@@ -273,17 +285,30 @@ export default function ProductScreen() {
       {
         accessorKey: "productName",
         header: "Product Name",
-        size: 150,
-        Cell: ({ cell, row }: { cell: any; row: any }) => (
-          <div className="flex flex-col gap-1">
-            <span className="font-semibold text-slate-800">{cell.getValue()}</span>
-            {row.original?.isCsp && (
-              <span className="inline-flex w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                {row.original.cspLabel || "CSP"}
+        size: 220,
+        Cell: ({ cell, row }: { cell: any; row: any }) => {
+          const name = String(cell.getValue() || "").trim() || "—";
+          const variantNames = getVariantNames(row.original as ProductRow);
+          const variantLabel =
+            variantNames.length > 0 ? ` (${variantNames.join(", ")})` : "";
+          return (
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold text-slate-800">
+                {name}
+                {variantLabel ? (
+                  <span className="font-medium text-slate-500">
+                    {variantLabel}
+                  </span>
+                ) : null}
               </span>
-            )}
-          </div>
-        ),
+              {row.original?.isCsp && (
+                <span className="inline-flex w-fit rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                  {row.original.cspLabel || "CSP"}
+                </span>
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: "category",

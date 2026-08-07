@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
-import { KeyRound, Loader2, RefreshCw, Shield, SquarePen, Trash2, Users } from "lucide-react";
+import { Eye, KeyRound, Loader2, RefreshCw, Shield, SquarePen, Trash2, Users } from "lucide-react";
 import {
   PERMISSION_CATALOG,
   PERMISSIONS,
@@ -20,6 +20,7 @@ import {
   handleUpdateAccessRole,
   handleUpdateAccessStaff,
   handleUpdateStaffPin,
+  handleViewStaffPin,
   type AccessRole,
   type AccessStaffRow,
 } from "@/services/apiClient";
@@ -99,22 +100,34 @@ export default function AccessScreen() {
     void loadAll("");
   }, [loadAll]);
 
-  const showPinOnce = async (title: string, pin: string, staffName: string) => {
+  const showPinDialog = async (
+    title: string,
+    pin: string,
+    staffName: string,
+    options?: { viewMode?: boolean },
+  ) => {
+    const viewMode = Boolean(options?.viewMode);
     await Swal.fire({
-      icon: "success",
+      icon: viewMode ? "info" : "success",
       title,
       html: `
         <p class="mb-2 text-sm text-slate-600">
-          Share this PIN securely with <b>${String(staffName).replace(/</g, "&lt;")}</b>.
-          It will not be shown again.
+          Staff PIN for <b>${String(staffName).replace(/</g, "&lt;")}</b>.
+          ${
+            viewMode
+              ? "Keep this private — only Access managers can view it."
+              : "You can view it again anytime from Access → View PIN."
+          }
         </p>
         <p class="rounded-lg bg-slate-900 px-4 py-3 font-mono text-2xl tracking-[0.35em] text-white">
           ${String(pin).replace(/</g, "&lt;")}
         </p>
       `,
-      confirmButtonText: "I have saved the PIN",
+      confirmButtonText: viewMode ? "Close" : "Got it",
     });
   };
+
+  const showPinOnce = showPinDialog;
 
   const patchStaffRow = (next: AccessStaffRow) => {
     setStaff((prev) =>
@@ -127,8 +140,8 @@ export default function AccessScreen() {
     const confirm = await Swal.fire({
       title: row.pinSet ? "Regenerate Staff PIN?" : "Generate Staff PIN?",
       text: row.pinSet
-        ? "The current PIN will be replaced. The new PIN is shown only once."
-        : "A 6-digit PIN will be generated and shown only once.",
+        ? "The current PIN will be replaced. You can view the new PIN anytime with View PIN."
+        : "A 6-digit PIN will be generated. You can view it anytime with View PIN.",
       icon: "question",
       showCancelButton: true,
       confirmButtonText: row.pinSet ? "Regenerate" : "Generate",
@@ -259,6 +272,62 @@ export default function AccessScreen() {
       await Swal.fire(
         "Clear failed",
         err?.response?.data?.message ?? "Could not clear Staff PIN.",
+        "error",
+      );
+    } finally {
+      setPinBusyId(null);
+    }
+  };
+
+  const onViewStaffPin = async (row: AccessStaffRow) => {
+    if (!canManage) return;
+    if (!row.pinSet) {
+      await Swal.fire(
+        "No PIN set",
+        "Generate or set a PIN before viewing it.",
+        "info",
+      );
+      return;
+    }
+    try {
+      setPinBusyId(row._id);
+      const res = await handleViewStaffPin(row._id);
+      if (res?.pin) {
+        await showPinDialog("Staff PIN", res.pin, row.fullName, {
+          viewMode: true,
+        });
+      } else {
+        await Swal.fire(
+          "View failed",
+          res?.message || "Could not load Staff PIN.",
+          "error",
+        );
+      }
+    } catch (error: unknown) {
+      const err = error as {
+        response?: { data?: { message?: string; needsReset?: boolean } };
+      };
+      const needsReset = Boolean(err?.response?.data?.needsReset);
+      if (needsReset) {
+        setPinBusyId(null);
+        const ask = await Swal.fire({
+          icon: "info",
+          title: "PIN not viewable yet",
+          text:
+            err?.response?.data?.message ??
+            "Reset this PIN once to enable View PIN for older PINs.",
+          showCancelButton: true,
+          confirmButtonText: "Reset PIN now",
+          cancelButtonText: "Later",
+        });
+        if (ask.isConfirmed) {
+          await onGenerateStaffPin(row);
+        }
+        return;
+      }
+      await Swal.fire(
+        "View failed",
+        err?.response?.data?.message ?? "Could not view Staff PIN.",
         "error",
       );
     } finally {
@@ -824,15 +893,29 @@ export default function AccessScreen() {
                             <div className="flex flex-wrap gap-1">
                               <button
                                 type="button"
-                                disabled={pinBusyId === row._id}
-                                onClick={() => void onGenerateStaffPin(row)}
-                                className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+                                disabled={pinBusyId === row._id || !row.pinSet}
+                                onClick={() => void onViewStaffPin(row)}
+                                className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                                title={
+                                  row.pinViewable
+                                    ? "View Staff PIN"
+                                    : "View PIN (reset once if this is an older PIN)"
+                                }
                               >
                                 {pinBusyId === row._id ? (
                                   <Loader2 size={12} className="animate-spin" />
                                 ) : (
-                                  <KeyRound size={12} />
+                                  <Eye size={12} />
                                 )}
+                                View PIN
+                              </button>
+                              <button
+                                type="button"
+                                disabled={pinBusyId === row._id}
+                                onClick={() => void onGenerateStaffPin(row)}
+                                className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+                              >
+                                <KeyRound size={12} />
                                 {row.pinSet ? "Reset" : "Generate"}
                               </button>
                               <button

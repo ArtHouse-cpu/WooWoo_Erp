@@ -22,8 +22,6 @@ const baseSchema = z.object({
   serviceName: z.string().optional().default(""),
   sellingPrice: z.number().gt(0, "Selling price must be greater than 0"),
   purchasePrice: z.number().min(0).default(0),
-  stockQty: z.number().min(0).default(0),
-  stockStatus: z.enum(["in_stock", "out_of_stock"]).default("in_stock"),
   primaryUnit: z.string().optional().default(""),
   itemCode: z.string().optional().default(""),
   barcode: z.string().optional().default(""),
@@ -103,8 +101,6 @@ const buildDefaultValues = (
       "",
     sellingPrice: Number(initialData?.sellingPrice || 0),
     purchasePrice: Number(initialData?.purchasePrice || 0),
-    stockQty: Number(initialData?.stockQty || 0),
-    stockStatus: initialData?.stockStatus || "in_stock",
     primaryUnit: initialData?.primaryUnit || "",
     itemCode: initialData?.itemCode || "",
     barcode:
@@ -194,8 +190,8 @@ export default function AddItemModal({
         ? "Update service details and save changes."
         : "Add a new service offering to your catalogue."
       : isEditMode
-        ? "Update product details for your inventory."
-        : "Manage tangible product details for your inventory.";
+        ? "Update product details for your catalogue."
+        : "Add product details to your catalogue.";
 
   const submit = handleSubmit(async (values) => {
     if (loading) return;
@@ -210,8 +206,6 @@ export default function AddItemModal({
     payload.append("serviceName", values.serviceName || values.productName || "");
     payload.append("sellingPrice", String(values.sellingPrice));
     payload.append("purchasePrice", String(values.purchasePrice));
-    payload.append("stockQty", String(resolvedType === "product" ? values.stockQty : 0));
-    payload.append("stockStatus", values.stockStatus);
     payload.append("primaryUnit", values.primaryUnit);
     payload.append("itemCode", values.itemCode);
     payload.append("barCode", values.barcode);

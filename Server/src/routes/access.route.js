@@ -19,6 +19,7 @@ import {
   setStaffPin,
   updateStaffPin,
   clearStaffPin,
+  viewStaffPin,
   verifyStaffPin,
 } from '../controllers/access.controller.js';
 
@@ -55,6 +56,11 @@ router.patch(
   '/staff/:id/role',
   requirePermission(PERMISSIONS.ACCESS_MANAGE),
   assignStaffRole,
+);
+router.get(
+  '/staff/:id/pin',
+  requirePermission(PERMISSIONS.ACCESS_MANAGE),
+  viewStaffPin,
 );
 router.post(
   '/staff/:id/pin',

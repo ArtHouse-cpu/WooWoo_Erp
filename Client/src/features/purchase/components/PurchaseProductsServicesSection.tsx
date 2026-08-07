@@ -7,6 +7,7 @@ import {
   type CatalogueLookupItem,
 } from "@/services/apiClient";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
+import CatalogueItemLabel from "@/features/sales/components/CatalogueItemLabel";
 import Swal from "sweetalert2";
 
 type DraftItem = {
@@ -54,6 +55,17 @@ function resolvePurchaseUnitPrice(item: CatalogueLookupItem): number {
   const purchase = Number(item.purchasePrice);
   if (Number.isFinite(purchase) && purchase > 0) return purchase;
   return Number(item.sellingPrice ?? 0) || 0;
+}
+
+function resolveSellingPrice(item: CatalogueLookupItem): number {
+  const selling = Number(item.sellingPrice);
+  return Number.isFinite(selling) && selling > 0 ? selling : 0;
+}
+
+function formatPrice(value: number): string {
+  return Number(value || 0).toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
 }
 
 function resolveImage(item: CatalogueLookupItem | any): string {
@@ -189,6 +201,7 @@ export default function ProductsServicesSection({
         productName: item.productName || item.name || "",
         qty: 1,
         unitPrice,
+        sellingPrice: resolveSellingPrice(item) || undefined,
         discount: 0,
         image: resolveImage(item),
       });
@@ -203,14 +216,6 @@ export default function ProductsServicesSection({
     itemInCart: InvoiceItem,
   ) => {
     if (!onUpdateItemQty) return;
-    if (item.trackStock && Number(item.stockQty ?? 0) <= itemInCart.qty) {
-      Swal.fire(
-        "Insufficient stock",
-        `${item.productName || item.name} has only ${item.stockQty} qty available.`,
-        "warning",
-      );
-      return;
-    }
     onUpdateItemQty(itemInCart.id, itemInCart.qty + 1);
   };
 
@@ -304,15 +309,19 @@ export default function ProductsServicesSection({
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="truncate font-medium text-gray-800">
-                            {p.productName || p.name}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            Purchase ₹{resolvePurchaseUnitPrice(p)}
+                          <CatalogueItemLabel item={p} />
+                          <div className="mt-0.5 text-xs text-gray-500">
+                            <span className="font-medium text-gray-700">
+                              Purchase ₹{formatPrice(resolvePurchaseUnitPrice(p))}
+                            </span>
+                            {resolveSellingPrice(p) > 0 && (
+                              <span className="ml-1.5 text-[10px] text-gray-400">
+                                Sell ₹{formatPrice(resolveSellingPrice(p))}
+                              </span>
+                            )}
                             {p.trackStock && p.stockQty != null
                               ? ` | Stock: ${p.stockQty}`
                               : ""}
-                            {p.variantName ? " · Variant" : ""}
                           </div>
                         </div>
                       </div>
@@ -451,11 +460,12 @@ export default function ProductsServicesSection({
               );
               const hasImage = Boolean(item.imageUrl) && !imageErrors[item._id];
               const purchasePrice = resolvePurchaseUnitPrice(item);
+              const sellingPrice = resolveSellingPrice(item);
 
               return (
                 <div
                   key={`${item.sourceType}-${item._id}`}
-                  className="group relative flex w-28 shrink-0 flex-col justify-between rounded-xl border border-gray-100 bg-white p-2 whitespace-normal transition-all duration-200 hover:border-blue-200 hover:shadow-md sm:w-32"
+                  className="group relative flex w-32 shrink-0 flex-col justify-between rounded-xl border border-gray-100 bg-white p-2.5 whitespace-normal transition-all duration-200 hover:border-blue-200 hover:shadow-md sm:w-36"
                 >
                   {item.sourceType === "food" && (
                     <span className="absolute top-1 right-1 z-10 flex items-center justify-center rounded border border-gray-100 bg-white p-0.5 shadow-sm">
@@ -500,12 +510,11 @@ export default function ProductsServicesSection({
                       </span>
                     </div>
 
-                    <div
-                      className="line-clamp-2 min-h-[24px] text-[10px] font-semibold leading-tight text-gray-800 transition-colors group-hover:text-blue-600 sm:text-xs"
-                      title={item.productName || item.name}
-                    >
-                      {item.productName || item.name}
-                    </div>
+                    <CatalogueItemLabel
+                      item={item}
+                      compact
+                      className="mt-0.5 group-hover:[&>div]:text-blue-700"
+                    />
                     <div className="mt-0.5 text-[9px] font-medium text-gray-400">
                       {item.category || "General"}
                     </div>
@@ -513,13 +522,21 @@ export default function ProductsServicesSection({
 
                   <div className="mt-1">
                     <div className="flex flex-wrap items-baseline justify-between gap-1">
-                      <div className="flex flex-col">
+                      <div className="flex min-w-0 flex-col">
                         <span className="text-[11px] font-bold text-gray-900 sm:text-xs">
-                          ₹{purchasePrice}
+                          ₹{formatPrice(purchasePrice)}
                         </span>
                         <span className="text-[8px] font-medium uppercase tracking-wide text-slate-400">
                           Purchase
                         </span>
+                        {sellingPrice > 0 && (
+                          <span
+                            className="mt-0.5 text-[9px] font-medium leading-tight text-emerald-600/90"
+                            title={`Selling price ₹${formatPrice(sellingPrice)}`}
+                          >
+                            Sell ₹{formatPrice(sellingPrice)}
+                          </span>
+                        )}
                       </div>
                       {item.trackStock && item.stockQty != null && (
                         <span
@@ -657,7 +674,14 @@ export default function ProductsServicesSection({
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      ₹ {item.unitPrice.toFixed(2)}
+                      <div className="font-medium text-gray-800">
+                        ₹ {item.unitPrice.toFixed(2)}
+                      </div>
+                      {Number(item.sellingPrice ?? 0) > 0 && (
+                        <div className="text-[10px] font-medium text-emerald-600">
+                          Sell ₹{Number(item.sellingPrice).toFixed(2)}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right">
                       {onUpdateItemDiscount ? (

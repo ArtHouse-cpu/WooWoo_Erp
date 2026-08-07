@@ -29,7 +29,6 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
   const images = watch("images");
   const discountType = watch("discountType");
   const discountValue = watch("discountValue");
-  const stockStatus = watch("stockStatus");
   const isCsp = watch("isCsp");
   const categoryId = watch("categoryId");
   const categoryName = watch("category");
@@ -187,16 +186,6 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Stock Quantity</label>
-          <input
-            type="number"
-            min="0"
-            placeholder="e.g. 10"
-            {...register("stockQty", { valueAsNumber: true })}
-            className="w-full rounded-lg border border-gray-300 p-2.5 text-sm"
-          />
-        </div>
-        <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Item Code / SKU</label>
           <input
             placeholder="e.g. SKU-12345"
@@ -213,17 +202,6 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
             <input {...register("barcode")} className="flex-1 rounded-lg border border-gray-300 p-2.5 text-sm" />
             <button type="button" onClick={() => setValue("barcode", generateBarcode())} className="rounded-lg border border-gray-300 px-3 text-gray-600">
               <Wand2 size={16} />
-            </button>
-          </div>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Stock Status</label>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => setValue("stockStatus", "in_stock")} className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${stockStatus === "in_stock" ? "bg-green-600 text-white" : "bg-green-50 text-green-700"}`}>
-              In Stock
-            </button>
-            <button type="button" onClick={() => setValue("stockStatus", "out_of_stock")} className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium ${stockStatus === "out_of_stock" ? "bg-red-600 text-white" : "bg-red-50 text-red-700"}`}>
-              Out of Stock
             </button>
           </div>
         </div>

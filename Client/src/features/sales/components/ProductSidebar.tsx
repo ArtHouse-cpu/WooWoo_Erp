@@ -14,6 +14,7 @@ import {
   type CatalogueLookupItem,
 } from "@/services/apiClient";
 import { calcCatalogueProductDiscount } from "../utils/membershipInvoiceUtils";
+import CatalogueItemLabel from "./CatalogueItemLabel";
 
 const PAGE_SIZE = 48;
 
@@ -339,9 +340,7 @@ export default function ProductSidebar({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs font-bold leading-tight text-slate-800">
-                      {item.productName || item.name}
-                    </div>
+                    <CatalogueItemLabel item={item} compact />
                     <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                       <CataloguePrice item={item} />
                       {item.variantName ? (
@@ -352,12 +351,12 @@ export default function ProductSidebar({
                       {item.trackStock && item.stockQty != null && (
                         <span
                           className={`text-[9px] font-bold ${
-                            item.stockQty <= 0
+                            Number(item.stockQty) <= 0
                               ? "rounded bg-red-50 px-1 text-red-500"
                               : "text-slate-400"
                           }`}
                         >
-                          {item.stockQty <= 0
+                          {Number(item.stockQty) <= 0
                             ? "OUT OF STOCK"
                             : `Stock: ${item.stockQty}`}
                         </span>

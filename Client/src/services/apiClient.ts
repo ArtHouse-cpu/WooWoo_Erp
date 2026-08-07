@@ -277,6 +277,18 @@ export const handleClearStaffPin = async (staffId: string) => {
   };
 };
 
+/** Reveal Staff PIN for Access managers (View PIN). */
+export const handleViewStaffPin = async (staffId: string) => {
+  const response = await axiosInstance.get(`/access/staff/${staffId}/pin`);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    pin?: string;
+    needsReset?: boolean;
+    staff?: { _id: string; fullName: string; m_staff_id?: string };
+  };
+};
+
 export const handleGetInvoices = async (
   search = "",
   signal?: AbortSignal,
@@ -1281,6 +1293,10 @@ export type PurchasePayload = {
   phoneNumber?: string;
   vendorDate: string;
   amount: number;
+  /** Bill-level manual discount value (₹ if flat, % if percentage) */
+  manualDiscount?: number;
+  /** How to interpret manualDiscount */
+  manualDiscountType?: "flat" | "percentage";
   paymentMode?: "Cash" | "UPI" | "Card" | "Bank" | "Credit" | "Other";
   status?: "draft" | "pending" | "paid" | "partial" | "cancelled";
   items?: PurchaseItemPayload[];
@@ -2053,6 +2069,8 @@ export type AccessStaffRow = {
   legacyRole?: string;
   pinEnabled?: boolean;
   pinSet?: boolean;
+  /** true when encrypted PIN exists and View PIN can reveal it */
+  pinViewable?: boolean;
   role?: {
     id: string;
     name: string;

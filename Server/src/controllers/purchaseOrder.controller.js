@@ -54,6 +54,8 @@ export const createPurchaseOrder = async (req, res) => {
       supplierDate,
       supplierAddress,
       supplierContact,
+      manualDiscount,
+      manualDiscountType,
     } = req.body;
     // console.log("purchase order controller",req.body);
   
@@ -99,6 +101,13 @@ export const createPurchaseOrder = async (req, res) => {
   vendorDate: vendorDate ? new Date(vendorDate) : null,
 
   amount: Number(amount ?? 0),
+
+  manualDiscount: Math.max(0, Number(manualDiscount ?? 0) || 0),
+
+  manualDiscountType:
+    String(manualDiscountType ?? "flat") === "percentage"
+      ? "percentage"
+      : "flat",
 
   paymentMode: String(paymentMode ?? "Cash"),
 
@@ -184,6 +193,20 @@ export const updatePurchaseOrder = async (req, res) => {
       } catch (e) {
         itemsList = undefined;
       }
+    }
+
+    if (updateData.manualDiscount !== undefined) {
+      updateData.manualDiscount = Math.max(
+        0,
+        Number(updateData.manualDiscount ?? 0) || 0,
+      );
+    }
+
+    if (updateData.manualDiscountType !== undefined) {
+      updateData.manualDiscountType =
+        String(updateData.manualDiscountType ?? "flat") === "percentage"
+          ? "percentage"
+          : "flat";
     }
 
     if (Array.isArray(itemsList)) {
