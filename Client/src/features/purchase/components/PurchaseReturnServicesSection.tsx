@@ -54,7 +54,13 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
   try {
     setLoadingProducts(true);
 
-    const { products = [] } = await handleGetProducts(searchText, signal);
+    const { products = [] } = await handleGetProducts({
+      search: searchText,
+      type: "product",
+      page: 1,
+      limit: 50,
+      signal,
+    });
 
     const filteredProducts = products.filter(
       (item: any) => item.itemType === "product" && item.type === "product"

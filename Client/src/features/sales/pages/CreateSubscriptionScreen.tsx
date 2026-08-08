@@ -560,6 +560,11 @@ export default function CreateSubscriptionScreen({
       setCustomer(doc.customerName || "");
       setSelectedCustomerId("");
       setPhone(doc.customerPhone || "");
+      // View: keep backend customer as-is — no search dropdown / rename
+      if (nextMode === "view") {
+        setCustomerDropdownOpen(false);
+        setCustomers([]);
+      }
       const docMembershipType = String(
         (doc as any).membershipType ?? "",
       ).toLowerCase();
@@ -850,7 +855,7 @@ export default function CreateSubscriptionScreen({
   const debouncedCustomer = useDebounce(customer.trim(), 250);
 
   useEffect(() => {
-    if (!customerDropdownOpen) return;
+    if (mode === "view" || !customerDropdownOpen) return;
 
     const term = debouncedCustomer;
     if (!term) {
@@ -865,7 +870,7 @@ export default function CreateSubscriptionScreen({
     return () => {
       controller.abort();
     };
-  }, [debouncedCustomer, customerDropdownOpen]);
+  }, [debouncedCustomer, customerDropdownOpen, mode]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1132,7 +1137,7 @@ export default function CreateSubscriptionScreen({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[70] flex items-stretch justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       onMouseDown={(e) => {
         if (e.currentTarget === e.target) {
           if (onClose) onClose();
@@ -1140,7 +1145,7 @@ export default function CreateSubscriptionScreen({
         }
       }}
     >
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+      <div className="h-dvh max-h-dvh w-full max-w-4xl overflow-y-auto bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-2xl">
         {mode === "bulk" ? (
           <div className="p-6">
             <div className="flex justify-between items-center mb-4">
@@ -1358,25 +1363,22 @@ export default function CreateSubscriptionScreen({
               <button
                 type="button"
                 onClick={async () => {
-                  const result = await Swal.fire({
-                title: "Are you sure?",
-                text: "Any unsaved changes will be lost.",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#4F46E5",
-                cancelButtonColor: "#6B7280",
-                confirmButtonText: "Yes, Close",
-                cancelButtonText: "Cancel",
-              });
-
-              if (result.isConfirmed) {
-                if (onClose) {
-                  onClose();
-                    } else {
-                  navigate(-1);
-                    }
-              }
-            }}
+                  if (mode !== "view") {
+                    const result = await Swal.fire({
+                      title: "Are you sure?",
+                      text: "Any unsaved changes will be lost.",
+                      icon: "warning",
+                      showCancelButton: true,
+                      confirmButtonColor: "#4F46E5",
+                      cancelButtonColor: "#6B7280",
+                      confirmButtonText: "Yes, Close",
+                      cancelButtonText: "Cancel",
+                    });
+                    if (!result.isConfirmed) return;
+                  }
+                  if (onClose) onClose();
+                  else navigate(-1);
+                }}
                 className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-black"
               >
                 <X size={18} />
@@ -1391,18 +1393,33 @@ export default function CreateSubscriptionScreen({
                   </label>
                   <input
                     value={customer}
+                    readOnly={mode === "view"}
+                    disabled={mode === "view"}
                     onChange={(e) => {
+                      if (mode === "view") return;
                       setCustomer(e.target.value);
                       setSelectedCustomerId("");
                       setPhone("");
                       setMembership("-");
                       setCustomerDropdownOpen(true);
                     }}
-                    onFocus={() => setCustomerDropdownOpen(true)}
-                    placeholder="Search customer by name or phone"
-                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                    onFocus={() => {
+                      if (mode === "view") return;
+                      setCustomerDropdownOpen(true);
+                    }}
+                    placeholder={
+                      mode === "view"
+                        ? "Customer name"
+                        : "Search customer by name or phone"
+                    }
+                    className={`h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none ${
+                      mode === "view"
+                        ? "cursor-not-allowed bg-gray-50 text-gray-700"
+                        : "focus:border-blue-500"
+                    }`}
                   />
-                  {customerDropdownOpen &&
+                  {mode !== "view" &&
+                    customerDropdownOpen &&
                     (loadingCustomers || customers.length > 0) && (
                       <div className="mt-1 max-h-48 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg z-20 relative">
                         {loadingCustomers ? (
@@ -1470,26 +1487,41 @@ export default function CreateSubscriptionScreen({
                         )}
                       </div>
                     )}
-                  {selectedCustomerId &&
-                    membership &&
-                    membership !== "-" &&
-                    membership.toLowerCase() !== "none" && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="text-[11px] text-gray-500">
-                          Current membership
-                        </span>
-                        <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
-                          {membership}
-                        </span>
-                      </div>
-                    )}
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateCustomerModal(true)}
-                    className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
-                  >
-                    + Add New Customer
-                  </button>
+                  {mode === "view"
+                    ? membership &&
+                      membership !== "-" &&
+                      membership.toLowerCase() !== "none" && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500">
+                            Current membership
+                          </span>
+                          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
+                            {membership}
+                          </span>
+                        </div>
+                      )
+                    : selectedCustomerId &&
+                      membership &&
+                      membership !== "-" &&
+                      membership.toLowerCase() !== "none" && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-[11px] text-gray-500">
+                            Current membership
+                          </span>
+                          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
+                            {membership}
+                          </span>
+                        </div>
+                      )}
+                  {mode !== "view" && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateCustomerModal(true)}
+                      className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                      + Add New Customer
+                    </button>
+                  )}
                 </div>
 
                 <div>
@@ -1498,9 +1530,18 @@ export default function CreateSubscriptionScreen({
                   </label>
                   <input
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    readOnly={mode === "view"}
+                    disabled={mode === "view"}
+                    onChange={(e) => {
+                      if (mode === "view") return;
+                      setPhone(e.target.value);
+                    }}
                     placeholder="Customer phone number"
-                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                    className={`h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none ${
+                      mode === "view"
+                        ? "cursor-not-allowed bg-gray-50 text-gray-700"
+                        : "focus:border-blue-500"
+                    }`}
                   />
                 </div>
               </div>
@@ -1568,11 +1609,17 @@ export default function CreateSubscriptionScreen({
                   <input
                     type="date"
                     value={startDate}
+                    disabled={mode === "view"}
                     onChange={(e) => {
+                      if (mode === "view") return;
                       setStartDate(e.target.value);
                       setEndDateManuallyEdited(false);
                     }}
-                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                    className={`h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none ${
+                      mode === "view"
+                        ? "cursor-not-allowed bg-gray-50 text-gray-700"
+                        : "focus:border-blue-500"
+                    }`}
                   />
                 </div>
                 <div>
@@ -1583,11 +1630,17 @@ export default function CreateSubscriptionScreen({
                     type="date"
                     value={endDate}
                     min={startDate}
+                    disabled={mode === "view"}
                     onChange={(e) => {
+                      if (mode === "view") return;
                       setEndDate(e.target.value);
                       setEndDateManuallyEdited(true);
                     }}
-                    className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                    className={`h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none ${
+                      mode === "view"
+                        ? "cursor-not-allowed bg-gray-50 text-gray-700"
+                        : "focus:border-blue-500"
+                    }`}
                   />
                 </div>
               </div>
@@ -1598,13 +1651,15 @@ export default function CreateSubscriptionScreen({
                     <h3 className="text-sm font-semibold text-orange-800">
                       Junior Student Details
                     </h3>
-                    <button
-                      type="button"
-                      onClick={addStudent}
-                      className="rounded-md bg-orange-600 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-700"
-                    >
-                      + Add More Student
-                    </button>
+                    {mode !== "view" && (
+                      <button
+                        type="button"
+                        onClick={addStudent}
+                        className="rounded-md bg-orange-600 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-700"
+                      >
+                        + Add More Student
+                      </button>
+                    )}
                   </div>
 
                   {students.map((student, index) => (
@@ -1800,8 +1855,17 @@ export default function CreateSubscriptionScreen({
                 </label>
                 <textarea
                   value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="min-h-[72px] w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                  readOnly={mode === "view"}
+                  disabled={mode === "view"}
+                  onChange={(e) => {
+                    if (mode === "view") return;
+                    setNotes(e.target.value);
+                  }}
+                  className={`min-h-[72px] w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none ${
+                    mode === "view"
+                      ? "cursor-not-allowed bg-gray-50 text-gray-700"
+                      : "focus:border-blue-500"
+                  }`}
                   placeholder="Add notes for this subscription..."
                 />
               </div>
@@ -1834,19 +1898,21 @@ export default function CreateSubscriptionScreen({
                 }}
                 className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300"
               >
-                Cancel
+                {mode === "view" ? "Close" : "Cancel"}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (validateBeforeCheckout()) setOpenCheckout(true);
-                }}
-                disabled={saving || mode === "view"}
-                className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Printer size={16} />
-                Checkout
-              </button>
+              {mode !== "view" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (validateBeforeCheckout()) setOpenCheckout(true);
+                  }}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Printer size={16} />
+                  Checkout
+                </button>
+              )}
             </div>
           </>
         )}
@@ -1860,38 +1926,40 @@ export default function CreateSubscriptionScreen({
         />
       )}
 
-      <CheckoutModal
-        open={openCheckout}
-        grandTotal={grandTotal}
-        disableCashback
-        items={
-          selectedMembership
-            ? [
-              {
-                id: 1,
-                name: selectedMembership.displayName,
-                qty: 1,
-                price: selectedMembership.amount,
-                discount: 0,
-                category: "membership",
-                cashback: selectedMembership.walletCashbackAmount,
-              },
-            ]
-            : []
-        }
-        initialCustomerName={customer}
-        initialCustomerPhone={phone}
-        initialCustomerId={selectedCustomerId || null}
-        initialMembership={selectedMembership?.displayName ?? ""}
-        initialCashbackTotal={
-          selectedMembership?.walletCashbackAmount ?? 0
-        }
-        onClose={() => setOpenCheckout(false)}
-        onConfirmPayment={async (payment) => {
-          setOpenCheckout(false);
-          await handleSaveSubscription(payment);
-        }}
-      />
+      {mode !== "view" && (
+        <CheckoutModal
+          open={openCheckout}
+          grandTotal={grandTotal}
+          disableCashback
+          items={
+            selectedMembership
+              ? [
+                {
+                  id: 1,
+                  name: selectedMembership.displayName,
+                  qty: 1,
+                  price: selectedMembership.amount,
+                  discount: 0,
+                  category: "membership",
+                  cashback: selectedMembership.walletCashbackAmount,
+                },
+              ]
+              : []
+          }
+          initialCustomerName={customer}
+          initialCustomerPhone={phone}
+          initialCustomerId={selectedCustomerId || null}
+          initialMembership={selectedMembership?.displayName ?? ""}
+          initialCashbackTotal={
+            selectedMembership?.walletCashbackAmount ?? 0
+          }
+          onClose={() => setOpenCheckout(false)}
+          onConfirmPayment={async (payment) => {
+            setOpenCheckout(false);
+            await handleSaveSubscription(payment);
+          }}
+        />
+      )}
       {mode === "view" && (
         <div className="pointer-events-none fixed inset-0 z-[55] rounded-2xl bg-transparent" />
       )}

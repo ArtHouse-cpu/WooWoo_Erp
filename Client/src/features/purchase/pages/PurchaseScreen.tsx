@@ -35,6 +35,7 @@ import {
   normalizeIndianWhatsAppDigits,
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
+import CreatePurchaseScreen from "./CreatePurchaseScreen";
 
 type PurchaseTabStatus = "Paid" | "Pending" | "Draft" | "Cancelled";
 
@@ -140,6 +141,8 @@ export default function PurchaseScreen() {
   const [data, setData] = useState<PurchaseListRow[]>([]);
   const [selectedActionRow, setSelectedActionRow] =
     useState<PurchaseListRow | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewData, setViewData] = useState<any>(null);
   const staffName = useAppSelector((state) => state.user.m_staff_name);
   const purchaser = staffName ?? "Not Assigned";
 
@@ -197,12 +200,16 @@ export default function PurchaseScreen() {
   const handleAction = useCallback(
     async (
       row: PurchaseListRow,
-      action: "edit" | "delete" | "convertReturn",
+      action: "view" | "edit" | "delete" | "convertReturn",
     ) => {
       const raw = row.raw;
       const id = row._id;
 
-      if (action === "edit") {
+      if (action === "view") {
+        setViewData(raw);
+        setViewOpen(true);
+        setSelectedActionRow(null);
+      } else if (action === "edit") {
         navigate("/create-purchase", {
           state: { purchase: raw, mode: "edit" },
         });
@@ -633,6 +640,13 @@ export default function PurchaseScreen() {
         overflow: "hidden",
       },
     },
+    muiTableContainerProps: {
+      sx: {
+        maxWidth: "100%",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+    },
   });
 
   const totalAmount = filteredData.reduce((s, r) => s + r.amount, 0);
@@ -760,6 +774,21 @@ export default function PurchaseScreen() {
               </button>
             </div>
             <div className="space-y-3 p-5">
+              <button
+                type="button"
+                onClick={() => handleAction(selectedActionRow, "view")}
+                className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
+              >
+                <div className="rounded-full bg-violet-100 p-2 text-violet-600">
+                  <Eye size={18} />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-800">View Purchase</div>
+                  <div className="text-xs text-gray-500">
+                    View in read-only mode
+                  </div>
+                </div>
+              </button>
               <Can permission={PERMISSIONS.PURCHASE_UPDATE}>
                 <button
                   type="button"
@@ -818,6 +847,17 @@ export default function PurchaseScreen() {
 
       {openLedgerModal && (
         <LedgerModal onClose={() => setOpenLedgerModal(false)} />
+      )}
+
+      {viewOpen && viewData && (
+        <CreatePurchaseScreen
+          initialMode="view"
+          initialData={viewData}
+          onClose={() => {
+            setViewOpen(false);
+            setViewData(null);
+          }}
+        />
       )}
     </div>
   );

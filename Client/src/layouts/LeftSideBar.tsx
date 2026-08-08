@@ -176,6 +176,19 @@ const MENU_GROUPS: MenuGroup[] = [
       },
     ],
   },
+  {
+    key: "affiliateProgram",
+    label: "Affiliate Program",
+    icon: Network,
+    submenu: [
+      {
+        name: "affiliate",
+        label: "Affiliate",
+        icon: Users,
+        path: "/affiliate-program",
+      },
+    ],
+  },
 ];
 
 const TOP_LINKS: TopLink[] = [
@@ -183,12 +196,6 @@ const TOP_LINKS: TopLink[] = [
   { key: "announcement", label: "Announcements", icon: Megaphone , path: "/announcements" },
   { key: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
   { key: "coupons", label: "Coupons", icon: Percent, path: "/coupons" },
-  {
-    key: "affiliate",
-    label: "Affiliate Program",
-    icon: Network,
-    path: "/affiliate-program",
-  },
   { key: "access", label: "Access", icon: ShieldUser, path: "/access" },
 
 ];
@@ -273,7 +280,7 @@ export default function LeftSideBar({
 
   return (
     <div
-      className={`flex h-full flex-col border-r border-gray-100 bg-white/95 shadow-sm backdrop-blur transition-all duration-300 ${mobile ? "w-full" : isCollapsed ? "w-16" : "w-64"
+      className={`flex h-full max-h-dvh flex-col border-r border-gray-100 bg-white/95 shadow-sm backdrop-blur transition-all duration-300 ${mobile ? "w-full" : isCollapsed ? "w-16" : "w-64"
         }`}
     >
       <div

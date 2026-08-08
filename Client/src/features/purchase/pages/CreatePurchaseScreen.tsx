@@ -23,6 +23,7 @@ import InvoiceDetailsSection from "@/features/sales/components/invoice/InvoiceDe
 import AddVendorModal from "../Modal/AddVendorModal";
 import type { InvoiceItem } from "../components/types";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
+import DocumentFormModal from "@/components/DocumentFormModal";
 import FileAttachmentSection from "../components/FileAttachmentSection";
 
 const today = new Date().toISOString().split("T")[0];
@@ -44,13 +45,23 @@ const getNextPurchaseNumber = (): string => {
 type Mode = "create" | "edit" | "view";
 type VendorOption = { _id: string; name: string; mobile: string; companyName?: string };
 
-export default function CreatePurchaseScreen() {
+type CreatePurchaseScreenProps = {
+  onClose?: () => void;
+  initialData?: any;
+  initialMode?: Mode;
+};
+
+export default function CreatePurchaseScreen({
+  onClose,
+  initialData,
+  initialMode,
+}: CreatePurchaseScreenProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const staffName = useAppSelector((state) => state.user.m_staff_name);
-  const purchaser = staffName ?? "Not Assigned";
+  const createdByDefault = staffName ?? "Not Assigned";
 
-  const [mode, setMode] = useState<Mode>("create");
+  const [mode, setMode] = useState<Mode>(initialMode || "create");
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
   const [purchaseNumber, setPurchaseNumber] = useState(getNextPurchaseNumber());
   const [vendor, setVendor] = useState("");
@@ -60,6 +71,8 @@ export default function CreatePurchaseScreen() {
   const [saving, setSaving] = useState(false);
   const [openCheckout, setOpenCheckout] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [createdByName, setCreatedByName] = useState(createdByDefault);
+  const [billBy, setBillBy] = useState("");
 
   const [vendors, setVendors] = useState<VendorOption[]>([]);
   const [allVendors, setAllVendors] = useState<VendorOption[]>([]);
@@ -79,36 +92,66 @@ export default function CreatePurchaseScreen() {
     useState<ManualDiscountType>("flat");
 
   useEffect(() => {
+    const applyPurchase = (purchase: any, nextMode: Mode) => {
+      setMode(nextMode);
+      setPurchaseId(purchase._id ?? null);
+      if (purchase.invoiceNumber) setPurchaseNumber(String(purchase.invoiceNumber));
+      setVendor(String(purchase.supplierName ?? ""));
+      setPhone(
+        String(
+          purchase.supplierContact ??
+            purchase.phoneNumber ??
+            purchase.vendorPhone ??
+            purchase.mobile ??
+            "",
+        ),
+      );
+      if (purchase.invoiceDate) {
+        setPurchaseDate(new Date(purchase.invoiceDate).toISOString().split("T")[0]);
+      }
+      setNotes(String(purchase.notes ?? ""));
+      setCreatedByName(
+        String(
+          purchase.createdByName ??
+            purchase.purchaser ??
+            createdByDefault,
+        ),
+      );
+      setBillBy(
+        String(
+          purchase.billBy ??
+            purchase.invoiceBy?.staffName ??
+            "",
+        ),
+      );
+      setVendorDropdownOpen(false);
+      setManualDiscount(Math.max(0, Number(purchase.manualDiscount ?? 0) || 0));
+      setManualDiscountType(
+        purchase.manualDiscountType === "percentage" ? "percentage" : "flat",
+      );
+      if (Array.isArray(purchase.items)) {
+        setItems(
+          purchase.items.map((item: any, idx: number) => ({
+            id: idx + 1,
+            productName: item.productName || "",
+            qty: Number(item.qty ?? 1),
+            unitPrice: Number(item.unitPrice ?? 0),
+            discount: Number(item.discount ?? 0),
+            image: item.image || item.imageUrl || "",
+          })),
+        );
+      }
+    };
+
+    if (initialData && initialMode) {
+      applyPurchase(initialData, initialMode);
+      return;
+    }
+
     const state = location.state as { purchase?: any; mode?: Mode } | null;
     if (!state?.mode || !state?.purchase) return;
-
-    setMode(state.mode);
-    const purchase = state.purchase;
-    setPurchaseId(purchase._id ?? null);
-    if (purchase.invoiceNumber) setPurchaseNumber(String(purchase.invoiceNumber));
-    setVendor(String(purchase.supplierName ?? ""));
-    setPhone(String(purchase.vendorPhone ?? purchase.mobile ?? ""));
-    if (purchase.invoiceDate) {
-      setPurchaseDate(new Date(purchase.invoiceDate).toISOString().split("T")[0]);
-    }
-    setNotes(String(purchase.notes ?? ""));
-    setManualDiscount(Math.max(0, Number(purchase.manualDiscount ?? 0) || 0));
-    setManualDiscountType(
-      purchase.manualDiscountType === "percentage" ? "percentage" : "flat",
-    );
-    if (Array.isArray(purchase.items)) {
-      setItems(
-        purchase.items.map((item: any, idx: number) => ({
-          id: idx + 1,
-          productName: item.productName || "",
-          qty: Number(item.qty ?? 1),
-          unitPrice: Number(item.unitPrice ?? 0),
-          discount: Number(item.discount ?? 0),
-          image: item.image || item.imageUrl || "",
-        })),
-      );
-    }
-  }, [location.state]);
+    applyPurchase(state.purchase, state.mode);
+  }, [location.state, initialData, initialMode]);
 
   const draft = { name: draftName, qty: draftQty, price: draftPrice, discount: draftDiscount, image: draftImage };
 
@@ -226,9 +269,9 @@ export default function CreatePurchaseScreen() {
   const debouncedVendor = useDebounce(vendor.trim(), 250);
 
   useEffect(() => {
-    if (!vendorDropdownOpen) return;
+    if (mode === "view" || !vendorDropdownOpen) return;
     void fetchVendors();
-  }, [vendorDropdownOpen]);
+  }, [vendorDropdownOpen, mode]);
 
   useEffect(() => {
     if (!vendorDropdownOpen) return;
@@ -274,16 +317,37 @@ export default function CreatePurchaseScreen() {
 
   const handleSave = async (
     status: "draft" | "pending" | "paid" | "partial" = "paid",
-    payment?: { mode: string; paymentStatus: "full" | "partial" },
+    payment?: {
+      mode: string;
+      paymentStatus: "full" | "partial";
+      invoiceBy?: {
+        staffId?: string;
+        staffName?: string;
+        employeeId?: string;
+        email?: string;
+      } | null;
+    },
   ) => {
     try {
       setSaving(true);
+      const pinBillBy = String(payment?.invoiceBy?.staffName ?? "").trim();
+      if (pinBillBy) setBillBy(pinBillBy);
       const payload: PurchasePayload = {
         invoiceNumber: purchaseNumber,
         invoiceDate: purchaseDate,
         supplierName: vendor.trim(),
         phoneNumber: phone.trim(),
-        purchaser: purchaser,
+        purchaser: createdByName || createdByDefault,
+        createdByName: createdByName || createdByDefault,
+        billBy: pinBillBy || billBy || undefined,
+        invoiceBy: payment?.invoiceBy
+          ? {
+              staffId: payment.invoiceBy.staffId,
+              staffName: payment.invoiceBy.staffName,
+              employeeId: payment.invoiceBy.employeeId,
+              email: payment.invoiceBy.email,
+            }
+          : undefined,
         vendorDate: purchaseDate,
         amount: grandTotal,
         manualDiscount: safeManualDiscount,
@@ -368,11 +432,16 @@ export default function CreatePurchaseScreen() {
     }
   };
 
-  return (
+  const handleBack = () => {
+    if (onClose) onClose();
+    else navigate(-1);
+  };
+
+  const content = (
     <div className="space-y-4 p-2">
       <CreatePurchaseHeader
         purchaseNumber={purchaseNumber}
-        onBack={() => navigate(-1)}
+        onBack={handleBack}
         onSaveDraft={() => void handleSaveDraft()}
         onSavePrint={() => void handleSavePrint()}
         onSave={() => {
@@ -388,15 +457,17 @@ export default function CreatePurchaseScreen() {
           phone={phone}
           customerOptions={vendors}
           loadingCustomers={loadingVendors}
-          customerDropdownOpen={vendorDropdownOpen}
+          customerDropdownOpen={mode !== "view" && vendorDropdownOpen}
           invoiceDate={purchaseDate}
-          salesPerson={purchaser}
+          salesPerson={createdByName || createdByDefault}
+          billBy={mode === "view" ? billBy || "—" : undefined}
           dateLabel="Purchase Date"
           selectorLabel="Select Vendor"
           createLabel="Create Vendor"
           phoneLabel="Vendor Phone"
           searchPlaceholder="Search vendor by name, company..."
           showDueDate={false}
+          readOnly={mode === "view"}
           onCustomerChange={(value) => {
             setVendor(value);
             setPhone("");
@@ -413,7 +484,7 @@ export default function CreatePurchaseScreen() {
           onInvoiceDateChange={setPurchaseDate}
         />
 
-        {showCreateVendorModal && (
+        {showCreateVendorModal && mode !== "view" && (
           <AddVendorModal
             onClose={() => setShowCreateVendorModal(false)}
             onSubmit={handleCreateVendorSubmit}
@@ -424,6 +495,7 @@ export default function CreatePurchaseScreen() {
         <PurchaseProductServiceScreen
           draft={draft}
           items={items}
+          readOnly={mode === "view"}
           onDraftChange={(field, value) => {
             if (field === "name") setDraftName(value);
             if (field === "qty") setDraftQty(value);
@@ -433,15 +505,17 @@ export default function CreatePurchaseScreen() {
           }}
           onAddItem={addItem}
           onRemoveItem={removeItem}
-          onUpdateItemQty={updateItemQty}
-          onUpdateItemDiscount={updateItemDiscount}
+          onUpdateItemQty={mode === "view" ? undefined : updateItemQty}
+          onUpdateItemDiscount={mode === "view" ? undefined : updateItemDiscount}
           onAddDirectItem={addDirectItem}
         />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
           <div className="lg:col-span-8 space-y-4">
             <NotesSection notes={notes} onChange={setNotes} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm" />
-            <FileAttachmentSection files={attachments} onFilesChange={setAttachments} />
+            {mode !== "view" && (
+              <FileAttachmentSection files={attachments} onFilesChange={setAttachments} />
+            )}
           </div>
           <PurchaseSummaryCard
             subTotal={subTotal}
@@ -467,25 +541,40 @@ export default function CreatePurchaseScreen() {
           />
         </div>
       </div>
-      <CheckoutModal
-        open={openCheckout}
-        grandTotal={grandTotal}
-        items={items.map((item) => ({
-          id: item.id,
-          name: item.productName,
-          qty: item.qty,
-          price: item.unitPrice,
-          discount: item.discount,
-        }))}
-        initialCustomerName={vendor}
-        initialCustomerPhone={phone}
-        initialMembership=""
-        onClose={() => setOpenCheckout(false)}
-        onConfirmPayment={async (payment) => {
-          setOpenCheckout(false);
-          await handleSave(payment.paymentStatus === "full" ? "paid" : "partial", payment);
-        }}
-      />
+      {mode !== "view" && (
+        <CheckoutModal
+          open={openCheckout}
+          grandTotal={grandTotal}
+          items={items.map((item) => ({
+            id: item.id,
+            name: item.productName,
+            qty: item.qty,
+            price: item.unitPrice,
+            discount: item.discount,
+          }))}
+          initialCustomerName={vendor}
+          initialCustomerPhone={phone}
+          initialMembership=""
+          onClose={() => setOpenCheckout(false)}
+          onConfirmPayment={async (payment) => {
+            setOpenCheckout(false);
+            await handleSave(payment.paymentStatus === "full" ? "paid" : "partial", payment);
+          }}
+        />
+      )}
     </div>
   );
+
+  if (onClose) {
+    return (
+      <DocumentFormModal
+        onClose={onClose}
+        confirmOnClose={mode !== "view"}
+      >
+        {content}
+      </DocumentFormModal>
+    );
+  }
+
+  return content;
 }

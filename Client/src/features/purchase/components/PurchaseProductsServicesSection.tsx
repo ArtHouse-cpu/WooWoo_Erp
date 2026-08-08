@@ -27,6 +27,8 @@ type Props = {
   onUpdateItemQty?: (id: number, newQty: number) => void;
   onUpdateItemDiscount?: (id: number, newDiscount: number) => void;
   onAddDirectItem?: (item: Omit<InvoiceItem, "id">) => void;
+  /** View purchase: no catalogue fetch, no quick-select / add / delete actions */
+  readOnly?: boolean;
 };
 
 const inputStyle =
@@ -86,6 +88,7 @@ export default function ProductsServicesSection({
   onUpdateItemQty,
   onUpdateItemDiscount,
   onAddDirectItem,
+  readOnly = false,
 }: Props) {
   const [catalogueItems, setCatalogueItems] = useState<CatalogueLookupItem[]>(
     [],
@@ -119,6 +122,11 @@ export default function ProductsServicesSection({
   }, []);
 
   useEffect(() => {
+    if (readOnly) {
+      setGridItems([]);
+      setLoadingGrid(false);
+      return;
+    }
     const controller = new AbortController();
     const fetchGridItems = async () => {
       try {
@@ -141,10 +149,10 @@ export default function ProductsServicesSection({
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [draft.name]);
+  }, [draft.name, readOnly]);
 
   useEffect(() => {
-    if (!dropdownOpen) return;
+    if (readOnly || !dropdownOpen) return;
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
       try {
@@ -167,7 +175,7 @@ export default function ProductsServicesSection({
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [draft.name, dropdownOpen]);
+  }, [draft.name, dropdownOpen, readOnly]);
 
   const filteredGridItems = useMemo(
     () =>
@@ -258,10 +266,11 @@ export default function ProductsServicesSection({
     <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-800">
-          Products & Services
+          {readOnly ? "Purchased Products" : "Products & Services"}
         </h2>
       </div>
 
+      {!readOnly && (
       <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
         <div className="relative md:col-span-4" ref={searchContainerRef}>
           <input
@@ -392,8 +401,10 @@ export default function ProductsServicesSection({
           <Plus size={14} /> Add
         </button>
       </div>
+      )}
 
-      {/* Quick Select Menu — same layout as invoice, prices = purchase price */}
+      {/* Quick Select Menu — skipped entirely in view (no catalogue API) */}
+      {!readOnly && (
       <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
         <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
@@ -591,6 +602,7 @@ export default function ProductsServicesSection({
           </div>
         )}
       </div>
+      )}
 
       <div className="overflow-x-auto rounded-lg border border-gray-200">
         <table className="min-w-full text-sm">
@@ -601,17 +613,21 @@ export default function ProductsServicesSection({
               <th className="px-3 py-2 text-right">Purchase Price</th>
               <th className="px-3 py-2 text-right">Discount</th>
               <th className="px-3 py-2 text-right">Total</th>
-              <th className="px-3 py-2 text-center">Action</th>
+              {!readOnly && (
+                <th className="px-3 py-2 text-center">Action</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={readOnly ? 5 : 6}
                   className="px-3 py-10 text-center text-gray-500"
                 >
-                  Search or add products to start creating purchase.
+                  {readOnly
+                    ? "No products on this purchase."
+                    : "Search or add products to start creating purchase."}
                 </td>
               </tr>
             ) : (
@@ -643,7 +659,7 @@ export default function ProductsServicesSection({
                       </div>
                     </td>
                     <td className="px-3 py-2">
-                      {onUpdateItemQty ? (
+                      {!readOnly && onUpdateItemQty ? (
                         <div className="flex items-center justify-center gap-2">
                           <button
                             type="button"
@@ -677,14 +693,14 @@ export default function ProductsServicesSection({
                       <div className="font-medium text-gray-800">
                         ₹ {item.unitPrice.toFixed(2)}
                       </div>
-                      {Number(item.sellingPrice ?? 0) > 0 && (
+                      {!readOnly && Number(item.sellingPrice ?? 0) > 0 && (
                         <div className="text-[10px] font-medium text-emerald-600">
                           Sell ₹{Number(item.sellingPrice).toFixed(2)}
                         </div>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {onUpdateItemDiscount ? (
+                      {!readOnly && onUpdateItemDiscount ? (
                         <div className="flex justify-end">
                           <input
                             type="number"
@@ -706,15 +722,17 @@ export default function ProductsServicesSection({
                     <td className="px-3 py-2 text-right font-semibold">
                       ₹ {lineTotal.toFixed(2)}
                     </td>
-                    <td className="px-3 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => onRemoveItem(item.id)}
-                        className="rounded bg-red-50 p-1.5 text-red-600 hover:bg-red-100"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
+                    {!readOnly && (
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          type="button"
+                          onClick={() => onRemoveItem(item.id)}
+                          className="rounded bg-red-50 p-1.5 text-red-600 hover:bg-red-100"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })
@@ -723,7 +741,7 @@ export default function ProductsServicesSection({
         </table>
       </div>
 
-      {showCreateModal && (
+      {!readOnly && showCreateModal && (
         <CreateProductModal
           onClose={() => setShowCreateModal(false)}
           onSubmit={submitNewProduct}

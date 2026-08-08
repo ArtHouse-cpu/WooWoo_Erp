@@ -18,6 +18,7 @@ import {
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
+import DocumentFormModal from "@/components/DocumentFormModal";
 
 const today = new Date().toISOString().split("T")[0];
 const QUOT_SEQ_KEY = "wooerp-quotation-seq";
@@ -37,10 +38,20 @@ const getNextQuotationNumber = (): string => {
 
 type Mode = "create" | "edit" | "view";
 
-export default function CreateQuotationScreen() {
+type CreateQuotationScreenProps = {
+  onClose?: () => void;
+  initialData?: any;
+  initialMode?: Mode;
+};
+
+export default function CreateQuotationScreen({
+  onClose,
+  initialData,
+  initialMode,
+}: CreateQuotationScreenProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [mode, setMode] = useState<Mode>("create");
+  const [mode, setMode] = useState<Mode>(initialMode || "create");
   const [quotationId, setQuotationId] = useState<string | null>(null);
   const [quotationNo, setQuotationNo] = useState(getNextQuotationNumber());
   const [customer, setCustomer] = useState("");
@@ -71,30 +82,38 @@ export default function CreateQuotationScreen() {
   const [items, setItems] = useState<InvoiceItem[]>([]);
 
   useEffect(() => {
+    const applyQuotation = (quot: any, nextMode: Mode) => {
+      setMode(nextMode);
+      setQuotationId(quot._id);
+      if (quot.quotationCode) setQuotationNo(quot.quotationCode);
+      setCustomer(quot.customerName || "");
+      setPhone(quot.customerPhone || "");
+      if (quot.quotationDate) setQuotationDate(new Date(quot.quotationDate).toISOString().split("T")[0]);
+      if (quot.dueDate) setDueDate(new Date(quot.dueDate).toISOString().split("T")[0]);
+      setNotes(quot.notes || "");
+      if (Array.isArray(quot.items)) {
+        setItems(quot.items.map((item: any, idx: number) => ({
+          id: idx + 1,
+          productName: item.productName || "",
+          qty: item.qty || 1,
+          unitPrice: item.unitPrice || 0,
+          discount: item.discount || 0,
+          cashback: item.cashback || 0,
+          image: item.image || item.imageUrl || "",
+        })));
+      }
+    };
+
+    if (initialData && initialMode) {
+      applyQuotation(initialData, initialMode);
+      return;
+    }
+
     const state = location.state as { quotation?: any; mode?: Mode } | null;
     if (state?.mode && state?.quotation) {
-        setMode(state.mode);
-        const quot = state.quotation;
-        setQuotationId(quot._id);
-        if (quot.quotationCode) setQuotationNo(quot.quotationCode);
-        setCustomer(quot.customerName || "");
-        setPhone(quot.customerPhone || "");
-        if (quot.quotationDate) setQuotationDate(new Date(quot.quotationDate).toISOString().split("T")[0]);
-        if (quot.dueDate) setDueDate(new Date(quot.dueDate).toISOString().split("T")[0]);
-        setNotes(quot.notes || "");
-        if (Array.isArray(quot.items)) {
-            setItems(quot.items.map((item: any, idx: number) => ({
-                id: idx + 1,
-                productName: item.productName || "",
-                qty: item.qty || 1,
-                unitPrice: item.unitPrice || 0,
-                discount: item.discount || 0,
-                cashback: item.cashback || 0,
-                image: item.image || item.imageUrl || "",
-            })));
-        }
+      applyQuotation(state.quotation, state.mode);
     }
-  }, [location.state]);
+  }, [location.state, initialData, initialMode]);
   const draft = {
     name: draftName,
     qty: draftQty,
@@ -326,13 +345,18 @@ export default function CreateQuotationScreen() {
     }
   };
 
-  return (
+  const handleBack = () => {
+    if (onClose) onClose();
+    else navigate(-1);
+  };
+
+  const content = (
     <div className="space-y-4 p-2">
       <CreateInvoiceHeader
         title={mode === "create" ? "Create Quotation" : mode === "edit" ? "Edit Quotation" : "View Quotation"}
         prefix="QUOT- "
         invoiceNo={quotationNo}
-        onBack={() => navigate(-1)}
+        onBack={handleBack}
         onSaveDraft={() => handleSaveDraft()}
         onSavePrint={handleSavePrint}
         onSave={() => setCheckoutOpen(true)}
@@ -346,11 +370,12 @@ export default function CreateQuotationScreen() {
         membership={membership}
         customerOptions={customers}
         loadingCustomers={loadingCustomers}
-        customerDropdownOpen={customerDropdownOpen}
+        customerDropdownOpen={mode !== "view" && customerDropdownOpen}
         invoiceDate={quotationDate}
         dueDate={dueDate}
         dueDateMin={today}
         salesPerson={salesPerson}
+        readOnly={mode === "view"}
         onCustomerChange={(value) => {
           setCustomer(value);
           setPhone("");
@@ -380,6 +405,7 @@ export default function CreateQuotationScreen() {
       <ProductsServicesSection
         draft={draft}
         items={items}
+        readOnly={mode === "view"}
         onDraftChange={(field, value) => {
           if (field === "name") setDraftName(value);
           if (field === "qty") setDraftQty(value);
@@ -409,6 +435,7 @@ export default function CreateQuotationScreen() {
           subTotal={subTotal}
           discountTotal={discountTotal}
           grandTotal={grandTotal}
+          readOnly={mode === "view"}
           onSave={
             mode !== "view"
               ? () => setCheckoutOpen(true)
@@ -417,28 +444,43 @@ export default function CreateQuotationScreen() {
           isSaving={saving}
         />
       </div>
-
-      <CheckoutModal
-        open={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
-        grandTotal={grandTotal}
-        items={items.map((it) => ({
-          name: it.productName,
-          qty: it.qty,
-          price: it.unitPrice,
-          discount: it.discount,
-          cashback: it.cashback,
-          image: it.image,
-        }))}
-        initialCustomerName={customer}
-        initialCustomerPhone={phone}
-        initialMembership={membership}
-        onConfirmPayment={async (paymentPayload) => {
-          await handleSaveDraft(paymentPayload);
-          setCheckoutOpen(false);
-        }}
-      />
       </div>
+
+      {mode !== "view" && (
+        <CheckoutModal
+          open={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          grandTotal={grandTotal}
+          items={items.map((it) => ({
+            name: it.productName,
+            qty: it.qty,
+            price: it.unitPrice,
+            discount: it.discount,
+            cashback: it.cashback,
+            image: it.image,
+          }))}
+          initialCustomerName={customer}
+          initialCustomerPhone={phone}
+          initialMembership={membership}
+          onConfirmPayment={async (paymentPayload) => {
+            await handleSaveDraft(paymentPayload);
+            setCheckoutOpen(false);
+          }}
+        />
+      )}
     </div>
   );
+
+  if (onClose) {
+    return (
+      <DocumentFormModal
+        onClose={onClose}
+        confirmOnClose={mode !== "view"}
+      >
+        {content}
+      </DocumentFormModal>
+    );
+  }
+
+  return content;
 }

@@ -22,6 +22,7 @@ import {
 } from "@/utils/whatsappInvoiceShare";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
+import CreateQuotationScreen from "./CreateQuotationScreen";
 
 type QuotationRow = {
   id: number;
@@ -41,6 +42,8 @@ export default function QuotationScreen() {
   const [data, setData] = useState<QuotationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedActionRow, setSelectedActionRow] = useState<QuotationRow | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewData, setViewData] = useState<any>(null);
 
   const fetchData = async () => {
     try {
@@ -75,7 +78,9 @@ export default function QuotationScreen() {
     const { _id, raw, status } = selectedActionRow;
 
     if (action === "view") {
-      navigate("/create-quotation", { state: { quotation: raw, mode: "view" } });
+      setViewData(raw);
+      setViewOpen(true);
+      setSelectedActionRow(null);
     } else if (action === "edit") {
       if (status === "rejected") {
         Swal.fire("Cannot Edit", "Rejected quotations cannot be edited.", "warning");
@@ -301,6 +306,13 @@ export default function QuotationScreen() {
       elevation: 0,
       style: { boxShadow: "none", border: "1px solid #e5e7eb" },
     },
+    muiTableContainerProps: {
+      sx: {
+        maxWidth: "100%",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+    },
   });
 
   return (
@@ -447,6 +459,17 @@ export default function QuotationScreen() {
             </div>
           </div>
         </div>
+      )}
+
+      {viewOpen && viewData && (
+        <CreateQuotationScreen
+          initialMode="view"
+          initialData={viewData}
+          onClose={() => {
+            setViewOpen(false);
+            setViewData(null);
+          }}
+        />
       )}
     </div>
   );

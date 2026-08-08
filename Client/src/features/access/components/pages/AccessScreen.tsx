@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
-import { Eye, KeyRound, Loader2, RefreshCw, Shield, SquarePen, Trash2, Users } from "lucide-react";
+import {
+  Eye,
+  KeyRound,
+  Loader2,
+  Receipt,
+  RefreshCw,
+  Shield,
+  SquarePen,
+  Trash2,
+  Users,
+} from "lucide-react";
 import {
   PERMISSION_CATALOG,
   PERMISSIONS,
@@ -25,7 +35,7 @@ import {
   type AccessStaffRow,
 } from "@/services/apiClient";
 
-type TabKey = "staff" | "roles" | "mine";
+type TabKey = "staff" | "roles" | "billing" | "mine";
 
 /**
  * Step 10 — Access Control management UI.
@@ -112,11 +122,11 @@ export default function AccessScreen() {
       title,
       html: `
         <p class="mb-2 text-sm text-slate-600">
-          Staff PIN for <b>${String(staffName).replace(/</g, "&lt;")}</b>.
+          Billing PIN for <b>${String(staffName).replace(/</g, "&lt;")}</b>.
           ${
             viewMode
               ? "Keep this private — only Access managers can view it."
-              : "You can view it again anytime from Access → View PIN."
+              : "You can view it again anytime from Access → Billing Access → View."
           }
         </p>
         <p class="rounded-lg bg-slate-900 px-4 py-3 font-mono text-2xl tracking-[0.35em] text-white">
@@ -138,13 +148,13 @@ export default function AccessScreen() {
   const onGenerateStaffPin = async (row: AccessStaffRow) => {
     if (!canManage) return;
     const confirm = await Swal.fire({
-      title: row.pinSet ? "Regenerate Staff PIN?" : "Generate Staff PIN?",
+      title: row.pinSet ? "Reset Billing PIN?" : "Create Billing PIN?",
       text: row.pinSet
-        ? "The current PIN will be replaced. You can view the new PIN anytime with View PIN."
-        : "A 6-digit PIN will be generated. You can view it anytime with View PIN.",
+        ? "The current billing PIN will be replaced. You can view the new PIN anytime from Billing Access → View."
+        : "A 6-digit billing PIN will be created. You can view it anytime from Billing Access → View.",
       icon: "question",
       showCancelButton: true,
-      confirmButtonText: row.pinSet ? "Regenerate" : "Generate",
+      confirmButtonText: row.pinSet ? "Reset PIN" : "Create PIN",
     });
     if (!confirm.isConfirmed) return;
     try {
@@ -155,18 +165,22 @@ export default function AccessScreen() {
       if (res?.staff) patchStaffRow(res.staff);
       if (res?.pin) {
         await showPinOnce(
-          row.pinSet ? "PIN regenerated" : "PIN generated",
+          row.pinSet ? "Billing PIN reset" : "Billing PIN created",
           res.pin,
           row.fullName,
         );
       } else {
-        await Swal.fire("Done", res?.message || "Staff PIN updated.", "success");
+        await Swal.fire(
+          "Done",
+          res?.message || "Billing PIN updated.",
+          "success",
+        );
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       await Swal.fire(
         "PIN failed",
-        err?.response?.data?.message ?? "Could not set Staff PIN.",
+        err?.response?.data?.message ?? "Could not update Billing PIN.",
         "error",
       );
     } finally {
@@ -174,10 +188,10 @@ export default function AccessScreen() {
     }
   };
 
-  const onChangeStaffPin = async (row: AccessStaffRow) => {
+  const onSetCustomBillingPin = async (row: AccessStaffRow) => {
     if (!canManage) return;
     const result = await Swal.fire({
-      title: "Set custom Staff PIN",
+      title: "Set custom Billing PIN",
       input: "text",
       inputLabel: "4–6 digit PIN",
       inputPlaceholder: "e.g. 482913",
@@ -199,12 +213,12 @@ export default function AccessScreen() {
         ? await handleUpdateStaffPin(row._id, { pin })
         : await handleSetStaffPin(row._id, { pin });
       if (res?.staff) patchStaffRow(res.staff);
-      await showPinOnce("PIN saved", res?.pin || pin, row.fullName);
+      await showPinOnce("Billing PIN saved", res?.pin || pin, row.fullName);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       await Swal.fire(
         "PIN failed",
-        err?.response?.data?.message ?? "Could not change Staff PIN.",
+        err?.response?.data?.message ?? "Could not save Billing PIN.",
         "error",
       );
     } finally {
@@ -212,32 +226,49 @@ export default function AccessScreen() {
     }
   };
 
-  const onToggleStaffPin = async (row: AccessStaffRow) => {
+  /** Create PIN when none exists — auto-generate or set a custom value. */
+  const onCreateBillingPin = async (row: AccessStaffRow) => {
     if (!canManage) return;
-    if (!row.pinSet) {
+    if (row.pinSet) {
       await Swal.fire(
-        "No PIN set",
-        "Generate or set a PIN before enabling it.",
+        "PIN already set",
+        "Use Reset to replace this billing PIN, or Clear first.",
         "info",
       );
       return;
     }
-    const nextEnabled = !row.pinEnabled;
+    const choice = await Swal.fire({
+      title: "Create Billing PIN",
+      text: `Choose how to create a billing PIN for ${row.fullName}.`,
+      icon: "question",
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonText: "Auto-generate",
+      denyButtonText: "Set custom",
+    });
+    if (choice.isDenied) {
+      await onSetCustomBillingPin(row);
+      return;
+    }
+    if (!choice.isConfirmed) return;
     try {
       setPinBusyId(row._id);
-      const res = await handleUpdateStaffPin(row._id, { enabled: nextEnabled });
+      const res = await handleSetStaffPin(row._id);
       if (res?.staff) patchStaffRow(res.staff);
-      await Swal.fire({
-        icon: "success",
-        title: nextEnabled ? "PIN enabled" : "PIN disabled",
-        timer: 1200,
-        showConfirmButton: false,
-      });
+      if (res?.pin) {
+        await showPinOnce("Billing PIN created", res.pin, row.fullName);
+      } else {
+        await Swal.fire(
+          "Done",
+          res?.message || "Billing PIN created.",
+          "success",
+        );
+      }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       await Swal.fire(
-        "Update failed",
-        err?.response?.data?.message ?? "Could not update PIN status.",
+        "PIN failed",
+        err?.response?.data?.message ?? "Could not create Billing PIN.",
         "error",
       );
     } finally {
@@ -249,8 +280,8 @@ export default function AccessScreen() {
     if (!canManage) return;
     if (!row.pinSet) return;
     const confirm = await Swal.fire({
-      title: "Clear Staff PIN?",
-      text: `${row.fullName} will not be able to verify invoices until a new PIN is set.`,
+      title: "Clear Billing PIN?",
+      text: `${row.fullName} will not be able to verify invoices until a new billing PIN is created.`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#dc2626",
@@ -263,7 +294,7 @@ export default function AccessScreen() {
       if (res?.staff) patchStaffRow(res.staff);
       await Swal.fire({
         icon: "success",
-        title: "PIN cleared",
+        title: "Billing PIN cleared",
         timer: 1200,
         showConfirmButton: false,
       });
@@ -271,7 +302,7 @@ export default function AccessScreen() {
       const err = error as { response?: { data?: { message?: string } } };
       await Swal.fire(
         "Clear failed",
-        err?.response?.data?.message ?? "Could not clear Staff PIN.",
+        err?.response?.data?.message ?? "Could not clear Billing PIN.",
         "error",
       );
     } finally {
@@ -284,7 +315,7 @@ export default function AccessScreen() {
     if (!row.pinSet) {
       await Swal.fire(
         "No PIN set",
-        "Generate or set a PIN before viewing it.",
+        "Create a billing PIN before viewing it.",
         "info",
       );
       return;
@@ -293,13 +324,13 @@ export default function AccessScreen() {
       setPinBusyId(row._id);
       const res = await handleViewStaffPin(row._id);
       if (res?.pin) {
-        await showPinDialog("Staff PIN", res.pin, row.fullName, {
+        await showPinDialog("Billing PIN", res.pin, row.fullName, {
           viewMode: true,
         });
       } else {
         await Swal.fire(
           "View failed",
-          res?.message || "Could not load Staff PIN.",
+          res?.message || "Could not load Billing PIN.",
           "error",
         );
       }
@@ -315,7 +346,7 @@ export default function AccessScreen() {
           title: "PIN not viewable yet",
           text:
             err?.response?.data?.message ??
-            "Reset this PIN once to enable View PIN for older PINs.",
+            "Reset this PIN once to enable View for older billing PINs.",
           showCancelButton: true,
           confirmButtonText: "Reset PIN now",
           cancelButtonText: "Later",
@@ -327,7 +358,7 @@ export default function AccessScreen() {
       }
       await Swal.fire(
         "View failed",
-        err?.response?.data?.message ?? "Could not view Staff PIN.",
+        err?.response?.data?.message ?? "Could not view Billing PIN.",
         "error",
       );
     } finally {
@@ -675,11 +706,12 @@ export default function AccessScreen() {
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex flex-wrap gap-2 border-b border-gray-200">
         {(
           [
-            { key: "staff", label: "Staff roles", icon: Users },
-            { key: "roles", label: "Role permissions", icon: Shield },
+            { key: "staff", label: "Staff Control", icon: Users },
+            { key: "roles", label: "Staff Role", icon: Shield },
+            { key: "billing", label: "Billing Access", icon: Receipt },
             { key: "mine", label: "My permissions", icon: Shield },
           ] as const
         ).map((item) => {
@@ -794,27 +826,26 @@ export default function AccessScreen() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-2 py-2">Staff</th>
                   <th className="px-2 py-2">Contact</th>
                   <th className="px-2 py-2">Current role</th>
                   <th className="px-2 py-2">Assign role</th>
-                  <th className="px-2 py-2">Staff PIN</th>
                   <th className="px-2 py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && !staff.length ? (
                   <tr>
-                    <td colSpan={6} className="px-2 py-8 text-center text-gray-400">
+                    <td colSpan={5} className="px-2 py-8 text-center text-gray-400">
                       Loading staff...
                     </td>
                   </tr>
                 ) : staff.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-2 py-8 text-center text-gray-400">
+                    <td colSpan={5} className="px-2 py-8 text-center text-gray-400">
                       No staff found.
                     </td>
                   </tr>
@@ -870,83 +901,6 @@ export default function AccessScreen() {
                         </Can>
                       </td>
                       <td className="px-2 py-3">
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-mono text-xs text-gray-500">
-                              PIN: {row.pinSet ? "••••" : "—"}
-                            </span>
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                row.pinSet && row.pinEnabled
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-gray-100 text-gray-500"
-                              }`}
-                            >
-                              {row.pinSet
-                                ? row.pinEnabled
-                                  ? "Active"
-                                  : "Disabled"
-                                : "Not set"}
-                            </span>
-                          </div>
-                          <Can permission={PERMISSIONS.ACCESS_MANAGE}>
-                            <div className="flex flex-wrap gap-1">
-                              <button
-                                type="button"
-                                disabled={pinBusyId === row._id || !row.pinSet}
-                                onClick={() => void onViewStaffPin(row)}
-                                className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
-                                title={
-                                  row.pinViewable
-                                    ? "View Staff PIN"
-                                    : "View PIN (reset once if this is an older PIN)"
-                                }
-                              >
-                                {pinBusyId === row._id ? (
-                                  <Loader2 size={12} className="animate-spin" />
-                                ) : (
-                                  <Eye size={12} />
-                                )}
-                                View PIN
-                              </button>
-                              <button
-                                type="button"
-                                disabled={pinBusyId === row._id}
-                                onClick={() => void onGenerateStaffPin(row)}
-                                className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
-                              >
-                                <KeyRound size={12} />
-                                {row.pinSet ? "Reset" : "Generate"}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={pinBusyId === row._id}
-                                onClick={() => void onChangeStaffPin(row)}
-                                className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-                              >
-                                Change
-                              </button>
-                              <button
-                                type="button"
-                                disabled={pinBusyId === row._id || !row.pinSet}
-                                onClick={() => void onToggleStaffPin(row)}
-                                className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-                              >
-                                {row.pinEnabled ? "Disable" : "Enable"}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={pinBusyId === row._id || !row.pinSet}
-                                onClick={() => void onClearStaffPin(row)}
-                                className="rounded-md bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
-                              >
-                                Clear
-                              </button>
-                            </div>
-                          </Can>
-                        </div>
-                      </td>
-                      <td className="px-2 py-3">
                         <div className="flex items-center gap-2">
                           <Can permission={PERMISSIONS.ACCESS_MANAGE}>
                             <button
@@ -967,6 +921,171 @@ export default function AccessScreen() {
                             </button>
                           </Can>
                         </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === "billing" && (
+        <div className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">
+                Billing Access
+              </h2>
+              <p className="mt-0.5 text-sm text-gray-500">
+                Billing rule for invoice verification — manage each staff
+                member&apos;s billing PIN (create, reset, view, clear).
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void onSearchStaff();
+                }}
+                placeholder="Search staff..."
+                className="min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => void onSearchStaff()}
+                className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Search
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[780px] text-left text-sm">
+              <thead className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-2 py-2">Staff Name</th>
+                  <th className="px-2 py-2">Contact Number</th>
+                  <th className="px-2 py-2">Staff PIN</th>
+                  <th className="px-2 py-2">Billing Rule</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && !staff.length ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-2 py-8 text-center text-gray-400"
+                    >
+                      Loading staff...
+                    </td>
+                  </tr>
+                ) : staff.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-2 py-8 text-center text-gray-400"
+                    >
+                      No staff found.
+                    </td>
+                  </tr>
+                ) : (
+                  staff.map((row) => (
+                    <tr key={row._id} className="border-b border-gray-50">
+                      <td className="px-2 py-3">
+                        <div className="font-medium text-gray-900">
+                          {row.fullName}
+                        </div>
+                        <div className="font-mono text-xs text-gray-400">
+                          {row.m_staff_id}
+                        </div>
+                      </td>
+                      <td className="px-2 py-3">
+                        <div className="font-medium text-gray-800">
+                          {row.phoneNumber || "—"}
+                        </div>
+                        <div className="text-xs text-gray-500">{row.email}</div>
+                      </td>
+                      <td className="px-2 py-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-mono text-xs text-gray-500">
+                            {row.pinSet ? "••••••" : "Not set"}
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              row.pinSet && row.pinEnabled
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {row.pinSet
+                              ? row.pinEnabled
+                                ? "Active"
+                                : "Disabled"
+                              : "No PIN"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-3">
+                        <Can
+                          permission={PERMISSIONS.ACCESS_MANAGE}
+                          fallback={
+                            <span className="text-xs text-gray-400">
+                              View only
+                            </span>
+                          }
+                        >
+                          <div className="flex flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              disabled={
+                                pinBusyId === row._id || Boolean(row.pinSet)
+                              }
+                              onClick={() => void onCreateBillingPin(row)}
+                              className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                              title="Create a new billing PIN"
+                            >
+                              <KeyRound size={12} />
+                              Create
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pinBusyId === row._id || !row.pinSet}
+                              onClick={() => void onGenerateStaffPin(row)}
+                              className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+                              title="Reset / regenerate PIN"
+                            >
+                              <RefreshCw size={12} />
+                              Reset
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pinBusyId === row._id || !row.pinSet}
+                              onClick={() => void onViewStaffPin(row)}
+                              className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                              title="View billing PIN"
+                            >
+                              {pinBusyId === row._id ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <Eye size={12} />
+                              )}
+                              View
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pinBusyId === row._id || !row.pinSet}
+                              onClick={() => void onClearStaffPin(row)}
+                              className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                              title="Clear billing PIN"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        </Can>
                       </td>
                     </tr>
                   ))

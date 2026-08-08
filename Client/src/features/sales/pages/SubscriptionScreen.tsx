@@ -726,6 +726,13 @@ export default function SubscriptionScreen() {
         overflow: "hidden",
       },
     },
+    muiTableContainerProps: {
+      sx: {
+        maxWidth: "100%",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+    },
   });
 
   const totalAmount = filteredData.reduce((sum, row) => sum + row.amount, 0);

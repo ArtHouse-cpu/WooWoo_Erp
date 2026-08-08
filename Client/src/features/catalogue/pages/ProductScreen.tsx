@@ -1,8 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  type UIEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Swal from "sweetalert2";
 import {
   MaterialReactTable,
   useMaterialReactTable,
+  type MRT_RowVirtualizer,
+  type MRT_SortingState,
 } from "material-react-table";
 import {
   ArrowDownCircle,
@@ -28,6 +37,9 @@ import UploadBulkProductModal, {
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
 
+const PAGE_SIZE = 50;
+const SEARCH_DEBOUNCE_MS = 350;
+
 type ProductRow = {
   _id?: string;
   productName?: string;
@@ -39,7 +51,19 @@ type ProductRow = {
   isCsp?: boolean;
   cspLabel?: string | null;
   cspEnrollmentId?: string | null;
+  barCode?: string;
+  barcode?: string;
+  categoryId?: string;
+  subCategoryId?: string;
   variants?: Array<{ name?: string } | string>;
+};
+
+type ProductStats = {
+  totalProducts: number;
+  totalStockQty: number;
+  inStockCount: number;
+  outOfStockCount: number;
+  categoryCount: number;
 };
 
 function getVariantNames(product: ProductRow): string[] {
@@ -53,40 +77,199 @@ function getVariantNames(product: ProductRow): string[] {
     .filter(Boolean);
 }
 
+function isAbortError(error: unknown) {
+  return (
+    (error as { name?: string; code?: string })?.name === "CanceledError" ||
+    (error as { name?: string; code?: string })?.code === "ERR_CANCELED" ||
+    (error as { name?: string })?.name === "AbortError"
+  );
+}
 
 export default function ProductScreen() {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [isError, setIsError] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showBulkCreateModal, setBulkCreateModal] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [editProduct, setEditProduct] = useState<any | null>(null);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sorting, setSorting] = useState<MRT_SortingState>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalRowCount, setTotalRowCount] = useState(0);
+  const [stats, setStats] = useState<ProductStats>({
+    totalProducts: 0,
+    totalStockQty: 0,
+    inStockCount: 0,
+    outOfStockCount: 0,
+    categoryCount: 0,
+  });
 
-  const fetchData = async (signal?: AbortSignal) => {
-    try {
-      setLoading(true);
-      const prodRes = await handleGetProducts("", signal, "product");
-      
-      const productList = Array.isArray(prodRes?.products)
-        ? prodRes.products
-        : Array.isArray(prodRes)
-          ? prodRes
-          : [];
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizerInstanceRef = useRef<MRT_RowVirtualizer>(null);
+  const fetchLockRef = useRef(false);
+  const requestIdRef = useRef(0);
 
-      setProducts(productList);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      setProducts([]);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(globalFilter.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [globalFilter]);
+
+  const sortParams = useMemo(() => {
+    const first = sorting[0];
+    if (!first?.id) {
+      return { sortBy: "createdAt", sortDir: "desc" as const };
     }
-  };
+    return {
+      sortBy: first.id,
+      sortDir: first.desc ? ("desc" as const) : ("asc" as const),
+    };
+  }, [sorting]);
+
+  const fetchPage = useCallback(
+    async ({
+      pageToLoad,
+      append,
+      signal,
+      withStats,
+    }: {
+      pageToLoad: number;
+      append: boolean;
+      signal?: AbortSignal;
+      withStats?: boolean;
+    }) => {
+      const requestId = ++requestIdRef.current;
+      try {
+        if (append) setIsFetchingMore(true);
+        else setLoading(true);
+
+        const prodRes = await handleGetProducts({
+          search: debouncedSearch,
+          type: "product",
+          page: pageToLoad,
+          limit: PAGE_SIZE,
+          sortBy: sortParams.sortBy,
+          sortDir: sortParams.sortDir,
+          includeStats: Boolean(withStats),
+          signal,
+        });
+
+        if (requestId !== requestIdRef.current) return;
+
+        const productList = Array.isArray(prodRes?.products)
+          ? prodRes.products
+          : [];
+        const pagination = prodRes?.pagination || prodRes?.meta || {};
+        const total = Number(
+          pagination.total ?? pagination.totalRowCount ?? productList.length,
+        );
+        const more =
+          typeof pagination.hasMore === "boolean"
+            ? pagination.hasMore
+            : pageToLoad * PAGE_SIZE < total;
+
+        setTotalRowCount(total);
+        setHasMore(more);
+        setPage(pageToLoad);
+        setIsError(false);
+        setProducts((prev) => {
+          if (!append) return productList;
+          const seen = new Set(prev.map((p) => String(p._id)));
+          const merged = [...prev];
+          for (const row of productList) {
+            const id = String(row?._id || "");
+            if (!id || seen.has(id)) continue;
+            seen.add(id);
+            merged.push(row);
+          }
+          return merged;
+        });
+
+        if (withStats && prodRes?.stats) {
+          setStats({
+            totalProducts: Number(prodRes.stats.totalProducts ?? total),
+            totalStockQty: Number(prodRes.stats.totalStockQty ?? 0),
+            inStockCount: Number(prodRes.stats.inStockCount ?? 0),
+            outOfStockCount: Number(prodRes.stats.outOfStockCount ?? 0),
+            categoryCount: Number(prodRes.stats.categoryCount ?? 0),
+          });
+        } else if (!append) {
+          setStats((prev) => ({ ...prev, totalProducts: total }));
+        }
+      } catch (error) {
+        if (isAbortError(error)) return;
+        console.error("Error fetching data:", error);
+        if (requestId !== requestIdRef.current) return;
+        setIsError(true);
+        if (!append) {
+          setProducts([]);
+          setHasMore(false);
+          setTotalRowCount(0);
+        }
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+          setIsFetchingMore(false);
+          fetchLockRef.current = false;
+        }
+      }
+    },
+    [debouncedSearch, sortParams.sortBy, sortParams.sortDir],
+  );
+
+  const reloadFromStart = useCallback(
+    async (signal?: AbortSignal) => {
+      fetchLockRef.current = false;
+      setHasMore(true);
+      setPage(1);
+      try {
+        rowVirtualizerInstanceRef.current?.scrollToIndex?.(0);
+      } catch {
+        /* ignore */
+      }
+      await fetchPage({
+        pageToLoad: 1,
+        append: false,
+        signal,
+        withStats: true,
+      });
+    },
+    [fetchPage],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchData(controller.signal);
+    void reloadFromStart(controller.signal);
     return () => controller.abort();
-  }, []);
+  }, [reloadFromStart]);
+
+  const fetchMoreOnBottomReached = useCallback(
+    (container?: HTMLDivElement | null) => {
+      if (!container || fetchLockRef.current || loading || isFetchingMore) {
+        return;
+      }
+      if (!hasMore) return;
+      const { scrollHeight, scrollTop, clientHeight } = container;
+      if (scrollHeight - scrollTop - clientHeight < 400) {
+        fetchLockRef.current = true;
+        void fetchPage({
+          pageToLoad: page + 1,
+          append: true,
+          withStats: false,
+        });
+      }
+    },
+    [fetchPage, hasMore, isFetchingMore, loading, page],
+  );
+
+  useEffect(() => {
+    fetchMoreOnBottomReached(tableContainerRef.current);
+  }, [fetchMoreOnBottomReached, products.length]);
 
   const handleSubmitProduct = async (formData: FormData) => {
     try {
@@ -96,7 +279,7 @@ export default function ProductScreen() {
       } else {
         await handleCreateProduct(formData);
       }
-      await fetchData();
+      await reloadFromStart();
     } catch (error) {
       console.error("Error saving product:", error);
     } finally {
@@ -111,44 +294,99 @@ export default function ProductScreen() {
     try {
       setBulkImporting(true);
 
-      const payload = rows.map((row) => ({
-        productName: row.productName,
-        variant: row.variant || "",
-        category: String(row.category || "").trim(),
-        categoryName: String(row.category || "").trim(),
-        barcode: row.barcode || "",
-        barCode: row.barcode || "",
-        sellingPrice: row.sellingPrice,
-        unitPrice: row.sellingPrice,
-        itemCode: row.itemCode || "",
-        stockQty: row.stockQty || 0,
-        qty: row.stockQty || 0,
-        purchasePrice: row.purchasePrice || 0,
-        variants: row.variant
-          ? [
-              {
-                name: row.variant,
-                sellingPrice: row.sellingPrice,
-                purchasePrice: row.purchasePrice || 0,
-                barcode: row.barcode || "",
-              },
-            ]
-          : [],
-      }));
+      const normalizeKey = (value: string) =>
+        String(value || "")
+          .replace(/[\r\n\t]+/g, " ")
+          .trim()
+          .toLowerCase()
+          .replace(/\s+/g, " ");
 
-      const missingCategory = payload.find((row) => !row.category);
-      if (missingCategory) {
+      const uniqueBarcodeKey = (value: string) => {
+        const digits = String(value || "")
+          .replace(/[\r\n\t\s]+/g, "")
+          .trim();
+        return /^\d{8,14}$/.test(digits) ? digits : "";
+      };
+
+      // Match server: Product+Variant primary; itemCode + real EAN secondary
+      const rowIdentityKeys = (row: ProductBulkImportRow) => {
+        const keys: string[] = [];
+        const name = normalizeKey(row.productName || "");
+        const variant = normalizeKey(row.variant || "");
+        if (name) keys.push(`name:${name}|variant:${variant}`);
+        const itemCode = normalizeKey(row.itemCode || "");
+        if (itemCode) keys.push(`item:${itemCode}`);
+        const barcode = uniqueBarcodeKey(row.barcode || "");
+        if (barcode) keys.push(`barcode:${barcode}`);
+        return keys;
+      };
+
+      // Drop true duplicate rows in the Excel before calling the API
+      const seen = new Set<string>();
+      const uniqueRows: ProductBulkImportRow[] = [];
+      let clientSkippedDuplicates = 0;
+      for (const row of rows) {
+        const keys = rowIdentityKeys(row);
+        if (!normalizeKey(row.productName || "")) continue;
+        const isDup = keys.some((k) => seen.has(k));
+        if (isDup) {
+          clientSkippedDuplicates += 1;
+          continue;
+        }
+        for (const k of keys) seen.add(k);
+        uniqueRows.push({
+          ...row,
+          barcode: String(row.barcode || "")
+            .replace(/[\r\n\t]+/g, "")
+            .trim(),
+        });
+      }
+
+      if (!uniqueRows.length) {
         await Swal.fire(
-          "Category required",
-          `"${missingCategory.productName}" has no Category. Fill Category in Excel — it will be auto-created if new.`,
+          "No products to import",
+          clientSkippedDuplicates
+            ? "Every row was a duplicate within the file."
+            : "No valid product rows found.",
           "warning",
         );
         return;
       }
 
+      const payload = uniqueRows.map((row) => {
+        const category =
+          String(row.category || "").trim() || "Uncategorized";
+        return {
+          productName: row.productName,
+          variant: row.variant || "",
+          category,
+          categoryName: category,
+          barcode: row.barcode || "",
+          barCode: row.barcode || "",
+          sellingPrice: row.sellingPrice,
+          unitPrice: row.sellingPrice,
+          itemCode: row.itemCode || "",
+          stockQty: row.stockQty || 0,
+          qty: row.stockQty || 0,
+          purchasePrice: row.purchasePrice || 0,
+          variants: row.variant
+            ? [
+                {
+                  name: row.variant,
+                  sellingPrice: row.sellingPrice,
+                  purchasePrice: row.purchasePrice || 0,
+                  barcode: row.barcode || "",
+                },
+              ]
+            : [],
+        };
+      });
+
       // Pre-create unique categories via POST /api/categories (backend also ensures this)
       const uniqueCategories = [
-        ...new Set(payload.map((row) => row.category).filter(Boolean)),
+        ...new Set(
+          payload.map((row) => row.category || "Uncategorized").filter(Boolean),
+        ),
       ];
       if (uniqueCategories.length) {
         try {
@@ -161,16 +399,16 @@ export default function ProductScreen() {
       }
 
       const response = await handleBulkUploadProducts(payload);
-      await fetchData();
+      await reloadFromStart();
       setBulkCreateModal(false);
 
       const created = Number(
         response?.summary?.created ?? response?.products?.length ?? 0,
       );
       const failed = Number(response?.summary?.failed ?? 0);
-      const skippedDuplicates = Number(
-        response?.summary?.skippedDuplicates ?? 0,
-      );
+      const skippedDuplicates =
+        Number(response?.summary?.skippedDuplicates ?? 0) +
+        clientSkippedDuplicates;
       const invalidRows = Array.isArray(response?.summary?.invalidRows)
         ? response.summary.invalidRows
         : [];
@@ -254,7 +492,7 @@ export default function ProductScreen() {
       if (result.isConfirmed) {
         setLoading(true);
         await handleDeleteProduct(id);
-        await fetchData();
+        await reloadFromStart();
         Swal.fire("Deleted!", "Your product has been deleted.", "success");
       }
     } catch (error) {
@@ -271,16 +509,10 @@ export default function ProductScreen() {
         accessorKey: "serial",
         header: "No.",
         size: 80,
-        Cell: ({ row, table }: { row: any; table: any }) => {
-          const pageIndex = table.getState().pagination.pageIndex;
-          const pageSize = table.getState().pagination.pageSize;
-
-          return (
-            <span className="text-xs text-gray-500">
-              {pageIndex * pageSize + row.index + 1}
-            </span>
-          );
-        },
+        enableSorting: false,
+        Cell: ({ row }: { row: any }) => (
+          <span className="text-xs text-gray-500">{row.index + 1}</span>
+        ),
       },
       {
         accessorKey: "productName",
@@ -322,6 +554,7 @@ export default function ProductScreen() {
         accessorKey: "subCategory",
         header: "Sub Category",
         size: 150,
+        enableSorting: false,
         Cell: ({ cell }: { cell: any }) => (
           <span className="text-slate-600">{cell.getValue()}</span>
         ),
@@ -346,6 +579,7 @@ export default function ProductScreen() {
       {
         header: "Actions",
         accessorKey: "actions",
+        enableSorting: false,
         Cell: ({ row }: { row: any }) => (
           <div className="flex items-center gap-2">
             <Can permission={PERMISSIONS.PRODUCT_UPDATE}>
@@ -376,14 +610,46 @@ export default function ProductScreen() {
         ),
       },
     ],
-    []
+    [],
   );
 
   const table = useMaterialReactTable({
     columns,
     data: products,
+    getRowId: (row) => String(row._id || ""),
+    enablePagination: false,
+    enableColumnFilters: false,
+    enableRowVirtualization: true,
+    enableGlobalFilter: true,
+    manualFiltering: true,
+    manualSorting: true,
+    initialState: {
+      showGlobalFilter: true,
+      density: "compact",
+    },
+    onGlobalFilterChange: setGlobalFilter,
+    onSortingChange: setSorting,
+    rowVirtualizerInstanceRef,
+    rowVirtualizerOptions: { overscan: 8 },
+    muiToolbarAlertBannerProps: isError
+      ? {
+          color: "error",
+          children: "Error loading products. Try again.",
+        }
+      : undefined,
+    renderBottomToolbarCustomActions: () => (
+      <span className="px-2 text-xs text-gray-500">
+        Showing {products.length.toLocaleString("en-IN")} of{" "}
+        {totalRowCount.toLocaleString("en-IN")} products
+        {isFetchingMore ? " · Loading more…" : hasMore ? "" : " · End of list"}
+      </span>
+    ),
     state: {
-      isLoading: loading,
+      globalFilter,
+      isLoading: loading && products.length === 0,
+      showAlertBanner: isError,
+      showProgressBars: isFetchingMore || (loading && products.length > 0),
+      sorting,
     },
     muiTablePaperProps: {
       elevation: 0,
@@ -392,33 +658,44 @@ export default function ProductScreen() {
         border: "1px solid #e5e7eb",
       },
     },
+    muiTableContainerProps: {
+      ref: tableContainerRef,
+      sx: {
+        maxWidth: "100%",
+        maxHeight: "min(70vh, 720px)",
+        overflowX: "auto",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+      onScroll: (event: UIEvent<HTMLDivElement>) =>
+        fetchMoreOnBottomReached(event.target as HTMLDivElement),
+    },
   });
 
   const cards = [
     {
       title: "Total Products",
-      value: products.length,
+      value: stats.totalProducts || totalRowCount,
       icon: <ShoppingBasket size={22} className="text-gray-500" />,
     },
     {
       title: "Products In Stock",
-      value: products.reduce((sum, p) => sum + (p.stockQty || 0), 0),
+      value: stats.totalStockQty,
       icon: <Boxes size={22} className="text-gray-500" />,
     },
     {
       title: "No of Categories",
-      value: new Set(products.map((p) => p.category).filter(Boolean)).size,
+      value: stats.categoryCount,
       icon: <LayoutList size={22} className="text-gray-500" />,
     },
-
     {
       title: "Products In",
-      value: products.filter((p) => (p.stockQty || 0) > 0).length,
+      value: stats.inStockCount,
       icon: <ArrowDownCircle size={22} className="text-gray-500" />,
     },
     {
       title: "Products Out",
-      value: products.filter((p) => (p.stockQty || 0) <= 0).length,
+      value: stats.outOfStockCount,
       icon: <ArrowUpCircle size={22} className="text-gray-500" />,
     },
   ];

@@ -540,6 +540,13 @@ export default function CustomerScreen() {
         border: "1px solid #e5e7eb",
       },
     },
+    muiTableContainerProps: {
+      sx: {
+        maxWidth: "100%",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+    },
     muiTableBodyRowProps: ({ row }) => ({
       onClick: () => {
         setDetailsCustomer(row.original);

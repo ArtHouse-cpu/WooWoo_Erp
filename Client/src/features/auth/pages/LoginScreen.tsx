@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Lock, Mail, Phone } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +28,7 @@ export default function LoginScreen() {
   const dispatch = useAppDispatch();
   const setUser = useAuthStore((s) => s.setUser);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Forgot password state
   const [showForgot, setShowForgot] = useState(false);
@@ -35,6 +36,7 @@ export default function LoginScreen() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotOtp, setForgotOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
 
   const {
@@ -166,9 +168,9 @@ export default function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <div className="w-full max-w-5xl bg-white shadow-sm rounded-2xl grid grid-cols-1 md:grid-cols-2 overflow-hidden p-12">
-        <div className="hidden md:flex items-center justify-center bg-white">
+    <div className="flex min-h-dvh items-center justify-center bg-gray-100 p-3 sm:p-6">
+      <div className="grid w-full max-w-5xl grid-cols-1 overflow-hidden rounded-2xl bg-white p-4 shadow-sm sm:p-8 md:grid-cols-2 md:p-10">
+        <div className="hidden items-center justify-center bg-white md:flex">
           <img
             src={logo}
             alt="Login"
@@ -176,12 +178,15 @@ export default function LoginScreen() {
           />
         </div>
 
-        <div className="p-10 flex flex-col justify-center">
-          <h2 className="text-xl md:text-3xl font-bold text-center mb-2">
+        <div className="flex flex-col justify-center p-2 sm:p-6 md:p-8">
+          <div className="mb-4 flex justify-center md:hidden">
+            <img src={logo} alt="Logo" className="h-16 w-auto object-contain" />
+          </div>
+          <h2 className="mb-2 text-center text-xl font-bold md:text-3xl">
             Login
           </h2>
 
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          <form className="space-y-4 sm:space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <div
               className={`flex items-center gap-3 border rounded-xl px-4 py-4 bg-gray-50 transition ${
                 errors.identifier ? "border-red-500" : "border-gray-300"
@@ -206,12 +211,25 @@ export default function LoginScreen() {
             >
               <Lock className="w-5 h-5 text-gray-500 shrink-0" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="Password"
                 autoComplete="current-password"
                 className="w-full bg-transparent outline-none text-gray-800"
                 {...register("password")}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="shrink-0 rounded-md p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-800"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                title={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
             </div>
 
             <div className="flex justify-end">
@@ -289,12 +307,29 @@ export default function LoginScreen() {
                   <div className="flex items-center gap-3 border border-gray-300 rounded-xl px-4 py-3 bg-gray-50">
                     <Lock className="w-5 h-5 text-gray-500 shrink-0" />
                     <input
-                      type="password"
+                      type={showNewPassword ? "text" : "password"}
                       placeholder="New Password (min 8 chars)"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       className="w-full bg-transparent outline-none text-gray-800"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword((v) => !v)}
+                      className="shrink-0 rounded-md p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-800"
+                      aria-label={
+                        showNewPassword ? "Hide password" : "Show password"
+                      }
+                      title={
+                        showNewPassword ? "Hide password" : "Show password"
+                      }
+                    >
+                      {showNewPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
                   </div>
                 </div>
                 <div className="flex gap-3">

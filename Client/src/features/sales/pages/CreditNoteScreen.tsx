@@ -29,6 +29,7 @@ import {
 } from "@/utils/whatsappInvoiceShare";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
+import CreateSalesReturnScreen from "./CreateSalesReturnScreen";
 
 type CreditNoteStatus = "Final" | "Draft" | "Cancelled";
 
@@ -76,6 +77,8 @@ export default function CreditNoteScreen() {
   const [selectedActionRow, setSelectedActionRow] = useState<CreditNoteRow | null>(
     null,
   );
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewData, setViewData] = useState<Record<string, unknown> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -127,9 +130,9 @@ export default function CreditNoteScreen() {
       const { _id, raw, status } = row;
 
       if (action === "view") {
-        navigate("/create-sales-return", {
-          state: { mode: "view", returnSale: raw },
-        });
+        setViewData(raw);
+        setViewOpen(true);
+        setSelectedActionRow(null);
       } else if (action === "edit") {
         if (status === "Cancelled") {
           Swal.fire(
@@ -496,6 +499,13 @@ export default function CreditNoteScreen() {
         overflow: "hidden",
       },
     },
+    muiTableContainerProps: {
+      sx: {
+        maxWidth: "100%",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+    },
   });
 
   const totalAmount = filteredData.reduce((sum, row) => sum + row.amount, 0);
@@ -706,6 +716,17 @@ export default function CreditNoteScreen() {
             </div>
           </div>
         </div>
+      )}
+
+      {viewOpen && viewData && (
+        <CreateSalesReturnScreen
+          initialMode="view"
+          initialData={viewData}
+          onClose={() => {
+            setViewOpen(false);
+            setViewData(null);
+          }}
+        />
       )}
     </div>
   );

@@ -21,6 +21,7 @@ import {
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
+import DocumentFormModal from "@/components/DocumentFormModal";
 import {
   calcStackedLineBenefits,
   membershipBenefitsForLine,
@@ -47,10 +48,20 @@ const getNextInvoiceNumber = (): string => {
 
 type Mode = "create" | "edit" | "view";
 
-export default function CreateInvoiceScreen() {
+type CreateInvoiceScreenProps = {
+  onClose?: () => void;
+  initialData?: any;
+  initialMode?: Mode;
+};
+
+export default function CreateInvoiceScreen({
+  onClose,
+  initialData,
+  initialMode,
+}: CreateInvoiceScreenProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [mode, setMode] = useState<Mode>("create");
+  const [mode, setMode] = useState<Mode>(initialMode || "create");
   const [invoiceId, setInvoiceId] = useState<string | null>(null);
   const [invoiceNo, setInvoiceNo] = useState(getNextInvoiceNumber());
   const [customer, setCustomer] = useState("");
@@ -95,44 +106,58 @@ export default function CreateInvoiceScreen() {
   }, []);
 
   useEffect(() => {
+    const applyInvoice = (inv: any, nextMode: Mode) => {
+      setMode(nextMode);
+      setInvoiceId(inv._id);
+      if (inv.invoiceCode) setInvoiceNo(inv.invoiceCode);
+      setCustomer(inv.customerName || "");
+      setPhone(inv.customerPhone || "");
+      const linkedCustomerId =
+        typeof inv.customerId === "object" && inv.customerId
+          ? String(inv.customerId._id ?? "")
+          : String(inv.customerId ?? "");
+      setCustomerId(linkedCustomerId || null);
+      // Never open name-search dropdown when opening an existing invoice
+      setCustomerDropdownOpen(false);
+      setCustomers([]);
+      if (inv.invoiceDate) {
+        setInvoiceDate(new Date(inv.invoiceDate).toISOString().split("T")[0]);
+      }
+      if (inv.dueDate) {
+        setDueDate(new Date(inv.dueDate).toISOString().split("T")[0]);
+      }
+      setNotes(inv.notes || "");
+      if (Array.isArray(inv.items)) {
+        setItems(
+          inv.items.map((item: any, idx: number) => ({
+            id: idx + 1,
+            productName: item.productName || "",
+            qty: item.qty || 1,
+            unitPrice: item.unitPrice || 0,
+            discount: item.discount || 0,
+            cashback: item.isCsp ? 0 : item.cashback || 0,
+            image: item.image || item.imageUrl || "",
+            category: item.category || "General",
+            isCsp: Boolean(item.isCsp),
+            cspLabel: item.cspLabel || (item.isCsp ? "CSP" : null),
+            productDiscountType: item.productDiscountType,
+            productDiscountValue: item.productDiscountValue,
+          })),
+        );
+      }
+      if (inv.extraCharges) setExtraCharges(inv.extraCharges);
+    };
+
+    if (initialData && initialMode) {
+      applyInvoice(initialData, initialMode);
+      return;
+    }
+
     const state = location.state as { invoice?: any; mode?: Mode } | null;
     if (state?.mode && state?.invoice) {
-        setMode(state.mode);
-        const inv = state.invoice;
-        setInvoiceId(inv._id);
-        if (inv.invoiceCode) setInvoiceNo(inv.invoiceCode);
-        setCustomer(inv.customerName || "");
-        setPhone(inv.customerPhone || "");
-        const linkedCustomerId =
-          typeof inv.customerId === "object" && inv.customerId
-            ? String(inv.customerId._id ?? "")
-            : String(inv.customerId ?? "");
-        setCustomerId(linkedCustomerId || null);
-        // Never open name-search dropdown when opening an existing invoice
-        setCustomerDropdownOpen(false);
-        setCustomers([]);
-        if (inv.invoiceDate) setInvoiceDate(new Date(inv.invoiceDate).toISOString().split("T")[0]);
-        if (inv.dueDate) setDueDate(new Date(inv.dueDate).toISOString().split("T")[0]);
-        setNotes(inv.notes || "");
-        if (Array.isArray(inv.items)) {
-            setItems(inv.items.map((item: any, idx: number) => ({
-                id: idx + 1,
-                productName: item.productName || "",
-                qty: item.qty || 1,
-                unitPrice: item.unitPrice || 0,
-                discount: item.discount || 0,
-                cashback: item.isCsp ? 0 : item.cashback || 0,
-                image: item.image || item.imageUrl || "",
-                category: item.category || "General",
-                isCsp: Boolean(item.isCsp),
-                cspLabel: item.cspLabel || (item.isCsp ? "CSP" : null),
-                productDiscountType: item.productDiscountType,
-                productDiscountValue: item.productDiscountValue,
-            })));
-        }
-        if (inv.extraCharges) setExtraCharges(inv.extraCharges);
+      applyInvoice(state.invoice, state.mode);
     }
-  }, [location.state]);
+  }, [location.state, initialData, initialMode]);
 
   /** Resolve exact CRM customer for view/edit (by invoice customerId, else exact phone). */
   useEffect(() => {
@@ -747,11 +772,16 @@ export default function CreateInvoiceScreen() {
     }
   };
 
-  return (
+  const handleBack = () => {
+    if (onClose) onClose();
+    else navigate(-1);
+  };
+
+  const content = (
     <div className="space-y-4 p-2">
       <CreateInvoiceHeader
         invoiceNo={invoiceNo}
-        onBack={() => navigate(-1)}
+        onBack={handleBack}
         onSaveDraft={handleSaveDraft}
         onSavePrint={handleSavePrint}
         onSave={() => {
@@ -828,7 +858,7 @@ export default function CreateInvoiceScreen() {
             onInvoiceDateChange={setInvoiceDate}
             onDueDateChange={setDueDate}
           />
-          {showCreateCustomerModal && (
+          {showCreateCustomerModal && mode !== "view" && (
             <CreateCustomerModal
               onClose={() => setShowCreateCustomerModal(false)}
               onSubmit={handleCreateCustomerSubmit}
@@ -948,38 +978,50 @@ export default function CreateInvoiceScreen() {
               extraCharges={extraCharges}
               onExtraChargesChange={setExtraCharges}
               grandTotal={grandTotal}
-              onSave={
-                mode !== "view"
-                  ? () => {
-                      if (validateBeforeCheckout()) setOpenCheckout(true);
-                    }
-                  : () => {}
-              }
+              onSave={() => {
+                if (validateBeforeCheckout()) setOpenCheckout(true);
+              }}
               isSaving={saving}
+              readOnly={mode === "view"}
             />
           </div>
         </div>
       </div>
-      <CheckoutModal
-        open={openCheckout}
-        grandTotal={grandTotal}
-        items={checkoutItems}
-        initialCustomerName={customer}
-        initialCustomerPhone={phone}
-        initialCustomerId={customerId}
-        initialMembership={membership}
-        initialMembershipPlanId={membershipPlanId}
-        initialMembershipDiscount={membershipDiscountTotal}
-        initialProductDiscount={productDiscountTotal}
-        initialCashbackTotal={cashbackTotal}
-        extraCharges={extraCharges}
-        membershipPlans={membershipPlans}
-        onClose={() => setOpenCheckout(false)}
-        onConfirmPayment={async (payment) => {
-          setOpenCheckout(false);
-          await handleSave(payment);
-        }}
-      />
+      {mode !== "view" && (
+        <CheckoutModal
+          open={openCheckout}
+          grandTotal={grandTotal}
+          items={checkoutItems}
+          initialCustomerName={customer}
+          initialCustomerPhone={phone}
+          initialCustomerId={customerId}
+          initialMembership={membership}
+          initialMembershipPlanId={membershipPlanId}
+          initialMembershipDiscount={membershipDiscountTotal}
+          initialProductDiscount={productDiscountTotal}
+          initialCashbackTotal={cashbackTotal}
+          extraCharges={extraCharges}
+          membershipPlans={membershipPlans}
+          onClose={() => setOpenCheckout(false)}
+          onConfirmPayment={async (payment) => {
+            setOpenCheckout(false);
+            await handleSave(payment);
+          }}
+        />
+      )}
     </div>
   );
+
+  if (onClose) {
+    return (
+      <DocumentFormModal
+        onClose={onClose}
+        confirmOnClose={mode !== "view"}
+      >
+        {content}
+      </DocumentFormModal>
+    );
+  }
+
+  return content;
 }

@@ -16,6 +16,7 @@ import {
 } from "@/utils/whatsappInvoiceShare";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
+import CreatePurchaseReturnScreen from "./CreatePurchaseReturnScreen";
 
 type DebitNoteRow = {
   id: string;
@@ -52,6 +53,8 @@ export default function DebitNoteScreen() {
   const [selectedActionRow, setSelectedActionRow] = useState<DebitNoteRow | null>(
     null,
   );
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewData, setViewData] = useState<any>(null);
 
   const docForPdf = (raw: Record<string, unknown>): Record<string, unknown> => {
     const amt = Number(raw.amount ?? raw.grandTotal ?? 0);
@@ -325,6 +328,13 @@ export default function DebitNoteScreen() {
         border: "1px solid #e5e7eb",
       },
     },
+    muiTableContainerProps: {
+      sx: {
+        maxWidth: "100%",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+    },
   });
   return (
     <div className="p-1">
@@ -386,9 +396,8 @@ export default function DebitNoteScreen() {
               <button
                 type="button"
                 onClick={() => {
-                  navigate("/create-purchase-return", {
-                    state: { purchase: selectedActionRow.raw, mode: "view" },
-                  });
+                  setViewData(selectedActionRow.raw);
+                  setViewOpen(true);
                   setSelectedActionRow(null);
                 }}
                 className="flex w-full items-center gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-left transition-colors hover:bg-green-100"
@@ -419,6 +428,17 @@ export default function DebitNoteScreen() {
             </div>
           </div>
         </div>
+      )}
+
+      {viewOpen && viewData && (
+        <CreatePurchaseReturnScreen
+          initialMode="view"
+          initialData={viewData}
+          onClose={() => {
+            setViewOpen(false);
+            setViewData(null);
+          }}
+        />
       )}
     </div>
   );

@@ -152,6 +152,13 @@ export default function CategoryListModal({ onClose }: any) {
       elevation: 0,
       sx: { border: "1px solid #e5e7eb" },
     },
+    muiTableContainerProps: {
+      sx: {
+        maxWidth: "100%",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+    },
   });
 
   return (

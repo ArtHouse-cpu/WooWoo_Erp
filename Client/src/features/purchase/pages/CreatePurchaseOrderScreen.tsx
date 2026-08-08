@@ -24,6 +24,7 @@ import InvoiceDetailsSection from "@/features/sales/components/invoice/InvoiceDe
 import AddVendorModal from "../Modal/AddVendorModal";
 import type { InvoiceItem } from "@/features/sales/components/invoice/types";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
+import DocumentFormModal from "@/components/DocumentFormModal";
 import FileAttachmentSection from "../components/FileAttachmentSection";
 
 const today = new Date().toISOString().split("T")[0];
@@ -50,13 +51,23 @@ type VendorOption = {
   companyName?: string;
 };
 
-export default function CreatePurchaseOrderScreen() {
+type CreatePurchaseOrderScreenProps = {
+  onClose?: () => void;
+  initialData?: any;
+  initialMode?: Mode;
+};
+
+export default function CreatePurchaseOrderScreen({
+  onClose,
+  initialData,
+  initialMode,
+}: CreatePurchaseOrderScreenProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const staffName = useAppSelector((state) => state.user.m_staff_name);
   const purchaser = staffName ?? "Not Assigned";
 
-  const [mode, setMode] = useState<Mode>("create");
+  const [mode, setMode] = useState<Mode>(initialMode || "create");
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
   const [purchaseOrderNo, setPurchaseOrderNo] = useState(
     getNextPurchaseNumber(),
@@ -87,39 +98,46 @@ export default function CreatePurchaseOrderScreen() {
     useState<ManualDiscountType>("flat");
 
   useEffect(() => {
+    const applyPurchase = (purchase: any, nextMode: Mode) => {
+      setMode(nextMode);
+      setPurchaseId(purchase._id ?? null);
+      if (purchase.invoiceNumber)
+        setPurchaseOrderNo(String(purchase.invoiceNumber));
+      setVendor(String(purchase.supplierName ?? ""));
+      setPhone(String(purchase.vendorPhone ?? purchase.mobile ?? ""));
+      if (purchase.invoiceDate) {
+        setPurchaseDate(
+          new Date(purchase.invoiceDate).toISOString().split("T")[0],
+        );
+      }
+      setNotes(String(purchase.notes ?? ""));
+      setManualDiscount(Math.max(0, Number(purchase.manualDiscount ?? 0) || 0));
+      setManualDiscountType(
+        purchase.manualDiscountType === "percentage" ? "percentage" : "flat",
+      );
+      if (Array.isArray(purchase.items)) {
+        setItems(
+          purchase.items.map((item: any, idx: number) => ({
+            id: idx + 1,
+            productName: item.productName || "",
+            qty: Number(item.qty ?? 1),
+            unitPrice: Number(item.unitPrice ?? 0),
+            discount: Number(item.discount ?? 0),
+            image: item.image || item.imageUrl || "",
+          })),
+        );
+      }
+    };
+
+    if (initialData && initialMode) {
+      applyPurchase(initialData, initialMode);
+      return;
+    }
+
     const state = location.state as { purchase?: any; mode?: Mode } | null;
     if (!state?.mode || !state?.purchase) return;
-
-    setMode(state.mode);
-    const purchase = state.purchase;
-    setPurchaseId(purchase._id ?? null);
-    if (purchase.invoiceNumber)
-      setPurchaseOrderNo(String(purchase.invoiceNumber));
-    setVendor(String(purchase.supplierName ?? ""));
-    setPhone(String(purchase.vendorPhone ?? purchase.mobile ?? ""));
-    if (purchase.invoiceDate) {
-      setPurchaseDate(
-        new Date(purchase.invoiceDate).toISOString().split("T")[0],
-      );
-    }
-    setNotes(String(purchase.notes ?? ""));
-    setManualDiscount(Math.max(0, Number(purchase.manualDiscount ?? 0) || 0));
-    setManualDiscountType(
-      purchase.manualDiscountType === "percentage" ? "percentage" : "flat",
-    );
-    if (Array.isArray(purchase.items)) {
-      setItems(
-        purchase.items.map((item: any, idx: number) => ({
-          id: idx + 1,
-          productName: item.productName || "",
-          qty: Number(item.qty ?? 1),
-          unitPrice: Number(item.unitPrice ?? 0),
-          discount: Number(item.discount ?? 0),
-          image: item.image || item.imageUrl || "",
-        })),
-      );
-    }
-  }, [location.state]);
+    applyPurchase(state.purchase, state.mode);
+  }, [location.state, initialData, initialMode]);
 
   const draft = {
     name: draftName,
@@ -407,11 +425,16 @@ export default function CreatePurchaseOrderScreen() {
     }
   };
 
-  return (
+  const handleBack = () => {
+    if (onClose) onClose();
+    else navigate(-1);
+  };
+
+  const content = (
     <div className="space-y-4 p-2">
       <CreatePurchaseOrderHeader
         purchaseOrderNo={purchaseOrderNo}
-        onBack={() => navigate(-1)}
+        onBack={handleBack}
         onSaveDraft={() => void handleSaveDraft()}
         onSavePrint={() => void handleSavePrint()}
         onSave={() => {
@@ -427,7 +450,7 @@ export default function CreatePurchaseOrderScreen() {
           phone={phone}
           customerOptions={vendors}
           loadingCustomers={loadingVendors}
-          customerDropdownOpen={vendorDropdownOpen}
+          customerDropdownOpen={mode !== "view" && vendorDropdownOpen}
           invoiceDate={purchaseDate}
           salesPerson={purchaser}
           dateLabel="Purchase Date"
@@ -436,6 +459,7 @@ export default function CreatePurchaseOrderScreen() {
           phoneLabel="Vendor Phone"
           searchPlaceholder="Search vendor by name, company..."
           showDueDate={false}
+          readOnly={mode === "view"}
           onCustomerChange={(value) => {
             setVendor(value);
             setPhone("");
@@ -463,6 +487,7 @@ export default function CreatePurchaseOrderScreen() {
         <PurchaseProductServiceScreen
           draft={draft}
           items={items}
+          readOnly={mode === "view"}
           onDraftChange={(field, value) => {
             if (field === "name") setDraftName(value);
             if (field === "qty") setDraftQty(value);
@@ -472,8 +497,8 @@ export default function CreatePurchaseOrderScreen() {
           }}
           onAddItem={addItem}
           onRemoveItem={removeItem}
-          onUpdateItemQty={updateItemQty}
-          onUpdateItemDiscount={updateItemDiscount}
+          onUpdateItemQty={mode === "view" ? undefined : updateItemQty}
+          onUpdateItemDiscount={mode === "view" ? undefined : updateItemDiscount}
           onAddDirectItem={addDirectItem}
         />
 
@@ -506,25 +531,40 @@ export default function CreatePurchaseOrderScreen() {
           />
         </div>
       </div>
-      <CheckoutModal
-        open={openCheckout}
-        grandTotal={grandTotal}
-        items={items.map((item) => ({
-          id: item.id,
-          name: item.productName,
-          qty: item.qty,
-          price: item.unitPrice,
-          discount: item.discount,
-        }))}
-        initialCustomerName={vendor}
-        initialCustomerPhone={phone}
-        initialMembership=""
-        onClose={() => setOpenCheckout(false)}
-        onConfirmPayment={async (payment) => {
-          setOpenCheckout(false);
-          await handleSave(payment.paymentStatus === "full" ? "paid" : "partial", payment);
-        }}
-      />
+      {mode !== "view" && (
+        <CheckoutModal
+          open={openCheckout}
+          grandTotal={grandTotal}
+          items={items.map((item) => ({
+            id: item.id,
+            name: item.productName,
+            qty: item.qty,
+            price: item.unitPrice,
+            discount: item.discount,
+          }))}
+          initialCustomerName={vendor}
+          initialCustomerPhone={phone}
+          initialMembership=""
+          onClose={() => setOpenCheckout(false)}
+          onConfirmPayment={async (payment) => {
+            setOpenCheckout(false);
+            await handleSave(payment.paymentStatus === "full" ? "paid" : "partial", payment);
+          }}
+        />
+      )}
     </div>
   );
+
+  if (onClose) {
+    return (
+      <DocumentFormModal
+        onClose={onClose}
+        confirmOnClose={mode !== "view"}
+      >
+        {content}
+      </DocumentFormModal>
+    );
+  }
+
+  return content;
 }

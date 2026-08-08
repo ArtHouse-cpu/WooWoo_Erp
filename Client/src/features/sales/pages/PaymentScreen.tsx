@@ -137,6 +137,13 @@ export default function PaymentScreen() {
         border: "1px solid #e5e7eb",
       },
     },
+    muiTableContainerProps: {
+      sx: {
+        maxWidth: "100%",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+    },
   });
   return (
     <div className="p-1">

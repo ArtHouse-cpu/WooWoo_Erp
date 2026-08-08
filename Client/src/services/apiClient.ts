@@ -1290,6 +1290,16 @@ export type PurchasePayload = {
   invoiceDate: string;
   supplierName: string;
   purchaser?: string;
+  /** Logged-in creator display name */
+  createdByName?: string;
+  /** PIN-verified billing staff (Bill By) */
+  billBy?: string;
+  invoiceBy?: {
+    staffId?: string;
+    staffName?: string;
+    employeeId?: string;
+    email?: string;
+  };
   phoneNumber?: string;
   vendorDate: string;
   amount: number;
@@ -1311,7 +1321,7 @@ export function purchasePayloadToFormData(
   const fd = new FormData();
   for (const [key, value] of Object.entries(payload)) {
     if (value === undefined || value === null) continue;
-    if (key === "items") {
+    if (key === "items" || key === "invoiceBy") {
       fd.append(key, JSON.stringify(value));
       continue;
     }
@@ -1614,18 +1624,45 @@ export const handleUpdateCsp = async (
   };
 };
 
+export type GetProductsParams = {
+  search?: string;
+  type?: "product" | "service";
+  page?: number;
+  limit?: number;
+  skip?: number;
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  includeStats?: boolean;
+  signal?: AbortSignal;
+};
+
+/**
+ * Fetch products. Supports legacy (search, signal, type) and options object
+ * for server-side pagination / search / sort.
+ */
 export const handleGetProducts = async (
-  search = "",
+  searchOrParams: string | GetProductsParams = "",
   signal?: AbortSignal,
   type?: "product" | "service",
 ) => {
   try {
+    const params: GetProductsParams =
+      typeof searchOrParams === "object" && searchOrParams !== null
+        ? searchOrParams
+        : { search: searchOrParams, signal, type };
+
     const response = await axiosInstance.get("/product", {
       params: {
-        search: search.trim(),
-        ...(type ? { type } : {}),
+        search: String(params.search || "").trim(),
+        ...(params.type ? { type: params.type } : {}),
+        ...(params.page != null ? { page: params.page } : {}),
+        ...(params.limit != null ? { limit: params.limit } : {}),
+        ...(params.skip != null ? { skip: params.skip } : {}),
+        ...(params.sortBy ? { sortBy: params.sortBy } : {}),
+        ...(params.sortDir ? { sortDir: params.sortDir } : {}),
+        ...(params.includeStats ? { includeStats: 1 } : {}),
       },
-      signal,
+      signal: params.signal ?? signal,
     });
     return response.data;
   } catch (error) {

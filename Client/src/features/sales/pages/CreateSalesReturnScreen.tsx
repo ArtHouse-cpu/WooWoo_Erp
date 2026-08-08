@@ -18,6 +18,7 @@ import {
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CreateSalesReturnHeader from "../components/invoice/CreateSalesReturnHeader";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
+import DocumentFormModal from "@/components/DocumentFormModal";
 import { printThermalReceipt } from "@/utils/printUtils";
 
 
@@ -39,10 +40,20 @@ const getNextReturnNumber = (): string => {
 
 type Mode = "create" | "edit" | "view";
 
-export default function CreateSalesReturnScreen() {
+type CreateSalesReturnScreenProps = {
+  onClose?: () => void;
+  initialData?: any;
+  initialMode?: Mode;
+};
+
+export default function CreateSalesReturnScreen({
+  onClose,
+  initialData,
+  initialMode,
+}: CreateSalesReturnScreenProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [mode, setMode] = useState<Mode>("create");
+  const [mode, setMode] = useState<Mode>(initialMode || "create");
   const [returnSaleId, setReturnSaleId] = useState<string | null>(null);
   const [originalInvoiceId, setOriginalInvoiceId] = useState<string | null>(null);
   const [invoiceNo, setInvoiceNo] = useState(getNextReturnNumber());
@@ -90,11 +101,6 @@ export default function CreateSalesReturnScreen() {
       items?: Line[];
       originalInvoiceId?: string | null;
     };
-    const state = location.state as {
-      mode?: Mode;
-      invoice?: Doc;
-      returnSale?: Doc;
-    } | null;
 
     const applyDoc = (doc: Doc, nextMode: Mode, idField: "return" | "invoice") => {
       setMode(nextMode);
@@ -118,10 +124,27 @@ export default function CreateSalesReturnScreen() {
             qty: item.qty ?? 1,
             unitPrice: item.unitPrice ?? 0,
             discount: item.discount ?? 0,
+            cashback: 0,
           })),
         );
       }
     };
+
+    if (initialData && initialMode) {
+      setOriginalInvoiceId(
+        initialData.originalInvoiceId
+          ? String(initialData.originalInvoiceId)
+          : null,
+      );
+      applyDoc(initialData, initialMode, "return");
+      return;
+    }
+
+    const state = location.state as {
+      mode?: Mode;
+      invoice?: Doc;
+      returnSale?: Doc;
+    } | null;
 
     if (state?.returnSale) {
       setOriginalInvoiceId(
@@ -168,7 +191,7 @@ export default function CreateSalesReturnScreen() {
         );
       }
     }
-  }, [location.state]);
+  }, [location.state, initialData, initialMode]);
   const draft = {
     name: draftName,
     qty: draftQty,
@@ -197,6 +220,7 @@ export default function CreateSalesReturnScreen() {
         qty,
         unitPrice: price,
         discount,
+        cashback: 0,
         image: draftImage,
       },
     ]);
@@ -443,11 +467,16 @@ export default function CreateSalesReturnScreen() {
     }
   };
 
-  return (
+  const handleBack = () => {
+    if (onClose) onClose();
+    else navigate(-1);
+  };
+
+  const content = (
     <div className="space-y-4 p-2">
       <CreateSalesReturnHeader
         invoiceNo={invoiceNo}
-        onBack={() => navigate(-1)}
+        onBack={handleBack}
         onSaveDraft={handleSaveDraft}
         onSavePrint={handleSavePrint}
         onSave={() => {
@@ -463,11 +492,12 @@ export default function CreateSalesReturnScreen() {
         dateLabel="Return Date"
         customerOptions={customers}
         loadingCustomers={loadingCustomers}
-        customerDropdownOpen={customerDropdownOpen}
+        customerDropdownOpen={mode !== "view" && customerDropdownOpen}
         invoiceDate={invoiceDate}
         dueDate={dueDate}
         dueDateMin={today}
         salesPerson={salesPerson}
+        readOnly={mode === "view"}
         onCustomerChange={(value) => {
           setCustomer(value);
           setPhone("");
@@ -495,6 +525,7 @@ export default function CreateSalesReturnScreen() {
       <ProductsServicesSection
         draft={draft}
         items={items}
+        readOnly={mode === "view"}
         onDraftChange={(field, value) => {
           if (field === "name") setDraftName(value);
           if (field === "qty") setDraftQty(value);
@@ -509,7 +540,7 @@ export default function CreateSalesReturnScreen() {
         onAddDirectItem={(newItem) => {
           setItems((prev) => {
             const nextId = prev.length > 0 ? Math.max(...prev.map((i) => i.id)) + 1 : 1;
-            return [...prev, { ...newItem, id: nextId }];
+            return [...prev, { ...newItem, id: nextId, cashback: Number(newItem.cashback ?? 0) }];
           });
         }}
       />
@@ -522,6 +553,7 @@ export default function CreateSalesReturnScreen() {
           subTotal={subTotal}
           discountTotal={discountTotal}
           grandTotal={grandTotal}
+          readOnly={mode === "view"}
           onSave={
             mode !== "view"
               ? () => {
@@ -533,25 +565,40 @@ export default function CreateSalesReturnScreen() {
         />
       </div>
       </div>
-      <CheckoutModal
-        open={openCheckout}
-        grandTotal={grandTotal}
-        items={items.map((item) => ({
-          id: item.id,
-          name: item.productName,
-          qty: item.qty,
-          price: item.unitPrice,
-          discount: item.discount,
-        }))}
-        initialCustomerName={customer}
-        initialCustomerPhone={phone}
-        initialMembership=""
-        onClose={() => setOpenCheckout(false)}
-        onConfirmPayment={async () => {
-          setOpenCheckout(false);
-          await handleSave();
-        }}
-      />
+      {mode !== "view" && (
+        <CheckoutModal
+          open={openCheckout}
+          grandTotal={grandTotal}
+          items={items.map((item) => ({
+            id: item.id,
+            name: item.productName,
+            qty: item.qty,
+            price: item.unitPrice,
+            discount: item.discount,
+          }))}
+          initialCustomerName={customer}
+          initialCustomerPhone={phone}
+          initialMembership=""
+          onClose={() => setOpenCheckout(false)}
+          onConfirmPayment={async () => {
+            setOpenCheckout(false);
+            await handleSave();
+          }}
+        />
+      )}
     </div>
   );
+
+  if (onClose) {
+    return (
+      <DocumentFormModal
+        onClose={onClose}
+        confirmOnClose={mode !== "view"}
+      >
+        {content}
+      </DocumentFormModal>
+    );
+  }
+
+  return content;
 }

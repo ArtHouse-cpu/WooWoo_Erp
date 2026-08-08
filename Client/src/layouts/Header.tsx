@@ -40,13 +40,13 @@ export default function Header({
   };
 
   return (
-    <header className="flex w-full items-center justify-between border-b border-gray-200 bg-white px-3 py-2.5 sm:px-4 md:px-6">
-      <div className="flex min-w-0 items-center gap-2 sm:gap-3 md:gap-4">
+    <header className="flex w-full max-w-[100vw] items-center justify-between gap-2 border-b border-gray-200 bg-white px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5 md:px-6">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3 md:gap-4">
         {showMenuButton ? (
           <button
             type="button"
             onClick={onMenuClick}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-700 transition hover:bg-gray-50 lg:hidden"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-700 transition hover:bg-gray-50 sm:h-10 sm:w-10 lg:hidden"
             aria-label="Open navigation menu"
           >
             <Menu size={20} />
@@ -56,15 +56,15 @@ export default function Header({
         <img
           src={activeLogo}
           alt="logo"
-          className="h-9 w-9 shrink-0 rounded-full border border-gray-100 object-cover shadow-sm sm:h-10 sm:w-10"
+          className="h-8 w-8 shrink-0 rounded-full border border-gray-100 object-cover shadow-sm sm:h-10 sm:w-10"
         />
 
         <div
           className="group flex min-w-0 cursor-pointer flex-col leading-tight"
           onClick={() => setIsCompanyModalOpen(true)}
         >
-          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-            <h1 className="truncate font-bold text-sm text-gray-900 transition-colors group-hover:text-blue-600 md:text-[15px]">
+          <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+            <h1 className="truncate font-bold text-[13px] text-gray-900 transition-colors group-hover:text-blue-600 sm:text-sm md:text-[15px]">
               {companyName || "WOO WOO Art House"}
             </h1>
             <ChevronDown
@@ -72,13 +72,13 @@ export default function Header({
               className="shrink-0 text-gray-400 transition-colors group-hover:text-blue-500"
             />
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <Shuffle size={12} className="hidden text-gray-400 sm:block" />
-            <span className="truncate text-[11px] font-medium tracking-tight uppercase sm:text-[12px]">
+          <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] text-gray-500 sm:gap-1.5 sm:text-xs">
+            <Shuffle size={12} className="hidden shrink-0 text-gray-400 sm:block" />
+            <span className="truncate font-medium tracking-tight uppercase">
               Change Company
             </span>
             {m_staff_branch ? (
-              <span className="ml-1 hidden font-normal text-gray-400 sm:inline">
+              <span className="ml-1 hidden shrink-0 font-normal text-gray-400 md:inline">
                 ({m_staff_branch})
               </span>
             ) : null}
@@ -100,30 +100,29 @@ export default function Header({
         </div>
       </div> */}
 
-      <div className="flex items-center gap-4 md:gap-5">
-               {hasQuickBillAccess && (
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 md:gap-5">
+        {hasQuickBillAccess && (
           <button
             type="button"
             onClick={() => setIsPosOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 text-xs font-semibold md:px-4 md:py-2 md:text-sm"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 md:px-4 md:py-2 md:text-sm"
             aria-label="POS Bill"
             title="POS Bill"
           >
             <FilePlus2 size={16} />
-            <span className="hidden sm:inline">POS BILL</span>
+            <span className="hidden md:inline">POS BILL</span>
           </button>
         )}
         <button
-            type="button"
-            onClick={() => setOpenCreateSubscriptionModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 text-xs font-semibold md:px-4 md:py-2 md:text-sm"
-            aria-label="Membership"
-            title="Membership"
-          >
-            <Crown size={16} />
-            
-            <span className="hidden sm:inline"> Activate Membership</span>
-          </button>
+          type="button"
+          onClick={() => setOpenCreateSubscriptionModal(true)}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 md:px-4 md:py-2 md:text-sm"
+          aria-label="Membership"
+          title="Activate Membership"
+        >
+          <Crown size={16} />
+          <span className="hidden lg:inline">Activate Membership</span>
+        </button>
 
           {openCreateSubscriptionModal ? (
                   <CreateSubscriptionScreen
@@ -136,10 +135,18 @@ export default function Header({
           <Icon
             key={i}
             size={20}
-            className="text-gray-700 hover:text-black cursor-pointer transition"
+            className="hidden cursor-pointer text-gray-700 transition hover:text-black sm:block"
             onClick={Icon === User ? handleOpenUser : undefined}
           />
         ))}
+        <button
+          type="button"
+          onClick={handleOpenUser}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-700 sm:hidden"
+          aria-label="Account"
+        >
+          <User size={18} />
+        </button>
         <UserModal
           open={isUserModalOpen}
           onClose={() => setIsUserModalOpen(false)}

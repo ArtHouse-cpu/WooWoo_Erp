@@ -53,6 +53,7 @@ const FIELD_ALIASES: Record<FieldKey, string[]> = {
     "unitprice",
     "sellingprice",
     "saleprice",
+    "pricewithtax",
     "price",
     "mrp",
     "sellprice",
@@ -61,6 +62,7 @@ const FIELD_ALIASES: Record<FieldKey, string[]> = {
   stockQty: ["qty", "quantity", "stock", "stockqty", "stockquantity"],
   purchasePrice: [
     "purchaseprice",
+    "purchaseunitprice",
     "costprice",
     "cost",
     "buyprice",
@@ -86,7 +88,23 @@ function cellToString(value: unknown): string {
     }
     return String(value);
   }
-  return String(value).trim();
+  return String(value)
+    .replace(/[\r\n\t]+/g, " ")
+    .trim();
+}
+
+/** Clean barcode; strip Excel newlines. */
+function cleanBarcode(value: unknown): string {
+  return cellToString(value).replace(/\s+/g, "");
+}
+
+/**
+ * Only real retail barcodes are treated as unique identity.
+ * Shared placeholders like "br33050xx" must not mark variants as duplicates.
+ */
+function uniqueBarcodeKey(value: unknown): string {
+  const digits = cleanBarcode(value);
+  return /^\d{8,14}$/.test(digits) ? digits : "";
 }
 
 function normalizeAmount(raw: unknown): number {
@@ -118,26 +136,46 @@ function sheetToRows(sheet: XLSX.WorkSheet): Record<string, unknown>[] {
 function mapSheetRows(rawRows: Record<string, unknown>[]): PreviewRow[] {
   const seen = new Map<string, number>();
 
-  const identityKey = (row: {
+  // Primary identity is Product + Variant. Item codes / numeric EANs are extra.
+  // Placeholder barcodes are ignored so multi-variant rows stay valid.
+  const identityKeys = (row: {
     productName: string;
     variant: string;
     itemCode: string;
     barcode: string;
   }) => {
-    const norm = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
+    const norm = (v: string) =>
+      v
+        .replace(/[\r\n\t]+/g, " ")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+    const keys: string[] = [];
+    const name = norm(row.productName);
+    const variant = norm(row.variant);
+    if (name) keys.push(`name:${name}|variant:${variant}`);
     const code = norm(row.itemCode);
-    if (code) return `item:${code}`;
-    const barcode = norm(row.barcode);
-    if (barcode) return `barcode:${barcode}`;
-    return `name:${norm(row.productName)}|variant:${norm(row.variant)}`;
+    if (code) keys.push(`item:${code}`);
+    const barcode = uniqueBarcodeKey(row.barcode);
+    if (barcode) keys.push(`barcode:${barcode}`);
+    return keys;
   };
 
   return rawRows.map((row, index) => {
     const productName = cellToString(pickField(row, "productName"));
     const variant = cellToString(pickField(row, "variant"));
-    const category = cellToString(pickField(row, "category"));
-    const barcode = cellToString(pickField(row, "barcode"));
-    const sellingPrice = normalizeAmount(pickField(row, "sellingPrice"));
+    // Many POS exports leave Category blank — default so rows still import
+    const category =
+      cellToString(pickField(row, "category")) || "Uncategorized";
+    const barcode = cleanBarcode(pickField(row, "barcode"));
+    let sellingPrice = normalizeAmount(pickField(row, "sellingPrice"));
+    // Some exports put 0 in Unit Price but a value in Price with Tax
+    if (!(sellingPrice > 0)) {
+      const taxPrice = normalizeAmount(
+        row["Price with Tax"] ?? row["priceWithTax"] ?? row["Price With Tax"],
+      );
+      if (taxPrice > 0) sellingPrice = taxPrice;
+    }
     const itemCode = cellToString(pickField(row, "itemCode"));
     const stockQty = 0; // Stock comes from purchases, not product master
     const purchasePrice = normalizeAmount(pickField(row, "purchasePrice"));
@@ -146,13 +184,13 @@ function mapSheetRows(rawRows: Record<string, unknown>[]): PreviewRow[] {
     let _error = "";
     if (!productName) _error = "Product name required";
     else if (!(sellingPrice > 0)) _error = "Unit / Selling Price must be > 0";
-    else if (!category) _error = "Category required";
     else {
-      const key = identityKey({ productName, variant, itemCode, barcode });
-      if (seen.has(key)) {
-        _error = `Duplicate in file (first on row ${seen.get(key)})`;
+      const keys = identityKeys({ productName, variant, itemCode, barcode });
+      const dupKey = keys.find((k) => seen.has(k));
+      if (dupKey) {
+        _error = `Duplicate in file (first on row ${seen.get(dupKey)})`;
       } else {
-        seen.set(key, excelRow);
+        for (const k of keys) seen.set(k, excelRow);
       }
     }
 
@@ -295,7 +333,9 @@ export default function UploadBulkProductModal({
             <p className="mt-0.5 text-xs text-gray-500">
               Columns: Product, Variant, Category, Barcode, Unit Price, Item
               Code, Purchase Price. Stock starts at 0 and updates from purchases
-              (Qty in Excel is ignored). Missing categories are auto-created.
+              (Qty in Excel is ignored). Missing categories become
+              Uncategorized. Shared placeholder barcodes no longer block
+              variants.
             </p>
           </div>
           <button

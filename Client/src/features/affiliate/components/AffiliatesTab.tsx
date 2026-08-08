@@ -150,7 +150,7 @@ export default function AffiliatesTab() {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
           <div className="border rounded-xl p-4">
             <Users size={16} className="text-indigo-600 mb-2" />
             <h2 className="text-2xl font-bold">{affiliates.length}</h2>

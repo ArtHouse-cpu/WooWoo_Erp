@@ -267,6 +267,13 @@ export default function ServiceScreen() {
         border: "1px solid #e5e7eb",
       },
     },
+    muiTableContainerProps: {
+      sx: {
+        maxWidth: "100%",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+    },
   });
 
   const uniqueCategories = useMemo(() => {

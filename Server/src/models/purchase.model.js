@@ -122,6 +122,27 @@ const purchaseSchema = new mongoose.Schema(
       trim: true,
     },
 
+    /** Staff who created the purchase (logged-in user) */
+    createdByName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    /** Staff verified via billing PIN at checkout (Bill By) */
+    billBy: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    invoiceBy: {
+      staffId: { type: String, default: "", trim: true },
+      staffName: { type: String, default: "", trim: true },
+      employeeId: { type: String, default: "", trim: true },
+      email: { type: String, default: "", trim: true },
+    },
+
     purchaserDate: {
       type: Date,
     },

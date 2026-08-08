@@ -736,7 +736,7 @@ export default function CreatePosScreen({
     <>
 
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+        className="fixed inset-0 z-[70] flex items-stretch justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
         onMouseDown={(e) => {
           if (e.currentTarget == e.target) {
             handleRequestClose();
@@ -744,7 +744,7 @@ export default function CreatePosScreen({
         }}
       >
 
-        <div className="max-h-[92vh] w-[95%] max-w-7xl overflow-auto rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="h-dvh max-h-dvh w-full max-w-7xl overflow-auto bg-white p-3 shadow-2xl sm:h-auto sm:max-h-[92vh] sm:w-[95%] sm:rounded-2xl sm:p-6">
           {/* Header */}
           <div className="flex justify-between items-center border-b pb-3">
             <h2 className="text-xl font-semibold">POS Billing</h2>

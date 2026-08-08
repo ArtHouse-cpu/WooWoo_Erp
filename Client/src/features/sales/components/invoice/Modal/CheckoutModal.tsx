@@ -1464,13 +1464,13 @@ export default function CheckoutModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="checkout-title"
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[80] flex items-stretch justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       onMouseDown={(e) => {
         if (e.currentTarget === e.target) onClose();
       }}
     >
-      <div className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4">
+      <div className="relative flex h-dvh max-h-dvh w-full max-w-5xl flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-2xl">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-3 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
             <h2
               id="checkout-title"

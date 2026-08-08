@@ -19,6 +19,7 @@ import AddVendorModal from "../Modal/AddVendorModal";
 import type { InvoiceItem } from "../components/types";
 import { useAppSelector } from "@/store/hooks";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
+import DocumentFormModal from "@/components/DocumentFormModal";
 
 const today = new Date().toISOString().split("T")[0];
 const PURCHASE_RETURN_SEQ_KEY = "wooerp-purchase-return-seq";
@@ -39,10 +40,20 @@ const getNextReturnNumber = (): string => {
 type Mode = "create" | "edit" | "view";
 type VendorOption = { _id: string; name: string; mobile: string; companyName?: string };
 
-export default function CreatePurchaseReturnScreen() {
+type CreatePurchaseReturnScreenProps = {
+  onClose?: () => void;
+  initialData?: any;
+  initialMode?: Mode;
+};
+
+export default function CreatePurchaseReturnScreen({
+  onClose,
+  initialData,
+  initialMode,
+}: CreatePurchaseReturnScreenProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [mode, setMode] = useState<Mode>("create");
+  const [mode, setMode] = useState<Mode>(initialMode || "create");
   const [purchaseReturnId, setPurchaseReturnId] = useState<string | null>(null);
   const [purchaseReturnNo, setPurchaseReturnNo] = useState(getNextReturnNumber());
   const [vendor, setVendor] = useState("");
@@ -87,32 +98,41 @@ export default function CreatePurchaseReturnScreen() {
       status?: string;
       purchaser?: string;
     };
+
+    const applyDoc = (doc: Doc, nextMode: Mode) => {
+      setMode(nextMode);
+      setPurchaseReturnId(doc._id ? String(doc._id) : null);
+      if (doc.invoiceNumber) setPurchaseReturnNo(String(doc.invoiceNumber));
+      setVendor(String(doc.supplierName ?? ""));
+      setPhone(String(doc.vendorPhone ?? doc.mobile ?? ""));
+      if (doc.invoiceDate) {
+        setReturnDate(new Date(doc.invoiceDate).toISOString().split("T")[0]);
+      }
+      setNotes(String(doc.notes ?? ""));
+      if (Array.isArray(doc.items)) {
+        setItems(
+          doc.items.map((item, idx) => ({
+            id: idx + 1,
+            productName: item.productName || "",
+            qty: Number(item.qty ?? 1),
+            unitPrice: Number(item.unitPrice ?? 0),
+            discount: Number(item.discount ?? 0),
+            image: item.image || item.imageUrl || "",
+          })),
+        );
+      }
+    };
+
+    if (initialData && initialMode) {
+      applyDoc(initialData, initialMode);
+      return;
+    }
+
     const state = location.state as { mode?: Mode; purchaseReturn?: Doc; purchase?: Doc } | null;
     const doc = state?.purchaseReturn ?? state?.purchase;
     if (!doc) return;
-
-    setMode(state?.mode ?? "edit");
-    setPurchaseReturnId(doc._id ? String(doc._id) : null);
-    if (doc.invoiceNumber) setPurchaseReturnNo(String(doc.invoiceNumber));
-    setVendor(String(doc.supplierName ?? ""));
-    setPhone(String(doc.vendorPhone ?? doc.mobile ?? ""));
-    if (doc.invoiceDate) {
-      setReturnDate(new Date(doc.invoiceDate).toISOString().split("T")[0]);
-    }
-    setNotes(String(doc.notes ?? ""));
-    if (Array.isArray(doc.items)) {
-      setItems(
-        doc.items.map((item, idx) => ({
-          id: idx + 1,
-          productName: item.productName || "",
-          qty: Number(item.qty ?? 1),
-          unitPrice: Number(item.unitPrice ?? 0),
-          discount: Number(item.discount ?? 0),
-          image: item.image || item.imageUrl || "",
-        })),
-      );
-    }
-  }, [location.state]);
+    applyDoc(doc, state?.mode ?? "edit");
+  }, [location.state, initialData, initialMode]);
 
   const draft: DraftItem = {
     name: draftName,
@@ -352,11 +372,16 @@ export default function CreatePurchaseReturnScreen() {
     }
   };
 
-  return (
+  const handleBack = () => {
+    if (onClose) onClose();
+    else navigate(-1);
+  };
+
+  const content = (
     <div className="space-y-4 p-2">
       <CreatePurchaseReturnHeader
         purchaseNumber={purchaseReturnNo}
-        onBack={() => navigate(-1)}
+        onBack={handleBack}
         onSaveDraft={handleSaveDraft}
         onSavePrint={handleSavePrint}
         onSave={() => {
@@ -376,7 +401,7 @@ export default function CreatePurchaseReturnScreen() {
         searchPlaceholder="Search vendor by name, company..."
         customerOptions={vendors}
         loadingCustomers={loadingVendors}
-        customerDropdownOpen={vendorDropdownOpen}
+        customerDropdownOpen={mode !== "view" && vendorDropdownOpen}
         invoiceDate={returnDate}
         showDueDate={false}
         salesPerson={purchaser}
@@ -424,6 +449,7 @@ export default function CreatePurchaseReturnScreen() {
           subTotal={subTotal}
           discountTotal={discountTotal}
           grandTotal={grandTotal}
+          readOnly={mode === "view"}
           onSave={
             mode !== "view"
               ? () => {
@@ -435,25 +461,40 @@ export default function CreatePurchaseReturnScreen() {
         />
       </div>
       </div>
-      <CheckoutModal
-        open={openCheckout}
-        grandTotal={grandTotal}
-        items={items.map((item) => ({
-          id: item.id,
-          name: item.productName,
-          qty: item.qty,
-          price: item.unitPrice,
-          discount: item.discount,
-        }))}
-        initialCustomerName={vendor}
-        initialCustomerPhone={phone}
-        initialMembership=""
-        onClose={() => setOpenCheckout(false)}
-        onConfirmPayment={async (payment) => {
-          setOpenCheckout(false);
-          await handleSave(payment.paymentStatus === "full" ? "paid" : "partial", payment);
-        }}
-      />
+      {mode !== "view" && (
+        <CheckoutModal
+          open={openCheckout}
+          grandTotal={grandTotal}
+          items={items.map((item) => ({
+            id: item.id,
+            name: item.productName,
+            qty: item.qty,
+            price: item.unitPrice,
+            discount: item.discount,
+          }))}
+          initialCustomerName={vendor}
+          initialCustomerPhone={phone}
+          initialMembership=""
+          onClose={() => setOpenCheckout(false)}
+          onConfirmPayment={async (payment) => {
+            setOpenCheckout(false);
+            await handleSave(payment.paymentStatus === "full" ? "paid" : "partial", payment);
+          }}
+        />
+      )}
     </div>
   );
+
+  if (onClose) {
+    return (
+      <DocumentFormModal
+        onClose={onClose}
+        confirmOnClose={mode !== "view"}
+      >
+        {content}
+      </DocumentFormModal>
+    );
+  }
+
+  return content;
 }

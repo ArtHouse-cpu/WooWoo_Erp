@@ -14,6 +14,8 @@ type Props = {
   grandTotal: number;
   onSave: () => void;
   isSaving?: boolean;
+  /** Hide checkout CTA and extra-charge editors (view modal). */
+  readOnly?: boolean;
 };
 
 export default function InvoiceSummaryCard({
@@ -27,6 +29,7 @@ export default function InvoiceSummaryCard({
   grandTotal,
   onSave,
   isSaving = false,
+  readOnly = false,
 }: Props) {
   const addCharge = () => {
     onExtraChargesChange?.([...extraCharges, { label: "Extra Charge", amount: 0 }]);
@@ -81,53 +84,69 @@ export default function InvoiceSummaryCard({
         {extraCharges.map((charge, idx) => (
           <div key={idx} className="flex flex-col gap-1 border-t border-slate-50 pt-2 first:border-t-0">
             <div className="flex items-center justify-between">
-              <input
-                type="text"
-                value={charge.label}
-                onChange={(e) => updateCharge(idx, "label", e.target.value)}
-                placeholder="Charge Name"
-                className="w-1/2 rounded border border-slate-100 bg-transparent px-1 py-0.5 text-xs text-slate-500 focus:border-blue-300 outline-none"
-              />
-              <div className="flex items-center gap-1">
-                <span className="text-slate-400">₹</span>
-                <input
-                  type="number"
-                  value={charge.amount || ""}
-                  onChange={(e) => updateCharge(idx, "amount", e.target.value)}
-                  placeholder="0"
-                  className="w-16 rounded border border-slate-200 px-1 py-0.5 text-right text-xs focus:border-blue-500 outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeCharge(idx)}
-                  className="ml-1 text-slate-300 hover:text-red-500"
-                >
-                  ×
-                </button>
-              </div>
+              {readOnly ? (
+                <>
+                  <span className="text-xs text-slate-500">{charge.label}</span>
+                  <span className="text-xs text-slate-700">
+                    ₹ {Number(charge.amount || 0).toFixed(2)}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={charge.label}
+                    onChange={(e) => updateCharge(idx, "label", e.target.value)}
+                    placeholder="Charge Name"
+                    className="w-1/2 rounded border border-slate-100 bg-transparent px-1 py-0.5 text-xs text-slate-500 focus:border-blue-300 outline-none"
+                  />
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-400">₹</span>
+                    <input
+                      type="number"
+                      value={charge.amount || ""}
+                      onChange={(e) => updateCharge(idx, "amount", e.target.value)}
+                      placeholder="0"
+                      className="w-16 rounded border border-slate-200 px-1 py-0.5 text-right text-xs focus:border-blue-500 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeCharge(idx)}
+                      className="ml-1 text-slate-300 hover:text-red-500"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         ))}
-        <button
-          type="button"
-          onClick={addCharge}
-          className="text-left text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700"
-        >
-          + Add Extra Charge
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={addCharge}
+            className="text-left text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700"
+          >
+            + Add Extra Charge
+          </button>
+        )}
         <div className="my-2 border-t border-dashed border-gray-200" />
         <div className="flex items-center justify-between text-base font-semibold text-gray-900">
           <span>Grand Total</span>
           <span>₹ {grandTotal.toFixed(2)}</span>  
         </div>
       </div>
-      <button
-        onClick={onSave}
-        disabled={isSaving}
-        className="mt-4 w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
-      >
-        {isSaving ? "Paid" : "Checkout"}
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={isSaving}
+          className="mt-4 w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+        >
+          {isSaving ? "Paid" : "Checkout"}
+        </button>
+      )}
     </div>
   );
 }

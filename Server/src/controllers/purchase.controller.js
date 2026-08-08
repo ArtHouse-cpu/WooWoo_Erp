@@ -48,12 +48,16 @@ export const createPurchase = async (req, res) => {
       items,
       notes,
       purchaser,
+      createdByName,
+      billBy,
+      invoiceBy,
       purchaserDate,
       purchaserSignature,
       supplierSignature,
       supplierDate,
       supplierAddress,
       supplierContact,
+      phoneNumber,
       manualDiscount,
       manualDiscountType,
     } = req.body;
@@ -118,6 +122,34 @@ export const createPurchase = async (req, res) => {
 
   purchaser: String(purchaser ?? "").trim(),
 
+  createdByName: String(createdByName ?? purchaser ?? "").trim(),
+
+  billBy: String(
+    billBy ??
+      (typeof invoiceBy === "object" && invoiceBy
+        ? invoiceBy.staffName
+        : "") ??
+      "",
+  ).trim(),
+
+  invoiceBy:
+    typeof invoiceBy === "object" && invoiceBy
+      ? {
+          staffId: String(invoiceBy.staffId ?? "").trim(),
+          staffName: String(invoiceBy.staffName ?? "").trim(),
+          employeeId: String(invoiceBy.employeeId ?? "").trim(),
+          email: String(invoiceBy.email ?? "").trim(),
+        }
+      : typeof invoiceBy === "string" && invoiceBy.trim()
+        ? (() => {
+            try {
+              return JSON.parse(invoiceBy);
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined,
+
   purchaserDate: purchaserDate
     ? new Date(purchaserDate)
     : undefined,
@@ -132,7 +164,7 @@ export const createPurchase = async (req, res) => {
 
   supplierAddress: String(supplierAddress ?? "").trim(),
 
-  supplierContact: String(supplierContact ?? "").trim(),
+  supplierContact: String(supplierContact ?? phoneNumber ?? "").trim(),
 });
 
     if (req.files && req.files.length > 0) {
@@ -251,6 +283,36 @@ export const updatePurchase = async (req, res) => {
     if (body.notes !== undefined) $set.notes = String(body.notes ?? "").trim();
     if (body.purchaser !== undefined) {
       $set.purchaser = String(body.purchaser ?? "").trim();
+    }
+    if (body.createdByName !== undefined) {
+      $set.createdByName = String(body.createdByName ?? "").trim();
+    }
+    if (body.billBy !== undefined) {
+      $set.billBy = String(body.billBy ?? "").trim();
+    }
+    if (body.invoiceBy !== undefined) {
+      let inv = body.invoiceBy;
+      if (typeof inv === "string") {
+        try {
+          inv = JSON.parse(inv);
+        } catch {
+          inv = null;
+        }
+      }
+      if (inv && typeof inv === "object") {
+        $set.invoiceBy = {
+          staffId: String(inv.staffId ?? "").trim(),
+          staffName: String(inv.staffName ?? "").trim(),
+          employeeId: String(inv.employeeId ?? "").trim(),
+          email: String(inv.email ?? "").trim(),
+        };
+        if (!$set.billBy && $set.invoiceBy.staffName) {
+          $set.billBy = $set.invoiceBy.staffName;
+        }
+      }
+    }
+    if (body.phoneNumber !== undefined && body.supplierContact === undefined) {
+      $set.supplierContact = String(body.phoneNumber ?? "").trim();
     }
     if (body.purchaserSignature !== undefined) {
       $set.purchaserSignature = String(body.purchaserSignature ?? "").trim();

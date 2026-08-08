@@ -309,6 +309,13 @@ export default function ManagePlanScreen() {
         overflow: "hidden",
       },
     },
+    muiTableContainerProps: {
+      sx: {
+        maxWidth: "100%",
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+      },
+    },
   });
 
   return (
