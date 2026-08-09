@@ -135,5 +135,33 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Prevent duplicate item codes / barcodes when present (empty values ignored)
+productSchema.index(
+  { itemCode: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      itemCode: { $type: 'string', $gt: '' },
+    },
+  },
+);
+productSchema.index(
+  { barCode: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      barCode: { $type: 'string', $gt: '' },
+    },
+  },
+);
+
+// List / search / sort indexes for paginated product catalogue
+productSchema.index({ createdAt: -1, _id: -1 });
+productSchema.index({ productName: 1 });
+productSchema.index({ category: 1 });
+productSchema.index({ itemType: 1, type: 1, createdAt: -1 });
+productSchema.index({ 'variants.name': 1 });
+productSchema.index({ 'variants.barcode': 1 });
+
 const Product = mongoose.model('Product', productSchema);
 export default Product;

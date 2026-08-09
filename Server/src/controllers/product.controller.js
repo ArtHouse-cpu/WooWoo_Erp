@@ -283,6 +283,28 @@ export const createProduct = async (req, res) => {
       }
     }
 
+    // Block duplicate catalogue products (same name / item code / barcode)
+    if (itemType === 'product') {
+      const nameLower = String(resolvedName).trim().toLowerCase();
+      const code = String(itemCode || '').trim();
+      const barcode = String(barCode || '').trim();
+      const or = [{ productName: new RegExp(`^${nameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }];
+      if (code) or.push({ itemCode: code });
+      if (barcode) or.push({ barCode: barcode }, { 'variants.barcode': barcode });
+      const existingDup = await Product.findOne({
+        itemType: { $ne: 'service' },
+        $or: or,
+      })
+        .select('productName itemCode barCode')
+        .lean();
+      if (existingDup) {
+        return res.status(409).json({
+          success: false,
+          message: `Product already exists: "${existingDup.productName}". Duplicate products are not allowed.`,
+        });
+      }
+    }
+
     const product = await Product.create({
       type: itemType,
       itemType,
@@ -344,33 +366,128 @@ export const uploadBulkProducts = async (req, res) => {
 
     const normalizeKey = (value) =>
       String(value || '')
+        .replace(/[\r\n\t]+/g, ' ')
         .trim()
         .toLowerCase()
         .replace(/\s+/g, ' ');
 
-    /** Prefer itemCode → barcode → name+variant for identity. */
-    const buildIdentity = ({ productName, variantName, itemCode, barCode }) => {
-      const code = normalizeKey(itemCode);
-      if (code) return { type: 'itemCode', key: `item:${code}`, label: `Item Code "${itemCode}"` };
+    /** Clean barcode text (Excel often has trailing newlines / spaces). */
+    const cleanBarcode = (value) =>
+      String(value || '')
+        .replace(/[\r\n\t]+/g, '')
+        .trim();
 
-      const barcode = normalizeKey(barCode);
+    /**
+     * Only real retail barcodes (EAN-8/UPC/EAN-13/GTIN-14) are globally unique.
+     * Placeholder codes like "br33050xx" are shared across many variants and
+     * must NOT block imports.
+     */
+    const uniqueBarcodeKey = (value) => {
+      const digits = cleanBarcode(value).replace(/\s+/g, '');
+      if (!/^\d{8,14}$/.test(digits)) return '';
+      return digits;
+    };
+
+    /**
+     * Split "Parent - Variant" style names used elsewhere in catalogue/stock.
+     */
+    const splitCombinedName = (productName) => {
+      const raw = String(productName || '').trim();
+      const idx = raw.indexOf(' - ');
+      if (idx <= 0) return { parent: raw, variant: '' };
+      return {
+        parent: raw.slice(0, idx).trim(),
+        variant: raw.slice(idx + 3).trim(),
+      };
+    };
+
+    /** Primary identity for labels / reporting (name+variant → itemCode → numeric barcode). */
+    const buildIdentity = ({ productName, variantName, itemCode, barCode }) => {
+      const name = normalizeKey(productName);
+      const variant = normalizeKey(variantName);
+      if (name) {
+        return {
+          type: 'nameVariant',
+          key: `name:${name}|variant:${variant}`,
+          label: variant
+            ? `Product "${productName}" / Variant "${variantName}"`
+            : `Product "${productName}"`,
+        };
+      }
+
+      const code = normalizeKey(itemCode);
+      if (code) {
+        return {
+          type: 'itemCode',
+          key: `item:${code}`,
+          label: `Item Code "${itemCode}"`,
+        };
+      }
+
+      const barcode = uniqueBarcodeKey(barCode);
       if (barcode) {
         return {
           type: 'barCode',
           key: `barcode:${barcode}`,
-          label: `Barcode "${barCode}"`,
+          label: `Barcode "${barcode}"`,
         };
       }
 
-      const name = normalizeKey(productName);
-      const variant = normalizeKey(variantName);
       return {
         type: 'nameVariant',
-        key: `name:${name}|variant:${variant}`,
-        label: variant
-          ? `Product "${productName}" / Variant "${variantName}"`
-          : `Product "${productName}"`,
+        key: `name:|variant:`,
+        label: 'Unknown product',
       };
+    };
+
+    /**
+     * Keys that should block a duplicate insert.
+     * Primary: product name + variant (and "Name - Variant" catalogue form).
+     * Also: itemCode when present; numeric EAN/UPC barcodes only.
+     * Shared placeholder barcodes are ignored so multi-variant rows import.
+     */
+    const collectIdentityKeys = ({
+      productName,
+      variantName,
+      itemCode,
+      barCode,
+    }) => {
+      const keys = new Set();
+      const code = normalizeKey(itemCode);
+      if (code) keys.add(`item:${code}`);
+
+      const barcode = uniqueBarcodeKey(barCode);
+      if (barcode) keys.add(`barcode:${barcode}`);
+
+      const name = normalizeKey(productName);
+      const variant = normalizeKey(variantName);
+      if (name) {
+        keys.add(`name:${name}|variant:${variant}`);
+        if (!variant) {
+          // Same product name, no variant → treat as duplicate
+          keys.add(`name:${name}`);
+        } else {
+          // Also match catalogue-style combined product names
+          keys.add(`name:${normalizeKey(`${productName} - ${variantName}`)}`);
+          keys.add(
+            `name:${normalizeKey(`${productName} - ${variantName}`)}|variant:`,
+          );
+        }
+      }
+
+      // If productName is already "Parent - Variant", index both forms
+      const split = splitCombinedName(productName);
+      const parent = normalizeKey(split.parent);
+      const splitVariant = normalizeKey(split.variant);
+      if (parent && splitVariant && !variant) {
+        keys.add(`name:${parent}|variant:${splitVariant}`);
+        keys.add(`name:${normalizeKey(`${split.parent} - ${split.variant}`)}`);
+        keys.add(
+          `name:${normalizeKey(`${split.parent} - ${split.variant}`)}|variant:`,
+        );
+      }
+
+      return [...keys];
     };
 
     const products = [];
@@ -379,11 +496,12 @@ export const uploadBulkProducts = async (req, res) => {
     const seenInFile = new Map(); // identity key → first row number
 
     // Auto-create any Excel categories via Category collection (POST /api/categories equivalent)
-    const categoryNamesFromFile = rawProducts
-      .map((row) =>
-        String(row?.category ?? row?.Category ?? row?.categoryName ?? '').trim(),
-      )
-      .filter(Boolean);
+    const categoryNamesFromFile = rawProducts.map(
+      (row) =>
+        String(
+          row?.category ?? row?.Category ?? row?.categoryName ?? '',
+        ).trim() || 'Uncategorized',
+    );
     const categoryMap = await ensureCategoriesExist(categoryNamesFromFile);
 
     rawProducts.forEach((row, index) => {
@@ -391,55 +509,44 @@ export const uploadBulkProducts = async (req, res) => {
       const productName = String(
         row?.productName ?? row?.Product ?? row?.name ?? '',
       ).trim();
-      const sellingPrice = toNumber(
+      let sellingPrice = toNumber(
         row?.sellingPrice ?? row?.unitPrice ?? row?.['Unit Price'],
         NaN,
       );
+      if (!(sellingPrice > 0)) {
+        const taxPrice = toNumber(
+          row?.['Price with Tax'] ?? row?.priceWithTax,
+          NaN,
+        );
+        if (taxPrice > 0) sellingPrice = taxPrice;
+      }
       const purchasePrice = toNumber(
         row?.purchasePrice ?? row?.['Purchase Price'],
         0,
       );
-      const categoryRaw = String(
-        row?.category ?? row?.Category ?? row?.categoryName ?? '',
-      ).trim();
+      const categoryRaw =
+        String(
+          row?.category ?? row?.Category ?? row?.categoryName ?? '',
+        ).trim() || 'Uncategorized';
       const itemCode = String(row?.itemCode ?? row?.['Item Code'] ?? '').trim();
-      const barCode = String(
+      const barCode = cleanBarcode(
         row?.barCode ?? row?.barcode ?? row?.Barcode ?? '',
-      ).trim();
+      );
       const variantName = String(row?.variant ?? row?.Variant ?? '').trim();
 
-      if (!productName || !(sellingPrice > 0) || !categoryRaw) {
+      if (!productName || !(sellingPrice > 0)) {
         invalidRows.push({
           row: excelRow,
           productName: productName || null,
           reason: !productName
             ? 'Product name is required'
-            : !(sellingPrice > 0)
-              ? 'Selling / Unit Price must be greater than 0'
-              : 'Category is required (will not default to General)',
+            : 'Selling / Unit Price must be greater than 0',
         });
         return;
       }
 
       const category =
         categoryMap.get(categoryRaw.toLowerCase()) || categoryRaw;
-
-      const identity = buildIdentity({
-        productName,
-        variantName,
-        itemCode,
-        barCode,
-      });
-
-      if (seenInFile.has(identity.key)) {
-        duplicateRows.push({
-          row: excelRow,
-          productName,
-          reason: `Duplicate in file (${identity.label}). First seen on row ${seenInFile.get(identity.key)}.`,
-        });
-        return;
-      }
-      seenInFile.set(identity.key, excelRow);
 
       let variants = [];
       if (Array.isArray(row?.variants)) {
@@ -448,7 +555,7 @@ export const uploadBulkProducts = async (req, res) => {
             name: String(v?.name ?? '').trim(),
             sellingPrice: toNumber(v?.sellingPrice, sellingPrice),
             purchasePrice: toNumber(v?.purchasePrice, purchasePrice),
-            barcode: String(v?.barcode ?? v?.barCode ?? '').trim(),
+            barcode: cleanBarcode(v?.barcode ?? v?.barCode ?? ''),
           }))
           .filter((v) => v.name);
       } else if (variantName) {
@@ -462,6 +569,38 @@ export const uploadBulkProducts = async (req, res) => {
         ];
       }
 
+      const resolvedVariantName =
+        variantName || (variants[0]?.name ? String(variants[0].name) : '');
+      const resolvedBarcode =
+        barCode ||
+        (variants[0]?.barcode ? cleanBarcode(variants[0].barcode) : '');
+
+      const identity = buildIdentity({
+        productName,
+        variantName: resolvedVariantName,
+        itemCode,
+        barCode: resolvedBarcode,
+      });
+      const identityKeys = collectIdentityKeys({
+        productName,
+        variantName: resolvedVariantName,
+        itemCode,
+        barCode: resolvedBarcode,
+      });
+
+      const fileDupKey = identityKeys.find((k) => seenInFile.has(k));
+      if (fileDupKey) {
+        duplicateRows.push({
+          row: excelRow,
+          productName,
+          reason: `Duplicate in file (${identity.label}). First seen on row ${seenInFile.get(fileDupKey)}.`,
+        });
+        return;
+      }
+      for (const k of identityKeys) {
+        seenInFile.set(k, excelRow);
+      }
+
       products.push({
         type: 'product',
         itemType: 'product',
@@ -471,7 +610,7 @@ export const uploadBulkProducts = async (req, res) => {
         sellingPrice,
         purchasePrice,
         itemCode,
-        barCode,
+        barCode: resolvedBarcode,
         category,
         subCategory: String(row?.subCategory ?? '').trim(),
         description: String(row?.description ?? '').trim(),
@@ -486,6 +625,7 @@ export const uploadBulkProducts = async (req, res) => {
         isCsp: false,
         cspEnrollmentId: null,
         _identity: identity,
+        _identityKeys: identityKeys,
         _excelRow: excelRow,
       });
     });
@@ -498,17 +638,32 @@ export const uploadBulkProducts = async (req, res) => {
           .filter(Boolean),
       ),
     ];
+    // Only query DB by real numeric barcodes — placeholder codes are not unique
     const barCodes = [
       ...new Set(
         products
-          .map((p) => String(p.barCode || '').trim())
+          .map((p) => uniqueBarcodeKey(p.barCode || ''))
           .filter(Boolean),
       ),
     ];
     const productNames = [
       ...new Set(
         products
-          .map((p) => String(p.productName || '').trim())
+          .flatMap((p) => {
+            const base = String(p.productName || '').trim();
+            const variant =
+              Array.isArray(p.variants) && p.variants[0]?.name
+                ? String(p.variants[0].name).trim()
+                : '';
+            const names = [base];
+            if (variant) names.push(`${base} - ${variant}`);
+            const split = splitCombinedName(base);
+            if (split.parent) names.push(split.parent);
+            if (split.parent && split.variant) {
+              names.push(`${split.parent} - ${split.variant}`);
+            }
+            return names;
+          })
           .filter(Boolean),
       ),
     ];
@@ -516,11 +671,18 @@ export const uploadBulkProducts = async (req, res) => {
     const orClauses = [];
     if (itemCodes.length) orClauses.push({ itemCode: { $in: itemCodes } });
     if (barCodes.length) orClauses.push({ barCode: { $in: barCodes } });
+    // Variant barcodes stored on nested variants
+    if (barCodes.length) {
+      orClauses.push({ 'variants.barcode': { $in: barCodes } });
+    }
 
     // Prefer exact $in for codes; names use $toLower chunks (no giant regex)
     let existingProducts = [];
     if (orClauses.length) {
-      existingProducts = await Product.find({ $or: orClauses })
+      existingProducts = await Product.find({
+        itemType: { $ne: 'service' },
+        $or: orClauses,
+      })
         .select('productName itemCode barCode variants')
         .lean();
     }
@@ -529,10 +691,13 @@ export const uploadBulkProducts = async (req, res) => {
         Product,
         'productName',
         productNames,
-        'productName itemCode barCode variants',
+        'productName itemCode barCode variants itemType',
       );
       const seenIds = new Set(existingProducts.map((p) => String(p._id)));
       for (const doc of byName) {
+        if (String(doc.itemType || doc.type || 'product') === 'service') {
+          continue;
+        }
         const id = String(doc._id);
         if (!seenIds.has(id)) {
           seenIds.add(id);
@@ -548,41 +713,40 @@ export const uploadBulkProducts = async (req, res) => {
         : [];
       if (existingVariants.length > 0) {
         for (const variant of existingVariants) {
-          const id = buildIdentity({
+          for (const key of collectIdentityKeys({
             productName: existing.productName,
             variantName: variant?.name,
             itemCode: existing.itemCode,
             barCode: existing.barCode || variant?.barcode,
-          });
-          existingIdentities.add(id.key);
+          })) {
+            existingIdentities.add(key);
+          }
         }
       } else {
-        const id = buildIdentity({
+        for (const key of collectIdentityKeys({
           productName: existing.productName,
           variantName: '',
           itemCode: existing.itemCode,
           barCode: existing.barCode,
-        });
-        existingIdentities.add(id.key);
+        })) {
+          existingIdentities.add(key);
+        }
       }
-
-      // Also index bare itemCode / barcode so either match blocks insert
-      const code = normalizeKey(existing.itemCode);
-      if (code) existingIdentities.add(`item:${code}`);
-      const barcode = normalizeKey(existing.barCode);
-      if (barcode) existingIdentities.add(`barcode:${barcode}`);
-      const nameOnly = normalizeKey(existing.productName);
-      if (nameOnly) existingIdentities.add(`name:${nameOnly}|variant:`);
     }
 
     const toInsert = [];
     for (const product of products) {
       const identity = product._identity;
+      const identityKeys = Array.isArray(product._identityKeys)
+        ? product._identityKeys
+        : [identity.key];
       const excelRow = product._excelRow;
       delete product._identity;
+      delete product._identityKeys;
       delete product._excelRow;
 
-      if (existingIdentities.has(identity.key)) {
+      const hit = identityKeys.find((k) => existingIdentities.has(k));
+      if (hit) {
         duplicateRows.push({
           row: excelRow,
           productName: product.productName,
@@ -592,8 +756,39 @@ export const uploadBulkProducts = async (req, res) => {
       }
 
       // Mark so later rows in same request can't collide with ones we're inserting
-      existingIdentities.add(identity.key);
+      for (const k of identityKeys) {
+        existingIdentities.add(k);
+      }
       toInsert.push(product);
+    }
+
+    // Unique barCode index: placeholder codes like "br33050xx" are often reused.
+    // Keep barcode on the first product only; clear later collisions so inserts succeed.
+    const usedBarCodes = new Set();
+    for (const existing of existingProducts) {
+      const top = cleanBarcode(existing.barCode);
+      if (top) usedBarCodes.add(top.toLowerCase());
+      for (const v of Array.isArray(existing.variants) ? existing.variants : []) {
+        const vb = cleanBarcode(v?.barcode);
+        if (vb) usedBarCodes.add(vb.toLowerCase());
+      }
+    }
+    for (const product of toInsert) {
+      const bc = cleanBarcode(product.barCode);
+      if (!bc) continue;
+      const key = bc.toLowerCase();
+      if (usedBarCodes.has(key)) {
+        product.barCode = '';
+        if (Array.isArray(product.variants)) {
+          product.variants = product.variants.map((v) =>
+            cleanBarcode(v?.barcode).toLowerCase() === key
+              ? { ...v, barcode: '' }
+              : v,
+          );
+        }
+      } else {
+        usedBarCodes.add(key);
+      }
     }
 
     if (!toInsert.length) {
@@ -636,17 +831,22 @@ export const uploadBulkProducts = async (req, res) => {
   } catch (error) {
     console.error('uploadBulkProducts error:', error);
 
-    // Partial success when ordered:false hits a validation error mid-batch
+    // Partial success when ordered:false hits a validation / unique-index error mid-batch
     if (error?.name === 'MongoBulkWriteError' && Array.isArray(error?.insertedDocs)) {
       const created = error.insertedDocs.length;
+      const writeErrors = Array.isArray(error?.writeErrors) ? error.writeErrors : [];
+      const dupErrors = writeErrors.filter(
+        (e) => e?.code === 11000 || /duplicate/i.test(String(e?.errmsg || e?.message || '')),
+      );
       return res.status(207).json({
         success: created > 0,
-        message: `Imported ${created} product(s) with some failures`,
+        message: `Imported ${created} product(s); skipped ${dupErrors.length} duplicate(s)`,
         products: error.insertedDocs,
         summary: {
           created,
-          failed: Number(error?.writeErrors?.length || 0),
-          errors: (error.writeErrors || []).map((e) => e?.errmsg || e?.message),
+          failed: writeErrors.length,
+          skippedDuplicates: dupErrors.length,
+          errors: writeErrors.map((e) => e?.errmsg || e?.message),
         },
       });
     }
@@ -658,9 +858,65 @@ export const uploadBulkProducts = async (req, res) => {
   }
 };
 
+const escapeRegex = (value) =>
+  String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const PRODUCT_LIST_SELECT = [
+  'type',
+  'itemType',
+  'productName',
+  'brandName',
+  'serviceName',
+  'sellingPrice',
+  'purchasePrice',
+  'itemCode',
+  'barCode',
+  'category',
+  'subCategory',
+  'primaryUnit',
+  'description',
+  'discountType',
+  'discountValue',
+  'stockQty',
+  'stockStatus',
+  'variants',
+  'images',
+  'imageUrl',
+  'isCsp',
+  'cspEnrollmentId',
+  'createdAt',
+  'updatedAt',
+].join(' ');
+
+const ALLOWED_PRODUCT_SORT = new Set([
+  'createdAt',
+  'updatedAt',
+  'productName',
+  'sellingPrice',
+  'purchasePrice',
+  'category',
+  'stockQty',
+]);
+
+/**
+ * Paginated product list with server-side search/sort.
+ * Query: page, limit|size, skip|start, search, type, sortBy, sortDir, includeStats
+ */
 export const getProducts = async (req, res) => {
   try {
-    const { search, type } = req.query;
+    const {
+      search,
+      type,
+      page: pageRaw,
+      limit: limitRaw,
+      size: sizeRaw,
+      skip: skipRaw,
+      start: startRaw,
+      sortBy: sortByRaw,
+      sortDir: sortDirRaw,
+      includeStats,
+    } = req.query;
+
     const clauses = [];
 
     // Optional type filter: product | service (omit = all)
@@ -671,14 +927,16 @@ export const getProducts = async (req, res) => {
       });
     }
 
-    if (search) {
-      const searchRegex = new RegExp(String(search).trim(), 'i');
+    const searchTerm = String(search || '').trim();
+    if (searchTerm) {
+      const searchRegex = new RegExp(escapeRegex(searchTerm), 'i');
       clauses.push({
         $or: [
           { productName: searchRegex },
           { serviceName: searchRegex },
           { itemCode: searchRegex },
           { barCode: searchRegex },
+          { category: searchRegex },
           { 'variants.name': searchRegex },
           { 'variants.barcode': searchRegex },
         ],
@@ -692,15 +950,75 @@ export const getProducts = async (req, res) => {
           ? clauses[0]
           : { $and: clauses };
 
-    const products = await Product.find(query).sort({ createdAt: -1 }).limit(6000);
+    const parsedLimit = Number(limitRaw ?? sizeRaw);
+    const limit = Math.min(
+      Math.max(Number.isFinite(parsedLimit) ? Math.trunc(parsedLimit) : 50, 1),
+      100,
+    );
+
+    const parsedSkip = Number(skipRaw ?? startRaw);
+    const parsedPage = Number(pageRaw);
+    let page = 1;
+    let skip = 0;
+    if (Number.isFinite(parsedSkip) && parsedSkip >= 0) {
+      skip = Math.trunc(parsedSkip);
+      page = Math.floor(skip / limit) + 1;
+    } else if (Number.isFinite(parsedPage) && parsedPage >= 1) {
+      page = Math.trunc(parsedPage);
+      skip = (page - 1) * limit;
+    }
+
+    const sortField = ALLOWED_PRODUCT_SORT.has(String(sortByRaw || ''))
+      ? String(sortByRaw)
+      : 'createdAt';
+    const sortDir =
+      String(sortDirRaw || '').toLowerCase() === 'asc' ? 1 : -1;
+    const sort = { [sortField]: sortDir, _id: sortDir };
+
+    const wantStats =
+      String(includeStats || '').toLowerCase() === 'true' ||
+      String(includeStats || '') === '1';
+
+    const [total, products, statsAgg] = await Promise.all([
+      Product.countDocuments(query),
+      Product.find(query)
+        .select(PRODUCT_LIST_SELECT)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      wantStats
+        ? Product.aggregate([
+            { $match: query },
+            {
+              $group: {
+                _id: null,
+                totalStockQty: { $sum: { $ifNull: ['$stockQty', 0] } },
+                inStockCount: {
+                  $sum: {
+                    $cond: [{ $gt: [{ $ifNull: ['$stockQty', 0] }, 0] }, 1, 0],
+                  },
+                },
+                outOfStockCount: {
+                  $sum: {
+                    $cond: [{ $lte: [{ $ifNull: ['$stockQty', 0] }, 0] }, 1, 0],
+                  },
+                },
+                categories: { $addToSet: '$category' },
+              },
+            },
+          ])
+        : Promise.resolve([]),
+    ]);
+
     const productNames = [
       ...new Set(products.flatMap((p) => getProductStockNames(p))),
     ];
     const stockMap = await computeStockByProductNames({ names: productNames });
 
-    const productsWithLiveStock = products.map((productDoc) => {
-      const product = productDoc.toObject();
-      const isService = product.itemType === "service" || product.type === "service";
+    const productsWithLiveStock = products.map((product) => {
+      const isService =
+        product.itemType === 'service' || product.type === 'service';
       const liveStockQty = isService
         ? 0
         : sumStockForNames(stockMap, getProductStockNames(product));
@@ -708,16 +1026,47 @@ export const getProducts = async (req, res) => {
       return {
         ...product,
         stockQty: liveStockQty,
-        stockStatus: liveStockQty > 0 ? "in_stock" : "out_of_stock",
+        stockStatus: liveStockQty > 0 ? 'in_stock' : 'out_of_stock',
       };
     });
 
     const productsWithCsp = await withCspLabel(productsWithLiveStock);
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+    const hasMore = skip + productsWithCsp.length < total;
 
-    return res.status(200).json({
+    const payload = {
       success: true,
       products: productsWithCsp,
-    });
+      pagination: {
+        page,
+        limit,
+        skip,
+        total,
+        totalPages,
+        hasMore,
+      },
+      // Backward-compatible aliases used by some clients
+      meta: {
+        totalRowCount: total,
+        page,
+        limit,
+        hasMore,
+      },
+    };
+
+    if (wantStats) {
+      const row = Array.isArray(statsAgg) ? statsAgg[0] : null;
+      const categories = Array.isArray(row?.categories) ? row.categories : [];
+      payload.stats = {
+        totalProducts: total,
+        totalStockQty: Number(row?.totalStockQty || 0),
+        inStockCount: Number(row?.inStockCount || 0),
+        outOfStockCount: Number(row?.outOfStockCount || 0),
+        categoryCount: categories.filter((c) => String(c || '').trim()).length,
+      };
+    }
+
+    return res.status(200).json(payload);
   } catch (error) {
     console.error('getProducts error:', error);
     return res.status(500).json({
