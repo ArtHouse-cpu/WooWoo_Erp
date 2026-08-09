@@ -188,26 +188,42 @@ export default function CreatePurchaseReturnScreen({
 
 
   const buildPayload = (
-    status: "draft" | "pending" | "paid" | "partial" = "pending",
+    status: "draft" | "pending" | "paid" | "partial" | "due" = "pending",
     paymentMode?: "Cash" | "UPI" | "Card" | "Bank" | "Credit" | "Other",
-  ): PurchaseReturnPayload => ({
-    invoiceNumber: purchaseReturnNo,
-    invoiceDate: returnDate,
-    supplierName: vendor.trim(),
-    purchaser: purchaser||"not assigned",
-    vendorDate: returnDate,
-    amount: grandTotal,
-    paymentMode,
-    notes: notes.trim(),
-    items: items.map((item) => ({
-      productName: item.productName,
-      qty: item.qty,
-      unitPrice: item.unitPrice,
-      discount: item.discount,
-      image: item.image,
-    })),
-    status,
-  });
+    extras?: {
+      purchaseType?: "cash" | "credit";
+      paidAmount?: number;
+      dueAmount?: number;
+    },
+  ): PurchaseReturnPayload => {
+    const isCredit =
+      extras?.purchaseType === "credit" || paymentMode === "Credit";
+    return {
+      invoiceNumber: purchaseReturnNo,
+      invoiceDate: returnDate,
+      supplierName: vendor.trim(),
+      purchaser: purchaser || "not assigned",
+      vendorDate: returnDate,
+      amount: grandTotal,
+      purchaseType: isCredit ? "credit" : "cash",
+      paymentMode: isCredit ? "Credit" : paymentMode,
+      paidAmount: isCredit
+        ? 0
+        : Number(extras?.paidAmount ?? (status === "paid" ? grandTotal : 0)),
+      dueAmount: isCredit
+        ? grandTotal
+        : Number(extras?.dueAmount ?? (status === "paid" ? 0 : grandTotal)),
+      notes: notes.trim(),
+      items: items.map((item) => ({
+        productName: item.productName,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        image: item.image,
+      })),
+      status: isCredit ? "due" : status,
+    };
+  };
 
   const handleSaveDraft = async () => {
     if (!vendor.trim() || !phone.trim() || !items.length) {
@@ -258,10 +274,21 @@ export default function CreatePurchaseReturnScreen({
   };
 
   const handleSave = async (
-    status: "pending" | "paid" | "partial" = "pending",
-    payment?: { mode: string; paymentStatus: "full" | "partial" },
+    status: "pending" | "paid" | "partial" | "due" = "pending",
+    payment?: {
+      mode: string;
+      paymentStatus: "full" | "partial";
+      purchaseType?: "cash" | "credit";
+      paidAmount?: number;
+      dueAmount?: number;
+    },
   ) => {
-    const formattedMode = payment?.mode
+    const isCredit =
+      payment?.purchaseType === "credit" ||
+      String(payment?.mode || "").toUpperCase() === "CREDIT";
+    const formattedMode = isCredit
+      ? ("Credit" as const)
+      : payment?.mode
       ? (payment.mode.toUpperCase() === "UPI"
           ? "UPI"
           : payment.mode.toUpperCase() === "MULTI"
@@ -271,13 +298,18 @@ export default function CreatePurchaseReturnScreen({
 
     try {
       setSaving(true);
+      const payload = buildPayload(isCredit ? "due" : status, formattedMode, {
+        purchaseType: isCredit ? "credit" : "cash",
+        paidAmount: payment?.paidAmount,
+        dueAmount: payment?.dueAmount,
+      });
       if (mode === "edit" && purchaseReturnId) {
-        await handleUpdatePurchaseReturn(purchaseReturnId, buildPayload(status, formattedMode));
+        await handleUpdatePurchaseReturn(purchaseReturnId, payload);
         Swal.fire("Return Updated", "Purchase return updated successfully.", "success").then(
           () => navigate(-1),
         );
       } else {
-        const response = await handleCreatePurchaseReturn(buildPayload(status, formattedMode));
+        const response = await handleCreatePurchaseReturn(payload);
 
         const savedCode = response?.purchaseReturn?.invoiceNumber;
         Swal.fire(
@@ -464,6 +496,7 @@ export default function CreatePurchaseReturnScreen({
       {mode !== "view" && (
         <CheckoutModal
           open={openCheckout}
+          checkoutContext="purchase"
           grandTotal={grandTotal}
           items={items.map((item) => ({
             id: item.id,
@@ -478,7 +511,15 @@ export default function CreatePurchaseReturnScreen({
           onClose={() => setOpenCheckout(false)}
           onConfirmPayment={async (payment) => {
             setOpenCheckout(false);
-            await handleSave(payment.paymentStatus === "full" ? "paid" : "partial", payment);
+            const isCredit = payment.purchaseType === "credit";
+            await handleSave(
+              isCredit
+                ? "due"
+                : payment.paymentStatus === "full"
+                  ? "paid"
+                  : "partial",
+              payment,
+            );
           }}
         />
       )}

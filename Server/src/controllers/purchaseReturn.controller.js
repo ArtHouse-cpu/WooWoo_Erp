@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import PurchaseReturn from "../models/purchaseReturn.model.js";
+import { resolvePurchasePaymentFields } from "../utils/purchasePayment.utils.js";
 
 export const createPurchaseReturn = async (req, res) => {
     try {
@@ -12,6 +13,9 @@ export const createPurchaseReturn = async (req, res) => {
             amount,
             paymentMode,
             status,
+            purchaseType,
+            paidAmount,
+            dueAmount,
             items,
             notes,
         } = req.body;
@@ -38,15 +42,27 @@ console.log("createPurchaseReturn controller:",req.body)
             })
             : [];
         const purchaseReturnPrefix="PURRETURN:";
+        const amountNum = Number(amount ?? 0);
+        const paymentFields = resolvePurchasePaymentFields({
+            amount: amountNum,
+            paymentMode,
+            status,
+            purchaseType,
+            paidAmount,
+            dueAmount,
+        });
         const purchaseReturn = await PurchaseReturn.create({
             invoiceNumber: purchaseReturnPrefix + String(invoiceNumber).trim(),
             invoiceDate: new Date(invoiceDate),
             purchaser: String(purchaser).trim(),
             supplierName: String(supplierName).trim(),
             vendorDate: new Date(vendorDate),
-            amount: Number(amount ?? 0),
-            paymentMode: String(paymentMode ?? "Cash"),
-            status: String(status ?? "pending"),
+            amount: amountNum,
+            purchaseType: paymentFields.purchaseType,
+            paymentMode: paymentFields.paymentMode,
+            status: paymentFields.status,
+            paidAmount: paymentFields.paidAmount,
+            dueAmount: paymentFields.dueAmount,
             items: normalizedItems,
             notes: String(notes ?? "").trim(),
         });

@@ -1308,7 +1308,11 @@ export type PurchasePayload = {
   /** How to interpret manualDiscount */
   manualDiscountType?: "flat" | "percentage";
   paymentMode?: "Cash" | "UPI" | "Card" | "Bank" | "Credit" | "Other";
-  status?: "draft" | "pending" | "paid" | "partial" | "cancelled";
+  /** cash = settled at checkout; credit = outstanding due */
+  purchaseType?: "cash" | "credit";
+  status?: "draft" | "pending" | "paid" | "partial" | "cancelled" | "due";
+  paidAmount?: number;
+  dueAmount?: number;
   items?: PurchaseItemPayload[];
   notes?: string;
   attachments?: string[];

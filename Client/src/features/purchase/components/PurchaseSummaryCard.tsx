@@ -11,9 +11,19 @@ type Props = {
   readOnly?: boolean;
   grandTotal: number;
   onSave: () => void;
+  /** Optional: save as credit / due (purchase now, pay later) */
+  onCredit?: () => void;
+  creditLabel?: string;
   isSaving?: boolean;
   title?: string;
   saveLabel?: string;
+  /** Shown when viewing an existing purchase (especially credit / due). */
+  paymentInfo?: {
+    purchaseType?: string;
+    status?: string;
+    paidAmount?: number;
+    dueAmount?: number;
+  };
 };
 
 /** Applied manual discount in ₹ (capped so grand total never goes negative). */
@@ -42,9 +52,12 @@ export default function PurchaseSummaryCard({
   readOnly = false,
   grandTotal,
   onSave,
+  onCredit,
+  creditLabel = "Credit",
   isSaving = false,
   title = "Purchase Summary",
   saveLabel = "Save Purchase",
+  paymentInfo,
 }: Props) {
   const canEditManual =
     Boolean(onManualDiscountChange) &&
@@ -59,6 +72,18 @@ export default function PurchaseSummaryCard({
     safeValue,
     type,
   );
+  const isCreditView =
+    String(paymentInfo?.purchaseType ?? "").toLowerCase() === "credit" ||
+    String(paymentInfo?.status ?? "").toLowerCase() === "due";
+  const paidDisplay = Math.max(0, Number(paymentInfo?.paidAmount) || 0);
+  const dueDisplay = isCreditView
+    ? Math.max(
+        0,
+        Number(paymentInfo?.dueAmount) > 0
+          ? Number(paymentInfo?.dueAmount)
+          : grandTotal,
+      )
+    : Math.max(0, Number(paymentInfo?.dueAmount) || 0);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:col-span-4">
@@ -153,16 +178,61 @@ export default function PurchaseSummaryCard({
           <span>Grand Total</span>
           <span>₹ {grandTotal.toFixed(2)}</span>
         </div>
+        {paymentInfo && (isCreditView || paidDisplay > 0 || dueDisplay > 0) ? (
+          <div className="mt-2 space-y-1.5 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 text-sm">
+            {isCreditView ? (
+              <div className="flex items-center justify-between font-semibold text-amber-900">
+                <span>Purchase Type</span>
+                <span>Credit</span>
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between text-gray-700">
+              <span>Payment Status</span>
+              <span className="font-semibold uppercase text-amber-800">
+                {isCreditView
+                  ? "DUE"
+                  : String(paymentInfo.status || "—").toUpperCase()}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-gray-600">
+              <span>Paid Amount</span>
+              <span>₹ {paidDisplay.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-gray-600">
+              <span>Due Amount</span>
+              <span className="font-medium text-amber-800">
+                ₹ {dueDisplay.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </div>
       {!readOnly && (
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={isSaving}
-          className="mt-4 w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+        <div
+          className={`mt-4 grid gap-2 ${
+            onCredit ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
+          }`}
         >
-          {isSaving ? "Saving..." : saveLabel}
-        </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={isSaving}
+            className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {isSaving ? "Saving..." : saveLabel}
+          </button>
+          {onCredit ? (
+            <button
+              type="button"
+              onClick={onCredit}
+              disabled={isSaving}
+              className="w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+              title="Purchase now, pay later — full amount stays Due"
+            >
+              {isSaving ? "Saving..." : creditLabel}
+            </button>
+          ) : null}
+        </div>
       )}
     </div>
   );

@@ -1,16 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { X, Loader2, Package, Briefcase, AlertCircle } from "lucide-react";
-import { FormProvider, useFieldArray, useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Swal from "sweetalert2";
 import ProductForm from "../forms/ProductForm";
 import ServiceForm from "../forms/ServiceForm";
-import VariantModal, { type VariantInput } from "./VariantModal";
 
 const variantSchema = z.object({
   name: z.string().min(1, "Variant name is required"),
-  sellingPrice: z.number().min(0, "Selling price must be >= 0"),
+  sellingPrice: z.number().gt(0, "Variant selling price must be greater than 0"),
   purchasePrice: z.number().min(0, "Purchase price must be >= 0"),
   barcode: z.string().optional().default(""),
 });
@@ -20,7 +19,8 @@ const baseSchema = z.object({
   productName: z.string().optional().default(""),
   brandName: z.string().optional().default(""),
   serviceName: z.string().optional().default(""),
-  sellingPrice: z.number().gt(0, "Selling price must be greater than 0"),
+  /** Parent price is optional when variants exist; variant prices are source of truth */
+  sellingPrice: z.number().min(0).default(0),
   purchasePrice: z.number().min(0).default(0),
   primaryUnit: z.string().optional().default(""),
   itemCode: z.string().optional().default(""),
@@ -41,10 +41,63 @@ const baseSchema = z.object({
 const schema = baseSchema.superRefine((value, ctx) => {
   const name = value.type === "product" ? value.productName : value.serviceName;
   if (!name?.trim()) {
-    ctx.addIssue({ code: "custom", message: "Name is required", path: [value.type === "product" ? "productName" : "serviceName"] });
+    ctx.addIssue({
+      code: "custom",
+      message: "Name is required",
+      path: [value.type === "product" ? "productName" : "serviceName"],
+    });
   }
 
-  if (value.discountType === "flat" && value.discountValue > value.sellingPrice) {
+  const hasVariants =
+    value.type === "product" &&
+    Array.isArray(value.variants) &&
+    value.variants.length > 0;
+
+  // Services (and products without variants) still need a parent selling price
+  if (value.type === "service" && !(value.sellingPrice > 0)) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Selling price must be greater than 0",
+      path: ["sellingPrice"],
+    });
+  }
+  if (value.type === "product" && !hasVariants && !(value.sellingPrice > 0)) {
+    ctx.addIssue({
+      code: "custom",
+      message:
+        "Enter a selling price, or add at least one variant with its own price",
+      path: ["sellingPrice"],
+    });
+  }
+
+  if (hasVariants) {
+    value.variants.forEach((variant, index) => {
+      if (!String(variant?.name || "").trim()) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Variant name is required",
+          path: ["variants", index, "name"],
+        });
+      }
+      if (!(Number(variant?.sellingPrice) > 0)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Variant selling price must be greater than 0",
+          path: ["variants", index, "sellingPrice"],
+        });
+      }
+    });
+  }
+
+  const priceForDiscount = hasVariants
+    ? Math.max(
+        0,
+        ...value.variants.map((v) => Number(v.sellingPrice) || 0),
+        Number(value.sellingPrice) || 0,
+      )
+    : Number(value.sellingPrice) || 0;
+
+  if (value.discountType === "flat" && value.discountValue > priceForDiscount) {
     ctx.addIssue({
       code: "custom",
       message: "Flat discount cannot exceed selling price",
@@ -59,7 +112,11 @@ const schema = baseSchema.superRefine((value, ctx) => {
     });
   }
 
-  if (value.type === "product" && value.isCsp === "yes" && !String(value.cspEnrollmentId || "").trim()) {
+  if (
+    value.type === "product" &&
+    value.isCsp === "yes" &&
+    !String(value.cspEnrollmentId || "").trim()
+  ) {
     ctx.addIssue({
       code: "custom",
       message: "Select a CSP seller when CSP is Yes",
@@ -114,7 +171,14 @@ const buildDefaultValues = (
     description: initialData?.description || "",
     discountType: initialData?.discountType || "flat",
     discountValue: Number(initialData?.discountValue || 0),
-    variants: initialData?.variants || [],
+    variants: Array.isArray(initialData?.variants)
+      ? initialData.variants.map((v: any) => ({
+          name: String(v?.name ?? "").trim(),
+          sellingPrice: Number(v?.sellingPrice ?? 0) || 0,
+          purchasePrice: Number(v?.purchasePrice ?? 0) || 0,
+          barcode: String(v?.barcode ?? v?.barCode ?? "").trim(),
+        }))
+      : [],
     images: initialData?.images || [],
     isCsp:
       (initialData as any)?.isCsp === "yes" ||
@@ -147,12 +211,9 @@ export default function AddItemModal({
     defaultValues: buildDefaultValues(initialData, lockType),
   });
 
-  const { handleSubmit, watch, formState, reset, setFocus, control } = methods;
-  const { append, update } = useFieldArray({ control, name: "variants" });
+  const { handleSubmit, watch, formState, reset, setFocus } = methods;
 
   const itemType = watch("type");
-  const [showVariantModal, setShowVariantModal] = useState(false);
-  const [editVariantIndex, setEditVariantIndex] = useState<number | null>(null);
 
   // Re-apply saved product values when opening edit modal
   useEffect(() => {
@@ -172,8 +233,6 @@ export default function AddItemModal({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [itemType, setFocus]);
-
-  const variantInitial = editVariantIndex !== null ? watch("variants")[editVariantIndex] : null;
 
   const modalTitle =
     itemType === "service"
@@ -196,6 +255,31 @@ export default function AddItemModal({
   const submit = handleSubmit(async (values) => {
     if (loading) return;
     const resolvedType = lockType || values.type;
+    const normalizedVariants =
+      resolvedType === "product" && Array.isArray(values.variants)
+        ? values.variants
+            .map((v) => ({
+              name: String(v?.name ?? "").trim(),
+              sellingPrice: Number(v?.sellingPrice) || 0,
+              purchasePrice: Number(v?.purchasePrice) || 0,
+              barcode: String(v?.barcode ?? "").trim(),
+            }))
+            .filter((v) => v.name)
+        : [];
+
+    // When variants exist, their prices are source of truth.
+    // Parent price stays optional; if empty, use first variant for catalogue defaults.
+    let sellingPrice = Number(values.sellingPrice) || 0;
+    let purchasePrice = Number(values.purchasePrice) || 0;
+    if (normalizedVariants.length > 0) {
+      if (!(sellingPrice > 0)) {
+        sellingPrice = Number(normalizedVariants[0].sellingPrice) || 0;
+      }
+      if (!(purchasePrice > 0)) {
+        purchasePrice = Number(normalizedVariants[0].purchasePrice) || 0;
+      }
+    }
+
     const payload = new FormData();
     payload.append("type", resolvedType);
     payload.append(
@@ -204,8 +288,8 @@ export default function AddItemModal({
     );
     payload.append("brandName", values.brandName || "");
     payload.append("serviceName", values.serviceName || values.productName || "");
-    payload.append("sellingPrice", String(values.sellingPrice));
-    payload.append("purchasePrice", String(values.purchasePrice));
+    payload.append("sellingPrice", String(sellingPrice));
+    payload.append("purchasePrice", String(purchasePrice));
     payload.append("primaryUnit", values.primaryUnit);
     payload.append("itemCode", values.itemCode);
     payload.append("barCode", values.barcode);
@@ -214,7 +298,7 @@ export default function AddItemModal({
     payload.append("description", values.description);
     payload.append("discountType", values.discountType);
     payload.append("discountValue", String(values.discountValue));
-    payload.append("variants", JSON.stringify(values.variants));
+    payload.append("variants", JSON.stringify(normalizedVariants));
     payload.append(
       "isCsp",
       resolvedType === "product" && values.isCsp === "yes" ? "true" : "false",
@@ -261,8 +345,9 @@ export default function AddItemModal({
               </p>
             </div>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            type="button"
+            onClick={onClose}
             className="rounded-full p-2.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-200"
           >
             <X size={20} />
@@ -271,7 +356,14 @@ export default function AddItemModal({
 
         {/* Form Wrapper */}
         <FormProvider {...methods}>
-          <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submit(e);
+            }}
+            method="post"
+            className="flex min-h-0 flex-1 flex-col"
+          >
             
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
@@ -313,16 +405,7 @@ export default function AddItemModal({
                 {/* Dynamic Form Content */}
                 <div className="min-w-0">
                   {itemType === "product" ? (
-                    <ProductForm
-                      onAddVariant={() => {
-                        setEditVariantIndex(null);
-                        setShowVariantModal(true);
-                      }}
-                      onEditVariant={(index) => {
-                        setEditVariantIndex(index);
-                        setShowVariantModal(true);
-                      }}
-                    />
+                    <ProductForm />
                   ) : (
                     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                       <ServiceForm />
@@ -383,17 +466,6 @@ export default function AddItemModal({
           </form>
         </FormProvider>
       </div>
-
-      {showVariantModal && (
-        <VariantModal
-          onClose={() => setShowVariantModal(false)}
-          initialValue={variantInitial as VariantInput | null}
-          onSave={(variant) => {
-            if (editVariantIndex === null) append(variant);
-            else update(editVariantIndex, variant);
-          }}
-        />
-      )}
     </div>
   );
 }

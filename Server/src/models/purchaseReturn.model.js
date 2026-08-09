@@ -19,6 +19,12 @@ const purchaseReturnSchema = new mongoose.Schema(
     supplierName: { type: String, required: true, trim: true },
     vendorDate: { type: Date, required: true },
     amount: { type: Number, required: true, min: 0 },
+    purchaseType: {
+      type: String,
+      enum: ["cash", "credit"],
+      default: "cash",
+      index: true,
+    },
     paymentMode: {
       type: String,
       enum: ["Cash", "UPI", "Card", "Bank", "Credit", "Other"],
@@ -26,8 +32,18 @@ const purchaseReturnSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["draft", "pending", "paid", "partial", "cancelled"],
+      enum: ["draft", "pending", "paid", "partial", "cancelled", "due"],
       default: "pending",
+    },
+    paidAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    dueAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     items: { type: [purchaseReturnItemSchema], default: [] },
     notes: { type: String, default: "", trim: true },

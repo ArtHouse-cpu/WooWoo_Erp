@@ -12,7 +12,14 @@ type Props = {
   readOnly?: boolean;
   grandTotal: number;
   onSave: () => void;
+  onCredit?: () => void;
   isSaving?: boolean;
+  paymentInfo?: {
+    purchaseType?: string;
+    status?: string;
+    paidAmount?: number;
+    dueAmount?: number;
+  };
 };
 
 /** Thin wrapper so existing Purchase Order imports keep working. */
@@ -22,6 +29,7 @@ export default function PurchaseOrderSummaryCard(props: Props) {
       {...props}
       title="Purchase Order Summary"
       saveLabel="Save Purchase Order"
+      creditLabel="Credit"
     />
   );
 }

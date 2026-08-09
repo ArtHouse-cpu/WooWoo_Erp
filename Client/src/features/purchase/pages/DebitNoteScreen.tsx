@@ -17,6 +17,11 @@ import {
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
 import CreatePurchaseReturnScreen from "./CreatePurchaseReturnScreen";
+import {
+  displayPaymentMode,
+  displayPaymentStatus,
+  displayPurchaseType,
+} from "@/features/purchase/utils/purchasePaymentDisplay";
 
 type DebitNoteRow = {
   id: string;
@@ -24,6 +29,7 @@ type DebitNoteRow = {
   account: string;
   status: string;
   mode: string;
+  purchaseType: string;
   amount: number;
   bill: string;
   invoiceNumber: string;
@@ -43,6 +49,7 @@ type PurchaseReturnApiItem = {
   purchaser?: string;
   status?: string;
   paymentMode?: string;
+  purchaseType?: string;
   amount?: number;
   invoiceDate?: string;
 };
@@ -89,11 +96,14 @@ export default function DebitNoteScreen() {
         header: "Status",
         Cell: ({ cell }: { cell: MRT_Cell<DebitNoteRow> }) => {
           const value = String(cell.getValue() ?? "");
+          const v = value.toLowerCase();
 
           const badgeClass =
-            value === "pending"
+            v === "due"
+              ? "bg-amber-100 text-amber-800"
+              : v === "pending" || v === "partial"
               ? "bg-yellow-100 text-yellow-700"
-              : value === "paid"
+              : v === "paid"
                 ? "bg-green-100 text-green-700"
                 : "bg-red-100 text-red-700";
 
@@ -101,12 +111,13 @@ export default function DebitNoteScreen() {
             <span
               className={`px-3 py-1 text-xs font-medium rounded-full ${badgeClass}`}
             >
-              {value ? value.charAt(0).toUpperCase() + value.slice(1) : "N/A"}
+              {value || "N/A"}
             </span>
           );
         },
       },
-      { accessorKey: "mode", header: "Mode" },
+      { accessorKey: "mode", header: "Payment Mode" },
+      { accessorKey: "purchaseType", header: "Purchase Type" },
       { accessorKey: "bill", header: "Amount" },
       { accessorKey: "invoiceNumber", header: "Invoice Number" },
       // { accessorKey: "purchaser", header: "Purchaser" },
@@ -290,8 +301,21 @@ export default function DebitNoteScreen() {
             id: item.invoiceNumber || item._id || String(index + 1),
             purchaser: item.purchaser || "-",
             account: item.supplierName || "-",
-            status: String(item.status || "pending"),
-            mode: item.paymentMode || "-",
+            status: displayPaymentStatus({
+              status: item.status,
+              purchaseType: item.purchaseType,
+              paymentMode: item.paymentMode,
+            }),
+            mode: displayPaymentMode({
+              status: item.status,
+              purchaseType: item.purchaseType,
+              paymentMode: item.paymentMode,
+            }),
+            purchaseType: displayPurchaseType({
+              status: item.status,
+              purchaseType: item.purchaseType,
+              paymentMode: item.paymentMode,
+            }),
             amount: Number(item.amount ?? 0),
             invoiceNumber: item.invoiceNumber || "-",
             bill: `₹${Number(item.amount ?? 0).toLocaleString("en-IN")}`,

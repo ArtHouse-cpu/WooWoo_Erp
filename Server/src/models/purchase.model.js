@@ -93,6 +93,14 @@ const purchaseSchema = new mongoose.Schema(
       default: "flat",
     },
 
+    /** cash = paid at checkout; credit = outstanding / due */
+    purchaseType: {
+      type: String,
+      enum: ["cash", "credit"],
+      default: "cash",
+      index: true,
+    },
+
     paymentMode: {
       type: String,
       enum: ["Cash", "UPI", "Card", "Bank", "Credit", "Other"],
@@ -101,8 +109,22 @@ const purchaseSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["draft", "pending", "paid", "partial", "cancelled"],
+      enum: ["draft", "pending", "paid", "partial", "cancelled", "due"],
       default: "pending",
+    },
+
+    /** Amount already settled against this purchase */
+    paidAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    /** Outstanding amount (full amount for credit purchases) */
+    dueAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     items: {

@@ -1,20 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useFieldArray, useFormContext } from "react-hook-form";
+import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import { Pencil, Plus, Trash2, Wand2 } from "lucide-react";
 import CategorySelect from "../shared/CategorySelect";
 import DiscountInput from "../shared/DiscountInput";
 import ImageUploader from "../shared/ImageUploader";
 import type { AddItemFormValues } from "../modals/AddItemModal";
-import type { VariantInput } from "../modals/VariantModal";
+import VariantModal, { type VariantInput } from "../modals/VariantModal";
 import {
   handleGetCspEnrollments,
   type CspEnrollment,
 } from "@/services/apiClient";
-
-type Props = {
-  onAddVariant: () => void;
-  onEditVariant: (index: number) => void;
-};
 
 const barcodeChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const generateBarcode = () =>
@@ -47,12 +42,17 @@ function Section({
   );
 }
 
-export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
+export default function ProductForm() {
   const { register, watch, setValue, control } =
     useFormContext<AddItemFormValues>();
-  const { fields, remove } = useFieldArray({ control, name: "variants" });
+  const { fields, append, update, remove } = useFieldArray({
+    control,
+    name: "variants",
+  });
   const [cspOptions, setCspOptions] = useState<CspEnrollment[]>([]);
   const [loadingCsp, setLoadingCsp] = useState(false);
+  const [showVariantModal, setShowVariantModal] = useState(false);
+  const [editVariantIndex, setEditVariantIndex] = useState<number | null>(null);
 
   const images = watch("images");
   const discountType = watch("discountType");
@@ -63,6 +63,14 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
   const subCategoryId = watch("subCategoryId");
   const subCategoryName = watch("subCategory");
   const cspEnrollmentId = watch("cspEnrollmentId");
+  // Live variant values (source of truth for table prices)
+  const watchedVariants =
+    useWatch({ control, name: "variants" }) ?? ([] as VariantInput[]);
+  const hasVariants = fields.length > 0;
+  const variantInitial =
+    editVariantIndex !== null
+      ? (watchedVariants[editVariantIndex] as VariantInput | undefined) ?? null
+      : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -151,13 +159,15 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
 
       <Section
         title="Pricing"
-        description="Selling and purchase amounts in INR."
+        description={
+          hasVariants
+            ? "Optional parent prices. Variant prices below are used for each option."
+            : "Selling and purchase amounts in INR. Optional if you add variants with their own prices."
+        }
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>
-              Selling Price (INR) <span className="text-red-500">*</span>
-            </label>
+            <label className={labelClass}>Selling Price (INR)</label>
             <div className="relative">
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">
                 ₹
@@ -171,6 +181,11 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
                 className={`${inputClass} pl-7`}
               />
             </div>
+            {hasVariants ? (
+              <p className="mt-1 text-[11px] text-slate-400">
+                Optional — each variant uses its own selling price.
+              </p>
+            ) : null}
           </div>
           <div>
             <label className={labelClass}>Purchase Price (INR)</label>
@@ -324,12 +339,15 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
 
       <Section
         title="Variants"
-        description="Optional size/color options with their own prices."
+        description="Optional size/color options with their own prices (source of truth when present)."
       >
         <div className="mb-3 flex items-center justify-end">
           <button
             type="button"
-            onClick={onAddVariant}
+            onClick={() => {
+              setEditVariantIndex(null);
+              setShowVariantModal(true);
+            }}
             className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700"
           >
             <Plus size={14} /> Add Variant
@@ -348,12 +366,14 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-3 py-2.5 text-left font-semibold">Name</th>
-                    <th className="px-3 py-2.5 text-right font-semibold">
-                      Selling
+                    <th className="px-3 py-2.5 text-left font-semibold">
+                      Variant
                     </th>
                     <th className="px-3 py-2.5 text-right font-semibold">
-                      Purchase
+                      Selling Price
+                    </th>
+                    <th className="px-3 py-2.5 text-right font-semibold">
+                      Purchase Price
                     </th>
                     <th className="px-3 py-2.5 text-left font-semibold">
                       Barcode
@@ -365,26 +385,49 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {fields.map((field, idx) => {
-                    const variant = field as unknown as VariantInput;
+                    const live = watchedVariants[idx] as
+                      | VariantInput
+                      | undefined;
+                    const name = String(live?.name ?? field.name ?? "").trim();
+                    const selling = Number(
+                      live?.sellingPrice ?? field.sellingPrice ?? 0,
+                    );
+                    const purchase = Number(
+                      live?.purchasePrice ?? field.purchasePrice ?? 0,
+                    );
+                    const barcode = String(
+                      live?.barcode ?? field.barcode ?? "",
+                    ).trim();
                     return (
                       <tr key={field.id} className="hover:bg-slate-50/80">
                         <td className="px-3 py-2.5 font-medium text-slate-800">
-                          {variant.name}
+                          {name || "—"}
                         </td>
-                        <td className="px-3 py-2.5 text-right text-slate-700">
-                          ₹{Number(variant.sellingPrice ?? 0).toFixed(2)}
+                        <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                          ₹
+                          {selling.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </td>
-                        <td className="px-3 py-2.5 text-right text-slate-700">
-                          ₹{Number(variant.purchasePrice ?? 0).toFixed(2)}
+                        <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                          ₹
+                          {purchase.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </td>
                         <td className="px-3 py-2.5 text-slate-600">
-                          {variant.barcode || "—"}
+                          {barcode || "—"}
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex justify-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => onEditVariant(idx)}
+                              onClick={() => {
+                                setEditVariantIndex(idx);
+                                setShowVariantModal(true);
+                              }}
                               className="rounded-md bg-slate-100 p-1.5 text-slate-600 transition hover:bg-slate-200"
                               title="Edit variant"
                             >
@@ -409,6 +452,31 @@ export default function ProductForm({ onAddVariant, onEditVariant }: Props) {
           </div>
         )}
       </Section>
+
+      {showVariantModal ? (
+        <VariantModal
+          onClose={() => {
+            setShowVariantModal(false);
+            setEditVariantIndex(null);
+          }}
+          initialValue={variantInitial}
+          onSave={(variant) => {
+            const next: VariantInput = {
+              name: String(variant.name || "").trim(),
+              sellingPrice: Number(variant.sellingPrice) || 0,
+              purchasePrice: Number(variant.purchasePrice) || 0,
+              barcode: String(variant.barcode || "").trim(),
+            };
+            if (editVariantIndex === null) {
+              append(next);
+            } else {
+              update(editVariantIndex, next);
+            }
+            setShowVariantModal(false);
+            setEditVariantIndex(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

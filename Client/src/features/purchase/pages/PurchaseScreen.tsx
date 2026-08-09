@@ -36,8 +36,14 @@ import {
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
 import CreatePurchaseScreen from "./CreatePurchaseScreen";
+import {
+  displayPaymentMode,
+  displayPaymentStatus,
+  displayPurchaseType,
+  resolvePaidDueAmounts,
+} from "@/features/purchase/utils/purchasePaymentDisplay";
 
-type PurchaseTabStatus = "Paid" | "Pending" | "Draft" | "Cancelled";
+type PurchaseTabStatus = "Paid" | "Due" | "Pending" | "Draft" | "Cancelled";
 
 type PurchaseListRow = {
   id: number;
@@ -49,16 +55,32 @@ type PurchaseListRow = {
   vendor: string;
   phone: string;
   mode: string;
+  purchaseType: string;
+  paidAmount: number;
+  dueAmount: number;
   date: string;
   createdTime: string;
   _id: string;
   raw: Record<string, unknown>;
 };
 
-const tabs: PurchaseTabStatus[] = ["Paid", "Pending", "Draft", "Cancelled"];
+const tabs: PurchaseTabStatus[] = [
+  "Paid",
+  "Due",
+  "Pending",
+  "Draft",
+  "Cancelled",
+];
 
-function statusForTab(raw: unknown): PurchaseTabStatus {
+function statusForTab(
+  raw: unknown,
+  purchaseType?: unknown,
+  paymentMode?: unknown,
+): PurchaseTabStatus {
   const v = String(raw ?? "").toLowerCase();
+  const type = String(purchaseType ?? "").toLowerCase();
+  const mode = String(paymentMode ?? "").toLowerCase();
+  if (v === "due" || type === "credit" || mode === "credit") return "Due";
   if (v === "cancelled" || v === "canceled") return "Cancelled";
   if (v === "draft") return "Draft";
   if (v === "pending" || v === "partial") return "Pending";
@@ -155,12 +177,16 @@ export default function PurchaseScreen() {
           const createdBy = p.createdBy as
             | { m_staff_name?: string | null }
             | undefined;
-          const statusRaw = String(p.status ?? "");
+          const statusRaw = displayPaymentStatus({
+            status: p.status,
+            purchaseType: p.purchaseType,
+            paymentMode: p.paymentMode,
+          });
           return {
             id: i + 1,
             _id: String(p._id),
             amount: Number(p.amount ?? 0),
-            status: statusForTab(p.status),
+            status: statusForTab(p.status, p.purchaseType, p.paymentMode),
             statusRaw,
             bill: String(p.invoiceNumber ?? `PUR-${i + 1}`),
             owner: String(createdBy?.m_staff_name ?? ""),
@@ -168,7 +194,24 @@ export default function PurchaseScreen() {
             phone: String(
               p.vendorPhone ?? p.supplierPhone ?? p.customerPhone ?? "",
             ),
-            mode: String(p.paymentMode ?? "—"),
+            mode: displayPaymentMode({
+              status: p.status,
+              purchaseType: p.purchaseType,
+              paymentMode: p.paymentMode,
+            }),
+            purchaseType: displayPurchaseType({
+              status: p.status,
+              purchaseType: p.purchaseType,
+              paymentMode: p.paymentMode,
+            }),
+            ...resolvePaidDueAmounts({
+              amount: p.amount,
+              paidAmount: p.paidAmount,
+              dueAmount: p.dueAmount,
+              status: p.status,
+              purchaseType: p.purchaseType,
+              paymentMode: p.paymentMode,
+            }),
             date: formatDate(
               (p.invoiceDate as string | undefined) ??
                 (p.createdAt as string | undefined),
@@ -323,7 +366,9 @@ export default function PurchaseScreen() {
           const value = row.original.statusRaw || row.original.status;
           const v = String(value).toLowerCase();
           const badgeClass =
-            v === "pending" || v === "partial"
+            v === "due" || v === "credit"
+              ? "bg-amber-100 text-amber-800"
+              : v === "pending" || v === "partial"
               ? "bg-yellow-100 text-yellow-700"
               : v === "paid" || v === "completed"
                 ? "bg-green-100 text-green-700"
@@ -336,7 +381,7 @@ export default function PurchaseScreen() {
             <span
               className={`px-2.5 py-1 text-xs font-semibold rounded-md ${badgeClass}`}
             >
-              {String(value || "—").toLowerCase()}
+              {String(value || "—")}
             </span>
           );
         },
@@ -344,7 +389,7 @@ export default function PurchaseScreen() {
       },
       {
         accessorKey: "mode",
-        header: "Mode",
+        header: "Payment Mode",
         Cell: ({ row }: { row: { original: PurchaseListRow } }) => {
           const value = row.original.mode;
           const modeStyles: Record<string, string> = {
@@ -352,6 +397,9 @@ export default function PurchaseScreen() {
             CARD: "bg-sky-100 text-sky-700",
             CASH: "bg-green-100 text-green-700",
             BANK: "bg-purple-100 text-purple-700",
+            PAID: "bg-green-100 text-green-700",
+            DUE: "bg-amber-100 text-amber-800",
+            CREDIT: "bg-amber-100 text-amber-800",
           };
           const key = String(value ?? "").toUpperCase();
           const className =
@@ -364,7 +412,60 @@ export default function PurchaseScreen() {
             </span>
           );
         },
-        size: 100,
+        size: 120,
+      },
+      {
+        accessorKey: "purchaseType",
+        header: "Purchase Type",
+        Cell: ({ row }: { row: { original: PurchaseListRow } }) => {
+          const value = row.original.purchaseType;
+          const isCredit = String(value).toLowerCase() === "credit";
+          return (
+            <span
+              className={`px-2.5 py-1 text-xs font-semibold rounded-md ${
+                isCredit
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-emerald-100 text-emerald-800"
+              }`}
+            >
+              {value}
+            </span>
+          );
+        },
+        size: 120,
+      },
+      {
+        accessorKey: "paidAmount",
+        header: "Paid Amount",
+        Cell: ({ row }: { row: { original: PurchaseListRow } }) => (
+          <span className="tabular-nums text-slate-700">
+            ₹{" "}
+            {Number(row.original.paidAmount || 0).toLocaleString("en-IN", {
+              minimumFractionDigits: 2,
+            })}
+          </span>
+        ),
+        size: 120,
+      },
+      {
+        accessorKey: "dueAmount",
+        header: "Due Amount",
+        Cell: ({ row }: { row: { original: PurchaseListRow } }) => {
+          const due = Number(row.original.dueAmount || 0);
+          return (
+            <span
+              className={`tabular-nums font-medium ${
+                due > 0 ? "text-amber-700" : "text-slate-700"
+              }`}
+            >
+              ₹{" "}
+              {due.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+              })}
+            </span>
+          );
+        },
+        size: 120,
       },
       {
         accessorKey: "bill",

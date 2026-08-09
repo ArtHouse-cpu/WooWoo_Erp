@@ -90,6 +90,12 @@ export default function CreatePurchaseScreen({
   const [manualDiscount, setManualDiscount] = useState(0);
   const [manualDiscountType, setManualDiscountType] =
     useState<ManualDiscountType>("flat");
+  const [savedPaymentInfo, setSavedPaymentInfo] = useState<{
+    purchaseType?: string;
+    status?: string;
+    paidAmount?: number;
+    dueAmount?: number;
+  } | null>(null);
 
   useEffect(() => {
     const applyPurchase = (purchase: any, nextMode: Mode) => {
@@ -129,6 +135,12 @@ export default function CreatePurchaseScreen({
       setManualDiscountType(
         purchase.manualDiscountType === "percentage" ? "percentage" : "flat",
       );
+      setSavedPaymentInfo({
+        purchaseType: purchase.purchaseType,
+        status: purchase.status,
+        paidAmount: Number(purchase.paidAmount ?? 0),
+        dueAmount: Number(purchase.dueAmount ?? 0),
+      });
       if (Array.isArray(purchase.items)) {
         setItems(
           purchase.items.map((item: any, idx: number) => ({
@@ -316,10 +328,13 @@ export default function CreatePurchaseScreen({
   };
 
   const handleSave = async (
-    status: "draft" | "pending" | "paid" | "partial" = "paid",
+    status: "draft" | "pending" | "paid" | "partial" | "due" = "paid",
     payment?: {
       mode: string;
       paymentStatus: "full" | "partial";
+      purchaseType?: "cash" | "credit";
+      paidAmount?: number;
+      dueAmount?: number;
       invoiceBy?: {
         staffId?: string;
         staffName?: string;
@@ -332,6 +347,9 @@ export default function CreatePurchaseScreen({
       setSaving(true);
       const pinBillBy = String(payment?.invoiceBy?.staffName ?? "").trim();
       if (pinBillBy) setBillBy(pinBillBy);
+      const isCredit =
+        payment?.purchaseType === "credit" ||
+        String(payment?.mode || "").toUpperCase() === "CREDIT";
       const payload: PurchasePayload = {
         invoiceNumber: purchaseNumber,
         invoiceDate: purchaseDate,
@@ -352,8 +370,15 @@ export default function CreatePurchaseScreen({
         amount: grandTotal,
         manualDiscount: safeManualDiscount,
         manualDiscountType,
-        status,
-        paymentMode: payment?.mode
+        purchaseType: isCredit ? "credit" : "cash",
+        status: isCredit ? "due" : status,
+        paidAmount: isCredit ? 0 : Number(payment?.paidAmount ?? (status === "paid" ? grandTotal : 0)),
+        dueAmount: isCredit
+          ? grandTotal
+          : Number(payment?.dueAmount ?? (status === "paid" ? 0 : grandTotal)),
+        paymentMode: isCredit
+          ? "Credit"
+          : payment?.mode
           ? (payment.mode.toUpperCase() === "UPI"
               ? "UPI"
               : payment.mode.toUpperCase() === "MULTI"
@@ -537,6 +562,25 @@ export default function CreatePurchaseScreen({
                   }
                 : () => {}
             }
+            onCredit={
+              mode !== "view"
+                ? () => {
+                    if (!validateBeforeCheckout()) return;
+                    void handleSave("due", {
+                      mode: "Credit",
+                      paymentStatus: "partial",
+                      purchaseType: "credit",
+                      paidAmount: 0,
+                      dueAmount: grandTotal,
+                    });
+                  }
+                : undefined
+            }
+            paymentInfo={
+              mode === "view" || mode === "edit"
+                ? savedPaymentInfo ?? undefined
+                : undefined
+            }
             isSaving={saving}
           />
         </div>
@@ -544,6 +588,7 @@ export default function CreatePurchaseScreen({
       {mode !== "view" && (
         <CheckoutModal
           open={openCheckout}
+          checkoutContext="purchase"
           grandTotal={grandTotal}
           items={items.map((item) => ({
             id: item.id,
@@ -558,7 +603,17 @@ export default function CreatePurchaseScreen({
           onClose={() => setOpenCheckout(false)}
           onConfirmPayment={async (payment) => {
             setOpenCheckout(false);
-            await handleSave(payment.paymentStatus === "full" ? "paid" : "partial", payment);
+            const isCredit =
+              payment.purchaseType === "credit" ||
+              String(payment.mode || "").toUpperCase() === "CREDIT";
+            await handleSave(
+              isCredit
+                ? "due"
+                : payment.paymentStatus === "full"
+                  ? "paid"
+                  : "partial",
+              payment,
+            );
           }}
         />
       )}

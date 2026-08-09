@@ -227,10 +227,10 @@ export const createProduct = async (req, res) => {
     const itemType = type === "service" ? "service" : "product";
     const resolvedName = itemType === "service" ? serviceName || productName : productName;
 
-    if (!resolvedName || sellingPrice === undefined) {
+    if (!resolvedName) {
       return res.status(400).json({
         success: false,
-        message: "Name and selling price are required.",
+        message: "Name is required.",
       });
     }
 
@@ -247,7 +247,56 @@ export const createProduct = async (req, res) => {
       });
     }
 
-    const parsedSellingPrice = Number(sellingPrice);
+    let parsedVariants = [];
+    if (variants) {
+      try {
+        const raw =
+          typeof variants === 'string' ? JSON.parse(variants) : variants;
+        parsedVariants = Array.isArray(raw)
+          ? raw
+              .map((v) => ({
+                name: String(v?.name ?? '').trim(),
+                sellingPrice: Math.max(0, Number(v?.sellingPrice) || 0),
+                purchasePrice: Math.max(0, Number(v?.purchasePrice) || 0),
+                barcode: String(v?.barcode ?? v?.barCode ?? '').trim(),
+              }))
+              .filter((v) => v.name)
+          : [];
+      } catch {
+        parsedVariants = [];
+      }
+    }
+
+    // Variant prices are source of truth; parent price optional when variants exist
+    let parsedSellingPrice = Number(sellingPrice);
+    let parsedPurchasePrice = purchasePrice ? Number(purchasePrice) : 0;
+    if (!Number.isFinite(parsedSellingPrice)) parsedSellingPrice = 0;
+    if (!Number.isFinite(parsedPurchasePrice)) parsedPurchasePrice = 0;
+
+    if (itemType === 'product' && parsedVariants.length > 0) {
+      const invalidVariant = parsedVariants.find((v) => !(v.sellingPrice > 0));
+      if (invalidVariant) {
+        return res.status(400).json({
+          success: false,
+          message: `Variant "${invalidVariant.name}" needs a selling price greater than 0.`,
+        });
+      }
+      if (!(parsedSellingPrice > 0)) {
+        parsedSellingPrice = parsedVariants[0].sellingPrice;
+      }
+      if (!(parsedPurchasePrice > 0)) {
+        parsedPurchasePrice = parsedVariants[0].purchasePrice;
+      }
+    } else if (!(parsedSellingPrice > 0)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          itemType === 'product'
+            ? 'Selling price is required, or add variants with their own prices.'
+            : 'Selling price is required.',
+      });
+    }
+
     const parsedDiscountValue = Number(discountValue || 0);
     if (discountType === "flat" && parsedDiscountValue > parsedSellingPrice) {
       return res.status(400).json({
@@ -260,15 +309,6 @@ export const createProduct = async (req, res) => {
         success: false,
         message: "Percentage discount cannot exceed 100.",
       });
-    }
-
-    let parsedVariants = [];
-    if (variants) {
-      try {
-        parsedVariants = JSON.parse(variants);
-      } catch {
-        parsedVariants = [];
-      }
     }
 
     let imageUrls = [];
@@ -312,7 +352,7 @@ export const createProduct = async (req, res) => {
       brandName: brandName || "",
       serviceName: itemType === "service" ? resolvedName : "",
       sellingPrice: parsedSellingPrice,
-      purchasePrice: purchasePrice ? Number(purchasePrice) : 0,
+      purchasePrice: parsedPurchasePrice,
       itemCode,
       barCode,
       category,
@@ -1180,11 +1220,36 @@ export const updateProduct = async (req, res) => {
       existingProduct.variants = [];
     } else {
       // Keep stored stockQty as-is; live inventory is computed from purchases/invoices
-      if (variants) {
+      if (variants !== undefined) {
         try {
-          existingProduct.variants = JSON.parse(variants);
+          const raw =
+            typeof variants === 'string' ? JSON.parse(variants) : variants;
+          const normalized = Array.isArray(raw)
+            ? raw
+                .map((v) => ({
+                  name: String(v?.name ?? '').trim(),
+                  sellingPrice: Math.max(0, Number(v?.sellingPrice) || 0),
+                  purchasePrice: Math.max(0, Number(v?.purchasePrice) || 0),
+                  barcode: String(v?.barcode ?? v?.barCode ?? '').trim(),
+                }))
+                .filter((v) => v.name)
+            : [];
+          // Preserve each variant's own prices — never overwrite with parent price
+          existingProduct.variants = normalized;
+          if (
+            normalized.length > 0 &&
+            !(Number(existingProduct.sellingPrice) > 0)
+          ) {
+            existingProduct.sellingPrice = normalized[0].sellingPrice;
+          }
+          if (
+            normalized.length > 0 &&
+            !(Number(existingProduct.purchasePrice) > 0)
+          ) {
+            existingProduct.purchasePrice = normalized[0].purchasePrice;
+          }
         } catch {
-          existingProduct.variants = existingProduct.variants;
+          // keep existing variants on parse failure
         }
       }
     }

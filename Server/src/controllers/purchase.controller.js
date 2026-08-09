@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import { resolvePurchasePaymentFields } from '../utils/purchasePayment.utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,6 +46,9 @@ export const createPurchase = async (req, res) => {
       amount,
       paymentMode,
       status,
+      purchaseType,
+      paidAmount,
+      dueAmount,
       items,
       notes,
       purchaser,
@@ -94,6 +98,15 @@ export const createPurchase = async (req, res) => {
         })
       : [];
     const purchasePrefix="PURCHASE: ";
+    const amountNum = Number(amount ?? 0);
+    const paymentFields = resolvePurchasePaymentFields({
+      amount: amountNum,
+      paymentMode,
+      status,
+      purchaseType,
+      paidAmount,
+      dueAmount,
+    });
    const purchase = await Purchase.create({
   invoiceNumber: purchasePrefix + String(invoiceNumber).trim(),
 
@@ -103,7 +116,7 @@ export const createPurchase = async (req, res) => {
 
   vendorDate: vendorDate ? new Date(vendorDate) : null,
 
-  amount: Number(amount ?? 0),
+  amount: amountNum,
 
   manualDiscount: Math.max(0, Number(manualDiscount ?? 0) || 0),
 
@@ -112,9 +125,15 @@ export const createPurchase = async (req, res) => {
       ? "percentage"
       : "flat",
 
-  paymentMode: String(paymentMode ?? "Cash"),
+  purchaseType: paymentFields.purchaseType,
 
-  status: String(status ?? "pending"),
+  paymentMode: paymentFields.paymentMode,
+
+  status: paymentFields.status,
+
+  paidAmount: paymentFields.paidAmount,
+
+  dueAmount: paymentFields.dueAmount,
 
   items: normalizedItems,
 
@@ -259,26 +278,47 @@ export const updatePurchase = async (req, res) => {
           ? "percentage"
           : "flat";
     }
-    if (body.status !== undefined && String(body.status).trim()) {
-      $set.status = String(body.status).trim().toLowerCase();
-    }
-    if (body.paymentMode !== undefined && String(body.paymentMode).trim()) {
-      const raw = String(body.paymentMode).trim();
-      const allowed = ["Cash", "UPI", "Card", "Bank", "Credit", "Other"];
-      if (raw.toUpperCase() === "UPI") {
-        $set.paymentMode = "UPI";
-      } else {
-        const hit = allowed.find(
-          (m) => m.toLowerCase() === raw.toLowerCase(),
-        );
-        if (!hit) {
-          return res.status(400).json({
-            success: false,
-            message: `Invalid payment mode: ${raw}`,
-          });
-        }
-        $set.paymentMode = hit;
+    if (
+      body.status !== undefined ||
+      body.paymentMode !== undefined ||
+      body.purchaseType !== undefined ||
+      body.paidAmount !== undefined ||
+      body.dueAmount !== undefined
+    ) {
+      const existing = await Purchase.findById(id).select(
+        "amount paymentMode status purchaseType paidAmount dueAmount",
+      );
+      if (!existing) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Purchase not found." });
       }
+      const paymentFields = resolvePurchasePaymentFields({
+        amount:
+          body.amount !== undefined
+            ? Number(body.amount)
+            : Number(existing.amount),
+        paymentMode:
+          body.paymentMode !== undefined
+            ? body.paymentMode
+            : existing.paymentMode,
+        status: body.status !== undefined ? body.status : existing.status,
+        purchaseType:
+          body.purchaseType !== undefined
+            ? body.purchaseType
+            : existing.purchaseType,
+        paidAmount:
+          body.paidAmount !== undefined
+            ? body.paidAmount
+            : existing.paidAmount,
+        dueAmount:
+          body.dueAmount !== undefined ? body.dueAmount : existing.dueAmount,
+      });
+      $set.purchaseType = paymentFields.purchaseType;
+      $set.paymentMode = paymentFields.paymentMode;
+      $set.status = paymentFields.status;
+      $set.paidAmount = paymentFields.paidAmount;
+      $set.dueAmount = paymentFields.dueAmount;
     }
     if (body.notes !== undefined) $set.notes = String(body.notes ?? "").trim();
     if (body.purchaser !== undefined) {

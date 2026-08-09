@@ -64,9 +64,15 @@ type Props = {
   disableCashback?: boolean;
   extraCharges?: Array<{ label: string; amount: number }>;
   membershipPlans?: MembershipPlanPayload[];
+  /**
+   * "purchase" adjusts confirm labels and sets purchaseType cash|credit.
+   * Full / Partial / Due toggle is always shown; Due = full amount outstanding.
+   */
+  checkoutContext?: "sale" | "purchase";
   onConfirmPayment?: (payload: {
     mode: string;
     paymentStatus: "full" | "partial";
+    purchaseType?: "cash" | "credit";
     paymentBreakdown: {
       cash: number;
       upi: number;
@@ -345,13 +351,17 @@ export default function CheckoutModal({
   disableCashback = false,
   extraCharges = [],
   membershipPlans = DEFAULT_MEMBERSHIP_PLANS,
+  checkoutContext = "sale",
   onConfirmPayment,
 }: Props) {
+  const isPurchaseCheckout = checkoutContext === "purchase";
   const [paymentMode, setPaymentMode] = useState("Cash");
   const [cashGiven, setCashGiven] = useState(0);
-  const [paymentStatus, setPaymentStatus] = useState<"full" | "partial">(
-    "full",
-  );
+  const [paymentStatus, setPaymentStatus] = useState<
+    "full" | "partial" | "due"
+  >("full");
+  /** Due = full amount outstanding (not paid). Same idea as credit purchase. */
+  const isDuePayment = paymentStatus === "due";
   const [isMultiMode, setIsMultiMode] = useState(false);
   const [splitPayments, setSplitPayments] = useState({
     cash: 0,
@@ -975,7 +985,20 @@ export default function CheckoutModal({
   );
 
   useEffect(() => {
+    if (!open) return;
+    setPaymentStatus("full");
+    setIsMultiMode(false);
+  }, [open]);
+
+  useEffect(() => {
     const payable = Math.max(0, payableBase - couponDiscount - referralDiscount);
+
+    if (paymentStatus === "due") {
+      setCashGiven(0);
+      setIsMultiMode(false);
+      setSplitPayments({ cash: 0, upi: 0, card: 0, wallet: 0 });
+      return;
+    }
 
     if (paymentStatus === "full") {
       if (isMultiMode) {
@@ -1136,14 +1159,20 @@ export default function CheckoutModal({
     payableBase - couponDiscount - referralDiscount,
   );
   const isPartialPayment = paymentStatus === "partial";
-  const totalPaid = isMultiMode
-    ? splitPayments.cash +
-      splitPayments.upi +
-      splitPayments.card +
-      splitPayments.wallet
-    : cashGiven;
-  const change = Math.max(0, totalPaid - finalPayable);
-  const dueAmount = Math.max(0, finalPayable - totalPaid);
+  const totalPaid = isDuePayment
+    ? 0
+    : isMultiMode
+      ? splitPayments.cash +
+        splitPayments.upi +
+        splitPayments.card +
+        splitPayments.wallet
+      : cashGiven;
+  const change = isDuePayment
+    ? 0
+    : Math.max(0, totalPaid - finalPayable);
+  const dueAmount = isDuePayment
+    ? finalPayable
+    : Math.max(0, finalPayable - totalPaid);
   const remainingForFull = Math.max(0, finalPayable - totalPaid);
 
 
@@ -1248,7 +1277,7 @@ export default function CheckoutModal({
         return;
       }
     }
-    if (paymentStatus === "full" && dueAmount > 0) {
+    if (!isDuePayment && paymentStatus === "full" && dueAmount > 0) {
       Swal.fire(
         "Payment incomplete",
         "For fully paid bill, due amount must be 0.",
@@ -1273,16 +1302,54 @@ export default function CheckoutModal({
     }
 
     const today = new Date().toISOString().split("T")[0];
-    const normalizedMode = isMultiMode ? "MULTI" : paymentMode.toUpperCase();
+    const normalizedMode = isDuePayment
+      ? "CREDIT"
+      : isMultiMode
+        ? "MULTI"
+        : paymentMode.toUpperCase();
     const paymentPayload = {
       mode: normalizedMode,
-      paymentStatus,
+      paymentStatus: isDuePayment
+        ? ("partial" as const)
+        : paymentStatus === "partial"
+          ? ("partial" as const)
+          : ("full" as const),
+      purchaseType: isPurchaseCheckout
+        ? isDuePayment
+          ? ("credit" as const)
+          : ("cash" as const)
+        : isDuePayment
+          ? ("credit" as const)
+          : undefined,
       paymentBreakdown: {
-        cash: isMultiMode ? splitPayments.cash : paymentMode === "Cash" ? cashGiven : 0,
-        upi: isMultiMode ? splitPayments.upi : paymentMode === "UPI" ? cashGiven : 0,
-        card: isMultiMode ? splitPayments.card : paymentMode === "Card" ? cashGiven : 0,
-        wallet:
-          isMultiMode ? splitPayments.wallet : paymentMode === "Wallet" ? cashGiven : 0,
+        cash: isDuePayment
+          ? 0
+          : isMultiMode
+            ? splitPayments.cash
+            : paymentMode === "Cash"
+              ? cashGiven
+              : 0,
+        upi: isDuePayment
+          ? 0
+          : isMultiMode
+            ? splitPayments.upi
+            : paymentMode === "UPI"
+              ? cashGiven
+              : 0,
+        card: isDuePayment
+          ? 0
+          : isMultiMode
+            ? splitPayments.card
+            : paymentMode === "Card"
+              ? cashGiven
+              : 0,
+        wallet: isDuePayment
+          ? 0
+          : isMultiMode
+            ? splitPayments.wallet
+            : paymentMode === "Wallet"
+              ? cashGiven
+              : 0,
         paidAmount: totalPaid,
         dueAmount,
         changeAmount: change,
@@ -1872,13 +1939,19 @@ export default function CheckoutModal({
                 title="Payment" 
                 icon={Banknote}
                 headerAction={
-                  <div className="flex items-center gap-2">
-                    <div className="flex rounded-lg bg-slate-100 p-1">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <div
+                      className="flex shrink-0 rounded-lg bg-slate-100 p-1"
+                      role="group"
+                      aria-label="Payment status"
+                    >
                       <button
                         type="button"
                         onClick={() => setPaymentStatus("full")}
                         className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                          paymentStatus === "full" ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"
+                          paymentStatus === "full"
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-400 hover:text-slate-600"
                         }`}
                       >
                         Full
@@ -1887,25 +1960,49 @@ export default function CheckoutModal({
                         type="button"
                         onClick={() => setPaymentStatus("partial")}
                         className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                          paymentStatus === "partial" ? "bg-white text-slate-900 shadow-sm" : "text-slate-400"
+                          paymentStatus === "partial"
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-400 hover:text-slate-600"
                         }`}
                       >
                         Partial
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentStatus("due")}
+                        className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                          paymentStatus === "due"
+                            ? "bg-amber-500 text-white shadow-sm"
+                            : "text-slate-400 hover:text-amber-700"
+                        }`}
+                        title="Due / Credit — full amount stays outstanding"
+                      >
+                        Due
+                      </button>
                     </div>
-                    <label className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isMultiMode}
-                        onChange={(e) => setIsMultiMode(e.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300 text-indigo-600"
-                      />
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Split</span>
-                    </label>
+                    {!isDuePayment ? (
+                      <label className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isMultiMode}
+                          onChange={(e) => setIsMultiMode(e.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+                        />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Split</span>
+                      </label>
+                    ) : null}
                   </div>
                 }
               >
-                {!isMultiMode ? (
+                {isDuePayment ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p className="font-semibold">Due — full amount outstanding</p>
+                    <p className="mt-1 text-xs text-amber-800/90">
+                      Due amount: {formatInr(finalPayable)}. Paid amount:{" "}
+                      {formatInr(0)}. Nothing is marked as paid; settle later.
+                    </p>
+                  </div>
+                ) : !isMultiMode ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       {PAYMENT_METHOD_OPTIONS.map(({ value, label, Icon }) => (
@@ -2057,7 +2154,17 @@ export default function CheckoutModal({
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : null}
-            <span>{saving ? "Saving..." : "Complete"}</span>
+            <span>
+              {saving
+                ? "Saving..."
+                : isDuePayment
+                  ? isPurchaseCheckout
+                    ? "Save Due / Credit Purchase"
+                    : "Complete as Due"
+                  : isPurchaseCheckout
+                    ? "Complete Cash Purchase"
+                    : "Complete"}
+            </span>
           </button>
         </footer>
       </div>

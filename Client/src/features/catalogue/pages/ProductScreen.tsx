@@ -754,6 +754,30 @@ export default function ProductScreen() {
                               : editProduct.cspEnrollmentId,
                           )
                         : "",
+                      // Keep each variant's own prices (do not inherit parent)
+                      variants: Array.isArray(editProduct.variants)
+                        ? editProduct.variants.map((v: any) =>
+                            typeof v === "string"
+                              ? {
+                                  name: v,
+                                  sellingPrice: Number(
+                                    editProduct.sellingPrice || 0,
+                                  ),
+                                  purchasePrice: Number(
+                                    editProduct.purchasePrice || 0,
+                                  ),
+                                  barcode: "",
+                                }
+                              : {
+                                  name: String(v?.name ?? "").trim(),
+                                  sellingPrice: Number(v?.sellingPrice ?? 0),
+                                  purchasePrice: Number(v?.purchasePrice ?? 0),
+                                  barcode: String(
+                                    v?.barcode ?? v?.barCode ?? "",
+                                  ).trim(),
+                                },
+                          )
+                        : [],
                       images: [],
                     }
                   : undefined

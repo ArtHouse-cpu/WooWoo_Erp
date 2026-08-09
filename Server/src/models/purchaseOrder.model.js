@@ -93,6 +93,13 @@ const purchaseOrderSchema = new mongoose.Schema(
       default: "flat",
     },
 
+    purchaseType: {
+      type: String,
+      enum: ["cash", "credit"],
+      default: "cash",
+      index: true,
+    },
+
     paymentMode: {
       type: String,
       enum: ["Cash", "UPI", "Card", "Bank", "Credit", "Other"],
@@ -101,8 +108,20 @@ const purchaseOrderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["draft", "pending", "paid", "partial", "cancelled"],
+      enum: ["draft", "pending", "paid", "partial", "cancelled", "due"],
       default: "pending",
+    },
+
+    paidAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    dueAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     items: {
