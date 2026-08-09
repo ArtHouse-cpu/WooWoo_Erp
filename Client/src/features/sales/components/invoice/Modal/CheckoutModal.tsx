@@ -752,7 +752,7 @@ export default function CheckoutModal({
         );
       } else {
         clearReferralDiscount();
-        Swal.fire(
+        console.error(
           "Referral not applied",
           err?.response?.data?.message ?? "Could not apply referral code.",
           "info",
@@ -845,7 +845,7 @@ export default function CheckoutModal({
       const err = error as { response?: { data?: { message?: string } } };
       const message = err?.response?.data?.message;
       if (message) {
-        void Swal.fire({
+        void console.error({
           icon: "info",
           title: "Referral not applied",
           text: message,

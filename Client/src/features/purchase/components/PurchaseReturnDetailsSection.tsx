@@ -17,6 +17,8 @@ type Props = {
   dueDate?: string;
   dueDateMin?: string;
   salesPerson: string;
+  /** PIN-verified billed-by staff (invoiceBy) */
+  billBy?: string;
   dateLabel?: string;
   selectorLabel?: string;
   createLabel?: string;
@@ -46,6 +48,7 @@ export default function PurchaseReturnDetailSection({
   dueDate,
   dueDateMin,
   salesPerson,
+  billBy,
   dateLabel,
   selectorLabel,
   createLabel,
@@ -155,7 +158,17 @@ export default function PurchaseReturnDetailSection({
           />
         </div>
       )}
-      <div className={showDueDate ? "lg:col-span-4" : "lg:col-span-6"}>
+      <div
+        className={
+          billBy !== undefined
+            ? showDueDate
+              ? "lg:col-span-2"
+              : "lg:col-span-3"
+            : showDueDate
+              ? "lg:col-span-4"
+              : "lg:col-span-6"
+        }
+      >
         <label className="mb-1 block text-xs font-semibold text-gray-600">Created By</label>
         <input
           value={salesPerson}
@@ -164,6 +177,20 @@ export default function PurchaseReturnDetailSection({
           className={`${inputStyle} cursor-not-allowed bg-gray-100 text-gray-500`}
         />
       </div>
+      {billBy !== undefined && (
+        <div className={showDueDate ? "lg:col-span-2" : "lg:col-span-3"}>
+          <label className="mb-1 block text-xs font-semibold text-gray-600">
+            Billed By
+          </label>
+          <input
+            value={billBy || "—"}
+            readOnly
+            disabled
+            className={`${inputStyle} cursor-not-allowed bg-gray-100 text-gray-500`}
+            title="Staff verified via billing PIN at checkout (invoiceBy)"
+          />
+        </div>
+      )}
     </div>
   );
 }

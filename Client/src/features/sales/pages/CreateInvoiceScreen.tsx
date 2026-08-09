@@ -23,6 +23,10 @@ import CreateCustomerModal from "@/features/network/components/CreateCustomerMod
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import DocumentFormModal from "@/components/DocumentFormModal";
 import {
+  resolveBilledBy,
+  resolveCreatedByName,
+} from "../utils/resolveBilledBy";
+import {
   calcStackedLineBenefits,
   membershipBenefitsForLine,
   resolveMembershipPlan,
@@ -74,6 +78,10 @@ export default function CreateInvoiceScreen({
   const staff = useAppSelector((state) => state.user);
   const staffName = useAppSelector((state) => state.user.m_staff_name);
   const salesPerson = staffName ?? "Not Assigned";
+  /** Document creator (Created By) — may differ from PIN billed-by. */
+  const [createdByDisplay, setCreatedByDisplay] = useState(salesPerson);
+  /** PIN-verified staff from invoiceBy */
+  const [billBy, setBillBy] = useState("");
   const [notes, setNotes] = useState("");
   const [extraCharges, setExtraCharges] = useState<Array<{ label: string; amount: number }>>([]);
   const [openCheckout, setOpenCheckout] = useState(false);
@@ -127,6 +135,11 @@ export default function CreateInvoiceScreen({
         setDueDate(new Date(inv.dueDate).toISOString().split("T")[0]);
       }
       setNotes(inv.notes || "");
+      setCreatedByDisplay(resolveCreatedByName(inv, salesPerson));
+      // Prefer invoiceBy (PIN); fall back to salesPersonName (backend also stores PIN there)
+      setBillBy(
+        resolveBilledBy(inv) || String(inv.salesPersonName ?? "").trim(),
+      );
       if (Array.isArray(inv.items)) {
         setItems(
           inv.items.map((item: any, idx: number) => ({
@@ -804,7 +817,14 @@ export default function CreateInvoiceScreen({
             invoiceDate={invoiceDate}
             dueDate={dueDate}
             dueDateMin={today}
-            salesPerson={salesPerson}
+            salesPerson={
+              mode === "view" || mode === "edit" ? createdByDisplay : salesPerson
+            }
+            billBy={
+              mode === "view" || mode === "edit"
+                ? billBy || "—"
+                : undefined
+            }
             readOnly={mode === "view"}
             onCustomerChange={(value) => {
               setCustomer(value);

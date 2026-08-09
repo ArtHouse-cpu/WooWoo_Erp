@@ -1081,7 +1081,7 @@ export default function FoodBill() {
           showConfirmButton: false,
         });
       } else {
-        Swal.fire(
+        console.error(
           "Referral not applied",
           "Could not apply this referral code.",
           "info",

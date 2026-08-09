@@ -33,7 +33,7 @@ type Props = {
   showDueDate?: boolean;
   /** View mode: show locked invoice customer only (no search / create). */
   readOnly?: boolean;
-  /** PIN-verified billing staff (Bill By). Shown when provided. */
+  /** PIN-verified billing staff (Billed By / invoiceBy). Shown when provided. */
   billBy?: string;
   onCustomerChange: (value: string) => void;
   onPickCustomer: (customer: CustomerOption) => void;
@@ -256,14 +256,14 @@ export default function InvoiceDetailsSection({
       {billBy !== undefined && (
         <div className={showDueDate ? "lg:col-span-2" : "lg:col-span-3"}>
           <label className="mb-1 block text-xs font-semibold text-gray-600">
-            Bill By
+            Billed By
           </label>
           <input
             value={billBy || "—"}
             readOnly
             disabled
             className={`${inputStyle} cursor-not-allowed bg-gray-100 text-gray-500`}
-            title="Staff verified via billing PIN at checkout"
+            title="Staff verified via billing PIN at checkout (invoiceBy)"
           />
         </div>
       )}

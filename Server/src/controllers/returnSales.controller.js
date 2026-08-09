@@ -60,6 +60,13 @@ export const createReturnSale = async (req, res) => {
       invoiceDate: parsed.data.invoiceDate,
       dueDate: parsed.data.dueDate,
       salesPersonName: parsed.data.salesPersonName,
+      billBy: parsed.data.billBy || '',
+      invoiceBy: parsed.data.invoiceBy || {
+        staffId: null,
+        staffName: '',
+        employeeId: '',
+        email: '',
+      },
       notes: parsed.data.notes,
       status: parsed.data.status,
       items: parsed.data.items,

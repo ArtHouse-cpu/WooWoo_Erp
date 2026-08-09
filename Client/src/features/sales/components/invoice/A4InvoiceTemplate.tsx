@@ -283,7 +283,20 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
     }
   }
 
-  const salesPerson = invoice.salesPersonName || "—";
+  const createdByName =
+    String(invoice.createdBy?.m_staff_name ?? "").trim() || "—";
+  const billedByName =
+    String(
+      invoice.invoiceBy?.staffName ??
+        invoice.invoiceBy?.name ??
+        invoice.invoiceBy?.m_staff_name ??
+        invoice.billBy ??
+        invoice.billedBy ??
+        "",
+    ).trim() ||
+    String(invoice.salesPersonName ?? "").trim() ||
+    "—";
+  const salesPerson = createdByName !== "—" ? createdByName : billedByName;
 
   const showBillPeriod =
     invoice.billPeriodStart &&
@@ -423,7 +436,8 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
           <RowKV label="Bill Number" value={String(billNumber)} />
           <RowKV label="Due Date" value={dueDate} />
           <RowKV label="Payment Mode" value={paymentModeDisplay} />
-          <RowKV label="Sales Person" value={salesPerson} />
+          <RowKV label="Created By" value={salesPerson} />
+          <RowKV label="Billed By" value={billedByName} />
         </div>
       </div>
 

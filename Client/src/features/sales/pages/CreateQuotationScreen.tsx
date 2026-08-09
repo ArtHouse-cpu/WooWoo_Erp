@@ -62,6 +62,8 @@ export default function CreateQuotationScreen({
   const staff = useAppSelector((state) => state.user);
   const staffName = useAppSelector((state) => state.user.m_staff_name);
   const salesPerson = staffName ?? "Not Assigned";
+  const [createdByDisplay, setCreatedByDisplay] = useState(salesPerson);
+  const [billBy, setBillBy] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<
@@ -91,6 +93,15 @@ export default function CreateQuotationScreen({
       if (quot.quotationDate) setQuotationDate(new Date(quot.quotationDate).toISOString().split("T")[0]);
       if (quot.dueDate) setDueDate(new Date(quot.dueDate).toISOString().split("T")[0]);
       setNotes(quot.notes || "");
+      const creator = String(quot.createdBy?.m_staff_name ?? "").trim();
+      setCreatedByDisplay(creator || salesPerson);
+      const pinBilledBy = String(
+        quot.invoiceBy?.staffName ??
+          quot.invoiceBy?.name ??
+          quot.billBy ??
+          "",
+      ).trim();
+      setBillBy(pinBilledBy || String(quot.salesPersonName ?? "").trim());
       if (Array.isArray(quot.items)) {
         setItems(quot.items.map((item: any, idx: number) => ({
           id: idx + 1,
@@ -374,7 +385,12 @@ export default function CreateQuotationScreen({
         invoiceDate={quotationDate}
         dueDate={dueDate}
         dueDateMin={today}
-        salesPerson={salesPerson}
+        salesPerson={
+          mode === "view" || mode === "edit" ? createdByDisplay : salesPerson
+        }
+        billBy={
+          mode === "view" || mode === "edit" ? billBy || "—" : undefined
+        }
         readOnly={mode === "view"}
         onCustomerChange={(value) => {
           setCustomer(value);

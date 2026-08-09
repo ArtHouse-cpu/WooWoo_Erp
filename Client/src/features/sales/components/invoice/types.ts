@@ -62,6 +62,17 @@ export type InvoicePdfInput = {
   billPeriodStart?: string;
   billPeriodEnd?: string;
   salesPersonName?: string;
+  /** PIN-verified billed-by staff */
+  billBy?: string;
+  billedBy?: string;
+  invoiceBy?: {
+    staffName?: string;
+    name?: string;
+    m_staff_name?: string;
+  };
+  createdBy?: {
+    m_staff_name?: string | null;
+  };
   notes?: string;
   items?: InvoicePdfItem[];
   subTotal?: number;

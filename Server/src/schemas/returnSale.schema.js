@@ -20,6 +20,8 @@ export function validateReturnSaleCreateBody(body) {
     invoiceDate,
     dueDate,
     salesPersonName,
+    billBy,
+    invoiceBy,
     notes,
     items,
     subTotal,
@@ -103,6 +105,24 @@ export function validateReturnSaleCreateBody(body) {
   const allowedStatus = ['draft', 'final', 'cancelled'];
   const stNorm = allowedStatus.includes(status) ? status : 'final';
 
+  const rawInvoiceBy =
+    invoiceBy && typeof invoiceBy === 'object' ? invoiceBy : {};
+  const invoiceByStaffName = String(
+    rawInvoiceBy.staffName || rawInvoiceBy.name || '',
+  ).trim();
+  const resolvedBillBy = String(
+    billBy || invoiceByStaffName || '',
+  ).trim();
+  const rawStaffId = rawInvoiceBy.staffId || rawInvoiceBy._id || null;
+  const staffId =
+    rawStaffId &&
+    typeof rawStaffId === 'string' &&
+    /^[a-fA-F0-9]{24}$/.test(rawStaffId)
+      ? rawStaffId
+      : rawStaffId && typeof rawStaffId === 'object'
+        ? rawStaffId
+        : null;
+
   return {
     ok: true,
     data: {
@@ -110,7 +130,18 @@ export function validateReturnSaleCreateBody(body) {
       customerPhone: String(customerPhone).trim(),
       invoiceDate: invoiceDateObj,
       dueDate: dueDateObj,
-      salesPersonName: String(salesPersonName).trim(),
+      salesPersonName: String(
+        invoiceByStaffName || salesPersonName || '',
+      ).trim(),
+      billBy: resolvedBillBy,
+      invoiceBy: {
+        staffId,
+        staffName: invoiceByStaffName || resolvedBillBy,
+        employeeId: String(
+          rawInvoiceBy.employeeId || rawInvoiceBy.m_staff_id || '',
+        ).trim(),
+        email: String(rawInvoiceBy.email || '').trim(),
+      },
       notes: String(notes ?? '').trim(),
       items: normalizedItems,
       subTotal: st,
@@ -134,6 +165,8 @@ export function validateReturnSaleUpdateBody(body) {
     invoiceDate,
     dueDate,
     salesPersonName,
+    billBy,
+    invoiceBy,
     notes,
     items,
     subTotal,
@@ -156,6 +189,21 @@ export function validateReturnSaleUpdateBody(body) {
   if (salesPersonName !== undefined) {
     if (!String(salesPersonName).trim()) errors.push('Sales person cannot be empty.');
     else update.salesPersonName = String(salesPersonName).trim();
+  }
+  if (billBy !== undefined) {
+    update.billBy = String(billBy ?? '').trim();
+  }
+  if (invoiceBy !== undefined) {
+    const raw = invoiceBy && typeof invoiceBy === 'object' ? invoiceBy : {};
+    update.invoiceBy = {
+      staffId: raw.staffId || raw._id || null,
+      staffName: String(raw.staffName || raw.name || '').trim(),
+      employeeId: String(raw.employeeId || raw.m_staff_id || '').trim(),
+      email: String(raw.email || '').trim(),
+    };
+    if (!update.billBy && update.invoiceBy.staffName) {
+      update.billBy = update.invoiceBy.staffName;
+    }
   }
   if (notes !== undefined) update.notes = String(notes).trim();
 

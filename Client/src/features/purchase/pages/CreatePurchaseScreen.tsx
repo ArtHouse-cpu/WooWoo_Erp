@@ -485,7 +485,9 @@ export default function CreatePurchaseScreen({
           customerDropdownOpen={mode !== "view" && vendorDropdownOpen}
           invoiceDate={purchaseDate}
           salesPerson={createdByName || createdByDefault}
-          billBy={mode === "view" ? billBy || "—" : undefined}
+          billBy={
+            mode === "view" || mode === "edit" ? billBy || "—" : undefined
+          }
           dateLabel="Purchase Date"
           selectorLabel="Select Vendor"
           createLabel="Create Vendor"

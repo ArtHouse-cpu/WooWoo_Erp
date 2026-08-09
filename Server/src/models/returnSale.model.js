@@ -76,6 +76,38 @@ const returnSaleSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    /** PIN-verified billing staff display name */
+    billBy: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    /**
+     * Staff who verified the credit note / return via PIN.
+     * createdBy remains the authenticated session user.
+     */
+    invoiceBy: {
+      staffId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+      staffName: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      employeeId: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+      email: {
+        type: String,
+        default: '',
+        trim: true,
+      },
+    },
     notes: {
       type: String,
       default: '',

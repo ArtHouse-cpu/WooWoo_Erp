@@ -60,6 +60,8 @@ export default function CreatePurchaseReturnScreen({
   const [phone, setPhone] = useState("");
   const [returnDate, setReturnDate] = useState(today);
   const purchaser = useAppSelector((state) => state.user.m_staff_name) ?? "Not Assigned";
+  const [createdByDisplay, setCreatedByDisplay] = useState(purchaser);
+  const [billBy, setBillBy] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [openCheckout, setOpenCheckout] = useState(false);
@@ -97,6 +99,9 @@ export default function CreatePurchaseReturnScreen({
       items?: Line[];
       status?: string;
       purchaser?: string;
+      createdBy?: { m_staff_name?: string | null };
+      billBy?: string;
+      invoiceBy?: { staffName?: string; name?: string };
     };
 
     const applyDoc = (doc: Doc, nextMode: Mode) => {
@@ -109,6 +114,17 @@ export default function CreatePurchaseReturnScreen({
         setReturnDate(new Date(doc.invoiceDate).toISOString().split("T")[0]);
       }
       setNotes(String(doc.notes ?? ""));
+      const creator = String(
+        doc.createdBy?.m_staff_name ?? doc.purchaser ?? "",
+      ).trim();
+      setCreatedByDisplay(creator || purchaser);
+      const pinBilledBy = String(
+        doc.invoiceBy?.staffName ??
+          doc.invoiceBy?.name ??
+          doc.billBy ??
+          "",
+      ).trim();
+      setBillBy(pinBilledBy);
       if (Array.isArray(doc.items)) {
         setItems(
           doc.items.map((item, idx) => ({
@@ -436,7 +452,12 @@ export default function CreatePurchaseReturnScreen({
         customerDropdownOpen={mode !== "view" && vendorDropdownOpen}
         invoiceDate={returnDate}
         showDueDate={false}
-        salesPerson={purchaser}
+        salesPerson={
+          mode === "view" || mode === "edit" ? createdByDisplay : purchaser
+        }
+        billBy={
+          mode === "view" || mode === "edit" ? billBy || "—" : undefined
+        }
         onCustomerChange={(value) => {
           setVendor(value);
           setPhone("");

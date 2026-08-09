@@ -19,6 +19,10 @@ import CreateCustomerModal from "@/features/network/components/CreateCustomerMod
 import CreateSalesReturnHeader from "../components/invoice/CreateSalesReturnHeader";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import DocumentFormModal from "@/components/DocumentFormModal";
+import {
+  resolveBilledBy,
+  resolveCreatedByName,
+} from "../utils/resolveBilledBy";
 import { printThermalReceipt } from "@/utils/printUtils";
 
 
@@ -64,6 +68,8 @@ export default function CreateSalesReturnScreen({
   const staff = useAppSelector((state) => state.user);
   const staffName = useAppSelector((state) => state.user.m_staff_name);
   const salesPerson = staffName ?? "Not Assigned";
+  const [createdByDisplay, setCreatedByDisplay] = useState(salesPerson);
+  const [billBy, setBillBy] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [openCheckout, setOpenCheckout] = useState(false);
@@ -100,6 +106,14 @@ export default function CreateSalesReturnScreen({
       notes?: string;
       items?: Line[];
       originalInvoiceId?: string | null;
+      salesPersonName?: string;
+      billBy?: string;
+      billedBy?: string;
+      invoiceBy?: {
+        staffName?: string;
+        name?: string;
+      };
+      createdBy?: { m_staff_name?: string | null };
     };
 
     const applyDoc = (doc: Doc, nextMode: Mode, idField: "return" | "invoice") => {
@@ -116,6 +130,10 @@ export default function CreateSalesReturnScreen({
         setDueDate(new Date(doc.dueDate).toISOString().split("T")[0]);
       }
       setNotes(doc.notes || "");
+      setCreatedByDisplay(resolveCreatedByName(doc, salesPerson));
+      setBillBy(
+        resolveBilledBy(doc) || String(doc.salesPersonName ?? "").trim(),
+      );
       if (Array.isArray(doc.items)) {
         setItems(
           doc.items.map((item, idx) => ({
@@ -260,30 +278,54 @@ export default function CreateSalesReturnScreen({
   const grandTotal = subTotal - discountTotal;
 
 
-  const buildPayload = (status: "draft" | "final") => ({
-    customerName: customer.trim(),
-    customerPhone: phone.trim(),
-    invoiceDate,
-    dueDate,
-    salesPersonName: salesPerson,
-    notes: notes.trim(),
-    items: items.map((item) => ({
-      productName: item.productName,
-      qty: item.qty,
-      unitPrice: item.unitPrice,
-      discount: item.discount,
-    })),
-    subTotal,
-    discountTotal,
-    grandTotal,
-    status,
-    ...(originalInvoiceId ? { originalInvoiceId } : {}),
-    createdBy: {
-      m_staff_id: staff.m_staff_id,
-      m_staff_name: staff.m_staff_name,
-      m_staff_email: staff.m_staff_email,
+  const buildPayload = (
+    status: "draft" | "final",
+    payment?: {
+      invoiceBy?: {
+        staffId?: string;
+        staffName?: string;
+        employeeId?: string;
+        email?: string;
+      };
     },
-  });
+  ) => {
+    const pinName = String(payment?.invoiceBy?.staffName ?? "").trim();
+    return {
+      customerName: customer.trim(),
+      customerPhone: phone.trim(),
+      invoiceDate,
+      dueDate,
+      salesPersonName: pinName || salesPerson,
+      billBy: pinName || billBy || undefined,
+      invoiceBy: payment?.invoiceBy
+        ? {
+            staffId: payment.invoiceBy.staffId,
+            staffName: payment.invoiceBy.staffName,
+            employeeId: payment.invoiceBy.employeeId,
+            email: payment.invoiceBy.email,
+          }
+        : billBy
+          ? { staffName: billBy }
+          : undefined,
+      notes: notes.trim(),
+      items: items.map((item) => ({
+        productName: item.productName,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+      })),
+      subTotal,
+      discountTotal,
+      grandTotal,
+      status,
+      ...(originalInvoiceId ? { originalInvoiceId } : {}),
+      createdBy: {
+        m_staff_id: staff.m_staff_id,
+        m_staff_name: staff.m_staff_name,
+        m_staff_email: staff.m_staff_email,
+      },
+    };
+  };
 
   const handleSaveDraft = async () => {
     if (!customer.trim() || !phone.trim() || !items.length) {
@@ -496,7 +538,12 @@ export default function CreateSalesReturnScreen({
         invoiceDate={invoiceDate}
         dueDate={dueDate}
         dueDateMin={today}
-        salesPerson={salesPerson}
+        salesPerson={
+          mode === "view" || mode === "edit" ? createdByDisplay : salesPerson
+        }
+        billBy={
+          mode === "view" || mode === "edit" ? billBy || "—" : undefined
+        }
         readOnly={mode === "view"}
         onCustomerChange={(value) => {
           setCustomer(value);
@@ -580,9 +627,87 @@ export default function CreateSalesReturnScreen({
           initialCustomerPhone={phone}
           initialMembership=""
           onClose={() => setOpenCheckout(false)}
-          onConfirmPayment={async () => {
+          onConfirmPayment={async (payment) => {
             setOpenCheckout(false);
-            await handleSave();
+            const pinName = String(payment?.invoiceBy?.staffName ?? "").trim();
+            if (pinName) setBillBy(pinName);
+            try {
+              setSaving(true);
+              if (mode === "edit" && returnSaleId) {
+                await handleUpdateReturnSale(
+                  returnSaleId,
+                  buildPayload("final", payment),
+                );
+                printThermalReceipt({
+                  invoiceNo: invoiceNo,
+                  customerName: customer.trim(),
+                  customerPhone: phone.trim(),
+                  items: items.map((item) => ({
+                    name: item.productName,
+                    qty: item.qty,
+                    price: item.unitPrice,
+                    discount: item.discount,
+                  })),
+                  totalMRP: items.reduce(
+                    (sum, item) => sum + item.qty * item.unitPrice,
+                    0,
+                  ),
+                  discountTotal: discountTotal,
+                  finalAmount: grandTotal,
+                  totalDue: 0,
+                  totalQty: items.reduce((sum, item) => sum + item.qty, 0),
+                });
+                Swal.fire(
+                  "Return Updated",
+                  "Sales Return updated successfully.",
+                  "success",
+                ).then(() => navigate(-1));
+              } else {
+                const response = await handleCreateReturnSale(
+                  buildPayload("final", payment),
+                );
+                const savedCode =
+                  response?.returnSale?.returnCode || invoiceNo;
+                printThermalReceipt({
+                  invoiceNo: savedCode,
+                  customerName: customer.trim(),
+                  customerPhone: phone.trim(),
+                  items: items.map((item) => ({
+                    name: item.productName,
+                    qty: item.qty,
+                    price: item.unitPrice,
+                    discount: item.discount,
+                  })),
+                  totalMRP: items.reduce(
+                    (sum, item) => sum + item.qty * item.unitPrice,
+                    0,
+                  ),
+                  discountTotal: discountTotal,
+                  finalAmount: grandTotal,
+                  totalDue: 0,
+                  totalQty: items.reduce((sum, item) => sum + item.qty, 0),
+                });
+                Swal.fire(
+                  "Return Saved",
+                  response?.returnSale?.returnCode
+                    ? `Sales Return ${response.returnSale.returnCode} saved successfully.`
+                    : "Sales Return saved successfully.",
+                  "success",
+                ).then(() => navigate(-1));
+              }
+            } catch (error: unknown) {
+              const err = error as {
+                response?: { data?: { message?: string } };
+              };
+              Swal.fire(
+                "Save failed",
+                err?.response?.data?.message ??
+                  "Could not save return. Try again.",
+                "error",
+              );
+            } finally {
+              setSaving(false);
+            }
           }}
         />
       )}
