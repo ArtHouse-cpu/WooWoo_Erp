@@ -48,6 +48,23 @@ type PosRow = {
   dueAmount: number;
 };
 
+type DateFilter =
+  | "today"
+  | "yesterday"
+  | "week"
+  | "month"
+  | "year";
+
+  // const dateFilterOptions: {value: DateFilter, label: string}[] = [
+  //   {value:"today", label:"Today"},
+  //   {value:"yesterday", label:"Yesterday"},
+  //   {value:"week", label:"This Week"},
+  //   {value:"month", label:"This Month"},
+  //   {value:"year", label:"This Year"},
+  // ]
+
+
+  // function getFilterDateRange(filter:DateFilter):{from:string,to:string  }
 function paymentStatusForWhatsApp(
   raw: Record<string, unknown>,
   rowStatus: PosRow["status"],
@@ -693,6 +710,8 @@ export default function PosScreen() {
             className="h-10 w-full rounded-md border border-gray-200 pl-9 pr-3 text-sm outline-none focus:border-blue-400"
           />
         </div>
+
+        {/* //working there */}
         <button className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm text-gray-700">
           This Year <ChevronDown size={14} />
         </button>
