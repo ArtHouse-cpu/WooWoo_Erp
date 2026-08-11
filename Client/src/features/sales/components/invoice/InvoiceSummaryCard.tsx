@@ -3,12 +3,26 @@ type ExtraCharge = {
   amount: number;
 };
 
+type PaymentBreakdown = {
+  cash?: number;
+  upi?: number;
+  card?: number;
+  wallet?: number;
+  paidAmount?: number;
+  dueAmount?: number;
+  changeAmount?: number;
+};
+
 type Props = {
   subTotal: number;
   discountTotal: number;
   productDiscountTotal?: number;
   membershipDiscountTotal?: number;
   cashbackTotal?: number;
+  couponDiscount?: number;
+  couponCode?: string;
+  referralDiscount?: number;
+  referralLabel?: string;
   extraCharges?: ExtraCharge[];
   onExtraChargesChange?: (val: ExtraCharge[]) => void;
   grandTotal: number;
@@ -16,7 +30,47 @@ type Props = {
   isSaving?: boolean;
   /** Hide checkout CTA and extra-charge editors (view modal). */
   readOnly?: boolean;
+  /** View-mode payment details (from saved invoice). */
+  paymentMode?: string;
+  paymentStatus?: string;
+  paymentBreakdown?: PaymentBreakdown | null;
 };
+
+function formatPaymentMode(
+  mode?: string,
+  breakdown?: PaymentBreakdown | null,
+): string {
+  const raw = String(mode ?? "").trim().toUpperCase();
+  const b = breakdown || {};
+  const cash = Number(b.cash || 0);
+  const upi = Number(b.upi || 0);
+  const card = Number(b.card || 0);
+  const wallet = Number(b.wallet || 0);
+
+  if (raw === "MULTI") {
+    const parts: string[] = [];
+    if (cash > 0) parts.push(`Cash ₹${cash.toFixed(0)}`);
+    if (upi > 0) parts.push(`UPI ₹${upi.toFixed(0)}`);
+    if (card > 0) parts.push(`Card ₹${card.toFixed(0)}`);
+    if (wallet > 0) parts.push(`Wallet ₹${wallet.toFixed(0)}`);
+    return parts.join(" · ") || "Multi-mode";
+  }
+  if (!raw) return "—";
+  if (raw === "UPI") return "UPI";
+  return raw.charAt(0) + raw.slice(1).toLowerCase();
+}
+
+function formatPaymentStatus(status?: string, dueAmount = 0): string {
+  // Any remaining due amount → Pending
+  if (Number(dueAmount) > 0.001) return "Pending";
+  const s = String(status ?? "").toLowerCase();
+  if (s === "due") return "Pending";
+  if (s === "partial") return "Pending";
+  if (s === "full" || s === "paid") return "Paid (Full)";
+  if (s === "pending") return "Pending";
+  if (s) return s.charAt(0).toUpperCase() + s.slice(1);
+  return "Paid (Full)";
+}
 
 export default function InvoiceSummaryCard({
   subTotal,
@@ -24,12 +78,19 @@ export default function InvoiceSummaryCard({
   productDiscountTotal = 0,
   membershipDiscountTotal = 0,
   cashbackTotal = 0,
+  couponDiscount = 0,
+  couponCode = "",
+  referralDiscount = 0,
+  referralLabel = "Referral Discount",
   extraCharges = [],
   onExtraChargesChange,
   grandTotal,
   onSave,
   isSaving = false,
   readOnly = false,
+  paymentMode,
+  paymentStatus,
+  paymentBreakdown = null,
 }: Props) {
   const addCharge = () => {
     onExtraChargesChange?.([...extraCharges, { label: "Extra Charge", amount: 0 }]);
@@ -41,14 +102,40 @@ export default function InvoiceSummaryCard({
     onExtraChargesChange?.(next);
   };
 
-  const updateCharge = (index: number, field: keyof ExtraCharge, value: string | number) => {
+  const updateCharge = (
+    index: number,
+    field: keyof ExtraCharge,
+    value: string | number,
+  ) => {
     const next = [...extraCharges];
-    next[index] = { ...next[index], [field]: field === "amount" ? Number(value) : value };
+    next[index] = {
+      ...next[index],
+      [field]: field === "amount" ? Number(value) : value,
+    };
     onExtraChargesChange?.(next);
   };
+
+  const paidAmount = Number(
+    paymentBreakdown?.paidAmount ??
+      (Number(paymentBreakdown?.cash || 0) +
+        Number(paymentBreakdown?.upi || 0) +
+        Number(paymentBreakdown?.card || 0) +
+        Number(paymentBreakdown?.wallet || 0)),
+  );
+  const dueAmount = Number(
+    paymentBreakdown?.dueAmount ?? Math.max(0, grandTotal - paidAmount),
+  );
+  const showPaymentBlock =
+    readOnly &&
+    (Boolean(paymentMode) ||
+      Boolean(paymentStatus) ||
+      paymentBreakdown != null);
+
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:col-span-4">
-      <h3 className="mb-3 text-sm font-semibold text-gray-800">Invoice Summary</h3>
+      <h3 className="mb-3 text-sm font-semibold text-gray-800">
+        Invoice Summary
+      </h3>
       <div className="space-y-2 text-sm">
         <div className="flex items-center justify-between text-gray-600">
           <span>Sub Total</span>
@@ -69,20 +156,37 @@ export default function InvoiceSummaryCard({
               </div>
             )}
           </>
-        ) : (
+        ) : discountTotal > 0 ? (
           <div className="flex items-center justify-between text-gray-600">
             <span>Discount</span>
             <span>- ₹ {discountTotal.toFixed(2)}</span>
           </div>
+        ) : null}
+        {couponDiscount > 0 && (
+          <div className="flex items-center justify-between text-violet-700">
+            <span>
+              Coupon{couponCode ? ` (${couponCode})` : ""}
+            </span>
+            <span>- ₹ {couponDiscount.toFixed(2)}</span>
+          </div>
+        )}
+        {referralDiscount > 0 && (
+          <div className="flex items-center justify-between text-green-700">
+            <span>{referralLabel || "Referral Discount"}</span>
+            <span>- ₹ {referralDiscount.toFixed(2)}</span>
+          </div>
         )}
         {cashbackTotal > 0 && (
           <div className="flex items-center justify-between text-emerald-600 font-medium">
-            <span>Cashback (Credit to Wallet)</span>
+            <span>Cashback (Credited to Wallet)</span>
             <span>+ ₹ {cashbackTotal.toFixed(2)}</span>
           </div>
         )}
         {extraCharges.map((charge, idx) => (
-          <div key={idx} className="flex flex-col gap-1 border-t border-slate-50 pt-2 first:border-t-0">
+          <div
+            key={idx}
+            className="flex flex-col gap-1 border-t border-slate-50 pt-2 first:border-t-0"
+          >
             <div className="flex items-center justify-between">
               {readOnly ? (
                 <>
@@ -105,7 +209,9 @@ export default function InvoiceSummaryCard({
                     <input
                       type="number"
                       value={charge.amount || ""}
-                      onChange={(e) => updateCharge(idx, "amount", e.target.value)}
+                      onChange={(e) =>
+                        updateCharge(idx, "amount", e.target.value)
+                      }
                       placeholder="0"
                       className="w-16 rounded border border-slate-200 px-1 py-0.5 text-right text-xs focus:border-blue-500 outline-none"
                     />
@@ -134,8 +240,40 @@ export default function InvoiceSummaryCard({
         <div className="my-2 border-t border-dashed border-gray-200" />
         <div className="flex items-center justify-between text-base font-semibold text-gray-900">
           <span>Grand Total</span>
-          <span>₹ {grandTotal.toFixed(2)}</span>  
+          <span>₹ {grandTotal.toFixed(2)}</span>
         </div>
+
+        {showPaymentBlock && (
+          <>
+            <div className="my-2 border-t border-dashed border-gray-200" />
+            <div className="flex items-center justify-between text-gray-700">
+              <span>Payment Mode</span>
+              <span className="font-medium text-right max-w-[60%]">
+                {formatPaymentMode(paymentMode, paymentBreakdown)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-gray-700">
+              <span>Payment Status</span>
+              <span
+                className={`font-semibold ${
+                  dueAmount > 0 ? "text-amber-600" : "text-emerald-600"
+                }`}
+              >
+                {formatPaymentStatus(paymentStatus, dueAmount)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-gray-600">
+              <span>Paid</span>
+              <span>₹ {paidAmount.toFixed(2)}</span>
+            </div>
+            {dueAmount > 0 && (
+              <div className="flex items-center justify-between text-amber-700 font-medium">
+                <span>Due</span>
+                <span>₹ {dueAmount.toFixed(2)}</span>
+              </div>
+            )}
+          </>
+        )}
       </div>
       {!readOnly && (
         <button

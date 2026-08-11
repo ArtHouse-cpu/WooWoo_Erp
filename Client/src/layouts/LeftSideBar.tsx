@@ -178,7 +178,7 @@ const MENU_GROUPS: MenuGroup[] = [
   },
   {
     key: "affiliateProgram",
-    label: "Affiliate Program",
+    label: "Program",
     icon: Network,
     submenu: [
       {

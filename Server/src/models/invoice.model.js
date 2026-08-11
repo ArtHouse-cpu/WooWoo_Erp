@@ -201,6 +201,24 @@ const invoiceSchema = new mongoose.Schema(
         amount: { type: Number, default: 0 }
       }
     ],
+    /** Membership discount amount applied at checkout (₹). */
+    membershipDiscount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    /** Membership cashback credited to wallet for this invoice (₹). */
+    cashbackTotal: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    /** Remaining due (mirrors paymentBreakdown.dueAmount). */
+    pendingAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     mode: {
       type: String,
       trim: true,
@@ -208,7 +226,7 @@ const invoiceSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ['full', 'partial'],
+      enum: ['full', 'partial', 'due'],
       default: 'full',
     },
     paymentBreakdown: {

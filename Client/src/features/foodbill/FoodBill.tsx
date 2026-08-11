@@ -432,7 +432,7 @@ export default function FoodBill() {
     });
   };
 
-  const deleteDraft = (id: string) => {
+  const deleteDraft = (id: string) => {   
     const next = loadDrafts().filter((d) => d.id !== id);
     persistDrafts(next);
     setDrafts(next);
@@ -868,28 +868,31 @@ export default function FoodBill() {
   const membershipBenefitTotal =
     Math.round((membershipDiscount + membershipCashback) * 10) / 10;
 
-  // No tax on food bill — membership discount reduces payable; cashback is wallet credit
+  // Membership reduces payable; cashback is wallet credit. Round final to nearest ₹.
   const totalBeforeRound = useMemo(() => {
-    return Math.max(0, subtotal - membershipDiscount);
-  }, [subtotal, membershipDiscount]);
-
-  const roundedBeforeReferral = useMemo(() => {
-    return Math.round(totalBeforeRound);
-  }, [totalBeforeRound]);
-
-  const roundOff = useMemo(() => {
-    const diff = roundedBeforeReferral - totalBeforeRound;
-    return Math.round(diff * 100) / 100;
-  }, [roundedBeforeReferral, totalBeforeRound]);
-
-  const grandTotal = useMemo(() => {
     return Math.max(
       0,
-      roundedBeforeReferral -
+      subtotal -
+        membershipDiscount -
         Number(couponDiscount || 0) -
         Number(referralDiscount || 0),
     );
-  }, [roundedBeforeReferral, couponDiscount, referralDiscount]);
+  }, [subtotal, membershipDiscount, couponDiscount, referralDiscount]);
+
+  const grandTotal = useMemo(
+    () => Math.round(totalBeforeRound),
+    [totalBeforeRound],
+  );
+
+  const roundOff = useMemo(() => {
+    const diff = grandTotal - totalBeforeRound;
+    return Math.round(diff * 100) / 100;
+  }, [grandTotal, totalBeforeRound]);
+
+  /** Pre-promo rounded base used for coupon validate orderAmount (matches prior behaviour). */
+  const roundedBeforeReferral = useMemo(() => {
+    return Math.round(Math.max(0, subtotal - membershipDiscount));
+  }, [subtotal, membershipDiscount]);
 
   const setSplitAmount = (mode: SplitKey, value: number) => {
     setSplitPayments((prev) => ({
@@ -1499,7 +1502,11 @@ export default function FoodBill() {
           );
       const payableTotal = Math.max(
         0,
-        roundedBeforeReferral - appliedCouponDiscount - appliedReferralDiscount,
+        Math.round(
+          roundedBeforeReferral -
+            appliedCouponDiscount -
+            appliedReferralDiscount,
+        ),
       );
 
       const invoiceItems = (() => {

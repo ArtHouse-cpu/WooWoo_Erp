@@ -985,13 +985,20 @@ const createInvoice = async (req, res) => {
         : undefined,
       grandTotal: computedGrandTotal,
       extraCharges: Array.isArray(extraCharges) ? extraCharges : [],
+      membershipDiscount: Math.max(0, Number(membershipDiscount ?? 0)),
+      cashbackTotal: Math.max(0, Number(cashbackTotal ?? 0)),
+      pendingAmount: normalizedPendingAmount,
       mode: String(mode ?? 'Cash'),
       paymentStatus:
         status === 'draft'
           ? 'partial'
-          : normalizedPendingAmount > 0 || paymentStatus === 'partial'
-            ? 'partial'
-            : 'full',
+          : paymentStatus === 'due' ||
+              (normalizedPendingAmount > 0 &&
+                Number(paymentBreakdown?.paidAmount ?? 0) <= 0)
+            ? 'due'
+            : normalizedPendingAmount > 0 || paymentStatus === 'partial'
+              ? 'partial'
+              : 'full',
       paymentBreakdown: {
         cash: Number(paymentBreakdown?.cash ?? 0),
         upi: Number(paymentBreakdown?.upi ?? 0),
@@ -1153,7 +1160,7 @@ const getInvoices=async(req,res)=>{
           .sort({createdAt: -1})
           .limit(limit)
           .select(
-            'customerName customerPhone pendingAmount paymentBreakdown status invoiceCode createdAt grandTotal createdBy mode salesPersonName invoiceDate items coupon referral membershipDiscount cashbackTotal extraCharges',
+            'customerName customerPhone pendingAmount paymentBreakdown paymentStatus status invoiceCode createdAt grandTotal createdBy mode salesPersonName invoiceDate items coupon referral membershipDiscount cashbackTotal discountTotal subTotal extraCharges invoiceBy',
           )
           .lean();
         return res.status(200).json({
@@ -1366,6 +1373,19 @@ const updateInvoice = async (req, res) => {
         dueAmount: Number(paymentBreakdown?.dueAmount ?? 0),
         changeAmount: Number(paymentBreakdown?.changeAmount ?? 0),
       };
+      updateData.pendingAmount = Number(paymentBreakdown?.dueAmount ?? 0);
+    }
+    if (req.body?.cashbackTotal !== undefined) {
+      updateData.cashbackTotal = Math.max(0, Number(req.body.cashbackTotal) || 0);
+    }
+    if (req.body?.membershipDiscount !== undefined) {
+      updateData.membershipDiscount = Math.max(
+        0,
+        Number(req.body.membershipDiscount) || 0,
+      );
+    }
+    if (req.body?.pendingAmount !== undefined) {
+      updateData.pendingAmount = Math.max(0, Number(req.body.pendingAmount) || 0);
     }
 
     let nextCouponPatch;

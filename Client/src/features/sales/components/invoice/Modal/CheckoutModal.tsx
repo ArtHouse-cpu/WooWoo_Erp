@@ -28,6 +28,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { printThermalReceipt } from "@/utils/printUtils";
 import { summarizeMembershipForCart } from "../../../utils/membershipInvoiceUtils";
 import { creditWalletCashback } from "../../../utils/walletCashback";
+import { roundPayable } from "../../../utils/paymentRoundOff";
 import StaffVerifyModal from "./StaffVerifyModal";
 import type { VerifiedStaff } from "@/services/apiClient";
 
@@ -991,7 +992,9 @@ export default function CheckoutModal({
   }, [open]);
 
   useEffect(() => {
-    const payable = Math.max(0, payableBase - couponDiscount - referralDiscount);
+    const { payable } = roundPayable(
+      payableBase - couponDiscount - referralDiscount,
+    );
 
     if (paymentStatus === "due") {
       setCashGiven(0);
@@ -1154,10 +1157,10 @@ export default function CheckoutModal({
     [items],
   );
 
-  const finalPayable = Math.max(
-    0,
-    payableBase - couponDiscount - referralDiscount,
-  );
+  const {
+    payable: finalPayable,
+    roundOff,
+  } = roundPayable(payableBase - couponDiscount - referralDiscount);
   const isPartialPayment = paymentStatus === "partial";
   const totalPaid = isDuePayment
     ? 0
@@ -1679,6 +1682,14 @@ export default function CheckoutModal({
                     value={`+ ${formatInr(Number(c.amount || 0))}`} 
                   />
                 ))}
+
+                {Math.abs(roundOff) >= 0.005 && (
+                  <SummaryLine
+                    label="Round Off"
+                    value={`${roundOff >= 0 ? "+" : "−"} ${formatInr(Math.abs(roundOff))}`}
+                    tone="muted"
+                  />
+                )}
                 
                 <div className="rounded-xl bg-green-400 p-4 text-white">
                   <div className="flex items-center justify-between">

@@ -113,9 +113,15 @@ function paymentStatusForWhatsApp(
   raw: Record<string, unknown>,
   rowStatus: PosRow["status"],
 ): string {
+  const due = Number(
+    (raw as any)?.pendingAmount ??
+      (raw as any)?.paymentBreakdown?.dueAmount ??
+      0,
+  );
+  if (due > 0.001 || rowStatus === "Pending") return "Pending";
   const ps = String(raw.paymentStatus ?? "").toLowerCase();
   if (ps === "full") return "Paid";
-  if (ps === "partial") return "Partially Paid";
+  if (ps === "partial" || ps === "due") return "Pending";
   return rowStatus;
 }
 
@@ -231,11 +237,20 @@ export default function PosScreen() {
     });
   };
 
-  const toStatus = (raw: unknown): PosRow["status"] => {
-    const v = String(raw ?? "").toLowerCase();
-    if (v === "pending") return "Pending";
+  const toStatus = (
+    rawStatus: unknown,
+    dueAmount = 0,
+    paymentStatus?: unknown,
+  ): PosRow["status"] => {
+    const v = String(rawStatus ?? "").toLowerCase();
     if (v === "cancelled") return "Cancelled";
     if (v === "draft") return "Draft";
+    const due = Number(dueAmount) || 0;
+    const ps = String(paymentStatus ?? "").toLowerCase();
+    if (due > 0.001 || ps === "partial" || ps === "due" || ps === "pending") {
+      return "Pending";
+    }
+    if (v === "pending") return "Pending";
     return "Paid";
   };
 
@@ -257,33 +272,36 @@ export default function PosScreen() {
         ? response.data.invoices
         : [];
 
-      const rows: PosRow[] = invoices.map((invoice: any, index: number) => ({
-        id: index + 1,
-        amount: Number(invoice?.grandTotal ?? 0),
-        mode: toMode(invoice?.mode),
-        status: toStatus(invoice?.status),
-        bill: String(
-          invoice?.invoiceCode ??
-            `INVVWAH-${invoice?.invoiceNumber ?? index + 1}`,
-        ),
-        owner: String(
-          invoice?.createdBy?.m_staff_name ||
-            invoice?.salesPersonName ||
-            "System",
-        ),
-        customer: String(invoice?.customerName),
-        phone: String(invoice?.customerPhone),
-        date: formatDate(invoice?.invoiceDate),
-        createdTime: invoice?.createdAt
-          ? new Date(invoice.createdAt).toLocaleString()
-          : "",
-        salesPerson: String(invoice?.salesPersonName),
-        _id: invoice._id,
-        raw: invoice,
-        dueAmount: Number(
-          invoice?.pendingAmount ?? invoice?.paymentBreakdown?.dueAmount ?? 0,
-        ),
-      }));
+            const rows: PosRow[] = invoices.map((invoice: any, index: number) => {
+              const dueAmount = Number(
+                invoice?.pendingAmount ?? invoice?.paymentBreakdown?.dueAmount ?? 0,
+              );
+              return {
+              id: index + 1,
+            amount: Math.round(Number(invoice?.grandTotal ?? 0)),
+              mode: toMode(invoice?.mode),
+              status: toStatus(invoice?.status, dueAmount, invoice?.paymentStatus),
+              bill: String(
+                invoice?.invoiceCode ??
+                  `INVVWAH-${invoice?.invoiceNumber ?? index + 1}`,
+              ),
+              owner: String(
+                invoice?.createdBy?.m_staff_name ||
+                  invoice?.salesPersonName ||
+                  "System",
+              ),
+              customer: String(invoice?.customerName),
+              phone: String(invoice?.customerPhone),
+              date: formatDate(invoice?.invoiceDate),
+              createdTime: invoice?.createdAt
+                ? new Date(invoice.createdAt).toLocaleString()
+                : "",
+              salesPerson: String(invoice?.salesPersonName),
+              _id: invoice._id,
+              raw: invoice,
+              dueAmount,
+            };
+            });
 
       setData(rows);
     } catch (error) {

@@ -104,6 +104,27 @@ export default function CreateInvoiceScreen({
   const [draftIsCsp, setDraftIsCsp] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [membershipPlans, setMembershipPlans] = useState<MembershipPlanPayload[]>([]);
+  /** Saved payment snapshot for view mode (POS View Invoice). */
+  const [viewPaymentMode, setViewPaymentMode] = useState("");
+  const [viewPaymentStatus, setViewPaymentStatus] = useState("");
+  const [viewPaymentBreakdown, setViewPaymentBreakdown] = useState<{
+    cash?: number;
+    upi?: number;
+    card?: number;
+    wallet?: number;
+    paidAmount?: number;
+    dueAmount?: number;
+    changeAmount?: number;
+  } | null>(null);
+  const [viewCashbackTotal, setViewCashbackTotal] = useState<number | null>(null);
+  const [viewMembershipDiscount, setViewMembershipDiscount] = useState<
+    number | null
+  >(null);
+  const [viewCouponDiscount, setViewCouponDiscount] = useState(0);
+  const [viewCouponCode, setViewCouponCode] = useState("");
+  const [viewReferralDiscount, setViewReferralDiscount] = useState(0);
+  const [viewReferralLabel, setViewReferralLabel] = useState("Referral Discount");
+  const [viewGrandTotal, setViewGrandTotal] = useState<number | null>(null);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -155,10 +176,53 @@ export default function CreateInvoiceScreen({
             cspLabel: item.cspLabel || (item.isCsp ? "CSP" : null),
             productDiscountType: item.productDiscountType,
             productDiscountValue: item.productDiscountValue,
+            productDiscountAmount: Number(item.productDiscountAmount ?? 0),
+            membershipDiscountAmount: Number(
+              item.membershipDiscountAmount ?? 0,
+            ),
           })),
         );
       }
       if (inv.extraCharges) setExtraCharges(inv.extraCharges);
+
+      // Payment / cashback snapshot for Invoice Summary (view mode)
+      setViewPaymentMode(String(inv.mode ?? inv.paymentMode ?? "").trim());
+      setViewPaymentStatus(String(inv.paymentStatus ?? "").trim());
+      setViewPaymentBreakdown(
+        inv.paymentBreakdown && typeof inv.paymentBreakdown === "object"
+          ? {
+              cash: Number(inv.paymentBreakdown.cash ?? 0),
+              upi: Number(inv.paymentBreakdown.upi ?? 0),
+              card: Number(inv.paymentBreakdown.card ?? 0),
+              wallet: Number(inv.paymentBreakdown.wallet ?? 0),
+              paidAmount: Number(inv.paymentBreakdown.paidAmount ?? 0),
+              dueAmount: Number(
+                inv.paymentBreakdown.dueAmount ?? inv.pendingAmount ?? 0,
+              ),
+              changeAmount: Number(inv.paymentBreakdown.changeAmount ?? 0),
+            }
+          : null,
+      );
+      setViewCashbackTotal(
+        inv.cashbackTotal != null ? Number(inv.cashbackTotal) || 0 : null,
+      );
+      setViewMembershipDiscount(
+        inv.membershipDiscount != null
+          ? Number(inv.membershipDiscount) || 0
+          : null,
+      );
+      setViewCouponDiscount(Number(inv.coupon?.discountAmount ?? 0) || 0);
+      setViewCouponCode(String(inv.coupon?.code ?? "").trim());
+      setViewReferralDiscount(Number(inv.referral?.discountAmount ?? 0) || 0);
+      setViewReferralLabel(
+        String(inv.referral?.label ?? "Referral Discount").trim() ||
+          "Referral Discount",
+      );
+      setViewGrandTotal(
+        inv.grandTotal != null && Number.isFinite(Number(inv.grandTotal))
+          ? Math.max(0, Number(inv.grandTotal))
+          : null,
+      );
     };
 
     if (initialData && initialMode) {
@@ -382,8 +446,30 @@ export default function CreateInvoiceScreen({
     () => items.reduce((sum, item) => sum + (item.cashback || 0), 0),
     [items],
   );
+  const displayCashbackTotal =
+    mode === "view" && viewCashbackTotal != null
+      ? viewCashbackTotal
+      : cashbackTotal;
+  const displayMembershipDiscount =
+    mode === "view" &&
+    viewMembershipDiscount != null &&
+    membershipDiscountTotal <= 0
+      ? viewMembershipDiscount
+      : membershipDiscountTotal;
   const extraChargesTotal = extraCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
-  const grandTotal = subTotal - discountTotal + extraChargesTotal;
+  // View mode: coupon/referral are invoice-level (not on line items), so subtract them.
+  // Prefer the saved invoice grandTotal when present (source of truth).
+  const computedGrandTotal = Math.max(
+    0,
+    subTotal -
+      discountTotal -
+      (mode === "view" ? viewCouponDiscount + viewReferralDiscount : 0) +
+      extraChargesTotal,
+  );
+  const grandTotal =
+    mode === "view" && viewGrandTotal != null
+      ? viewGrandTotal
+      : computedGrandTotal;
  
   const checkoutItems = useMemo(
     () =>
@@ -993,8 +1079,12 @@ export default function CreateInvoiceScreen({
               subTotal={subTotal}
               discountTotal={discountTotal}
               productDiscountTotal={productDiscountTotal}
-              membershipDiscountTotal={membershipDiscountTotal}
-              cashbackTotal={cashbackTotal}
+              membershipDiscountTotal={displayMembershipDiscount}
+              cashbackTotal={displayCashbackTotal}
+              couponDiscount={mode === "view" ? viewCouponDiscount : 0}
+              couponCode={mode === "view" ? viewCouponCode : ""}
+              referralDiscount={mode === "view" ? viewReferralDiscount : 0}
+              referralLabel={mode === "view" ? viewReferralLabel : undefined}
               extraCharges={extraCharges}
               onExtraChargesChange={setExtraCharges}
               grandTotal={grandTotal}
@@ -1003,6 +1093,11 @@ export default function CreateInvoiceScreen({
               }}
               isSaving={saving}
               readOnly={mode === "view"}
+              paymentMode={mode === "view" ? viewPaymentMode : undefined}
+              paymentStatus={mode === "view" ? viewPaymentStatus : undefined}
+              paymentBreakdown={
+                mode === "view" ? viewPaymentBreakdown : undefined
+              }
             />
           </div>
         </div>

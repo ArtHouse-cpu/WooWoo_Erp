@@ -23,6 +23,7 @@ import InvoiceDetailsSection from "@/features/sales/components/invoice/InvoiceDe
 import AddVendorModal from "../Modal/AddVendorModal";
 import type { InvoiceItem } from "../components/types";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
+import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
 import DocumentFormModal from "@/components/DocumentFormModal";
 import FileAttachmentSection from "../components/FileAttachmentSection";
 
@@ -70,6 +71,7 @@ export default function CreatePurchaseScreen({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [openCheckout, setOpenCheckout] = useState(false);
+  const [showStaffVerify, setShowStaffVerify] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [createdByName, setCreatedByName] = useState(createdByDefault);
   const [billBy, setBillBy] = useState("");
@@ -568,13 +570,7 @@ export default function CreatePurchaseScreen({
               mode !== "view"
                 ? () => {
                     if (!validateBeforeCheckout()) return;
-                    void handleSave("due", {
-                      mode: "Credit",
-                      paymentStatus: "partial",
-                      purchaseType: "credit",
-                      paidAmount: 0,
-                      dueAmount: grandTotal,
-                    });
+                    setShowStaffVerify(true);
                   }
                 : undefined
             }
@@ -619,6 +615,29 @@ export default function CreatePurchaseScreen({
           }}
         />
       )}
+
+      <StaffVerifyModal
+        open={showStaffVerify}
+        onClose={() => setShowStaffVerify(false)}
+        onVerified={({ staff }) => {
+          setShowStaffVerify(false);
+          void handleSave("due", {
+            mode: "Credit",
+            paymentStatus: "partial",
+            purchaseType: "credit",
+            paidAmount: 0,
+            dueAmount: grandTotal,
+            invoiceBy: {
+              staffId: String(staff.staffId || staff._id || ""),
+              staffName: String(staff.staffName || staff.name || "").trim(),
+              employeeId: String(
+                staff.employeeId || staff.m_staff_id || "",
+              ).trim(),
+              email: String(staff.email || "").trim(),
+            },
+          });
+        }}
+      />
     </div>
   );
 

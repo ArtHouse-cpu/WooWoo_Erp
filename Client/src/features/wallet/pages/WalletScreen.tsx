@@ -900,6 +900,8 @@ export default function WalletScreen() {
     columns,
     data,
     state: { isLoading: loading },
+    enablePagination: true,
+    enableBottomToolbar: true,  
     muiTablePaperProps: {
       elevation: 0,
       style: {
