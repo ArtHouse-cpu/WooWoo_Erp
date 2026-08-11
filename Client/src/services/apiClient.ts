@@ -910,6 +910,8 @@ export type WalletTransactionPayload = {
   type?: "credit" | "debit" | string;
   amount: number;
   note?: string;
+  /** Which bucket to credit/debit: general | cashback | affiliate */
+  walletType?: "general" | "cashback" | "affiliate" | string;
   minimumBalance?: number;
   referenceType?: string;
   referenceId?: string;

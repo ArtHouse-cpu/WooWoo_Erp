@@ -318,11 +318,35 @@ export default function WalletScreen() {
       return;
     }
 
+    const generalAvailable = Number(row.generalBalance ?? 0);
+    const cashbackAvailable = Number(row.cashbackBalance ?? 0);
+    const affiliateAvailable = Number(row.affiliateBalance ?? 0);
+    const totalAvailable = Number(row.walletAmount ?? 0);
+
     const result = await Swal.fire({
       title: `<h2 class="text-xl font-bold text-slate-800">${actionLabel} Wallet Amount</h2>`,
       html: `
         <div class="flex flex-col gap-4 text-left mt-2">
-          <div class="text-sm text-slate-500 mb-2">Customer: <strong class="text-slate-700">${row.customerName}</strong></div>
+          <div class="text-sm text-slate-500">
+            Customer: <strong class="text-slate-700">${row.customerName}</strong>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1.5">
+            <div class="flex justify-between"><span class="text-slate-500">Total</span><span class="font-semibold">₹ ${totalAvailable.toLocaleString("en-IN")}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">General</span><span class="font-semibold text-slate-800">₹ ${generalAvailable.toLocaleString("en-IN")}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Cashback</span><span class="font-semibold text-emerald-700">₹ ${cashbackAvailable.toLocaleString("en-IN")}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Affiliate</span><span class="font-semibold text-amber-700">₹ ${affiliateAvailable.toLocaleString("en-IN")}</span></div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Wallet bucket <span class="text-red-500">*</span></label>
+            <select id="wallet-type" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all">
+              <option value="general">General (₹ ${generalAvailable.toLocaleString("en-IN")})</option>
+              <option value="cashback">Cashback (₹ ${cashbackAvailable.toLocaleString("en-IN")})</option>
+              <option value="affiliate">Affiliate (₹ ${affiliateAvailable.toLocaleString("en-IN")})</option>
+            </select>
+            <p class="mt-1 text-[11px] text-slate-400">
+              Deduct/Add applies to the selected bucket only — not the total.
+            </p>
+          </div>
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Amount (₹) <span class="text-red-500">*</span></label>
             <input id="wallet-amount" type="number" min="0" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" placeholder="Enter amount..." />
@@ -339,40 +363,64 @@ export default function WalletScreen() {
       confirmButtonColor: type === "credit" ? "#16a34a" : "#dc2626",
       cancelButtonColor: "#64748b",
       customClass: {
-        popup: 'rounded-2xl',
-        confirmButton: 'px-6 py-2.5 rounded-lg font-semibold',
-        cancelButton: 'px-6 py-2.5 rounded-lg font-semibold'
+        popup: "rounded-2xl",
+        confirmButton: "px-6 py-2.5 rounded-lg font-semibold",
+        cancelButton: "px-6 py-2.5 rounded-lg font-semibold",
       },
       preConfirm: () => {
-        const amountInput = document.getElementById("wallet-amount") as HTMLInputElement | null;
-        const noteInput = document.getElementById("wallet-note") as HTMLInputElement | null;
+        const amountInput = document.getElementById(
+          "wallet-amount",
+        ) as HTMLInputElement | null;
+        const noteInput = document.getElementById(
+          "wallet-note",
+        ) as HTMLInputElement | null;
+        const typeInput = document.getElementById(
+          "wallet-type",
+        ) as HTMLSelectElement | null;
         const amount = Number(amountInput?.value ?? 0);
         const note = String(noteInput?.value ?? "").trim();
+        const walletType = String(typeInput?.value ?? "general").toLowerCase();
 
         if (!Number.isFinite(amount) || amount <= 0) {
           Swal.showValidationMessage("Enter a valid amount.");
           return undefined;
         }
-        const generalAvailable = Number(
-          row.generalBalance ?? row.walletAmount ?? 0,
-        );
-        if (type === "debit" && amount > generalAvailable) {
+
+        const bucketAvailable =
+          walletType === "cashback"
+            ? cashbackAvailable
+            : walletType === "affiliate"
+              ? affiliateAvailable
+              : generalAvailable;
+
+        if (type === "debit" && amount > bucketAvailable + 0.001) {
+          const label =
+            walletType === "cashback"
+              ? "cashback"
+              : walletType === "affiliate"
+                ? "affiliate"
+                : "general";
           Swal.showValidationMessage(
-            "Cannot deduct more than available general wallet amount.",
+            `Cannot deduct more than available ${label} amount (₹ ${bucketAvailable.toLocaleString("en-IN")}). Total wallet ₹ ${totalAvailable.toLocaleString("en-IN")} includes other buckets.`,
           );
           return undefined;
         }
-        const remainingBalance =
-          type === "debit"
-            ? generalAvailable - amount
-            : generalAvailable + amount;
-        if (remainingBalance < instruction.minimumBalance) {
-          Swal.showValidationMessage(
-            `Final balance cannot be less than minimum balance ₹ ${instruction.minimumBalance.toLocaleString("en-IN")}.`,
-          );
-          return undefined;
+
+        // Minimum balance rule applies to general bucket only
+        if (walletType === "general") {
+          const remainingBalance =
+            type === "debit"
+              ? generalAvailable - amount
+              : generalAvailable + amount;
+          if (remainingBalance < instruction.minimumBalance) {
+            Swal.showValidationMessage(
+              `Final general balance cannot be less than minimum balance ₹ ${instruction.minimumBalance.toLocaleString("en-IN")}.`,
+            );
+            return undefined;
+          }
         }
-        return { amount, note };
+
+        return { amount, note, walletType };
       },
     });
 
@@ -382,6 +430,10 @@ export default function WalletScreen() {
       type,
       amount: result.value.amount,
       note: result.value.note,
+      walletType: result.value.walletType as
+        | "general"
+        | "cashback"
+        | "affiliate",
       minimumBalance: instruction.minimumBalance,
       customerId: row.customerId,
       customerName: row.customerName,
@@ -401,11 +453,16 @@ export default function WalletScreen() {
         await handleUpdateWallet(walletRecordId, payload);
       }
       await fetchWalletRows();
-      await Swal.fire("Updated", `Wallet amount ${type === "credit" ? "added" : "deducted"} successfully.`, "success");
+      await Swal.fire(
+        "Updated",
+        `Wallet amount ${type === "credit" ? "added" : "deducted"} successfully.`,
+        "success",
+      );
     } catch (error: any) {
       Swal.fire(
         "Wallet update failed",
-        error?.response?.data?.message ?? "Could not update wallet. Please verify the backend wallet API.",
+        error?.response?.data?.message ??
+          "Could not update wallet. Please verify the backend wallet API.",
         "error",
       );
     }
@@ -815,10 +872,16 @@ export default function WalletScreen() {
         accessorKey: "walletAmount",
         Cell: ({ row }) => {
           const total = Number(row.original.walletAmount ?? 0);
+          const general = Number(row.original.generalBalance ?? 0);
+          const cashback = Number(row.original.cashbackBalance ?? 0);
           return (
             <div className="flex flex-col">
               <span className="font-semibold tabular-nums text-slate-900">
                 ₹ {total.toLocaleString("en-IN")}
+              </span>
+              <span className="text-[10px] text-slate-400">
+                G ₹{general.toLocaleString("en-IN")} · CB ₹
+                {cashback.toLocaleString("en-IN")}
               </span>
             </div>
           );
