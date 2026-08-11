@@ -4,10 +4,6 @@ import {
   useMaterialReactTable,
 } from "material-react-table";
 import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Search,
   Edit,
   XCircle,
   Trash2,
@@ -722,8 +718,9 @@ export default function PurchaseOrderScreen() {
     columns,
     data: filteredData,
     state: { isLoading: loading },
-    enableTopToolbar: false,
-    enableBottomToolbar: false,
+    enableTopToolbar: true,
+    enableBottomToolbar: true,
+    enablePagination: true,
     enableColumnActions: false,
     enableDensityToggle: false,
     enableFullScreenToggle: false,
@@ -807,27 +804,7 @@ export default function PurchaseOrderScreen() {
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3">
-        <div className="relative min-w-[280px] flex-1">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by order no., vendor, phone…"
-            className="h-10 w-full rounded-md border border-gray-200 pl-9 pr-3 text-sm outline-none focus:border-blue-400"
-          />
-        </div>
-        <button
-          type="button"
-          className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm text-gray-700"
-        >
-          This Year <ChevronDown size={14} />
-        </button>
-      </div>
+  
 
       <MaterialReactTable table={table} />
 
@@ -848,23 +825,7 @@ export default function PurchaseOrderScreen() {
             })}
           </span>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span>1 / 1</span>
-          <button
-            type="button"
-            className="rounded border border-gray-200 p-1.5"
-            aria-label="Previous page"
-          >
-            <ChevronLeft size={14} />
-          </button>
-          <button
-            type="button"
-            className="rounded border border-gray-200 p-1.5"
-            aria-label="Next page"
-          >
-            <ChevronRight size={14} />
-          </button>
-        </div>
+       
       </div>
 
       {selectedActionRow && (

@@ -39,6 +39,16 @@ import { PERMISSIONS } from "@/constants/permissions";
 
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 350;
+/**
+ * MRT's useMRT_RowVirtualizer returns early BEFORE calling useVirtualizer when
+ * enableRowVirtualization is false. Toggling that flag (or HMR / remount races
+ * with React 19) throws "Rendered more hooks than during the previous render".
+ *
+ * Keep virtualization OFF here. Infinite scroll already pages data in chunks;
+ * enabling virtualization later must be a permanent constant, never conditional
+ * on products.length / loading.
+ */
+const ENABLE_ROW_VIRTUALIZATION = false;
 
 type ProductRow = {
   _id?: string;
@@ -616,10 +626,12 @@ export default function ProductScreen() {
   const table = useMaterialReactTable({
     columns,
     data: products,
-    getRowId: (row) => String(row._id || ""),
+    getRowId: (row, index) =>
+      String(row._id || `${row.productName ?? "product"}-${index}`),
     enablePagination: false,
     enableColumnFilters: false,
-    enableRowVirtualization: true,
+    // IMPORTANT: must not be conditional (see ENABLE_ROW_VIRTUALIZATION note)
+    enableRowVirtualization: ENABLE_ROW_VIRTUALIZATION,
     enableGlobalFilter: true,
     manualFiltering: true,
     manualSorting: true,
@@ -629,8 +641,15 @@ export default function ProductScreen() {
     },
     onGlobalFilterChange: setGlobalFilter,
     onSortingChange: setSorting,
-    rowVirtualizerInstanceRef,
-    rowVirtualizerOptions: { overscan: 8 },
+    ...(ENABLE_ROW_VIRTUALIZATION
+      ? {
+          rowVirtualizerInstanceRef,
+          rowVirtualizerOptions: {
+            overscan: 8,
+            estimateSize: () => 48,
+          },
+        }
+      : {}),
     muiToolbarAlertBannerProps: isError
       ? {
           color: "error",
@@ -671,6 +690,14 @@ export default function ProductScreen() {
         fetchMoreOnBottomReached(event.target as HTMLDivElement),
     },
   });
+
+  // Remount MRT when the query changes so the virtualizer starts clean
+  // (avoids stale scroll metrics; does not toggle virtualization).
+  const tableMountKey = useMemo(
+    () =>
+      `products:${debouncedSearch}|${sortParams.sortBy}:${sortParams.sortDir}`,
+    [debouncedSearch, sortParams.sortBy, sortParams.sortDir],
+  );
 
   const cards = [
     {
@@ -808,7 +835,7 @@ export default function ProductScreen() {
           </div>
         ))}
       </div>
-      <MaterialReactTable table={table} />
+      <MaterialReactTable key={tableMountKey} table={table} />
     </div>
   );
 }

@@ -5,15 +5,13 @@ import {
 } from "material-react-table";
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   Search,
   Edit,
   XCircle,
   Trash2,
   Download,
-  Ellipsis
+  Ellipsis,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { axiosInstance } from "@/services/axiosInstance";
@@ -48,23 +46,69 @@ type PosRow = {
   dueAmount: number;
 };
 
-type DateFilter =
-  | "today"
-  | "yesterday"
-  | "week"
-  | "month"
-  | "year";
+type DateFilter = "today" | "yesterday" | "week" | "month" | "year";
 
-  // const dateFilterOptions: {value: DateFilter, label: string}[] = [
-  //   {value:"today", label:"Today"},
-  //   {value:"yesterday", label:"Yesterday"},
-  //   {value:"week", label:"This Week"},
-  //   {value:"month", label:"This Month"},
-  //   {value:"year", label:"This Year"},
-  // ]
+const dateFilterOptions: { value: DateFilter; label: string }[] = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "week", label: "This Week" },
+  { value: "month", label: "This Month" },
+  { value: "year", label: "This Year" },
+];
 
+function getFilterDateRange(filter: DateFilter): { from: string; to: string } {
+  const toYmd = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
 
-  // function getFilterDateRange(filter:DateFilter):{from:string,to:string  }
+  const startOfDay = (d: Date) => {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x;
+  };
+
+  const now = startOfDay(new Date());
+
+  if (filter === "today") {
+    return { from: toYmd(now), to: toYmd(now) };
+  }
+
+  if (filter === "yesterday") {
+    const y = new Date(now);
+    y.setDate(y.getDate() - 1);
+    return { from: toYmd(y), to: toYmd(y) };
+  }
+
+  if (filter === "week") {
+    // Calendar week Monday → today
+    const day = now.getDay(); // 0 Sun .. 6 Sat
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const from = new Date(now);
+    from.setDate(now.getDate() + mondayOffset);
+    return { from: toYmd(from), to: toYmd(now) };
+  }
+
+  if (filter === "month") {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { from: toYmd(from), to: toYmd(now) };
+  }
+
+  // this year
+  const from = new Date(now.getFullYear(), 0, 1);
+  return { from: toYmd(from), to: toYmd(now) };
+}
+
+function toLocalYmd(value: unknown): string {
+  const d = new Date(String(value ?? ""));
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 function paymentStatusForWhatsApp(
   raw: Record<string, unknown>,
   rowStatus: PosRow["status"],
@@ -91,6 +135,12 @@ export default function PosScreen() {
   const [selectedDueRow, setSelectedDueRow] = useState<PosRow | null>(null);
   const [viewInvoiceOpen, setViewInvoiceOpen] = useState(false);
   const [viewInvoiceData, setViewInvoiceData] = useState<any>(null);
+  const [dateFilter, setDateFilter] = useState<DateFilter>("year");
+  const [dateMenuOpen, setDateMenuOpen] = useState(false);
+
+  const selectedLabel =
+    dateFilterOptions.find((o) => o.value === dateFilter)?.label ?? "This Year";
+  const { from, to } = getFilterDateRange(dateFilter);
 
   const handleAction = async (
     action: "view" | "edit" | "cancel" | "delete" | "Credit Note",
@@ -195,7 +245,7 @@ export default function PosScreen() {
     if (v === "CARD") return "Card";
     if (v === "MULTI") return "Multi";
     if (v === "WALLET") return "Wallet";
-  if (v === "DRAFT") return "Draft";
+    if (v === "DRAFT") return "Draft";
     return "Cash";
   };
 
@@ -214,7 +264,7 @@ export default function PosScreen() {
         status: toStatus(invoice?.status),
         bill: String(
           invoice?.invoiceCode ??
-          `INVVWAH-${invoice?.invoiceNumber ?? index + 1}`,
+            `INVVWAH-${invoice?.invoiceNumber ?? index + 1}`,
         ),
         owner: String(
           invoice?.createdBy?.m_staff_name ||
@@ -258,13 +308,13 @@ export default function PosScreen() {
         row.customer.toLowerCase().includes(term) ||
         row.phone.toLowerCase().includes(term) ||
         row.status.toLowerCase().includes(term);
-      return statusOk && searchOk;
+
+      const ymd = toLocalYmd(row.raw?.invoiceDate ?? row.raw?.createdAt);
+      const dateOk = !!ymd && ymd >= from && ymd <= to;
+
+      return statusOk && searchOk && dateOk;
     });
-  }, [activeTab, data, search]);
-
-
-
-
+  }, [activeTab, data, search, from, to]);
 
   const columns = useMemo(
     () => [
@@ -406,7 +456,7 @@ export default function PosScreen() {
               }}
               className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
             >
-             <Ellipsis size={18} />
+              <Ellipsis size={18} />
             </button>
           </div>
         ),
@@ -423,14 +473,12 @@ export default function PosScreen() {
             const raw = (invoice.raw ?? {}) as Record<string, unknown>;
 
             const customerName =
-              String(invoice.customer || raw.customerName || "Customer").trim() ||
-              "Customer";
+              String(
+                invoice.customer || raw.customerName || "Customer",
+              ).trim() || "Customer";
 
             const docCode = String(
-              raw.returnCode ??
-                raw.invoiceCode ??
-                invoice.bill ??
-                invoice.id,
+              raw.returnCode ?? raw.invoiceCode ?? invoice.bill ?? invoice.id,
             );
 
             const isCreditNote = Boolean(raw.returnCode);
@@ -504,7 +552,9 @@ export default function PosScreen() {
             const digits = normalizeIndianWhatsAppDigits(
               String(invoice.phone || raw.customerPhone || ""),
             );
-            const waBase = digits ? `https://wa.me/${digits}` : "https://wa.me/";
+            const waBase = digits
+              ? `https://wa.me/${digits}`
+              : "https://wa.me/";
             window.open(
               `${waBase}?text=${encodeURIComponent(message)}`,
               "_blank",
@@ -574,12 +624,12 @@ export default function PosScreen() {
                 }}
                 className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
               >
-                 <Download size={14} />
+                <Download size={14} />
               </button>
             </div>
           );
         },
-      }
+      },
     ],
     [],
   );
@@ -591,7 +641,8 @@ export default function PosScreen() {
       isLoading: loading,
     },
     enableTopToolbar: false,
-    enableBottomToolbar: false,
+    enablePagination:true,
+    enableBottomToolbar: true,
     enableColumnActions: false,
     enableDensityToggle: false,
     enableFullScreenToggle: false,
@@ -613,10 +664,13 @@ export default function PosScreen() {
       onClick: () => {
         const rowData = row.original as PosRow;
         if (rowData.status !== "Draft") return;
-        navigate("/create-invoice", { state: { invoice: rowData.raw, mode: "edit" } });
+        navigate("/create-invoice", {
+          state: { invoice: rowData.raw, mode: "edit" },
+        });
       },
       sx: {
-        cursor: (row.original as PosRow).status === "Draft" ? "pointer" : "default",
+        cursor:
+          (row.original as PosRow).status === "Draft" ? "pointer" : "default",
       },
     }),
     muiTablePaperProps: {
@@ -711,10 +765,47 @@ export default function PosScreen() {
           />
         </div>
 
-        {/* //working there */}
-        <button className="inline-flex h-10 shrink-0 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm text-gray-700">
-          This Year <ChevronDown size={14} />
-        </button>
+        {/* Date range filter */}
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setDateMenuOpen((v) => !v)}
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm text-gray-700"
+          >
+            {selectedLabel} <ChevronDown size={14} />
+          </button>
+
+          {dateMenuOpen && (
+            <>
+              {/* click-outside overlay */}
+              <button
+                type="button"
+                className="fixed inset-0 z-10 cursor-default"
+                aria-label="Close date filter"
+                onClick={() => setDateMenuOpen(false)}
+              />
+              <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                {dateFilterOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      setDateFilter(opt.value);
+                      setDateMenuOpen(false);
+                    }}
+                    className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                      dateFilter === opt.value
+                        ? "bg-blue-50 font-semibold text-blue-700"
+                        : "text-gray-700"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="table-scroll min-w-0">
@@ -737,15 +828,6 @@ export default function PosScreen() {
               minimumFractionDigits: 2,
             })}
           </span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span>1 / 180</span>
-          <button className="rounded border border-gray-200 p-1.5">
-            <ChevronLeft size={14} />
-          </button>
-          <button className="rounded border border-gray-200 p-1.5">
-            <ChevronRight size={14} />
-          </button>
         </div>
       </div>
 
