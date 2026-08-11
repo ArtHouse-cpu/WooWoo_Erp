@@ -76,6 +76,10 @@ type SplitPayments = {
 
 type SplitKey = keyof SplitPayments;
 
+const FOOD_BILL_DRAFTS_KEY = "woowoo-foodbill-drafts";
+const PLACEHOLDER_FOOD_IMAGE =
+  "https://res.cloudinary.com/demo/image/upload/w_300,h_300,c_fill/sample.jpg";
+
 // Types
 interface Category {
   id: string;
@@ -96,9 +100,6 @@ interface FoodItem {
   imageUrl?: string | null;
   status?: "Active" | "Inactive";
 }
-
-const PLACEHOLDER_FOOD_IMAGE =
-  "https://res.cloudinary.com/demo/image/upload/w_300,h_300,c_fill/sample.jpg";
 
 function normalizeCategoryKey(category: string) {
   return String(category || "Snacks")
@@ -166,6 +167,53 @@ interface Customer {
   referredBy?: string;
 }
 
+interface OrderItem {
+  item: FoodItem;
+  quantity: number;
+}
+
+type FoodBillDraft = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  label: string;
+  cart: OrderItem[];
+  customer: Customer;
+  tableNumber: string;
+  orderType: string;
+  paymentMethod: string;
+  amountReceived: string;
+  isMultiMode: boolean;
+  splitPayments: SplitPayments;
+  billNote: string;
+  promoCodeInput?: string;
+  couponCode?: string;
+  couponDiscount?: number;
+};
+
+function loadDrafts(): FoodBillDraft[] {
+  try {
+    const raw = localStorage.getItem(FOOD_BILL_DRAFTS_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistDrafts(list: FoodBillDraft[]) {
+  localStorage.setItem(FOOD_BILL_DRAFTS_KEY, JSON.stringify(list));
+}
+
+function makeDraftLabel(
+  cart: OrderItem[],
+  customerName: string,
+  total: number,
+) {
+  const qty = cart.reduce((s, l) => s + l.quantity, 0);
+  return `${customerName || "Walk-in"} · ${qty} item(s) · ₹${total.toFixed(0)}`;
+}
+
 const WALK_IN_CUSTOMER: Customer = {
   id: "walk-in",
   name: "Walk-in Customer",
@@ -217,7 +265,9 @@ function mapApiCustomer(raw: any): Customer | null {
   const membershipType = String(raw?.membershipType || "none");
   const membershipPlanId = raw?.membershipPlanId
     ? String(
-        raw.membershipPlanId._id || raw.membershipPlanId.id || raw.membershipPlanId,
+        raw.membershipPlanId._id ||
+          raw.membershipPlanId.id ||
+          raw.membershipPlanId,
       ).trim()
     : null;
   const ownCode = String(raw?.referralCode || raw?.referral?.code || "")
@@ -237,11 +287,6 @@ function mapApiCustomer(raw: any): Customer | null {
     referralCode: ownCode || undefined,
     referredBy: referredBy || undefined,
   };
-}
-
-interface OrderItem {
-  item: FoodItem;
-  quantity: number;
 }
 
 interface RecentBill {
@@ -264,7 +309,7 @@ export default function FoodBill() {
   );
   /** Keep full customer (membership fields) even if search refetch replaces the list */
   const [selectedCustomerCache, setSelectedCustomerCache] =
-    useState<Customer>(WALK_IN_CUSTOMER);
+    useState<Customer>(WALK_IN_CUSTOMER);   
   const [customerSearch, setCustomerSearch] = useState<string>("");
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const customerSearchWrapRef = useRef<HTMLDivElement>(null);
@@ -337,6 +382,61 @@ export default function FoodBill() {
   const [showRecentBillsDrawer, setShowRecentBillsDrawer] =
     useState<boolean>(false);
   const [recentBills, setRecentBills] = useState<RecentBill[]>([]);
+  const [drafts, setDrafts] = useState<FoodBillDraft[]>(() => loadDrafts());
+  const [showDraftsDrawer, setShowDraftsDrawer] = useState(false);
+
+  useEffect(() => {
+    setDrafts(loadDrafts());
+  }, []);
+
+  const restoreDraft = (d: FoodBillDraft) => {
+    const customer = d.customer || WALK_IN_CUSTOMER;
+    setCart(Array.isArray(d.cart) ? d.cart : []);
+    setSelectedCustomerCache(customer);
+    setSelectedCustomerId(customer.id);
+    setCustomers((prev) => {
+      if (customer.id === WALK_IN_CUSTOMER.id) return [WALK_IN_CUSTOMER];
+      const without = prev.filter(
+        (c) => c.id !== customer.id && c.id !== WALK_IN_CUSTOMER.id,
+      );
+      return [customer, ...without, WALK_IN_CUSTOMER];
+    });
+    setCustomerSearch(formatCustomerLabel(customer));
+    setTableNumber(d.tableNumber || "Table 5");
+    setOrderType(d.orderType || "Takeaway");
+    setPaymentMethod(d.paymentMethod || "Cash");
+    setAmountReceived(d.amountReceived || "0");
+    setIsMultiMode(Boolean(d.isMultiMode));
+    setSplitPayments(
+      d.splitPayments || { cash: 0, upi: 0, card: 0, wallet: 0 },
+    );
+    setBillNote(d.billNote || "");
+    setPromoCodeInput(d.promoCodeInput || "");
+    setCouponCode(d.couponCode || "");
+    setCouponDiscount(Number(d.couponDiscount || 0) || 0);
+    setCouponLabel(d.couponCode ? "Coupon" : "");
+    // Referral is not stored in drafts — clear any leftover from current session
+    setReferralDiscount(0);
+    setReferralCodeApplied("");
+    setReferralCodeInput("");
+    setReferralInviterName("");
+    setReferralLabel("Referral Discount");
+    setReferralStatusMessage("");
+    setShowDraftsDrawer(false);
+    Swal.fire({
+      title: "Draft Restored",
+      text: "Continue billing from where you left off.",
+      icon: "success",
+      timer: 1200,
+      showConfirmButton: false,
+    });
+  };
+
+  const deleteDraft = (id: string) => {
+    const next = loadDrafts().filter((d) => d.id !== id);
+    persistDrafts(next);
+    setDrafts(next);
+  };
 
   const clearReferralDiscount = () => {
     setReferralDiscount(0);
@@ -384,7 +484,7 @@ export default function FoodBill() {
           ? pinnedCustomer
           : null;
       const withoutPinned = pinned
-        ? mapped.filter((c:any) => c.id !== pinned.id)
+        ? mapped.filter((c: any) => c.id !== pinned.id)
         : mapped;
 
       const walkInMatches = WALK_IN_CUSTOMER.name
@@ -394,7 +494,10 @@ export default function FoodBill() {
       const next = pinned ? [pinned, ...withoutPinned] : withoutPinned;
       setCustomers(
         walkInMatches
-          ? [...next.filter((c:any) => c.id !== WALK_IN_CUSTOMER.id), WALK_IN_CUSTOMER]
+          ? [
+              ...next.filter((c: any) => c.id !== WALK_IN_CUSTOMER.id),
+              WALK_IN_CUSTOMER,
+            ]
           : next.length
             ? next
             : pinned
@@ -762,9 +865,8 @@ export default function FoodBill() {
     : rawMembershipDiscount;
   const membershipCashback = Number(membershipSummary.cashbackTotal || 0);
   const membershipPlan = membershipSummary.plan;
-  const membershipBenefitTotal = Math.round(
-    (membershipDiscount + membershipCashback) * 10,
-  ) / 10;
+  const membershipBenefitTotal =
+    Math.round((membershipDiscount + membershipCashback) * 10) / 10;
 
   // No tax on food bill — membership discount reduces payable; cashback is wallet credit
   const totalBeforeRound = useMemo(() => {
@@ -1122,9 +1224,7 @@ export default function FoodBill() {
     // Keep selected customer in local list for display / re-select
     setCustomers((prev) => [
       cust,
-      ...prev.filter(
-        (c) => c.id !== cust.id && c.id !== WALK_IN_CUSTOMER.id,
-      ),
+      ...prev.filter((c) => c.id !== cust.id && c.id !== WALK_IN_CUSTOMER.id),
       WALK_IN_CUSTOMER,
     ]);
     setWalletBalance(Number(cust.points || 0) || 0);
@@ -1147,7 +1247,10 @@ export default function FoodBill() {
           return;
         }
         const general = Number(
-          wallet?.generalBalance ?? wallet?.walletAmount ?? wallet?.balance ?? 0,
+          wallet?.generalBalance ??
+            wallet?.walletAmount ??
+            wallet?.balance ??
+            0,
         );
         const cashback = Number(wallet?.cashbackBalance ?? 0);
         const affiliate = Number(
@@ -1158,9 +1261,7 @@ export default function FoodBill() {
           wallet?.cashbackBalance !== undefined ||
           wallet?.affiliateBalance !== undefined
         ) {
-          setWalletBalance(
-            Math.max(0, general + cashback + affiliate),
-          );
+          setWalletBalance(Math.max(0, general + cashback + affiliate));
           return;
         }
         const amount = Number(
@@ -1398,9 +1499,7 @@ export default function FoodBill() {
           );
       const payableTotal = Math.max(
         0,
-        roundedBeforeReferral -
-          appliedCouponDiscount -
-          appliedReferralDiscount,
+        roundedBeforeReferral - appliedCouponDiscount - appliedReferralDiscount,
       );
 
       const invoiceItems = (() => {
@@ -1505,8 +1604,7 @@ export default function FoodBill() {
         customerName: selectedCustomer.name,
         customerPhone: selectedCustomer.phone,
         customerId:
-          selectedCustomer.id &&
-          selectedCustomer.id !== WALK_IN_CUSTOMER.id
+          selectedCustomer.id && selectedCustomer.id !== WALK_IN_CUSTOMER.id
             ? selectedCustomer.id
             : undefined,
         invoiceDate: today,
@@ -1589,7 +1687,10 @@ export default function FoodBill() {
             },
           });
         } catch (cashbackErr) {
-          console.error("Food Bill cashback wallet credit failed:", cashbackErr);
+          console.error(
+            "Food Bill cashback wallet credit failed:",
+            cashbackErr,
+          );
         }
       }
 
@@ -2235,12 +2336,8 @@ export default function FoodBill() {
                     <div className="flex items-center justify-between gap-2 text-[10px] text-violet-700">
                       <span className="truncate font-semibold">
                         {referralLabel}
-                        {referralCodeApplied
-                          ? ` (${referralCodeApplied})`
-                          : ""}
-                        {referralInviterName
-                          ? ` · ${referralInviterName}`
-                          : ""}
+                        {referralCodeApplied ? ` (${referralCodeApplied})` : ""}
+                        {referralInviterName ? ` · ${referralInviterName}` : ""}
                       </span>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="font-bold text-green-600">
@@ -2262,12 +2359,8 @@ export default function FoodBill() {
                         {referralStatusMessage ||
                           referralLabel ||
                           "Referral applied (no buyer discount)"}
-                        {referralCodeApplied
-                          ? ` (${referralCodeApplied})`
-                          : ""}
-                        {referralInviterName
-                          ? ` · ${referralInviterName}`
-                          : ""}
+                        {referralCodeApplied ? ` (${referralCodeApplied})` : ""}
+                        {referralInviterName ? ` · ${referralInviterName}` : ""}
                       </span>
                       <button
                         type="button"
@@ -2536,13 +2629,47 @@ export default function FoodBill() {
                   Hold Order
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     if (cart.length === 0) return;
+
+                    const now = new Date().toISOString();
+                    const draft: FoodBillDraft = {
+                      id: `draft-${Date.now()}`,
+                      createdAt: now,
+                      updatedAt: now,
+                      label: makeDraftLabel(
+                        cart,
+                        selectedCustomerCache.name,
+                        grandTotal,
+                      ),
+                      cart,
+                      customer: selectedCustomerCache,
+                      tableNumber,
+                      orderType,
+                      paymentMethod,
+                      amountReceived,
+                      isMultiMode,
+                      splitPayments,
+                      billNote,
+                      promoCodeInput,
+                      couponCode,
+                      couponDiscount,
+                    };
+
+                    const next = [draft, ...loadDrafts()].slice(0, 30); // keep last 30
+                    persistDrafts(next);
+                    setDrafts(next);
+
+                    // optional: clear current bill after saving
+                    setCart([]);
+                    // reset customer / notes if you want a fresh counter
+
                     Swal.fire({
                       title: "Saved as Draft",
-                      text: "Order details saved to drafts.",
+                      text: "Open Drafts to continue this order later.",
                       icon: "success",
-                      timer: 1200,
+                      timer: 1400,
                       showConfirmButton: false,
                     });
                   }}
@@ -2600,9 +2727,26 @@ export default function FoodBill() {
           </div>
         </div>
 
-        {/* Recent Bills navigation action */}
-        <div>
+        {/* Recent Bills / Drafts navigation */}
+        <div className="flex items-center gap-2">
           <button
+            type="button"
+            onClick={() => {
+              setDrafts(loadDrafts());
+              setShowDraftsDrawer(true);
+            }}
+            className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+          >
+            <Save size={14} className="text-gray-500" />
+            Drafts
+            {drafts.length > 0 ? (
+              <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-600">
+                {drafts.length}
+              </span>
+            ) : null}
+          </button>
+          <button
+            type="button"
             onClick={() => setShowRecentBillsDrawer(true)}
             className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
           >
@@ -2711,13 +2855,63 @@ export default function FoodBill() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
 
-            <button
-              onClick={() => setShowRecentBillsDrawer(false)}
-              className="w-full py-2 bg-gray-100 text-gray-700 font-bold rounded-xl text-xs hover:bg-gray-250 transition cursor-pointer"
-            >
-              Close Drawer
-            </button>
+      {/* SAVED DRAFTS SIDEBAR DRAWER */}
+      {showDraftsDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
+          <div className="h-full w-full max-w-sm bg-white p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between border-b border-gray-150 pb-3">
+              <h3 className="text-sm font-bold flex items-center gap-1.5">
+                <Save size={16} />
+                Saved Drafts
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowDraftsDrawer(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {drafts.length === 0 ? (
+              <p className="text-xs text-gray-500">No drafts yet.</p>
+            ) : (
+              <div className="space-y-2 overflow-y-auto max-h-[80vh]">
+                {drafts.map((d) => (
+                  <div
+                    key={d.id}
+                    className="rounded-xl border border-gray-200 p-3"
+                  >
+                    <div className="text-xs font-bold text-gray-800">
+                      {d.label}
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      {new Date(d.updatedAt).toLocaleString()}
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => restoreDraft(d)}
+                        className="flex-1 rounded-lg bg-blue-600 py-1.5 text-[11px] font-bold text-white"
+                      >
+                        Continue
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteDraft(d.id)}
+                        className="rounded-lg border px-3 py-1.5 text-[11px] font-bold text-red-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
