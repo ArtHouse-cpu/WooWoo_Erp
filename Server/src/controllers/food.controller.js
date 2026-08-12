@@ -44,6 +44,7 @@ const buildFoodPayload = (body = {}, imageUrl) => {
   const payload = {
     name,
     category: String(body.category ?? 'Snacks').trim() || 'Snacks',
+    itemType: 'food',
     price: Math.max(0, Number(body.price ?? 0) || 0),
     // Stock is optional for restaurant made-to-order; availability uses status
     stock: Math.max(0, Number(body.stock ?? 0) || 0),

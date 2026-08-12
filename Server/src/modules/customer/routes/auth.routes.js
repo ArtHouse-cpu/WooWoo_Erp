@@ -24,6 +24,10 @@ import {
 import {getReferralDashboard} from '../controllers/referral.controller.js';
 import {getWalletDashboard} from '../controllers/wallet.controller.js';
 import {getCustomerMembershipPlans} from '../controllers/membership.controller.js';
+import {
+  getMyActivity,
+  getMyActivityDetail,
+} from '../controllers/activity.controller.js';
 import {validateRequest} from '../middlewares/validateRequest.js';
 import {
   authenticateCustomer,
@@ -61,7 +65,7 @@ router.post(
   '/login/otp',
   customerOtpLimiter,
   validateRequest(otpLoginSchema),
-  loginOtp,
+  loginOtp, 
 );
 router.post(
   '/verify-otp',
@@ -107,6 +111,18 @@ router.get(
   authenticateCustomer,
   authorizeCustomer('active'),
   getWalletDashboard,
+);
+router.get(
+  '/activity',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  getMyActivity,
+);
+router.get(
+  '/activity/:invoiceId',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  getMyActivityDetail,
 );
 router.put(
   '/profile',

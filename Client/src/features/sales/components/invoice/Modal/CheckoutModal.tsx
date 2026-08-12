@@ -1183,11 +1183,21 @@ export default function CheckoutModal({
     invoiceNo,
     customerName: customerName.trim() || "Walk-in Customer",
     customerPhone: customerSearch.trim(),
+    salesPerson:
+      verifiedStaff?.staffName ||
+      verifiedStaff?.name ||
+      "—",
+    membershipType:
+      selectedCustomer?.membershipType || membership || undefined,
     items: items.map((it) => ({
       name: it.name,
       qty: Number(it.qty),
       price: Number(it.price),
       discount: Number(it.discount ?? 0),
+      itemCode: (it as { sku?: string; productCode?: string }).sku ||
+        (it as { productCode?: string }).productCode,
+      hsn: (it as { hsn?: string; hsnCode?: string }).hsn ||
+        (it as { hsnCode?: string }).hsnCode,
     })),
     totalMRP: items.reduce(
       (sum, it) => sum + Number(it.qty) * Number(it.price),

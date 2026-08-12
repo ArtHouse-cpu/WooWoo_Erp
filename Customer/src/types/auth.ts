@@ -129,3 +129,29 @@ export type OtpPurpose =
   | 'forgot-password'
   | 'verify-mobile'
   | 'verify-email';
+
+
+export interface ActivityItem {
+  invoiceId: string;
+  invoiceNumber: string;
+  createdAt: string;
+  paidAmount: number;
+  totalPaid: number;
+  itemCount: number;
+  totalBenefit: number;
+  discountAmount: number;
+  cashbackAmount: number;
+  status: 'Paid' | 'Pending' | 'Cancelled' | string;
+  category?: string;
+  subTotal?: number;
+}
+
+export interface ActivityDashboard {
+  activities: ActivityItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}

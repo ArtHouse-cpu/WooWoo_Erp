@@ -68,6 +68,7 @@ export const getServices = async (req, res) => {
  * POST /services — create a service (forces type=service).
  */
 export const createService = async (req, res) => {
+  req.forceItemType = 'service';
   req.body = {
     ...(req.body || {}),
     type: 'service',
@@ -93,6 +94,7 @@ export const updateService = async (req, res) => {
       });
     }
 
+    req.forceItemType = 'service';
     req.body = {
       ...(req.body || {}),
       type: 'service',

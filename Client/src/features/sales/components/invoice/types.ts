@@ -54,6 +54,9 @@ export type InvoicePdfInput = {
   subscriptionCode?: string;
   customerName?: string;
   customerPhone?: string;
+  /** Customer membership plan key (e.g. premium, pro) — shown beside name on PDF */
+  membershipType?: string;
+  membershipPlanId?: string;
   /** Multi-line postal address */
   customerAddress?: string | string[];
   accountNumber?: string;

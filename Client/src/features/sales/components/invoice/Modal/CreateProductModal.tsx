@@ -8,5 +8,16 @@ type Props = {
 };
 
 export default function CreateProductModal({ onClose, onSubmit, loading, initialData }: Props) {
-  return <AddItemModal onClose={onClose} onSubmit={onSubmit} loading={loading} initialData={initialData} />;
+  return (
+    <AddItemModal
+      lockType="product"
+      onClose={onClose}
+      onSubmit={onSubmit}
+      loading={loading}
+      initialData={{
+        type: "product",
+        ...initialData,
+      }}
+    />
+  );
 }

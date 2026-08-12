@@ -7,6 +7,7 @@ import path from 'path';
 import { computeStockByProductNames, getProductStockNames, sumStockForNames } from '../utils/inventoryStock.utils.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import mongoose from 'mongoose';
+import {LINE_TYPES} from '../utils/itemClassification.utils.js';
 
 /**
  * Case-insensitive name lookup without giant $regex patterns
@@ -224,7 +225,18 @@ export const createProduct = async (req, res) => {
     } = req.body;
     console.log("product controller",req.body);
 
-    const itemType = type === "service" ? "service" : "product";
+    // Product routes always create products; Services routes set forceItemType='service'
+    const forcedType = String(req.forceItemType || '').trim().toLowerCase();
+    const itemType =
+      forcedType === LINE_TYPES.SERVICE || forcedType === LINE_TYPES.PRODUCT
+        ? forcedType
+        : type === 'service'
+          ? LINE_TYPES.SERVICE
+          : LINE_TYPES.PRODUCT;
+    // CSP only allowed on products
+    if (itemType === LINE_TYPES.SERVICE) {
+      req.body.isCsp = false;
+    }
     const resolvedName = itemType === "service" ? serviceName || productName : productName;
 
     if (!resolvedName) {
@@ -1153,6 +1165,22 @@ export const updateProduct = async (req, res) => {
       });
     }
 
+    const existingIsService =
+      existingProduct.itemType === 'service' || existingProduct.type === 'service';
+    const forcedTypeEarly = String(req.forceItemType || '').trim().toLowerCase();
+    if (forcedTypeEarly === 'product' && existingIsService) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found. Use Services API to update services.',
+      });
+    }
+    if (forcedTypeEarly === 'service' && !existingIsService) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found.',
+      });
+    }
+
     if (isCsp !== undefined || cspEnrollmentId !== undefined) {
       try {
         const cspFields = await resolveCspFields({
@@ -1187,8 +1215,19 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // update fields
-    const nextType = type === "service" ? "service" : "product";
+    // update fields — never convert product↔service unless forceItemType says so
+    const forcedType = String(req.forceItemType || '').trim().toLowerCase();
+    let nextType;
+    if (forcedType === LINE_TYPES.SERVICE || forcedType === LINE_TYPES.PRODUCT) {
+      nextType = forcedType;
+    } else {
+      // Keep existing type; ignore client attempts to reclassify via /products
+      const existingType =
+        existingProduct.itemType === 'service' || existingProduct.type === 'service'
+          ? LINE_TYPES.SERVICE
+          : LINE_TYPES.PRODUCT;
+      nextType = existingType;
+    }
     existingProduct.type = nextType;
     existingProduct.itemType = nextType;
     const nextName =

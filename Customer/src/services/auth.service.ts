@@ -5,6 +5,7 @@ import type {
   OtpPurpose,
   ReferralDashboard,
   WalletDashboard,
+  ActivityDashboard,
 } from '../types/auth';
 
 export const authApi = {
@@ -144,4 +145,11 @@ export const authApi = {
         paidAmount: number;
       }>
     >(`/payments/${txnid}`),
+
+
+  getActivity: (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }) => api.get<ApiResponse<ActivityDashboard>>('/activity', {params}),
 };

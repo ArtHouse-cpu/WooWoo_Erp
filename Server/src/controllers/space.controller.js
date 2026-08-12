@@ -51,6 +51,7 @@ const buildSpacePayload = (body = {}, imageUrl) => {
   const payload = {
     name,
     category: String(body.category ?? 'Studio').trim() || 'Studio',
+    itemType: 'space',
     price: Math.max(0, Number(body.price ?? 0) || 0),
     capacity: Math.max(1, Number(body.capacity ?? 1) || 1),
     status: normalizeStatus(body.status),

@@ -12,6 +12,13 @@ const spaceSchema = new mongoose.Schema(
       default: 'Studio',
       trim: true,
     },
+    /** Strict entity type — always Space (never Product/Services/Food). */
+    itemType: {
+      type: String,
+      enum: ['space'],
+      default: 'space',
+      index: true,
+    },
     price: {
       type: Number,
       required: true,

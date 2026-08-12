@@ -51,6 +51,8 @@ export default function ProductForm() {
   });
   const [cspOptions, setCspOptions] = useState<CspEnrollment[]>([]);
   const [loadingCsp, setLoadingCsp] = useState(false);
+  const [cspSearch, setCspSearch] = useState("");
+  const [cspDropdownOpen, setCspDropdownOpen] = useState(false);
   const [showVariantModal, setShowVariantModal] = useState(false);
   const [editVariantIndex, setEditVariantIndex] = useState<number | null>(null);
 
@@ -109,6 +111,34 @@ export default function ProductForm() {
       }
     }
   }, [cspOptions, cspEnrollmentId, setValue]);
+
+  const cspSellerLabel = (row: CspEnrollment) => {
+    const name =
+      row.label ||
+      `CSP · ${
+        row.displayName ||
+        row.customer?.name ||
+        (typeof row.customerId === "object" ? row.customerId?.name : "") ||
+        "Seller"
+      }`;
+    const mobile =
+      row.mobile ||
+      (typeof row.customerId === "object" ? row.customerId?.mobile : "") ||
+      "";
+    return mobile ? `${name} (${mobile})` : String(name);
+  };
+
+  const selectedCsp = cspOptions.find(
+    (row) => String(row._id) === String(cspEnrollmentId || ""),
+  );
+
+  const filteredCspOptions = (() => {
+    const q = cspSearch.trim().toLowerCase();
+    if (!q) return cspOptions;
+    return cspOptions.filter((row) =>
+      cspSellerLabel(row).toLowerCase().includes(q),
+    );
+  })();
 
   return (
     <div className="space-y-4">
@@ -258,44 +288,77 @@ export default function ProductForm() {
             </select>
           </div>
           {isCsp === "yes" ? (
-            <div>
+            <div className="relative">
               <label className={labelClass}>
                 CSP Seller <span className="text-red-500">*</span>
               </label>
-              <select
-                value={String(cspEnrollmentId || "")}
-                onChange={(e) =>
-                  setValue("cspEnrollmentId", e.target.value, {
-                    shouldValidate: true,
-                    shouldDirty: true,
-                  })
+              <input
+                type="text"
+                value={
+                  cspDropdownOpen
+                    ? cspSearch
+                    : selectedCsp
+                      ? cspSellerLabel(selectedCsp)
+                      : cspSearch
+                }
+                onChange={(e) => {
+                  setCspSearch(e.target.value);
+                  setCspDropdownOpen(true);
+                  if (cspEnrollmentId) {
+                    setValue("cspEnrollmentId", "", { shouldValidate: true });
+                  }
+                }}
+                onFocus={() => {
+                  setCspDropdownOpen(true);
+                  setCspSearch("");
+                }}
+                onBlur={() => {
+                  // Delay so option click registers
+                  window.setTimeout(() => setCspDropdownOpen(false), 150);
+                }}
+                placeholder={
+                  loadingCsp ? "Loading sellers…" : "Search CSP seller…"
                 }
                 className={inputClass}
                 disabled={loadingCsp}
-              >
-                <option value="">
-                  {loadingCsp ? "Loading sellers…" : "Select CSP seller"}
-                </option>
-                {cspOptions.map((row) => (
-                  <option key={row._id} value={String(row._id)}>
-                    {row.label ||
-                      `CSP · ${
-                        row.displayName ||
-                        row.customer?.name ||
-                        (typeof row.customerId === "object"
-                          ? row.customerId?.name
-                          : "") ||
-                        "Seller"
-                      }`}
-                    {row.mobile
-                      ? ` (${row.mobile})`
-                      : typeof row.customerId === "object" &&
-                          row.customerId?.mobile
-                        ? ` (${row.customerId.mobile})`
-                        : ""}
-                  </option>
-                ))}
-              </select>
+                autoComplete="off"
+              />
+              {cspDropdownOpen && !loadingCsp ? (
+                <div className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                  {filteredCspOptions.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-slate-500">
+                      No sellers match “{cspSearch.trim() || "…"}”
+                    </p>
+                  ) : (
+                    filteredCspOptions.map((row) => {
+                      const id = String(row._id);
+                      const active = id === String(cspEnrollmentId || "");
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          className={`flex w-full px-3 py-2 text-left text-sm transition ${
+                            active
+                              ? "bg-blue-50 font-semibold text-blue-700"
+                              : "text-slate-700 hover:bg-slate-50"
+                          }`}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setValue("cspEnrollmentId", id, {
+                              shouldValidate: true,
+                              shouldDirty: true,
+                            });
+                            setCspSearch("");
+                            setCspDropdownOpen(false);
+                          }}
+                        >
+                          {cspSellerLabel(row)}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              ) : null}
               {!loadingCsp && cspOptions.length === 0 ? (
                 <p className="mt-1.5 text-xs text-amber-600">
                   No CSP sellers found. Enroll one under Network → CSP.

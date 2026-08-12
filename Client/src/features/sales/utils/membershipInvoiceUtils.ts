@@ -1,4 +1,8 @@
 import type { MembershipPlanPayload } from "@/services/apiClient";
+import {
+  membershipBucketForLineType,
+  normalizeLineType,
+} from "./itemClassification";
 
 export type UsageLimit = { discount?: number; cashback?: number };
 
@@ -87,39 +91,14 @@ export function resolveMembershipPlan(
   return fuzzy;
 }
 
-function isFoodCategory(category: string) {
-  const lower = String(category || "").trim().toLowerCase();
-  return ["food", "foods", "meal", "restaurant", "canteen"].some(
-    (g) => lower === g || lower.startsWith(`${g} `) || lower.endsWith(` ${g}`),
-  );
-}
-
-function isSpaceCategory(category: string) {
-  const lower = String(category || "").trim().toLowerCase();
-  return ["space", "spaces", "booking", "room"].some(
-    (g) => lower === g || lower.startsWith(`${g} `) || lower.endsWith(` ${g}`),
-  );
-}
-
-function isServiceCategory(category: string) {
-  const lower = String(category || "").trim().toLowerCase();
-  return ["service", "services"].some(
-    (g) => lower === g || lower.startsWith(`${g} `) || lower.endsWith(` ${g}`),
-  );
-}
-
 /**
  * Map a line-item category to the membership usageLimits bucket.
- * Catalogue products often store a custom category (Electronics, Art, …) —
- * those must still use the Products cashback/discount row (not be skipped).
+ * Only explicit line types (product/service/space/food) map to their buckets.
+ * Catalogue labels (Snacks, Studio, Electronics) → Products — never cross-apply
+ * Space/Services/Food discounts.
  */
 export function canonicalBenefitCategory(category: string): string {
-  const raw = String(category ?? "").trim();
-  if (isFoodCategory(raw)) return "Food";
-  if (isSpaceCategory(raw)) return "Space";
-  if (isServiceCategory(raw)) return "Services";
-  // product / general / empty / any other catalogue category → Products
-  return "Products";
+  return membershipBucketForLineType(category);
 }
 
 export function getUsageLimitForCategory(
@@ -132,7 +111,7 @@ export function getUsageLimitForCategory(
   const limits = normalizeUsageLimits(usageLimits);
   if (!Object.keys(limits).length) return undefined;
 
-  // Map catalogue / line categories → Food | Space | Services | Products
+  // Strict: only the matching membership bucket for this line type
   const cat = canonicalBenefitCategory(category);
   if (limits[cat]) return limits[cat];
 
@@ -140,48 +119,19 @@ export function getUsageLimitForCategory(
   const exact = Object.keys(limits).find((k) => k.toLowerCase() === lower);
   if (exact) return limits[exact];
 
-  // Fuzzy match: Food / Space / Products / Services / Store line categories
-  const aliasGroups: string[][] = [
-    ["food", "foods", "meal", "restaurant", "canteen"],
-    ["space", "spaces", "booking", "room"],
-    [
-      "product",
-      "products",
-      "store",
-      "supply",
-      "sheets",
-      "stationary",
-      "stationery",
-      "general",
-      "catalogue",
-    ],
-    ["service", "services"],
-  ];
-  for (const group of aliasGroups) {
-    if (!group.some((g) => lower === g || lower.includes(g))) continue;
-    // Prefer canonical keys first (Products / Services / Food / Space)
-    const preferred = Object.keys(limits).find((k) => {
-      const nk = k.toLowerCase();
-      return group.some((g) => nk === g || nk === `${g}s`);
-    });
-    if (preferred) return limits[preferred];
-    const key = Object.keys(limits).find((k) => {
-      const nk = k.toLowerCase();
-      return group.some((g) => nk.includes(g));
-    });
-    if (key) return limits[key];
-  }
-
-  // Anything that canonicalized to Products (incl. custom catalogue categories)
-  if (cat === "Products") {
-    const productsKey = Object.keys(limits).find((k) => {
-      const nk = k.toLowerCase();
-      return nk === "products" || nk === "product" || nk.includes("store");
-    });
-    if (productsKey) return limits[productsKey];
-  }
-
-  return undefined;
+  // Singular/plural only within the same bucket (Products↔product, Services↔service)
+  const sameBucketAliases: Record<string, string[]> = {
+    food: ["food", "foods"],
+    space: ["space", "spaces"],
+    products: ["product", "products", "store"],
+    services: ["service", "services"],
+  };
+  const aliases = sameBucketAliases[lower] || [lower];
+  const match = Object.keys(limits).find((k) => {
+    const nk = k.toLowerCase();
+    return aliases.some((a) => nk === a);
+  });
+  return match ? limits[match] : undefined;
 }
 
 function findLimitRow(

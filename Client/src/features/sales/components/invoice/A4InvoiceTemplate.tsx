@@ -216,6 +216,14 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
   const billNumber = invoice.billNumber??invoice.subscriptionCode??invoiceNo?? "—";
   const customerName = (invoice.customerName || "Walk-in Customer").toUpperCase();
   const customerPhone = invoice.customerPhone || "—";
+  const membershipType = String(invoice.membershipType ?? "").trim();
+  const membershipLabel = (() => {
+    const t = membershipType.toLowerCase();
+    if (!t || t === "none" || t === "-" || t === "n/a") return "";
+    return membershipType
+      .replace(/[_-]+/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  })();
   const customerAddrLines = normalizeCustomerAddress(invoice.customerAddress);
 
   const billDate = safeParseDateDisplay(invoice.invoiceDate);
@@ -407,8 +415,35 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
             lineHeight: 1.55,
           }}
         >
-          <div style={{ fontWeight: 700, marginBottom: "8px" }}>
-            {customerName}
+          <div
+            style={{
+              fontWeight: 700,
+              marginBottom: "8px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              flexWrap: "wrap",
+            }}
+          >
+            <span>{customerName}</span>
+            {membershipLabel ? (
+              <span
+                style={{
+                  display: "inline-block",
+                  background: ACCENT_ORANGE,
+                  color: "#111827",
+                  fontSize: "9px",
+                  fontWeight: 800,
+                  letterSpacing: "0.4px",
+                  textTransform: "uppercase",
+                  padding: "2px 8px",
+                  borderRadius: "999px",
+                  lineHeight: 1.4,
+                }}
+              >
+                {membershipLabel}
+              </span>
+            ) : null}
           </div>
           {customerAddrLines.length > 0 ? (
             customerAddrLines.map((line, i) => (
@@ -729,7 +764,35 @@ export const A4InvoiceTemplate: React.FC<Props> = ({ invoice: raw, documentType 
               lineHeight: 1.5,
             }}
           >
-            <div style={{ fontWeight: 700 }}>{customerName}</div>
+            <div
+              style={{
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                flexWrap: "wrap",
+              }}
+            >
+              <span>{customerName}</span>
+              {membershipLabel ? (
+                <span
+                  style={{
+                    display: "inline-block",
+                    background: ACCENT_ORANGE,
+                    color: "#111827",
+                    fontSize: "9px",
+                    fontWeight: 800,
+                    letterSpacing: "0.4px",
+                    textTransform: "uppercase",
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {membershipLabel}
+                </span>
+              ) : null}
+            </div>
             {customerAddrLines.map((line, i) => (
               <div key={i}>{line}</div>
             ))}

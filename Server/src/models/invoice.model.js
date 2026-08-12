@@ -57,6 +57,12 @@ const invoiceItemSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /** Platform / future-use share (default 30%) — stored, never walleted to sailor */
+    cspPlatformAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {_id: false},
 );
@@ -207,11 +213,34 @@ const invoiceSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    /** Customer membership plan at time of invoice (e.g. premium, pro). */
+    membershipType: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     /** Membership cashback credited to wallet for this invoice (₹). */
     cashbackTotal: {
       type: Number,
       min: 0,
       default: 0,
+    },
+    /** Sum of CSP sailor shares (70%) credited to owner wallets after full payment. */
+    cspSailorTotal: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    /** Sum of CSP platform shares (30%) retained in DB for future use. */
+    cspPlatformTotal: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    /** When CSP 70/30 split was settled (null = not yet / not applicable). */
+    cspSettledAt: {
+      type: Date,
+      default: null,
     },
     /** Remaining due (mirrors paymentBreakdown.dueAmount). */
     pendingAmount: {

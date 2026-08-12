@@ -12,6 +12,13 @@ const foodSchema = new mongoose.Schema(
       default: 'Snacks',
       trim: true,
     },
+    /** Strict entity type — always Food (never Product/Services/Space). */
+    itemType: {
+      type: String,
+      enum: ['food'],
+      default: 'food',
+      index: true,
+    },
     price: {
       type: Number,
       required: true,

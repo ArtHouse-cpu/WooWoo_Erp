@@ -10,6 +10,7 @@ import {
   calcStackedLineBenefits,
   resolveMembershipPlan,
 } from "../../utils/membershipInvoiceUtils";
+import {resolveInvoiceLineCategory} from "../../utils/itemClassification";
 import CreateProductModal from "./Modal/CreateProductModal";
 import CatalogueItemLabel from "@/features/sales/components/CatalogueItemLabel";
 import Swal from "sweetalert2";
@@ -130,14 +131,11 @@ export default function ProductsServicesSection({
 
   const getCalculatedItemBenefits = (item: CatalogueLookupItem, qty: number) => {
     const sellingPrice = Number(item.sellingPrice ?? 0);
-    const lineCategory = item.lineCategory || item.sourceType || "product";
-    // Prefer line type (product/service/food/space) so plan Products/Services limits apply
-    const benefitCategory =
-      lineCategory || item.category || "General";
+    const lineCategory = resolveInvoiceLineCategory(item);
     const stacked = calcStackedLineBenefits({
       unitPrice: sellingPrice,
       qty,
-      category: benefitCategory,
+      category: lineCategory,
       plan: getPlan(),
       discountType: item.discountType,
       discountValue: item.discountValue,
@@ -253,12 +251,12 @@ export default function ProductsServicesSection({
   const applyItemToDraft = (item: CatalogueLookupItem | any) => {
     const qty = Number(draft.qty || 1);
     const sellingPrice = Number(item.sellingPrice ?? 0);
-    const lineCategory = item.lineCategory || item.sourceType || "product";
+    const lineCategory = resolveInvoiceLineCategory(item);
     const isCsp = Boolean(item.isCsp);
     const stacked = calcStackedLineBenefits({
       unitPrice: sellingPrice,
       qty,
-      category: lineCategory || item.category || "General",
+      category: lineCategory,
       plan: getPlan(),
       discountType: item.discountType,
       discountValue: item.discountValue,

@@ -25,6 +25,7 @@ import {
   resolveMembershipPlan,
   toMembershipPlanId,
 } from "../utils/membershipInvoiceUtils";
+import {resolveInvoiceLineCategory} from "../utils/itemClassification";
 import { creditWalletCashback } from "../utils/walletCashback";
 import { useNavigate } from "react-router-dom";
 
@@ -231,17 +232,14 @@ export default function CreatePosScreen({
     }
 
     const price = Number(selectedProduct?.sellingPrice ?? 0);
-    const lineCategory =
-      selectedProduct?.lineCategory ||
-      selectedProduct?.sourceType ||
-      "product";
+    const lineCategory = resolveInvoiceLineCategory(selectedProduct || {});
     const isCsp = Boolean(selectedProduct?.isCsp);
     const productDiscountType = selectedProduct?.discountType;
     const productDiscountValue = Number(selectedProduct?.discountValue ?? 0);
     const stacked = stackLineBenefits(
       price,
       qty,
-      lineCategory || selectedProduct?.category || "General",
+      lineCategory,
       membership,
       membershipPlanId,
       isCsp,
@@ -309,14 +307,14 @@ export default function CreatePosScreen({
     } else {
       const qty = 1;
       const price = Number(p.sellingPrice ?? 0);
-      const lineCategory = p.lineCategory || p.sourceType || "product";
+      const lineCategory = resolveInvoiceLineCategory(p);
       const isCsp = Boolean(p.isCsp);
       const productDiscountType = p.discountType;
       const productDiscountValue = Number(p.discountValue ?? 0);
       const stacked = stackLineBenefits(
         price,
         qty,
-        lineCategory || p.category || "General",
+        lineCategory,
         membership,
         membershipPlanId,
         isCsp,

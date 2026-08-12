@@ -6,7 +6,14 @@ export const printThermalReceipt = (data: {
   subscriptionCode?: string;
   customerName: string;
   customerPhone: string;
-  items: Array<{ name: string; qty: number; price: number; discount: number }>;
+  items: Array<{
+    name: string;
+    qty: number;
+    price: number;
+    discount: number;
+    itemCode?: string;
+    hsn?: string;
+  }>;
   totalMRP: number;
   discountTotal: number;
   cashbackAmount?: number;
@@ -14,12 +21,20 @@ export const printThermalReceipt = (data: {
   totalDue: number;
   totalQty: number;
   extraCharges?: Array<{ label: string; amount: number }>;
+  salesPerson?: string;
+  dueDate?: string;
+  membershipType?: string;
 }) => {
-  const printWindow = window.open("", "_blank", "width=850,height=700");
+  const printWindow = window.open("", "_blank", "width=900,height=1100");
   if (!printWindow) return;
 
-  const today = new Date().toISOString().split("T")[0];
-  const time = new Date().toLocaleTimeString("en-US", {
+  const today = new Date();
+  const date = today.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const time = today.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -27,8 +42,11 @@ export const printThermalReceipt = (data: {
   const html = renderToString(
     <ThermalPrint
       invoiceNo={data.invoiceNo}
-      date={today}
+      date={date}
       time={time}
+      dueDate={data.dueDate || date}
+      salesPerson={data.salesPerson}
+      membershipType={data.membershipType}
       customerName={data.customerName}
       customerPhone={data.customerPhone}
       items={data.items}
@@ -39,25 +57,42 @@ export const printThermalReceipt = (data: {
       totalDue={data.totalDue}
       totalQty={data.totalQty}
       extraCharges={data.extraCharges}
-    />
+    />,
   );
 
   printWindow.document.write(`
     <html>
       <head>
-        <title>Receipt ${data.invoiceNo}</title>
+        <title>Invoice ${data.invoiceNo}</title>
         <base href="${window.location.origin}">
         <style>
-          @page { margin: 0; }
-          body { margin: 0; padding: 0; }
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+          * { box-sizing: border-box; }
+          html, body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+          }
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          }
         </style>
       </head>
       <body>
         ${html}
+        <script>
+          window.onload = function () {
+            setTimeout(function () {
+              window.focus();
+              window.print();
+            }, 250);
+          };
+        </script>
       </body>
     </html>
   `);
   printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 };

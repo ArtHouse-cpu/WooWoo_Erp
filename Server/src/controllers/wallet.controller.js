@@ -179,6 +179,22 @@ const appendTransaction = async (
       return wallet;
     }
   }
+  // Prevent duplicate CSP Product Earning credits for the same invoice
+  if (
+    refId &&
+    txType === "credit" &&
+    String(referenceType || "").trim() === "CspSale"
+  ) {
+    const duplicateCsp = (wallet.transactions || []).some(
+      tx =>
+        String(tx.referenceId || "").trim() === refId &&
+        String(tx.type || "").toLowerCase() === "credit" &&
+        String(tx.referenceType || "").trim() === "CspSale",
+    );
+    if (duplicateCsp) {
+      return wallet;
+    }
+  }
 
   // Merge customer + wallet buckets (0 must not hide the other side)
   const customer = await Customer.findById(wallet.customerId)

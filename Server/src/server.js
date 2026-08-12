@@ -34,6 +34,7 @@ import {customerErrorHandler} from './modules/customer/middlewares/errorHandler.
 import path from 'path';
 import {fileURLToPath} from 'url';
 import sentAnnouncement from './routes/sendAnnouncement.router.js';
+// import activityRoutes from './routes/activity.route.js';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);
@@ -103,6 +104,7 @@ app.use('/coupon', couponRoutes);
 app.use('/company', companyRoutes);
 app.use('/affiliate', affiliateRoutes);
 app.use('/access', accessRoutes);
+
 
 //CSP APIs
 app.use('/csp', cspRouters);
