@@ -66,9 +66,14 @@ const customerSchema = new mongoose.Schema(
     },
 
  
+    /**
+     * Membership plan key (planId from Membership collection).
+     * Keep as free string — Manage Plans can add custom ids (e.g. lifetime).
+     */
     membershipType: {
       type: String,
-      enum: ["none","pro", "premium", "special", "junior", "general"],
+      trim: true,
+      lowercase: true,
       default: "none",
     },
     membershipPlanId: {

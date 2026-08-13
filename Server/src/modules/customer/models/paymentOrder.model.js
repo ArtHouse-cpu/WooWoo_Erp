@@ -17,8 +17,9 @@ const paymentOrderSchema = new mongoose.Schema(
     },
     membershipType: {
       type: String,
-      enum: ['general', 'special', 'junior', 'premium', 'pro'],
       required: true,
+      trim: true,
+      lowercase: true,
     },
     couponCode: {
       type: String,

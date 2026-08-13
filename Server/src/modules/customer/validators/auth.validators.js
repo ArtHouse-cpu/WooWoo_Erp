@@ -114,9 +114,7 @@ export const updateProfileSchema = z.object({
   pincode: z.string().optional(),
   profileImage: z.string().optional(),
   whatsappNumber: z.string().optional(),
-  membershipType: z
-    .enum(['none', 'pro', 'premium', 'special', 'junior', 'general'])
-    .optional(),
+  membershipType: z.string().trim().min(1).max(64).optional(),
   profileSetupCompleted: z.boolean().optional(),
   onboardingCompleted: z.boolean().optional(),
 });

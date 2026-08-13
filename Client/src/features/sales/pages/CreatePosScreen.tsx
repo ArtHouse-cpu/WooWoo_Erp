@@ -578,7 +578,6 @@ export default function CreatePosScreen({
   const handleSaveDraft = async () => {
     try {
       setSaving(true);
-
       await handleCreateInvoice({
         customerName: customer.trim() || "Walk-in Customer",
         customerPhone: phone.trim(),

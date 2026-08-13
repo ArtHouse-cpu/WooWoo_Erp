@@ -1,19 +1,37 @@
 import type { CatalogueLookupItem } from "@/services/apiClient";
 
-type CatalogueIdentity = Pick<
-  CatalogueLookupItem,
-  "_id" | "sourceType" | "sourceId" | "variantName" | "productName" | "name"
-> & {
+/**
+ * Shared identity shape for catalogue tiles and POS cart lines.
+ * Cart lines use `name` + optional `catalogueKey`; catalogue rows use `_id` / productName.
+ */
+export type CatalogueIdentity = {
+  _id?: string;
+  id?: number | string;
+  sourceType?: string;
+  sourceId?: string;
+  variantName?: string | null;
+  productName?: string;
+  name?: string;
   catalogueKey?: string;
   sellingPrice?: number;
   price?: number;
 };
 
+/** Accept full catalogue rows or partial cart/identity objects. */
+export type CatalogueIdentityInput =
+  | CatalogueIdentity
+  | Pick<
+      CatalogueLookupItem,
+      "_id" | "sourceType" | "sourceId" | "variantName" | "productName" | "name"
+    >
+  | null
+  | undefined;
+
 /**
  * Stable identity for a catalogue row (parent product vs each variant).
  * Catalogue variant rows use `_id = sourceId::variantName`.
  */
-export function getCatalogueLineKey(item: CatalogueIdentity | null | undefined): string {
+export function getCatalogueLineKey(item: CatalogueIdentityInput): string {
   if (!item) return "";
   const explicit = String(item.catalogueKey || "").trim();
   if (explicit) return explicit.toLowerCase();
@@ -33,26 +51,28 @@ export function getCatalogueLineKey(item: CatalogueIdentity | null | undefined):
 /** Find the cart line that belongs to this catalogue tile (not all same-named parents). */
 export function findCartItemForCatalogueLine<T extends CatalogueIdentity>(
   cartItems: T[] | null | undefined,
-  catalogueItem: CatalogueIdentity,
+  catalogueItem: CatalogueIdentityInput,
 ): T | undefined {
   const list = Array.isArray(cartItems) ? cartItems : [];
   const key = getCatalogueLineKey(catalogueItem);
   if (!key) return undefined;
 
-  const byKey = list.find(
-    (c) => getCatalogueLineKey(c) === key || String(c._id || "").toLowerCase() === key,
-  );
+  const byKey = list.find((c) => {
+    const cartKey = getCatalogueLineKey(c);
+    if (cartKey && cartKey === key) return true;
+    return String(c._id || "").toLowerCase() === key;
+  });
   if (byKey) return byKey;
 
   // Legacy cart lines (no catalogueKey): match full line name + price only.
   // Never match on parent name alone — that selects every variant of the same product.
   const lineName = String(
-    catalogueItem.productName || catalogueItem.name || "",
+    catalogueItem?.productName || catalogueItem?.name || "",
   )
     .trim()
     .toLowerCase();
   const price = Number(
-    catalogueItem.sellingPrice ?? catalogueItem.price ?? 0,
+    catalogueItem?.sellingPrice ?? catalogueItem?.price ?? 0,
   );
   if (!lineName) return undefined;
 
