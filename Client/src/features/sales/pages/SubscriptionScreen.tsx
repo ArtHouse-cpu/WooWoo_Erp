@@ -554,7 +554,7 @@ export default function SubscriptionScreen() {
 
             let blobPkg: { blob: Blob; filename: string } | null = null;
             try {
-              blobPkg = await getInvoicePdfBlob(raw);
+              blobPkg = await getInvoicePdfBlob(raw, "SUBSCRIPTION");
             } catch (error) {
               console.error(error);
             }
@@ -634,7 +634,7 @@ export default function SubscriptionScreen() {
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading(),
               });
-              await downloadInvoicePdf(subscription.raw);
+              await downloadInvoicePdf(subscription.raw, "SUBSCRIPTION");
               Swal.close();
             } catch {
               Swal.fire("Error", "Could not generate PDF.", "error");

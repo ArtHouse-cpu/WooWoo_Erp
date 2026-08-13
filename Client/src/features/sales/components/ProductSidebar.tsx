@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   Minus,
@@ -14,7 +14,7 @@ import {
   type CatalogueLookupItem,
 } from "@/services/apiClient";
 import { calcCatalogueProductDiscount } from "../utils/membershipInvoiceUtils";
-import CatalogueItemLabel from "./CatalogueItemLabel";
+import CatalogueItemLabel, { getCatalogueNameParts } from "./CatalogueItemLabel";
 import {
   findCartItemForCatalogueLine,
   getCatalogueLineKey,
@@ -231,6 +231,24 @@ export default function ProductSidebar({
     setPage((p) => p + 1);
   };
 
+  /** Hide empty parent tiles when any variant of that product name is in the list. */
+  const visibleItems = useMemo(() => {
+    const parentsWithVariants = new Set<string>();
+    for (const item of items) {
+      const parts = getCatalogueNameParts(item);
+      if (parts.variantName) {
+        parentsWithVariants.add(parts.parentName.trim().toLowerCase());
+      }
+    }
+    if (!parentsWithVariants.size) return items;
+
+    return items.filter((item) => {
+      const parts = getCatalogueNameParts(item);
+      if (parts.variantName) return true;
+      return !parentsWithVariants.has(parts.parentName.trim().toLowerCase());
+    });
+  }, [items]);
+
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="border-b border-slate-100 bg-slate-50/50 p-4">
@@ -291,16 +309,17 @@ export default function ProductSidebar({
               Loading catalogue...
             </span>
           </div>
-        ) : items.length === 0 ? (
+        ) : visibleItems.length === 0 ? (
           <div className="py-12 text-center text-xs font-medium text-slate-400">
             No items found.
           </div>
         ) : (
           <>
-            {items.map((item) => {
+            {visibleItems.map((item) => {
               const badge = SOURCE_BADGE[item.sourceType] || SOURCE_BADGE.product;
               const IconComponent = badge.icon;
               const lineKey = getCatalogueLineKey(item);
+              const nameParts = getCatalogueNameParts(item);
 
               const cartItem = findCartItemForCatalogueLine(cartItems, item);
               const qtyInCart = cartItem?.qty || 0;
@@ -341,7 +360,7 @@ export default function ProductSidebar({
                     <CatalogueItemLabel item={item} compact />
                     <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                       <CataloguePrice item={item} />
-                      {item.variantName ? (
+                      {nameParts.variantName ? (
                         <span className="rounded bg-violet-50 px-1 py-0.5 text-[8px] font-extrabold uppercase tracking-wide text-violet-700 ring-1 ring-violet-100">
                           Variant
                         </span>
@@ -419,7 +438,7 @@ export default function ProductSidebar({
                   ? "Loading..."
                   : "Load more products"}
               </button>
-            ) : items.length > 0 ? (
+            ) : visibleItems.length > 0 ? (
               <p className="py-2 text-center text-[10px] font-medium text-slate-400">
                 End of list · use search to find any product
               </p>

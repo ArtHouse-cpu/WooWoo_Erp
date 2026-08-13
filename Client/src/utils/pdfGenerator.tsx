@@ -10,6 +10,14 @@ import {
 
 const PDF_ROOT_SELECTOR = "[data-invoice-pdf-root]";
 
+type PdfHotLink = {
+  href: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
 }
@@ -29,7 +37,7 @@ function invoicePdfBasename(invoice: InvoicePdfInput): string {
   const code =
     invoice.invoiceCode ??
     invoice.returnCode ??
-    (invoice.invoiceNumber != null ? String(invoice.invoiceNumber ) : null) ??
+    (invoice.invoiceNumber != null ? String(invoice.invoiceNumber) : null) ??
     "invoice";
   return `${safePdfFileName(String(code))}.pdf`;
 }
@@ -59,13 +67,45 @@ async function waitForCaptureReady(root: HTMLElement): Promise<void> {
   });
 }
 
-/** Tall invoices: slice the raster across multiple A4 pages. */
-function addCanvasAsPagedPdf(pdf: jsPDF, canvas: HTMLCanvasElement): void {
+/** Collect footer/social <a> boxes relative to invoice root (CSS px). */
+function collectInvoiceLinks(root: HTMLElement): PdfHotLink[] {
+  const rootRect = root.getBoundingClientRect();
+  return [...root.querySelectorAll("a[href]")]
+    .map((node) => {
+      const el = node as HTMLAnchorElement;
+      const href = String(el.href || "").trim();
+      const r = el.getBoundingClientRect();
+      return {
+        href,
+        x: r.left - rootRect.left,
+        y: r.top - rootRect.top,
+        w: Math.max(r.width, 12),
+        h: Math.max(r.height, 12),
+      };
+    })
+    .filter((link) => /^https?:\/\//i.test(link.href));
+}
+
+/**
+ * Raster pages + invisible clickable link annotations for soft-copy PDFs.
+ * Links are mapped from DOM positions onto the same image coordinate system.
+ */
+function addCanvasAsPagedPdf(
+  pdf: jsPDF,
+  canvas: HTMLCanvasElement,
+  root: HTMLElement,
+  links: PdfHotLink[],
+): void {
   const pdfWidth = pdf.internal.pageSize.getWidth();
   const pdfHeight = pdf.internal.pageSize.getHeight();
 
   const imgWidth = pdfWidth;
   const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+  const contentWidthPx = Math.max(1, root.scrollWidth || root.offsetWidth);
+  const contentHeightPx = Math.max(1, root.scrollHeight || root.offsetHeight);
+  const scaleX = imgWidth / contentWidthPx;
+  const scaleY = imgHeight / contentHeightPx;
 
   let imgData: string;
   try {
@@ -78,14 +118,37 @@ function addCanvasAsPagedPdf(pdf: jsPDF, canvas: HTMLCanvasElement): void {
 
   let heightLeft = imgHeight;
   let position = 0;
+  let pageIndex = 0;
+
+  const placeLinksForPage = (page: number, imageOffsetY: number) => {
+    pdf.setPage(page + 1);
+    for (const link of links) {
+      const lx = link.x * scaleX;
+      const ly = link.y * scaleY;
+      const lw = link.w * scaleX;
+      const lh = link.h * scaleY;
+
+      // Link center must fall on this page's visible slice.
+      const centerY = ly + lh / 2;
+      const pageTop = -imageOffsetY;
+      const pageBottom = pageTop + pdfHeight;
+      if (centerY < pageTop || centerY > pageBottom) continue;
+
+      const yOnPage = ly + imageOffsetY;
+      pdf.link(lx, yOnPage, lw, lh, { url: link.href });
+    }
+  };
 
   pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+  placeLinksForPage(pageIndex, position);
   heightLeft -= pdfHeight;
 
   while (heightLeft > 0) {
     position = heightLeft - imgHeight;
+    pageIndex += 1;
     pdf.addPage();
     pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    placeLinksForPage(pageIndex, position);
     heightLeft -= pdfHeight;
   }
 }
@@ -101,14 +164,17 @@ function cleanupDom(root: Root | null, container: HTMLDivElement): void {
   }
 }
 
-async function createInvoicePdf(invoice: InvoicePdfInput, documentType: string = "INVOICE"): Promise<jsPDF> {
+async function createInvoicePdf(
+  invoice: InvoicePdfInput,
+  documentType: string = "INVOICE",
+): Promise<jsPDF> {
   const container = document.createElement("div");
   container.setAttribute("aria-hidden", "true");
   container.style.position = "absolute";
   container.style.left = "-9999px";
   container.style.top = "0";
   container.style.width = "900px";
-  container.style.pointerEvents = "none";
+  container.style.pointerEvents = "auto";
   container.style.overflow = "visible";
   document.body.appendChild(container);
 
@@ -116,7 +182,9 @@ async function createInvoicePdf(invoice: InvoicePdfInput, documentType: string =
 
   try {
     flushSync(() => {
-      root!.render(<A4InvoiceTemplate invoice={invoice} documentType={documentType} />);
+      root!.render(
+        <A4InvoiceTemplate invoice={invoice} documentType={documentType} />,
+      );
     });
   } catch (renderError) {
     console.error("Invoice PDF render failed:", renderError);
@@ -135,6 +203,7 @@ async function createInvoicePdf(invoice: InvoicePdfInput, documentType: string =
 
   try {
     await waitForCaptureReady(element);
+    const links = collectInvoiceLinks(element);
 
     const canvas = await html2canvas(element, {
       scale: Math.min(2, (window.devicePixelRatio || 1) * 1.5),
@@ -150,6 +219,8 @@ async function createInvoicePdf(invoice: InvoicePdfInput, documentType: string =
         const clonedRoot = clone.querySelector(PDF_ROOT_SELECTOR);
         if (!clonedRoot) return;
         clonedRoot.querySelectorAll("img").forEach((node: HTMLImageElement) => {
+          // Keep bundled logo/stamp and UPI QR; only strip unsafe product photos.
+          if (node.hasAttribute("data-pdf-keep")) return;
           node.src = PDF_INLINE_IMAGE_PLACEHOLDER;
         });
       },
@@ -161,7 +232,7 @@ async function createInvoicePdf(invoice: InvoicePdfInput, documentType: string =
       format: "a4",
     });
 
-    addCanvasAsPagedPdf(pdf, canvas);
+    addCanvasAsPagedPdf(pdf, canvas, element, links);
     return pdf;
   } catch (err) {
     const message =
@@ -173,7 +244,10 @@ async function createInvoicePdf(invoice: InvoicePdfInput, documentType: string =
   }
 }
 
-export async function downloadInvoicePdf(invoice: unknown, documentType: string = "INVOICE"): Promise<void> {
+export async function downloadInvoicePdf(
+  invoice: unknown,
+  documentType: string = "INVOICE",
+): Promise<void> {
   assertInvoiceForPdf(invoice);
   const pdf = await createInvoicePdf(invoice, documentType);
   pdf.save(invoicePdfBasename(invoice));
@@ -181,7 +255,7 @@ export async function downloadInvoicePdf(invoice: unknown, documentType: string 
 
 export async function getInvoicePdfBlob(
   invoice: unknown,
-  documentType: string = "INVOICE"
+  documentType: string = "INVOICE",
 ): Promise<{ blob: Blob; filename: string }> {
   assertInvoiceForPdf(invoice);
   const pdf = await createInvoicePdf(invoice, documentType);

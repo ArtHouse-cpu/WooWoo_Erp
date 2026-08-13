@@ -575,7 +575,7 @@ export default function PurchaseScreen() {
 
             let blobPkg: { blob: Blob; filename: string } | null = null;
             try {
-              blobPkg = await getInvoicePdfBlob(pdfInput);
+              blobPkg = await getInvoicePdfBlob(pdfInput, "PURCHASE");
             } catch (e) {
               console.error(e);
             }
@@ -645,7 +645,7 @@ export default function PurchaseScreen() {
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading(),
               });
-              await downloadInvoicePdf(pdfInput);
+              await downloadInvoicePdf(pdfInput, "PURCHASE");
               Swal.close();
             } catch {
               Swal.fire("Error", "Could not generate PDF.", "error");

@@ -27,13 +27,13 @@ const parentMatchesSearch = (product, searchRegex) => {
  * Expand a product into catalogue rows.
  * Products WITH variants → only variant rows as "Parent - Variant".
  * Products WITHOUT variants → single parent row.
+ * Never emit both a parent row and variant rows for the same product.
  * stockByName: Map of line name → live stock (parent and each "Parent - Variant").
  */
 const expandProductCatalogueRows = (product, searchRegex, stockByName) => {
   const parentName = String(product.productName ?? '').trim();
-  const variants = Array.isArray(product.variants)
-    ? product.variants.filter((v) => String(v?.name ?? '').trim())
-    : [];
+  const rawVariants = Array.isArray(product.variants) ? product.variants : [];
+  const variants = rawVariants.filter((v) => String(v?.name ?? '').trim());
   const isCsp = Boolean(product.isCsp);
   const parentHit = parentMatchesSearch(product, searchRegex);
   const rows = [];
@@ -91,18 +91,77 @@ const expandProductCatalogueRows = (product, searchRegex, stockByName) => {
     });
   };
 
-  if (variants.length === 0) {
-    if (!searchRegex || parentHit) pushParent();
+  // Named variants exist → only variant rows (never also emit empty parent)
+  if (variants.length > 0) {
+    if (!searchRegex || parentHit) {
+      variants.forEach(pushVariant);
+      return rows;
+    }
+    variants.filter((v) => variantMatchesSearch(v, searchRegex)).forEach(pushVariant);
     return rows;
   }
 
-  if (!searchRegex || parentHit) {
-    variants.forEach(pushVariant);
-    return rows;
-  }
-
-  variants.filter((v) => variantMatchesSearch(v, searchRegex)).forEach(pushVariant);
+  // No named variants → single parent row
+  if (!searchRegex || parentHit) pushParent();
   return rows;
+};
+
+/**
+ * Collect canonical parent product names that have at least one variant row.
+ */
+const parentNamesWithVariants = (rows = []) => {
+  const parents = new Set();
+  for (const row of rows) {
+    if (String(row?.sourceType || '') !== 'product') continue;
+    const variantName = String(row?.variantName ?? '').trim();
+    if (!variantName) continue;
+
+    let parent = String(row.parentProductName ?? '').trim();
+    if (!parent) {
+      const full = String(row.productName || row.name || '').trim();
+      const sep = ` - ${variantName}`;
+      parent = full.endsWith(sep)
+        ? full.slice(0, -sep.length).trim()
+        : full;
+    }
+    // Also strip accidental "Parent - Variant" stored in parentProductName
+    const sep = ` - ${variantName}`;
+    if (parent.endsWith(sep)) {
+      parent = parent.slice(0, -sep.length).trim();
+    }
+    if (parent) parents.add(parent.toLowerCase());
+  }
+  return parents;
+};
+
+/**
+ * If any variant exists for a product name, hide the empty parent row.
+ * Also hides same-named service/space/food tiles that collide with that parent.
+ */
+const dedupeParentRowsWhenVariantsExist = (rows = []) => {
+  const parentsWithVariants = parentNamesWithVariants(rows);
+  if (!parentsWithVariants.size) return rows;
+
+  return rows.filter((row) => {
+    const variantName = String(row?.variantName ?? '').trim();
+    // Always keep real variant product rows
+    if (String(row?.sourceType || '') === 'product' && variantName) {
+      return true;
+    }
+
+    // Non-variant row (parent product, or service/space/food with same label)
+    const displayName = String(
+      row?.parentProductName || row?.productName || row?.name || '',
+    )
+      .trim()
+      .toLowerCase();
+
+    // If this exact name is a parent that has variants → hide empty parent / twin
+    if (displayName && parentsWithVariants.has(displayName)) {
+      return false;
+    }
+    return true;
+  });
 };
 
 const mapService = (service) => {
@@ -319,9 +378,18 @@ export const lookupCatalogueItems = async (req, res) => {
     const spaces = spaceDocs.map(mapSpace);
     const foods = foodDocs.map(mapFood);
 
-    const items = [...products, ...services, ...spaces, ...foods].sort((a, b) =>
-      String(a.name).localeCompare(String(b.name)),
-    );
+    // Dedupe AFTER merge so same-named services/parents cannot sit beside variants
+    const items = dedupeParentRowsWhenVariantsExist([
+      ...products,
+      ...services,
+      ...spaces,
+      ...foods,
+    ]).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+    const productCount = items.filter((i) => i.sourceType === 'product').length;
+    const serviceCount = items.filter((i) => i.sourceType === 'service').length;
+    const spaceCount = items.filter((i) => i.sourceType === 'space').length;
+    const foodCount = items.filter((i) => i.sourceType === 'food').length;
 
     // hasMore tracks the primary paginated collection for the active tab.
     let primaryTotal = productTotal;
@@ -337,10 +405,10 @@ export const lookupCatalogueItems = async (req, res) => {
       message: 'Catalogue lookup successful.',
       items,
       counts: {
-        product: products.length,
-        service: services.length,
-        space: spaces.length,
-        food: foods.length,
+        product: productCount,
+        service: serviceCount,
+        space: spaceCount,
+        food: foodCount,
         total: items.length,
       },
       pagination: {

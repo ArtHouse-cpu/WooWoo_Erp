@@ -387,6 +387,7 @@ export default function CreateSalesReturnScreen({
           invoiceNo: invoiceNo,
           customerName: customer.trim(),
           customerPhone: phone.trim(),
+          documentType: "SALES RETURN",
           items: items.map((item) => ({
             name: item.productName,
             qty: item.qty,
@@ -410,6 +411,7 @@ export default function CreateSalesReturnScreen({
           invoiceNo: savedCode,
           customerName: customer.trim(),
           customerPhone: phone.trim(),
+          documentType: "SALES RETURN",
           items: items.map((item) => ({
             name: item.productName,
             qty: item.qty,
@@ -642,6 +644,7 @@ export default function CreateSalesReturnScreen({
                   invoiceNo: invoiceNo,
                   customerName: customer.trim(),
                   customerPhone: phone.trim(),
+                  documentType: "SALES RETURN",
                   items: items.map((item) => ({
                     name: item.productName,
                     qty: item.qty,
@@ -672,6 +675,7 @@ export default function CreateSalesReturnScreen({
                   invoiceNo: savedCode,
                   customerName: customer.trim(),
                   customerPhone: phone.trim(),
+                  documentType: "SALES RETURN",
                   items: items.map((item) => ({
                     name: item.productName,
                     qty: item.qty,

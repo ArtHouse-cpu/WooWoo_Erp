@@ -609,7 +609,7 @@ export default function PurchaseOrderScreen() {
 
             let blobPkg: { blob: Blob; filename: string } | null = null;
             try {
-              blobPkg = await getInvoicePdfBlob(pdfInput);
+              blobPkg = await getInvoicePdfBlob(pdfInput, "PURCHASE ORDER");
             } catch (e) {
               console.error(e);
             }
@@ -679,7 +679,7 @@ export default function PurchaseOrderScreen() {
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading(),
               });
-              await downloadInvoicePdf(pdfInput);
+              await downloadInvoicePdf(pdfInput, "PURCHASE ORDER");
               Swal.close();
             } catch {
               Swal.fire("Error", "Could not generate PDF.", "error");

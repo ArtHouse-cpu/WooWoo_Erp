@@ -13,10 +13,26 @@ export function getCatalogueNameParts(
     "productName" | "name" | "variantName" | "parentProductName"
   >,
 ): CatalogueNameParts {
-  const variantName = String(item.variantName ?? "").trim() || null;
+  let variantName = String(item.variantName ?? "").trim() || null;
   const parentFromApi = String(item.parentProductName ?? "").trim();
   const full =
     String(item.productName || item.name || "").trim() || "Untitled";
+
+  // Fallback: catalogue/POS sometimes stores "Parent - Variant" without variantName
+  if (!variantName) {
+    const idx = full.indexOf(" - ");
+    if (idx > 0) {
+      const maybeParent = full.slice(0, idx).trim();
+      const maybeVariant = full.slice(idx + 3).trim();
+      if (maybeParent && maybeVariant) {
+        return {
+          parentName: parentFromApi || maybeParent,
+          variantName: maybeVariant,
+          fullLabel: `${parentFromApi || maybeParent} (${maybeVariant})`,
+        };
+      }
+    }
+  }
 
   if (variantName) {
     let parentName = parentFromApi;

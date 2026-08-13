@@ -349,7 +349,7 @@ export default function CreditNoteScreen() {
 
             let blobPkg: { blob: Blob; filename: string } | null = null;
             try {
-              blobPkg = await getInvoicePdfBlob(raw);
+              blobPkg = await getInvoicePdfBlob(raw, "CREDIT NOTE");
             } catch (e) {
               console.error(e);
             }
@@ -425,7 +425,7 @@ export default function CreditNoteScreen() {
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading(),
               });
-              await downloadInvoicePdf(cn.raw);
+              await downloadInvoicePdf(cn.raw, "CREDIT NOTE");
               Swal.close();
             } catch {
               Swal.fire("Error", "Could not generate PDF.", "error");

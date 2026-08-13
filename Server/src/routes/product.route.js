@@ -6,6 +6,7 @@ import {
   deleteProduct,
   updateProduct,
   uploadBulkProducts,
+  getProductsById,
 } from '../controllers/product.controller.js';
 import {authenticateUser} from '../middlewares/auth.middleware.js';
 import {
@@ -29,6 +30,7 @@ const forceProductType = (req, _res, next) => {
 };
 
 router.get('/', requirePermission(PERMISSIONS.PRODUCT_READ), getProducts);
+router.get('/:id', requirePermission(PERMISSIONS.PRODUCT_READ), getProductsById);
 router.post(
   '/',
   requirePermission(PERMISSIONS.PRODUCT_CREATE),

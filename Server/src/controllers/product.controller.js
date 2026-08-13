@@ -9,6 +9,37 @@ import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import mongoose from 'mongoose';
 import {LINE_TYPES} from '../utils/itemClassification.utils.js';
 
+const escapeRegex = (value) =>
+  String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const namedVariantsOf = (product) =>
+  (Array.isArray(product?.variants) ? product.variants : []).filter((v) =>
+    String(v?.name ?? '').trim(),
+  );
+
+/**
+ * After a product gains named variants, remove leftover parent-only docs
+ * with the same product name (they show as empty-variant duplicates in POS).
+ */
+const removeParentOnlyDuplicatesForName = async (productName, keepId) => {
+  const name = String(productName || '').trim();
+  if (!name || !keepId) return 0;
+
+  const siblings = await Product.find({
+    _id: {$ne: keepId},
+    productName: {$regex: `^${escapeRegex(name)}$`, $options: 'i'},
+    type: {$ne: 'service'},
+    itemType: {$ne: 'service'},
+  }).select('_id productName variants');
+
+  let removed = 0;
+  for (const sib of siblings) {
+    if (namedVariantsOf(sib).length > 0) continue;
+    await Product.deleteOne({_id: sib._id});
+    removed += 1;
+  }
+  return removed;
+};
 /**
  * Case-insensitive name lookup without giant $regex patterns
  * (MongoDB rejects regex patterns that are too long).
@@ -335,7 +366,8 @@ export const createProduct = async (req, res) => {
       }
     }
 
-    // Block duplicate catalogue products (same name / item code / barcode)
+    // Block duplicate catalogue products (same name / item code / barcode).
+    // Special case: parent-only product + new create with variants → merge into parent.
     if (itemType === 'product') {
       const nameLower = String(resolvedName).trim().toLowerCase();
       const code = String(itemCode || '').trim();
@@ -346,10 +378,45 @@ export const createProduct = async (req, res) => {
       const existingDup = await Product.findOne({
         itemType: { $ne: 'service' },
         $or: or,
-      })
-        .select('productName itemCode barCode')
-        .lean();
+      });
+
       if (existingDup) {
+        const existingHasVariants = namedVariantsOf(existingDup).length > 0;
+        const creatingWithVariants = parsedVariants.length > 0;
+
+        // Adding first variant(s) onto an existing parent-only product → update in place
+        if (!existingHasVariants && creatingWithVariants) {
+          existingDup.sellingPrice = parsedSellingPrice;
+          existingDup.purchasePrice = parsedPurchasePrice;
+          existingDup.itemCode = itemCode || existingDup.itemCode;
+          existingDup.barCode = barCode || existingDup.barCode;
+          existingDup.brandName = brandName || existingDup.brandName;
+          existingDup.category = category || existingDup.category;
+          existingDup.subCategory = subCategory || existingDup.subCategory;
+          existingDup.description = description || existingDup.description;
+          existingDup.discountType = discountType || existingDup.discountType;
+          existingDup.discountValue = parsedDiscountValue;
+          existingDup.variants = parsedVariants;
+          if (imageUrls.length) {
+            existingDup.images = imageUrls;
+            existingDup.imageUrl = imageUrls[0] || null;
+          }
+          Object.assign(existingDup, cspFields);
+          await existingDup.save();
+          await removeParentOnlyDuplicatesForName(
+            existingDup.productName,
+            existingDup._id,
+          );
+
+          const [productWithLabel] = await withCspLabel([existingDup.toObject()]);
+          return res.status(200).json({
+            success: true,
+            message:
+              'Variants added to existing product (merged parent duplicate).',
+            product: productWithLabel,
+          });
+        }
+
         return res.status(409).json({
           success: false,
           message: `Product already exists: "${existingDup.productName}". Duplicate products are not allowed.`,
@@ -380,6 +447,10 @@ export const createProduct = async (req, res) => {
       imageUrl: imageUrls[0] || null,
       ...cspFields,
     });
+
+    if (itemType === 'product' && parsedVariants.length > 0) {
+      await removeParentOnlyDuplicatesForName(product.productName, product._id);
+    }
 
     const [productWithLabel] = await withCspLabel([product.toObject()]);
 
@@ -910,9 +981,6 @@ export const uploadBulkProducts = async (req, res) => {
   }
 };
 
-const escapeRegex = (value) =>
-  String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 const PRODUCT_LIST_SELECT = [
   'type',
   'itemType',
@@ -1127,6 +1195,58 @@ export const getProducts = async (req, res) => {
     });
   }
 };
+export const getProductsById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findById(id)
+      .select(PRODUCT_LIST_SELECT)
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    const isService =
+      product.itemType === "service" || product.type === "service";
+
+    const productNames = getProductStockNames(product);
+
+    const stockMap = await computeStockByProductNames({
+      names: productNames,
+    });
+
+    const liveStockQty = isService
+      ? 0
+      : sumStockForNames(stockMap, productNames);
+
+    const productWithLiveStock = {
+      ...product,
+      stockQty: liveStockQty,
+      stockStatus:
+        liveStockQty > 0 ? "in_stock" : "out_of_stock",
+    };
+
+    const [productWithCsp] = await withCspLabel([
+      productWithLiveStock,
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      product: productWithCsp,
+    });
+  } catch (error) {
+    console.error("getProductsById error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch product",
+    });
+  }
+};
 
 //Edit product detail
 export const updateProduct = async (req, res) => {
@@ -1297,6 +1417,13 @@ export const updateProduct = async (req, res) => {
     existingProduct.imageUrl = imageUrls[0] || null;
 
     await existingProduct.save();
+
+    if (namedVariantsOf(existingProduct).length > 0) {
+      await removeParentOnlyDuplicatesForName(
+        existingProduct.productName,
+        existingProduct._id,
+      );
+    }
 
     const [productWithLabel] = await withCspLabel([existingProduct.toObject()]);
 

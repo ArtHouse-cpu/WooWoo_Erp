@@ -191,7 +191,7 @@ export default function DebitNoteScreen() {
 
             let blobPkg: { blob: Blob; filename: string } | null = null;
             try {
-              blobPkg = await getInvoicePdfBlob(pdfInput);
+              blobPkg = await getInvoicePdfBlob(pdfInput, "DEBIT NOTE");
             } catch (e) {
               console.error(e);
             }
@@ -251,7 +251,7 @@ export default function DebitNoteScreen() {
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading(),
               });
-              await downloadInvoicePdf(pdfInput);
+              await downloadInvoicePdf(pdfInput, "DEBIT NOTE");
               Swal.close();
             } catch {
               Swal.fire("Error", "Could not generate PDF.", "error");
