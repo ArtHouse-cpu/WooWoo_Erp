@@ -18,9 +18,20 @@ const PUBLIC_AUTH_PATHS = [
   "/auth/forgot-password",
 ];
 
+/**
+ * Authenticated business checks that may return 401/400 for a wrong secondary
+ * credential (e.g. Staff PIN). Must NOT force-logout the ERP session.
+ */
+const NON_SESSION_401_PATHS = ["/access/staff/verify-pin"];
+
 export function isPublicAuthRequest(url = ""): boolean {
   const path = url.split("?")[0];
   return PUBLIC_AUTH_PATHS.some((p) => path.includes(p));
+}
+
+export function isNonSessionAuthFailure(url = ""): boolean {
+  const path = url.split("?")[0];
+  return NON_SESSION_401_PATHS.some((p) => path.includes(p));
 }
 
 /** Read JWT `exp` (ms). Returns null if missing/invalid. */

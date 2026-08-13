@@ -15,6 +15,10 @@ import {
 } from "@/services/apiClient";
 import { calcCatalogueProductDiscount } from "../utils/membershipInvoiceUtils";
 import CatalogueItemLabel from "./CatalogueItemLabel";
+import {
+  findCartItemForCatalogueLine,
+  getCatalogueLineKey,
+} from "../utils/catalogueLineKey";
 
 const PAGE_SIZE = 48;
 
@@ -64,9 +68,9 @@ function CataloguePrice({ item }: { item: CatalogueLookupItem }) {
 type ProductSidebarProps = {
   cartItems: any[];
   onAddItem: (item: CatalogueLookupItem) => void;
-  onRemoveItem: (itemName: string) => void;
+  onRemoveItem?: (item: CatalogueLookupItem) => void;
   onIncrementItem: (item: CatalogueLookupItem, existingQty: number) => void;
-  onDecrementItem: (itemName: string, existingQty: number) => void;
+  onDecrementItem: (item: CatalogueLookupItem, existingQty: number) => void;
   title?: string;
 };
 
@@ -99,7 +103,6 @@ const SOURCE_BADGE: Record<
 export default function ProductSidebar({
   cartItems,
   onAddItem,
-  onRemoveItem,
   onIncrementItem,
   onDecrementItem,
   title = "Catalogue Sidebar",
@@ -196,10 +199,10 @@ export default function ProductSidebar({
 
         const nextItems = Array.isArray(response?.items) ? response.items : [];
         setItems((prev) => {
-          const seen = new Set(prev.map((i) => `${i.sourceType}-${i._id}`));
+          const seen = new Set(prev.map((i) => getCatalogueLineKey(i)));
           const merged = [...prev];
           for (const item of nextItems) {
-            const key = `${item.sourceType}-${item._id}`;
+            const key = getCatalogueLineKey(item);
             if (!seen.has(key)) {
               seen.add(key);
               merged.push(item);
@@ -297,20 +300,15 @@ export default function ProductSidebar({
             {items.map((item) => {
               const badge = SOURCE_BADGE[item.sourceType] || SOURCE_BADGE.product;
               const IconComponent = badge.icon;
+              const lineKey = getCatalogueLineKey(item);
 
-              const cartItem = cartItems.find(
-                (c) =>
-                  String(c.productName || c.name || "")
-                    .trim()
-                    .toLowerCase() ===
-                  (item.productName || item.name || "").trim().toLowerCase(),
-              );
+              const cartItem = findCartItemForCatalogueLine(cartItems, item);
               const qtyInCart = cartItem?.qty || 0;
               const hasImage = item.imageUrl && !imageErrors[item._id];
 
               return (
                 <div
-                  key={`${item.sourceType}-${item._id}`}
+                  key={lineKey}
                   className={`flex items-center gap-3 rounded-xl border bg-white p-2 transition-all duration-200 ${
                     qtyInCart > 0
                       ? "border-indigo-200 bg-indigo-50/10 shadow-sm"
@@ -374,12 +372,7 @@ export default function ProductSidebar({
                       <div className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-white p-1">
                         <button
                           type="button"
-                          onClick={() =>
-                            onDecrementItem(
-                              item.productName || item.name || "",
-                              qtyInCart,
-                            )
-                          }
+                          onClick={() => onDecrementItem(item, qtyInCart)}
                           className="flex h-5 w-5 items-center justify-center rounded bg-slate-100 text-slate-600 transition hover:bg-slate-200"
                         >
                           <Minus size={10} strokeWidth={3} />

@@ -28,7 +28,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { printThermalReceipt } from "@/utils/printUtils";
 import { summarizeMembershipForCart } from "../../../utils/membershipInvoiceUtils";
 import { creditWalletCashback } from "../../../utils/walletCashback";
-import { roundPayable } from "../../../utils/paymentRoundOff";
+import { roundPayable, roundToPaise } from "../../../utils/paymentRoundOff";
 import StaffVerifyModal from "./StaffVerifyModal";
 import type { VerifiedStaff } from "@/services/apiClient";
 
@@ -957,10 +957,12 @@ export default function CheckoutModal({
     : rawMembershipDiscount;
 
   // When coupon replaces membership, add membership amount back into payable base
-  const payableBase = Math.max(
-    0,
-    Number(grandTotal || 0) +
-      (waiveMembershipForCoupon ? rawMembershipDiscount : 0),
+  const payableBase = roundToPaise(
+    Math.max(
+      0,
+      Number(grandTotal || 0) +
+        (waiveMembershipForCoupon ? rawMembershipDiscount : 0),
+    ),
   );
 
   const displayCashbackTotal = disableCashback
@@ -993,7 +995,9 @@ export default function CheckoutModal({
 
   useEffect(() => {
     const { payable } = roundPayable(
-      payableBase - couponDiscount - referralDiscount,
+      payableBase -
+        roundToPaise(couponDiscount) -
+        roundToPaise(referralDiscount),
     );
 
     if (paymentStatus === "due") {
@@ -1160,7 +1164,12 @@ export default function CheckoutModal({
   const {
     payable: finalPayable,
     roundOff,
-  } = roundPayable(payableBase - couponDiscount - referralDiscount);
+    preRound: billTotalBeforeRoundOff,
+  } = roundPayable(
+    payableBase -
+      roundToPaise(couponDiscount) -
+      roundToPaise(referralDiscount),
+  );
   const isPartialPayment = paymentStatus === "partial";
   const totalPaid = isDuePayment
     ? 0
@@ -1692,6 +1701,12 @@ export default function CheckoutModal({
                     value={`+ ${formatInr(Number(c.amount || 0))}`} 
                   />
                 ))}
+
+                <SummaryLine
+                  label="Total"
+                  value={formatInr(billTotalBeforeRoundOff)}
+                  tone="total"
+                />
 
                 {Math.abs(roundOff) >= 0.005 && (
                   <SummaryLine

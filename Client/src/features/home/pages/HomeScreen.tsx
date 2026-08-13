@@ -257,7 +257,7 @@ export default function HomeScreen() {
     <div className="mx-auto w-full max-w-6xl space-y-5 font-sans">
       {/* Quick actions */}
       <section className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-        <button
+        {/* <button
           type="button"
           onClick={() => navigate("/foodBill")}
           className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-2 sm:p-3 md:p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
@@ -268,7 +268,7 @@ export default function HomeScreen() {
           <span className="mt-2 text-center text-[10px] sm:text-xs md:text-sm font-semibold text-gray-800 leading-tight">
             Food Bill
           </span>
-        </button>
+        </button> */}
 
         <button
           type="button"

@@ -51,7 +51,7 @@ export default function StaffVerifyModal({
       setError("");
       const res = await handleVerifyStaffPin(value);
       if (!res?.success || !res.staff) {
-        setError(res?.message || "Invalid Staff PIN.");
+        setError("Invalid Staff PIN.");
         setPin("");
         window.setTimeout(() => inputRef.current?.focus(), 50);
         return;

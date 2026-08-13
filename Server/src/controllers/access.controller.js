@@ -1013,7 +1013,7 @@ export const verifyStaffPin = async (req, res) => {
     }
 
     if (!matched) {
-      return res.status(401).json({
+      return res.status(400).json({
         success: false,
         message: 'Invalid Staff PIN.',
       });

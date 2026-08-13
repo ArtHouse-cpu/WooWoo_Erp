@@ -2,6 +2,7 @@ import axios from "axios";
 import { useAuthStore } from "@/store/authStore";
 import {
   forceLogout,
+  isNonSessionAuthFailure,
   isPublicAuthRequest,
   isTokenExpired,
 } from "@/utils/session";
@@ -37,16 +38,30 @@ axiosInstance.interceptors.response.use(
     const url = String(error?.config?.url || "");
     const message = String(error?.response?.data?.message || "").toLowerCase();
 
+    // Wrong Staff PIN (and similar) must stay in-app — do not clear the ERP session.
+    if (isNonSessionAuthFailure(url)) {
+      return Promise.reject(error);
+    }
+
     const looksLikeExpiredToken =
       status === 401 &&
       !isPublicAuthRequest(url) &&
       Boolean(useAuthStore.getState().token) &&
       (message.includes("expired") ||
-        message.includes("invalid") ||
         message.includes("unauthorized") ||
-        message.includes("token"));
+        message.includes("token") ||
+        message.includes("jwt") ||
+        message.includes("session"));
 
-    if (looksLikeExpiredToken || (status === 401 && !isPublicAuthRequest(url) && useAuthStore.getState().token)) {
+    // Only force-logout on real session/auth failures — not every 401 business error.
+    if (
+      looksLikeExpiredToken ||
+      (status === 401 &&
+        !isPublicAuthRequest(url) &&
+        Boolean(useAuthStore.getState().token) &&
+        !message.includes("staff pin") &&
+        !message.includes("pin"))
+    ) {
       forceLogout({
         reason: message.includes("expired") ? "expired" : "unauthorized",
       });

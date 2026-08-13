@@ -27,6 +27,11 @@ import {
 } from "../utils/membershipInvoiceUtils";
 import {resolveInvoiceLineCategory} from "../utils/itemClassification";
 import { creditWalletCashback } from "../utils/walletCashback";
+import { roundPayable, roundToPaise } from "../utils/paymentRoundOff";
+import {
+  findCartItemForCatalogueLine,
+  getCatalogueLineKey,
+} from "../utils/catalogueLineKey";
 import { useNavigate } from "react-router-dom";
 
 
@@ -57,6 +62,11 @@ type PosItem = {
   stockQty?: number;
   image?: string;
   isCsp?: boolean;
+  /** Unique catalogue row key (product vs each variant) */
+  catalogueKey?: string;
+  sourceId?: string;
+  sourceType?: string;
+  variantName?: string | null;
   /** Catalogue discount metadata for CSP / product discount recalc on qty change */
   productDiscountType?: string;
   productDiscountValue?: number;
@@ -262,6 +272,14 @@ export default function CreatePosScreen({
           : undefined,
         image: selectedProduct?.imageUrl || (selectedProduct?.images && selectedProduct?.images[0]) || "",
         isCsp,
+        catalogueKey: selectedProduct
+          ? getCatalogueLineKey(selectedProduct)
+          : undefined,
+        sourceId: selectedProduct?.sourceId
+          ? String(selectedProduct.sourceId)
+          : undefined,
+        sourceType: selectedProduct?.sourceType,
+        variantName: selectedProduct?.variantName ?? null,
         productDiscountType,
         productDiscountValue,
         productDiscountAmount: stacked.productDiscount,
@@ -290,10 +308,10 @@ export default function CreatePosScreen({
     }
 
     const name = p.productName || p.name || "";
-    const existingIndex = items.findIndex((it) => it.name.toLowerCase() === name.toLowerCase());
+    const catalogueKey = getCatalogueLineKey(p);
+    const existingItem = findCartItemForCatalogueLine(items, p);
 
-    if (existingIndex > -1) {
-      const existingItem = items[existingIndex];
+    if (existingItem) {
       const newQty = existingItem.qty + 1;
       if (p.trackStock && Number(p.stockQty ?? 0) < newQty) {
         Swal.fire(
@@ -335,6 +353,10 @@ export default function CreatePosScreen({
           stockQty: p.trackStock ? Number(p.stockQty ?? 0) : undefined,
           image: p.imageUrl || (p as any).images?.[0] || "",
           isCsp,
+          catalogueKey,
+          sourceId: String(p.sourceId || ""),
+          sourceType: p.sourceType,
+          variantName: p.variantName ?? null,
           productDiscountType,
           productDiscountValue,
           productDiscountAmount: stacked.productDiscount,
@@ -344,12 +366,15 @@ export default function CreatePosScreen({
     }
   };
 
-  const removeSidebarItem = (itemName: string) => {
-    setItems((prev) => prev.filter((it) => it.name.toLowerCase() !== itemName.toLowerCase()));
+  const removeSidebarItem = (p: CatalogueLookupItem) => {
+    const key = getCatalogueLineKey(p);
+    setItems((prev) =>
+      prev.filter((it) => getCatalogueLineKey(it) !== key),
+    );
   };
 
   const incrementSidebarItem = (p: CatalogueLookupItem, existingQty: number) => {
-    const matchedItem = items.find((it) => it.name.toLowerCase() === (p.productName || p.name || "").toLowerCase());
+    const matchedItem = findCartItemForCatalogueLine(items, p);
     if (matchedItem) {
       if (p.trackStock && Number(p.stockQty ?? 0) <= existingQty) {
         Swal.fire(
@@ -363,8 +388,8 @@ export default function CreatePosScreen({
     }
   };
 
-  const decrementSidebarItem = (itemName: string, existingQty: number) => {
-    const matchedItem = items.find((it) => it.name.toLowerCase() === itemName.toLowerCase());
+  const decrementSidebarItem = (p: CatalogueLookupItem, existingQty: number) => {
+    const matchedItem = findCartItemForCatalogueLine(items, p);
     if (matchedItem) {
       if (existingQty <= 1) {
         removeItem(matchedItem.id);
@@ -383,7 +408,7 @@ export default function CreatePosScreen({
   };
 
   const calculateTotal = (item: PosItem) => {
-    return item.qty * item.price - item.discount;
+    return roundToPaise(item.qty * item.price - item.discount);
   };
 
   const discountTotal = useMemo(
@@ -421,8 +446,19 @@ export default function CreatePosScreen({
     [items],
   );
 
-  const extraChargesTotal = extraCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0);
-  const grandTotal = subTotal - discountTotal + extraChargesTotal;
+  const extraChargesTotal = roundToPaise(
+    extraCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0),
+  );
+  /** Net bill before nearest-rupee round-off (source for checkout + coupons). */
+  const totalBeforeRound = roundToPaise(
+    Math.max(0, subTotal - discountTotal + extraChargesTotal),
+  );
+  /** Round-off applies only on the final total amount (not per line). */
+  const {
+    payable: grandTotal,
+    roundOff,
+    preRound: billTotalBeforeRoundOff,
+  } = roundPayable(totalBeforeRound);
 
   const creditCashbackForInvoice = async (
     amount: number,
@@ -1116,7 +1152,11 @@ export default function CreatePosScreen({
 
                         {/* Total */}
                         <td className="p-3 text-center font-semibold">
-                          ₹{calculateTotal(item)}
+                          ₹
+                          {calculateTotal(item).toLocaleString("en-IN", {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}
                         </td>
 
                         {/* Delete */}
@@ -1155,8 +1195,24 @@ export default function CreatePosScreen({
                   <div className="text-right">
                     <div className="text-xs text-gray-500">Grand Total</div>
                     <div className="text-xl font-bold text-gray-900">
-                      ₹ {grandTotal.toLocaleString("en-IN")}
+                      ₹{" "}
+                      {grandTotal.toLocaleString("en-IN", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}
                     </div>
+                    {Math.abs(roundOff) >= 0.005 && (
+                      <div className="mt-0.5 text-[11px] text-slate-500">
+                        Bill ₹
+                        {billTotalBeforeRoundOff.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                        {" · "}
+                        Round off {roundOff >= 0 ? "+" : "−"}₹
+                        {Math.abs(roundOff).toFixed(2)}
+                      </div>
+                    )}
                     {cashbackTotal > 0 && (
                       <div className="mt-1 text-xs font-medium text-emerald-600">
                         +₹ {cashbackTotal.toFixed(2)} cashback
@@ -1279,7 +1335,7 @@ export default function CreatePosScreen({
           )}
           <CheckoutModal
             open={openCheckout}
-            grandTotal={grandTotal}
+            grandTotal={totalBeforeRound}
             items={items.map((it) => ({
               ...it,
               productName: it.name,

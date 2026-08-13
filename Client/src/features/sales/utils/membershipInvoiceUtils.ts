@@ -230,10 +230,13 @@ export function calcCatalogueProductDiscount(
   const dType = String(discountType ?? "flat").trim().toLowerCase();
   const lineTotal = price * quantity;
   if (dType === "percentage") {
-    return Math.min(lineTotal, (lineTotal * dValue) / 100);
+    return Math.min(
+      lineTotal,
+      Math.round(((lineTotal * dValue) / 100) * 100) / 100,
+    );
   }
   // flat = amount off per unit
-  return Math.min(lineTotal, dValue * quantity);
+  return Math.min(lineTotal, Math.round(dValue * quantity * 100) / 100);
 }
 
 export function membershipBenefitsForLine(
@@ -259,9 +262,13 @@ export function membershipBenefitsForLine(
   }
 
   const discount =
-    discountPercent > 0 ? (lineTotal * discountPercent) / 100 : 0;
+    discountPercent > 0
+      ? Math.round(((lineTotal * discountPercent) / 100) * 100) / 100
+      : 0;
   const cashback =
-    cashbackPercent > 0 ? (lineTotal * cashbackPercent) / 100 : 0;
+    cashbackPercent > 0
+      ? Math.round(((lineTotal * cashbackPercent) / 100) * 100) / 100
+      : 0;
   return { discount, cashback };
 }
 
