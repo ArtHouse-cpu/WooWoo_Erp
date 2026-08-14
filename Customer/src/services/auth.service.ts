@@ -6,6 +6,7 @@ import type {
   ReferralDashboard,
   WalletDashboard,
   ActivityDashboard,
+  ActivityInvoiceDetail,
 } from '../types/auth';
 
 export const authApi = {
@@ -152,4 +153,6 @@ export const authApi = {
     limit?: number;
     status?: string;
   }) => api.get<ApiResponse<ActivityDashboard>>('/activity', {params}),
+
+  getActivityInvoice:(invoice:string) => api.get<ApiResponse<ActivityInvoiceDetail>>(`/activity/${invoice}`),
 };

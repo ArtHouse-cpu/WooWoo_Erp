@@ -1,5 +1,5 @@
-import {useState, useMemo, useEffect} from 'react';
-import {useNavigate} from 'react-router-dom';
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Calendar,
   ChevronLeft,
@@ -16,16 +16,22 @@ import {
   MoreVertical,
   Gift,
   X,
-} from 'lucide-react';
-import {toast} from 'sonner';
-import {DashboardSidebar} from '../../components/dashboard/DashboardSidebar';
-import {TopNavbar} from '../../components/dashboard/TopNavbar';
-import {authApi} from '../../services/auth.service';
-import {getErrorMessage} from '../../services/axios';
-import type {ActivityItem} from '../../types/auth';
+} from "lucide-react";
+import { toast } from "sonner";
+import { DashboardSidebar } from "../../components/dashboard/DashboardSidebar";
+import { TopNavbar } from "../../components/dashboard/TopNavbar";
+import { authApi } from "../../services/auth.service";
+import { getErrorMessage } from "../../services/axios";
+import type { ActivityItem } from "../../types/auth";
+import type { ThermalPrintProps } from "../../thermalPrint/ThermalPrint";
+import { ThermalPrint } from "../../thermalPrint/ThermalPrint";
+import { useAuthStore } from "../../store/authStore";
+import { mapActivityInvoiceToThermalPrint } from "./mapActivityInvoiceToThermalPrint";
+import { downloadThermalInvoicePdf } from '../../thermalPrint/downloadThermalInvoicePdf';
 
-type DateFilter = 'today' | 'week' | 'month' | 'last_month' | 'lifetime';
-type Category = 'shopping' | 'services' | 'space' | 'food';
+
+type DateFilter = "today" | "week" | "month" | "last_month" | "lifetime";
+type Category = "shopping" | "services" | "space" | "food";
 
 export interface Transaction {
   invoiceId?: string;
@@ -36,7 +42,7 @@ export interface Transaction {
   totalPaid: number;
   discount: number;
   cashback: number;
-  status: 'Paid' | 'Pending';
+  status: "Paid" | "Pending";
   category: Category;
   timestamp: number;
 }
@@ -45,24 +51,24 @@ export interface Transaction {
 export const MOCK_TRANSACTIONS: Transaction[] = [];
 
 const mapCategory = (raw?: string): Category => {
-  const value = String(raw || 'shopping').toLowerCase();
-  if (value === 'services' || value === 'service') return 'services';
-  if (value === 'space') return 'space';
-  if (value === 'food' || value === 'cafe') return 'food';
+  const value = String(raw || "shopping").toLowerCase();
+  if (value === "services" || value === "service") return "services";
+  if (value === "space") return "space";
+  if (value === "food" || value === "cafe") return "food";
   // product / general / shopping → shopping tab
-  return 'shopping';
+  return "shopping";
 };
 
 const mapActivityToTransaction = (a: ActivityItem): Transaction => {
   const d = new Date(a.createdAt);
-  const datePart = d.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+  const datePart = d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
-  const timePart = d.toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
+  const timePart = d.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
     hour12: true,
   });
 
@@ -73,14 +79,14 @@ const mapActivityToTransaction = (a: ActivityItem): Transaction => {
 
   return {
     invoiceId: a.invoiceId,
-    invoiceNo: a.invoiceNumber || '—',
+    invoiceNo: a.invoiceNumber || "—",
     items: `${Number(a.itemCount ?? 0) || 0} Items`,
     dateTime: `${datePart}, ${timePart}`,
     amount,
     totalPaid,
     discount,
     cashback,
-    status: a.status === 'Pending' ? 'Pending' : 'Paid',
+    status: a.status === "Pending" ? "Pending" : "Paid",
     category: mapCategory(a.category),
     timestamp: d.getTime(),
   };
@@ -90,29 +96,29 @@ const startOfDay = (d: Date) =>
   new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
 const isInDateFilter = (timestamp: number, dateFilter: DateFilter) => {
-  if (dateFilter === 'lifetime') return true;
+  if (dateFilter === "lifetime") return true;
 
   const now = new Date();
   const itemDate = new Date(timestamp);
   const oneDayMs = 24 * 60 * 60 * 1000;
 
-  if (dateFilter === 'today') {
+  if (dateFilter === "today") {
     return startOfDay(itemDate) === startOfDay(now);
   }
 
-  if (dateFilter === 'week') {
+  if (dateFilter === "week") {
     const diffMs = startOfDay(now) - startOfDay(itemDate);
     return diffMs >= 0 && diffMs <= 7 * oneDayMs;
   }
 
-  if (dateFilter === 'month') {
+  if (dateFilter === "month") {
     return (
       itemDate.getMonth() === now.getMonth() &&
       itemDate.getFullYear() === now.getFullYear()
     );
   }
 
-  if (dateFilter === 'last_month') {
+  if (dateFilter === "last_month") {
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     return (
       itemDate.getMonth() === lastMonth.getMonth() &&
@@ -126,30 +132,84 @@ const isInDateFilter = (timestamp: number, dateFilter: DateFilter) => {
 export default function ActivityPage() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(
-    null,
-  );
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<Transaction | null>(null);
 
-  const [dateFilter, setDateFilter] = useState<DateFilter>('lifetime');
-  const [activeCategory, setActiveCategory] = useState<Category>('shopping');
+  const [dateFilter, setDateFilter] = useState<DateFilter>("lifetime");
+  const [activeCategory, setActiveCategory] = useState<Category>("shopping");
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
 
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+
+
+  const [invoicePreview, setInvoicePreview] =
+    useState<ThermalPrintProps | null>(null);
+  const [loadingInvoice, setLoadingInvoice] = useState(false);
+  const customer = useAuthStore((s) => s.customer);
+
+  const loadInvoiceProps = async () => {
+    const invoiceId = selectedTransaction?.invoiceId;
+    if (!invoiceId) {
+      toast.error("Invoice id missing");
+      return null;
+    }
+
+    const res = await authApi.getActivityInvoice(invoiceId);
+    const detail = res.data.data;
+    if (!detail) {
+      toast.error("Failed to load invoice");
+      return null;
+    }
+
+    return mapActivityInvoiceToThermalPrint(detail, {
+      name: customer?.name,
+      mobile: customer?.mobile,
+      membershipType: customer?.membershipType,
+    });
+  };
+
+  const handleViewInvoice = async () => {
+    try {
+      setLoadingInvoice(true);
+      const props = await loadInvoiceProps();
+      if (!props) return;
+      setInvoicePreview(props);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to load invoice"));
+    } finally {
+      setLoadingInvoice(false);
+    }
+  };
+
+const handleDownloadInvoice = async () => {
+  try {
+    setDownloadingInvoice(true);
+    const props = invoicePreview ?? (await loadInvoiceProps());
+    if (!props) return;
+    await downloadThermalInvoicePdf (props);
+    toast.success(`Invoice ${props.invoiceNo} downloaded`);
+  } catch (error) {
+    toast.error(getErrorMessage(error, 'Failed to download invoice'));
+  } finally {
+    setDownloadingInvoice(false);
+  }
+};
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
       setLoading(true);
       try {
-        const res = await authApi.getActivity({page: 1, limit: 100});
+        const res = await authApi.getActivity({ page: 1, limit: 100 });
         if (!cancelled) {
           setActivities(res.data.data?.activities ?? []);
         }
       } catch (error) {
         if (!cancelled) {
-          toast.error(getErrorMessage(error, 'Failed to load activity'));
+          toast.error(getErrorMessage(error, "Failed to load activity"));
           setActivities([]);
         }
       } finally {
@@ -169,11 +229,11 @@ export default function ActivityPage() {
   );
 
   const filterLabels = {
-    today: 'Today',
-    week: 'This Week',
-    month: 'This Month',
-    last_month: 'Last Month',
-    lifetime: 'Lifetime',
+    today: "Today",
+    week: "This Week",
+    month: "This Month",
+    last_month: "Last Month",
+    lifetime: "Lifetime",
   };
 
   const selectFilter = (filter: DateFilter) => {
@@ -183,7 +243,7 @@ export default function ActivityPage() {
 
   const filteredTransactions = useMemo(() => {
     return transactions
-      .filter(item => {
+      .filter((item) => {
         if (item.category !== activeCategory) return false;
         return isInDateFilter(item.timestamp, dateFilter);
       })
@@ -192,39 +252,39 @@ export default function ActivityPage() {
 
   const categoryConfig = {
     shopping: {
-      card1Bg: 'from-[#FFFDFB] to-[#FFF7ED] border-[#FFEDD5]',
-      iconBg: 'bg-[#FFF7ED]',
-      iconColor: 'text-[#EA580C]',
-      textColor: 'text-[#EA580C]',
-      countLabel: 'Total Orders',
-      valueLabel: 'Total Order Value',
+      card1Bg: "from-[#FFFDFB] to-[#FFF7ED] border-[#FFEDD5]",
+      iconBg: "bg-[#FFF7ED]",
+      iconColor: "text-[#EA580C]",
+      textColor: "text-[#EA580C]",
+      countLabel: "Total Orders",
+      valueLabel: "Total Order Value",
       icon: ShoppingBag,
     },
     services: {
-      card1Bg: 'from-[#FCFAFE] to-[#FAF5FF] border-[#E9D5FF]/60',
-      iconBg: 'bg-[#FAF5FF]',
-      iconColor: 'text-[#9333EA]',
-      textColor: 'text-[#9333EA]',
-      countLabel: 'Total Services',
-      valueLabel: 'Total Service Value',
+      card1Bg: "from-[#FCFAFE] to-[#FAF5FF] border-[#E9D5FF]/60",
+      iconBg: "bg-[#FAF5FF]",
+      iconColor: "text-[#9333EA]",
+      textColor: "text-[#9333EA]",
+      countLabel: "Total Services",
+      valueLabel: "Total Service Value",
       icon: Wrench,
     },
     space: {
-      card1Bg: 'from-[#F9FDFB] to-[#EAFDF4] border-[#BBF7D0]/60',
-      iconBg: 'bg-[#EAFDF4]',
-      iconColor: 'text-[#16A34A]',
-      textColor: 'text-[#16A34A]',
-      countLabel: 'Total Bookings',
-      valueLabel: 'Total Booking Value',
+      card1Bg: "from-[#F9FDFB] to-[#EAFDF4] border-[#BBF7D0]/60",
+      iconBg: "bg-[#EAFDF4]",
+      iconColor: "text-[#16A34A]",
+      textColor: "text-[#16A34A]",
+      countLabel: "Total Bookings",
+      valueLabel: "Total Booking Value",
       icon: Calendar,
     },
     food: {
-      card1Bg: 'from-[#FFFBFB] to-[#FEF2F2] border-[#FCA5A5]/60',
-      iconBg: 'bg-[#FEF2F2]',
-      iconColor: 'text-[#EF4444]',
-      textColor: 'text-[#EF4444]',
-      countLabel: 'Total Orders',
-      valueLabel: 'Total Spend Value',
+      card1Bg: "from-[#FFFBFB] to-[#FEF2F2] border-[#FCA5A5]/60",
+      iconBg: "bg-[#FEF2F2]",
+      iconColor: "text-[#EF4444]",
+      textColor: "text-[#EF4444]",
+      countLabel: "Total Orders",
+      valueLabel: "Total Spend Value",
       icon: Soup,
     },
   };
@@ -246,7 +306,7 @@ export default function ActivityPage() {
 
     const now = new Date();
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthTransactions = transactions.filter(item => {
+    const lastMonthTransactions = transactions.filter((item) => {
       if (item.category !== activeCategory) return false;
       const dateObj = new Date(item.timestamp);
       return (
@@ -266,7 +326,7 @@ export default function ActivityPage() {
 
     const calculateTrend = (current: number, previous: number) => {
       if (previous === 0) {
-        return {percent: current > 0 ? 100 : 0, isUp: true};
+        return { percent: current > 0 ? 100 : 0, isUp: true };
       }
       const diff = current - previous;
       const percent = Math.round((diff / previous) * 100);
@@ -303,36 +363,32 @@ export default function ActivityPage() {
 
   const categories = [
     {
-      id: 'shopping' as Category,
-      label: 'Shopping',
+      id: "shopping" as Category,
+      label: "Shopping",
       icon: ShoppingBag,
-      color: '#EA580C',
-      activeStyle:
-        'bg-[#FFF7ED] text-[#EA580C] border-[#FDBA74]/40',
+      color: "#EA580C",
+      activeStyle: "bg-[#FFF7ED] text-[#EA580C] border-[#FDBA74]/40",
     },
     {
-      id: 'services' as Category,
-      label: 'Services',
+      id: "services" as Category,
+      label: "Services",
       icon: Wrench,
-      color: '#9333EA',
-      activeStyle:
-        'bg-[#FAF5FF] text-[#9333EA] border-[#E9D5FF]/40',
+      color: "#9333EA",
+      activeStyle: "bg-[#FAF5FF] text-[#9333EA] border-[#E9D5FF]/40",
     },
     {
-      id: 'space' as Category,
-      label: 'Space',
+      id: "space" as Category,
+      label: "Space",
       icon: Calendar,
-      color: '#16A34A',
-      activeStyle:
-        'bg-[#EAFDF4] text-[#16A34A] border-[#BBF7D0]/40',
+      color: "#16A34A",
+      activeStyle: "bg-[#EAFDF4] text-[#16A34A] border-[#BBF7D0]/40",
     },
     {
-      id: 'food' as Category,
-      label: 'Food',
+      id: "food" as Category,
+      label: "Food",
       icon: Soup,
-      color: '#EF4444',
-      activeStyle:
-        'bg-[#FEF2F2] text-[#EF4444] border-[#FCA5A5]/40',
+      color: "#EF4444",
+      activeStyle: "bg-[#FEF2F2] text-[#EF4444] border-[#FCA5A5]/40",
     },
   ];
 
@@ -341,7 +397,7 @@ export default function ActivityPage() {
       <div className="relative flex items-center justify-between">
         <button
           type="button"
-          onClick={() => navigate('/home')}
+          onClick={() => navigate("/home")}
           className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
           aria-label="Go back"
         >
@@ -355,12 +411,15 @@ export default function ActivityPage() {
         <div className="relative">
           <button
             type="button"
-            onClick={() => setDropdownOpen(v => !v)}
+            onClick={() => setDropdownOpen((v) => !v)}
             className="flex h-9 items-center gap-2 rounded-xl border border-black/[0.04] bg-white px-3.5 text-[12px] font-extrabold text-[#111111] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-98 cursor-pointer"
           >
             <Calendar className="h-4 w-4 text-[#4B5563]" strokeWidth={2.2} />
             <span>{filterLabels[dateFilter]}</span>
-            <ChevronDown className="h-3.5 w-3.5 text-[#9CA3AF]" strokeWidth={2.2} />
+            <ChevronDown
+              className="h-3.5 w-3.5 text-[#9CA3AF]"
+              strokeWidth={2.2}
+            />
           </button>
 
           {dropdownOpen && (
@@ -375,18 +434,18 @@ export default function ActivityPage() {
                 <ul className="space-y-0.5">
                   {(
                     [
-                      'today',
-                      'week',
-                      'month',
-                      'last_month',
-                      'lifetime',
+                      "today",
+                      "week",
+                      "month",
+                      "last_month",
+                      "lifetime",
                     ] as DateFilter[]
-                  ).map(item => {
+                  ).map((item) => {
                     const active = dateFilter === item;
                     const Icon =
-                      item === 'lifetime'
+                      item === "lifetime"
                         ? Infinity
-                        : item === 'last_month'
+                        : item === "last_month"
                           ? Clock
                           : Calendar;
                     return (
@@ -396,8 +455,8 @@ export default function ActivityPage() {
                           onClick={() => selectFilter(item)}
                           className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-[11px] font-bold transition-all cursor-pointer ${
                             active
-                              ? 'bg-[#FFF7ED] text-[#EA580C]'
-                              : 'text-[#4B5563] hover:bg-slate-50'
+                              ? "bg-[#FFF7ED] text-[#EA580C]"
+                              : "text-[#4B5563] hover:bg-slate-50"
                           }`}
                         >
                           <span className="flex items-center gap-2">
@@ -426,9 +485,9 @@ export default function ActivityPage() {
 
       <div
         className="flex items-center gap-2 overflow-x-auto pb-2 -mx-5 px-5 scroll-smooth whitespace-nowrap flex-nowrap"
-        style={{scrollbarWidth: 'none', msOverflowStyle: 'none'}}
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {categories.map(cat => {
+        {categories.map((cat) => {
           const active = activeCategory === cat.id;
           const Icon = cat.icon;
           return (
@@ -439,19 +498,19 @@ export default function ActivityPage() {
               className={`relative transition-all duration-200 cursor-pointer flex-shrink-0 ${
                 active
                   ? `${cat.activeStyle} border shadow-sm rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 flex items-center gap-2 text-[11px] sm:text-[12px] font-extrabold`
-                  : 'bg-white text-[#6B7280] border border-black/[0.04] rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 flex items-center gap-2 text-[11px] sm:text-[12px] font-extrabold hover:bg-slate-50'
+                  : "bg-white text-[#6B7280] border border-black/[0.04] rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 flex items-center gap-2 text-[11px] sm:text-[12px] font-extrabold hover:bg-slate-50"
               }`}
             >
               <Icon
                 className="h-4 w-4"
                 strokeWidth={active ? 2.5 : 2}
-                style={{color: active ? cat.color : '#6B7280'}}
+                style={{ color: active ? cat.color : "#6B7280" }}
               />
               <span>{cat.label}</span>
               {active && (
                 <span
                   className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-8 h-[3px] rounded-full"
-                  style={{backgroundColor: cat.color}}
+                  style={{ backgroundColor: cat.color }}
                 />
               )}
             </button>
@@ -470,7 +529,7 @@ export default function ActivityPage() {
           </div>
           <div>
             <p className="text-[22px] font-extrabold text-[#111111] leading-none mt-2">
-              {loading ? '—' : categoryStats.count}
+              {loading ? "—" : categoryStats.count}
             </p>
             <p className="text-[11px] font-bold text-[#6B7280] leading-none mt-1">
               {config.countLabel}
@@ -478,7 +537,7 @@ export default function ActivityPage() {
             <p
               className={`text-[15px] font-extrabold ${config.textColor} mt-3.5 leading-none`}
             >
-              ₹{loading ? '—' : categoryStats.value.toLocaleString('en-IN')}
+              ₹{loading ? "—" : categoryStats.value.toLocaleString("en-IN")}
             </p>
             <p className="text-[10px] font-bold text-[#6B7280] leading-none mt-1">
               {config.valueLabel}
@@ -492,7 +551,7 @@ export default function ActivityPage() {
           </div>
           <div>
             <p className="text-[22px] font-extrabold text-[#111111] leading-none mt-2">
-              ₹{loading ? '—' : categoryStats.discount.toLocaleString('en-IN')}
+              ₹{loading ? "—" : categoryStats.discount.toLocaleString("en-IN")}
             </p>
             <p className="text-[11px] font-bold text-[#6B7280] leading-none mt-1">
               Discount
@@ -504,8 +563,8 @@ export default function ActivityPage() {
               <span
                 className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-full ${
                   categoryStats.discountTrend.isUp
-                    ? 'bg-[#EAFDF4] text-[#10B981]'
-                    : 'bg-[#FEF2F2] text-[#EF4444]'
+                    ? "bg-[#EAFDF4] text-[#10B981]"
+                    : "bg-[#FEF2F2] text-[#EF4444]"
                 }`}
               >
                 {categoryStats.discountTrend.isUp ? (
@@ -527,7 +586,7 @@ export default function ActivityPage() {
           </div>
           <div>
             <p className="text-[22px] font-extrabold text-[#111111] leading-none mt-2">
-              ₹{loading ? '—' : categoryStats.cashback.toLocaleString('en-IN')}
+              ₹{loading ? "—" : categoryStats.cashback.toLocaleString("en-IN")}
             </p>
             <p className="text-[11px] font-bold text-[#6B7280] leading-none mt-1">
               Cashbacks
@@ -539,8 +598,8 @@ export default function ActivityPage() {
               <span
                 className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-full ${
                   categoryStats.cashbackTrend.isUp
-                    ? 'bg-[#EAFDF4] text-[#10B981]'
-                    : 'bg-[#FEF2F2] text-[#EF4444]'
+                    ? "bg-[#EAFDF4] text-[#10B981]"
+                    : "bg-[#FEF2F2] text-[#EF4444]"
                 }`}
               >
                 {categoryStats.cashbackTrend.isUp ? (
@@ -564,7 +623,9 @@ export default function ActivityPage() {
 
         {loading ? (
           <div className="rounded-[24px] border border-black/[0.03] bg-white py-14 text-center shadow-sm">
-            <p className="text-[13px] font-bold text-[#6B7280]">Loading activity...</p>
+            <p className="text-[13px] font-bold text-[#6B7280]">
+              Loading activity...
+            </p>
           </div>
         ) : filteredTransactions.length === 0 ? (
           <div className="rounded-[24px] border border-black/[0.03] bg-white py-14 text-center shadow-sm">
@@ -593,7 +654,7 @@ export default function ActivityPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/[0.03]">
-                  {filteredTransactions.map(item => {
+                  {filteredTransactions.map((item) => {
                     const totalB = item.discount + item.cashback;
                     return (
                       <tr
@@ -606,15 +667,15 @@ export default function ActivityPage() {
                             {item.invoiceNo}
                           </div>
                           <div className="text-[9px] sm:text-[10px] text-[#9CA3AF] mt-0.5 font-semibold">
-                            {item.dateTime.split(',')[0]}
+                            {item.dateTime.split(",")[0]}
                           </div>
                           <div className="text-[8px] sm:text-[9px] text-[#9CA3AF] font-medium mt-0.5">
-                            {item.dateTime.split(',')[1]?.trim()}
+                            {item.dateTime.split(",")[1]?.trim()}
                           </div>
                         </td>
                         <td className="py-4 px-3 align-top">
                           <div className="text-[11px] sm:text-[12px] font-extrabold text-[#111111]">
-                            ₹{item.amount.toLocaleString('en-IN')}
+                            ₹{item.amount.toLocaleString("en-IN")}
                           </div>
                           <div className="text-[9px] sm:text-[10px] text-[#9CA3AF] mt-0.5">
                             {item.items}
@@ -643,9 +704,9 @@ export default function ActivityPage() {
                         <td className="py-4 px-3 align-top">
                           <span
                             className={`inline-block rounded-full px-2 py-0.5 text-[8px] sm:text-[9px] font-extrabold ${
-                              item.status === 'Paid'
-                                ? 'bg-[#EAFDF4] text-[#10B981]'
-                                : 'bg-[#FFF7ED] text-[#EA580C]'
+                              item.status === "Paid"
+                                ? "bg-[#EAFDF4] text-[#10B981]"
+                                : "bg-[#FFF7ED] text-[#EA580C]"
                             }`}
                           >
                             {item.status}
@@ -654,7 +715,7 @@ export default function ActivityPage() {
                         <td className="py-4 px-1 align-top">
                           <button
                             type="button"
-                            onClick={e => {
+                            onClick={(e) => {
                               e.stopPropagation();
                               setSelectedTransaction(item);
                             }}
@@ -683,11 +744,11 @@ export default function ActivityPage() {
               <div>
                 <h3 className="text-[12px] font-extrabold text-[#111111]">
                   {activeCategory.charAt(0).toUpperCase() +
-                    activeCategory.slice(1)}{' '}
+                    activeCategory.slice(1)}{" "}
                   Summary
                 </h3>
                 <p className="text-[15px] font-extrabold text-[#FF5A26] mt-0.5 leading-none">
-                  ₹{totalBenefit.toLocaleString('en-IN')}
+                  ₹{totalBenefit.toLocaleString("en-IN")}
                 </p>
                 <p className="text-[9px] font-semibold text-[#4F5B73] mt-0.5">
                   Total Benefit ({filterLabels[dateFilter]})
@@ -746,7 +807,7 @@ export default function ActivityPage() {
         >
           <div
             className="relative w-full max-w-md overflow-hidden rounded-[28px] border border-black/[0.05] bg-white p-6 shadow-[0_20px_50px_rgba(0,0,0,0.15)] text-left animate-in fade-in zoom-in-95 duration-150"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-black/[0.03] pb-4">
               <div>
@@ -782,13 +843,13 @@ export default function ActivityPage() {
                   </p>
                   <span
                     className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-extrabold mt-1 uppercase ${
-                      selectedTransaction.category === 'shopping'
-                        ? 'bg-[#FFF7ED] text-[#EA580C]'
-                        : selectedTransaction.category === 'services'
-                          ? 'bg-[#FAF5FF] text-[#9333EA]'
-                          : selectedTransaction.category === 'space'
-                            ? 'bg-[#EAFDF4] text-[#16A34A]'
-                            : 'bg-[#FEF2F2] text-[#EF4444]'
+                      selectedTransaction.category === "shopping"
+                        ? "bg-[#FFF7ED] text-[#EA580C]"
+                        : selectedTransaction.category === "services"
+                          ? "bg-[#FAF5FF] text-[#9333EA]"
+                          : selectedTransaction.category === "space"
+                            ? "bg-[#EAFDF4] text-[#16A34A]"
+                            : "bg-[#FEF2F2] text-[#EF4444]"
                     }`}
                   >
                     {selectedTransaction.category}
@@ -811,9 +872,9 @@ export default function ActivityPage() {
                   </p>
                   <span
                     className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-extrabold mt-1 ${
-                      selectedTransaction.status === 'Paid'
-                        ? 'bg-[#EAFDF4] text-[#10B981]'
-                        : 'bg-[#FFF7ED] text-[#EA580C]'
+                      selectedTransaction.status === "Paid"
+                        ? "bg-[#EAFDF4] text-[#10B981]"
+                        : "bg-[#FFF7ED] text-[#EA580C]"
                     }`}
                   >
                     {selectedTransaction.status}
@@ -825,14 +886,14 @@ export default function ActivityPage() {
                 <div className="flex justify-between text-[12px] font-semibold text-[#4B5563]">
                   <span>Subtotal</span>
                   <span>
-                    ₹{selectedTransaction.amount.toLocaleString('en-IN')}
+                    ₹{selectedTransaction.amount.toLocaleString("en-IN")}
                   </span>
                 </div>
                 {selectedTransaction.discount > 0 && (
                   <div className="flex justify-between text-[12px] font-semibold text-[#9333EA]">
                     <span>Discount</span>
                     <span>
-                      - ₹{selectedTransaction.discount.toLocaleString('en-IN')}
+                      - ₹{selectedTransaction.discount.toLocaleString("en-IN")}
                     </span>
                   </div>
                 )}
@@ -840,14 +901,14 @@ export default function ActivityPage() {
                   <div className="flex justify-between text-[12px] font-semibold text-[#2563EB]">
                     <span>Cashback</span>
                     <span>
-                      - ₹{selectedTransaction.cashback.toLocaleString('en-IN')}
+                      - ₹{selectedTransaction.cashback.toLocaleString("en-IN")}
                     </span>
                   </div>
                 )}
                 <div className="border-t border-dashed border-slate-200 pt-2 flex justify-between text-[14px] font-extrabold text-[#111111]">
                   <span>Total Paid</span>
                   <span>
-                    ₹{selectedTransaction.totalPaid.toLocaleString('en-IN')}
+                    ₹{selectedTransaction.totalPaid.toLocaleString("en-IN")}
                   </span>
                 </div>
                 <div className="border-t border-dashed border-slate-200/50 pt-2 flex justify-between text-[13px] font-bold text-[#10B981]">
@@ -857,7 +918,7 @@ export default function ActivityPage() {
                     {(
                       selectedTransaction.discount +
                       selectedTransaction.cashback
-                    ).toLocaleString('en-IN')}
+                    ).toLocaleString("en-IN")}
                   </span>
                 </div>
               </div>
@@ -866,29 +927,45 @@ export default function ActivityPage() {
             <div className="border-t border-black/[0.03] pt-4 flex gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  toast.success(
-                    `Invoice ${selectedTransaction.invoiceNo} shared successfully!`,
-                  );
-                  setSelectedTransaction(null);
-                }}
+                disabled={loadingInvoice}
+                onClick={handleViewInvoice}
                 className="flex-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#374151] py-2.5 text-[12px] font-extrabold text-center transition cursor-pointer"
               >
-                Share Invoice
+                {loadingInvoice ? "Loading…" : "View Invoice"}
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  toast.success(
-                    `Downloading invoice ${selectedTransaction.invoiceNo}...`,
-                  );
-                  setSelectedTransaction(null);
-                }}
-                className="flex-1 rounded-xl bg-[#111111] hover:bg-black text-white py-2.5 text-[12px] font-extrabold text-center transition cursor-pointer"
+                disabled={downloadingInvoice || loadingInvoice}
+                onClick={handleDownloadInvoice}
+                className="flex-1 rounded-xl bg-[#111111] hover:bg-black text-white py-2.5 text-[12px] font-extrabold text-center transition cursor-pointer disabled:opacity-60"
               >
-                Download PDF
+                {downloadingInvoice ? "Downloading…" : "Download PDF"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {invoicePreview && (
+        <div className="fixed inset-0 z-[80] bg-black/50 flex items-start justify-center overflow-auto p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-[900px] w-full relative my-4">
+            <div className="sticky top-0 z-10 flex justify-end gap-2 bg-white/95 p-3 border-b border-black/5">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="rounded-lg bg-slate-100 px-3 py-1.5 text-[12px] font-bold"
+              >
+                Print
+              </button>
+              <button
+                type="button"
+                onClick={() => setInvoicePreview(null)}
+                className="rounded-lg bg-[#111111] text-white px-3 py-1.5 text-[12px] font-bold"
+              >
+                Close
+              </button>
+            </div>
+
+            <ThermalPrint {...invoicePreview} />
           </div>
         </div>
       )}

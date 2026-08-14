@@ -155,3 +155,30 @@ export interface ActivityDashboard {
     totalPages: number;
   };
 }
+
+  export interface ActivityInvoiceLine {
+  productName: string;
+  qty: number;
+  unitPrice: number;
+  discount: number;
+  lineTotal?: number;
+  category?: string;
+};
+
+  export interface ActivityInvoiceDetail{
+    invoiceId: string;
+     invoiceNumber: string;
+  dateTime?: string;
+  createdAt?: string;
+  status?: string;
+  subTotal: number;
+  discount: number;
+  discountAmount?: number;
+  cashback: number;
+  cashbackAmount?: number;
+  totalPaid: number;
+  paidAmount?: number;
+  pendingAmount?: number;
+  paymentMode?: string;
+  items: ActivityInvoiceLine[];
+  }

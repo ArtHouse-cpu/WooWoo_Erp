@@ -1,7 +1,7 @@
 import React from "react";
 import logo from "@/assets/images/logo/woo_woo_art_house_logo.png";
 import stamp from "@/assets/images/logo/StampWooWooArtHouse.jpeg";
-import ativesLogo from "@/assets/images/logo/Atives_Logo.png";
+// import ativesLogo from "@/assets/images/logo/Atives_Logo.png";
 
 export type ThermalPrintItem = {
   name: string;
