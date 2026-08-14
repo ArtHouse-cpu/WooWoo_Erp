@@ -293,7 +293,6 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
   membershipType,
   documentType = "INVOICE",
   items,
-  totalMRP,
   discountTotal,
   cashbackAmount = 0,
   finalAmount,
