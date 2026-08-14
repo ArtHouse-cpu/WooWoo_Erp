@@ -634,7 +634,7 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
               <span>Total Balance due</span>
               <span>₹ {formatMoney(totalDue)}</span>
             </div>
-            {totalMRP > 0 && (
+            {/* {totalMRP > 0 && (
               <div
                 style={{
                   display: "flex",
@@ -647,7 +647,7 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
                 <span>Total MRP</span>
                 <span>₹ {formatMoney(totalMRP)}</span>
               </div>
-            )}
+            )} */}
           </div>
         </div>
 

@@ -38,6 +38,7 @@ export function mapActivityInvoiceToThermalPrint(
      dueDate: formatInvoiceDate(data.dateTime || data.createdAt),
     customerName: customer.name || 'Customer',
     customerPhone: customer.mobile || '—',
+    salesPerson: data.billedBy?.staffName || '—',
     membershipType: customer.membershipType || '—',
     items,
     totalMRP,

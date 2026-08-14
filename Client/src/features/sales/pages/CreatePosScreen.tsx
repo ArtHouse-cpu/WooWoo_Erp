@@ -832,9 +832,9 @@ export default function CreatePosScreen({
           )}
 
           {/* Main Layout Grid */}
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px] mt-4">
+          <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[1fr_340px] mt-4">
             {/* Left Column: Form & Cart */}
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               {/* Customer Section */}
               <div className="mt-4 flex flex-col gap-2 rounded-xl bg-slate-50 p-4 border border-slate-100">
                 <div className="flex items-center justify-between">
@@ -1058,25 +1058,25 @@ export default function CreatePosScreen({
                 </div>
               )}
 
-              {/* Table */}
-              <div className="mt-6 border rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
+              {/* Table — horizontal scroll on small screens */}
+              <div className="mt-6 overflow-x-auto rounded-xl border [scrollbar-width:thin]">
+                <table className="w-full min-w-[720px] text-sm">
                   <thead className="bg-gray-100">
                     <tr>
-                      <th className="p-3 text-left">Product</th>
-                      <th className="p-3">Qty</th>
-                      <th className="p-3">Price</th>
-                      <th className="p-3">Discount</th>
-                      <th className="p-3">Cashback</th>
-                      <th className="p-3">Total</th>
-                      <th className="p-3">Action</th>
+                      <th className="p-3 text-left whitespace-nowrap">Product</th>
+                      <th className="p-3 whitespace-nowrap">Qty</th>
+                      <th className="p-3 whitespace-nowrap">Price</th>
+                      <th className="p-3 whitespace-nowrap">Discount</th>
+                      <th className="p-3 whitespace-nowrap">Cashback</th>
+                      <th className="p-3 whitespace-nowrap">Total</th>
+                      <th className="p-3 whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
 
                   <tbody>
                     {items.map((item) => (
                       <tr key={item.id} className="border-t">
-                        <td className="p-3">
+                        <td className="p-3 min-w-[160px]">
                           <div className="flex items-center gap-2 font-medium">
                             <span>{item.name}</span>
                             {item.isCsp && (

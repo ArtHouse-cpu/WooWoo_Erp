@@ -111,6 +111,26 @@ function resolveItemCount(items) {
   );
 }
 
+/** PIN-verified staff who billed the invoice (fallback: sales person). */
+function resolveBilledBy(inv) {
+  const invoiceBy = inv?.invoiceBy && typeof inv.invoiceBy === 'object'
+    ? inv.invoiceBy
+    : {};
+  const name = String(
+    invoiceBy.staffName ||
+      invoiceBy.name ||
+      inv.salesPersonName ||
+      '',
+  ).trim();
+  if (!name) return null;
+  return {
+    staffId: invoiceBy.staffId ? String(invoiceBy.staffId) : null,
+    staffName: name,
+    employeeId: String(invoiceBy.employeeId || '').trim() || null,
+    email: String(invoiceBy.email || '').trim() || null,
+  };
+}
+
 /** Transaction History list row — matches customer portal table UI */
 const mapActivityListItem = (inv) => {
   const items = Array.isArray(inv.items) ? inv.items : [];
@@ -125,6 +145,7 @@ const mapActivityListItem = (inv) => {
     invoiceId: String(inv._id),
     invoiceNumber: inv.invoiceCode || '',
     createdAt: inv.createdAt,
+    billedBy: resolveBilledBy(inv),
     /** Bill value before benefits (shown as PAID column in design) */
     subTotal,
     /** Actual amount customer paid at checkout */
@@ -141,7 +162,7 @@ const mapActivityListItem = (inv) => {
 };
 
 const activitySelectFields =
-  'invoiceCode subTotal discountTotal membershipDiscount cashbackTotal grandTotal status paymentStatus pendingAmount paymentBreakdown coupon referral items mode createdAt customerId customerPhone';
+  'invoiceCode subTotal discountTotal membershipDiscount cashbackTotal grandTotal status paymentStatus pendingAmount paymentBreakdown coupon referral items mode createdAt customerId customerPhone invoiceBy salesPersonName';
 
 /** Invoice Receipt modal — full breakdown for one transaction */
 const mapActivityDetail = (inv) => {
@@ -172,6 +193,7 @@ const mapActivityDetail = (inv) => {
     benefited: totalBenefit,
     paymentMode: inv.mode || '',
     pendingAmount: toNum(inv.pendingAmount ?? inv.paymentBreakdown?.dueAmount),
+    billedBy: resolveBilledBy(inv),
     items: items.map((item) => ({
       productName: item.productName || '',
       qty: toNum(item.qty),

@@ -180,5 +180,11 @@ export interface ActivityDashboard {
   paidAmount?: number;
   pendingAmount?: number;
   paymentMode?: string;
+  billedBy?: {
+    staffId?: string | null;
+    staffName: string;
+    employeeId?: string | null;
+    email?: string | null;
+  } | null;
   items: ActivityInvoiceLine[];
   }
