@@ -164,6 +164,33 @@ const dedupeParentRowsWhenVariantsExist = (rows = []) => {
   });
 };
 
+/**
+ * If the same catalogue label exists as product and service, keep product only.
+ * Prevents "Masking Tape" showing twice (PRODUCT + SERVICE) when DB has twin rows.
+ */
+const dedupeServiceWhenProductExists = (rows = []) => {
+  const productNames = new Set(
+    rows
+      .filter((row) => String(row?.sourceType || '') === 'product')
+      .map((row) =>
+        String(row?.productName || row?.name || '')
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+
+  if (!productNames.size) return rows;
+
+  return rows.filter((row) => {
+    if (String(row?.sourceType || '') !== 'service') return true;
+    const name = String(row?.productName || row?.name || '')
+      .trim()
+      .toLowerCase();
+    return !name || !productNames.has(name);
+  });
+};
+
 const mapService = (service) => {
   const name = String(service.serviceName || service.productName || '').trim();
   return {
@@ -379,12 +406,14 @@ export const lookupCatalogueItems = async (req, res) => {
     const foods = foodDocs.map(mapFood);
 
     // Dedupe AFTER merge so same-named services/parents cannot sit beside variants
-    const items = dedupeParentRowsWhenVariantsExist([
-      ...products,
-      ...services,
-      ...spaces,
-      ...foods,
-    ]).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const items = dedupeServiceWhenProductExists(
+      dedupeParentRowsWhenVariantsExist([
+        ...products,
+        ...services,
+        ...spaces,
+        ...foods,
+      ]),
+    ).sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
     const productCount = items.filter((i) => i.sourceType === 'product').length;
     const serviceCount = items.filter((i) => i.sourceType === 'service').length;

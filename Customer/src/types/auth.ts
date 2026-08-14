@@ -188,3 +188,24 @@ export interface ActivityDashboard {
   } | null;
   items: ActivityInvoiceLine[];
   }
+
+
+  export interface ActivityCategoryStat {
+  count: number;
+  benefit: number;
+}
+
+export interface ActivityInsights {
+  impact: {
+    totalBenefited: number;
+    totalCashback: number;
+    totalDiscount: number;
+    rewardsCount: number;
+  };
+  activities: {
+    shopping: ActivityCategoryStat;
+    services: ActivityCategoryStat;
+    space: ActivityCategoryStat;
+    food: ActivityCategoryStat;
+  };
+}

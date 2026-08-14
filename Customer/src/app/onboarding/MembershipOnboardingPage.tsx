@@ -30,7 +30,6 @@ import {
 } from 'lucide-react';
 import purpleStarPedestal from '../../assets/purple_star_pedestal.jpg';
 import {toast} from 'sonner';
-import { MOCK_TRANSACTIONS } from '../activity/ActivityPage';
 import {Button} from '../../components/ui/Button';
 import {
   FALLBACK_MEMBERSHIP_PLANS,
@@ -44,6 +43,7 @@ import {getErrorMessage} from '../../services/axios';
 import {useAuthStore} from '../../store/authStore';
 import {useIsDesktop} from '../../hooks/useIsDesktop';
 import {redirectToPayu} from '../../utils/payuCheckout';
+import type { ActivityInsights } from '../../types/auth';
 
 function PlanIcon({
   iconKey,
@@ -370,13 +370,45 @@ function InsightsTab({
 }) {
   const navigate = useNavigate();
   const isMember = customer?.membershipType && customer.membershipType !== 'none';
-  const memberPlan = isMember ? String(customer.membershipType).toUpperCase() : 'SPECIAL';
-  
+  const memberPlan = isMember
+    ? String(customer.membershipType).toUpperCase()
+    : 'SPECIAL';
+
+  const [insights, setInsights] = useState<ActivityInsights | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        setLoadingInsights(true);
+        const res = await authApi.getActivityInsights();
+        if (!cancelled) setInsights(res.data.data ?? null);
+      } catch (error) {
+        if (!cancelled) {
+          setInsights(null);
+          toast.error(getErrorMessage(error, 'Failed to load insights'));
+        }
+      } finally {
+        if (!cancelled) setLoadingInsights(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const memberSince = useMemo(() => {
     if (customer?.createdAt) {
       try {
         const date = new Date(customer.createdAt);
-        return `Member since ${date.toLocaleDateString('en-US', {month: 'short', year: 'numeric'})}`;
+        return `Member since ${date.toLocaleDateString('en-US', {
+          month: 'short',
+          year: 'numeric',
+        })}`;
       } catch {
         // ignore
       }
@@ -385,78 +417,73 @@ function InsightsTab({
   }, [customer?.createdAt]);
 
   const activitiesStats = useMemo(() => {
-    const categoriesList = ['shopping', 'services', 'space', 'food'] as const;
-    
-    return categoriesList.map(cat => {
-      const trans = MOCK_TRANSACTIONS.filter(t => t.category === cat);
-      const count = trans.length;
-      const benefit = trans.reduce((sum, t) => sum + t.discount + t.cashback, 0);
-
-      if (cat === 'shopping') {
-        return {
-          id: cat,
-          title: 'Shopping',
-          subtitle: 'Orders & Purchases',
-          count: 24,
-          benefit: 4210,
-          icon: ShoppingBag,
-          color: '#EA580C',
-          bg: 'bg-[#FFF7ED]',
-        };
-      }
-      if (cat === 'services') {
-        return {
-          id: cat,
-          title: 'Services',
-          subtitle: 'Custom Framings & Scans',
-          count: count,
-          benefit: benefit,
-          icon: Wrench,
-          color: '#9333EA',
-          bg: 'bg-[#FAF5FF]',
-        };
-      }
-      if (cat === 'space') {
-        return {
-          id: cat,
-          title: 'Space Bookings',
-          subtitle: 'Studio & Room Rentals',
-          count: count,
-          benefit: benefit,
-          icon: Calendar,
-          color: '#16A34A',
-          bg: 'bg-[#EAFDF4]',
-        };
-      }
-      // food
-      return {
-        id: cat,
+    const stats = insights?.activities;
+    return [
+      {
+        id: 'shopping',
+        title: 'Shopping',
+        subtitle: 'Orders & Purchases',
+        count: stats?.shopping.count ?? 0,
+        benefit: stats?.shopping.benefit ?? 0,
+        icon: ShoppingBag,
+        color: '#EA580C',
+        bg: 'bg-[#FFF7ED]',
+      },
+      {
+        id: 'services',
+        title: 'Services',
+        subtitle: 'Custom Framings & Scans',
+        count: stats?.services.count ?? 0,
+        benefit: stats?.services.benefit ?? 0,
+        icon: Wrench,
+        color: '#9333EA',
+        bg: 'bg-[#FAF5FF]',
+      },
+      {
+        id: 'space',
+        title: 'Space Bookings',
+        subtitle: 'Studio & Room Rentals',
+        count: stats?.space.count ?? 0,
+        benefit: stats?.space.benefit ?? 0,
+        icon: Calendar,
+        color: '#16A34A',
+        bg: 'bg-[#EAFDF4]',
+      },
+      {
+        id: 'food',
         title: 'Food & Cafe',
         subtitle: 'Cafe Orders & Combos',
-        count: count,
-        benefit: benefit,
+        count: stats?.food.count ?? 0,
+        benefit: stats?.food.benefit ?? 0,
         icon: Soup,
         color: '#EF4444',
         bg: 'bg-[#FEF2F2]',
-      };
-    });
-  }, []);
+      },
+    ];
+  }, [insights]);
+
+  const impact = insights?.impact;
 
   return (
     <div className="space-y-6 text-left">
-      {/* Your Current Plan Card */}
       <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-[#F5F3FF] to-[#EDE9FE] border border-[#DDD6FE] p-5 flex items-center justify-between shadow-sm">
         <div className="absolute right-0 top-0 h-full w-1/2 opacity-10 bg-[radial-gradient(#8B5CF6_1px,transparent_1px)] [background-size:16px_16px]" />
-        
+
         <div className="relative z-10 flex-1">
-          <p className="text-[12px] font-bold text-[#7C3AED] opacity-90">Your Current Plan</p>
+          <p className="text-[12px] font-bold text-[#7C3AED] opacity-90">
+            Your Current Plan
+          </p>
           <div className="mt-1.5 flex items-center gap-2">
-            <h2 className="text-[24px] font-extrabold text-[#5B21B6] tracking-tight">{memberPlan}</h2>
+            <h2 className="text-[24px] font-extrabold text-[#5B21B6] tracking-tight">
+              {memberPlan}
+            </h2>
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#8B5CF6] text-white shadow-sm">
               <Star className="h-3 w-3 fill-current stroke-none" />
             </span>
           </div>
-          <p className="mt-1 text-[11px] font-bold text-[#7C3AED] opacity-75">{memberSince}</p>
+          <p className="mt-1 text-[11px] font-bold text-[#7C3AED] opacity-75">
+            {memberSince}
+          </p>
         </div>
 
         <div className="relative z-10 flex h-15 w-18 shrink-0 items-center justify-center rounded-2xl bg-white/40 backdrop-blur-sm p-1.5 shadow-inner">
@@ -468,68 +495,81 @@ function InsightsTab({
         </div>
       </div>
 
-      {/* Your Impact Section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-[15px] font-extrabold text-[#111111]">Your Impact</h3>
-          
         </div>
 
         <div className="grid grid-cols-4 gap-2">
-          {/* Card 1: Total Benefited */}
           <div className="border border-black/[0.03] bg-white rounded-[20px] p-4.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EAFDF4] text-[#10B981]">
               <DollarSign className="h-4 w-4" />
             </div>
             <div className="mt-2">
-              <p className="text-[14px] font-extrabold text-[#111111] leading-none">₹12,450</p>
-              <p className="text-[9px] font-bold text-[#10B981] leading-tight mt-1"> Benefited</p>
-              
+              <p className="text-[14px] font-extrabold text-[#111111] leading-none">
+                {loadingInsights
+                  ? '—'
+                  : `₹${(impact?.totalBenefited ?? 0).toLocaleString('en-IN')}`}
+              </p>
+              <p className="text-[9px] font-bold text-[#10B981] leading-tight mt-1">
+                Benefited
+              </p>
             </div>
           </div>
 
-          {/* Card 2: Cashbacks Earned */}
           <div className="border border-black/[0.03] bg-white rounded-[20px] p-4.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EFF6FF] text-[#2563EB]">
               <Target className="h-4 w-4" />
             </div>
             <div className="mt-2">
-              <p className="text-[14px] font-extrabold text-[#111111] leading-none">₹2,350</p>
-              <p className="text-[9px] font-bold text-[#2563EB] leading-tight mt-1">Cashbacks </p>
-           
+              <p className="text-[14px] font-extrabold text-[#111111] leading-none">
+                {loadingInsights
+                  ? '—'
+                  : `₹${(impact?.totalCashback ?? 0).toLocaleString('en-IN')}`}
+              </p>
+              <p className="text-[9px] font-bold text-[#2563EB] leading-tight mt-1">
+                Cashbacks
+              </p>
             </div>
           </div>
 
-          {/* Card 3: Discounts Received */}
           <div className="border border-black/[0.03] bg-white rounded-[20px] p-4.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FFF7ED] text-[#EA580C]">
               <Tag className="h-4 w-4" />
             </div>
             <div className="mt-2">
-              <p className="text-[14px] font-extrabold text-[#111111] leading-none">₹1,860</p>
-              <p className="text-[9px] font-bold text-[#EA580C] leading-tight mt-1">Discounts </p>
-              
+              <p className="text-[14px] font-extrabold text-[#111111] leading-none">
+                {loadingInsights
+                  ? '—'
+                  : `₹${(impact?.totalDiscount ?? 0).toLocaleString('en-IN')}`}
+              </p>
+              <p className="text-[9px] font-bold text-[#EA580C] leading-tight mt-1">
+                Discounts
+              </p>
             </div>
           </div>
 
-          {/* Card 4: Rewards Earned */}
           <div className="border border-black/[0.03] bg-white rounded-[20px] p-4.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FAF5FF] text-[#9333EA]">
               <Gift className="h-4 w-4" />
             </div>
             <div className="mt-2">
-              <p className="text-[14px] font-extrabold text-[#111111] leading-none">18</p>
-              <p className="text-[9px] font-bold text-[#9333EA] leading-tight mt-1">Rewards </p>
-              
+              <p className="text-[14px] font-extrabold text-[#111111] leading-none">
+                {loadingInsights ? '—' : impact?.rewardsCount ?? 0}
+              </p>
+              <p className="text-[9px] font-bold text-[#9333EA] leading-tight mt-1">
+                Rewards
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Your Activities Section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-[15px] font-extrabold text-[#111111]">Your Activities</h3>
+          <h3 className="text-[15px] font-extrabold text-[#111111]">
+            Your Activities
+          </h3>
           <button
             type="button"
             className="text-[11px] font-bold text-[#4F46E5] flex items-center gap-0.5 hover:underline cursor-pointer"
@@ -541,23 +581,37 @@ function InsightsTab({
         </div>
 
         <div className="bg-white rounded-[24px] border border-black/[0.03] px-4 py-3 divide-y divide-black/[0.03] shadow-sm">
-          {activitiesStats.map(item => {
+          {activitiesStats.map((item) => {
             const Icon = item.icon;
             return (
-              <div key={item.id} className="flex items-center justify-between py-3">
+              <div
+                key={item.id}
+                className="flex items-center justify-between py-3"
+              >
                 <div className="flex items-center gap-3">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] ${item.bg}`} style={{ color: item.color }}>
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] ${item.bg}`}
+                    style={{color: item.color}}
+                  >
                     <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
                   </div>
                   <div>
-                    <p className="text-[12px] font-extrabold text-[#111111]">{item.title}</p>
-                    <p className="text-[10px] font-semibold text-[#9CA3AF] mt-0.5">{item.subtitle}</p>
+                    <p className="text-[12px] font-extrabold text-[#111111]">
+                      {item.title}
+                    </p>
+                    <p className="text-[10px] font-semibold text-[#9CA3AF] mt-0.5">
+                      {item.subtitle}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 text-right">
-                  <span className="text-[12px] font-extrabold text-[#111111]">{item.count}</span>
+                  <span className="text-[12px] font-extrabold text-[#111111]">
+                    {loadingInsights ? '—' : item.count}
+                  </span>
                   <span className="text-[9px] font-extrabold text-[#10B981] flex items-center gap-0.5 min-w-[70px] justify-end">
-                    +₹{item.benefit.toLocaleString('en-IN')}
+                    {loadingInsights
+                      ? '—'
+                      : `+₹${item.benefit.toLocaleString('en-IN')}`}
                   </span>
                 </div>
               </div>

@@ -35,3 +35,14 @@ export const getMyActivityDetail = asyncHandler(async (req, res) => {
     data: detail,
   });
 });
+
+
+export const getMyActivityInsights=asyncHandler(async(req,res)=>{
+  const data = await activityService.getCustomerActivityInsights(req.customer._id, {
+   customerMobile: req.customer.mobile
+  });
+  return sendSuccess(res, {
+    message: 'Activity Insights loaded',
+    data,
+  });
+})

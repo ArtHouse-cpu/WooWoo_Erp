@@ -27,6 +27,7 @@ import {getCustomerMembershipPlans} from '../controllers/membership.controller.j
 import {
   getMyActivity,
   getMyActivityDetail,
+  getMyActivityInsights,
 } from '../controllers/activity.controller.js';
 import {validateRequest} from '../middlewares/validateRequest.js';
 import {
@@ -117,6 +118,12 @@ router.get(
   authenticateCustomer,
   authorizeCustomer('active'),
   getMyActivity,
+);
+router.get(
+  '/activity/insights',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  getMyActivityInsights,
 );
 router.get(
   '/activity/:invoiceId',

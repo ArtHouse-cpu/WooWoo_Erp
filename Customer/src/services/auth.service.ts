@@ -1,4 +1,4 @@
-import {api} from './axios';
+import { api } from "./axios";
 import type {
   ApiResponse,
   Customer,
@@ -7,7 +7,8 @@ import type {
   WalletDashboard,
   ActivityDashboard,
   ActivityInvoiceDetail,
-} from '../types/auth';
+  ActivityInsights,
+} from "../types/auth";
 
 export const authApi = {
   signup: (payload: {
@@ -19,13 +20,16 @@ export const authApi = {
     gender?: string;
     dob?: string;
     ref?: string;
-  }) => api.post<ApiResponse<Customer>>('/signup', payload),
+  }) => api.post<ApiResponse<Customer>>("/signup", payload),
 
-  login: (payload: {identifier: string; password: string; rememberMe?: boolean}) =>
-    api.post<ApiResponse<Customer>>('/login', payload),
+  login: (payload: {
+    identifier: string;
+    password: string;
+    rememberMe?: boolean;
+  }) => api.post<ApiResponse<Customer>>("/login", payload),
 
-  requestOtp: (payload: {mobile: string; countryCode?: string}) =>
-    api.post<ApiResponse>('/login/otp', payload),
+  requestOtp: (payload: { mobile: string; countryCode?: string }) =>
+    api.post<ApiResponse>("/login/otp", payload),
 
   verifyOtp: (payload: {
     mobile?: string;
@@ -34,19 +38,19 @@ export const authApi = {
     purpose?: OtpPurpose;
     name?: string;
     ref?: string;
-  }) => api.post<ApiResponse<Customer | {resetToken?: string; identifier?: string}>>(
-    '/verify-otp',
-    payload,
-  ),
+  }) =>
+    api.post<
+      ApiResponse<Customer | { resetToken?: string; identifier?: string }>
+    >("/verify-otp", payload),
 
   resendOtp: (payload: {
     mobile?: string;
     identifier?: string;
     purpose?: OtpPurpose;
-  }) => api.post<ApiResponse>('/resend-otp', payload),
+  }) => api.post<ApiResponse>("/resend-otp", payload),
 
-  forgotPassword: (payload: {identifier: string}) =>
-    api.post<ApiResponse>('/forgot-password', payload),
+  forgotPassword: (payload: { identifier: string }) =>
+    api.post<ApiResponse>("/forgot-password", payload),
 
   resetPassword: (payload: {
     identifier: string;
@@ -54,29 +58,30 @@ export const authApi = {
     confirmPassword?: string;
     otp?: string;
     resetToken?: string;
-  }) => api.post<ApiResponse<Customer>>('/reset-password', payload),
+  }) => api.post<ApiResponse<Customer>>("/reset-password", payload),
 
-  refreshToken: () => api.post<ApiResponse<Customer>>('/refresh-token'),
+  refreshToken: () => api.post<ApiResponse<Customer>>("/refresh-token"),
 
-  logout: () => api.post<ApiResponse>('/logout'),
+  logout: () => api.post<ApiResponse>("/logout"),
 
-  me: () => api.get<ApiResponse<Customer>>('/me'),
+  me: () => api.get<ApiResponse<Customer>>("/me"),
 
-  getReferralDashboard: () => api.get<ApiResponse<ReferralDashboard>>('/referral'),
+  getReferralDashboard: () =>
+    api.get<ApiResponse<ReferralDashboard>>("/referral"),
 
-  getWalletDashboard: () => api.get<ApiResponse<WalletDashboard>>('/wallet'),
+  getWalletDashboard: () => api.get<ApiResponse<WalletDashboard>>("/wallet"),
 
   updateProfile: (
     payload: Partial<Customer> & {
       dob?: string;
       gender?: string;
-      membershipType?: Customer['membershipType'];
+      membershipType?: Customer["membershipType"];
       profileSetupCompleted?: boolean;
       onboardingCompleted?: boolean;
     },
-  ) => api.put<ApiResponse<Customer>>('/profile', payload),
+  ) => api.put<ApiResponse<Customer>>("/profile", payload),
 
-  deleteProfile: () => api.delete<ApiResponse>('/profile'),
+  deleteProfile: () => api.delete<ApiResponse>("/profile"),
 
   getMembershipPlans: () =>
     api.get<
@@ -89,31 +94,31 @@ export const authApi = {
           price: number;
           description: string;
           themeKey?: string;
-          iconKey?: 'user' | 'star' | 'graduation' | 'crown';
-          features?: Array<{label: string; was?: number}>;
-          discounts?: Array<{icon: 'store' | 'space'; label: string}>;
+          iconKey?: "user" | "star" | "graduation" | "crown";
+          features?: Array<{ label: string; was?: number }>;
+          discounts?: Array<{ icon: "store" | "space"; label: string }>;
           cashback?: string;
         }>
       >
-    >('/membership/plans'),
+    >("/membership/plans"),
 
-  validateCoupon: (payload: {code: string; membershipType: string}) =>
+  validateCoupon: (payload: { code: string; membershipType: string }) =>
     api.post<
       ApiResponse<{
         code: string;
         title: string;
-        discountType: 'percentage' | 'flat';
+        discountType: "percentage" | "flat";
         discountValue: number;
         orderAmount: number;
         discountAmount: number;
         payableAmount: number;
       }>
-    >('/coupon/validate', payload),
+    >("/coupon/validate", payload),
 
   activateMembership: (payload: {
     membershipType: string;
     couponCode?: string;
-  }) => api.post<ApiResponse<Customer>>('/membership/activate', payload),
+  }) => api.post<ApiResponse<Customer>>("/membership/activate", payload),
 
   initiatePayuPayment: (payload: {
     membershipType: string;
@@ -121,7 +126,7 @@ export const authApi = {
   }) =>
     api.post<
       ApiResponse<{
-        mode: 'payu' | 'free';
+        mode: "payu" | "free";
         activated?: boolean;
         customer?: Customer;
         paymentUrl?: string;
@@ -135,7 +140,7 @@ export const authApi = {
           couponCode?: string | null;
         };
       }>
-    >('/payments/payu/initiate', payload),
+    >("/payments/payu/initiate", payload),
 
   getPaymentStatus: (txnid: string) =>
     api.get<
@@ -147,12 +152,12 @@ export const authApi = {
       }>
     >(`/payments/${txnid}`),
 
+  getActivity: (params?: { page?: number; limit?: number; status?: string }) =>
+    api.get<ApiResponse<ActivityDashboard>>("/activity", { params }),
 
-  getActivity: (params?: {
-    page?: number;
-    limit?: number;
-    status?: string;
-  }) => api.get<ApiResponse<ActivityDashboard>>('/activity', {params}),
+  getActivityInvoice: (invoice: string) =>
+    api.get<ApiResponse<ActivityInvoiceDetail>>(`/activity/${invoice}`),
 
-  getActivityInvoice:(invoice:string) => api.get<ApiResponse<ActivityInvoiceDetail>>(`/activity/${invoice}`),
+  getActivityInsights: () =>
+    api.get<ApiResponse<ActivityInsights>>("/activity/insights"),
 };

@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import Invoice from '../../../models/invoice.model.js';
 import {normalizeMobile} from '../utils/normalize.js';
 
-const toNum = (v) => {
+const toNum = v => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
@@ -60,7 +60,7 @@ function buildCustomerInvoiceQuery(customerId, customerMobile) {
   };
 }
 
-const mapPaymentStatus = (inv) => {
+const mapPaymentStatus = inv => {
   const doc = String(inv.status || '').toLowerCase();
   if (doc === 'cancelled') return 'Cancelled';
   if (doc === 'draft') return 'Draft';
@@ -113,14 +113,10 @@ function resolveItemCount(items) {
 
 /** PIN-verified staff who billed the invoice (fallback: sales person). */
 function resolveBilledBy(inv) {
-  const invoiceBy = inv?.invoiceBy && typeof inv.invoiceBy === 'object'
-    ? inv.invoiceBy
-    : {};
+  const invoiceBy =
+    inv?.invoiceBy && typeof inv.invoiceBy === 'object' ? inv.invoiceBy : {};
   const name = String(
-    invoiceBy.staffName ||
-      invoiceBy.name ||
-      inv.salesPersonName ||
-      '',
+    invoiceBy.staffName || invoiceBy.name || inv.salesPersonName || '',
   ).trim();
   if (!name) return null;
   return {
@@ -132,7 +128,7 @@ function resolveBilledBy(inv) {
 }
 
 /** Transaction History list row — matches customer portal table UI */
-const mapActivityListItem = (inv) => {
+const mapActivityListItem = inv => {
   const items = Array.isArray(inv.items) ? inv.items : [];
   const itemCount = resolveItemCount(items);
   const subTotal = toNum(inv.subTotal);
@@ -165,7 +161,7 @@ const activitySelectFields =
   'invoiceCode subTotal discountTotal membershipDiscount cashbackTotal grandTotal status paymentStatus pendingAmount paymentBreakdown coupon referral items mode createdAt customerId customerPhone invoiceBy salesPersonName';
 
 /** Invoice Receipt modal — full breakdown for one transaction */
-const mapActivityDetail = (inv) => {
+const mapActivityDetail = inv => {
   const items = Array.isArray(inv.items) ? inv.items : [];
   const itemCount = resolveItemCount(items);
   const subTotal = toNum(inv.subTotal);
@@ -194,7 +190,7 @@ const mapActivityDetail = (inv) => {
     paymentMode: inv.mode || '',
     pendingAmount: toNum(inv.pendingAmount ?? inv.paymentBreakdown?.dueAmount),
     billedBy: resolveBilledBy(inv),
-    items: items.map((item) => ({
+    items: items.map(item => ({
       productName: item.productName || '',
       qty: toNum(item.qty),
       unitPrice: toNum(item.unitPrice),
@@ -242,7 +238,7 @@ export async function getCustomerActivity(
   let activities = rows.map(mapActivityListItem);
   if (status) {
     const s = String(status).toLowerCase();
-    activities = activities.filter((a) => a.status.toLowerCase() === s);
+    activities = activities.filter(a => a.status.toLowerCase() === s);
   }
 
   return {
@@ -278,4 +274,138 @@ export async function getCustomerActivityDetail(
 
   if (!inv) return null;
   return mapActivityDetail(inv);
+}
+
+export async function getCustomerActivityInsights(
+  customerId,
+  {customerMobile} = {},
+) {
+  const empty = {
+    impact: {
+      totalBenefited: 0,
+      totalCashback: 0,
+      totalDiscount: 0,
+      rewardsCount: 0,
+    },
+    activities: {
+      shopping: {count: 0, benefit: 0},
+      services: {count: 0, benefit: 0},
+      space: {count: 0, benefit: 0},
+      food: {count: 0, benefit: 0},
+    },
+  };
+
+  const match = buildCustomerInvoiceQuery(customerId, customerMobile);
+  if (!match) return empty;
+
+  const rows = await Invoice.aggregate([
+    {$match: match},
+    {
+      $addFields: {
+        uiCategory: {
+          $let: {
+            vars: {
+              topItemCategory: {
+                $ifNull: [{$arrayElemAt: ['$items.category', 0]}, ''],
+              },
+            },
+            in: {
+              $switch: {
+                branches: [
+                  {
+                    case: {
+                      $regexMatch: {
+                        input: {$toUpper: '$$topItemCategory'},
+                        regex: 'SERVICE',
+                      },
+                    },
+                    then: 'services',
+                  },
+                  {
+                    case: {
+                      $regexMatch: {
+                        input: {$toUpper: '$$topItemCategory'},
+                        regex: 'SPACE',
+                      },
+                    },
+                    then: 'space',
+                  },
+                  {
+                    case: {
+                      $regexMatch: {
+                        input: {$toUpper: '$$topItemCategory'},
+                        regex: 'FOOD|CAFE',
+                      },
+                    },
+                    then: 'food',
+                  },
+                ],
+                default: 'shopping',
+              },
+            },
+          },
+        },
+        discountAmount: {$ifNull: ['$discountTotal', 0]},
+        cashbackAmount: {$ifNull: ['$cashbackTotal', 0]},
+      },
+    },
+    {
+      $addFields: {
+        benefit: {$add: ['$discountAmount', '$cashbackAmount']},
+      },
+    },
+    {
+      $facet: {
+        impact: [
+          {
+            $group: {
+              _id: null,
+              totalBenefited: {$sum: '$benefit'},
+              totalCashback: {$sum: '$cashbackAmount'},
+              totalDiscount: {$sum: '$discountAmount'},
+              rewardsCount: {$sum: 1},
+            },
+          },
+        ],
+        byCategory: [
+          {
+            $group: {
+              _id: '$uiCategory',
+              count: {$sum: 1},
+              benefit: {$sum: '$benefit'},
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  const impactRow = rows[0]?.impact?.[0] ?? {};
+  const byCategory = rows[0]?.byCategory ?? [];
+
+  const catMap = {
+    shopping: {count: 0, benefit: 0},
+    services: {count: 0, benefit: 0},
+    space: {count: 0, benefit: 0},
+    food: {count: 0, benefit: 0},
+  };
+
+  for (const row of byCategory) {
+    if (catMap[row._id]) {
+      catMap[row._id] = {
+        count: row.count,
+        benefit: Math.round((row.benefit ?? 0) * 100) / 100,
+      };
+    }
+  }
+
+  return {
+    impact: {
+      totalBenefited: Math.round((impactRow.totalBenefited ?? 0) * 100) / 100,
+      totalCashback: Math.round((impactRow.totalCashback ?? 0) * 100) / 100,
+      totalDiscount: Math.round((impactRow.totalDiscount ?? 0) * 100) / 100,
+      rewardsCount: impactRow.rewardsCount ?? 0,
+    },
+    activities: catMap,
+  };
 }
