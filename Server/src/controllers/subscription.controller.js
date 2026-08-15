@@ -57,7 +57,7 @@ export const creditPlanPurchaseCashback = async ({
     note: `Membership purchase cashback · ${planName || 'Plan'} · ${ref}`,
     referenceType: 'MembershipPurchase',
     referenceId: ref,
-    walletType: 'cashback',
+    walletType: 'nonWithdrawable',
     createdBy,
   });
 };

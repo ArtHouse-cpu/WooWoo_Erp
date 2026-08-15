@@ -31,6 +31,7 @@ import { creditWalletCashback } from "../../../utils/walletCashback";
 import { roundPayable, roundToPaise } from "../../../utils/paymentRoundOff";
 import StaffVerifyModal from "./StaffVerifyModal";
 import type { VerifiedStaff } from "@/services/apiClient";
+import { resolveWalletBalance } from "@/utils/resolveWalletBalance";
 
 type CheckoutItem = {
   id?: number;
@@ -279,50 +280,6 @@ function Badge({
       {children}
     </span>
   );
-}
-
-/** Prefer total spendable balance (general + cashback + affiliate). */
-function resolveWalletBalance(
-  wallet: Record<string, unknown> | null | undefined,
-  fallback = 0,
-): number {
-  if (!wallet || typeof wallet !== "object") {
-    return Number.isFinite(Number(fallback)) ? Math.max(0, Number(fallback)) : 0;
-  }
-
-  const total = Number(wallet.totalBalance);
-  if (Number.isFinite(total)) return Math.max(0, total);
-
-  const general = Number(
-    wallet.generalBalance ?? wallet.walletAmount ?? wallet.balance ?? 0,
-  );
-  const cashback = Number(wallet.cashbackBalance ?? 0);
-  const affiliate = Number(
-    wallet.affiliateBalance ?? wallet.withdrawableBalance ?? 0,
-  );
-
-  // Raw wallet docs store buckets separately; list API already sums into walletAmount.
-  if (
-    wallet.generalBalance !== undefined ||
-    wallet.cashbackBalance !== undefined ||
-    wallet.affiliateBalance !== undefined
-  ) {
-    const sum =
-      (Number.isFinite(general) ? general : 0) +
-      (Number.isFinite(cashback) ? cashback : 0) +
-      (Number.isFinite(affiliate) ? affiliate : 0);
-    return Math.max(0, sum);
-  }
-
-  const amount = Number(
-    wallet.walletAmount ??
-      wallet.balance ??
-      wallet.currentBalance ??
-      wallet.availableBalance ??
-      wallet.closingBalance ??
-      fallback,
-  );
-  return Number.isFinite(amount) ? Math.max(0, amount) : 0;
 }
 
 /** Max wallet payment while keeping the configured minimum balance. */
@@ -1559,7 +1516,7 @@ export default function CheckoutModal({
       }}
     >
       <div className="relative flex h-dvh max-h-dvh w-full max-w-5xl flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-2xl">
-        <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-3 py-3 sm:px-6 sm:py-4">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
             <h2
               id="checkout-title"
@@ -1587,14 +1544,14 @@ export default function CheckoutModal({
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <aside className="flex max-h-[min(40vh,380px)] flex-col border-b border-slate-100 bg-slate-50/30 lg:max-h-none lg:w-[320px] lg:shrink-0 lg:border-b-0 lg:border-r">
-            <div className="flex items-center gap-2 border-b border-slate-100 px-6 py-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-3 sm:px-6 sm:py-4">
               <FileText className="h-4 w-4 text-slate-400" />
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Order Summary
               </span>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6">
               <ul className="divide-y divide-slate-100">
                 {items.map((item, i) => {
                   const pricing = getCheckoutLinePricing(item);
@@ -1748,7 +1705,7 @@ export default function CheckoutModal({
             </div>
           </aside>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 [scrollbar-width:thin]">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 [scrollbar-width:thin]">
             <div className="mx-auto max-w-3xl space-y-6">
               <SectionCard title="Customer Information" icon={User}>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -2163,7 +2120,7 @@ export default function CheckoutModal({
           </div>
         </div>
 
-        <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-white px-6 py-4">
+        <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-white px-3 py-3 sm:gap-3 sm:px-6 sm:py-4">
           <button
             type="button"
             className="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
@@ -2174,7 +2131,7 @@ export default function CheckoutModal({
             type="button"
             onClick={handlePrintOnly}
             disabled={saving || items.length === 0}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 transition-all"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 transition-all sm:flex-none sm:px-5"
           >
             <Printer className="h-4 w-4" />
             <span>Print</span>
@@ -2185,7 +2142,7 @@ export default function CheckoutModal({
               void handleComplete();
             }}
             disabled={saving}
-            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-all"
+            className="inline-flex min-w-0 flex-[2] items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 transition-all sm:flex-none sm:px-6"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />

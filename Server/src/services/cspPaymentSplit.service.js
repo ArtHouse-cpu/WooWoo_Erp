@@ -276,7 +276,7 @@ const ensureCspsailorWalletCredits = async ({
         }),
         referenceType: 'CspSale',
         referenceId: ref,
-        walletType: 'affiliate',
+        walletType: 'withdrawable',
         createdBy,
       });
     }
@@ -604,7 +604,7 @@ export const reverseCspPaymentSplit = async ({invoice, createdBy}) => {
         note: `CSP Product Earning reversed · Invoice ${ref}`,
         referenceType: 'CspSale',
         referenceId: ref,
-        walletType: 'affiliate',
+        walletType: 'withdrawable',
         createdBy,
       });
     }

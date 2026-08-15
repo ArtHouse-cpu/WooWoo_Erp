@@ -26,6 +26,7 @@ type Props = {
   dueDateMin?: string;
   salesPerson: string;
   dateLabel?: string;
+  billedByLabel?: string;
   selectorLabel?: string;
   createLabel?: string;
   phoneLabel?: string;
@@ -62,6 +63,7 @@ export default function InvoiceDetailsSection({
   dueDateMin,
   salesPerson,
   dateLabel,
+  billedByLabel,
   selectorLabel,
   createLabel,
   phoneLabel,
@@ -256,7 +258,7 @@ export default function InvoiceDetailsSection({
       {billBy !== undefined && (
         <div className={showDueDate ? "lg:col-span-2" : "lg:col-span-3"}>
           <label className="mb-1 block text-xs font-semibold text-gray-600">
-            Billed By
+            {billedByLabel || "Billed By"}
           </label>
           <input
             value={billBy || "—"}

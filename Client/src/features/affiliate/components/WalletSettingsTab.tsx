@@ -50,7 +50,7 @@ export default function WalletSettingsTab({ settings, handleSave }: Props) {
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold">Wallet Settings</h3>
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="border border-gray-200 rounded-xl p-5 bg-white">
           <div className="flex items-center gap-2 mb-4"><Wallet size={20} className="text-indigo-600" /><span className="font-semibold text-sm">Minimum Withdrawal</span></div>
           <h2 className="text-3xl font-bold mb-2">{formatCurrency(withdrawal.minAmount ?? 2000)}</h2>
@@ -86,10 +86,10 @@ export default function WalletSettingsTab({ settings, handleSave }: Props) {
         </div>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-6 lg:flex-row">
         <div className="flex-1 border border-gray-200 rounded-xl p-6 bg-white">
           <h3 className="font-semibold mb-4">Payout Settings</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Payout Frequency</label>
               <AffiliateSelect value={payoutSettings.frequency || 'weekly'} onChange={(v) => savePayout({ frequency: v })} options={[
@@ -128,7 +128,7 @@ export default function WalletSettingsTab({ settings, handleSave }: Props) {
             </div>
           </div>
         </div>
-        <div className="w-80 border border-gray-200 rounded-xl bg-white p-5">
+        <div className="w-full border border-gray-200 rounded-xl bg-white p-5 lg:w-80 lg:shrink-0">
           <h3 className="font-semibold mb-4">Wallet Summary</h3>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between"><span className="text-gray-500">Total Wallet Balance</span><span className="font-medium">{formatCurrency(summary.totalWalletBalance)}</span></div>

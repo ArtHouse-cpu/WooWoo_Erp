@@ -34,6 +34,8 @@ type Props = {
   paymentMode?: string;
   paymentStatus?: string;
   paymentBreakdown?: PaymentBreakdown | null;
+  /** Override heading (default Invoice Summary). */
+  title?: string;
 };
 
 function formatPaymentMode(
@@ -91,7 +93,14 @@ export default function InvoiceSummaryCard({
   paymentMode,
   paymentStatus,
   paymentBreakdown = null,
+  title = "Invoice Summary",
 }: Props) {
+  const isQuotationSummary = title.toLowerCase().includes("quotation");
+  const billSavings =
+    Math.max(0, productDiscountTotal) +
+    Math.max(0, membershipDiscountTotal) +
+    Math.max(0, couponDiscount) +
+    Math.max(0, referralDiscount);
   const addCharge = () => {
     onExtraChargesChange?.([...extraCharges, { label: "Extra Charge", amount: 0 }]);
   };
@@ -134,7 +143,7 @@ export default function InvoiceSummaryCard({
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:col-span-4">
       <h3 className="mb-3 text-sm font-semibold text-gray-800">
-        Invoice Summary
+        {title}
       </h3>
       <div className="space-y-2 text-sm">
         <div className="flex items-center justify-between text-gray-600">
@@ -178,9 +187,19 @@ export default function InvoiceSummaryCard({
         )}
         {cashbackTotal > 0 && (
           <div className="flex items-center justify-between text-emerald-600 font-medium">
-            <span>Cashback (Credited to Wallet)</span>
+            <span>
+              {isQuotationSummary
+                ? "Cashback to wallet (not deducted)"
+                : "Cashback (Credited to Wallet)"}
+            </span>
             <span>+ ₹ {cashbackTotal.toFixed(2)}</span>
           </div>
+        )}
+        {isQuotationSummary && cashbackTotal > 0 && (
+          <p className="text-[10px] leading-snug text-gray-500">
+            Credited to the customer wallet on purchase. It does not reduce the
+            quoted amount.
+          </p>
         )}
         {extraCharges.map((charge, idx) => (
           <div
@@ -239,9 +258,28 @@ export default function InvoiceSummaryCard({
         )}
         <div className="my-2 border-t border-dashed border-gray-200" />
         <div className="flex items-center justify-between text-base font-semibold text-gray-900">
-          <span>Grand Total</span>
+          <span>{isQuotationSummary ? "Quoted Amount" : "Grand Total"}</span>
           <span>₹ {grandTotal.toFixed(2)}</span>
         </div>
+        {isQuotationSummary && (billSavings > 0 || cashbackTotal > 0) && (
+          <div className="mt-2 space-y-1 rounded-md bg-slate-50 px-2 py-2 text-[11px] leading-snug text-slate-600">
+            {billSavings > 0 ? (
+              <div>
+                This quotation saves ₹ {billSavings.toFixed(2)} on the bill
+                {membershipDiscountTotal > 0
+                  ? ` (includes membership ₹ ${membershipDiscountTotal.toFixed(2)})`
+                  : ""}
+                .
+              </div>
+            ) : null}
+            {cashbackTotal > 0 ? (
+              <div>
+                Extra cashback ₹ {cashbackTotal.toFixed(2)} goes to wallet on
+                purchase and is not subtracted from the quoted amount.
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {showPaymentBlock && (
           <>

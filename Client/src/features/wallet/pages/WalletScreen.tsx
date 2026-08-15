@@ -23,12 +23,13 @@ type WalletRow = {
   customerId?: string;
   customerName: string;
   customerPhone: string;
-  /** Total available = general + cashback + affiliate */
+  /** Derived total = withdrawable + nonWithdrawable */
   walletAmount: number;
-  generalBalance?: number;
+  withdrawable: number;
+  nonWithdrawable: number;
+  withdrawableBalance?: number;
   affiliateBalance?: number;
   cashbackBalance?: number;
-  withdrawableBalance?: number;
   lastActivity?: string;
   raw?: any;
 };
@@ -58,31 +59,33 @@ function hasExistingWalletRecord(row: WalletRow) {
 
 function toWalletRow(entry: any): WalletRow {
   const customer = entry?.customer ?? {};
-  const hasSplit =
-    entry?.generalBalance !== undefined ||
-    entry?.cashbackBalance !== undefined ||
-    entry?.affiliateBalance !== undefined ||
-    entry?.totalBalance !== undefined;
-
-  const generalBalance = hasSplit
-    ? toAmount(entry?.generalBalance)
-    : toAmount(entry?.walletAmount, customer?.walletAmount);
-  const affiliateBalance = toAmount(
-    entry?.affiliateBalance,
+  const withdrawable = toAmount(
+    entry?.withdrawable,
     entry?.withdrawableBalance,
+    entry?.affiliateBalance,
+    customer?.withdrawable,
     customer?.affiliateBalance,
   );
-  const cashbackBalance = toAmount(
+  const nonWithdrawable = toAmount(
+    entry?.nonWithdrawable,
     entry?.cashbackBalance,
+    customer?.nonWithdrawable,
     customer?.cashbackBalance,
   );
-  // Always derive total from buckets when split fields exist so a stale
-  // walletAmount (general-only) cannot under-report spendable balance.
-  const totalBalance = hasSplit
-    ? Math.round(
-        (generalBalance + cashbackBalance + affiliateBalance) * 100,
-      ) / 100
-    : generalBalance;
+  const hasTwo =
+    entry?.withdrawable != null ||
+    entry?.nonWithdrawable != null ||
+    entry?.totalBalance != null ||
+    entry?.affiliateBalance != null ||
+    entry?.cashbackBalance != null;
+
+  const totalBalance = hasTwo
+    ? Math.round((withdrawable + nonWithdrawable) * 100) / 100
+    : toAmount(
+        entry?.totalBalance,
+        entry?.walletAmount,
+        customer?.walletAmount,
+      );
 
   return {
     id: String(
@@ -104,10 +107,11 @@ function toWalletRow(entry: any): WalletRow {
       entry?.customerPhone ?? customer?.mobile ?? entry?.mobile ?? "-",
     ).trim(),
     walletAmount: totalBalance,
-    generalBalance,
-    affiliateBalance,
-    cashbackBalance,
-    withdrawableBalance: affiliateBalance,
+    withdrawable,
+    nonWithdrawable,
+    withdrawableBalance: withdrawable,
+    affiliateBalance: withdrawable,
+    cashbackBalance: nonWithdrawable,
     lastActivity: String(entry?.updatedAt ?? entry?.createdAt ?? "").trim(),
     raw: entry,
   };
@@ -318,9 +322,8 @@ export default function WalletScreen() {
       return;
     }
 
-    const generalAvailable = Number(row.generalBalance ?? 0);
-    const cashbackAvailable = Number(row.cashbackBalance ?? 0);
-    const affiliateAvailable = Number(row.affiliateBalance ?? 0);
+    const withdrawableAvailable = Number(row.withdrawable ?? 0);
+    const nonWithdrawableAvailable = Number(row.nonWithdrawable ?? 0);
     const totalAvailable = Number(row.walletAmount ?? 0);
 
     const result = await Swal.fire({
@@ -332,21 +335,25 @@ export default function WalletScreen() {
           </div>
           <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1.5">
             <div class="flex justify-between"><span class="text-slate-500">Total</span><span class="font-semibold">₹ ${totalAvailable.toLocaleString("en-IN")}</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">General</span><span class="font-semibold text-slate-800">₹ ${generalAvailable.toLocaleString("en-IN")}</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">Cashback</span><span class="font-semibold text-emerald-700">₹ ${cashbackAvailable.toLocaleString("en-IN")}</span></div>
-            <div class="flex justify-between"><span class="text-slate-500">Affiliate</span><span class="font-semibold text-amber-700">₹ ${affiliateAvailable.toLocaleString("en-IN")}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Withdrawable</span><span class="font-semibold text-emerald-700">₹ ${withdrawableAvailable.toLocaleString("en-IN")}</span></div>
+            <div class="flex justify-between"><span class="text-slate-500">Non-Withdrawable</span><span class="font-semibold text-slate-800">₹ ${nonWithdrawableAvailable.toLocaleString("en-IN")}</span></div>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-slate-700 mb-1">Wallet bucket <span class="text-red-500">*</span></label>
+          ${
+            type === "credit"
+              ? `<div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Wallet type <span class="text-red-500">*</span></label>
             <select id="wallet-type" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all">
-              <option value="general">General (₹ ${generalAvailable.toLocaleString("en-IN")})</option>
-              <option value="cashback">Cashback (₹ ${cashbackAvailable.toLocaleString("en-IN")})</option>
-              <option value="affiliate">Affiliate (₹ ${affiliateAvailable.toLocaleString("en-IN")})</option>
+              <option value="nonWithdrawable">Non-Withdrawable (₹ ${nonWithdrawableAvailable.toLocaleString("en-IN")})</option>
+              <option value="withdrawable">Withdrawable (₹ ${withdrawableAvailable.toLocaleString("en-IN")})</option>
             </select>
             <p class="mt-1 text-[11px] text-slate-400">
-              Deduct/Add applies to the selected bucket only — not the total.
+              Credit goes into the selected wallet. Debits always use combined balance (non-withdrawable first).
             </p>
-          </div>
+          </div>`
+              : `<p class="text-[11px] text-slate-500">
+            Debit uses the combined balance. Non-withdrawable is deducted first, then withdrawable.
+          </p>`
+          }
           <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Amount (₹) <span class="text-red-500">*</span></label>
             <input id="wallet-amount" type="number" min="0" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all" placeholder="Enter amount..." />
@@ -379,45 +386,31 @@ export default function WalletScreen() {
         ) as HTMLSelectElement | null;
         const amount = Number(amountInput?.value ?? 0);
         const note = String(noteInput?.value ?? "").trim();
-        const walletType = String(typeInput?.value ?? "general").toLowerCase();
+        const walletType = String(
+          typeInput?.value ?? "nonWithdrawable",
+        );
 
         if (!Number.isFinite(amount) || amount <= 0) {
           Swal.showValidationMessage("Enter a valid amount.");
           return undefined;
         }
 
-        const bucketAvailable =
-          walletType === "cashback"
-            ? cashbackAvailable
-            : walletType === "affiliate"
-              ? affiliateAvailable
-              : generalAvailable;
-
-        if (type === "debit" && amount > bucketAvailable + 0.001) {
-          const label =
-            walletType === "cashback"
-              ? "cashback"
-              : walletType === "affiliate"
-                ? "affiliate"
-                : "general";
+        if (type === "debit" && amount > totalAvailable + 0.001) {
           Swal.showValidationMessage(
-            `Cannot deduct more than available ${label} amount (₹ ${bucketAvailable.toLocaleString("en-IN")}). Total wallet ₹ ${totalAvailable.toLocaleString("en-IN")} includes other buckets.`,
+            `Insufficient wallet balance. Available ₹ ${totalAvailable.toLocaleString("en-IN")}.`,
           );
           return undefined;
         }
 
-        // Minimum balance rule applies to general bucket only
-        if (walletType === "general") {
-          const remainingBalance =
-            type === "debit"
-              ? generalAvailable - amount
-              : generalAvailable + amount;
-          if (remainingBalance < instruction.minimumBalance) {
-            Swal.showValidationMessage(
-              `Final general balance cannot be less than minimum balance ₹ ${instruction.minimumBalance.toLocaleString("en-IN")}.`,
-            );
-            return undefined;
-          }
+        const remainingBalance =
+          type === "debit"
+            ? totalAvailable - amount
+            : totalAvailable + amount;
+        if (remainingBalance < instruction.minimumBalance) {
+          Swal.showValidationMessage(
+            `Final wallet balance cannot be less than minimum balance ₹ ${instruction.minimumBalance.toLocaleString("en-IN")}.`,
+          );
+          return undefined;
         }
 
         return { amount, note, walletType };
@@ -430,10 +423,7 @@ export default function WalletScreen() {
       type,
       amount: result.value.amount,
       note: result.value.note,
-      walletType: result.value.walletType as
-        | "general"
-        | "cashback"
-        | "affiliate",
+      walletType: result.value.walletType as "withdrawable" | "nonWithdrawable",
       minimumBalance: instruction.minimumBalance,
       customerId: row.customerId,
       customerName: row.customerName,
@@ -583,7 +573,16 @@ export default function WalletScreen() {
             const walletType = String(entry?.walletType || "").toLowerCase();
             const isWithdrawable =
               walletType === "affiliate" ||
+              walletType === "withdrawable" ||
               String(entry?.referenceType || "") === "CspSale";
+            const isCredit =
+              type === "CREDIT" || type === "ADD";
+            const wDed = toAmount(entry?.withdrawableDeducted);
+            const nwDed = toAmount(entry?.nonWithdrawableDeducted);
+            const splitHint =
+              !isCredit && (wDed > 0 || nwDed > 0)
+                ? `<p class="mt-1 text-[11px] text-slate-400">Non-withdrawable −₹${nwDed.toLocaleString("en-IN")} · Withdrawable −₹${wDed.toLocaleString("en-IN")}</p>`
+                : "";
 
             const staffName =
               entry?.createdBy?.m_staff_name ??
@@ -605,9 +604,6 @@ export default function WalletScreen() {
                     minute: "2-digit",
                   })
                 : "";
-
-            const isCredit =
-              type === "CREDIT" || type === "ADD";
 
             const amountColor = isCredit
               ? "text-emerald-600"
@@ -661,7 +657,9 @@ export default function WalletScreen() {
                         ${
                           isWithdrawable
                             ? `<span class="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-amber-100 text-amber-800 border border-amber-200">Withdrawable</span>`
-                            : ""
+                            : !isCredit
+                              ? ""
+                              : `<span class="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-slate-100 text-slate-700 border border-slate-200">Non-Withdrawable</span>`
                         }
 
                         <p class="text-sm font-medium text-slate-700 break-words">
@@ -707,6 +705,7 @@ export default function WalletScreen() {
               "en-IN"
             )}
                       </p>
+                      ${splitHint}
                     </div>
 
                   </div>
@@ -781,33 +780,31 @@ export default function WalletScreen() {
                 ₹${Number(viewRow.walletAmount || 0).toLocaleString("en-IN")}
               </h3>
               <p class="mt-1 text-[11px] text-slate-400">
-                General + cashback + affiliate
+                Withdrawable + non-withdrawable
               </p>
             </div>
 
             <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left">
               <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
-                Withdrawable Balance
+                Withdrawable
               </p>
               <h3 class="mt-1.5 text-xl font-bold tabular-nums text-emerald-800">
-                ₹${Number(
-                  viewRow.withdrawableBalance ?? viewRow.affiliateBalance ?? 0,
-                ).toLocaleString("en-IN")}
+                ₹${Number(viewRow.withdrawable ?? 0).toLocaleString("en-IN")}
               </h3>
               <p class="mt-1 text-[11px] text-emerald-600/80">
-                Affiliate earnings
+                Affiliate, referral, CSP
               </p>
             </div>
 
-            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                Minimum Balance
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 text-left">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Non-Withdrawable
               </p>
-              <h3 class="mt-1.5 text-xl font-bold tabular-nums text-amber-800">
-                ₹${Number(instruction.minimumBalance || 0).toLocaleString("en-IN")}
+              <h3 class="mt-1.5 text-xl font-bold tabular-nums text-slate-800">
+                ₹${Number(viewRow.nonWithdrawable ?? 0).toLocaleString("en-IN")}
               </h3>
-              <p class="mt-1 text-[11px] text-amber-700/80">
-                Debits cannot go below this
+              <p class="mt-1 text-[11px] text-slate-400">
+                Cashback and restricted credits
               </p>
             </div>
           </div>
@@ -872,16 +869,16 @@ export default function WalletScreen() {
         accessorKey: "walletAmount",
         Cell: ({ row }) => {
           const total = Number(row.original.walletAmount ?? 0);
-          const general = Number(row.original.generalBalance ?? 0);
-          const cashback = Number(row.original.cashbackBalance ?? 0);
+          const withdrawable = Number(row.original.withdrawable ?? 0);
+          const nonWithdrawable = Number(row.original.nonWithdrawable ?? 0);
           return (
             <div className="flex flex-col">
               <span className="font-semibold tabular-nums text-slate-900">
                 ₹ {total.toLocaleString("en-IN")}
               </span>
               <span className="text-[10px] text-slate-400">
-                G ₹{general.toLocaleString("en-IN")} · CB ₹
-                {cashback.toLocaleString("en-IN")}
+                W ₹{withdrawable.toLocaleString("en-IN")} · NW ₹
+                {nonWithdrawable.toLocaleString("en-IN")}
               </span>
             </div>
           );
@@ -890,18 +887,23 @@ export default function WalletScreen() {
       },
       {
         header: "Withdrawable",
-        accessorKey: "withdrawableBalance",
+        accessorKey: "withdrawable",
         Cell: ({ row }) => (
           <span className="font-semibold tabular-nums text-emerald-700">
-            ₹{" "}
-            {Number(
-              row.original.withdrawableBalance ??
-                row.original.affiliateBalance ??
-                0,
-            ).toLocaleString("en-IN")}
+            ₹ {Number(row.original.withdrawable ?? 0).toLocaleString("en-IN")}
           </span>
         ),
         size: 130,
+      },
+      {
+        header: "Non-Withdrawable",
+        accessorKey: "nonWithdrawable",
+        Cell: ({ row }) => (
+          <span className="font-semibold tabular-nums text-slate-700">
+            ₹ {Number(row.original.nonWithdrawable ?? 0).toLocaleString("en-IN")}
+          </span>
+        ),
+        size: 150,
       },
       {
         header: "Last Activity",
@@ -990,7 +992,7 @@ export default function WalletScreen() {
             Track wallet balance, add amount, deduct amount, and review activity.
           </p>
         </div>
-        <div className="flex w-full max-w-3xl flex-wrap items-center justify-end gap-2">
+        <div className="flex w-full max-w-3xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           <Can permission={PERMISSIONS.WALLET_MANAGE}>
             <button
               type="button"

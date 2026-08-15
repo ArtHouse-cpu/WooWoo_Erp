@@ -93,7 +93,7 @@ export default function SignUpScreen() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <div className="w-full max-w-5xl bg-white shadow-sm rounded-2xl grid grid-cols-1 md:grid-cols-2 overflow-hidden p-12">
+      <div className="grid w-full max-w-5xl grid-cols-1 overflow-hidden rounded-2xl bg-white p-4 shadow-sm sm:p-8 md:grid-cols-2 md:p-10">
         <div className="hidden md:flex items-center justify-center bg-white">
           <img
             src={logo}
@@ -102,7 +102,7 @@ export default function SignUpScreen() {
           />
         </div>
 
-        <div className="p-10 flex flex-col justify-center">
+        <div className="flex flex-col justify-center p-2 sm:p-6 md:p-10">
           <h2 className="text-xl md:text-3xl font-bold text-center mb-2">
             Create account
           </h2>

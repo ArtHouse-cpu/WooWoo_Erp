@@ -14,11 +14,19 @@ import {
   handleGetCustomers,
   handleCreateQuotation,
   handleUpdateQuotation,
+  handleGetMemberships,
   type CustomerPayload,
+  type MembershipPlanPayload,
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import DocumentFormModal from "@/components/DocumentFormModal";
+import {
+  calcStackedLineBenefits,
+  membershipBenefitsForLine,
+  resolveMembershipPlan,
+  toMembershipPlanId,
+} from "../utils/membershipInvoiceUtils";
 
 const today = new Date().toISOString().split("T")[0];
 const QUOT_SEQ_KEY = "wooerp-quotation-seq";
@@ -56,7 +64,9 @@ export default function CreateQuotationScreen({
   const [quotationNo, setQuotationNo] = useState(getNextQuotationNumber());
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
-  const [membership, setMembership] = useState("");
+  const [membership, setMembership] = useState("none");
+  const [membershipPlanId, setMembershipPlanId] = useState<string | null>(null);
+  const [membershipPlans, setMembershipPlans] = useState<MembershipPlanPayload[]>([]);
   const [quotationDate, setQuotationDate] = useState(today);
   const [dueDate, setDueDate] = useState(today);
   const staff = useAppSelector((state) => state.user);
@@ -67,7 +77,14 @@ export default function CreateQuotationScreen({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<
-    Array<{ _id: string; name: string; mobile: string; companyName?: string }>
+    Array<{
+      _id: string;
+      name: string;
+      mobile: string;
+      companyName?: string;
+      membershipType?: string;
+      membershipPlanId?: string;
+    }>
   >([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(true);
@@ -81,7 +98,23 @@ export default function CreateQuotationScreen({
   const [draftDiscount, setDraftDiscount] = useState("0");
   const [draftCashback, setDraftCashback] = useState("0");
   const [draftImage, setDraftImage] = useState("");
+  const [draftCategory, setDraftCategory] = useState("General");
+  const [draftIsCsp, setDraftIsCsp] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [extraCharges, setExtraCharges] = useState<Array<{ label: string; amount: number }>>([]);
+  const [viewCashbackTotal, setViewCashbackTotal] = useState<number | null>(null);
+  const [viewMembershipDiscount, setViewMembershipDiscount] = useState<number | null>(null);
+  const [viewCouponDiscount, setViewCouponDiscount] = useState(0);
+  const [viewCouponCode, setViewCouponCode] = useState("");
+  const [viewGrandTotal, setViewGrandTotal] = useState<number | null>(null);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    handleGetMemberships({ status: "Active" }, ac.signal)
+      .then((res) => setMembershipPlans(res.memberships || []))
+      .catch(() => setMembershipPlans([]));
+    return () => ac.abort();
+  }, []);
 
   useEffect(() => {
     const applyQuotation = (quot: any, nextMode: Mode) => {
@@ -90,6 +123,8 @@ export default function CreateQuotationScreen({
       if (quot.quotationCode) setQuotationNo(quot.quotationCode);
       setCustomer(quot.customerName || "");
       setPhone(quot.customerPhone || "");
+      setMembership(String(quot.membershipType ?? "none"));
+      setMembershipPlanId(toMembershipPlanId(quot.membershipPlanId));
       if (quot.quotationDate) setQuotationDate(new Date(quot.quotationDate).toISOString().split("T")[0]);
       if (quot.dueDate) setDueDate(new Date(quot.dueDate).toISOString().split("T")[0]);
       setNotes(quot.notes || "");
@@ -103,16 +138,49 @@ export default function CreateQuotationScreen({
       ).trim();
       setBillBy(pinBilledBy || String(quot.salesPersonName ?? "").trim());
       if (Array.isArray(quot.items)) {
-        setItems(quot.items.map((item: any, idx: number) => ({
+        setItems(quot.items.map((item: any, idx: number) => {
+          const discount = Number(item.discount || 0);
+          const membershipAmt = Number(item.membershipDiscountAmount ?? 0);
+          const productAmt = Number(item.productDiscountAmount ?? 0);
+          return {
           id: idx + 1,
           productName: item.productName || "",
           qty: item.qty || 1,
           unitPrice: item.unitPrice || 0,
-          discount: item.discount || 0,
-          cashback: item.cashback || 0,
+          discount,
+          cashback: item.isCsp ? 0 : item.cashback || 0,
           image: item.image || item.imageUrl || "",
-        })));
+          category: item.category || "General",
+          isCsp: Boolean(item.isCsp),
+          cspLabel: item.cspLabel || (item.isCsp ? "CSP" : null),
+          productDiscountType: item.productDiscountType,
+          productDiscountValue: item.productDiscountValue,
+          productDiscountAmount:
+            productAmt > 0
+              ? productAmt
+              : membershipAmt > 0
+                ? Math.max(0, discount - membershipAmt)
+                : 0,
+          membershipDiscountAmount: membershipAmt,
+        };
+        }));
       }
+      if (Array.isArray(quot.extraCharges)) setExtraCharges(quot.extraCharges);
+      setViewCashbackTotal(
+        quot.cashbackTotal != null ? Number(quot.cashbackTotal) || 0 : null,
+      );
+      setViewMembershipDiscount(
+        quot.membershipDiscount != null
+          ? Number(quot.membershipDiscount) || 0
+          : null,
+      );
+      setViewCouponDiscount(Number(quot.coupon?.discountAmount ?? 0) || 0);
+      setViewCouponCode(String(quot.coupon?.code ?? "").trim());
+      setViewGrandTotal(
+        quot.grandTotal != null && Number.isFinite(Number(quot.grandTotal))
+          ? Math.max(0, Number(quot.grandTotal))
+          : null,
+      );
     };
 
     if (initialData && initialMode) {
@@ -125,6 +193,31 @@ export default function CreateQuotationScreen({
       applyQuotation(state.quotation, state.mode);
     }
   }, [location.state, initialData, initialMode]);
+
+  useEffect(() => {
+    if (mode !== "view") return;
+    const phoneTerm = phone.trim();
+    if (!phoneTerm) return;
+    const controller = new AbortController();
+    handleGetCustomers(phoneTerm, controller.signal)
+      .then((response) => {
+        const list = Array.isArray(response?.customers) ? response.customers : [];
+        const match =
+          list.find(
+            (c: { mobile?: string }) =>
+              String(c.mobile ?? "").trim() === phoneTerm,
+          ) || list[0];
+        if (!match) return;
+        setMembership((prev) =>
+          prev && prev !== "none"
+            ? prev
+            : String(match.membershipType ?? "none"),
+        );
+        setMembershipPlanId((prev) => prev || toMembershipPlanId(match.membershipPlanId));
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [mode, phone]);
   const draft = {
     name: draftName,
     qty: draftQty,
@@ -132,6 +225,20 @@ export default function CreateQuotationScreen({
     discount: draftDiscount,
     cashback: draftCashback,
     image: draftImage,
+    category: draftCategory,
+    isCsp: draftIsCsp ? "true" : "false",
+  };
+
+  const getMembershipBenefitsForItem = (
+    price: number,
+    qty: number,
+    category: string,
+    mType: string,
+    mId?: string | null,
+    isCsp?: boolean,
+  ) => {
+    const plan = resolveMembershipPlan(membershipPlans, mType, mId);
+    return membershipBenefitsForLine(price, qty, category, plan, { isCsp });
   };
 
   const addItem = () => {
@@ -142,11 +249,27 @@ export default function CreateQuotationScreen({
     const qty = Number(draftQty);
     const price = Number(draftPrice);
     const discount = Number(draftDiscount);
-    const cashback = Number(draftCashback);
+    const cashback = draftIsCsp ? 0 : Number(draftCashback);
     if (qty <= 0 || price < 0 || discount < 0 || cashback < 0) {
       Swal.fire("Invalid values", "Check quantity, price, discount and cashback.", "error");
       return;
     }
+    const plan = resolveMembershipPlan(
+      membershipPlans,
+      membership,
+      membershipPlanId,
+    );
+    const stacked = calcStackedLineBenefits({
+      unitPrice: price,
+      qty,
+      category: draftCategory,
+      plan,
+      isCsp: draftIsCsp,
+    });
+    const membershipAmt = draftIsCsp
+      ? 0
+      : Math.min(discount, stacked.membershipDiscount);
+    const productAmt = Math.max(0, discount - membershipAmt);
     setItems((prev) => [
       ...prev,
       {
@@ -157,6 +280,11 @@ export default function CreateQuotationScreen({
         discount,
         cashback,
         image: draftImage,
+        category: draftCategory,
+        isCsp: draftIsCsp,
+        cspLabel: draftIsCsp ? "CSP" : null,
+        productDiscountAmount: productAmt,
+        membershipDiscountAmount: membershipAmt,
       },
     ]);
     setDraftName("");
@@ -165,6 +293,8 @@ export default function CreateQuotationScreen({
     setDraftDiscount("0");
     setDraftCashback("0");
     setDraftImage("");
+    setDraftCategory("General");
+    setDraftIsCsp(false);
   };
 
   const removeItem = (id: number) => {
@@ -174,7 +304,31 @@ export default function CreateQuotationScreen({
   const updateItemQty = (id: number, newQty: number) => {
     if (newQty < 1) return;
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, qty: newQty } : item)),
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const plan = resolveMembershipPlan(
+          membershipPlans,
+          membership,
+          membershipPlanId,
+        );
+        const stacked = calcStackedLineBenefits({
+          unitPrice: item.unitPrice,
+          qty: newQty,
+          category: item.category || "General",
+          plan,
+          discountType: item.productDiscountType,
+          discountValue: item.productDiscountValue,
+          isCsp: Boolean(item.isCsp),
+        });
+        return {
+          ...item,
+          qty: newQty,
+          discount: stacked.discount,
+          cashback: stacked.cashback,
+          productDiscountAmount: stacked.productDiscount,
+          membershipDiscountAmount: stacked.membershipDiscount,
+        };
+      }),
     );
   };
 
@@ -187,7 +341,11 @@ export default function CreateQuotationScreen({
   const updateItemCashback = (id: number, newCashback: number) => {
     if (newCashback < 0) return;
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, cashback: newCashback } : item)),
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        if (item.isCsp) return { ...item, cashback: 0 };
+        return { ...item, cashback: newCashback };
+      }),
     );
   };
 
@@ -199,7 +357,58 @@ export default function CreateQuotationScreen({
     () => items.reduce((sum, item) => sum + item.discount, 0),
     [items],
   );
-  const grandTotal = subTotal - discountTotal;
+  const productDiscountTotal = useMemo(
+    () =>
+      items.reduce(
+        (sum, item) => sum + Number(item.productDiscountAmount ?? 0),
+        0,
+      ),
+    [items],
+  );
+  const membershipDiscountTotal = useMemo(
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum + (item.isCsp ? 0 : Number(item.membershipDiscountAmount ?? 0)),
+        0,
+      ),
+    [items],
+  );
+  const cashbackTotal = useMemo(
+    () => items.reduce((sum, item) => sum + (item.cashback || 0), 0),
+    [items],
+  );
+  const displayCashbackTotal =
+    mode === "view" && viewCashbackTotal != null
+      ? viewCashbackTotal
+      : cashbackTotal;
+  const displayMembershipDiscount =
+    mode === "view" &&
+    viewMembershipDiscount != null &&
+    membershipDiscountTotal <= 0
+      ? viewMembershipDiscount
+      : membershipDiscountTotal;
+  const displayProductDiscount =
+    productDiscountTotal > 0
+      ? productDiscountTotal
+      : displayMembershipDiscount > 0
+        ? Math.max(0, discountTotal - displayMembershipDiscount)
+        : 0;
+  const extraChargesTotal = extraCharges.reduce(
+    (sum, c) => sum + Number(c.amount || 0),
+    0,
+  );
+  const computedGrandTotal = Math.max(
+    0,
+    subTotal -
+      discountTotal -
+      (mode === "view" ? viewCouponDiscount : 0) +
+      extraChargesTotal,
+  );
+  const grandTotal =
+    mode === "view" && viewGrandTotal != null
+      ? viewGrandTotal
+      : computedGrandTotal;
 
 
   const handleSaveDraft = async (paymentPayload?: any) => {
@@ -235,11 +444,24 @@ export default function CreateQuotationScreen({
           qty: item.qty,
           unitPrice: item.unitPrice,
           discount: item.discount,
-          cashback: item.cashback,
+          cashback: item.isCsp ? 0 : item.cashback,
+          category: item.category || "General",
+          isCsp: Boolean(item.isCsp),
+          productDiscountType: item.productDiscountType,
+          productDiscountValue: item.productDiscountValue,
+          productDiscountAmount: Number(item.productDiscountAmount ?? 0),
+          membershipDiscountAmount: item.isCsp
+            ? 0
+            : Number(item.membershipDiscountAmount ?? 0),
         })),
         subTotal,
         discountTotal,
         grandTotal: paymentPayload?.finalAmount ?? grandTotal,
+        membershipType: membership,
+        membershipPlanId,
+        membershipDiscount: membershipDiscountTotal,
+        cashbackTotal,
+        extraCharges,
         status: "draft" as const,
       };
 
@@ -248,6 +470,15 @@ export default function CreateQuotationScreen({
         payload.paymentStatus = paymentPayload.paymentStatus;
         payload.paymentBreakdown = paymentPayload.paymentBreakdown;
         if (paymentPayload.coupon) payload.coupon = paymentPayload.coupon;
+        if (Array.isArray(paymentPayload.extraCharges)) {
+          payload.extraCharges = paymentPayload.extraCharges;
+        }
+        if (paymentPayload.membershipDiscount != null) {
+          payload.membershipDiscount = Number(paymentPayload.membershipDiscount) || 0;
+        }
+        if (paymentPayload.cashbackTotal != null) {
+          payload.cashbackTotal = Number(paymentPayload.cashbackTotal) || 0;
+        }
       }
 
       if (quotationId) {
@@ -339,7 +570,8 @@ export default function CreateQuotationScreen({
       if (created?.name) {
         setCustomer(String(created.name));
         setPhone(String(created.mobile ?? ""));
-        setMembership(String(created.membershipType ?? ""));
+        setMembership(String(created.membershipType ?? "none"));
+        setMembershipPlanId(toMembershipPlanId(created.membershipPlanId));
       }
       setShowCreateCustomerModal(false);
       await fetchCustomers();
@@ -362,7 +594,7 @@ export default function CreateQuotationScreen({
   };
 
   const content = (
-    <div className="space-y-4 p-2">
+    <div className="min-w-0 space-y-4 p-1 sm:p-2">
       <CreateInvoiceHeader
         title={mode === "create" ? "Create Quotation" : mode === "edit" ? "Edit Quotation" : "View Quotation"}
         prefix="QUOT- "
@@ -379,12 +611,18 @@ export default function CreateQuotationScreen({
         customer={customer}
         phone={phone}
         membership={membership}
+        membershipPlanId={membershipPlanId}
+        membershipPlans={membershipPlans}
         customerOptions={customers}
         loadingCustomers={loadingCustomers}
         customerDropdownOpen={mode !== "view" && customerDropdownOpen}
         invoiceDate={quotationDate}
         dueDate={dueDate}
         dueDateMin={today}
+        dateLabel="Quotation Date"
+        billedByLabel="Quoted By"
+        selectorLabel="Select Customer"
+        createLabel="Create Customer"
         salesPerson={
           mode === "view" || mode === "edit" ? createdByDisplay : salesPerson
         }
@@ -395,14 +633,39 @@ export default function CreateQuotationScreen({
         onCustomerChange={(value) => {
           setCustomer(value);
           setPhone("");
-          setMembership("");
+          setMembership("none");
+          setMembershipPlanId(null);
         }}
         onPickCustomer={(selectedCustomer) => {
+          const mType = selectedCustomer.membershipType ?? "none";
+          const mId = toMembershipPlanId(selectedCustomer.membershipPlanId);
           setCustomer(selectedCustomer.name);
           setPhone(selectedCustomer.mobile);
-          setMembership(selectedCustomer.membershipType ?? "");
+          setMembership(mType);
+          setMembershipPlanId(mId);
           setCustomers([]);
           setCustomerDropdownOpen(false);
+          setItems((prev) =>
+            prev.map((item) => {
+              const plan = resolveMembershipPlan(membershipPlans, mType, mId);
+              const stacked = calcStackedLineBenefits({
+                unitPrice: item.unitPrice,
+                qty: item.qty,
+                category: item.category || "General",
+                plan,
+                discountType: item.productDiscountType,
+                discountValue: item.productDiscountValue,
+                isCsp: Boolean(item.isCsp),
+              });
+              return {
+                ...item,
+                discount: stacked.discount,
+                cashback: stacked.cashback,
+                productDiscountAmount: stacked.productDiscount,
+                membershipDiscountAmount: stacked.membershipDiscount,
+              };
+            }),
+          );
         }}
         onOpenCreateCustomer={() => setShowCreateCustomerModal(true)}
         onOpenCustomerDropdown={() => setCustomerDropdownOpen(true)}
@@ -422,13 +685,33 @@ export default function CreateQuotationScreen({
         draft={draft}
         items={items}
         readOnly={mode === "view"}
+        documentKind="quotation"
+        membershipType={membership}
+        membershipPlans={membershipPlans}
+        membershipPlanId={membershipPlanId}
         onDraftChange={(field, value) => {
           if (field === "name") setDraftName(value);
-          if (field === "qty") setDraftQty(value);
+          if (field === "qty") {
+            setDraftQty(value);
+            if (!draftIsCsp && draftCategory) {
+              const benefits = getMembershipBenefitsForItem(
+                Number(draftPrice),
+                Number(value),
+                draftCategory,
+                membership,
+                membershipPlanId,
+                false,
+              );
+              if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
+              setDraftCashback(String(benefits.cashback));
+            }
+          }
           if (field === "price") setDraftPrice(value);
           if (field === "discount") setDraftDiscount(value);
           if (field === "cashback") setDraftCashback(value);
           if (field === "image") setDraftImage(value);
+          if (field === "category") setDraftCategory(value);
+          if (field === "isCsp") setDraftIsCsp(value === "true");
         }}
         onAddItem={addItem}
         onRemoveItem={removeItem}
@@ -448,8 +731,16 @@ export default function CreateQuotationScreen({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <NotesSection notes={notes} onChange={setNotes} />
         <InvoiceSummaryCard
+          title="Quotation Summary"
           subTotal={subTotal}
           discountTotal={discountTotal}
+          productDiscountTotal={displayProductDiscount}
+          membershipDiscountTotal={displayMembershipDiscount}
+          cashbackTotal={displayCashbackTotal}
+          couponDiscount={mode === "view" ? viewCouponDiscount : 0}
+          couponCode={mode === "view" ? viewCouponCode : ""}
+          extraCharges={extraCharges}
+          onExtraChargesChange={mode === "view" ? undefined : setExtraCharges}
           grandTotal={grandTotal}
           readOnly={mode === "view"}
           onSave={
@@ -472,12 +763,24 @@ export default function CreateQuotationScreen({
             qty: it.qty,
             price: it.unitPrice,
             discount: it.discount,
-            cashback: it.cashback,
+            cashback: it.isCsp ? 0 : it.cashback,
             image: it.image,
+            category: it.category,
+            isCsp: Boolean(it.isCsp),
+            productDiscountAmount: Number(it.productDiscountAmount ?? 0),
+            membershipDiscountAmount: it.isCsp
+              ? 0
+              : Number(it.membershipDiscountAmount ?? 0),
           }))}
+          extraCharges={extraCharges}
+          membershipPlans={membershipPlans}
           initialCustomerName={customer}
           initialCustomerPhone={phone}
           initialMembership={membership}
+          initialMembershipPlanId={membershipPlanId}
+          initialMembershipDiscount={membershipDiscountTotal}
+          initialProductDiscount={productDiscountTotal}
+          initialCashbackTotal={cashbackTotal}
           onConfirmPayment={async (paymentPayload) => {
             await handleSaveDraft(paymentPayload);
             setCheckoutOpen(false);

@@ -76,15 +76,15 @@ export default function MilestoneRewardsTab({ settings, handleSave }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold">Milestone Rewards</h3>
           <p className="text-sm text-gray-500">Set milestone based rewards for affiliates.</p>
         </div>
-        <button type="button" onClick={openAdd} className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium">+ Add Milestone</button>
+        <button type="button" onClick={openAdd} className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium sm:w-auto">+ Add Milestone</button>
       </div>
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <div className="border rounded-xl p-4 bg-indigo-50/30"><Trophy size={16} className="text-indigo-600 mb-2" /><h2 className="text-2xl font-bold">{milestones.length}</h2><p className="text-xs text-gray-500">Total milestones</p></div>
         <div className="border rounded-xl p-4 bg-green-50/30"><Gift size={16} className="text-green-600 mb-2" /><h2 className="text-2xl font-bold">{formatCurrency(milestones.reduce((a: number, m: any) => a + (m.rewardAmount || 0), 0))}</h2><p className="text-xs text-gray-500">Rewards budget</p></div>
         <div className="border rounded-xl p-4"><Wallet size={16} className="text-purple-600 mb-2" /><h2 className="text-2xl font-bold">{formatCurrency(0)}</h2><p className="text-xs text-gray-500">Distributed</p></div>
@@ -92,10 +92,10 @@ export default function MilestoneRewardsTab({ settings, handleSave }: Props) {
         <div className="border rounded-xl p-4"><Activity size={16} className="text-orange-600 mb-2" /><h2 className="text-2xl font-bold">{formatCurrency(0)}</h2><p className="text-xs text-gray-500">Next payout</p></div>
       </div>
 
-      <div className="flex gap-6">
+      <div className="flex flex-col gap-6 lg:flex-row">
         <div className="flex-1 border rounded-xl bg-white overflow-hidden">
-          <div className="flex justify-between p-4 border-b">
-            <div className="flex gap-4 text-sm font-medium">
+          <div className="flex flex-col gap-2 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="hide-scrollbar flex gap-4 overflow-x-auto text-sm font-medium">
               {(['all', 'active', 'inactive'] as const).map((f) => (
                 <button key={f} type="button" onClick={() => setFilter(f)} className={filter === f ? 'text-indigo-600 border-b-2 border-indigo-600 pb-1 capitalize' : 'text-gray-500 capitalize'}>
                   {f} ({f === 'all' ? milestones.length : milestones.filter((m: any) => (f === 'active' ? m.status === 'active' : m.status !== 'active')).length})
@@ -104,7 +104,8 @@ export default function MilestoneRewardsTab({ settings, handleSave }: Props) {
             </div>
             <button type="button" onClick={exportCsv} className="text-sm border rounded-lg px-3 py-1">Export CSV</button>
           </div>
-          <table className="w-full text-sm text-left">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-sm text-left">
             <thead className="bg-gray-50 border-b"><tr>
               <th className="py-3 px-4">Revenue (₹)</th><th className="py-3 px-4">Reward (₹)</th><th className="py-3 px-4">Type</th><th className="py-3 px-4">Status</th><th className="py-3 px-4">Actions</th>
             </tr></thead>
@@ -128,8 +129,9 @@ export default function MilestoneRewardsTab({ settings, handleSave }: Props) {
               })}
             </tbody>
           </table>
+          </div>
         </div>
-        <div className="w-80 border rounded-xl bg-white p-5 space-y-4">
+        <div className="w-full border rounded-xl bg-white p-5 space-y-4 lg:w-80 lg:shrink-0">
           <h3 className="font-semibold">Milestone Settings</h3>
           <div className="flex justify-between items-center">
             <span className="text-sm">Auto Credit Reward</span>

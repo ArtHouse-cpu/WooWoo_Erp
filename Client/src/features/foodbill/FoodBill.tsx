@@ -61,6 +61,7 @@ import {
   type MembershipPlanPayload,
   type VerifiedStaff,
 } from "@/services/apiClient";
+import { resolveWalletBalance } from "@/utils/resolveWalletBalance";
 import {
   membershipBenefitsForLine,
   summarizeMembershipForCart,
@@ -1244,38 +1245,11 @@ export default function FoodBill() {
           controller.signal,
         );
         const wallet = response?.wallet ?? response?.data ?? response ?? null;
-        const total = Number(wallet?.totalBalance);
-        if (Number.isFinite(total)) {
-          setWalletBalance(Math.max(0, total));
-          return;
-        }
-        const general = Number(
-          wallet?.generalBalance ??
-            wallet?.walletAmount ??
-            wallet?.balance ??
-            0,
+        const amount = resolveWalletBalance(
+          wallet,
+          Number(cust.points || 0) || 0,
         );
-        const cashback = Number(wallet?.cashbackBalance ?? 0);
-        const affiliate = Number(
-          wallet?.affiliateBalance ?? wallet?.withdrawableBalance ?? 0,
-        );
-        if (
-          wallet?.generalBalance !== undefined ||
-          wallet?.cashbackBalance !== undefined ||
-          wallet?.affiliateBalance !== undefined
-        ) {
-          setWalletBalance(Math.max(0, general + cashback + affiliate));
-          return;
-        }
-        const amount = Number(
-          wallet?.walletAmount ??
-            wallet?.balance ??
-            wallet?.currentBalance ??
-            wallet?.availableBalance ??
-            cust.points ??
-            0,
-        );
-        if (Number.isFinite(amount)) setWalletBalance(Math.max(0, amount));
+        setWalletBalance(amount);
       } catch {
         setWalletBalance(Number(cust.points || 0) || 0);
       }

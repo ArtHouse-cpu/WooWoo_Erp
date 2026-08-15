@@ -777,10 +777,10 @@ export default function CreatePosScreen({
         }}
       >
 
-        <div className="h-dvh max-h-dvh w-full max-w-7xl overflow-auto bg-white p-3 shadow-2xl sm:h-auto sm:max-h-[92vh] sm:w-[95%] sm:rounded-2xl sm:p-6">
+        <div className="flex h-dvh max-h-dvh w-full max-w-7xl flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:w-[95%] sm:rounded-2xl">
           {/* Header */}
-          <div className="flex justify-between items-center border-b pb-3">
-            <h2 className="text-xl font-semibold">POS Billing</h2>
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-3 py-3 sm:px-6 sm:py-4">
+            <h2 className="text-lg font-semibold sm:text-xl">POS Billing</h2>
             <button
               type="button"
               onClick={handleRequestClose}
@@ -831,8 +831,9 @@ export default function CreatePosScreen({
             </div>
           )}
 
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 pb-3 [-webkit-overflow-scrolling:touch] sm:px-6 sm:pb-6">
           {/* Main Layout Grid */}
-          <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[1fr_340px] mt-4">
+          <div className="mt-3 grid min-w-0 grid-cols-1 gap-5 lg:mt-4 lg:grid-cols-[minmax(0,1fr)_340px]">
             {/* Left Column: Form & Cart */}
             <div className="min-w-0 space-y-4">
               {/* Customer Section */}
@@ -849,8 +850,8 @@ export default function CreatePosScreen({
                 </div>
 
                 <div className="relative mt-2">
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex-1">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="relative min-w-0 flex-1">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                       <input
                         value={customer}
@@ -934,7 +935,7 @@ export default function CreatePosScreen({
                     </div>
 
                     {customer && (
-                      <div className="flex items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50/50 px-4 py-2">
+                      <div className="flex min-w-0 items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50/50 px-4 py-2">
                         <div className="text-xs">
                           <div className="font-bold text-indigo-900">{customer}</div>
                           <div className="text-indigo-600 font-medium">{phone}</div>
@@ -953,9 +954,8 @@ export default function CreatePosScreen({
               </div>
 
               {/* Search Section */}
-              <div className="flex items-center gap-3 mt-6 w-full">
-                {/* Search + Qty */}
-                <div className="flex items-center gap-2 flex-1">
+              <div className="mt-4 flex w-full min-w-0 flex-col gap-2 sm:mt-6 sm:flex-row sm:items-center sm:gap-3">
+                <div className="flex min-w-0 items-center gap-2">
                   <input
                     value={searchText}
                     onChange={(e) => {
@@ -963,7 +963,7 @@ export default function CreatePosScreen({
                       setSelectedProduct(null);
                     }}
                     placeholder="Search product, space, service, food..."
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    className="min-w-0 flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                   />
 
                   <input
@@ -971,27 +971,26 @@ export default function CreatePosScreen({
                     placeholder="Qty"
                     value={draftQty}
                     onChange={(e) => setDraftQty(e.target.value)}
-                    className="w-20 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    className="w-16 shrink-0 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-violet-500 sm:w-20"
                   />
                 </div>
 
-                {/* Add Item Button */}
-                <button
-                  type="button"
-                  onClick={addItem}
-                  className="bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 transition"
-                >
-                  Add Item
-                </button>
-
-                {/* Add New Product */}
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(true)}
-                  className="text-violet-600 text-sm font-medium hover:underline whitespace-nowrap"
-                >
-                  + Add New Product
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={addItem}
+                    className="flex-1 bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 transition sm:flex-none"
+                  >
+                    Add Item
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(true)}
+                    className="text-violet-600 text-sm font-medium hover:underline whitespace-nowrap"
+                  >
+                    + Add New Product
+                  </button>
+                </div>
               </div>
 
               {/* Search Results (optional UI) */}
@@ -1058,9 +1057,9 @@ export default function CreatePosScreen({
                 </div>
               )}
 
-              {/* Table — horizontal scroll on small screens */}
-              <div className="mt-6 overflow-x-auto rounded-xl border [scrollbar-width:thin]">
-                <table className="w-full min-w-[720px] text-sm">
+              {/* Table — swipe sideways on phone; page still scrolls vertically */}
+              <div className="mt-4 overflow-x-auto overscroll-x-contain rounded-xl border touch-pan-x [scrollbar-width:thin] [-webkit-overflow-scrolling:touch] sm:mt-6">
+                <table className="w-max min-w-[640px] text-sm sm:w-full sm:min-w-[720px]">
                   <thead className="bg-gray-100">
                     <tr>
                       <th className="p-3 text-left whitespace-nowrap">Product</th>
@@ -1176,7 +1175,7 @@ export default function CreatePosScreen({
               </div>
 
               {/* Billing Summary */}
-              <div className="mt-6 border-t pt-4 flex flex-col gap-4">
+              <div className="mt-4 flex flex-col gap-4 border-t pt-4 sm:mt-6">
                 {/* Top Row */}
                 <div className="flex items-center justify-between">
                   {/* Left: Items Count */}
@@ -1276,37 +1275,11 @@ export default function CreatePosScreen({
                 </div>
 
 
-                {/* Bottom Row (Checkout CTA) */}
-                {/* Bottom Row (Draft + Checkout CTA) */}
-                <div className="flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSaveDraft}
-                    disabled={items.length === 0 || saving}
-                    className="bg-white text-slate-700 border border-slate-200 px-6 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-slate-50 transition shadow-sm disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
-                  >
-                    <FileText size={18} />
-                    Save Draft
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openCheckoutModal}
-                    disabled={items.length === 0 || saving}
-                    className="bg-green-600 text-white px-8 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-green-700 transition shadow-sm disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600"
-                  >
-                    {saving ? "Processing..." : (
-                      <>
-                        <ShoppingCart size={18} />
-                        Checkout
-                      </>
-                    )}
-                  </button>
-                </div>
               </div>
             </div>
 
 
-            <aside className="h-[60vh] lg:h-[70vh] sticky top-0 overflow-hidden">
+            <aside className="h-[min(52dvh,440px)] min-h-[260px] overflow-hidden lg:sticky lg:top-0 lg:h-[70vh]">
               <ProductSidebar
                 cartItems={items}
                 onAddItem={addSidebarItem}
@@ -1316,6 +1289,32 @@ export default function CreatePosScreen({
                 title="POS Catalogue"
               />
             </aside>
+          </div>
+          </div>
+
+          <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:justify-end sm:gap-3 sm:px-6">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={items.length === 0 || saving}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 sm:flex-none sm:px-6"
+            >
+              <FileText size={18} />
+              Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={openCheckoutModal}
+              disabled={items.length === 0 || saving}
+              className="flex flex-[1.4] items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600 sm:flex-none sm:px-8"
+            >
+              {saving ? "Processing..." : (
+                <>
+                  <ShoppingCart size={18} />
+                  Checkout
+                </>
+              )}
+            </button>
           </div>
 
           {showCreateModal && (

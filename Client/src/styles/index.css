@@ -25,6 +25,27 @@ body {
   text-size-adjust: 100%;
 }
 
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+/* Stop iOS zoom on focus (needs >= 16px) */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  main .MuiToolbar-root {
+    flex-wrap: wrap !important;
+    min-width: 0 !important;
+  }
+}
+
 /* Material React Table: keep wide grids inside the viewport */
 main .MuiPaper-root {
   max-width: 100%;
@@ -34,12 +55,20 @@ main .MuiTableContainer-root {
   max-width: 100% !important;
   overflow-x: auto !important;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+main :where(.overflow-x-auto),
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   max-width: 100%;
+  overscroll-behavior-x: contain;
 }
 
 .hide-scrollbar {

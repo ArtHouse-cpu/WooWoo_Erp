@@ -62,6 +62,8 @@ const txVisuals: Record<string, {icon: typeof ArrowDown; color: string; bg: stri
   withdrawal: {icon: ArrowUpRight, color: 'text-[#7C3AED]', bg: 'bg-[#F3E8FF]'},
   general: {icon: Wallet, color: 'text-[#6366F1]', bg: 'bg-[#EEF2FF]'},
   cashback: {icon: Gift, color: 'text-[#6366F1]', bg: 'bg-[#EEF2FF]'},
+  nonWithdrawable: {icon: Wallet, color: 'text-[#6366F1]', bg: 'bg-[#EEF2FF]'},
+  withdrawable: {icon: TrendingUp, color: 'text-[#22C55E]', bg: 'bg-[#DCFCE7]'},
   affiliate: {icon: TrendingUp, color: 'text-[#22C55E]', bg: 'bg-[#DCFCE7]'},
   csp: {icon: TrendingUp, color: 'text-[#16A34A]', bg: 'bg-[#DCFCE7]'},
   other: {icon: PieChart, color: 'text-[#4B5563]', bg: 'bg-[#F3F4F6]'},
@@ -196,9 +198,9 @@ export default function WalletPage() {
     ? [
         {
           id: 'cashbacks',
-          label: 'Cashbacks',
+          label: 'Restricted',
           icon: Wallet,
-          value: formatInr(data.summary.cashbackBalance),
+          value: formatInr(data.balances.nonWithdrawable ?? data.summary.cashbackBalance),
           color: 'text-[#6366F1]',
         },
         {
@@ -412,7 +414,8 @@ export default function WalletPage() {
                 {formatInr(data.balances.totalAvailable)}
               </h2>
               <p className="pt-1 text-[12px] font-medium text-slate-400">
-                Available to withdraw {formatInr(data.balances.withdrawable)}
+                Withdrawable {formatInr(data.balances.withdrawable)} · Non-withdrawable{' '}
+                {formatInr(data.balances.nonWithdrawable ?? 0)}
               </p>
             </div>
 
@@ -518,6 +521,13 @@ export default function WalletPage() {
                           {tx.withdrawable && income ? (
                             <p className="mt-0.5 text-[10px] font-semibold text-[#16A34A]">
                               Withdrawable
+                            </p>
+                          ) : !income &&
+                            (Number(tx.withdrawableDeducted || 0) > 0 ||
+                              Number(tx.nonWithdrawableDeducted || 0) > 0) ? (
+                            <p className="mt-0.5 text-[10px] font-medium text-[#9CA3AF]">
+                              NW {formatInr(tx.nonWithdrawableDeducted || 0)} · W{' '}
+                              {formatInr(tx.withdrawableDeducted || 0)}
                             </p>
                           ) : null}
                         </div>

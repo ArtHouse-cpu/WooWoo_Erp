@@ -98,16 +98,16 @@ export default function PayoutsTab({ onOpenSettings }: { onOpenSettings?: () => 
   const methodTotal = methodStats.reduce((a, m) => a + (m.total || 0), 0);
 
   return (
-    <div className="flex gap-6">
-      <div className="flex-1 space-y-6">
-        <div className="flex justify-between items-center">
+    <div className="flex flex-col gap-6 xl:flex-row">
+      <div className="min-w-0 flex-1 space-y-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div><h2 className="text-xl font-bold">Payouts</h2><p className="text-sm text-gray-500">Track affiliate payouts</p></div>
           {onOpenSettings && (
             <button type="button" onClick={onOpenSettings} className="text-indigo-600 border border-indigo-200 rounded-lg px-4 py-2 text-sm">Payout Settings</button>
           )}
         </div>
 
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <div className="border rounded-xl p-4"><Wallet size={16} className="mb-2 text-indigo-600" /><h2 className="text-xl font-bold">{formatCurrency(totalAll)}</h2><p className="text-xs text-gray-500">Total</p></div>
           <div className="border rounded-xl p-4"><CheckCircle2 size={16} className="mb-2 text-green-600" /><h2 className="text-xl font-bold">{formatCurrency(stats.paid?.total)}</h2><p className="text-xs text-gray-500">{stats.paid?.count || 0} paid</p></div>
           <div className="border rounded-xl p-4"><Clock size={16} className="mb-2 text-orange-600" /><h2 className="text-xl font-bold">{formatCurrency(stats.pending?.total)}</h2><p className="text-xs text-gray-500">{stats.pending?.count || 0} pending</p></div>
@@ -116,7 +116,7 @@ export default function PayoutsTab({ onOpenSettings }: { onOpenSettings?: () => 
         </div>
 
         <div className="border rounded-xl bg-white overflow-hidden">
-          <div className="flex gap-4 px-4 border-b text-sm">
+          <div className="hide-scrollbar flex gap-4 overflow-x-auto px-4 border-b text-sm">
             {[
               { key: 'all', label: 'All', count: payouts.length },
               { key: 'Pending', label: 'Pending', count: stats.pending?.count },
@@ -145,7 +145,8 @@ export default function PayoutsTab({ onOpenSettings }: { onOpenSettings?: () => 
             <AffiliateSelect className="w-36" value={dateRange} onChange={setDateRange} options={DATE_RANGE_OPTIONS} />
             <button type="button" onClick={exportCsv} className="border rounded-lg px-3 py-2 text-sm">Export CSV</button>
           </div>
-          <table className="w-full text-sm text-left">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm text-left">
             <thead className="bg-gray-50 border-b"><tr>
               <th className="py-3 px-4">Affiliate</th><th className="py-3 px-4">Txn ID</th><th className="py-3 px-4">Method</th>
               <th className="py-3 px-4">Amount</th><th className="py-3 px-4">Status</th><th className="py-3 px-4">Requested</th><th className="py-3 px-4">Paid</th><th className="py-3 px-4">Actions</th>
@@ -171,10 +172,11 @@ export default function PayoutsTab({ onOpenSettings }: { onOpenSettings?: () => 
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
-      <div className="w-72 space-y-4">
+      <div className="w-full space-y-4 xl:w-72 xl:shrink-0">
         <div className="border rounded-xl p-5">
           <h3 className="font-semibold mb-3">Payout Summary</h3>
           <div className="space-y-2 text-sm">

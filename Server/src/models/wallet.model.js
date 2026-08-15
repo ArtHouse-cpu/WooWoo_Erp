@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const walletTransactionSchema = new mongoose.Schema(
   {
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer",
+      default: null,
+    },
     type: {
       type: String,
       enum: ["credit", "debit"],
@@ -12,11 +17,52 @@ const walletTransactionSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    // Which bucket this tx affects
+    // Which bucket this tx affects (legacy: cashback/affiliate/general)
     walletType: {
       type: String,
-      enum: ["cashback", "affiliate", "general"],
-      default: "general",
+      enum: [
+        "cashback",
+        "affiliate",
+        "general",
+        "withdrawable",
+        "nonWithdrawable",
+      ],
+      default: "nonWithdrawable",
+    },
+    withdrawableDeducted: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    nonWithdrawableDeducted: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalBalanceBefore: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    totalBalanceAfter: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    withdrawableAfter: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    nonWithdrawableAfter: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    reason: {
+      type: String,
+      default: "",
+      trim: true,
     },
     note: {
       type: String,
@@ -92,13 +138,26 @@ const walletSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
-    // Withdrawable affiliate earnings
+    // 2 = canonical withdrawable + nonWithdrawable (walletAmount is derived total)
+    balanceSchema: {
+      type: Number,
+      enum: [1, 2],
+    },
+    withdrawable: {
+      type: Number,
+      min: 0,
+    },
+    nonWithdrawable: {
+      type: Number,
+      min: 0,
+    },
+    // Withdrawable alias (affiliate / referral / CSP)
     affiliateBalance: {
       type: Number,
       default: 0,
       min: 0,
     },
-    // Non-withdrawable cashback / promo credits
+    // Non-withdrawable alias (cashback + other restricted credits)
     cashbackBalance: {
       type: Number,
       default: 0,

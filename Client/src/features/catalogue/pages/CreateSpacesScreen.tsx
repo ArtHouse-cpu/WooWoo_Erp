@@ -248,8 +248,8 @@ export default function CreateSpacesScreen() {
   };
 
   return (
-    <div className="p-1">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="min-w-0 p-1">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold">Spaces List</h1>
         <div className="flex gap-3">
           <Can permission={PERMISSIONS.SPACE_CREATE}>
@@ -259,7 +259,7 @@ export default function CreateSpacesScreen() {
                 setEditing(null);
                 setOpenModal(true);
               }}
-              className="cursor-pointer rounded bg-black px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-gray-900"
+              className="w-full cursor-pointer rounded bg-black px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-gray-900 sm:w-auto"
             >
               Add Space
             </button>

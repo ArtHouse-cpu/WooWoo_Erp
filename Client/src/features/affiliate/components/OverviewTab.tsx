@@ -30,7 +30,7 @@ export default function OverviewTab() {
         <h2 className="text-xl font-bold">Overview</h2>
         <p className="text-sm text-gray-500">Affiliate program performance at a glance</p>
       </div>
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="border rounded-xl p-5 bg-white">
           <Users size={20} className="text-indigo-600 mb-2" />
           <h2 className="text-3xl font-bold">{overview.totalAffiliates}</h2>

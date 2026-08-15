@@ -567,11 +567,11 @@ export default function CustomerScreen() {
           </div>
         </div>
 
-        <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
+        <div className="flex w-full flex-col gap-2 sm:flex-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
           <Can permission={PERMISSIONS.CUSTOMER_CREATE}>
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 sm:w-auto"
               onClick={() => setOpenImportModal(true)}
             >
               <FileSpreadsheet size={16} />
@@ -579,7 +579,7 @@ export default function CustomerScreen() {
             </button>
             <button
               type="button"
-              className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:w-auto"
               onClick={() => setOpenCreateCustomerModal(true)}
             >
               + New Customer

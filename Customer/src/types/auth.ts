@@ -25,6 +25,8 @@ export interface Customer {
   profileSetupCompleted?: boolean;
   onboardingCompleted?: boolean;
   referralCode?: string | null;
+  withdrawable?: number;
+  nonWithdrawable?: number;
   affiliateBalance?: number;
   affiliateReserved?: number;
   cashbackBalance?: number;
@@ -69,11 +71,12 @@ export interface ReferralDashboard {
 export interface WalletDashboard {
   balances: {
     totalAvailable: number;
-    generalBalance: number;
-    affiliateBalance: number;
-    affiliateReserved: number;
-    cashbackBalance: number;
     withdrawable: number;
+    nonWithdrawable: number;
+    generalBalance?: number;
+    affiliateBalance?: number;
+    affiliateReserved: number;
+    cashbackBalance?: number;
   };
   summary: {
     cashbackBalance: number;
@@ -103,6 +106,8 @@ export interface WalletDashboard {
     status: string;
     category: string;
     withdrawable?: boolean;
+    withdrawableDeducted?: number;
+    nonWithdrawableDeducted?: number;
     createdAt: string;
   }>;
   referral: {

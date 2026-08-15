@@ -4,6 +4,7 @@ import WalletWithdrawal from '../../../models/walletWithdrawal.model.js';
 import AffiliateCommission from '../../../models/affiliateCommission.model.js';
 import CommissionLedger from '../../../models/commissionLedger.model.js';
 import {getReferralDashboard} from './referral.service.js';
+import {resolveTwoBuckets} from '../../../utils/walletBuckets.js';
 
 const startOfMonth = () => {
   const date = new Date();
@@ -24,22 +25,6 @@ const categoryLabels = {
 
 const statusIsEarned = status =>
   ['approved', 'credited', 'Approved', 'Paid'].includes(status);
-
-/** Prefer non-zero bucket; if both differ and both > 0, prefer wallet ledger. */
-const pickBucketBalance = (customerVal, walletVal) => {
-  const c = Number(customerVal);
-  const w = Number(walletVal);
-  const cOk = Number.isFinite(c);
-  const wOk = Number.isFinite(w);
-  if (cOk && wOk) {
-    if (c === 0 && w !== 0) return w;
-    if (w === 0 && c !== 0) return c;
-    return w;
-  }
-  if (wOk) return w;
-  if (cOk) return c;
-  return 0;
-};
 
 const normalizeCategory = record => {
   if (record.category) return record.category;
@@ -89,21 +74,10 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
   const earningRecords = usePrimaryCommissions ? commissions : legacyCommissions;
 
   let liveWallet = wallet;
-  let generalBalance = pickBucketBalance(
-    customer.walletAmount,
-    wallet?.walletAmount,
-  );
-  let affiliateBalance = pickBucketBalance(
-    customer.affiliateBalance,
-    wallet?.affiliateBalance,
-  );
-  let cashbackBalance = pickBucketBalance(
-    customer.cashbackBalance,
-    wallet?.cashbackBalance,
-  );
+  let buckets = resolveTwoBuckets(wallet, customer);
 
   // Restore signup welcome ₹ wiped by older membership-cashback wallet create
-  if (customer.welcomeBonusCredited && generalBalance <= 0) {
+  if (customer.welcomeBonusCredited && buckets.nonWithdrawable <= 0) {
     const welcomeAmount = (() => {
       const n = Number(
         process.env.WHATSAPP_ACCOUNT_CREATED_CASHBACK ||
@@ -119,12 +93,10 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
         (String(tx.referenceType || '') === 'WelcomeBonus' ||
           /welcome|signup/i.test(String(tx.note || ''))),
     );
-    const hasGeneralDebit = txs.some(
-      tx =>
-        String(tx.type || '').toLowerCase() === 'debit' &&
-        String(tx.walletType || 'general').toLowerCase() === 'general',
+    const hasSpendDebit = txs.some(
+      tx => String(tx.type || '').toLowerCase() === 'debit',
     );
-    if (!hasWelcomeCredit && !hasGeneralDebit && welcomeAmount > 0) {
+    if (!hasWelcomeCredit && !hasSpendDebit && welcomeAmount > 0) {
       try {
         const {appendTransaction} = await import(
           '../../../controllers/wallet.controller.js'
@@ -135,15 +107,13 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
             customerId,
             customerName: String(customer.name ?? '').trim(),
             customerPhone: String(customer.mobile ?? '').trim(),
-            walletAmount: 0,
-            cashbackBalance,
-            affiliateBalance,
+            withdrawable: buckets.withdrawable,
+            nonWithdrawable: 0,
+            affiliateBalance: buckets.withdrawable,
+            cashbackBalance: 0,
+            walletAmount: buckets.withdrawable,
             transactions: [],
           });
-        } else {
-          mutableWallet.walletAmount = 0;
-          mutableWallet.cashbackBalance = cashbackBalance;
-          mutableWallet.affiliateBalance = affiliateBalance;
         }
         liveWallet = await appendTransaction(mutableWallet, {
           type: 'credit',
@@ -151,14 +121,14 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
           note: 'Signup welcome bonus (restored)',
           referenceType: 'WelcomeBonus',
           referenceId: `welcome:${customerId}`,
-          walletType: 'general',
+          walletType: 'nonWithdrawable',
           createdBy: {
             m_staff_id: null,
             m_staff_name: 'System',
             m_staff_email: null,
           },
         });
-        generalBalance = welcomeAmount;
+        buckets = resolveTwoBuckets(liveWallet, customer);
       } catch (error) {
         console.error(
           '[WalletDashboard] welcome bonus restore failed:',
@@ -167,6 +137,10 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
       }
     }
   }
+
+  const withdrawable = buckets.withdrawable;
+  const nonWithdrawable = buckets.nonWithdrawable;
+  const totalAvailable = buckets.total;
 
   const affiliateReserved = Number(customer.affiliateReserved || 0);
 
@@ -204,7 +178,13 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
   const walletTransactions = (liveWallet?.transactions || wallet?.transactions || []).map(transaction => {
     const refType = String(transaction.referenceType || '').trim();
     const isCsp = refType === 'CspSale';
-    const walletType = String(transaction.walletType || 'general').toLowerCase();
+    const walletType = String(
+      transaction.walletType || 'nonWithdrawable',
+    ).toLowerCase();
+    const isWithdrawableCredit =
+      isCsp ||
+      walletType === 'affiliate' ||
+      walletType === 'withdrawable';
     return {
       id: String(transaction._id),
       kind: 'wallet',
@@ -220,10 +200,16 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
       status: 'completed',
       category: isCsp
         ? 'csp'
-        : walletType === 'affiliate'
+        : isWithdrawableCredit
           ? 'affiliate'
-          : walletType || 'general',
-      withdrawable: isCsp || walletType === 'affiliate',
+          : walletType === 'cashback' || walletType === 'nonwithdrawable'
+            ? 'cashback'
+            : walletType || 'cashback',
+      withdrawable: isWithdrawableCredit,
+      withdrawableDeducted: Number(transaction.withdrawableDeducted || 0),
+      nonWithdrawableDeducted: Number(
+        transaction.nonWithdrawableDeducted || 0,
+      ),
       createdAt: transaction.createdAt,
     };
   });
@@ -280,15 +266,16 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
 
   return {
     balances: {
-      totalAvailable: generalBalance + affiliateBalance + cashbackBalance,
-      generalBalance,
-      affiliateBalance,
+      totalAvailable,
+      withdrawable,
+      nonWithdrawable,
+      affiliateBalance: withdrawable,
       affiliateReserved,
-      cashbackBalance,
-      withdrawable: affiliateBalance,
+      cashbackBalance: nonWithdrawable,
+      generalBalance: 0,
     },
     summary: {
-      cashbackBalance,
+      cashbackBalance: nonWithdrawable,
       totalAffiliateEarned: referral.stats.totalEarned,
       rewardTransactions: earningRecords.length,
       totalTransactions: transactions.length,

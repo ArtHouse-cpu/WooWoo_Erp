@@ -81,10 +81,10 @@ export default function AffiliateProgramScreen() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-6 font-sans">
-      <div className="mb-6 flex justify-between items-center">
+    <div className="min-w-0 p-3 sm:p-6 font-sans">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Affiliate Program</h1>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Affiliate Program</h1>
           <p className="text-sm text-gray-500">Manage affiliates, commission, rewards & wallet settings</p>
           {loadError && (
             <p className="text-sm text-orange-600 mt-1">Using defaults — {loadError}. Check login/API connection.</p>

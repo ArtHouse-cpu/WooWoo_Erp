@@ -214,7 +214,7 @@ export default function InvoiceScreen() {
   });
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-8">
+    <div className="min-h-[calc(100vh-4rem)]">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex items-center gap-3">
@@ -230,7 +230,7 @@ export default function InvoiceScreen() {
             <Can permission={PERMISSIONS.INVOICE_CREATE}>
               <button
                 onClick={() => navigate("/create-invoice")}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:w-auto"
               >
                 <Plus size={18} />
                 Create Invoice

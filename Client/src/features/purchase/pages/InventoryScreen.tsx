@@ -116,8 +116,8 @@ export default function InventoryScreen() {
   });
 
   return (
-    <div className="p-1">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <div className="min-w-0 p-1">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold">Inventory List</h1>
           <p className="mt-0.5 text-xs text-slate-500">

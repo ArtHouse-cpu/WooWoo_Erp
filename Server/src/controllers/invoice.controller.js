@@ -293,20 +293,20 @@ const notifyActivityUpdateWhatsApp = async ({
 
     const cashbackAmt = Math.max(0, Number(cashbackTotal ?? 0));
 
-    // Live TOTAL wallet after debit + cashback credit (general + cashback + affiliate).
-    // Using only customer.walletAmount shows "general" and misses cashback — WhatsApp
-    // "Updated Wallet Balance" looked wrong after cashback bills.
+    // Live TOTAL wallet after debit + cashback credit (withdrawable + nonWithdrawable).
     let walletBalance = getSpendableWalletBalance(null, customer);
     let membershipType = customer?.membershipType || membershipTypeHint;
     if (customer?._id) {
       const [fresh, walletDoc] = await Promise.all([
         Customer.findById(customer._id)
           .select(
-            'walletAmount closingBalance cashbackBalance affiliateBalance membershipType name',
+            'walletAmount closingBalance cashbackBalance affiliateBalance withdrawable nonWithdrawable membershipType name',
           )
           .lean(),
         Wallet.findOne({customerId: customer._id})
-          .select('walletAmount cashbackBalance affiliateBalance')
+          .select(
+            'walletAmount cashbackBalance affiliateBalance withdrawable nonWithdrawable balanceSchema',
+          )
           .lean(),
       ]);
       if (fresh) {
@@ -399,7 +399,7 @@ const applyWalletDelta = async ({
   await appendTransaction(wallet, {
     type: 'credit',
     amount: Math.abs(numericAmount),
-    walletType: 'general',
+    walletType: 'nonWithdrawable',
     note,
     referenceType: 'invoice',
     referenceId: invoiceCode,
@@ -446,7 +446,7 @@ const creditMembershipCashback = async ({
     note: `Membership cashback for ${String(activityType || 'Invoice').trim() || 'Invoice'} ${ref}`,
     referenceType: 'invoice',
     referenceId: ref,
-    walletType: 'cashback',
+    walletType: 'nonWithdrawable',
     createdBy,
   });
 };
@@ -697,7 +697,7 @@ const createInvoice = async (req, res) => {
       if (walletAmount > availableWallet + 0.01) {
         return res.status(400).json({
           success: false,
-          message: `Wallet amount exceeds available balance. Available: ₹${availableWallet.toFixed(2)}`,
+          message: `Insufficient wallet balance. Available: ₹${availableWallet.toFixed(2)}`,
         });
       }
       if (walletAmount > maxPayable + 0.01) {
@@ -960,9 +960,10 @@ const getInvoices=async(req,res)=>{
         }
         const invoices = await Invoice.find(query)
           .sort({createdAt: -1})
+          // .sort({updatedAt: -1})
           .limit(limit)
           .select(
-            'customerName customerPhone pendingAmount paymentBreakdown paymentStatus status invoiceCode createdAt grandTotal createdBy mode salesPersonName invoiceDate items coupon referral membershipDiscount membershipType cashbackTotal discountTotal subTotal extraCharges invoiceBy',
+            'customerName customerPhone pendingAmount paymentBreakdown paymentStatus status invoiceCode createdAt updatedAt grandTotal createdBy mode salesPersonName invoiceDate items coupon referral membershipDiscount membershipType cashbackTotal discountTotal subTotal extraCharges invoiceBy',
           )
           .lean();
         return res.status(200).json({
@@ -1260,7 +1261,7 @@ const updateInvoice = async (req, res) => {
       if (walletDelta > 0 && walletDelta > availableWallet + 0.01) {
         return res.status(400).json({
           success: false,
-          message: `Wallet amount exceeds available balance. Available: ₹${availableWallet.toFixed(2)}`,
+          message: `Insufficient wallet balance. Available: ₹${availableWallet.toFixed(2)}`,
         });
       }
 

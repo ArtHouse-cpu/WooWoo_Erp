@@ -10,6 +10,9 @@ export type ThermalPrintItem = {
   discount: number;
   itemCode?: string;
   hsn?: string;
+  productDiscount?: number;
+  membershipDiscount?: number;
+  cashback?: number;
 };
 
 export type ThermalPrintProps = {
@@ -26,6 +29,11 @@ export type ThermalPrintProps = {
   items: ThermalPrintItem[];
   totalMRP: number;
   discountTotal: number;
+  /** Quotation-only split; invoices leave these unset */
+  productDiscountTotal?: number;
+  membershipDiscountTotal?: number;
+  couponDiscount?: number;
+  couponCode?: string;
   cashbackAmount?: number;
   finalAmount: number;
   totalDue: number;
@@ -296,6 +304,10 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
   items,
   totalMRP,
   discountTotal,
+  productDiscountTotal = 0,
+  membershipDiscountTotal = 0,
+  couponDiscount = 0,
+  couponCode,
   cashbackAmount = 0,
   finalAmount,
   totalDue,
@@ -304,6 +316,13 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
 }) => {
   const amountInWords = `INR ${rupeesToWords(Math.round(finalAmount))} Rupees Only`;
   const title = String(documentType || "INVOICE").toUpperCase();
+  const isQuotation = title === "QUOTATION";
+  const numberLabel = isQuotation ? "Quotation #" : "Invoice #";
+  const dateLabel = isQuotation ? "Quotation Date" : "Invoice Date";
+  const billedByLabel = isQuotation ? "Quoted By" : "Billed By";
+  const showSplitDiscounts =
+    isQuotation &&
+    (productDiscountTotal > 0 || membershipDiscountTotal > 0 || couponDiscount > 0);
   const membershipLabel = (() => {
     const value = String(membershipType || "").trim();
     return value.toLowerCase() === "none" ? "Visitor" : value;
@@ -418,7 +437,7 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
                 letterSpacing: "0.4px",
               }}
             >
-              ORIGINAL FOR RECIPIENT
+              {isQuotation ? "THIS IS A QUOTATION" : "ORIGINAL FOR RECIPIENT"}
             </div>
           </div>
         </div>
@@ -440,7 +459,7 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
                 marginBottom: "6px",
               }}
             >
-              Bill To:
+              {isQuotation ? "Quote To:" : "Bill To:"}
             </div>
             <div
               style={{ fontWeight: 700, fontSize: "14px", marginBottom: "2px" }}
@@ -466,10 +485,10 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
           </div>
 
           <div style={{ minWidth: "260px" }}>
-            <MetaRow label="Invoice #" value={invoiceNo || "—"} />
-            <MetaRow label="Invoice Date" value={date || "—"} />
+            <MetaRow label={numberLabel} value={invoiceNo || "—"} />
+            <MetaRow label={dateLabel} value={date || "—"} />
             <MetaRow label="Due Date" value={dueDate || date || "—"} />
-            <MetaRow label="Billed By" value={salesPerson || "—"} />
+            <MetaRow label={billedByLabel} value={salesPerson || "—"} />
           </div>
         </div>
 
@@ -510,10 +529,53 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
             ) : (
               items.map((item, index) => {
                 const lineAmount = Number(item.qty) * Number(item.price);
+                const lineDiscount = Number(item.discount || 0);
+                const lineNet = Math.max(0, lineAmount - lineDiscount);
                 return (
                   <tr key={`${item.name}-${index}`}>
                     <td style={td}>{index + 1}</td>
-                    <td style={{ ...td, fontWeight: 600 }}>{item.name}</td>
+                    <td style={{ ...td, fontWeight: 600 }}>
+                      {item.name}
+                      {isQuotation &&
+                      (Number(item.productDiscount || 0) > 0 ||
+                        Number(item.membershipDiscount || 0) > 0 ||
+                        Number(item.cashback || 0) > 0 ||
+                        lineDiscount > 0) ? (
+                        <div
+                          style={{
+                            marginTop: "4px",
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            color: MUTED,
+                          }}
+                        >
+                          {Number(item.productDiscount || 0) > 0
+                            ? `Product disc. −₹ ${formatMoney(Number(item.productDiscount))}`
+                            : null}
+                          {Number(item.productDiscount || 0) > 0 &&
+                          Number(item.membershipDiscount || 0) > 0
+                            ? " · "
+                            : null}
+                          {Number(item.membershipDiscount || 0) > 0
+                            ? `Membership disc. −₹ ${formatMoney(Number(item.membershipDiscount))}`
+                            : null}
+                          {Number(item.productDiscount || 0) <= 0 &&
+                          Number(item.membershipDiscount || 0) <= 0 &&
+                          lineDiscount > 0
+                            ? `Discount −₹ ${formatMoney(lineDiscount)}`
+                            : null}
+                          {Number(item.cashback || 0) > 0
+                            ? `${
+                                Number(item.productDiscount || 0) > 0 ||
+                                Number(item.membershipDiscount || 0) > 0 ||
+                                lineDiscount > 0
+                                  ? " · "
+                                  : ""
+                              }Cashback ₹ ${formatMoney(Number(item.cashback))} to wallet`
+                            : null}
+                        </div>
+                      ) : null}
+                    </td>
                     <td style={td}>{item.itemCode || "—"}</td>
                     <td style={td}>{item.hsn || "—"}</td>
                     <td style={{ ...td, textAlign: "right" }}>
@@ -521,7 +583,7 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
                     </td>
                     <td style={{ ...td, textAlign: "center" }}>{item.qty}</td>
                     <td style={{ ...td, textAlign: "right", fontWeight: 600 }}>
-                      {formatMoney(lineAmount)}
+                      {formatMoney(isQuotation ? lineNet : lineAmount)}
                     </td>
                   </tr>
                 );
@@ -546,7 +608,7 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
           </div>
 
           <div style={{ minWidth: "280px", fontSize: "12px" }}>
-            {discountTotal > 0 && (
+            {isQuotation && (
               <div
                 style={{
                   display: "flex",
@@ -554,9 +616,64 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
                   marginBottom: "6px",
                 }}
               >
-                <span>Discount</span>
-                <span>- ₹ {formatMoney(discountTotal)}</span>
+                <span>Total MRP</span>
+                <span>₹ {formatMoney(totalMRP)}</span>
               </div>
+            )}
+            {showSplitDiscounts ? (
+              <>
+                {productDiscountTotal > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <span>Product Discount</span>
+                    <span>- ₹ {formatMoney(productDiscountTotal)}</span>
+                  </div>
+                )}
+                {membershipDiscountTotal > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <span>Membership Discount</span>
+                    <span>- ₹ {formatMoney(membershipDiscountTotal)}</span>
+                  </div>
+                )}
+                {couponDiscount > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <span>
+                      Coupon{couponCode ? ` (${couponCode})` : ""}
+                    </span>
+                    <span>- ₹ {formatMoney(couponDiscount)}</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              discountTotal > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: "6px",
+                  }}
+                >
+                  <span>Discount</span>
+                  <span>- ₹ {formatMoney(discountTotal)}</span>
+                </div>
+              )
             )}
             {cashbackAmount > 0 && (
               <div
@@ -564,10 +681,17 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
                   display: "flex",
                   justifyContent: "space-between",
                   marginBottom: "6px",
+                  color: isQuotation ? "#047857" : undefined,
                 }}
               >
-                <span>Cashback</span>
-                <span>- ₹ {formatMoney(cashbackAmount)}</span>
+                <span>
+                  {isQuotation
+                    ? "Cashback to wallet (not deducted)"
+                    : "Cashback"}
+                </span>
+                <span>
+                  {isQuotation ? "+" : "−"} ₹ {formatMoney(cashbackAmount)}
+                </span>
               </div>
             )}
             {extraCharges.map((c, i) => (
@@ -608,6 +732,20 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
                 <span>₹ {formatMoney(discountTotal)}</span>
               </div>
             )}
+            {isQuotation && cashbackAmount > 0 && (
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: MUTED,
+                  marginBottom: "6px",
+                  lineHeight: 1.4,
+                }}
+              >
+                {/* Cashback is credited to the customer wallet when this quotation
+                is converted to a paid invoice. It does not reduce the quoted
+                amount. */}
+              </div>
+            )}
             <div
               style={{
                 borderTop: `2px solid ${YELLOW}`,
@@ -622,20 +760,22 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
                 marginBottom: "6px",
               }}
             >
-              <span>Amount Payable</span>
+              <span>{isQuotation ? "Quoted Amount" : "Amount Payable"}</span>
               <span>₹ {formatMoney(finalAmount)}</span>
             </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                fontWeight: 700,
-              }}
-            >
-              <span>Total Balance due</span>
-              <span>₹ {formatMoney(totalDue)}</span>
-            </div>
-            {totalMRP > 0 && (
+            {!isQuotation && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontWeight: 700,
+                }}
+              >
+                <span>Total Balance due</span>
+                <span>₹ {formatMoney(totalDue)}</span>
+              </div>
+            )}
+            {totalMRP > 0 && !isQuotation && (
               <div
                 style={{
                   display: "flex",

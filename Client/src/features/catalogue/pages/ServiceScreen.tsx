@@ -302,8 +302,8 @@ export default function ServiceScreen() {
   ];
 
   return (
-    <div className="p-1">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="min-w-0 p-1">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold">Services List</h1>
         <Can permission={PERMISSIONS.SERVICE_CREATE}>
           <button
@@ -312,7 +312,7 @@ export default function ServiceScreen() {
               setEditService(null);
               setShowCreateModal(true);
             }}
-            className="cursor-pointer rounded bg-black px-4 py-2 text-[14px] font-semibold text-white transition"
+            className="w-full cursor-pointer rounded bg-black px-4 py-2 text-[14px] font-semibold text-white transition sm:w-auto"
           >
             + Create Service
           </button>

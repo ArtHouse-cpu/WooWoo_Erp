@@ -16,6 +16,9 @@ import Swal from "sweetalert2";
 import { handleGetQuotations, handleDeleteQuotation, handleUpdateQuotationStatus } from "@/services/apiClient";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
+  toQuotationPdfRecord,
+} from "@/features/sales/utils/quotationPrintMapper";
+import {
   buildWoowooInvoiceWhatsAppMessage,
   normalizeIndianWhatsAppDigits,
   resolveHostedInvoiceLink,
@@ -150,22 +153,7 @@ export default function QuotationScreen() {
   };
 
   const downloadPdf = (row: QuotationRow) => {
-    downloadInvoicePdf({
-      invoiceNo: row.quotationCode,
-      customerName: row.customer,
-      customerPhone: row.phone,
-      items: row.raw.items.map((it: any) => ({
-        name: it.productName,
-        qty: it.qty,
-        price: it.unitPrice,
-        discount: it.discount,
-      })),
-      totalMRP: row.raw.subTotal,
-      discountTotal: row.raw.discountTotal,
-      finalAmount: row.amount,
-      totalDue: row.amount,
-      totalQty: row.raw.items.reduce((s: number, i: any) => s + i.qty, 0),
-    }, "QUOTATION");
+    downloadInvoicePdf(toQuotationPdfRecord(row.raw), "QUOTATION");
   };
 
   const shareOnWhatsApp = async (row: QuotationRow) => {
@@ -175,22 +163,10 @@ export default function QuotationScreen() {
         Swal.fire("Invalid Phone", "Customer phone number is invalid.", "error");
         return;
       }
-      const pdfBlob = await getInvoicePdfBlob({
-        invoiceNo: row.quotationCode,
-        customerName: row.customer,
-        customerPhone: row.phone,
-        items: row.raw.items.map((it: any) => ({
-          name: it.productName,
-          qty: it.qty,
-          price: it.unitPrice,
-          discount: it.discount,
-        })),
-        totalMRP: row.raw.subTotal,
-        discountTotal: row.raw.discountTotal,
-        finalAmount: row.amount,
-        totalDue: row.amount,
-        totalQty: row.raw.items.reduce((s: number, i: any) => s + i.qty, 0),
-      }, "QUOTATION");
+      const pdfBlob = await getInvoicePdfBlob(
+        toQuotationPdfRecord(row.raw),
+        "QUOTATION",
+      );
 
       const file = new File([pdfBlob.blob], `${row.quotationCode}.pdf`, { type: "application/pdf" });
       const publicLink = resolveHostedInvoiceLink(row.raw);
@@ -316,14 +292,14 @@ export default function QuotationScreen() {
   });
 
   return (
-    <div className="p-4">
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Quotations</h1>
-        <div className="flex gap-3 mt-4 sm:mt-0">
+    <div className="min-w-0 p-1 sm:p-4">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">Quotations</h1>
+        <div className="flex gap-3">
           <Can permission={PERMISSIONS.QUOTATION_CREATE}>
             <button
               onClick={() => navigate("/create-quotation")}
-              className="bg-black text-white py-2 px-4 rounded-full text-sm font-semibold hover:bg-gray-800 transition"
+              className="w-full rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800 sm:w-auto"
             >
               Create Quotation
             </button>

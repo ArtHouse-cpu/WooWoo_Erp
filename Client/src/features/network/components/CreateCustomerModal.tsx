@@ -247,9 +247,9 @@ export default function CreateCustomerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm transition-opacity">
-      <div className="relative flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/5 transition-all">
+      <div className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/5 transition-all">
         {/* Header */}
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-5">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
               <UserRound size={20} />
@@ -279,7 +279,7 @@ export default function CreateCustomerModal({
           className="contents"
         >
           {/* Form Body */}
-          <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
+          <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
             <div className="space-y-8">
               {/* Profile Photo */}
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">

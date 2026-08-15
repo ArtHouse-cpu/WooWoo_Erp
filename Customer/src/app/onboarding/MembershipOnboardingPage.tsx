@@ -500,7 +500,7 @@ function InsightsTab({
           <h3 className="text-[15px] font-extrabold text-[#111111]">Your Impact</h3>
         </div>
 
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div className="border border-black/[0.03] bg-white rounded-[20px] p-4.5 flex flex-col justify-between h-[118px] shadow-[0_2px_8px_rgba(15,23,42,0.01)]">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EAFDF4] text-[#10B981]">
               <DollarSign className="h-4 w-4" />

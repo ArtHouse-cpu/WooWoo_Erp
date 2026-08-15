@@ -331,7 +331,7 @@ export default function CspScreen() {
   });
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="min-w-0 space-y-4 p-1 md:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">
@@ -342,7 +342,7 @@ export default function CspScreen() {
             automatically. CSP products credit 70% to the seller wallet on invoice.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <select
             value={statusFilter}
             onChange={(e) =>

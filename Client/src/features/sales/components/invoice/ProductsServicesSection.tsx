@@ -42,6 +42,8 @@ type Props = {
   onAddDirectItem?: (item: Omit<InvoiceItem, "id">) => void;
   /** View invoice: hide catalogue / add UI; show sold line items only */
   readOnly?: boolean;
+  /** Quotation view: line-level membership / cashback split copy */
+  documentKind?: "invoice" | "quotation";
 };
 
 const inputStyle =
@@ -79,6 +81,7 @@ export default function ProductsServicesSection({
   membershipPlanId = null,
   onAddDirectItem,
   readOnly = false,
+  documentKind = "invoice",
 }: Props) {
   const [catalogueItems, setCatalogueItems] = useState<CatalogueLookupItem[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -706,8 +709,12 @@ export default function ProductsServicesSection({
                   className="px-3 py-10 text-center text-gray-500"
                 >
                   {readOnly
-                    ? "No products were sold on this invoice."
-                    : "Search or add products to start creating invoice."}
+                    ? documentKind === "quotation"
+                      ? "No products on this quotation."
+                      : "No products were sold on this invoice."
+                    : documentKind === "quotation"
+                      ? "Search or add products to start creating quotation."
+                      : "Search or add products to start creating invoice."}
                 </td>
               </tr>
             ) : (
@@ -751,9 +758,29 @@ export default function ProductsServicesSection({
                     <td className="px-3 py-2 text-right">₹ {item.unitPrice.toFixed(2)}</td>
                     <td className="px-3 py-2 text-right">
                       {readOnly ? (
-                        <span>₹ {Number(item.discount || 0).toFixed(2)}</span>
+                        <div className="text-right">
+                          <span>₹ {Number(item.discount || 0).toFixed(2)}</span>
+                          {documentKind === "quotation" &&
+                          (Number(item.productDiscountAmount ?? 0) > 0 ||
+                            Number(item.membershipDiscountAmount ?? 0) > 0) ? (
+                            <div className="mt-0.5 text-[10px] font-medium leading-tight text-gray-500">
+                              {Number(item.productDiscountAmount ?? 0) > 0 ? (
+                                <div>
+                                  Product −₹
+                                  {Number(item.productDiscountAmount).toFixed(2)}
+                                </div>
+                              ) : null}
+                              {Number(item.membershipDiscountAmount ?? 0) > 0 ? (
+                                <div className="text-indigo-600">
+                                  Membership −₹
+                                  {Number(item.membershipDiscountAmount).toFixed(2)}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
                       ) : (
-                        <div className="flex justify-end">
+                        <div className="flex flex-col items-end">
                           <input
                             type="number"
                             min={0}
@@ -768,14 +795,40 @@ export default function ProductsServicesSection({
                             }
                             className="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500"
                           />
+                          {documentKind === "quotation" &&
+                          (Number(item.productDiscountAmount ?? 0) > 0 ||
+                            Number(item.membershipDiscountAmount ?? 0) > 0) ? (
+                            <div className="mt-0.5 text-right text-[10px] font-medium leading-tight text-gray-500">
+                              {Number(item.productDiscountAmount ?? 0) > 0 ? (
+                                <div>
+                                  Product −₹
+                                  {Number(item.productDiscountAmount).toFixed(2)}
+                                </div>
+                              ) : null}
+                              {Number(item.membershipDiscountAmount ?? 0) > 0 ? (
+                                <div className="text-indigo-600">
+                                  Membership −₹
+                                  {Number(item.membershipDiscountAmount).toFixed(2)}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">
                       {readOnly ? (
-                        <span>₹ {Number(item.cashback || 0).toFixed(2)}</span>
+                        <div className="text-right">
+                          <span>₹ {Number(item.cashback || 0).toFixed(2)}</span>
+                          {documentKind === "quotation" &&
+                          Number(item.cashback || 0) > 0 ? (
+                            <div className="mt-0.5 text-[10px] font-medium text-emerald-700">
+                              Wallet credit on purchase
+                            </div>
+                          ) : null}
+                        </div>
                       ) : (
-                        <div className="flex justify-end">
+                        <div className="flex flex-col items-end">
                           <input
                             type="number"
                             min={0}
@@ -785,6 +838,12 @@ export default function ProductsServicesSection({
                             }
                             className="w-20 rounded border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-blue-500"
                           />
+                          {documentKind === "quotation" &&
+                          Number(item.cashback || 0) > 0 ? (
+                            <div className="mt-0.5 text-[10px] font-medium text-emerald-700">
+                              Wallet credit on purchase
+                            </div>
+                          ) : null}
                         </div>
                       )}
                     </td>

@@ -2,6 +2,7 @@ import React from "react";
 import { ThermalPrint } from "@/features/sales/components/invoice/ThermalPrint";
 import type { InvoicePdfInput } from "@/features/sales/components/invoice/types";
 import { mapInvoiceToThermalPrintProps } from "@/features/sales/utils/invoicePrintMapper";
+import { mapQuotationToThermalPrintProps } from "@/features/sales/utils/quotationPrintMapper";
 
 type Props = {
   invoice: InvoicePdfInput | null | undefined;
@@ -16,6 +17,9 @@ export const A4InvoiceTemplate: React.FC<Props> = ({
   invoice: raw,
   documentType = "INVOICE",
 }) => {
-  const props = mapInvoiceToThermalPrintProps(raw ?? {}, documentType);
+  const props =
+    String(documentType).toUpperCase() === "QUOTATION"
+      ? mapQuotationToThermalPrintProps(raw ?? {}, documentType)
+      : mapInvoiceToThermalPrintProps(raw ?? {}, documentType);
   return <ThermalPrint {...props} />;
 };

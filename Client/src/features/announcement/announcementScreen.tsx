@@ -430,7 +430,7 @@ export default function AnnouncementScreen() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-[220px] flex-1 md:max-w-sm">
+        <div className="relative min-w-0 w-full flex-1 md:max-w-sm">
           <Search
             size={15}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"

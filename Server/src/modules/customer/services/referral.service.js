@@ -1,9 +1,14 @@
 import Customer from '../../../models/customer.model.js';
+import Wallet from '../../../models/wallet.model.js';
 import AffiliateSettings, {
   normalizeAffiliateRules,
 } from '../../../models/affiliateSettings.model.js';
 import AffiliateCommission from '../../../models/affiliateCommission.model.js';
 import CommissionLedger from '../../../models/commissionLedger.model.js';
+import {
+  persistableBucketFields,
+  resolveTwoBuckets,
+} from '../../../utils/walletBuckets.js';
 
 const generateReferralCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -65,10 +70,39 @@ const ensureInviteBalanceCredited = async (commission, inviterId) => {
     return commission;
   }
 
-  await Customer.updateOne(
-    {_id: inviterId},
-    {$inc: {affiliateBalance: Number(commission.commissionAmount || 0)}},
-  );
+  const amount = Number(commission.commissionAmount || 0);
+  if (amount > 0 && inviterId) {
+    const inviter = await Customer.findById(inviterId);
+    if (inviter) {
+      const seed = resolveTwoBuckets(null, inviter);
+      let wallet = await Wallet.findOne({customerId: inviter._id});
+      if (!wallet) {
+        wallet = await Wallet.create({
+          customerId: inviter._id,
+          customerName: String(inviter.name ?? '').trim(),
+          customerPhone: String(inviter.mobile ?? '').trim(),
+          ...persistableBucketFields(seed),
+          transactions: [],
+        });
+      }
+      const {appendTransaction} = await import(
+        '../../../controllers/wallet.controller.js'
+      );
+      await appendTransaction(wallet, {
+        type: 'credit',
+        amount,
+        note: commission.description || 'Referral / invite earning',
+        referenceType: 'Referral',
+        referenceId: String(commission._id),
+        walletType: 'withdrawable',
+        createdBy: {
+          m_staff_id: null,
+          m_staff_name: 'System',
+          m_staff_email: null,
+        },
+      });
+    }
+  }
 
   commission.meta = {
     ...(typeof commission.meta?.toObject === 'function'

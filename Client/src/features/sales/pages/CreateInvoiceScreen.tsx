@@ -877,7 +877,7 @@ export default function CreateInvoiceScreen({
   };
 
   const content = (
-    <div className="space-y-4 p-2">
+    <div className="min-w-0 space-y-4 p-1 sm:p-2">
       <CreateInvoiceHeader
         invoiceNo={invoiceNo}
         onBack={handleBack}

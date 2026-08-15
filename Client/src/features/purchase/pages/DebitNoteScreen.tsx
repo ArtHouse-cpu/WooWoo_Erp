@@ -361,9 +361,9 @@ export default function DebitNoteScreen() {
     },
   });
   return (
-    <div className="p-1">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-xl font-semibold ">
+    <div className="min-w-0 p-1">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-semibold">
           Purchase Returns / Debit Notes
         </h1>
         <div className="flex gap-3">
@@ -371,7 +371,7 @@ export default function DebitNoteScreen() {
             <button
               type="button"
               onClick={() => navigate("/create-purchase-return")}
-              className="w-[260px] bg-black text-white py-2 px-1 rounded text-[14px] font-semibold transition text-center cursor-pointer"
+              className="w-full rounded bg-black px-3 py-2 text-center text-[14px] font-semibold text-white transition cursor-pointer sm:w-auto"
             >
               Create Purchase Return/Debit Note
             </button>

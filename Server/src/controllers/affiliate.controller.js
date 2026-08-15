@@ -9,6 +9,44 @@ import WalletWithdrawal from '../models/walletWithdrawal.model.js';
 import Invoice from '../models/invoice.model.js';
 import Subscription from '../models/subscription.model.js';
 import mongoose from 'mongoose';
+import Wallet from '../models/wallet.model.js';
+import {
+  persistableBucketFields,
+  resolveTwoBuckets,
+} from '../utils/walletBuckets.js';
+
+/** After affiliateBalance mutations, keep withdrawable aliases + wallet ledger aligned. */
+const persistWithdrawableFromAffiliate = async (customer) => {
+  if (!customer?._id) return;
+  const wallet = await Wallet.findOne({customerId: customer._id});
+  const current = resolveTwoBuckets(wallet, customer);
+  const fields = persistableBucketFields({
+    withdrawable: Math.max(0, Number(customer.affiliateBalance) || 0),
+    nonWithdrawable: current.nonWithdrawable,
+  });
+  customer.withdrawable = fields.withdrawable;
+  customer.nonWithdrawable = fields.nonWithdrawable;
+  customer.affiliateBalance = fields.affiliateBalance;
+  customer.cashbackBalance = fields.cashbackBalance;
+  customer.walletAmount = fields.walletAmount;
+  customer.closingBalance = fields.walletAmount;
+  await customer.save();
+  if (wallet) {
+    await Wallet.updateOne(
+      {_id: wallet._id},
+      {
+        $set: {
+          balanceSchema: 2,
+          withdrawable: fields.withdrawable,
+          nonWithdrawable: fields.nonWithdrawable,
+          affiliateBalance: fields.affiliateBalance,
+          cashbackBalance: fields.cashbackBalance,
+          walletAmount: fields.total,
+        },
+      },
+    );
+  }
+};
 
 const mergeNested = (target, source) => {
   if (!source || typeof source !== 'object') return target;
@@ -692,11 +730,11 @@ export const createManualPayout = async (req, res) => {
 
     if (!markPending) {
       customer.affiliateBalance -= amount;
-      await customer.save();
+      await persistWithdrawableFromAffiliate(customer);
     } else {
       customer.affiliateReserved = (customer.affiliateReserved || 0) + amount;
       customer.affiliateBalance -= amount;
-      await customer.save();
+      await persistWithdrawableFromAffiliate(customer);
     }
 
     const payout = new PayoutRequest({
@@ -759,7 +797,7 @@ export const updatePayoutStatus = async (req, res) => {
         if (withdrawal.reserved) {
           customer.affiliateBalance += withdrawal.amount;
           customer.affiliateReserved = Math.max(0, (customer.affiliateReserved || 0) - withdrawal.amount);
-          await customer.save();
+          await persistWithdrawableFromAffiliate(customer);
         }
       } else if (status === 'Paid' && previousStatus !== 'paid') {
         withdrawal.paidAt = new Date();
@@ -791,7 +829,7 @@ export const updatePayoutStatus = async (req, res) => {
       if (customer) {
         customer.affiliateBalance += payout.amount;
         customer.affiliateReserved = Math.max(0, (customer.affiliateReserved || 0) - payout.amount);
-        await customer.save();
+        await persistWithdrawableFromAffiliate(customer);
       }
     } else if (status === 'Paid' && previousStatus !== 'Paid') {
       payout.transactionId = transactionId;

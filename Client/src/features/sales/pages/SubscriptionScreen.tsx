@@ -743,20 +743,20 @@ export default function SubscriptionScreen() {
     .reduce((sum, row) => sum + row.amount, 0);
 
   return (
-    <div className="space-y-4 p-1">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold text-gray-900">
+    <div className="min-w-0 space-y-4 p-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">
             Subscriptions
           </h1>
           <span className="rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">
             {filteredData.length}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           <Can permission={PERMISSIONS.SUBSCRIPTION_CREATE}>
             <button
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 cursor-pointer "
+              className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 cursor-pointer sm:w-auto"
               onClick={() => {
                 setModalMode("create");
                 setModalData(null);
@@ -773,7 +773,7 @@ export default function SubscriptionScreen() {
             ]}
           >
             <button
-              className="rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 cursor-pointer "
+              className="w-full rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 cursor-pointer sm:w-auto"
               onClick={() => {
                 setModalMode("bulk");
                 setModalData(null);
@@ -786,10 +786,10 @@ export default function SubscriptionScreen() {
         </div>
       </div>
 
-      <div className="flex items-center gap-6 border-b border-gray-200 pb-2">
+      <div className="hide-scrollbar flex items-center gap-4 overflow-x-auto border-b border-gray-200 pb-2 sm:gap-6">
         <button
           onClick={() => setActiveTab("all")}
-          className={`text-sm font-medium ${activeTab === "all" ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "text-gray-500"}`}
+          className={`shrink-0 text-sm font-medium ${activeTab === "all" ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "text-gray-500"}`}
         >
           All{" "}
           <span className="text-xs text-gray-400">{filteredData.length}</span>
@@ -800,7 +800,7 @@ export default function SubscriptionScreen() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`text-sm font-medium ${activeTab === tab ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "text-gray-500"}`}
+                className={`shrink-0 text-sm font-medium ${activeTab === tab ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "text-gray-500"}`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
@@ -809,7 +809,7 @@ export default function SubscriptionScreen() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3">
-        <div className="relative min-w-[280px] flex-1">
+        <div className="relative min-w-0 w-full flex-1 sm:min-w-[200px]">
           <Search
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"

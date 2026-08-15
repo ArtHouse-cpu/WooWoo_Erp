@@ -348,10 +348,22 @@ export type CreateQuotationPayload = {
     qty: number;
     unitPrice: number;
     discount: number;
+    cashback?: number;
+    category?: string;
+    isCsp?: boolean;
+    productDiscountType?: string;
+    productDiscountValue?: number;
+    productDiscountAmount?: number;
+    membershipDiscountAmount?: number;
   }[];
   subTotal: number;
   discountTotal: number;
   grandTotal: number;
+  membershipType?: string;
+  membershipPlanId?: string | null;
+  membershipDiscount?: number;
+  cashbackTotal?: number;
+  extraCharges?: Array<{ label: string; amount: number }>;
   status?: "draft" | "sent" | "accepted" | "rejected";
   coupon?: {
     code: string;
@@ -910,8 +922,8 @@ export type WalletTransactionPayload = {
   type?: "credit" | "debit" | string;
   amount: number;
   note?: string;
-  /** Which bucket to credit/debit: general | cashback | affiliate */
-  walletType?: "general" | "cashback" | "affiliate" | string;
+  /** Which wallet type to credit: withdrawable | nonWithdrawable */
+  walletType?: "withdrawable" | "nonWithdrawable" | "general" | "cashback" | "affiliate" | string;
   minimumBalance?: number;
   referenceType?: string;
   referenceId?: string;

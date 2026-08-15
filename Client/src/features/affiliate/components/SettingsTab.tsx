@@ -36,7 +36,7 @@ export default function SettingsTab({ settings, handleSave }: Props) {
         <p className="text-sm text-gray-500">Manage program controls and notifications.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="border rounded-xl bg-white p-6 space-y-5">
           <h3 className="font-semibold">Program Control</h3>
           <div className="flex justify-between items-center">
@@ -157,8 +157,8 @@ export default function SettingsTab({ settings, handleSave }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 border rounded-xl bg-white p-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="border rounded-xl bg-white p-6 space-y-5 lg:col-span-2">
           <h3 className="font-semibold mb-2">Other Settings</h3>
           <div className="space-y-4">
             <div className="flex justify-between items-center">

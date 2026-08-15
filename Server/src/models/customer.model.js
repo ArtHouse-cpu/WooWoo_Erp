@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import {resolveTwoBuckets} from "../utils/walletBuckets.js";
 
 const customerSchema = new mongoose.Schema(
   {
@@ -226,7 +227,7 @@ const customerSchema = new mongoose.Schema(
     },
 
     // =========================
-    // WALLET (dual balances)
+    // WALLET (two types only)
     // =========================
     walletAmount: {
       type: Number,
@@ -238,13 +239,23 @@ const customerSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
-    // Withdrawable affiliate / referral earnings
+    // Withdrawable: affiliate / referral / CSP eligible
+    withdrawable: {
+      type: Number,
+      min: 0,
+    },
+    // Non-withdrawable: cashback + other restricted credits
+    nonWithdrawable: {
+      type: Number,
+      min: 0,
+    },
+    // Alias of withdrawable
     affiliateBalance: {
       type: Number,
       default: 0,
       min: 0,
     },
-    // Non-withdrawable cashback / promotional credits
+    // Alias of nonWithdrawable
     cashbackBalance: {
       type: Number,
       default: 0,
@@ -403,7 +414,14 @@ customerSchema.methods.toSafeObject = function toSafeObject() {
   const obj = this.toObject({ virtuals: true });
   delete obj.password;
   delete obj.__v;
-  obj.walletBalance = obj.walletAmount ?? 0;
+  const buckets = resolveTwoBuckets(null, obj);
+  obj.withdrawable = buckets.withdrawable;
+  obj.nonWithdrawable = buckets.nonWithdrawable;
+  obj.affiliateBalance = buckets.withdrawable;
+  obj.cashbackBalance = buckets.nonWithdrawable;
+  obj.walletAmount = buckets.total;
+  obj.closingBalance = buckets.total;
+  obj.walletBalance = buckets.total;
   return obj;
 };
 

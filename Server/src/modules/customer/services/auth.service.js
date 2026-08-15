@@ -106,7 +106,7 @@ const applyWelcomeBonus = async customer => {
         note: 'Signup welcome bonus',
         referenceType: 'WelcomeBonus',
         referenceId: ref,
-        walletType: 'general',
+        walletType: 'nonWithdrawable',
         createdBy: {
           m_staff_id: null,
           m_staff_name: 'System',

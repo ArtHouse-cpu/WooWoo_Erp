@@ -481,11 +481,11 @@ export default function VendorScreen() {
               : `${vendors.length.toLocaleString("en-IN")} vendors`}
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:gap-3">
           <Can permission={PERMISSIONS.VENDOR_CREATE}>
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 sm:w-auto"
               onClick={() => setOpenImportVendorModal(true)}
             >
               <FileSpreadsheet size={16} />
@@ -493,7 +493,7 @@ export default function VendorScreen() {
             </button>
             <button
               type="button"
-              className="rounded-lg bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-900"
+              className="w-full rounded-lg bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-900 sm:w-auto"
               onClick={() => {
                 setEditingVendor(null);
                 setOpenCreateVendorModal(true);

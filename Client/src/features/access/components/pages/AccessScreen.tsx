@@ -706,7 +706,7 @@ export default function AccessScreen() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b border-gray-200">
+      <div className="hide-scrollbar flex flex-nowrap gap-2 overflow-x-auto border-b border-gray-200">
         {(
           [
             { key: "staff", label: "Staff Control", icon: Users },
@@ -722,7 +722,7 @@ export default function AccessScreen() {
               key={item.key}
               type="button"
               onClick={() => setTab(item.key)}
-              className={`inline-flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium ${
+              className={`inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium ${
                 active
                   ? "border-blue-600 text-blue-700"
                   : "border-transparent text-gray-500 hover:text-gray-800"
@@ -814,7 +814,7 @@ export default function AccessScreen() {
                 if (e.key === "Enter") void onSearchStaff();
               }}
               placeholder="Search staff by name, email, phone..."
-              className="min-w-[240px] flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="min-w-0 w-full flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm sm:min-w-[240px]"
             />
             <button
               type="button"
@@ -951,7 +951,7 @@ export default function AccessScreen() {
                   if (e.key === "Enter") void onSearchStaff();
                 }}
                 placeholder="Search staff..."
-                className="min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="min-w-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm sm:min-w-[200px]"
               />
               <button
                 type="button"

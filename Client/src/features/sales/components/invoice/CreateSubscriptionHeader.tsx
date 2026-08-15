@@ -20,27 +20,27 @@ export default function CreateSubscriptionHeader({
     mode = "create",
 }: Props) {
     return (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm sm:px-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
                 <button
                     onClick={onBack}
-                    className="rounded-md border border-gray-200 p-2 text-gray-600 hover:bg-gray-50"
+                    className="shrink-0 rounded-md border border-gray-200 p-2 text-gray-600 hover:bg-gray-50"
                 >
                     <ArrowLeft size={16} />
                 </button>
-                <div>
-                    <h1 className="text-lg font-semibold text-gray-900">
+                <div className="min-w-0">
+                    <h1 className="text-base font-semibold text-gray-900 sm:text-lg">
                         {mode === "create" ? "Create Subscription" : mode === "edit" ? "Edit Subscription" : "View Subscription"}
                     </h1>
                 </div>
-                <div className="ml-3 flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
+                <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
                     {mode === "create" ? "SUB- " : ""}
                     <span className="font-semibold">{subScripNo}</span>
                 </div>
             </div>
 
             {mode !== "view" && (
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                     {mode === "create" && onSaveDraft && (
                         <button
                             onClick={onSaveDraft}

@@ -762,10 +762,10 @@ export default function PurchaseOrderScreen() {
     .reduce((s, r) => s + r.amount, 0);
 
   return (
-    <div className="space-y-4 p-1">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold text-gray-900">
+    <div className="min-w-0 space-y-4 p-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">
             Purchase Order List
           </h1>
           <span className="rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">
@@ -775,7 +775,7 @@ export default function PurchaseOrderScreen() {
         <Can permission={PERMISSIONS.PURCHASE_ORDER_CREATE}>
           <button
             type="button"
-            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+            className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white sm:w-auto"
             onClick={() => navigate("/create-purchase-order")}
           >
             + Create Order
@@ -783,11 +783,11 @@ export default function PurchaseOrderScreen() {
         </Can>
       </div>
 
-      <div className="flex items-center gap-6 border-b border-gray-200 pb-2">
+      <div className="hide-scrollbar flex items-center gap-4 overflow-x-auto border-b border-gray-200 pb-2 sm:gap-6">
         <button
           type="button"
           onClick={() => setActiveTab("All")}
-          className={`text-sm font-medium ${activeTab === "All" ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "text-gray-500"}`}
+          className={`shrink-0 text-sm font-medium ${activeTab === "All" ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "text-gray-500"}`}
         >
           All{" "}
           <span className="text-xs text-gray-400">{filteredData.length}</span>
@@ -797,7 +797,7 @@ export default function PurchaseOrderScreen() {
             type="button"
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`text-sm font-medium ${activeTab === tab ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "text-gray-500"}`}
+            className={`shrink-0 text-sm font-medium ${activeTab === tab ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "text-gray-500"}`}
           >
             {tab}
           </button>

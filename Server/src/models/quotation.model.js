@@ -23,6 +23,40 @@ const quotationItemSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    cashback: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    category: {
+      type: String,
+      trim: true,
+      default: 'General',
+    },
+    isCsp: {
+      type: Boolean,
+      default: false,
+    },
+    productDiscountType: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    productDiscountValue: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    productDiscountAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    membershipDiscountAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     lineTotal: {
       type: Number,
       required: true,
@@ -101,6 +135,32 @@ const quotationSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+    membershipType: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    membershipPlanId: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    membershipDiscount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    cashbackTotal: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    extraCharges: [
+      {
+        label: { type: String, trim: true },
+        amount: { type: Number, default: 0 },
+      },
+    ],
     coupon: {
       code: { type: String, trim: true, uppercase: true, default: null },
       title: { type: String, trim: true, default: null },

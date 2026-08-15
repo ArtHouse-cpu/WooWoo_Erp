@@ -382,7 +382,7 @@ const createCustomer = async (req, res) => {
 };
 
 const CUSTOMER_LIST_PROJECTION =
-  'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId priority walletAmount closingBalance cashbackBalance affiliateBalance referralCode referredBy status createdAt updatedAt createdBy';
+  'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId priority walletAmount closingBalance cashbackBalance affiliateBalance withdrawable nonWithdrawable referralCode referredBy status createdAt updatedAt createdBy';
 
 const getCustomerById = async (req, res) => {
   try {

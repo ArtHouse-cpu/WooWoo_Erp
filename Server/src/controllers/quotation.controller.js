@@ -56,6 +56,11 @@ const createQuotation = async (req, res) => {
       status,
       createdBy,
       coupon,
+      membershipType,
+      membershipPlanId,
+      membershipDiscount,
+      cashbackTotal,
+      extraCharges,
     } = req.body;
 
     if (!customerName || !quotationDate || !dueDate || !salesPersonName || !customerPhone) {
@@ -92,12 +97,20 @@ const createQuotation = async (req, res) => {
       const qty = Number(item.qty);
       const unitPrice = Number(item.unitPrice);
       const discount = Number(item.discount ?? 0);
+      const cashback = Number(item.cashback ?? 0);
       const lineTotal = qty * unitPrice - discount;
       return {
         productName: String(item.productName ?? '').trim(),
         qty,
         unitPrice,
         discount,
+        cashback: Number.isFinite(cashback) && cashback > 0 ? cashback : 0,
+        category: String(item.category ?? 'General').trim() || 'General',
+        isCsp: Boolean(item.isCsp),
+        productDiscountType: String(item.productDiscountType ?? '').trim(),
+        productDiscountValue: Number(item.productDiscountValue ?? 0) || 0,
+        productDiscountAmount: Number(item.productDiscountAmount ?? 0) || 0,
+        membershipDiscountAmount: Number(item.membershipDiscountAmount ?? 0) || 0,
         lineTotal,
       };
     });
@@ -139,6 +152,14 @@ const createQuotation = async (req, res) => {
 
     const computedDiscountTotal = itemDiscountTotal + couponDiscount;
     const computedGrandTotal = Math.max(0, computedSubTotal - computedDiscountTotal);
+    const computedCashbackTotal = normalizedItems.reduce(
+      (sum, item) => sum + Number(item.cashback ?? 0),
+      0,
+    );
+    const computedMembershipDiscount = normalizedItems.reduce(
+      (sum, item) => sum + Number(item.membershipDiscountAmount ?? 0),
+      0,
+    );
 
     const nextNumber = await getNextQuotationNumber();
     const quotationPrefix = 'QUOTVWAH';
@@ -159,6 +180,16 @@ const createQuotation = async (req, res) => {
       items: normalizedItems,
       subTotal: Number(subTotal ?? computedSubTotal),
       discountTotal: Number(discountTotal ?? computedDiscountTotal),
+      membershipType: String(membershipType ?? '').trim(),
+      membershipPlanId: String(membershipPlanId ?? '').trim(),
+      membershipDiscount: Number(membershipDiscount ?? computedMembershipDiscount) || 0,
+      cashbackTotal: Number(cashbackTotal ?? computedCashbackTotal) || 0,
+      extraCharges: Array.isArray(extraCharges)
+        ? extraCharges.map((c) => ({
+            label: String(c?.label ?? 'Extra Charge').trim() || 'Extra Charge',
+            amount: Number(c?.amount ?? 0) || 0,
+          }))
+        : [],
       coupon: appliedCoupon
         ? {
             code: appliedCoupon.code,
@@ -258,6 +289,11 @@ const updateQuotation = async (req, res) => {
       grandTotal,
       status,
       coupon,
+      membershipType,
+      membershipPlanId,
+      membershipDiscount,
+      cashbackTotal,
+      extraCharges,
     } = req.body;
 
     const existingQuotation = await Quotation.findById(id);
@@ -274,12 +310,20 @@ const updateQuotation = async (req, res) => {
         const qty = Number(item.qty);
         const unitPrice = Number(item.unitPrice);
         const discount = Number(item.discount ?? 0);
+        const cashback = Number(item.cashback ?? 0);
         const lineTotal = qty * unitPrice - discount;
         return {
           productName: String(item.productName ?? '').trim(),
           qty,
           unitPrice,
           discount,
+          cashback: Number.isFinite(cashback) && cashback > 0 ? cashback : 0,
+          category: String(item.category ?? 'General').trim() || 'General',
+          isCsp: Boolean(item.isCsp),
+          productDiscountType: String(item.productDiscountType ?? '').trim(),
+          productDiscountValue: Number(item.productDiscountValue ?? 0) || 0,
+          productDiscountAmount: Number(item.productDiscountAmount ?? 0) || 0,
+          membershipDiscountAmount: Number(item.membershipDiscountAmount ?? 0) || 0,
           lineTotal,
         };
       });
@@ -297,6 +341,18 @@ const updateQuotation = async (req, res) => {
     if (discountTotal !== undefined) updateData.discountTotal = Number(discountTotal);
     if (grandTotal !== undefined) updateData.grandTotal = Number(grandTotal);
     if (status !== undefined) updateData.status = status;
+    if (membershipType !== undefined) updateData.membershipType = String(membershipType).trim();
+    if (membershipPlanId !== undefined) updateData.membershipPlanId = String(membershipPlanId ?? '').trim();
+    if (membershipDiscount !== undefined) updateData.membershipDiscount = Number(membershipDiscount) || 0;
+    if (cashbackTotal !== undefined) updateData.cashbackTotal = Number(cashbackTotal) || 0;
+    if (extraCharges !== undefined) {
+      updateData.extraCharges = Array.isArray(extraCharges)
+        ? extraCharges.map((c) => ({
+            label: String(c?.label ?? 'Extra Charge').trim() || 'Extra Charge',
+            amount: Number(c?.amount ?? 0) || 0,
+          }))
+        : [];
+    }
 
     let nextCouponPatch;
     if (coupon !== undefined) {

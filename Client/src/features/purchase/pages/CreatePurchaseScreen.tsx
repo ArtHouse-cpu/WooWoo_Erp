@@ -465,7 +465,7 @@ export default function CreatePurchaseScreen({
   };
 
   const content = (
-    <div className="space-y-4 p-2">
+    <div className="min-w-0 space-y-4 p-1 sm:p-2">
       <CreatePurchaseHeader
         purchaseNumber={purchaseNumber}
         onBack={handleBack}
