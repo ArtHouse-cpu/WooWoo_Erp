@@ -16,10 +16,16 @@ import {
 import { useNavigate } from "react-router-dom";
 import { axiosInstance } from "@/services/axiosInstance";
 import Swal from "sweetalert2";
-import { handleCancelInvoice, handleDeleteInvoice } from "@/services/apiClient";
+import { handleDeleteInvoice, handleGetInvoice } from "@/services/apiClient";
 import CreatePosScreen from "./CreatePosScreen";
 import CreateInvoiceScreen from "./CreateInvoiceScreen";
 import DuePaymentModal from "../components/invoice/Modal/DuePaymentModal";
+import SalesReturnFlowModal from "../components/invoice/Modal/SalesReturnFlowModal";
+import {
+  currentInvoiceTotal,
+  originalInvoiceTotal,
+  returnedInvoiceTotal,
+} from "../utils/salesReturn";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
   buildWoowooInvoiceWhatsAppMessage,
@@ -32,6 +38,8 @@ import { PERMISSIONS } from "@/constants/permissions";
 type PosRow = {
   id: number;
   amount: number;
+  originalAmount: number;
+  returnedAmount: number;
   mode: "Cash" | "UPI" | "Card" | "Multi" | "Wallet" | "Draft";
   status: "Paid" | "Pending" | "Cancelled" | "Draft";
   bill: string;
@@ -139,6 +147,9 @@ export default function PosScreen() {
   const [posModalOpen, setPosModalOpen] = useState(false);
   const [dueModalOpen, setDueModalOpen] = useState(false);
   const [selectedDueRow, setSelectedDueRow] = useState<PosRow | null>(null);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnIntent, setReturnIntent] = useState<"return" | "cancel">("return");
+  const [returnInvoice, setReturnInvoice] = useState<any>(null);
   const [viewInvoiceOpen, setViewInvoiceOpen] = useState(false);
   const [viewInvoiceData, setViewInvoiceData] = useState<any>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>("year");
@@ -155,7 +166,12 @@ export default function PosScreen() {
     const { _id, raw, status } = selectedActionRow;
 
     if (action === "view") {
-      setViewInvoiceData(raw);
+      try {
+        const res = await handleGetInvoice(_id);
+        setViewInvoiceData(res?.invoice ?? raw);
+      } catch {
+        setViewInvoiceData(raw);
+      }
       setViewInvoiceOpen(true);
       setSelectedActionRow(null);
     } else if (action === "edit") {
@@ -177,22 +193,9 @@ export default function PosScreen() {
         );
         return;
       }
-      const confirm = await Swal.fire({
-        title: "Cancel Invoice?",
-        text: "Are you sure you want to cancel this invoice?",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonText: "Yes, Cancel",
-      });
-      if (confirm.isConfirmed) {
-        try {
-          await handleCancelInvoice(_id);
-          Swal.fire("Cancelled", "Invoice cancelled successfully.", "success");
-          fetchInvoices();
-        } catch {
-          Swal.fire("Error", "Could not cancel invoice.", "error");
-        }
-      }
+      setReturnIntent("cancel");
+      setReturnInvoice(raw);
+      setReturnModalOpen(true);
     } else if (action === "delete") {
       const confirm = await Swal.fire({
         title: "Delete Invoice?",
@@ -211,17 +214,17 @@ export default function PosScreen() {
         }
       }
     } else if (action === "Credit Note") {
-      navigate("/create-sales-return", {
-        state: {
-          invoice: {
-            ...raw,
-            notes: raw?.notes
-              ? `${raw.notes}\nReturn against invoice ${raw?.invoiceCode ?? ""}`.trim()
-              : `Return against invoice ${raw?.invoiceCode ?? ""}`.trim(),
-          },
-          mode: "create",
-        },
-      });
+      if (status === "Cancelled") {
+        Swal.fire(
+          "Cannot return",
+          "Cancelled invoices cannot be returned.",
+          "info",
+        );
+        return;
+      }
+      setReturnIntent("return");
+      setReturnInvoice(raw);
+      setReturnModalOpen(true);
     }
     setSelectedActionRow(null);
   };
@@ -276,9 +279,13 @@ export default function PosScreen() {
               const dueAmount = Number(
                 invoice?.pendingAmount ?? invoice?.paymentBreakdown?.dueAmount ?? 0,
               );
+              const originalAmount = originalInvoiceTotal(invoice);
+              const returnedAmount = returnedInvoiceTotal(invoice);
               return {
               id: index + 1,
-            amount: Math.round(Number(invoice?.grandTotal ?? 0)),
+            amount: currentInvoiceTotal(invoice),
+            originalAmount,
+            returnedAmount,
               mode: toMode(invoice?.mode),
               status: toStatus(invoice?.status, dueAmount, invoice?.paymentStatus),
               bill: String(
@@ -340,11 +347,21 @@ export default function PosScreen() {
         accessorKey: "amount",
         header: "Amount",
         Cell: ({ row }: { row: { original: PosRow } }) => (
-          <span className="font-semibold text-gray-800">
-            {`₹ ${row.original.amount.toLocaleString("en-IN", {
-              minimumFractionDigits: 2,
-            })}`}
-          </span>
+          <div className="flex flex-col">
+            <span className="font-semibold text-gray-800">
+              {`₹ ${row.original.amount.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+              })}`}
+            </span>
+            {row.original.returnedAmount > 0 ? (
+              <span className="text-[10px] font-semibold text-rose-600">
+                Returned −₹
+                {row.original.returnedAmount.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                })}
+              </span>
+            ) : null}
+          </div>
         ),
         size: 120,
       },
@@ -504,7 +521,9 @@ export default function PosScreen() {
               ? "Sales Return / Credit Note"
               : "Invoice";
 
-            const totalVal = Number(raw.grandTotal ?? invoice.amount ?? 0);
+            const totalVal = Number(
+              currentInvoiceTotal(raw) || invoice.amount || 0,
+            );
             const totalFormatted = `₹ ${totalVal.toLocaleString("en-IN", {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
@@ -717,6 +736,10 @@ export default function PosScreen() {
   const pendingAmount = filteredData
     .filter((row) => row.status === "Pending")
     .reduce((sum, row) => sum + row.amount, 0);
+  const returnedAmount = filteredData.reduce(
+    (sum, row) => sum + Number(row.returnedAmount || 0),
+    0,
+  );
 
   return (
     <div className="min-w-0 space-y-4 p-1">
@@ -846,6 +869,14 @@ export default function PosScreen() {
               minimumFractionDigits: 2,
             })}
           </span>
+          {returnedAmount > 0 ? (
+            <span className="rounded bg-rose-100 px-2 py-1 text-rose-700">
+              Returned −₹{" "}
+              {returnedAmount.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+              })}
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -913,7 +944,7 @@ export default function PosScreen() {
                       Cancel Invoice
                     </div>
                     <div className="text-xs text-gray-500">
-                      Mark status as cancelled
+                      Return remaining items and refund
                     </div>
                   </div>
                 </button>
@@ -921,7 +952,12 @@ export default function PosScreen() {
               <Can permission={PERMISSIONS.CREDIT_NOTE_CREATE}>
                 <button
                   onClick={() => handleAction("Credit Note")}
-                  className="flex w-full items-center gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-left transition-colors hover:bg-green-100"
+                  disabled={selectedActionRow.status === "Cancelled"}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-green-100 bg-green-50 p-3 text-left transition-colors ${
+                    selectedActionRow.status === "Cancelled"
+                      ? "cursor-not-allowed opacity-50"
+                      : "hover:bg-green-100"
+                  }`}
                 >
                   <div className="rounded-full bg-green-200 p-2 text-green-700">
                     <Trash2 size={18} />
@@ -931,7 +967,7 @@ export default function PosScreen() {
                       Sales return
                     </div>
                     <div className="text-xs text-green-600/70">
-                      Convert to Sale return
+                      Partial or full item return + refund
                     </div>
                   </div>
                 </button>
@@ -982,6 +1018,16 @@ export default function PosScreen() {
           setSelectedDueRow(null);
         }}
         invoice={selectedDueRow}
+        onSuccess={fetchInvoices}
+      />
+      <SalesReturnFlowModal
+        open={returnModalOpen}
+        invoice={returnInvoice}
+        intent={returnIntent}
+        onClose={() => {
+          setReturnModalOpen(false);
+          setReturnInvoice(null);
+        }}
         onSuccess={fetchInvoices}
       />
     </div>

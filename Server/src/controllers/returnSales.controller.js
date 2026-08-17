@@ -1,10 +1,16 @@
 import mongoose from 'mongoose';
 import Counter from '../models/counter.model.js';
 import ReturnSale from '../models/returnSale.model.js';
+import Invoice from '../models/invoice.model.js';
+import Customer from '../models/customer.model.js';
+import Wallet from '../models/wallet.model.js';
+import {appendTransaction} from './wallet.controller.js';
 import {
   validateReturnSaleCreateBody,
   validateReturnSaleUpdateBody,
 } from '../schemas/returnSale.schema.js';
+
+const round2 = n => Math.round((Number(n) || 0) * 100) / 100;
 
 const getNextReturnNumber = async () => {
   const counter = await Counter.findOneAndUpdate(
@@ -16,6 +22,206 @@ const getNextReturnNumber = async () => {
 };
 
 const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Original amount the customer paid for the line. Never subtract discount from lineTotal. */
+const originalLineNetPaid = item => {
+  const qty = Number(item?.qty) || 0;
+  const unitPrice = Number(item?.unitPrice) || 0;
+  const discount = Number(item?.discount) || 0;
+  const stored = Number(item?.lineTotal);
+  if (Number.isFinite(stored) && stored >= 0) return stored;
+  return Math.max(0, qty * unitPrice - discount);
+};
+
+const findCustomerForReturn = async ({customerId, customerPhone, customerName}) => {
+  const id = String(customerId ?? '').trim();
+  if (id && mongoose.Types.ObjectId.isValid(id)) {
+    const byId = await Customer.findById(id);
+    if (byId) return byId;
+  }
+  const phone = String(customerPhone ?? '').trim();
+  const digits = phone.replace(/\D/g, '');
+  if (digits) {
+    const byPhone = await Customer.findOne({
+      $or: [
+        {mobile: phone},
+        {mobile: digits},
+        {mobile: `+91${digits}`},
+        {mobile: `91${digits}`},
+      ],
+    });
+    if (byPhone) return byPhone;
+  }
+  const name = String(customerName ?? '').trim();
+  if (name) return Customer.findOne({name});
+  return null;
+};
+
+const creditWalletForReturn = async ({customer, amount, returnCode, invoiceCode, createdBy}) => {
+  const numericAmount = round2(amount);
+  if (!customer?._id || !(numericAmount > 0)) return null;
+
+  let wallet = await Wallet.findOne({customerId: customer._id});
+  if (!wallet) {
+    wallet = await Wallet.create({
+      customerId: customer._id,
+      customerName: String(customer.name ?? '').trim(),
+      customerPhone: String(customer.mobile ?? '').trim(),
+      walletAmount: 0,
+      transactions: [],
+    });
+  }
+
+  return appendTransaction(wallet, {
+    type: 'credit',
+    amount: numericAmount,
+    walletType: 'nonWithdrawable',
+    note: `Sales return ${returnCode} against invoice ${invoiceCode}`,
+    referenceType: 'sales_return',
+    referenceId: returnCode,
+    createdBy,
+  });
+};
+
+const applyInvoiceReturnQuantities = async ({
+  invoice,
+  returnItems,
+  refundBreakdown,
+  refundMode,
+  intent,
+}) => {
+  const items = Array.isArray(invoice.items) ? invoice.items : [];
+  const usedIndexes = new Set();
+  const normalizedReturnItems = [];
+
+  for (const returnItem of returnItems) {
+    let idx = Number.isInteger(returnItem.lineIndex) ? returnItem.lineIndex : -1;
+    if (idx < 0 || idx >= items.length || usedIndexes.has(idx)) {
+      idx = items.findIndex(
+        (invItem, i) =>
+          !usedIndexes.has(i) &&
+          String(invItem.productName || '').trim() === String(returnItem.productName || '').trim(),
+      );
+    }
+    if (idx < 0) {
+      const error = new Error(`Invoice does not contain item "${returnItem.productName}".`);
+      error.status = 400;
+      throw error;
+    }
+    usedIndexes.add(idx);
+
+    const source = items[idx];
+    const purchasedQty = Number(source.qty) || 0;
+    const alreadyReturned = Math.max(0, Number(source.returnedQty) || 0);
+    const remaining = Math.max(0, purchasedQty - alreadyReturned);
+    const returnQty = Number(returnItem.qty) || 0;
+    if (returnQty <= 0) {
+      const error = new Error(`Return quantity must be at least 1 for "${returnItem.productName}".`);
+      error.status = 400;
+      throw error;
+    }
+    if (returnQty > remaining) {
+      const error = new Error(
+        `Cannot return ${returnQty} of "${returnItem.productName}". Only ${remaining} remaining.`,
+      );
+      error.status = 400;
+      throw error;
+    }
+
+    const isGift = Boolean(returnItem.isGift ?? source.isGift);
+    const originalNet = originalLineNetPaid(source);
+    const unitNet = purchasedQty > 0 ? originalNet / purchasedQty : 0;
+    const refundAmount = isGift ? 0 : round2(unitNet * returnQty);
+    const originalDiscount = Number(source.discount) || 0;
+    const discountShare =
+      purchasedQty > 0 ? round2((originalDiscount / purchasedQty) * returnQty) : 0;
+
+    source.returnedQty = alreadyReturned + returnQty;
+    source.isGift = isGift;
+    items[idx] = source;
+
+    normalizedReturnItems.push({
+      ...returnItem,
+      productName: String(source.productName || returnItem.productName || '').trim(),
+      qty: returnQty,
+      unitPrice: Number(source.unitPrice) || 0,
+      discount: discountShare,
+      lineIndex: idx,
+      originalQty: purchasedQty,
+      isGift,
+      refundAmount,
+      lineTotal: refundAmount,
+    });
+  }
+
+  const itemsNet = round2(
+    normalizedReturnItems.reduce((sum, item) => sum + Number(item.refundAmount || 0), 0),
+  );
+  const originalDiscountTotal = round2(
+    normalizedReturnItems.reduce((sum, item) => sum + Number(item.discount || 0), 0),
+  );
+  /** Refund is original net paid × qty. Do not re-apply product/membership/coupon discounts. */
+  const computedReturnValue = itemsNet;
+
+  const paidAmount = round2(Number(invoice.paymentBreakdown?.paidAmount ?? 0) || 0);
+  const alreadyRefunded = round2(Number(invoice.returnedAmount ?? 0) || 0);
+  const pending = round2(Number(invoice.pendingAmount ?? invoice.paymentBreakdown?.dueAmount ?? 0) || 0);
+  const dueReduce = round2(Math.min(pending, computedReturnValue));
+  const maxCashRefund = round2(Math.max(0, paidAmount - alreadyRefunded));
+  const refundable = round2(Math.min(maxCashRefund, Math.max(0, computedReturnValue - dueReduce)));
+
+  const cash = round2(refundBreakdown?.cash);
+  const upi = round2(refundBreakdown?.upi);
+  const card = round2(refundBreakdown?.card);
+  const wallet = round2(refundBreakdown?.wallet);
+  const refundedNow = round2(cash + upi + card + wallet);
+  const processRefund = Boolean(String(refundMode || '').trim()) || refundedNow > 0;
+
+  if (processRefund && refundedNow > refundable + 0.05) {
+    const error = new Error(
+      `Refund ₹${refundedNow} exceeds refundable amount ₹${refundable}.`,
+    );
+    error.status = 400;
+    throw error;
+  }
+  if (processRefund && refundable > 0 && Math.abs(refundedNow - refundable) > 0.05) {
+    const error = new Error(
+      `Refund must equal ₹${refundable} (wallet + cash + UPI + card).`,
+    );
+    error.status = 400;
+    throw error;
+  }
+
+  const nextPending = round2(Math.max(0, pending - dueReduce));
+  const nextReturnedAmount = round2(alreadyRefunded + computedReturnValue);
+  const allReturned = items.every(
+    item => Number(item.returnedQty || 0) >= Number(item.qty || 0),
+  );
+  const shouldCancel = intent === 'cancel' && allReturned;
+
+  invoice.items = items;
+  invoice.returnedAmount = nextReturnedAmount;
+  invoice.pendingAmount = nextPending;
+  if (invoice.paymentBreakdown) {
+    invoice.paymentBreakdown.dueAmount = nextPending;
+  }
+  if (shouldCancel) {
+    invoice.status = 'cancelled';
+  }
+  invoice.markModified('items');
+  invoice.markModified('paymentBreakdown');
+  await invoice.save();
+
+  return {
+    normalizedReturnItems,
+    computedReturnValue,
+    originalDiscountTotal,
+    refundable,
+    dueReduce,
+    shouldCancel,
+    nextPending,
+  };
+};
 
 export const createReturnSale = async (req, res) => {
   try {
@@ -41,6 +247,8 @@ export const createReturnSale = async (req, res) => {
     const createdBy = parsed.data.createdBy ?? staffFromReq;
 
     let originalInvoiceId = null;
+    let originalInvoiceCode = parsed.data.originalInvoiceCode || '';
+    let processedReturn = null;
     if (parsed.data.originalInvoiceId) {
       if (!mongoose.Types.ObjectId.isValid(parsed.data.originalInvoiceId)) {
         return res.status(400).json({
@@ -50,6 +258,69 @@ export const createReturnSale = async (req, res) => {
       }
       originalInvoiceId = new mongoose.Types.ObjectId(parsed.data.originalInvoiceId);
     }
+
+    let items = parsed.data.items;
+    if (originalInvoiceId) {
+      const invoice = await Invoice.findById(originalInvoiceId);
+      if (!invoice) {
+        return res.status(404).json({
+          success: false,
+          message: 'Original invoice not found.',
+        });
+      }
+      if (invoice.status === 'cancelled') {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot return items on a cancelled invoice.',
+        });
+      }
+      originalInvoiceCode = originalInvoiceCode || invoice.invoiceCode || '';
+      try {
+        processedReturn = await applyInvoiceReturnQuantities({
+          invoice,
+          returnItems: parsed.data.items,
+          refundBreakdown: parsed.data.refundBreakdown,
+          refundMode: parsed.data.refundMode,
+          intent: parsed.data.intent,
+        });
+        items = processedReturn.normalizedReturnItems;
+      } catch (returnError) {
+        const status = returnError.status || 400;
+        return res.status(status).json({
+          success: false,
+          message: returnError.message || 'Failed to apply return quantities.',
+        });
+      }
+
+      const refundWallet = round2(parsed.data.refundBreakdown?.wallet);
+      if (refundWallet > 0) {
+        const customer = await findCustomerForReturn({
+          customerId: invoice.customerId,
+          customerPhone: invoice.customerPhone,
+          customerName: invoice.customerName,
+        });
+        if (!customer) {
+          return res.status(400).json({
+            success: false,
+            message: 'Customer not found. Cannot add refund to wallet.',
+          });
+        }
+        await creditWalletForReturn({
+          customer,
+          amount: refundWallet,
+          returnCode,
+          invoiceCode: originalInvoiceCode,
+          createdBy,
+        });
+      }
+    }
+
+    const refundPaid = round2(
+      Number(parsed.data.refundBreakdown?.cash || 0) +
+        Number(parsed.data.refundBreakdown?.upi || 0) +
+        Number(parsed.data.refundBreakdown?.card || 0) +
+        Number(parsed.data.refundBreakdown?.wallet || 0),
+    );
 
     const doc = await ReturnSale.create({
       returnPrefix,
@@ -69,11 +340,19 @@ export const createReturnSale = async (req, res) => {
       },
       notes: parsed.data.notes,
       status: parsed.data.status,
-      items: parsed.data.items,
-      subTotal: parsed.data.subTotal,
-      discountTotal: parsed.data.discountTotal,
-      grandTotal: parsed.data.grandTotal,
+      items,
+      subTotal: processedReturn?.computedReturnValue ?? parsed.data.subTotal,
+      discountTotal: processedReturn?.originalDiscountTotal ?? parsed.data.discountTotal,
+      grandTotal: processedReturn?.computedReturnValue ?? parsed.data.grandTotal,
       originalInvoiceId,
+      originalInvoiceCode,
+      intent: parsed.data.intent || 'return',
+      refundMode: parsed.data.refundMode || '',
+      refundBreakdown: {
+        ...parsed.data.refundBreakdown,
+        paidAmount: refundPaid,
+      },
+      refundedAt: refundPaid > 0 ? new Date() : null,
       createdBy,
     });
 
@@ -103,7 +382,16 @@ export const getReturnSales = async (req, res) => {
         {returnCode: regex},
         {customerName: regex},
         {customerPhone: regex},
+        {originalInvoiceCode: regex},
       ];
+    }
+
+    const originalInvoiceId = String(req.query.originalInvoiceId ?? '').trim();
+    if (originalInvoiceId) {
+      if (!mongoose.Types.ObjectId.isValid(originalInvoiceId)) {
+        return res.status(400).json({success: false, message: 'Invalid originalInvoiceId.'});
+      }
+      query.originalInvoiceId = originalInvoiceId;
     }
 
     const returnSales = await ReturnSale.find(query)

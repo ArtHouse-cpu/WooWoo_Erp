@@ -408,7 +408,11 @@ export default function HomeScreen() {
                 invoice?.invoiceCode ??
                   `INV-${invoice?.invoiceNumber ?? index + 1}`,
               ),
-              amount: Number(invoice?.grandTotal ?? 0),
+              amount: Math.max(
+                0,
+                Number(invoice?.grandTotal ?? 0) -
+                  Number(invoice?.returnedAmount ?? 0),
+              ),
               status: toStatus(invoice?.status ?? invoice?.paymentStatus, due),
               paymentType: formatPaymentType(invoice?.mode),
               category: billCategoryFromItems(invoice?.items),

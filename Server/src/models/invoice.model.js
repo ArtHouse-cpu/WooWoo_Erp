@@ -63,6 +63,17 @@ const invoiceItemSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /** Complimentary / gift line — refund value is 0 */
+    isGift: {
+      type: Boolean,
+      default: false,
+    },
+    /** Accumulated qty already returned against this line */
+    returnedQty: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {_id: false},
 );
@@ -275,6 +286,12 @@ const invoiceSchema = new mongoose.Schema(
         receivedBy: { type: String, default: null }
       }
     ],
+    /** Sum of refunded/returned value processed against this invoice */
+    returnedAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     createdBy: {
       m_staff_id: {type: String, default: null},
       m_staff_name: {type: String, default: null},

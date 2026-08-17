@@ -200,6 +200,8 @@ export function resolveBenefitPercents(
         discountPercent = Number(display.spaceDiscountPercent ?? 0) || 0;
       } else if (benefitCategory === "Products") {
         discountPercent = Number(display.storeDiscountPercent ?? 0) || 0;
+      } else if (benefitCategory === "Services") {
+        discountPercent = Number(display.serviceDiscountPercent ?? 0) || 0;
       }
     }
     if (cashbackPercent <= 0) {

@@ -51,6 +51,7 @@ type PlanFormState = Required<
     storeDiscountPercent: number;
     spaceDiscountPercent: number;
     foodDiscountPercent: number;
+    serviceDiscountPercent: number;
     features: Array<{ label: string; was: number }>;
   };
   walletCashback: {
@@ -138,6 +139,7 @@ const initialState: PlanFormState = {
     storeDiscountPercent: 0,
     spaceDiscountPercent: 0,
     foodDiscountPercent: 0,
+    serviceDiscountPercent: 0,
     features: [{ label: "", was: 0 }],
   },
   walletCashback: {
@@ -277,6 +279,12 @@ export default function AddnewPlansModal({
                 ?.discount ??
               prev.customerDisplay.foodDiscountPercent,
           ),
+          serviceDiscountPercent: Number(
+            initialPlan.customerDisplay?.serviceDiscountPercent ??
+              (initialPlan.usageLimits as UsageLimits | undefined)?.Services
+                ?.discount ??
+              prev.customerDisplay.serviceDiscountPercent,
+          ),
           features:
             Array.isArray(initialPlan.customerDisplay?.features) &&
             initialPlan.customerDisplay.features.length > 0
@@ -352,6 +360,9 @@ export default function AddnewPlansModal({
         }
         if (key.toLowerCase() === "products" || key.toLowerCase() === "product") {
           customerDisplay.storeDiscountPercent = next;
+        }
+        if (key.toLowerCase() === "services" || key.toLowerCase() === "service") {
+          customerDisplay.serviceDiscountPercent = next;
         }
       }
       if (field === "cashback") {
@@ -445,6 +456,13 @@ export default function AddnewPlansModal({
         const n = k.toLowerCase();
         return n === "product" || n === "products" || n.includes("store");
       })?.[1];
+    const servicesLimit =
+      usageLimits.Services ||
+      usageLimits.Service ||
+      usageLimits.services ||
+      Object.entries(usageLimits).find(([k]) =>
+        k.toLowerCase().includes("service"),
+      )?.[1];
 
     // Keep usageLimits.Products in sync with store display fields (discount + cashback)
     const storeDiscount =
@@ -458,6 +476,13 @@ export default function AddnewPlansModal({
     usageLimits.Products = {
       discount: storeDiscount,
       cashback: storeCashback,
+    };
+    usageLimits.Services = {
+      discount:
+        Number(
+          servicesLimit?.discount ?? form.customerDisplay.serviceDiscountPercent,
+        ) || 0,
+      cashback: Number(servicesLimit?.cashback ?? 0) || 0,
     };
 
     await onSubmit({
@@ -489,6 +514,10 @@ export default function AddnewPlansModal({
         foodDiscountPercent:
           Number(foodLimit?.discount ?? form.customerDisplay.foodDiscountPercent) ||
           0,
+        serviceDiscountPercent:
+          Number(
+            servicesLimit?.discount ?? form.customerDisplay.serviceDiscountPercent,
+          ) || 0,
         storeDiscountPercent:
           Number(
             productsLimit?.discount ?? form.customerDisplay.storeDiscountPercent,
@@ -1022,6 +1051,31 @@ export default function AddnewPlansModal({
                     }
                     type="number"
                     placeholder="10"
+                  />
+                  <InputField
+                    label="Services Discount (%)"
+                    value={String(form.customerDisplay.serviceDiscountPercent)}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        customerDisplay: {
+                          ...p.customerDisplay,
+                          serviceDiscountPercent: Number(v || 0),
+                        },
+                        usageLimits: {
+                          ...p.usageLimits,
+                          Services: {
+                            ...(p.usageLimits.Services || {
+                              discount: 0,
+                              cashback: 0,
+                            }),
+                            discount: Number(v || 0),
+                          },
+                        },
+                      }))
+                    }
+                    type="number"
+                    placeholder="5"
                   />
                   <InputField
                     label="Space Discount (%)"

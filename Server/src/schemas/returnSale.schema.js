@@ -30,6 +30,10 @@ export function validateReturnSaleCreateBody(body) {
     status,
     originalInvoiceId,
     createdBy,
+    intent,
+    refundMode,
+    refundBreakdown,
+    originalInvoiceCode,
   } = body ?? {};
 
   if (!customerName || !String(customerName).trim()) {
@@ -53,7 +57,9 @@ export function validateReturnSaleCreateBody(body) {
     errors.push('Valid due date is required.');
   }
   if (invoiceDateObj && dueDateObj && dueDateObj < getStartOfToday()) {
-    errors.push('Due date cannot be before today.');
+    if (!originalInvoiceId) {
+      errors.push('Due date cannot be before today.');
+    }
   }
 
   if (!Array.isArray(items) || items.length === 0) {
@@ -66,13 +72,30 @@ export function validateReturnSaleCreateBody(body) {
       const qty = Number(item.qty);
       const unitPrice = Number(item.unitPrice);
       const discount = Number(item.discount ?? 0);
-      const lineTotal = qty * unitPrice - discount;
+      const clientLineTotal = Number(item.lineTotal);
+      const refundAmount = Number(item.refundAmount);
+      // Prefer stored net / refund amount. Do not recalculate list − discount when net is known.
+      const lineTotal =
+        Number.isFinite(clientLineTotal) && clientLineTotal >= 0
+          ? clientLineTotal
+          : Number.isFinite(refundAmount) && refundAmount >= 0
+            ? refundAmount
+            : Math.max(0, qty * unitPrice - discount);
+      const lineIndexRaw = item.lineIndex;
+      const lineIndex =
+        lineIndexRaw === null || lineIndexRaw === undefined || lineIndexRaw === ''
+          ? null
+          : Number(lineIndexRaw);
       return {
         productName: String(item.productName ?? '').trim(),
         qty,
         unitPrice,
         discount,
-        lineTotal,
+        lineTotal: Math.max(0, lineTotal),
+        lineIndex: Number.isInteger(lineIndex) && lineIndex >= 0 ? lineIndex : null,
+        originalQty: Math.max(0, Number(item.originalQty ?? 0) || 0),
+        isGift: Boolean(item.isGift),
+        refundAmount: Math.max(0, Number(item.refundAmount ?? 0) || 0),
         _idx: idx,
       };
     });
@@ -149,6 +172,16 @@ export function validateReturnSaleCreateBody(body) {
       grandTotal: gt,
       status: stNorm,
       originalInvoiceId: originalInvoiceId || null,
+      originalInvoiceCode: String(originalInvoiceCode ?? '').trim(),
+      intent: intent === 'cancel' ? 'cancel' : 'return',
+      refundMode: String(refundMode ?? '').trim(),
+      refundBreakdown: {
+        cash: Math.max(0, Number(refundBreakdown?.cash ?? 0) || 0),
+        upi: Math.max(0, Number(refundBreakdown?.upi ?? 0) || 0),
+        card: Math.max(0, Number(refundBreakdown?.card ?? 0) || 0),
+        wallet: Math.max(0, Number(refundBreakdown?.wallet ?? 0) || 0),
+        paidAmount: Math.max(0, Number(refundBreakdown?.paidAmount ?? 0) || 0),
+      },
       createdBy:
         createdBy ?? null,
     },
@@ -229,13 +262,21 @@ export function validateReturnSaleUpdateBody(body) {
         const qty = Number(item.qty);
         const unitPrice = Number(item.unitPrice);
         const discount = Number(item.discount ?? 0);
-        const lineTotal = qty * unitPrice - discount;
+        const clientLineTotal = Number(item.lineTotal);
+        const refundAmount = Number(item.refundAmount);
+        const lineTotal =
+          Number.isFinite(clientLineTotal) && clientLineTotal >= 0
+            ? clientLineTotal
+            : Number.isFinite(refundAmount) && refundAmount >= 0
+              ? refundAmount
+              : Math.max(0, qty * unitPrice - discount);
         return {
           productName: String(item.productName ?? '').trim(),
           qty,
           unitPrice,
           discount,
-          lineTotal,
+          lineTotal: Math.max(0, lineTotal),
+          refundAmount: Math.max(0, Number.isFinite(refundAmount) ? refundAmount : 0),
         };
       });
       if (

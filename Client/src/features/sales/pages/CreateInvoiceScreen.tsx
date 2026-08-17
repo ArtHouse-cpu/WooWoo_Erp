@@ -5,6 +5,8 @@ import CreateInvoiceHeader from "../components/invoice/CreateInvoiceHeader";
 import InvoiceDetailsSection from "../components/invoice/InvoiceDetailsSection";
 import InvoiceSummaryCard from "../components/invoice/InvoiceSummaryCard";
 import NotesSection from "../components/invoice/NotesSection";
+import InvoiceReturnHistory from "../components/invoice/InvoiceReturnHistory";
+import InvoiceViewLines from "../components/invoice/InvoiceViewLines";
 import ProductsServicesSection from "../components/invoice/ProductsServicesSection";
 import type { InvoiceItem } from "../components/invoice/types";
 import { useAppSelector } from "@/store/hooks";
@@ -15,6 +17,7 @@ import {
   handleUpdateInvoice,
   handleGetCustomers,
   handleGetCustomerById,
+  handleGetInvoice,
   handleGetMemberships,
   type CustomerPayload,
   type MembershipPlanPayload,
@@ -125,6 +128,8 @@ export default function CreateInvoiceScreen({
   const [viewReferralDiscount, setViewReferralDiscount] = useState(0);
   const [viewReferralLabel, setViewReferralLabel] = useState("Referral Discount");
   const [viewGrandTotal, setViewGrandTotal] = useState<number | null>(null);
+  const [viewReturnedTotal, setViewReturnedTotal] = useState(0);
+  const [viewSourceInvoice, setViewSourceInvoice] = useState<any>(null);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -180,6 +185,9 @@ export default function CreateInvoiceScreen({
             membershipDiscountAmount: Number(
               item.membershipDiscountAmount ?? 0,
             ),
+            returnedQty: Number(item.returnedQty ?? 0) || 0,
+            lineTotal: Number(item.lineTotal ?? 0) || 0,
+            isGift: Boolean(item.isGift),
           })),
         );
       }
@@ -223,18 +231,44 @@ export default function CreateInvoiceScreen({
           ? Math.max(0, Number(inv.grandTotal))
           : null,
       );
+      setViewReturnedTotal(Math.max(0, Number(inv.returnedAmount) || 0));
+      setViewSourceInvoice(inv);
     };
 
-    if (initialData && initialMode) {
-      applyInvoice(initialData, initialMode);
-      return;
-    }
+    let cancelled = false;
+    const bootstrap = async () => {
+      if (initialData && initialMode) {
+        applyInvoice(initialData, initialMode);
+        if (initialMode === "view" && initialData._id) {
+          try {
+            const res = await handleGetInvoice(String(initialData._id));
+            if (!cancelled && res?.invoice) applyInvoice(res.invoice, "view");
+          } catch {
+            /* keep list snapshot */
+          }
+        }
+        return;
+      }
 
-    const state = location.state as { invoice?: any; mode?: Mode } | null;
-    if (state?.mode && state?.invoice) {
-      applyInvoice(state.invoice, state.mode);
-    }
-  }, [location.state, initialData, initialMode]);
+      const state = location.state as { invoice?: any; mode?: Mode } | null;
+      if (state?.mode && state?.invoice) {
+        applyInvoice(state.invoice, state.mode);
+        if (state.mode === "view" && state.invoice._id) {
+          try {
+            const res = await handleGetInvoice(String(state.invoice._id));
+            if (!cancelled && res?.invoice) applyInvoice(res.invoice, "view");
+          } catch {
+            /* keep navigation snapshot */
+          }
+        }
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, [location.state, initialData, initialMode, salesPerson]);
 
   /** Resolve exact CRM customer for view/edit (by invoice customerId, else exact phone). */
   useEffect(() => {
@@ -971,6 +1005,9 @@ export default function CreateInvoiceScreen({
               loading={creatingCustomer}
             />
           )}
+          {mode === "view" ? (
+            <InvoiceViewLines invoice={viewSourceInvoice || initialData} />
+          ) : (
           <ProductsServicesSection
             draft={draft}
             items={items}
@@ -1072,6 +1109,7 @@ export default function CreateInvoiceScreen({
               });
             }}
           />
+          )}
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
             <NotesSection notes={notes} onChange={setNotes} />
@@ -1088,6 +1126,7 @@ export default function CreateInvoiceScreen({
               extraCharges={extraCharges}
               onExtraChargesChange={setExtraCharges}
               grandTotal={grandTotal}
+              returnedTotal={mode === "view" ? viewReturnedTotal : 0}
               onSave={() => {
                 if (validateBeforeCheckout()) setOpenCheckout(true);
               }}
@@ -1100,6 +1139,12 @@ export default function CreateInvoiceScreen({
               }
             />
           </div>
+          {mode === "view" ? (
+            <InvoiceReturnHistory
+              invoiceId={invoiceId}
+              invoice={viewSourceInvoice || initialData}
+            />
+          ) : null}
         </div>
       </div>
       {mode !== "view" && (

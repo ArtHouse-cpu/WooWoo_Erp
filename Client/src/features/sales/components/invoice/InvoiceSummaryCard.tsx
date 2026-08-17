@@ -34,6 +34,8 @@ type Props = {
   paymentMode?: string;
   paymentStatus?: string;
   paymentBreakdown?: PaymentBreakdown | null;
+  /** Original invoice total before sales returns. */
+  returnedTotal?: number;
   /** Override heading (default Invoice Summary). */
   title?: string;
 };
@@ -93,6 +95,7 @@ export default function InvoiceSummaryCard({
   paymentMode,
   paymentStatus,
   paymentBreakdown = null,
+  returnedTotal = 0,
   title = "Invoice Summary",
 }: Props) {
   const isQuotationSummary = title.toLowerCase().includes("quotation");
@@ -134,6 +137,8 @@ export default function InvoiceSummaryCard({
   const dueAmount = Number(
     paymentBreakdown?.dueAmount ?? Math.max(0, grandTotal - paidAmount),
   );
+  const salesReturnTotal = Math.max(0, Number(returnedTotal) || 0);
+  const currentTotal = Math.max(0, grandTotal - salesReturnTotal);
   const showPaymentBlock =
     readOnly &&
     (Boolean(paymentMode) ||
@@ -257,10 +262,27 @@ export default function InvoiceSummaryCard({
           </button>
         )}
         <div className="my-2 border-t border-dashed border-gray-200" />
-        <div className="flex items-center justify-between text-base font-semibold text-gray-900">
-          <span>{isQuotationSummary ? "Quoted Amount" : "Grand Total"}</span>
-          <span>₹ {grandTotal.toFixed(2)}</span>
-        </div>
+        {salesReturnTotal > 0 ? (
+          <>
+            <div className="flex items-center justify-between text-gray-600">
+              <span>Original Invoice Total</span>
+              <span>₹ {grandTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-rose-700">
+              <span>Sales Return</span>
+              <span>− ₹ {salesReturnTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-base font-semibold text-gray-900">
+              <span>Current Invoice Total</span>
+              <span>₹ {currentTotal.toFixed(2)}</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-between text-base font-semibold text-gray-900">
+            <span>{isQuotationSummary ? "Quoted Amount" : "Grand Total"}</span>
+            <span>₹ {grandTotal.toFixed(2)}</span>
+          </div>
+        )}
         {isQuotationSummary && (billSavings > 0 || cashbackTotal > 0) && (
           <div className="mt-2 space-y-1 rounded-md bg-slate-50 px-2 py-2 text-[11px] leading-snug text-slate-600">
             {billSavings > 0 ? (
@@ -304,6 +326,12 @@ export default function InvoiceSummaryCard({
               <span>Paid</span>
               <span>₹ {paidAmount.toFixed(2)}</span>
             </div>
+            {salesReturnTotal > 0 && (
+              <div className="flex items-center justify-between text-rose-700">
+                <span>Refunded</span>
+                <span>− ₹ {salesReturnTotal.toFixed(2)}</span>
+              </div>
+            )}
             {dueAmount > 0 && (
               <div className="flex items-center justify-between text-amber-700 font-medium">
                 <span>Due</span>

@@ -306,6 +306,11 @@ export const handleGetInvoices = async (
   }
 };
 
+export const handleGetInvoice = async (id: string, signal?: AbortSignal) => {
+  const response = await axiosInstance.get(`/invoice/${id}`, { signal });
+  return response.data as { success: boolean; invoice?: any; message?: string };
+};
+
 export const handleUpdateInvoice = async (id: string, payload: Partial<CreateInvoicePayload>) => {
   try {
     const response = await axiosInstance.patch(`/invoice/${id}`, payload);
@@ -510,12 +515,30 @@ export type CreateReturnSalePayload = {
   dueDate: string;
   salesPersonName: string;
   notes: string;
-  items: ReturnSaleItemPayload[];
+  items: Array<
+    ReturnSaleItemPayload & {
+      lineIndex?: number | null;
+      originalQty?: number;
+      isGift?: boolean;
+      refundAmount?: number;
+      lineTotal?: number;
+    }
+  >;
   subTotal: number;
   discountTotal: number;
   grandTotal: number;
   status?: "draft" | "final" | "cancelled";
   originalInvoiceId?: string | null;
+  originalInvoiceCode?: string;
+  intent?: "return" | "cancel";
+  refundMode?: string;
+  refundBreakdown?: {
+    cash: number;
+    upi: number;
+    card: number;
+    wallet: number;
+    paidAmount: number;
+  };
   createdBy?: {
     m_staff_id?: string | null;
     m_staff_name?: string | null;
@@ -527,9 +550,14 @@ export const handleGetReturnSales = async (
   search = "",
   limit = 100,
   signal?: AbortSignal,
+  originalInvoiceId?: string,
 ) => {
   const response = await axiosInstance.get("/returnsales", {//return sales Api Call 
-    params: { search: search.trim(), limit },
+    params: {
+      search: search.trim(),
+      limit,
+      ...(originalInvoiceId ? { originalInvoiceId } : {}),
+    },
     signal,
   });
   return response.data;
@@ -1085,6 +1113,7 @@ export type MembershipPlanPayload = {
     storeDiscountPercent?: number;
     spaceDiscountPercent?: number;
     foodDiscountPercent?: number;
+    serviceDiscountPercent?: number;
     features?: Array<{ label: string; was?: number }>;
   };
   /** Fixed ₹ credited to wallet when this membership is purchased */

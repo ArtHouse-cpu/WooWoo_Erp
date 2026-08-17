@@ -91,12 +91,30 @@ export const authApi = {
           planId: string;
           title: string;
           badge: string;
+          tenure?: string;
           price: number;
+          grossAmount?: number;
+          discountAmount?: number;
+          walletCashbackAmount?: number;
+          cspEligible?: boolean;
           description: string;
           themeKey?: string;
-          iconKey?: "user" | "star" | "graduation" | "crown";
+          iconKey?: "user" | "star" | "graduation" | "crown" | "diamond";
           features?: Array<{ label: string; was?: number }>;
-          discounts?: Array<{ icon: "store" | "space"; label: string }>;
+          discounts?: Array<{ icon: "store" | "service" | "food" | "space"; label: string }>;
+          categories?: Array<{
+            key: "food" | "space" | "products" | "services";
+            icon: "store" | "service" | "food" | "space";
+            label: string;
+            discountPercent: number;
+            cashbackPercent: number;
+          }>;
+          programs?: Array<{
+            key: string;
+            label: string;
+            subtitle: string;
+            eligible: boolean;
+          }>;
           cashback?: string;
         }>
       >

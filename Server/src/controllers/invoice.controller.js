@@ -963,7 +963,7 @@ const getInvoices=async(req,res)=>{
           // .sort({updatedAt: -1})
           .limit(limit)
           .select(
-            'customerName customerPhone pendingAmount paymentBreakdown paymentStatus status invoiceCode createdAt updatedAt grandTotal createdBy mode salesPersonName invoiceDate items coupon referral membershipDiscount membershipType cashbackTotal discountTotal subTotal extraCharges invoiceBy',
+            'customerName customerPhone pendingAmount paymentBreakdown paymentStatus status invoiceCode createdAt updatedAt grandTotal returnedAmount createdBy mode salesPersonName invoiceDate items coupon referral membershipDiscount membershipType cashbackTotal discountTotal subTotal extraCharges invoiceBy notes',
           )
           .lean();
         return res.status(200).json({
@@ -981,6 +981,35 @@ const getInvoices=async(req,res)=>{
         });
       }
 }
+
+const getInvoice = async (req, res) => {
+  try {
+    const {id} = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid invoice id.',
+      });
+    }
+    const invoice = await Invoice.findById(id).lean();
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found.',
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      invoice,
+    });
+  } catch (error) {
+    console.error('getInvoice error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch invoice.',
+    });
+  }
+};
 
 const deleteInvoice = async (req, res) => {
   try {
@@ -1098,11 +1127,13 @@ const updateInvoice = async (req, res) => {
 
     let normalizedItems;
     if (items && Array.isArray(items)) {
-      normalizedItems = items.map(item => {
+      const existingItems = Array.isArray(existingInvoice.items) ? existingInvoice.items : [];
+      normalizedItems = items.map((item, idx) => {
         const qty = Number(item.qty);
         const unitPrice = Number(item.unitPrice);
         const discount = Number(item.discount ?? 0);
         const lineTotal = qty * unitPrice - discount;
+        const previous = existingItems[idx] || {};
         return {
           productName: String(item.productName ?? '').trim(),
           qty,
@@ -1110,6 +1141,8 @@ const updateInvoice = async (req, res) => {
           discount,
           lineTotal,
           category: normalizeLineType(item.category || item.lineCategory || 'product'),
+          returnedQty: Math.max(0, Number(previous.returnedQty) || 0),
+          isGift: Boolean(previous.isGift || item.isGift),
         };
       });
     }
@@ -1388,4 +1421,4 @@ const cancelInvoice = async (req, res) => {
   }
 };
 
-export { createInvoice, getInvoices, deleteInvoice, updateInvoice, cancelInvoice };
+export { createInvoice, getInvoices, getInvoice, deleteInvoice, updateInvoice, cancelInvoice };

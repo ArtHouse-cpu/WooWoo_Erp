@@ -22,6 +22,9 @@ export type InvoiceItem = {
   /** Split amounts so checkout can show Product vs Membership discount clearly */
   productDiscountAmount?: number;
   membershipDiscountAmount?: number;
+  returnedQty?: number;
+  lineTotal?: number;
+  isGift?: boolean;
 };
 
 /** API / POS raw invoice shape used by PDF and print templates */

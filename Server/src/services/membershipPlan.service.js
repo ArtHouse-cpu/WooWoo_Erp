@@ -21,19 +21,53 @@ const toPlainUsageLimits = usageLimits => {
   if (usageLimits instanceof Map) {
     return Object.fromEntries(usageLimits.entries());
   }
+  if (Array.isArray(usageLimits)) {
+    return Object.fromEntries(usageLimits);
+  }
+  if (typeof usageLimits?.toJSON === 'function') {
+    const json = usageLimits.toJSON();
+    if (json && typeof json === 'object' && json !== usageLimits) {
+      return toPlainUsageLimits(json);
+    }
+  }
   if (typeof usageLimits === 'object') return usageLimits;
   return {};
+};
+
+const readLimitField = (row, field) => {
+  if (row == null || typeof row !== 'object') return 0;
+  const n = Number(row[field]);
+  return Number.isFinite(n) ? n : 0;
 };
 
 const findUsageLimitValue = (usageLimits, matchers, field) => {
   const entries = Object.entries(toPlainUsageLimits(usageLimits));
   for (const [key, value] of entries) {
     const normalized = String(key || '').trim().toLowerCase();
-    if (matchers.some(m => normalized.includes(m))) {
-      return Number(value?.[field] ?? 0);
+    if (matchers.some(m => normalized === m || normalized.includes(m))) {
+      const n = readLimitField(value, field);
+      if (n > 0) return n;
     }
   }
   return 0;
+};
+
+const resolveCategoryDiscount = (displayValue, usageLimits, matchers) => {
+  const fromDisplay = Number(displayValue ?? 0);
+  if (Number.isFinite(fromDisplay) && fromDisplay > 0) return fromDisplay;
+  return Math.max(0, findUsageLimitValue(usageLimits, matchers, 'discount'));
+};
+
+const resolveCategoryCashback = (displayValue, usageLimits, matchers) => {
+  const fromDisplay = Number(displayValue ?? 0);
+  if (Number.isFinite(fromDisplay) && fromDisplay > 0) return fromDisplay;
+  return Math.max(0, findUsageLimitValue(usageLimits, matchers, 'cashback'));
+};
+
+const isPremiumMembership = membership => {
+  const planId = String(membership?.planId || '').trim().toLowerCase();
+  const name = String(membership?.displayName || '').trim().toLowerCase();
+  return planId === 'premium' || name === 'premium' || name.includes('premium');
 };
 
 export const getListedPlanPrice = membership => {
@@ -86,23 +120,46 @@ export const formatCustomerMembershipPlan = membership => {
   const usageLimits = toPlainUsageLimits(membership.usageLimits);
   const price = getListedPlanPrice(membership);
 
-  const storeDiscount =
-    Number(display.storeDiscountPercent ?? 0) ||
-    findUsageLimitValue(usageLimits, ['product', 'products', 'store', 'general', 'supply'], 'discount');
-
-  const spaceDiscount =
-    Number(display.spaceDiscountPercent ?? 0) ||
-    findUsageLimitValue(usageLimits, ['space', 'booking'], 'discount');
-
-  const foodDiscount =
-    Number(display.foodDiscountPercent ?? 0) ||
-    findUsageLimitValue(usageLimits, ['food', 'meal', 'canteen'], 'discount');
-
-  const serviceDiscount = findUsageLimitValue(
+  const storeDiscount = resolveCategoryDiscount(
+    display.storeDiscountPercent,
     usageLimits,
-    ['service', 'services'],
-    'discount',
+    ['products', 'product', 'store', 'supply'],
   );
+  const spaceDiscount = resolveCategoryDiscount(
+    display.spaceDiscountPercent,
+    usageLimits,
+    ['space', 'spaces', 'booking'],
+  );
+  const foodDiscount = resolveCategoryDiscount(
+    display.foodDiscountPercent,
+    usageLimits,
+    ['food', 'foods', 'meal', 'canteen'],
+  );
+  const serviceDiscount = resolveCategoryDiscount(
+    display.serviceDiscountPercent,
+    usageLimits,
+    ['services', 'service'],
+  );
+
+  const foodCashback = resolveCategoryCashback(
+    display.cashbackPercent,
+    usageLimits,
+    ['food', 'foods', 'meal', 'canteen'],
+  );
+  const storeCashback = resolveCategoryCashback(
+    display.storeCashbackPercent,
+    usageLimits,
+    ['products', 'product', 'store', 'supply'],
+  );
+  const spaceCashback = resolveCategoryCashback(0, usageLimits, [
+    'space',
+    'spaces',
+    'booking',
+  ]);
+  const serviceCashback = resolveCategoryCashback(0, usageLimits, [
+    'services',
+    'service',
+  ]);
 
   const cashbackPercent =
     Number(display.cashbackPercent ?? 0) ||
@@ -126,33 +183,92 @@ export const formatCustomerMembershipPlan = membership => {
   const iconKey =
     String(display.iconKey || DEFAULT_ICON_BY_PLAN_ID[planId] || 'user').trim() || 'user';
 
+  const badge =
+    String(display.badgeLabel || membership.pricing?.period || 'Yearly').trim() || 'Yearly';
+  const grossAmount = Number(membership.pricing?.grossAmount ?? 0);
+  const listedGross = Number.isFinite(grossAmount) && grossAmount > 0 ? grossAmount : price;
+  const discountAmount = Math.max(0, listedGross - price);
+  const walletCashbackAmount = Math.max(
+    0,
+    Number(membership.walletCashback?.amount ?? 0) || 0,
+  );
+  const cspEligible = isPremiumMembership(membership);
+
+  const categories = [
+    {
+      key: 'food',
+      icon: 'food',
+      label: 'Food',
+      discountPercent: foodDiscount,
+      cashbackPercent: foodCashback,
+    },
+    {
+      key: 'space',
+      icon: 'space',
+      label: 'Space',
+      discountPercent: spaceDiscount,
+      cashbackPercent: spaceCashback,
+    },
+    {
+      key: 'products',
+      icon: 'store',
+      label: 'Products',
+      discountPercent: storeDiscount,
+      cashbackPercent: storeCashback,
+    },
+    {
+      key: 'services',
+      icon: 'service',
+      label: 'Services',
+      discountPercent: serviceDiscount,
+      cashbackPercent: serviceCashback,
+    },
+  ];
+
   return {
     id: planId,
     planId,
     _id: membership._id,
     title: membership.displayName,
-    badge:
-      String(display.badgeLabel || membership.pricing?.period || 'Yearly').trim() || 'Yearly',
+    badge,
+    tenure: badge,
     price,
+    grossAmount: listedGross,
+    discountAmount,
+    walletCashbackAmount,
     description: String(membership.description || '').trim(),
     themeKey,
     iconKey,
     features,
     discounts: [
-      ...(storeDiscount > 0
-        ? [{icon: 'store', label: `Products ${storeDiscount}%`}]
-        : []),
-      ...(serviceDiscount > 0
-        ? [{icon: 'service', label: `Services ${serviceDiscount}%`}]
-        : []),
-      ...(foodDiscount > 0
-        ? [{icon: 'food', label: `Food ${foodDiscount}%`}]
-        : []),
-      ...(spaceDiscount > 0
-        ? [{icon: 'space', label: `Space ${spaceDiscount}%`}]
-        : []),
+      {icon: 'store', label: `Products ${storeDiscount}%`},
+      {icon: 'service', label: `Services ${serviceDiscount}%`},
+      {icon: 'food', label: `Food ${foodDiscount}%`},
+      {icon: 'space', label: `Space ${spaceDiscount}%`},
     ],
+    categories,
     cashback: `${cashbackPercent || 0}%`,
+    cspEligible,
+    programs: [
+      {
+        key: 'CSP',
+        label: 'CSP',
+        subtitle: 'Sell Products',
+        eligible: cspEligible,
+      },
+      {
+        key: 'HAP',
+        label: 'HAP',
+        subtitle: 'Refer & Earn',
+        eligible: true,
+      },
+      {
+        key: 'CVP',
+        label: 'CVP',
+        subtitle: 'Event Volunteering',
+        eligible: true,
+      },
+    ],
     priority: Number(membership.priority ?? 0),
   };
 };
