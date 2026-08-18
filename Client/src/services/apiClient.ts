@@ -311,6 +311,125 @@ export const handleGetInvoice = async (id: string, signal?: AbortSignal) => {
   return response.data as { success: boolean; invoice?: any; message?: string };
 };
 
+export const handleGetAllExpences = async (
+  search = "",
+  signal?: AbortSignal,
+  limit = 2000,
+) => {
+  const response = await axiosInstance.get("/api/expences", {
+    params: { search: search.trim(), limit },
+    signal,
+  });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    expences?: any[];
+    total?: number;
+    limit?: number;
+  };
+};
+
+export type CreateExpencePayload = {
+  expenseCode?: string;
+  title: string;
+  category: string;
+  amount: number;
+  paidTo: string;
+  vendorId?: string | null;
+  mode: string;
+  status?: string;
+  date: string;
+  notes?: string;
+  receiptUrl?: string | null;
+  createdBy?: {
+    m_staff_id?: string | null;
+    m_staff_name?: string | null;
+    m_staff_email?: string | null;
+  };
+  addedBy?: {
+    m_staff_id?: string | null;
+    m_staff_name?: string | null;
+    m_staff_email?: string | null;
+  };
+};
+
+export function expencePayloadToFormData(
+  payload: Partial<CreateExpencePayload>,
+  receiptFile?: File | null,
+) {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined || value === null) continue;
+    if (key === "createdBy" || key === "addedBy") {
+      fd.append(key, JSON.stringify(value));
+      continue;
+    }
+    fd.append(key, String(value));
+  }
+  if (receiptFile) fd.append("receipt", receiptFile);
+  return fd;
+}
+
+const expenceMultipartHeaders = {
+  headers: { "Content-Type": "multipart/form-data" as const },
+};
+
+export const handleCreateExpence = async (
+  payload: CreateExpencePayload,
+  receiptFile?: File | null,
+) => {
+  const body = receiptFile
+    ? expencePayloadToFormData(payload, receiptFile)
+    : payload;
+  const response = await axiosInstance.post(
+    "/api/expences",
+    body,
+    receiptFile ? expenceMultipartHeaders : undefined,
+  );
+  return response.data as {
+    success: boolean;
+    message?: string;
+    expence?: any;
+  };
+};
+
+export const handleGetExpenceById = async (id: string, signal?: AbortSignal) => {
+  const response = await axiosInstance.get(`/api/expences/${id}`, { signal });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    expence?: any;
+  };
+};
+
+export const handleUpdateExpence = async (
+  id: string,
+  payload: Partial<CreateExpencePayload>,
+  receiptFile?: File | null,
+) => {
+  const body = receiptFile
+    ? expencePayloadToFormData(payload, receiptFile)
+    : payload;
+  const response = await axiosInstance.patch(
+    `/api/expences/${id}`,
+    body,
+    receiptFile ? expenceMultipartHeaders : undefined,
+  );
+  return response.data as {
+    success: boolean;
+    message?: string;
+    expence?: any;
+  };
+};
+
+export const handleDeleteExpence = async (id: string) => {
+  const response = await axiosInstance.delete(`/api/expences/${id}`);
+  return response.data as {
+    success: boolean;
+    message?: string;
+  };
+};
+
 export const handleUpdateInvoice = async (id: string, payload: Partial<CreateInvoicePayload>) => {
   try {
     const response = await axiosInstance.patch(`/invoice/${id}`, payload);

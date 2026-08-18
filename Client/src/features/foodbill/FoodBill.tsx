@@ -1431,7 +1431,7 @@ export default function FoodBill() {
               <span>Paid via ${paymentLabel}:</span>
               <span>₹${previewPaid.toFixed(2)}</span>
             </div>
-          </div>
+            </div>
         </div>
       `,
       icon: "question",
@@ -1714,8 +1714,8 @@ export default function FoodBill() {
             }
           </div>
         `,
-        confirmButtonColor: "#3B82F6",
-      });
+      confirmButtonColor: "#3B82F6",
+    });
 
       setCart([]);
       setAmountReceived("0");
@@ -1830,15 +1830,15 @@ export default function FoodBill() {
           <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-2xs">
             <div ref={customerSearchWrapRef} className="relative">
               <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600 focus-within:border-blue-400 focus-within:bg-white transition-colors duration-150">
-                <Search size={18} className="text-gray-400 shrink-0" />
-                <input
-                  type="text"
+              <Search size={18} className="text-gray-400 shrink-0" />
+              <input
+                type="text"
                   role="combobox"
                   aria-expanded={showCustomerDropdown}
                   aria-controls="foodbill-customer-listbox"
                   aria-autocomplete="list"
-                  placeholder="Search customer by name or mobile"
-                  value={customerSearch}
+                placeholder="Search customer by name or mobile"
+                value={customerSearch}
                   onChange={(e) => {
                     const next = e.target.value;
                     setCustomerSearch(next);
@@ -1853,8 +1853,8 @@ export default function FoodBill() {
                   onFocus={() => {
                     if (customerSearch.trim()) setCustomerDropdownOpen(true);
                   }}
-                  className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
-                />
+                className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
+              />
                 {loadingCustomers ? (
                   <span className="shrink-0 text-[10px] font-medium text-blue-500">
                     Searching…
@@ -1877,7 +1877,7 @@ export default function FoodBill() {
                 >
                   <UserPlus size={14} />
                 </button>
-              </div>
+            </div>
 
               {showCustomerDropdown ? (
                 <ul
@@ -1901,7 +1901,7 @@ export default function FoodBill() {
                               cust.membershipType !== "none"
                             ? mapMembershipTier(cust.membershipType)
                             : "No membership";
-                      return (
+                return (
                         <li key={cust.id} role="option">
                           <button
                             type="button"
@@ -1909,15 +1909,15 @@ export default function FoodBill() {
                             onClick={() => handleSelectCustomer(cust)}
                             className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-blue-50 transition"
                           >
-                            <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-semibold text-gray-900">
-                                {cust.name}
+                        {cust.name}
                               </p>
-                              <p className="truncate text-[11px] text-gray-500">
+                      <p className="truncate text-[11px] text-gray-500">
                                 {cust.phone || "No phone"}
-                              </p>
+                      </p>
                             </div>
-                            <span
+                      <span
                               className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${
                                 membershipLabel === "Gold"
                                   ? "border border-amber-100 bg-amber-50 text-amber-700"
@@ -1929,7 +1929,7 @@ export default function FoodBill() {
                               }`}
                             >
                               {membershipLabel}
-                            </span>
+                      </span>
                           </button>
                         </li>
                       );
@@ -2043,7 +2043,7 @@ export default function FoodBill() {
                         </div>
 
                         <div className="flex shrink-0 items-center gap-1.5">
-                          <button
+                        <button
                             type="button"
                             title="Edit food item"
                             aria-label={`Edit ${food.name}`}
@@ -2057,15 +2057,15 @@ export default function FoodBill() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => addToCart(food)}
+                          onClick={() => addToCart(food)}
                             className={`cursor-pointer rounded-lg border px-4 py-1.5 text-xs font-bold transition ${
-                              isInCart
+                            isInCart
                                 ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700"
                                 : "border-blue-200 bg-blue-50/40 text-blue-600 hover:bg-blue-50"
-                            }`}
-                          >
-                            {isInCart ? "Add +" : "Add"}
-                          </button>
+                          }`}
+                        >
+                          {isInCart ? "Add +" : "Add"}
+                        </button>
                         </div>
                       </div>
                     );
@@ -2297,7 +2297,7 @@ export default function FoodBill() {
                       <span className="truncate font-semibold">
                         {couponLabel || "Coupon"}
                         {couponCode ? ` (${couponCode})` : ""}
-                      </span>
+                    </span>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="font-bold text-green-600">
                           −₹{couponDiscount.toFixed(2)}
@@ -2310,8 +2310,8 @@ export default function FoodBill() {
                         >
                           <X size={12} />
                         </button>
-                      </div>
-                    </div>
+                  </div>
+                </div>
                   ) : null}
                   {referralDiscount > 0 ? (
                     <div className="flex items-center justify-between gap-2 text-[10px] text-violet-700">
@@ -2319,7 +2319,7 @@ export default function FoodBill() {
                         {referralLabel}
                         {referralCodeApplied ? ` (${referralCodeApplied})` : ""}
                         {referralInviterName ? ` · ${referralInviterName}` : ""}
-                      </span>
+                  </span>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="font-bold text-green-600">
                           −₹{Number(referralDiscount || 0).toFixed(2)}
@@ -2332,7 +2332,7 @@ export default function FoodBill() {
                         >
                           <X size={12} />
                         </button>
-                      </div>
+                </div>
                     </div>
                   ) : referralCodeApplied ? (
                     <div className="flex items-center justify-between gap-2 text-[10px] text-violet-700">
@@ -2391,8 +2391,8 @@ export default function FoodBill() {
               <div className="mt-4 border-t border-gray-100 pt-3.5">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-xs font-bold text-gray-600">
-                    Payment Method
-                  </h3>
+                  Payment Method
+                </h3>
                   <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 py-1">
                     <input
                       type="checkbox"
@@ -2408,33 +2408,33 @@ export default function FoodBill() {
 
                 {!isMultiMode ? (
                   <>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {[
-                        { id: "Cash", label: "Cash", icon: DollarSignIcon },
-                        { id: "UPI", label: "UPI", icon: UpiIcon },
-                        { id: "Card", label: "Card", icon: CreditCard },
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { id: "Cash", label: "Cash", icon: DollarSignIcon },
+                    { id: "UPI", label: "UPI", icon: UpiIcon },
+                    { id: "Card", label: "Card", icon: CreditCard },
                         { id: "Wallet", label: "Wallet", icon: Wallet },
-                      ].map((method) => {
-                        const IconComp = method.icon;
-                        const isActive = paymentMethod === method.id;
+                  ].map((method) => {
+                    const IconComp = method.icon;
+                    const isActive = paymentMethod === method.id;
 
-                        return (
-                          <button
-                            key={method.id}
+                    return (
+                      <button
+                        key={method.id}
                             type="button"
-                            onClick={() => setPaymentMethod(method.id)}
-                            className={`flex flex-col items-center justify-center gap-1 rounded-xl border py-2.5 transition duration-150 cursor-pointer ${
-                              isActive
-                                ? "border-blue-500 bg-blue-50/50 text-blue-600 font-bold"
-                                : "border-gray-250 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
-                            }`}
-                          >
-                            <IconComp size={16} />
-                            <span className="text-[10px]">{method.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                        onClick={() => setPaymentMethod(method.id)}
+                        className={`flex flex-col items-center justify-center gap-1 rounded-xl border py-2.5 transition duration-150 cursor-pointer ${
+                          isActive
+                            ? "border-blue-500 bg-blue-50/50 text-blue-600 font-bold"
+                            : "border-gray-250 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        <IconComp size={16} />
+                        <span className="text-[10px]">{method.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
 
                     {paymentMethod === "Wallet" ? (
                       <p className="mt-2 text-[10px] font-medium text-amber-700">
@@ -2442,38 +2442,38 @@ export default function FoodBill() {
                       </p>
                     ) : null}
 
-                    {paymentMethod === "Cash" && (
-                      <div className="mt-3.5 space-y-2">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1">
-                              Amount Received
-                            </label>
-                            <div className="relative">
-                              <span className="absolute left-2.5 top-2 text-xs text-gray-500">
-                                ₹
-                              </span>
-                              <input
-                                type="number"
-                                value={amountReceived}
+                {paymentMethod === "Cash" && (
+                  <div className="mt-3.5 space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1">
+                          Amount Received
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-2 text-xs text-gray-500">
+                            ₹
+                          </span>
+                          <input
+                            type="number"
+                            value={amountReceived}
                                 onChange={(e) =>
                                   setAmountReceived(e.target.value)
                                 }
-                                className="w-full rounded-xl border border-gray-200 bg-white py-1.5 pl-5 pr-2.5 text-xs font-bold text-gray-800 focus:border-blue-400 focus:outline-none"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1">
-                              Change
-                            </label>
-                            <div className="rounded-xl bg-gray-50 border border-gray-100 py-1.5 px-3 text-xs font-bold text-green-600 min-h-[30px] flex items-center">
-                              ₹{changeAmount.toFixed(2)}
-                            </div>
-                          </div>
+                            className="w-full rounded-xl border border-gray-200 bg-white py-1.5 pl-5 pr-2.5 text-xs font-bold text-gray-800 focus:border-blue-400 focus:outline-none"
+                          />
                         </div>
                       </div>
-                    )}
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 mb-1">
+                          Change
+                        </label>
+                        <div className="rounded-xl bg-gray-50 border border-gray-100 py-1.5 px-3 text-xs font-bold text-green-600 min-h-[30px] flex items-center">
+                          ₹{changeAmount.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                   </>
                 ) : (
                   <div className="space-y-3">
@@ -2849,13 +2849,13 @@ export default function FoodBill() {
                 <Save size={16} />
                 Saved Drafts
               </h3>
-              <button
+            <button
                 type="button"
                 onClick={() => setShowDraftsDrawer(false)}
                 className="text-gray-400 hover:text-gray-600"
-              >
+            >
                 <X size={18} />
-              </button>
+            </button>
             </div>
 
             {drafts.length === 0 ? (

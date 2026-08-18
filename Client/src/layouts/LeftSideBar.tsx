@@ -20,6 +20,7 @@ import {
   ShieldUser,
   MapPin,
   UtensilsCrossed,
+  BadgeIndianRupee,
   Utensils,
   type LucideIcon,
   Megaphone,
@@ -192,7 +193,8 @@ const MENU_GROUPS: MenuGroup[] = [
 ];
 
 const TOP_LINKS: TopLink[] = [
-  { key: "foodBill", label: "Food Billing", icon: Utensils, path: "/foodBill" },
+  // { key: "foodBill", label: "Food Billing", icon: Utensils, path: "/foodBill" },
+  { key: "expenses ", label: "Expense", icon: BadgeIndianRupee, path: "/expenses" },
   { key: "announcement", label: "Announcements", icon: Megaphone , path: "/announcements" },
   { key: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
   { key: "coupons", label: "Coupons", icon: Percent, path: "/coupons" },

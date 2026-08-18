@@ -249,16 +249,22 @@ export default function CspScreen() {
 
   const columns = useMemo<MRT_ColumnDef<CspEnrollment>[]>(
     () => [
-      {
-        accessorKey: "label",
-        header: "CSP Label",
-        Cell: ({ row }) => (
-          <span className="font-semibold text-slate-800">
-            {row.original.label ||
-              `CSP · ${row.original.displayName || row.original.customer?.name || "Seller"}`}
-          </span>
-        ),
+       {
+        id: "customer",
+        header: "Customer",
+        Cell: ({ row }) =>
+          row.original.customer?.name || row.original.displayName || "—",
       },
+      // {
+      //   accessorKey: "label",
+      //   header: "CSP Label",
+      //   Cell: ({ row }) => (
+      //     <span className="font-semibold text-slate-800">
+      //       {row.original.label ||
+      //         `${row.original.displayName || row.original.customer?.name || "Seller"}`}
+      //     </span>
+      //   ),
+      // },
       {
         accessorKey: "mobile",
         header: "Mobile",
@@ -268,12 +274,7 @@ export default function CspScreen() {
           row.original.vendor?.mobile ||
           "—",
       },
-      {
-        id: "customer",
-        header: "Customer",
-        Cell: ({ row }) =>
-          row.original.customer?.name || row.original.displayName || "—",
-      },
+     
       {
         id: "vendor",
         header: "Linked Vendor",

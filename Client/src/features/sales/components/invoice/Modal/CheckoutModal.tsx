@@ -5,6 +5,7 @@ import {
   CreditCard,
   Smartphone,
   Wallet as WalletIcon,
+  Landmark,
   User,
   FileText,
   Loader2,
@@ -55,6 +56,9 @@ type Props = {
   onSaved?: () => void;
   initialCustomerName?: string;
   initialCustomerPhone?: string;
+  initialNotes?: string;
+  initialVerifiedStaff?: VerifiedStaff | null;
+  initialVerifiedAt?: string | null;
   initialMembership?: string;
   initialMembershipPlanId?: string | null;
   initialCustomerId?: string | null;
@@ -68,9 +72,10 @@ type Props = {
   membershipPlans?: MembershipPlanPayload[];
   /**
    * "purchase" adjusts confirm labels and sets purchaseType cash|credit.
+   * "expense" collects title/category/paid-to/amount and skips customer/promo.
    * Full / Partial / Due toggle is always shown; Due = full amount outstanding.
    */
-  checkoutContext?: "sale" | "purchase";
+  checkoutContext?: "sale" | "purchase" | "expense";
   onConfirmPayment?: (payload: {
     mode: string;
     paymentStatus: "full" | "partial";
@@ -115,8 +120,21 @@ type Props = {
       email?: string;
     } | null;
     verifiedAt?: string | null;
+    expenseTitle?: string;
+    expenseCategory?: string;
   }) => Promise<void>;
 };
+
+const EXPENSE_CATEGORIES = [
+  "Rent",
+  "Utilities",
+  "Salary",
+  "Marketing",
+  "Supplies",
+  "Maintenance",
+  "Travel",
+  "Other",
+] as const;
 
 const DEFAULT_MEMBERSHIP_PLANS: MembershipPlanPayload[] = [];
 
@@ -295,11 +313,14 @@ function getMaxWalletPaymentAmount(
 export default function CheckoutModal({
   open,
   onClose,
-  grandTotal,
-  items,
+  grandTotal: grandTotalProp,
+  items: itemsProp,
   onSaved,
   initialCustomerName = "",
   initialCustomerPhone = "",
+  initialNotes = "",
+  initialVerifiedStaff = null,
+  initialVerifiedAt = null,
   initialMembership = "",
   initialMembershipPlanId = null,
   initialCustomerId = null,
@@ -313,6 +334,7 @@ export default function CheckoutModal({
   onConfirmPayment,
 }: Props) {
   const isPurchaseCheckout = checkoutContext === "purchase";
+  const isExpenseCheckout = checkoutContext === "expense";
   const [paymentMode, setPaymentMode] = useState("Cash");
   const [cashGiven, setCashGiven] = useState(0);
   const [paymentStatus, setPaymentStatus] = useState<
@@ -339,9 +361,41 @@ export default function CheckoutModal({
   const [walletBalance, setWalletBalance] = useState(0);
   const [minimumWalletBalance, setMinimumWalletBalance] = useState(0);
   const [instructionNotes, setInstructionNotes] = useState("");
+  const [expenseTitle, setExpenseTitle] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState<(typeof EXPENSE_CATEGORIES)[number]>("Other");
+  const [expenseAmount, setExpenseAmount] = useState("");
   const [verifiedStaff, setVerifiedStaff] = useState<VerifiedStaff | null>(null);
+
+  const items = useMemo(() => {
+    if (!isExpenseCheckout) return itemsProp;
+    if (itemsProp.length > 0) return itemsProp;
+    return [
+      {
+        name: expenseTitle.trim() || "Expense",
+        qty: 1,
+        price: Math.max(0, Number(expenseAmount) || 0),
+        category: expenseCategory,
+      },
+    ];
+  }, [isExpenseCheckout, itemsProp, expenseTitle, expenseAmount, expenseCategory]);
+
+  const grandTotal = isExpenseCheckout
+    ? itemsProp.length > 0
+      ? Math.max(0, Number(grandTotalProp) || 0)
+      : Math.max(0, Number(expenseAmount) || 0)
+    : grandTotalProp;
+
+  const paymentMethodOptions = isExpenseCheckout
+    ? [
+        { value: "Cash", label: "Cash", Icon: Banknote },
+        { value: "Card", label: "Card", Icon: CreditCard },
+        { value: "UPI", label: "UPI", Icon: Smartphone },
+        { value: "Bank Transfer", label: "Bank", Icon: Landmark },
+      ]
+    : PAYMENT_METHOD_OPTIONS;
   const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
   const [staffVerified, setStaffVerified] = useState(false);
+  const [reverifyRequested, setReverifyRequested] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponLabel, setCouponLabel] = useState("");
@@ -396,7 +450,7 @@ export default function CheckoutModal({
   }, [membershipPlans]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || isExpenseCheckout) return;
     const ac = new AbortController();
     void handleGetMemberships({ status: "Active" }, ac.signal)
       .then((res) => {
@@ -407,10 +461,10 @@ export default function CheckoutModal({
       })
       .catch(() => {});
     return () => ac.abort();
-  }, [open]);
+  }, [open, isExpenseCheckout]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || isExpenseCheckout) return;
     const ac = new AbortController();
     void handleGetWalletInstructions(ac.signal)
       .then((res) => {
@@ -423,7 +477,7 @@ export default function CheckoutModal({
         setMinimumWalletBalance(0);
       });
     return () => ac.abort();
-  }, [open]);
+  }, [open, isExpenseCheckout]);
 
   useEffect(() => {
     if (open) {
@@ -443,10 +497,34 @@ export default function CheckoutModal({
       );
       // Reset until wallet fetch completes for the prefilled customer
       setWalletBalance(0);
-      setInstructionNotes("");
-      setVerifiedStaff(null);
-      setVerifiedAt(null);
-      setStaffVerified(false);
+      setInstructionNotes(initialNotes);
+      setExpenseTitle(itemsProp[0]?.name || "");
+      {
+        const cat = String(itemsProp[0]?.category || "");
+        setExpenseCategory(
+          (EXPENSE_CATEGORIES as readonly string[]).includes(cat)
+            ? (cat as (typeof EXPENSE_CATEGORIES)[number])
+            : "Other",
+        );
+      }
+      setExpenseAmount(
+        String(
+          Number(grandTotalProp) > 0
+            ? grandTotalProp
+            : Number(itemsProp[0]?.price) || "",
+        ),
+      );
+      setPaymentMode("Cash");
+      setReverifyRequested(false);
+      if (initialVerifiedStaff?.staffId) {
+        setVerifiedStaff(initialVerifiedStaff);
+        setVerifiedAt(initialVerifiedAt || new Date().toISOString());
+        setStaffVerified(true);
+      } else {
+        setVerifiedStaff(null);
+        setVerifiedAt(null);
+        setStaffVerified(false);
+      }
       setCouponCode("");
       setCouponDiscount(0);
       setCouponLabel("");
@@ -467,9 +545,14 @@ export default function CheckoutModal({
     open,
     initialCustomerName,
     initialCustomerPhone,
+    initialNotes,
+    initialVerifiedStaff,
+    initialVerifiedAt,
     initialMembership,
     initialCustomerId,
     initialMembershipPlanId,
+    grandTotalProp,
+    itemsProp,
   ]);
 
   // Prefill from Create Invoice / POS: load wallet when customer is already selected
@@ -1144,14 +1227,18 @@ export default function CheckoutModal({
     : Math.max(0, finalPayable - totalPaid);
   const remainingForFull = Math.max(0, finalPayable - totalPaid);
 
+  const billedStaff =
+    verifiedStaff ||
+    (!reverifyRequested ? initialVerifiedStaff : null);
+
 
   const buildReceiptPayload = (invoiceNo: string) => ({
     invoiceNo,
     customerName: customerName.trim() || "Walk-in Customer",
     customerPhone: customerSearch.trim(),
     salesPerson:
-      verifiedStaff?.staffName ||
-      verifiedStaff?.name ||
+      billedStaff?.staffName ||
+      billedStaff?.name ||
       "—",
     membershipType:
       selectedCustomer?.membershipType || membership || undefined,
@@ -1190,15 +1277,30 @@ export default function CheckoutModal({
   };
 
   const handleComplete = async () => {
-    if (!customerName.trim()) {
-      Swal.fire("Customer required", "Please enter customer name.", "warning");
-      return;
+    if (isExpenseCheckout) {
+      if (!items.length || grandTotal <= 0) {
+        Swal.fire("Invalid amount", "Enter a valid expense amount.", "warning");
+        return;
+      }
+      if (!customerName.trim()) {
+        Swal.fire("Paid To required", "Please enter who this expense was paid to.", "warning");
+        return;
+      }
+    } else {
+      if (!customerName.trim()) {
+        Swal.fire("Customer required", "Please enter customer name.", "warning");
+        return;
+      }
+      if (!customerSearch.trim()) {
+        Swal.fire("Phone required", "Please enter customer mobile number.", "warning");
+        return;
+      }
+      if (!items.length) {
+        Swal.fire("No items", "Please add at least one item.", "warning");
+        return;
+      }
     }
-    if (!customerSearch.trim()) {
-      Swal.fire("Phone required", "Please enter customer mobile number.", "warning");
-      return;
-    }
-    if (!verifiedStaff?.staffId || !verifiedStaff?.staffName) {
+    if (!billedStaff?.staffId || !(billedStaff.staffName || billedStaff.name)) {
       Swal.fire(
         "Staff verification required",
         "Verify Staff PIN before completing this bill.",
@@ -1206,11 +1308,7 @@ export default function CheckoutModal({
       );
       return;
     }
-    if (!items.length) {
-      Swal.fire("No items", "Please add at least one item.", "warning");
-      return;
-    }
-    if (!selectedCustomer && (paymentMode === "Wallet" || splitPayments.wallet > 0)) {
+    if (!isExpenseCheckout && !selectedCustomer && (paymentMode === "Wallet" || splitPayments.wallet > 0)) {
       Swal.fire(
         "Customer required",
         "Select a customer before using wallet payment.",
@@ -1270,7 +1368,7 @@ export default function CheckoutModal({
       return;
     }
 
-    if (!verifiedStaff) {
+    if (!billedStaff) {
       Swal.fire(
         "Staff verification required",
         "Verify Staff PIN before completing billing.",
@@ -1361,12 +1459,18 @@ export default function CheckoutModal({
       customerId:
         selectedCustomer?._id ?? initialCustomerId ?? null,
       invoiceBy: {
-        staffId: String(verifiedStaff.staffId || verifiedStaff._id),
-        staffName: verifiedStaff.staffName || verifiedStaff.name,
-        employeeId: verifiedStaff.employeeId || verifiedStaff.m_staff_id || "",
-        email: verifiedStaff.email || "",
+        staffId: String(billedStaff.staffId || billedStaff._id),
+        staffName: billedStaff.staffName || billedStaff.name,
+        employeeId: billedStaff.employeeId || billedStaff.m_staff_id || "",
+        email: billedStaff.email || "",
       },
-      verifiedAt: verifiedAt,
+      verifiedAt: verifiedAt || initialVerifiedAt,
+      expenseTitle: isExpenseCheckout
+        ? (expenseTitle.trim() || items[0]?.name || "").trim()
+        : undefined,
+      expenseCategory: isExpenseCheckout
+        ? expenseCategory || items[0]?.category || "Other"
+        : undefined,
     };
     const payload = {
       customerName: customerName.trim(),
@@ -1375,17 +1479,17 @@ export default function CheckoutModal({
       invoiceDate: today,
       dueDate: today,
       salesPersonName:
-        verifiedStaff.staffName ||
-        verifiedStaff.name ||
+        billedStaff.staffName ||
+        billedStaff.name ||
         staff.m_staff_name ||
         "POS Sales",
       invoiceBy: {
-        staffId: String(verifiedStaff.staffId || verifiedStaff._id),
-        staffName: verifiedStaff.staffName || verifiedStaff.name,
-        employeeId: verifiedStaff.employeeId || verifiedStaff.m_staff_id || "",
-        email: verifiedStaff.email || "",
+        staffId: String(billedStaff.staffId || billedStaff._id),
+        staffName: billedStaff.staffName || billedStaff.name,
+        employeeId: billedStaff.employeeId || billedStaff.m_staff_id || "",
+        email: billedStaff.email || "",
       },
-      verifiedAt: verifiedAt,
+      verifiedAt: verifiedAt || initialVerifiedAt,
       notes: instructionNotes.trim(),
       items: items.map((item) => ({
         productName: item.name,
@@ -1491,7 +1595,11 @@ export default function CheckoutModal({
 
   if (!open) return null;
 
-  if (!staffVerified) {
+  const shouldAskPin =
+    !staffVerified &&
+    (!initialVerifiedStaff?.staffId || reverifyRequested);
+
+  if (shouldAskPin) {
     return (
       <StaffVerifyModal
         open
@@ -1500,6 +1608,7 @@ export default function CheckoutModal({
           setVerifiedStaff(verified);
           setVerifiedAt(at);
           setStaffVerified(true);
+          setReverifyRequested(false);
         }}
       />
     );
@@ -1525,10 +1634,14 @@ export default function CheckoutModal({
               Checkout
             </h2>
             <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
-              <Badge variant="indigo">{items.length} items</Badge>
-              <span className="text-xs font-medium text-slate-400">
-                {totalQty} units
-              </span>
+              <Badge variant="indigo">
+                {isExpenseCheckout ? "Expense" : `${items.length} items`}
+              </Badge>
+              {!isExpenseCheckout ? (
+                <span className="text-xs font-medium text-slate-400">
+                  {totalQty} units
+                </span>
+              ) : null}
             </div>
           </div>
 
@@ -1707,7 +1820,39 @@ export default function CheckoutModal({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 [scrollbar-width:thin]">
             <div className="mx-auto max-w-3xl space-y-6">
-              <SectionCard title="Customer Information" icon={User}>
+              <SectionCard
+                title={isExpenseCheckout ? "Expense Details" : "Customer Information"}
+                icon={User}
+              >
+                {isExpenseCheckout ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Title
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold text-slate-800">
+                        {expenseTitle || items[0]?.name || "Expense"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Category
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold text-slate-800">
+                        {expenseCategory || items[0]?.category || "Other"}
+                      </div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Paid To
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold text-slate-800">
+                        {customerName || "—"}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                <>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="relative" ref={searchRef}>
                     <label className="mb-1 block text-xs font-medium text-slate-500">
@@ -1790,9 +1935,12 @@ export default function CheckoutModal({
                     <span>Balance: {formatInr(walletBalance)}</span>
                   </div>
                 </div>
+                </>
+                )}
               </SectionCard>
 
               {/* Coupon / Referral — single input like FoodBill */}
+              {!isExpenseCheckout ? (
               <section className="rounded-xl border border-dashed border-violet-300 bg-violet-50/40 p-5 space-y-3">
                 <div className="flex items-center gap-2">
                   <Tag className="h-4 w-4 text-violet-600" />
@@ -1927,6 +2075,7 @@ export default function CheckoutModal({
                   </p>
                 )}
               </section>
+              ) : null}
 
               <SectionCard 
                 title="Payment" 
@@ -1998,7 +2147,7 @@ export default function CheckoutModal({
                 ) : !isMultiMode ? (
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      {PAYMENT_METHOD_OPTIONS.map(({ value, label, Icon }) => (
+                      {paymentMethodOptions.map(({ value, label, Icon }) => (
                         <PaymentModeButton
                           key={value}
                           active={paymentMode === value}
@@ -2025,7 +2174,10 @@ export default function CheckoutModal({
                 ) : (
                   <div className="space-y-4">
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                      {["cash", "upi", "wallet", "card"].map((key) => (
+                      {(isExpenseCheckout
+                        ? ["cash", "upi", "card"]
+                        : ["cash", "upi", "wallet", "card"]
+                      ).map((key) => (
                         <div key={key}>
                           <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                             {key}
@@ -2040,7 +2192,10 @@ export default function CheckoutModal({
                       ))}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {["Cash", "UPI", "Wallet", "Card"].map((label) => (
+                      {(isExpenseCheckout
+                        ? ["Cash", "UPI", "Card"]
+                        : ["Cash", "UPI", "Wallet", "Card"]
+                      ).map((label) => (
                         <button
                           key={label}
                           type="button"
@@ -2079,22 +2234,25 @@ export default function CheckoutModal({
 
               <div className="rounded-xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">
-                  Invoice By (PIN verified)
+                  {isExpenseCheckout
+                    ? "Expense created by (PIN verified)"
+                    : "Invoice By (PIN verified)"}
                 </div>
                 <div className="mt-0.5 flex items-center justify-between gap-2">
                   <div>
                     <div className="text-sm font-semibold text-slate-800">
-                      {verifiedStaff?.staffName || verifiedStaff?.name || "—"}
+                      {billedStaff?.staffName || billedStaff?.name || "—"}
                     </div>
                     <div className="text-xs text-slate-500">
-                      {verifiedStaff?.employeeId ||
-                        verifiedStaff?.m_staff_id ||
+                      {billedStaff?.employeeId ||
+                        billedStaff?.m_staff_id ||
                         ""}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
+                      setReverifyRequested(true);
                       setStaffVerified(false);
                       setVerifiedStaff(null);
                       setVerifiedAt(null);
@@ -2121,21 +2279,25 @@ export default function CheckoutModal({
         </div>
 
         <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-white px-3 py-3 sm:gap-3 sm:px-6 sm:py-4">
-          <button
-            type="button"
-            className="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
-          >
-            Save & New
-          </button>
-          <button
-            type="button"
-            onClick={handlePrintOnly}
-            disabled={saving || items.length === 0}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 transition-all sm:flex-none sm:px-5"
-          >
-            <Printer className="h-4 w-4" />
-            <span>Print</span>
-          </button>
+          {!isExpenseCheckout ? (
+            <button
+              type="button"
+              className="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+            >
+              Save & New
+            </button>
+          ) : null}
+          {!isExpenseCheckout ? (
+            <button
+              type="button"
+              onClick={handlePrintOnly}
+              disabled={saving || items.length === 0}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 transition-all sm:flex-none sm:px-5"
+            >
+              <Printer className="h-4 w-4" />
+              <span>Print</span>
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -2150,13 +2312,17 @@ export default function CheckoutModal({
             <span>
               {saving
                 ? "Saving..."
-                : isDuePayment
-                  ? isPurchaseCheckout
-                    ? "Save Due / Credit Purchase"
-                    : "Complete as Due"
-                  : isPurchaseCheckout
-                    ? "Complete Cash Purchase"
-                    : "Complete"}
+                : isExpenseCheckout
+                  ? isDuePayment
+                    ? "Save as Due Expense"
+                    : "Save Expense"
+                  : isDuePayment
+                    ? isPurchaseCheckout
+                      ? "Save Due / Credit Purchase"
+                      : "Complete as Due"
+                    : isPurchaseCheckout
+                      ? "Complete Cash Purchase"
+                      : "Complete"}
             </span>
           </button>
         </footer>

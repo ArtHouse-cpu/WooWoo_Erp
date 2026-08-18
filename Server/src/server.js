@@ -34,6 +34,8 @@ import {customerErrorHandler} from './modules/customer/middlewares/errorHandler.
 import path from 'path';
 import {fileURLToPath} from 'url';
 import sentAnnouncement from './routes/sendAnnouncement.router.js';
+import expenceRoutes from './routes/expence.router.js';
+import expenceCategoryRoutes from './routes/expenceCategory.router.js';
 // import activityRoutes from './routes/activity.route.js';
 
 // Load environment variables
@@ -112,6 +114,11 @@ app.use('/csp', cspRouters);
 app.use('/api/customer', customerAuthRoutes);
 //send whatsapp announcement
 app.use('/api/announcement', sentAnnouncement);
+
+//Expences module
+
+app.use('/api/expences', expenceRoutes);
+app.use('/api/expences/category', expenceCategoryRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

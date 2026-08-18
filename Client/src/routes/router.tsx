@@ -54,6 +54,7 @@ import CreateSpacesScreen from "@/features/catalogue/pages/CreateSpacesScreen";
 import CreateFoodScreen from "@/features/catalogue/pages/CreateFoodScreen";
 import { FoodBill } from "@/features/foodbill";
 import AnnouncementScreen from "@/features/announcement/announcementScreen";
+import ExpenseScreen from "@/features/expenses/ExpenseScreen";
 
 export const router = createBrowserRouter([
   {
@@ -119,6 +120,7 @@ export const router = createBrowserRouter([
           { path: "foods", element: <CreateFoodScreen /> },
           { path: "foodBill", element: <FoodBill /> },
           { path: "announcements", element: <AnnouncementScreen /> },
+          { path: "expenses", element: <ExpenseScreen /> },
         ],
       },
     ],

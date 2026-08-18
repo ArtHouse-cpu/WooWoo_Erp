@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import {
+import { 
   Users, Wallet, Settings, Gift, Trophy, CreditCard,
 } from 'lucide-react';
-import {
-  handleGetAffiliateSettings,
+import { 
+  handleGetAffiliateSettings, 
   handleUpdateAffiliateSettings,
 } from '@/services/apiClient';
 import { AffiliateToggle, notifyAffiliate, runAffiliateAction } from '../components/affiliateShared';
@@ -57,8 +57,8 @@ export default function AffiliateProgramScreen() {
   const handleSave = async (updatedSettings: any) => {
     await runAffiliateAction(
       async () => {
-        const data = await handleUpdateAffiliateSettings(updatedSettings);
-        setSettings(data);
+      const data = await handleUpdateAffiliateSettings(updatedSettings);
+      setSettings(data);
       },
       'Settings saved successfully',
       'Are you sure you want to save these changes?'
@@ -68,7 +68,7 @@ export default function AffiliateProgramScreen() {
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
-
+  
   const tabs = [
     { name: 'Overview', icon: <Users size={16} /> },
     { name: 'Affiliates', icon: <Users size={16} /> },
