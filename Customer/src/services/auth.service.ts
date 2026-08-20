@@ -143,25 +143,37 @@ export const authApi = {
     couponCode?: string;
   }) =>
     api.post<
-      ApiResponse<{
-        mode: "razorpay" | "free";
-        activated?: boolean;
-        customer?: Customer;
-        orderId?: string;
-        amount?: number;
-        amountInRupees?: number;
-        currency?: string;
-        keyId?: string;
-        dbOrderId?: string;
-        pricing?: {
-          orderAmount: number;
-          discountAmount: number;
-          paidAmount: number;
-          couponCode?: string | null;
-        };
-        plan?: { planName: string; planId: string };
-        customer?: { name?: string; email?: string; mobile?: string };
-      }>
+      ApiResponse<
+        | {
+            mode: "free";
+            activated?: boolean;
+            customer?: Customer;
+            pricing?: {
+              orderAmount: number;
+              discountAmount: number;
+              paidAmount: number;
+              couponCode?: string | null;
+            };
+          }
+        | {
+            mode: "razorpay";
+            activated?: boolean;
+            orderId?: string;
+            amount?: number;
+            amountInRupees?: number;
+            currency?: string;
+            keyId?: string;
+            dbOrderId?: string;
+            pricing?: {
+              orderAmount: number;
+              discountAmount: number;
+              paidAmount: number;
+              couponCode?: string | null;
+            };
+            plan?: { planName: string; planId: string };
+            customer?: { name?: string; email?: string; mobile?: string };
+          }
+      >
     >("/payments/razorpay/initiate", payload),
 
   verifyRazorpayPayment: (payload: {
