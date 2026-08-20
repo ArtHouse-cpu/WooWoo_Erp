@@ -8,6 +8,7 @@ import {
   deleteSubscription,
   getSubscriptionById,
   getSubscriptions,
+  sendMembershipRenewalReminder,
   updateSubscription,
 } from '../controllers/subscription.controller.js';
 
@@ -21,6 +22,11 @@ router.post(
   '/bulk',
   requirePermission(PERMISSIONS.SUBSCRIPTION_BULK_CREATE),
   bulkCreateSubscriptions,
+);
+router.post(
+  '/:id/whatsapp-renewal',
+  requirePermission(PERMISSIONS.SUBSCRIPTION_UPDATE),
+  sendMembershipRenewalReminder,
 );
 router.get('/:id', requirePermission(PERMISSIONS.SUBSCRIPTION_READ), getSubscriptionById);
 router.post('/', requirePermission(PERMISSIONS.SUBSCRIPTION_CREATE), createSubscription);

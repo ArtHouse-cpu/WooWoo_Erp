@@ -19,6 +19,7 @@ import {
 import {creditInviteReward} from './referral.service.js';
 import Wallet from '../../../models/wallet.model.js';
 import {creditPlanPurchaseCashback} from '../../../controllers/subscription.controller.js';
+import {ensureSubscriptionForMembership} from '../../../services/subscriptionFromMembership.service.js';
 import {
   generateAccessToken,
   createRefreshToken,
@@ -768,6 +769,29 @@ export const activateMembership = async (customerId, payload = {}) => {
       customer.membershipPurchase?.paymentOrderId &&
       String(customer.membershipPurchase.paymentOrderId) === String(paymentOrder._id)
     ) {
+      // Still ensure Subscription row exists (legacy activations skipped this)
+      try {
+        await ensureSubscriptionForMembership({
+          customer,
+          membershipType: paymentOrder.membershipType || customer.membershipType,
+          membershipPlan: null,
+          orderAmount: paymentOrder.orderAmount,
+          discountAmount: paymentOrder.discountAmount,
+          paidAmount: paymentOrder.paidAmount,
+          couponCode: paymentOrder.couponCode || null,
+          paymentOrder,
+          createdBy: {
+            m_staff_id: null,
+            m_staff_name: 'Customer Portal',
+            m_staff_email: null,
+          },
+        });
+      } catch (subErr) {
+        console.error(
+          '[Membership] ensure Subscription on re-activate failed:',
+          subErr?.message || subErr,
+        );
+      }
       return {
         customer: customer.toSafeObject(),
         cashback: 0,
@@ -907,6 +931,30 @@ export const activateMembership = async (customerId, payload = {}) => {
   }
 
   await customer.save();
+
+  // Always create/link a Subscription row so Admin Subscription screen stays in sync
+  try {
+    await ensureSubscriptionForMembership({
+      customer,
+      membershipType,
+      membershipPlan,
+      orderAmount,
+      discountAmount,
+      paidAmount,
+      couponCode,
+      paymentOrder,
+      createdBy: {
+        m_staff_id: null,
+        m_staff_name: 'Customer Portal',
+        m_staff_email: null,
+      },
+    });
+  } catch (subErr) {
+    console.error(
+      '[Membership] ensure Subscription row failed:',
+      subErr?.message || subErr,
+    );
+  }
 
   let responseCustomer = customer;
   if (safeCashback > 0) {

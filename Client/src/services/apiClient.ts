@@ -901,6 +901,26 @@ export const handleDeleteSubscription = async (id: string) => {
   return response.data;
 };
 
+export const handleSendMembershipRenewalWhatsApp = async (subscriptionId: string) => {
+  const response = await axiosInstance.post(
+    `/subscriptions/${subscriptionId}/whatsapp-renewal`,
+  );
+  return response.data as {
+    success: boolean;
+    message?: string;
+    reminder?: {
+      subscriptionId: string;
+      phone: string;
+      templateName: string;
+      messageId?: string | null;
+      stub?: boolean;
+      bodyParams?: string[];
+      lastRenewalReminderAt?: string;
+      lastRenewalReminderStatus?: string;
+    };
+  };
+};
+
 export type CustomerPayload = {
   _id?: string;
   name: string;

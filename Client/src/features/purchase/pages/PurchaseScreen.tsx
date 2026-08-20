@@ -22,6 +22,12 @@ import {
   handleCreatePurchaseReturn,
   type PurchaseReturnPayload,
 } from "@/services/apiClient";
+import {
+  DATE_PRESET_OPTIONS,
+  getTodayYmd,
+  rangeForPreset,
+  type DatePreset,
+} from "@/utils/datePresets";
 import { useAppSelector } from "@/store/hooks";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import Can from "@/components/rbac/Can";
@@ -168,16 +174,9 @@ export default function PurchaseScreen() {
   const [activeTab, setActiveTab] = useState<PurchaseTabStatus | "All">("All");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
-
-//fromDate to date
-const getToday = () => {
-  const d = new Date();
-  const offset = d.getTimezoneOffset();
-  return new Date(d.getTime() - offset * 60 * 1000).toISOString().split("T")[0];
-};
-
-const [fromDate, setFromDate] = useState(getToday());
-const [toDate, setToDate] = useState(getToday());
+  const [datePreset, setDatePreset] = useState<DatePreset>("today");
+  const [fromDate, setFromDate] = useState(getTodayYmd);
+  const [toDate, setToDate] = useState(getTodayYmd);
 
   const [data, setData] = useState<PurchaseListRow[]>([]);
   const [selectedActionRow, setSelectedActionRow] =
@@ -828,6 +827,24 @@ useEffect(() => {
 
       <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <select
+            value={datePreset}
+            onChange={(e) => {
+              const preset = e.target.value as DatePreset;
+              setDatePreset(preset);
+              if (preset === "custom") return;
+              const range = rangeForPreset(preset);
+              setFromDate(range.from);
+              setToDate(range.to);
+            }}
+            className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+          >
+            {DATE_PRESET_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           <div className="flex items-center gap-2">
             <label className="whitespace-nowrap text-xs font-medium text-gray-500">
               From
@@ -836,7 +853,10 @@ useEffect(() => {
               type="date"
               value={fromDate}
               max={toDate || undefined}
-              onChange={(e) => setFromDate(e.target.value)}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setDatePreset("custom");
+              }}
               className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
             />
           </div>
@@ -848,10 +868,26 @@ useEffect(() => {
               type="date"
               value={toDate}
               min={fromDate || undefined}
-              onChange={(e) => setToDate(e.target.value)}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setDatePreset("custom");
+              }}
               className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
             />
           </div>
+          {(fromDate || toDate || datePreset !== "all") && (
+            <button
+              type="button"
+              onClick={() => {
+                setDatePreset("all");
+                setFromDate("");
+                setToDate("");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 

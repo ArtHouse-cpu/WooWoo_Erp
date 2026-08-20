@@ -19,6 +19,12 @@ import {
   handleGetInvoice,
   handleGetInvoices,
 } from "@/services/apiClient";
+import {
+  DATE_PRESET_OPTIONS,
+  getTodayYmd,
+  rangeForPreset,
+  type DatePreset,
+} from "@/utils/datePresets";
 import CreatePosScreen from "./CreatePosScreen";
 import CreateInvoiceScreen from "./CreateInvoiceScreen";
 import DuePaymentModal from "../components/invoice/Modal/DuePaymentModal";
@@ -78,14 +84,9 @@ export default function PosScreen() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<PosRow["status"] | "All">("All");
   const [search, setSearch] = useState("");
-  const getToday = () => {
-    const date = new Date();
-    const offset = date.getTimezoneOffset();
-    const localDate = new Date(date.getTime() - offset * 60 * 1000);
-    return localDate.toISOString().split("T")[0];
-  };
-  const [fromDate, setFromDate] = useState(getToday());
-  const [toDate, setToDate] = useState(getToday());
+  const [datePreset, setDatePreset] = useState<DatePreset>("today");
+  const [fromDate, setFromDate] = useState(getTodayYmd);
+  const [toDate, setToDate] = useState(getTodayYmd);
   const [data, setData] = useState<PosRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedActionRow, setSelectedActionRow] = useState<PosRow | null>(
@@ -749,8 +750,26 @@ export default function PosScreen() {
           />
         </div>
 
-        {/* From / To date filter */}
+        {/* Date preset + From / To */}
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <select
+            value={datePreset}
+            onChange={(e) => {
+              const preset = e.target.value as DatePreset;
+              setDatePreset(preset);
+              if (preset === "custom") return;
+              const range = rangeForPreset(preset);
+              setFromDate(range.from);
+              setToDate(range.to);
+            }}
+            className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+          >
+            {DATE_PRESET_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
           <div className="flex items-center gap-2">
             <label className="whitespace-nowrap text-xs font-medium text-gray-500">
               From
@@ -759,7 +778,10 @@ export default function PosScreen() {
               type="date"
               value={fromDate}
               max={toDate || undefined}
-              onChange={(e) => setFromDate(e.target.value)}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setDatePreset("custom");
+              }}
               className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
             />
           </div>
@@ -771,10 +793,26 @@ export default function PosScreen() {
               type="date"
               value={toDate}
               min={fromDate || undefined}
-              onChange={(e) => setToDate(e.target.value)}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setDatePreset("custom");
+              }}
               className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
             />
           </div>
+          {(fromDate || toDate || datePreset !== "all") && (
+            <button
+              type="button"
+              onClick={() => {
+                setDatePreset("all");
+                setFromDate("");
+                setToDate("");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 

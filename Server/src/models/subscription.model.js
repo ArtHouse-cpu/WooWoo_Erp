@@ -203,6 +203,14 @@ const subscriptionSchema = new mongoose.Schema(
       m_staff_name: {type: String, default: null},
       m_staff_email: {type: String, default: null},
     },
+    /** Last membershiprenewal WhatsApp reminder attempt */
+    lastRenewalReminderAt: {type: Date, default: null},
+    lastRenewalReminderStatus: {
+      type: String,
+      enum: ['success', 'failed', ''],
+      default: '',
+    },
+    lastRenewalReminderMessageId: {type: String, default: null},
   },
   {timestamps: true},
 );

@@ -1,0 +1,56 @@
+/** Shared date-range presets for list screens (invoices, purchases, expenses, etc.). */
+
+export type DatePreset =
+  | "all"
+  | "today"
+  | "yesterday"
+  | "month"
+  | "year"
+  | "custom";
+
+export const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
+  { value: "all", label: "All Dates" },
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "month", label: "This Month" },
+  { value: "year", label: "This Year" },
+  { value: "custom", label: "Custom Range" },
+];
+
+export function toDateYmd(value: Date): string {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, "0");
+  const d = String(value.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Local calendar today as YYYY-MM-DD (avoids UTC shift). */
+export function getTodayYmd(): string {
+  return toDateYmd(new Date());
+}
+
+export function rangeForPreset(preset: DatePreset): { from: string; to: string } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (preset === "today") {
+    const ymd = toDateYmd(today);
+    return { from: ymd, to: ymd };
+  }
+  if (preset === "yesterday") {
+    const y = new Date(today);
+    y.setDate(y.getDate() - 1);
+    const ymd = toDateYmd(y);
+    return { from: ymd, to: ymd };
+  }
+  if (preset === "month") {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { from: toDateYmd(start), to: toDateYmd(today) };
+  }
+  if (preset === "year") {
+    const start = new Date(today.getFullYear(), 0, 1);
+    return { from: toDateYmd(start), to: toDateYmd(today) };
+  }
+  // "all" | "custom" — caller keeps or clears inputs
+  return { from: "", to: "" };
+}

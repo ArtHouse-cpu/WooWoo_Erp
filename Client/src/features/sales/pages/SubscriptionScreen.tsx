@@ -12,12 +12,14 @@ import {
   Download,
   Ellipsis,
   ArrowUpCircle,
+  MessageCircle,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import {
   handleDeleteSubscription,
   handleGetMemberships,
   handleGetAllSubscriptions,
+  handleSendMembershipRenewalWhatsApp,
 } from "@/services/apiClient";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
@@ -28,6 +30,11 @@ import {
 import CreateSubscriptionScreen from "./CreateSubscriptionScreen";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
+import {
+  DATE_PRESET_OPTIONS,
+  rangeForPreset,
+  type DatePreset,
+} from "@/utils/datePresets";
 
 type SubscriptionStatus =
   | "active"
@@ -53,7 +60,56 @@ type SubscriptionRow = {
   subscriptionType: string;
   _id: string;
   raw: any;
+  lastRenewalReminderAt?: string;
+  lastRenewalReminderStatus?: string;
 };
+
+function toDateYmd(value: Date): string {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, "0");
+  const d = String(value.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function subscriptionRowDateYmd(row: SubscriptionRow): string | null {
+  const raw = row.raw as Record<string, unknown> | undefined;
+  const candidates = [
+    raw?.invoiceDate,
+    raw?.startDate,
+    raw?.createdAt,
+    raw?.updatedAt,
+  ];
+  for (const value of candidates) {
+    if (!value) continue;
+    const d = value instanceof Date ? value : new Date(String(value));
+    if (!Number.isNaN(d.getTime())) return toDateYmd(d);
+  }
+  return null;
+}
+
+const RENEWAL_SOON_DAYS = 30;
+
+function daysUntilEnd(raw: any): number | null {
+  const endDateRaw = raw?.endDate ?? raw?.dueDate;
+  if (!endDateRaw) return null;
+  const endDate = new Date(endDateRaw);
+  if (Number.isNaN(endDate.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  endDate.setHours(0, 0, 0, 0);
+  return Math.ceil(
+    (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+  );
+}
+
+/** Expired or expiring within RENEWAL_SOON_DAYS — matches backend eligibility */
+function isRenewalReminderEligible(row: SubscriptionRow): boolean {
+  if (row.status === "cancelled" || row.status === "error") return false;
+  if (row.status === "expired") return true;
+  const days = daysUntilEnd(row.raw);
+  if (days == null) return false;
+  return days <= RENEWAL_SOON_DAYS;
+}
 
 const tabs: Array<SubscriptionStatus | "all"> = [
   "all",
@@ -81,6 +137,9 @@ export default function SubscriptionScreen() {
   >([]);
   const [subscriptionTypeFilter, setSubscriptionTypeFilter] = useState("all");
   const [expiryFilter, setExpiryFilter] = useState("all");
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [data, setData] = useState<SubscriptionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedActionRow, setSelectedActionRow] =
@@ -98,6 +157,9 @@ export default function SubscriptionScreen() {
       _id?: string;
     }>
   >([]);
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     const fetchMemberships = async () => {
@@ -202,6 +264,87 @@ export default function SubscriptionScreen() {
       }
     }
     setSelectedActionRow(null);
+  };
+
+  const sendRenewalReminder = async (row: SubscriptionRow) => {
+    if (!row._id || sendingReminderId) return;
+    if (!isRenewalReminderEligible(row)) {
+      await Swal.fire(
+        "Not eligible",
+        "Reminders are only for expired or soon-to-expire memberships.",
+        "info",
+      );
+      return;
+    }
+    if (!String(row.phone || "").trim()) {
+      await Swal.fire(
+        "No phone number",
+        "This member has no WhatsApp / mobile number on file.",
+        "warning",
+      );
+      return;
+    }
+
+    const confirm = await Swal.fire({
+      title: "Send WhatsApp reminder?",
+      html: `Send <b>membershiprenewal</b> reminder to <b>${row.customer}</b> (${row.phone})?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Send reminder",
+      confirmButtonColor: "#16a34a",
+    });
+    if (!confirm.isConfirmed) return;
+
+    setSendingReminderId(row._id);
+    Swal.fire({
+      title: "Sending...",
+      text: "Sending WhatsApp renewal reminder",
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading(),
+    });
+
+    try {
+      const res = await handleSendMembershipRenewalWhatsApp(row._id);
+      await Swal.fire(
+        "Sent",
+        res?.message || "WhatsApp reminder sent successfully.",
+        "success",
+      );
+      setData((prev) =>
+        prev.map((r) =>
+          r._id === row._id
+            ? {
+                ...r,
+                lastRenewalReminderAt:
+                  res?.reminder?.lastRenewalReminderAt ||
+                  new Date().toISOString(),
+                lastRenewalReminderStatus:
+                  res?.reminder?.lastRenewalReminderStatus || "success",
+                raw: {
+                  ...r.raw,
+                  lastRenewalReminderAt:
+                    res?.reminder?.lastRenewalReminderAt ||
+                    new Date().toISOString(),
+                  lastRenewalReminderStatus:
+                    res?.reminder?.lastRenewalReminderStatus || "success",
+                  lastRenewalReminderMessageId:
+                    res?.reminder?.messageId || null,
+                },
+              }
+            : r,
+        ),
+      );
+    } catch (error: any) {
+      await Swal.fire(
+        "Send failed",
+        error?.response?.data?.message ||
+          error?.message ||
+          "Could not send WhatsApp reminder. Please try again.",
+        "error",
+      );
+    } finally {
+      setSendingReminderId(null);
+    }
   };
 
   const formatDate = (value?: string | Date) => {
@@ -342,6 +485,12 @@ export default function SubscriptionScreen() {
             ).toLowerCase(),
             _id: String(subscription?._id ?? ""),
             raw: subscription,
+            lastRenewalReminderAt: subscription?.lastRenewalReminderAt
+              ? String(subscription.lastRenewalReminderAt)
+              : undefined,
+            lastRenewalReminderStatus: subscription?.lastRenewalReminderStatus
+              ? String(subscription.lastRenewalReminderStatus)
+              : undefined,
           };
         },
       );
@@ -405,9 +554,34 @@ export default function SubscriptionScreen() {
         return true;
       })();
 
-      return statusOk && searchOk && typeOk && expiryOk;
+      const dateOk = (() => {
+        if (!fromDate && !toDate) return true;
+        const ymd = subscriptionRowDateYmd(row);
+        if (!ymd) return false;
+        if (fromDate && ymd < fromDate) return false;
+        if (toDate && ymd > toDate) return false;
+        return true;
+      })();
+
+      return statusOk && searchOk && typeOk && expiryOk && dateOk;
     });
-  }, [activeTab, data, search, subscriptionTypeFilter, expiryFilter]);
+  }, [
+    activeTab,
+    data,
+    search,
+    subscriptionTypeFilter,
+    expiryFilter,
+    fromDate,
+    toDate,
+  ]);
+
+  const applyDatePreset = (preset: DatePreset) => {
+    setDatePreset(preset);
+    if (preset === "custom") return;
+    const range = rangeForPreset(preset);
+    setFromDate(range.from);
+    setToDate(range.to);
+  };
 
   const columns = useMemo(
     () => [
@@ -669,30 +843,60 @@ export default function SubscriptionScreen() {
             }
           };
 
+          const eligible = isRenewalReminderEligible(subscription);
+          const sending = sendingReminderId === subscription._id;
+          const lastSent = subscription.lastRenewalReminderAt
+            ? formatDate(subscription.lastRenewalReminderAt)
+            : "";
+
           return (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleWhatsAppShare}
-                className="flex items-center gap-1 rounded-md bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200"
-              >
-                <img
-                  src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
-                  alt="whatsapp"
-                  className="h-4 w-4"
-                />
-              </button>
-              <button
-                onClick={handleDownloadInvoice}
-                className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
-              >
-                <Download size={14} />
-              </button>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                {eligible ? (
+                  <Can permission={PERMISSIONS.SUBSCRIPTION_UPDATE}>
+                    <button
+                      type="button"
+                      title="Send WhatsApp renewal reminder"
+                      disabled={sending || Boolean(sendingReminderId)}
+                      onClick={() => void sendRenewalReminder(subscription)}
+                      className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <MessageCircle size={14} />
+                      {sending ? "Sending..." : "Remind"}
+                    </button>
+                  </Can>
+                ) : null}
+                <button
+                  onClick={handleWhatsAppShare}
+                  className="flex items-center gap-1 rounded-md bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200"
+                >
+                  <img
+                    src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
+                    alt="whatsapp"
+                    className="h-4 w-4"
+                  />
+                </button>
+                <button
+                  onClick={handleDownloadInvoice}
+                  className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+                >
+                  <Download size={14} />
+                </button>
+              </div>
+              {lastSent ? (
+                <span className="text-[10px] text-slate-400">
+                  Last reminder: {lastSent}
+                  {subscription.lastRenewalReminderStatus
+                    ? ` · ${subscription.lastRenewalReminderStatus}`
+                    : ""}
+                </span>
+              ) : null}
             </div>
           );
         },
       },
     ],
-    [],
+    [sendingReminderId, membershipPlans],
   );
 
   const table = useMaterialReactTable({
@@ -874,6 +1078,60 @@ export default function SubscriptionScreen() {
           <option value="year">Expire in a Year</option>
           <option value="expired">Expired</option>
         </select>
+
+        <select
+          value={datePreset}
+          onChange={(e) => applyDatePreset(e.target.value as DatePreset)}
+          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-400 bg-white text-gray-700"
+        >
+          {DATE_PRESET_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              From
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setDatePreset("custom");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              To
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setDatePreset("custom");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+          {(fromDate || toDate || datePreset !== "all") && (
+            <button
+              type="button"
+              onClick={() => applyDatePreset("all")}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       <MaterialReactTable table={table} />
@@ -928,6 +1186,32 @@ export default function SubscriptionScreen() {
                   </div>
                 </div>
               </button>
+              {isRenewalReminderEligible(selectedActionRow) && (
+                <Can permission={PERMISSIONS.SUBSCRIPTION_UPDATE}>
+                  <button
+                    type="button"
+                    disabled={Boolean(sendingReminderId)}
+                    onClick={() => {
+                      const row = selectedActionRow;
+                      setSelectedActionRow(null);
+                      void sendRenewalReminder(row);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 text-left transition-colors hover:bg-emerald-50 disabled:opacity-60"
+                  >
+                    <div className="rounded-full bg-emerald-100 p-2 text-emerald-700">
+                      <MessageCircle size={18} />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-800">
+                        Send WhatsApp Reminder
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Send membershiprenewal template to this member
+                      </div>
+                    </div>
+                  </button>
+                </Can>
+              )}
               <Can permission={PERMISSIONS.SUBSCRIPTION_UPDATE}>
                 <button
                   onClick={() => handleAction("edit")}

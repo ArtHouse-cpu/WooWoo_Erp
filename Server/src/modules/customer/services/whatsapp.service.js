@@ -1207,6 +1207,8 @@ export const sendWhatsAppTemplateMessage = async ({
   bodyParams = [], // ["Rahul", "Premium"] → {{1}} {{2}}
   headerImageLink = '', // public HTTPS URL for IMAGE-header templates
   headerImageId = '', // WhatsApp media id (preferred when no public URL)
+  /** Dynamic URL button suffixes, index order (0 = first URL button) */
+  buttonUrlParams = [],
 }) => {
   const { phoneNumberId, accessToken, version } = getWhatsAppCreds();
 
@@ -1218,6 +1220,7 @@ export const sendWhatsAppTemplateMessage = async ({
       bodyParams,
       headerImageLink,
       headerImageId,
+      buttonUrlParams,
     });
     return { delivered: false, stub: true };
   }
@@ -1263,6 +1266,17 @@ export const sendWhatsAppTemplateMessage = async ({
     });
   }
 
+  (Array.isArray(buttonUrlParams) ? buttonUrlParams : []).forEach((param, index) => {
+    const text = String(param ?? '').trim();
+    if (!text) return;
+    components.push({
+      type: 'button',
+      sub_type: 'url',
+      index: String(index),
+      parameters: [{ type: 'text', text }],
+    });
+  });
+
   if (
     announcementRequiresImageHeader(templateName) &&
     !components.some((c) => c.type === 'header')
@@ -1300,4 +1314,234 @@ export const sendWhatsAppTemplateMessage = async ({
     throw new Error(details ? `${msg} — ${details}` : msg);
   }
   return { delivered: true, messageId: data?.messages?.[0]?.id };
+};
+
+const getMembershipRenewalTemplateConfig = () => {
+  const { phoneNumberId, accessToken, language } = getConfig();
+  const templateName = (
+    process.env.WHATSAPP_MEMBERSHIP_RENEWAL_TEMPLATE ||
+    'membershiprenewal'
+  ).trim();
+  const renewalLanguage = (
+    process.env.WHATSAPP_MEMBERSHIP_RENEWAL_TEMPLATE_LANGUAGE ||
+    language ||
+    'en'
+  ).trim();
+  const urlButtonParam = (
+    process.env.WHATSAPP_MEMBERSHIP_RENEWAL_URL_PARAM ||
+    ''
+  ).trim();
+
+  return {
+    phoneNumberId,
+    accessToken,
+    templateName,
+    language: renewalLanguage,
+    urlButtonParam,
+  };
+};
+
+const buildMembershipRenewalTemplatePayload = ({
+  to,
+  templateName,
+  language,
+  name,
+  daysLabel,
+  savingsLabel,
+  planLabel,
+  cashbackLabel,
+  urlButtonParam,
+}) => {
+  const components = [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', text: String(name || 'Member') },
+        { type: 'text', text: String(daysLabel) },
+        { type: 'text', text: String(savingsLabel) },
+        { type: 'text', text: String(planLabel) },
+        { type: 'text', text: String(cashbackLabel) },
+      ],
+    },
+  ];
+
+  if (urlButtonParam) {
+    components.push({
+      type: 'button',
+      sub_type: 'url',
+      index: '0',
+      parameters: [{ type: 'text', text: String(urlButtonParam) }],
+    });
+  }
+
+  return {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: language },
+      components,
+    },
+  };
+};
+
+/**
+ * Send Meta template `membershiprenewal`.
+ * Body vars (positional):
+ *  {{1}} name
+ *  {{2}} days until expiry (e.g. 07)
+ *  {{3}} savings so far — digits only (template already has ₹)
+ *  {{4}} plan name (e.g. Premium)
+ *  {{5}} renew cashback gift — digits only (template already has ₹)
+ * Optional URL button index 0 = renew link suffix.
+ */
+export const sendMembershipRenewalWhatsApp = async ({
+  to,
+  name,
+  daysUntilExpiry,
+  savingsAmount,
+  planName,
+  cashbackAmount,
+  renewUrlParam,
+}) => {
+  const {
+    phoneNumberId,
+    accessToken,
+    templateName,
+    language,
+    urlButtonParam,
+  } = getMembershipRenewalTemplateConfig();
+
+  const daysNum = Math.max(0, Math.ceil(Number(daysUntilExpiry) || 0));
+  const daysLabel = String(daysNum).padStart(2, '0');
+  const savingsNum = Math.max(0, Math.round(Number(savingsAmount) || 0));
+  const cashbackNum = Math.max(
+    0,
+    Math.round(
+      Number(
+        cashbackAmount ??
+          process.env.WHATSAPP_MEMBERSHIP_RENEWAL_CASHBACK ??
+          process.env.WHATSAPP_MEMBERSHIP_CASHBACK ??
+          200,
+      ) || 0,
+    ),
+  );
+  const planLabel = String(planName || 'Membership').trim() || 'Membership';
+  // Meta template body already includes ₹ before {{3}} and {{5}} — send digits only.
+  const savingsLabel = formatAmountPlain(savingsNum);
+  const cashbackLabel = formatAmountPlain(cashbackNum);
+  const buttonParam = String(renewUrlParam || urlButtonParam || '').trim();
+
+  if (!phoneNumberId || !accessToken) {
+    console.log('[MembershipRenewal][WhatsApp stub]', {
+      to,
+      name,
+      daysLabel,
+      savingsLabel,
+      planLabel,
+      cashbackLabel,
+      buttonParam,
+    });
+    return {
+      channel: 'whatsapp-stub',
+      delivered: false,
+      stub: true,
+      bodyParams: [name, daysLabel, savingsLabel, planLabel, cashbackLabel],
+    };
+  }
+
+  const recipient = toWhatsAppRecipient(to);
+  if (!recipient) {
+    const error = new Error('Invalid mobile / WhatsApp number');
+    error.status = 400;
+    throw error;
+  }
+
+  let lastError = null;
+  const templateNames = templateNameCandidates(templateName, [
+    'membershiprenewal',
+  ]);
+  const buttonModes = buttonParam
+    ? [buttonParam, '']
+    : ['', 'renew'];
+
+  for (const activeTemplate of templateNames) {
+    for (const lang of languageCandidates(language)) {
+      for (const btn of buttonModes) {
+        const payload = buildMembershipRenewalTemplatePayload({
+          to: recipient,
+          templateName: activeTemplate,
+          language: lang,
+          name: String(name || 'Member').trim() || 'Member',
+          daysLabel,
+          savingsLabel,
+          planLabel,
+          cashbackLabel,
+          urlButtonParam: btn || null,
+        });
+
+        const result = await postTemplateMessage({
+          phoneNumberId,
+          accessToken,
+          payload,
+        });
+
+        if (result.ok) {
+          const messageId = result.json?.messages?.[0]?.id || null;
+          console.log(
+            `[MembershipRenewal][WhatsApp] delivered to=${recipient} template=${activeTemplate} lang=${lang} id=${messageId}`,
+          );
+          return {
+            channel: 'whatsapp',
+            delivered: true,
+            messageId,
+            templateName: activeTemplate,
+            language: lang,
+            bodyParams: [
+              String(name || 'Member').trim() || 'Member',
+              daysLabel,
+              savingsLabel,
+              planLabel,
+              cashbackLabel,
+            ],
+          };
+        }
+
+        lastError =
+          result.json?.error || { message: result.raw, status: result.status };
+        const message = String(lastError.message || '');
+
+        if (
+          lastError.code === 190 ||
+          /oauth|access token|authenticat/i.test(message)
+        ) {
+          break;
+        }
+        if (isMissingTemplateError(lastError)) {
+          break;
+        }
+        if (/button|component|parameter|expected|number of params/i.test(message)) {
+          continue;
+        }
+        break;
+      }
+
+      if (
+        lastError?.code === 190 ||
+        isMissingTemplateError(lastError) ||
+        /oauth|access token|authenticat/i.test(String(lastError?.message || ''))
+      ) {
+        break;
+      }
+    }
+  }
+
+  const err = new Error(
+    lastError?.message || 'Failed to send membership renewal WhatsApp',
+  );
+  err.status = 502;
+  err.meta = lastError;
+  throw err;
 };

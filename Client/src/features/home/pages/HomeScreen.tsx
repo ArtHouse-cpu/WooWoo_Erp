@@ -23,6 +23,7 @@ import {
 import {
   customerPayloadToFormData,
   handleCreateCustomer,
+  handleGetAllSubscriptions,
   handleGetCspEnrollments,
   handleGetCustomers,
   handleGetFoods,
@@ -210,6 +211,52 @@ function inDateRange(date: Date | null, filter: DateFilter) {
   return date >= start;
 }
 
+/** Local YYYY-MM-DD — same day basis as SubscriptionScreen date filters. */
+function toLocalYmd(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function periodBoundsYmd(filter: DateFilter): { from: string; to: string } | null {
+  if (filter === "all") return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const to = toLocalYmd(today);
+  if (filter === "today") return { from: to, to };
+  if (filter === "week") {
+    const start = new Date(today);
+    const day = start.getDay() || 7;
+    start.setDate(start.getDate() - (day - 1));
+    return { from: toLocalYmd(start), to };
+  }
+  if (filter === "month") {
+    return {
+      from: toLocalYmd(new Date(today.getFullYear(), today.getMonth(), 1)),
+      to,
+    };
+  }
+  return { from: toLocalYmd(new Date(today.getFullYear(), 0, 1)), to };
+}
+
+/** Same date fields SubscriptionScreen uses for From/To filtering. */
+function subscriptionSaleYmd(sub: Record<string, unknown>): string | null {
+  for (const key of ["invoiceDate", "startDate", "createdAt", "updatedAt"] as const) {
+    const parsed = parseDate(sub[key]);
+    if (parsed) return toLocalYmd(parsed);
+  }
+  return null;
+}
+
+/** Same Amount column as SubscriptionScreen: grandTotal (received from customer). */
+function subscriptionReceivedAmount(sub: Record<string, unknown>): number {
+  const status = String(sub.status ?? "").toLowerCase();
+  if (status === "cancelled" || status === "draft") return 0;
+  const n = Number(sub.grandTotal ?? sub.amount ?? 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 function toStatus(raw: unknown, dueAmount: number): RecentBill["status"] {
   const v = String(raw ?? "").toLowerCase();
   if (v === "cancelled") return "Cancelled";
@@ -228,31 +275,88 @@ function formatPaymentType(raw: unknown): string {
   return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
 }
 
-function billCategoryFromItems(items: unknown): BillCategory {
-  if (!Array.isArray(items) || items.length === 0) return "Store";
-  const totals: Record<BillCategory, number> = {
+function emptyRevenueBuckets(): Record<BillCategory, number> {
+  return {
     Store: 0,
     Space: 0,
     Services: 0,
     Food: 0,
     Membership: 0,
   };
+}
+
+function categoryFromLine(rec: Record<string, unknown>): BillCategory {
+  const rawType = String(
+    rec.lineCategory ?? rec.sourceType ?? rec.category ?? "",
+  ).trim();
+  const productName = String(rec.productName ?? rec.name ?? "").toLowerCase();
+  if (
+    /membership|subscription/.test(rawType.toLowerCase()) ||
+    /membership|subscription/.test(productName)
+  ) {
+    return "Membership";
+  }
+  const lineType = normalizeLineType(rawType);
+  if (lineType === "space") return "Space";
+  if (lineType === "service") return "Services";
+  if (lineType === "food") return "Food";
+  return "Store";
+}
+
+function lineAmount(rec: Record<string, unknown>): number {
+  const direct = Number(rec.lineTotal ?? rec.netAmount ?? 0);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  return Math.max(
+    0,
+    Number(rec.qty ?? 1) * Number(rec.unitPrice ?? rec.price ?? 0) -
+      Number(rec.discount ?? 0),
+  );
+}
+
+/** Split a bill's net amount across Store / Space / Services / Food / Membership. */
+function allocateBillRevenue(
+  bill: RecentBill,
+): Record<BillCategory, number> {
+  const buckets = emptyRevenueBuckets();
+  const amount = Math.max(0, Number(bill.amount) || 0);
+  if (!(amount > 0) || bill.status === "Cancelled") return buckets;
+
+  const items = Array.isArray(bill.raw?.items) ? bill.raw.items : [];
+  if (items.length === 0) {
+    buckets[bill.category || "Store"] = amount;
+    return buckets;
+  }
+
+  const lineBuckets = emptyRevenueBuckets();
+  let lineSum = 0;
   for (const item of items) {
     const rec = item as Record<string, unknown>;
-    const lineType = normalizeLineType(
-      String(rec.lineCategory ?? rec.sourceType ?? rec.category ?? ""),
-    );
-    const amount =
-      Number(rec.lineTotal ?? rec.netAmount ?? 0) ||
-      Math.max(
-        0,
-        Number(rec.qty ?? 1) * Number(rec.unitPrice ?? rec.price ?? 0) -
-          Number(rec.discount ?? 0),
-      );
-    if (lineType === "space") totals.Space += amount;
-    else if (lineType === "service") totals.Services += amount;
-    else if (lineType === "food") totals.Food += amount;
-    else totals.Store += amount;
+    const amt = lineAmount(rec);
+    if (!(amt > 0)) continue;
+    const cat = categoryFromLine(rec);
+    lineBuckets[cat] += amt;
+    lineSum += amt;
+  }
+
+  if (!(lineSum > 0)) {
+    buckets[bill.category || "Store"] = amount;
+    return buckets;
+  }
+
+  // Scale line totals to net bill amount (membership discounts / round-offs)
+  const scale = amount / lineSum;
+  (Object.keys(lineBuckets) as BillCategory[]).forEach((key) => {
+    buckets[key] = Math.round(lineBuckets[key] * scale * 100) / 100;
+  });
+  return buckets;
+}
+
+function billCategoryFromItems(items: unknown): BillCategory {
+  if (!Array.isArray(items) || items.length === 0) return "Store";
+  const totals = emptyRevenueBuckets();
+  for (const item of items) {
+    const rec = item as Record<string, unknown>;
+    totals[categoryFromLine(rec)] += lineAmount(rec);
   }
   return (Object.entries(totals) as [BillCategory, number][]).sort(
     (a, b) => b[1] - a[1],
@@ -311,6 +415,9 @@ export default function HomeScreen() {
   const filterRef = useRef<HTMLDivElement>(null);
 
   const [bills, setBills] = useState<RecentBill[]>([]);
+  const [membershipSales, setMembershipSales] = useState<
+    { id: string; amount: number; ymd: string | null }[]
+  >([]);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [membershipPlans, setMembershipPlans] = useState<
     MembershipPlanPayload[]
@@ -363,10 +470,10 @@ export default function HomeScreen() {
           cspRes,
           purchaseRes,
           membershipRes,
+          subscriptionRes,
         ] = await Promise.allSettled([
-          canPath("/pos") || canPath("/invoices")
-            ? handleGetInvoices("", undefined, 2000)
-            : Promise.resolve(null),
+          // Home KPIs: load sales even if menu path checks are narrow
+          handleGetInvoices("", undefined, 2000),
           canPath("/customers")
             ? handleGetCustomers("", undefined, 2000, 1)
             : Promise.resolve(null),
@@ -378,6 +485,7 @@ export default function HomeScreen() {
           canPath("/membership") || canPath("/manage-plans")
             ? handleGetMemberships({ status: "Active" })
             : Promise.resolve(null),
+          handleGetAllSubscriptions(""),
         ]);
 
         if (!alive) return;
@@ -388,7 +496,6 @@ export default function HomeScreen() {
             ? invoiceRes.value.invoices
             : [];
 
-        console.log("invoices", invoices);
         const mappedBills: RecentBill[] = invoices.map(
           (invoice: Record<string, unknown>, index: number) => {
             const due = Number(
@@ -417,13 +524,37 @@ export default function HomeScreen() {
               paymentType: formatPaymentType(invoice?.mode),
               category: billCategoryFromItems(invoice?.items),
               createdAt:
-                parseDate(invoice?.updatedAt) || parseDate(invoice?.createdAt),
+                parseDate(invoice?.invoiceDate) ||
+                parseDate(invoice?.createdAt) ||
+                parseDate(invoice?.updatedAt),
               raw: invoice,
             };
           },
         );
         setBills(mappedBills);
         setBillsLoading(false);
+
+        const subscriptionList =
+          subscriptionRes.status === "fulfilled" &&
+          Array.isArray(
+            (subscriptionRes.value as { subscriptions?: unknown[] })
+              ?.subscriptions,
+          )
+            ? (
+                subscriptionRes.value as {
+                  subscriptions: Record<string, unknown>[];
+                }
+              ).subscriptions
+            : [];
+
+        setMembershipSales(
+          subscriptionList.map((sub, i) => ({
+            id: String(sub?._id ?? sub?.subscriptionCode ?? i),
+            // Exact same figure as Subscription table "Amount" (money received)
+            amount: subscriptionReceivedAmount(sub),
+            ymd: subscriptionSaleYmd(sub),
+          })),
+        );
 
         const plans =
           membershipRes.status === "fulfilled" &&
@@ -491,6 +622,7 @@ export default function HomeScreen() {
       } catch {
         if (alive) {
           setBills([]);
+          setMembershipSales([]);
           setCustomers([]);
         }
       } finally {
@@ -599,19 +731,28 @@ export default function HomeScreen() {
   );
 
   const revenueBreakdown = useMemo(() => {
-    const buckets: Record<BillCategory, number> = {
-      Store: 0,
-      Space: 0,
-      Services: 0,
-      Food: 0,
-      Membership: 0,
-    };
+    const buckets = emptyRevenueBuckets();
     for (const bill of periodBills) {
-      if (bill.status === "Cancelled") continue;
-      buckets[bill.category] += bill.amount;
+      const allocated = allocateBillRevenue(bill);
+      (Object.keys(allocated) as BillCategory[]).forEach((key) => {
+        buckets[key] += allocated[key];
+      });
+    }
+
+    // Membership cash received = Subscription table Amount for this period only
+    // (ignore any POS line tagged Membership to avoid double-count)
+    buckets.Membership = 0;
+    const bounds = periodBoundsYmd(dateFilter);
+    for (const sale of membershipSales) {
+      if (!(sale.amount > 0)) continue;
+      if (bounds) {
+        if (!sale.ymd) continue;
+        if (sale.ymd < bounds.from || sale.ymd > bounds.to) continue;
+      }
+      buckets.Membership += sale.amount;
     }
     return buckets;
-  }, [periodBills]);
+  }, [periodBills, membershipSales, dateFilter]);
 
   const revenueTotal = Object.values(revenueBreakdown).reduce(
     (a, b) => a + b,
@@ -864,7 +1005,7 @@ export default function HomeScreen() {
             },
             {
               label: "Membership",
-              value: formatCompact(revenueBreakdown.Membership),
+              value: formatMoney(revenueBreakdown.Membership),
               colorClass: "text-indigo-600",
             },
           ]}

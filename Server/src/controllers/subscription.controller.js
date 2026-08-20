@@ -12,9 +12,11 @@ import {
 import {validateReferralDiscountForOrder} from './affiliate.controller.js';
 import {validateCouponForOrder} from './coupon.controller.js';
 import {creditReferralDiscountToInviter, markReferralDiscountUsed} from '../modules/customer/services/referral.service.js';
-import {sendNewMembershipWhatsApp} from '../modules/customer/services/whatsapp.service.js';
+import {sendNewMembershipWhatsApp, sendMembershipRenewalWhatsApp} from '../modules/customer/services/whatsapp.service.js';
 import {resolvePlanMeta} from '../services/membershipPlan.service.js';
 import {appendTransaction} from './wallet.controller.js';
+import Invoice from '../models/invoice.model.js';
+import WhatsAppReminderLog from '../models/whatsappReminderLog.model.js';
 
 /** Credit fixed plan wallet cashback when membership is purchased (idempotent). */
 export const creditPlanPurchaseCashback = async ({
@@ -73,6 +75,10 @@ const getNextSubscriptionNumber = async () => {
 
 const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Throttle portal→subscription repair so list endpoints stay fast. */
+let lastMembershipSubBackfillAt = 0;
+const MEMBERSHIP_SUB_BACKFILL_TTL_MS = 5 * 60 * 1000;
 const isJuniorMembership = value => {
   const v = String(value ?? '').trim().toLowerCase();
   return v.includes('junior') || v.includes('junoir');
@@ -587,6 +593,23 @@ export const createSubscription = async (req, res) => {
 
 export const getSubscriptions = async (req, res) => {
   try {
+    // Repair legacy portal activations that updated Customer but never created Subscription
+    const now = Date.now();
+    if (now - lastMembershipSubBackfillAt > MEMBERSHIP_SUB_BACKFILL_TTL_MS) {
+      lastMembershipSubBackfillAt = now;
+      try {
+        const {backfillMissingMembershipSubscriptions} = await import(
+          '../services/subscriptionFromMembership.service.js'
+        );
+        await backfillMissingMembershipSubscriptions({limit: 300});
+      } catch (syncErr) {
+        console.warn(
+          '[getSubscriptions] membership→subscription backfill skipped:',
+          syncErr?.message || syncErr,
+        );
+      }
+    }
+
     const search = String(req.query.search ?? '').trim();
     // Admin subscription table needs the full list; allow up to 10k (was capped at 200).
     const limit = Math.min(Math.max(Number(req.query.limit) || 2000, 1), 10000);
@@ -1389,3 +1412,264 @@ export const bulkCreateSubscriptions = async (req, res) => {
     });
   }
 };
+
+const phoneDigits = raw => String(raw || '').replace(/\D/g, '');
+
+const phoneLookupVariants = phone => {
+  const digits = phoneDigits(phone);
+  if (!digits) return [];
+  const ten =
+    digits.length === 12 && digits.startsWith('91')
+      ? digits.slice(2)
+      : digits.length >= 10
+        ? digits.slice(-10)
+        : digits;
+  return [
+    ...new Set(
+      [digits, ten, `+91${ten}`, `91${ten}`, `0${ten}`].filter(Boolean),
+    ),
+  ];
+};
+
+const daysUntilEndDate = endDate => {
+  if (!endDate) return null;
+  const end = new Date(endDate);
+  if (Number.isNaN(end.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  return Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+};
+
+const isRenewalReminderEligible = subscription => {
+  const status = String(subscription?.status || '').toLowerCase();
+  if (status === 'cancelled' || status === 'draft' || status === 'error') {
+    return false;
+  }
+  if (status === 'expired') return true;
+
+  const soonDays = Math.max(
+    1,
+    Number(process.env.WHATSAPP_MEMBERSHIP_RENEWAL_SOON_DAYS || 30) || 30,
+  );
+  const days = daysUntilEndDate(subscription?.endDate ?? subscription?.dueDate);
+  if (days == null) return false;
+  return days <= soonDays; // includes already expired (negative)
+};
+
+/**
+ * POST /subscriptions/:id/whatsapp-renewal
+ * Send Meta template `membershiprenewal` for one subscription row.
+ */
+export const sendMembershipRenewalReminder = async (req, res) => {
+  try {
+    const {id} = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({success: false, message: 'Invalid subscription id.'});
+    }
+
+    const subscription = await Subscription.findById(id);
+    if (!subscription) {
+      return res.status(404).json({success: false, message: 'Subscription not found.'});
+    }
+
+    if (!isRenewalReminderEligible(subscription)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Renewal reminder is only available for expired or soon-to-expire memberships.',
+      });
+    }
+
+    const phone =
+      String(subscription.customerPhone || '').trim() ||
+      '';
+    const variants = phoneLookupVariants(phone);
+    if (!variants.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'Customer has no valid WhatsApp / mobile number.',
+      });
+    }
+
+    const customer = await Customer.findOne({
+      $or: [
+        {mobile: {$in: variants}},
+        {whatsappNumber: {$in: variants}},
+      ],
+      isDeleted: {$ne: true},
+    })
+      .select('_id name mobile whatsappNumber membershipType')
+      .lean();
+
+    const whatsappTo =
+      String(customer?.whatsappNumber || '').trim() ||
+      String(customer?.mobile || '').trim() ||
+      phone;
+
+    if (!whatsappTo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Customer has no valid WhatsApp / mobile number.',
+      });
+    }
+
+    const daysRaw = daysUntilEndDate(
+      subscription.endDate ?? subscription.dueDate,
+    );
+    const daysUntilExpiry = daysRaw == null ? 0 : Math.max(0, daysRaw);
+
+    // Lifetime membership savings from invoices (membership discounts)
+    let savingsAmount = 0;
+    try {
+      const agg = await Invoice.aggregate([
+        {
+          $match: {
+            status: {$nin: ['cancelled', 'Canceled', 'draft']},
+            $or: [
+              ...(customer?._id ? [{customerId: customer._id}] : []),
+              {customerPhone: {$in: variants}},
+            ],
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            saved: {
+              $sum: {
+                $add: [
+                  {$ifNull: ['$membershipDiscount', 0]},
+                  {$ifNull: ['$cashbackTotal', 0]},
+                ],
+              },
+            },
+          },
+        },
+      ]);
+      savingsAmount = Math.max(0, Number(agg?.[0]?.saved || 0));
+    } catch (aggErr) {
+      console.warn(
+        '[MembershipRenewal] savings aggregate failed:',
+        aggErr?.message || aggErr,
+      );
+    }
+
+    const planId = String(
+      subscription.membershipType || subscription.membershipPlanId || '',
+    )
+      .trim()
+      .toLowerCase();
+    let planName = planId
+      ? planId.charAt(0).toUpperCase() + planId.slice(1)
+      : 'Membership';
+    let renewCashback = Number(
+      process.env.WHATSAPP_MEMBERSHIP_RENEWAL_CASHBACK ||
+        process.env.WHATSAPP_MEMBERSHIP_CASHBACK ||
+        200,
+    );
+
+    try {
+      const membership = await Membership.findOne({
+        $or: [{planId}, {planId: subscription.membershipPlanId}],
+        status: {$in: ['Active', 'Inactive', 'active', 'inactive']},
+      })
+        .select('displayName planId walletCashback')
+        .lean();
+      if (membership?.displayName) {
+        planName = String(membership.displayName).replace(/\s*Membership$/i, '').trim() || planName;
+      }
+      const planCashback = Number(membership?.walletCashback?.amount ?? 0);
+      if (planCashback > 0) renewCashback = planCashback;
+    } catch {
+      // keep defaults
+    }
+
+    const displayName =
+      String(customer?.name || subscription.customerName || 'Member').trim() ||
+      'Member';
+
+    const staff = {
+      m_staff_id: req.user?.userId ?? req.staff?.m_staff_id ?? null,
+      m_staff_name: req.user?.name ?? req.staff?.m_staff_name ?? null,
+      m_staff_email: req.user?.email ?? req.staff?.m_staff_email ?? null,
+    };
+
+    let result;
+    try {
+      result = await sendMembershipRenewalWhatsApp({
+        to: whatsappTo,
+        name: displayName,
+        daysUntilExpiry,
+        savingsAmount,
+        planName,
+        cashbackAmount: renewCashback,
+      });
+    } catch (sendErr) {
+      await WhatsAppReminderLog.create({
+        subscriptionId: subscription._id,
+        customerId: customer?._id || null,
+        customerName: displayName,
+        phone: whatsappTo,
+        templateName: 'membershiprenewal',
+        bodyParams: [],
+        status: 'failed',
+        errorMessage: sendErr?.message || 'WhatsApp send failed',
+        sentBy: staff,
+      });
+      subscription.lastRenewalReminderAt = new Date();
+      subscription.lastRenewalReminderStatus = 'failed';
+      await subscription.save();
+
+      return res.status(502).json({
+        success: false,
+        message: sendErr?.message || 'Failed to send WhatsApp reminder.',
+      });
+    }
+
+    const delivered = Boolean(result?.delivered || result?.stub);
+    const logStatus = delivered || result?.stub ? 'success' : 'failed';
+
+    await WhatsAppReminderLog.create({
+      subscriptionId: subscription._id,
+      customerId: customer?._id || null,
+      customerName: displayName,
+      phone: whatsappTo,
+      templateName: result?.templateName || 'membershiprenewal',
+      languageCode: result?.language || '',
+      bodyParams: result?.bodyParams || [],
+      status: logStatus,
+      messageId: result?.messageId || null,
+      errorMessage: result?.stub ? 'Sent in stub mode (no WhatsApp credentials)' : '',
+      sentBy: staff,
+    });
+
+    subscription.lastRenewalReminderAt = new Date();
+    subscription.lastRenewalReminderStatus = logStatus;
+    subscription.lastRenewalReminderMessageId = result?.messageId || null;
+    await subscription.save();
+
+    return res.status(200).json({
+      success: true,
+      message: result?.stub
+        ? 'Reminder logged (WhatsApp stub — configure credentials to send live).'
+        : 'WhatsApp reminder sent successfully.',
+      reminder: {
+        subscriptionId: String(subscription._id),
+        phone: whatsappTo,
+        templateName: result?.templateName || 'membershiprenewal',
+        messageId: result?.messageId || null,
+        stub: Boolean(result?.stub),
+        bodyParams: result?.bodyParams || [],
+        lastRenewalReminderAt: subscription.lastRenewalReminderAt,
+        lastRenewalReminderStatus: subscription.lastRenewalReminderStatus,
+      },
+    });
+  } catch (error) {
+    console.error('sendMembershipRenewalReminder error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to send membership renewal reminder.',
+    });
+  }
+};
+
