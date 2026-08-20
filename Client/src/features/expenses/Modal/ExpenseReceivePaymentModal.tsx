@@ -442,7 +442,7 @@ export default function ExpenseReceivePaymentModal({
                     <>
                       <div>
                         <label className="mb-1.5 block text-xs font-medium text-gray-600">
-                          Amount to Receive
+                          Paying
                         </label>
                         <div className="relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
