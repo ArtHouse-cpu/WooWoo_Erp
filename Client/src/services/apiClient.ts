@@ -1,3 +1,4 @@
+import { Signal } from "lucide-react";
 import { axiosInstance } from "./axiosInstance";
 
 export const toWhatsAppNumber = (digits10: string) => `+91${digits10}`;
@@ -124,6 +125,11 @@ export type CreateInvoiceItemPayload = {
 };
 
 export type CreateInvoicePayload = {
+  search: string;
+  signal?: AbortSignal;
+  limit?: number;
+  fromDate:string,
+  toDate:string,
   customerName: string;
   customerPhone: string;
   /** Exact CRM customer linked to this invoice (preferred over name search). */
@@ -210,6 +216,7 @@ export type CouponPayload = {
 };
 
 export const handleCreateInvoice = async (payload: CreateInvoicePayload) => {
+ 
   try {
     const response = await axiosInstance.post("/invoice", payload);
     return response.data;
@@ -293,10 +300,12 @@ export const handleGetInvoices = async (
   search = "",
   signal?: AbortSignal,
   limit = 2000,
+  fromDate = "",
+  toDate = "",
 ) => {
   try {
     const response = await axiosInstance.get("/invoice", {
-      params: { search: search.trim(), limit },
+      params: { search: search.trim(), limit ,...(fromDate ? { fromDate } : {}), ...(toDate ? { toDate } : {}) },
       signal,
     });
     return response.data;
@@ -314,10 +323,17 @@ export const handleGetInvoice = async (id: string, signal?: AbortSignal) => {
 export const handleGetAllExpences = async (
   search = "",
   signal?: AbortSignal,
-  limit = 2000,
+  limit = 6000,
+  fromDate = "",
+  toDate = "",
 ) => {
   const response = await axiosInstance.get("/api/expences", {
-    params: { search: search.trim(), limit },
+    params: {
+      search: search.trim(),
+      limit,
+      ...(fromDate ? { fromDate } : {}),
+      ...(toDate ? { toDate } : {}),
+    },
     signal,
   });
   return response.data as {
@@ -1612,8 +1628,20 @@ export function purchasePayloadToFormData(
 
 export type PurchaseReturnPayload = PurchasePayload;
 
-export const handleGetPurchases = async (signal?: AbortSignal) => {
-  const response = await axiosInstance.get("/purchase", { signal });
+export const handleGetPurchases = async (
+  signal?: AbortSignal,
+  fromDate = "",
+  toDate = "",
+  limit = 2000,
+) => {
+  const response = await axiosInstance.get("/purchase", {
+    params: {
+      limit,
+      ...(fromDate ? { fromDate } : {}),
+      ...(toDate ? { toDate } : {}),
+    },
+    signal,
+  });
   return response.data;
 };
 
@@ -1839,6 +1867,12 @@ export type CspEnrollment = {
   label?: string;
   customer?: { _id?: string; name?: string; mobile?: string; email?: string };
   vendor?: { _id?: string; name?: string; mobile?: string };
+  /** CSP earnings eligible for withdrawal (wallet withdrawable bucket) */
+  withdrawable?: number;
+  withdrawableBalance?: number;
+  affiliateBalance?: number;
+  nonWithdrawable?: number;
+  walletAmount?: number;
 };
 
 export const handleGetCspEnrollments = async (params?: {

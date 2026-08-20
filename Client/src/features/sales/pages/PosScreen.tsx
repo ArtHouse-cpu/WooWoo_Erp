@@ -4,7 +4,6 @@ import {
   useMaterialReactTable,
 } from "material-react-table";
 import {
-  ChevronDown,
   Eye,
   Search,
   Edit,
@@ -14,9 +13,12 @@ import {
   Ellipsis,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { axiosInstance } from "@/services/axiosInstance";
 import Swal from "sweetalert2";
-import { handleDeleteInvoice, handleGetInvoice } from "@/services/apiClient";
+import {
+  handleDeleteInvoice,
+  handleGetInvoice,
+  handleGetInvoices,
+} from "@/services/apiClient";
 import CreatePosScreen from "./CreatePosScreen";
 import CreateInvoiceScreen from "./CreateInvoiceScreen";
 import DuePaymentModal from "../components/invoice/Modal/DuePaymentModal";
@@ -54,69 +56,6 @@ type PosRow = {
   dueAmount: number;
 };
 
-type DateFilter = "today" | "yesterday" | "week" | "month" | "year";
-
-const dateFilterOptions: { value: DateFilter; label: string }[] = [
-  { value: "today", label: "Today" },
-  { value: "yesterday", label: "Yesterday" },
-  { value: "week", label: "This Week" },
-  { value: "month", label: "This Month" },
-  { value: "year", label: "This Year" },
-];
-
-function getFilterDateRange(filter: DateFilter): { from: string; to: string } {
-  const toYmd = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
-
-  const startOfDay = (d: Date) => {
-    const x = new Date(d);
-    x.setHours(0, 0, 0, 0);
-    return x;
-  };
-
-  const now = startOfDay(new Date());
-
-  if (filter === "today") {
-    return { from: toYmd(now), to: toYmd(now) };
-  }
-
-  if (filter === "yesterday") {
-    const y = new Date(now);
-    y.setDate(y.getDate() - 1);
-    return { from: toYmd(y), to: toYmd(y) };
-  }
-
-  if (filter === "week") {
-    // Calendar week Monday → today
-    const day = now.getDay(); // 0 Sun .. 6 Sat
-    const mondayOffset = day === 0 ? -6 : 1 - day;
-    const from = new Date(now);
-    from.setDate(now.getDate() + mondayOffset);
-    return { from: toYmd(from), to: toYmd(now) };
-  }
-
-  if (filter === "month") {
-    const from = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { from: toYmd(from), to: toYmd(now) };
-  }
-
-  // this year
-  const from = new Date(now.getFullYear(), 0, 1);
-  return { from: toYmd(from), to: toYmd(now) };
-}
-
-function toLocalYmd(value: unknown): string {
-  const d = new Date(String(value ?? ""));
-  if (Number.isNaN(d.getTime())) return "";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 function paymentStatusForWhatsApp(
   raw: Record<string, unknown>,
   rowStatus: PosRow["status"],
@@ -139,6 +78,14 @@ export default function PosScreen() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<PosRow["status"] | "All">("All");
   const [search, setSearch] = useState("");
+  const getToday = () => {
+    const date = new Date();
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - offset * 60 * 1000);
+    return localDate.toISOString().split("T")[0];
+  };
+  const [fromDate, setFromDate] = useState(getToday());
+  const [toDate, setToDate] = useState(getToday());
   const [data, setData] = useState<PosRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedActionRow, setSelectedActionRow] = useState<PosRow | null>(
@@ -148,16 +95,12 @@ export default function PosScreen() {
   const [dueModalOpen, setDueModalOpen] = useState(false);
   const [selectedDueRow, setSelectedDueRow] = useState<PosRow | null>(null);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
-  const [returnIntent, setReturnIntent] = useState<"return" | "cancel">("return");
+  const [returnIntent, setReturnIntent] = useState<"return" | "cancel">(
+    "return",
+  );
   const [returnInvoice, setReturnInvoice] = useState<any>(null);
   const [viewInvoiceOpen, setViewInvoiceOpen] = useState(false);
   const [viewInvoiceData, setViewInvoiceData] = useState<any>(null);
-  const [dateFilter, setDateFilter] = useState<DateFilter>("year");
-  const [dateMenuOpen, setDateMenuOpen] = useState(false);
-
-  const selectedLabel =
-    dateFilterOptions.find((o) => o.value === dateFilter)?.label ?? "This Year";
-  const { from, to } = getFilterDateRange(dateFilter);
 
   const handleAction = async (
     action: "view" | "edit" | "cancel" | "delete" | "Credit Note",
@@ -267,48 +210,55 @@ export default function PosScreen() {
     return "Cash";
   };
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const response = await axiosInstance.get("/invoice");
-      const invoices = Array.isArray(response.data?.invoices)
-        ? response.data.invoices
+      const response = await handleGetInvoices(
+        search,
+        signal,
+        3000,
+        fromDate,
+        toDate,
+      );
+      // handleGetInvoices already returns response.data
+      const invoices = Array.isArray(response?.invoices)
+        ? response.invoices
         : [];
 
-            const rows: PosRow[] = invoices.map((invoice: any, index: number) => {
-              const dueAmount = Number(
-                invoice?.pendingAmount ?? invoice?.paymentBreakdown?.dueAmount ?? 0,
-              );
-              const originalAmount = originalInvoiceTotal(invoice);
-              const returnedAmount = returnedInvoiceTotal(invoice);
-              return {
-              id: index + 1,
-            amount: currentInvoiceTotal(invoice),
-            originalAmount,
-            returnedAmount,
-              mode: toMode(invoice?.mode),
-              status: toStatus(invoice?.status, dueAmount, invoice?.paymentStatus),
-              bill: String(
-                invoice?.invoiceCode ??
-                  `INVVWAH-${invoice?.invoiceNumber ?? index + 1}`,
-              ),
-              owner: String(
-                invoice?.createdBy?.m_staff_name ||
-                  invoice?.salesPersonName ||
-                  "System",
-              ),
-              customer: String(invoice?.customerName),
-              phone: String(invoice?.customerPhone),
-              date: formatDate(invoice?.invoiceDate),
-              createdTime: invoice?.createdAt
-                ? new Date(invoice.createdAt).toLocaleString()
-                : "",
-              salesPerson: String(invoice?.salesPersonName),
-              _id: invoice._id,
-              raw: invoice,
-              dueAmount,
-            };
-            });
+      const rows: PosRow[] = invoices.map((invoice: any, index: number) => {
+        const dueAmount = Number(
+          invoice?.pendingAmount ?? invoice?.paymentBreakdown?.dueAmount ?? 0,
+        );
+        const originalAmount = originalInvoiceTotal(invoice);
+        const returnedAmount = returnedInvoiceTotal(invoice);
+        return {
+          id: index + 1,
+          amount: currentInvoiceTotal(invoice),
+          originalAmount,
+          returnedAmount,
+          mode: toMode(invoice?.mode),
+          status: toStatus(invoice?.status, dueAmount, invoice?.paymentStatus),
+          bill: String(
+            invoice?.invoiceCode ??
+              `INVVWAH-${invoice?.invoiceNumber ?? index + 1}`,
+          ),
+          owner: String(
+            invoice?.createdBy?.m_staff_name ||
+              invoice?.salesPersonName ||
+              "System",
+          ),
+          customer: String(invoice?.customerName),
+          phone: String(invoice?.customerPhone),
+          date: formatDate(invoice?.invoiceDate),
+          createdTime: invoice?.createdAt
+            ? new Date(invoice.createdAt).toLocaleString()
+            : "",
+          salesPerson: String(invoice?.salesPersonName),
+          _id: invoice._id,
+          raw: invoice,
+          dueAmount,
+        };
+      });
 
       setData(rows);
     } catch (error) {
@@ -320,26 +270,19 @@ export default function PosScreen() {
   };
 
   useEffect(() => {
-    fetchInvoices();
-  }, []);
+    const controller = new AbortController();
+    void fetchInvoices(controller.signal);
+    return () => controller.abort();
+  }, [fromDate, toDate, search]);
 
+  // Server already filters by fromDate/toDate — only filter status client-side.
+  // Search is also sent to the API; keep a light client filter for status tabs.
   const filteredData = useMemo(() => {
-    const term = search.trim().toLowerCase();
     return data.filter((row) => {
       const statusOk = activeTab === "All" || row.status === activeTab;
-      const searchOk =
-        !term ||
-        row.bill.toLowerCase().includes(term) ||
-        row.customer.toLowerCase().includes(term) ||
-        row.phone.toLowerCase().includes(term) ||
-        row.status.toLowerCase().includes(term);
-
-      const ymd = toLocalYmd(row.raw?.invoiceDate ?? row.raw?.createdAt);
-      const dateOk = !!ymd && ymd >= from && ymd <= to;
-
-      return statusOk && searchOk && dateOk;
+      return statusOk;
     });
-  }, [activeTab, data, search, from, to]);
+  }, [activeTab, data]);
 
   const columns = useMemo(
     () => [
@@ -678,7 +621,7 @@ export default function PosScreen() {
       isLoading: loading,
     },
     enableTopToolbar: false,
-    enablePagination:true,
+    enablePagination: true,
     enableBottomToolbar: true,
     enableColumnActions: false,
     enableDensityToggle: false,
@@ -806,46 +749,32 @@ export default function PosScreen() {
           />
         </div>
 
-        {/* Date range filter */}
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setDateMenuOpen((v) => !v)}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm text-gray-700"
-          >
-            {selectedLabel} <ChevronDown size={14} />
-          </button>
-
-          {dateMenuOpen && (
-            <>
-              {/* click-outside overlay */}
-              <button
-                type="button"
-                className="fixed inset-0 z-10 cursor-default"
-                aria-label="Close date filter"
-                onClick={() => setDateMenuOpen(false)}
-              />
-              <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
-                {dateFilterOptions.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setDateFilter(opt.value);
-                      setDateMenuOpen(false);
-                    }}
-                    className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                      dateFilter === opt.value
-                        ? "bg-blue-50 font-semibold text-blue-700"
-                        : "text-gray-700"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
+        {/* From / To date filter */}
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              From
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              To
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => setToDate(e.target.value)}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
         </div>
       </div>
 

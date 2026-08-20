@@ -4,7 +4,6 @@ import {
   useMaterialReactTable,
 } from "material-react-table";
 import {
-  ChevronDown,
   Search,
   Plus,
   Eye,
@@ -82,12 +81,21 @@ const CATEGORIES: ExpenseCategory[] = [
   "Travel",
   "Other",
 ];
-const MODES: PaymentMode[] = ["Cash", "UPI", "Card", "Bank Transfer", "Wallet", "Due"];
+const MODES: PaymentMode[] = [
+  "Cash",
+  "UPI",
+  "Card",
+  "Bank Transfer",
+  "Wallet",
+  "Due",
+];
 const STATUSES: ExpenseStatus[] = ["Paid", "Pending", "Cancelled"];
 
 function asCategory(value: unknown): ExpenseCategory {
   const v = String(value ?? "").trim();
-  return (CATEGORIES as string[]).includes(v) ? (v as ExpenseCategory) : "Other";
+  return (CATEGORIES as string[]).includes(v)
+    ? (v as ExpenseCategory)
+    : "Other";
 }
 
 function asMode(value: unknown, status?: ExpenseStatus): PaymentMode {
@@ -228,17 +236,7 @@ function rowToModalValues(row: ExpenseRow): ExpenseModalValues {
   };
 }
 
-// ─── Date filter ──────────────────────────────────────────────────────────────
-
-type DateFilter = "today" | "yesterday" | "week" | "month" | "year";
-
-const dateFilterOptions: { value: DateFilter; label: string }[] = [
-  { value: "today", label: "Today" },
-  { value: "yesterday", label: "Yesterday" },
-  { value: "week", label: "This Week" },
-  { value: "month", label: "This Month" },
-  { value: "year", label: "This Year" },
-];
+// ─── Date filter  from date to toDate ──────────────────────────────────────────────────────────────
 
 function toYmd(d: Date) {
   const y = d.getFullYear();
@@ -247,33 +245,6 @@ function toYmd(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-function getFilterDateRange(filter: DateFilter): { from: string; to: string } {
-  const startOfDay = (d: Date) => {
-    const x = new Date(d);
-    x.setHours(0, 0, 0, 0);
-    return x;
-  };
-  const now = startOfDay(new Date());
-  if (filter === "today") return { from: toYmd(now), to: toYmd(now) };
-  if (filter === "yesterday") {
-    const y = new Date(now);
-    y.setDate(y.getDate() - 1);
-    return { from: toYmd(y), to: toYmd(y) };
-  }
-  if (filter === "week") {
-    const day = now.getDay();
-    const mondayOffset = day === 0 ? -6 : 1 - day;
-    const from = new Date(now);
-    from.setDate(now.getDate() + mondayOffset);
-    return { from: toYmd(from), to: toYmd(now) };
-  }
-  if (filter === "month") {
-    const from = new Date(now.getFullYear(), now.getMonth(), 1);
-    return { from: toYmd(from), to: toYmd(now) };
-  }
-  const from = new Date(now.getFullYear(), 0, 1);
-  return { from: toYmd(from), to: toYmd(now) };
-}
 
 const STATUS_TABS: Array<ExpenseStatus | "All"> = [
   "All",
@@ -311,8 +282,14 @@ const ExpenseScreen = () => {
   const [rows, setRows] = useState<ExpenseRow[]>([]);
   const [activeTab, setActiveTab] = useState<ExpenseStatus | "All">("All");
   const [search, setSearch] = useState("");
-  const [dateFilter, setDateFilter] = useState<DateFilter>("year");
-  const [dateMenuOpen, setDateMenuOpen] = useState(false);
+  const getToday = () => {
+  const date = new Date();
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60 * 1000);
+  return localDate.toISOString().split("T")[0];
+};
+  const [fromDate, setFromDate] = useState(getToday());
+  const [toDate, setToDate] = useState(getToday());
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ExpenseModalMode>("create");
   const [activeExpense, setActiveExpense] = useState<ExpenseRow | null>(null);
@@ -320,7 +297,9 @@ const ExpenseScreen = () => {
   const [openPin, setOpenPin] = useState(false);
   const [openCheckout, setOpenCheckout] = useState(false);
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft | null>(null);
-  const [verifiedStaff, setVerifiedStaff] = useState<VerifiedStaff | null>(null);
+  const [verifiedStaff, setVerifiedStaff] = useState<VerifiedStaff | null>(
+    null,
+  );
   const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
   const [expenseFormKey, setExpenseFormKey] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -330,10 +309,6 @@ const ExpenseScreen = () => {
   const [selectedActionRow, setSelectedActionRow] = useState<ExpenseRow | null>(
     null,
   );
-
-  const selectedLabel =
-    dateFilterOptions.find((o) => o.value === dateFilter)?.label ?? "This Year";
-  const { from, to } = getFilterDateRange(dateFilter);
 
   const checkoutItems = useMemo(
     () =>
@@ -361,7 +336,7 @@ const ExpenseScreen = () => {
   const fetchExpenses = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const response = await handleGetAllExpences("", signal);
+      const response = await handleGetAllExpences("", signal,2000,fromDate,toDate);
       const list = Array.isArray(response?.expences) ? response.expences : [];
       setRows(list.map(mapExpenceToRow));
     } catch (error) {
@@ -376,7 +351,7 @@ const ExpenseScreen = () => {
     const controller = new AbortController();
     void fetchExpenses(controller.signal);
     return () => controller.abort();
-  }, []);
+  }, [fromDate, toDate]);
 
   const openCreateModal = () => {
     setModalMode("create");
@@ -481,10 +456,10 @@ const ExpenseScreen = () => {
         row.category.toLowerCase().includes(term) ||
         row.addedBy.toLowerCase().includes(term) ||
         row.createdBy.toLowerCase().includes(term);
-      const dateOk = !!row.date && row.date >= from && row.date <= to;
+      const dateOk = !!row.date && row.date >= fromDate && row.date <= toDate;
       return statusOk && searchOk && dateOk;
     });
-  }, [activeTab, search, from, to, rows]);
+  }, [activeTab, search, fromDate, toDate, rows]);
 
   const columns = useMemo(
     () => [
@@ -767,42 +742,49 @@ const ExpenseScreen = () => {
           />
         </div>
 
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setDateMenuOpen((v) => !v)}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-gray-200 px-3 text-sm text-gray-700"
-          >
-            {selectedLabel} <ChevronDown size={14} />
-          </button>
-          {dateMenuOpen && (
-            <>
-              <button
-                type="button"
-                className="fixed inset-0 z-10 cursor-default"
-                aria-label="Close date filter"
-                onClick={() => setDateMenuOpen(false)}
-              />
-              <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
-                {dateFilterOptions.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      setDateFilter(opt.value);
-                      setDateMenuOpen(false);
-                    }}
-                    className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                      dateFilter === opt.value
-                        ? "bg-blue-50 font-semibold text-blue-700"
-                        : "text-gray-700"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          {/* From Date */}
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              From
+            </label>
+
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none transition focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+            />
+          </div>
+
+          {/* To Date */}
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              To
+            </label>
+
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => setToDate(e.target.value)}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none transition focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+            />
+          </div>
+
+          {/* Clear */}
+          {(fromDate || toDate) && (
+            <button
+              type="button"
+              onClick={() => {
+                setFromDate("");
+                setToDate("");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Clear
+            </button>
           )}
         </div>
       </div>
@@ -1013,58 +995,58 @@ const ExpenseScreen = () => {
               .replace(/_/g, " ") === "MULTI";
           await handleCreateExpence(
             {
-            title: expenseDraft.title,
-            category: expenseDraft.category || "Other",
-            amount: expenseDraft.amount,
-            paidAmount,
-            dueAmount,
-            paymentBreakdown: {
-              cash: payment.paymentBreakdown.cash,
-              upi: payment.paymentBreakdown.upi,
-              card: payment.paymentBreakdown.card,
-              wallet: payment.paymentBreakdown.wallet,
-            },
-            initialPayment:
-              paidAmount > 0
-                ? {
-                    mode: isMulti ? "Multi" : mode,
-                    isMultiMode: isMulti,
-                    paymentBreakdown: {
-                      cash: payment.paymentBreakdown.cash,
-                      upi: payment.paymentBreakdown.upi,
-                      card: payment.paymentBreakdown.card,
-                      wallet: payment.paymentBreakdown.wallet,
-                    },
-                    receivedBy: {
-                      m_staff_id:
-                        payment.invoiceBy?.employeeId ||
-                        payment.invoiceBy?.staffId ||
-                        null,
-                      m_staff_name: payment.invoiceBy?.staffName || null,
-                      m_staff_email: payment.invoiceBy?.email || null,
-                    },
-                    paidAt: payment.verifiedAt || new Date().toISOString(),
-                  }
-                : undefined,
-            paidTo: expenseDraft.paidTo,
-            vendorId: expenseDraft.vendorId || null,
-            mode,
-            status,
-            date: expenseDraft.date,
-            notes: expenseDraft.description || payment.notes,
-            createdBy: {
-              m_staff_id:
-                payment.invoiceBy?.employeeId ||
-                payment.invoiceBy?.staffId ||
-                null,
-              m_staff_name: payment.invoiceBy?.staffName || null,
-              m_staff_email: payment.invoiceBy?.email || null,
-            },
-            addedBy: {
-              m_staff_id: user.m_staff_id || null,
-              m_staff_name: user.m_staff_name || null,
-              m_staff_email: user.m_staff_email || null,
-            },
+              title: expenseDraft.title,
+              category: expenseDraft.category || "Other",
+              amount: expenseDraft.amount,
+              paidAmount,
+              dueAmount,
+              paymentBreakdown: {
+                cash: payment.paymentBreakdown.cash,
+                upi: payment.paymentBreakdown.upi,
+                card: payment.paymentBreakdown.card,
+                wallet: payment.paymentBreakdown.wallet,
+              },
+              initialPayment:
+                paidAmount > 0
+                  ? {
+                      mode: isMulti ? "Multi" : mode,
+                      isMultiMode: isMulti,
+                      paymentBreakdown: {
+                        cash: payment.paymentBreakdown.cash,
+                        upi: payment.paymentBreakdown.upi,
+                        card: payment.paymentBreakdown.card,
+                        wallet: payment.paymentBreakdown.wallet,
+                      },
+                      receivedBy: {
+                        m_staff_id:
+                          payment.invoiceBy?.employeeId ||
+                          payment.invoiceBy?.staffId ||
+                          null,
+                        m_staff_name: payment.invoiceBy?.staffName || null,
+                        m_staff_email: payment.invoiceBy?.email || null,
+                      },
+                      paidAt: payment.verifiedAt || new Date().toISOString(),
+                    }
+                  : undefined,
+              paidTo: expenseDraft.paidTo,
+              vendorId: expenseDraft.vendorId || null,
+              mode,
+              status,
+              date: expenseDraft.date,
+              notes: expenseDraft.description || payment.notes,
+              createdBy: {
+                m_staff_id:
+                  payment.invoiceBy?.employeeId ||
+                  payment.invoiceBy?.staffId ||
+                  null,
+                m_staff_name: payment.invoiceBy?.staffName || null,
+                m_staff_email: payment.invoiceBy?.email || null,
+              },
+              addedBy: {
+                m_staff_id: user.m_staff_id || null,
+                m_staff_name: user.m_staff_name || null,
+                m_staff_email: user.m_staff_email || null,
+              },
             },
             expenseDraft.receipt || null,
           );

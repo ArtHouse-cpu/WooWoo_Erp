@@ -109,6 +109,18 @@ function axiosErrMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function isRequestAborted(error: unknown): boolean {
+  const err = error as { code?: string; name?: string; message?: string };
+  return (
+    err?.code === "ERR_CANCELED" ||
+    err?.name === "CanceledError" ||
+    err?.name === "AbortError" ||
+    String(err?.message ?? "")
+      .toLowerCase()
+      .includes("canceled")
+  );
+}
+
 function coercePaymentMode(
   v: unknown,
 ): NonNullable<PurchaseReturnPayload["paymentMode"]> {
@@ -156,6 +168,17 @@ export default function PurchaseScreen() {
   const [activeTab, setActiveTab] = useState<PurchaseTabStatus | "All">("All");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+
+//fromDate to date
+const getToday = () => {
+  const d = new Date();
+  const offset = d.getTimezoneOffset();
+  return new Date(d.getTime() - offset * 60 * 1000).toISOString().split("T")[0];
+};
+
+const [fromDate, setFromDate] = useState(getToday());
+const [toDate, setToDate] = useState(getToday());
+
   const [data, setData] = useState<PurchaseListRow[]>([]);
   const [selectedActionRow, setSelectedActionRow] =
     useState<PurchaseListRow | null>(null);
@@ -164,10 +187,13 @@ export default function PurchaseScreen() {
   const staffName = useAppSelector((state) => state.user.m_staff_name);
   const purchaser = staffName ?? "Not Assigned";
 
-  const fetchPurchases = useCallback(async () => {
+  const fetchPurchases = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const { purchases = [] } = await handleGetPurchases();
+      const response = await handleGetPurchases(signal, fromDate, toDate);
+      const purchases = Array.isArray(response?.purchases)
+        ? response.purchases
+        : [];
       const rows: PurchaseListRow[] = (purchases as Record<string, unknown>[]).map(
         (p, i) => {
           const createdBy = p.createdBy as
@@ -221,6 +247,8 @@ export default function PurchaseScreen() {
       );
       setData(rows);
     } catch (err: unknown) {
+      // Ignore aborted requests (Strict Mode remount / date change cleanup)
+      if (isRequestAborted(err) || signal?.aborted) return;
       Swal.fire(
         "Fetch failed",
         axiosErrMessage(err, "Failed to load purchases."),
@@ -228,13 +256,15 @@ export default function PurchaseScreen() {
       );
       setData([]);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  }, []);
+  }, [fromDate, toDate]);
 
-  useEffect(() => {
-    void fetchPurchases();
-  }, [fetchPurchases]);
+useEffect(() => {
+  const controller = new AbortController();
+  void fetchPurchases(controller.signal);
+  return () => controller.abort();
+}, [fetchPurchases]);
 
   const handleAction = useCallback(
     async (
@@ -794,6 +824,35 @@ export default function PurchaseScreen() {
             {tab}
           </button>
         ))}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              From
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              To
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => setToDate(e.target.value)}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+        </div>
       </div>
 
       <MaterialReactTable table={table} />

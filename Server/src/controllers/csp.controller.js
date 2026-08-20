@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import Customer from '../models/customer.model.js';
 import Vendor from '../models/vendor.model.js';
 import CustomersailorProgram from '../models/customerSellerProgram.model.js';
+import Wallet from '../models/wallet.model.js';
+import {resolveTwoBuckets} from '../utils/walletBuckets.js';
 
 const getsailorSharePercent = () => {
   const n = Number(process.env.CSP_sailor_SHARE_PERCENT ?? 70);
@@ -78,7 +80,10 @@ const toEnrollmentDto = doc => {
 
 const populateEnrollment = query =>
   query
-    .populate('customerId', 'name mobile email walletAmount membershipType')
+    .populate(
+      'customerId',
+      'name mobile email walletAmount membershipType withdrawable affiliateBalance nonWithdrawable cashbackBalance closingBalance',
+    )
     .populate('vendorId', 'name mobile email companyName');
 
 /**
@@ -109,12 +114,50 @@ export const getCSP = async (req, res) => {
       CustomersailorProgram.find(query).sort({createdAt: -1}),
     );
 
+    const customerIds = rows
+      .map(row => {
+        const plain = row?.toObject ? row.toObject() : row;
+        const customer =
+          plain?.customerId && typeof plain.customerId === 'object'
+            ? plain.customerId
+            : null;
+        return customer?._id || plain?.customerId || null;
+      })
+      .filter(id => id && mongoose.Types.ObjectId.isValid(String(id)));
+
+    const wallets = customerIds.length
+      ? await Wallet.find({customerId: {$in: customerIds}})
+          .select(
+            'customerId withdrawable nonWithdrawable affiliateBalance cashbackBalance walletAmount balanceSchema',
+          )
+          .lean()
+      : [];
+
+    const walletMap = new Map(
+      wallets.map(w => [String(w.customerId), w]),
+    );
+
+    const enrollments = rows.map(row => {
+      const dto = toEnrollmentDto(row);
+      const customerId = dto.customerId ? String(dto.customerId) : '';
+      const wallet = customerId ? walletMap.get(customerId) : null;
+      const buckets = resolveTwoBuckets(wallet, dto.customer);
+      return {
+        ...dto,
+        withdrawable: buckets.withdrawable,
+        withdrawableBalance: buckets.withdrawable,
+        affiliateBalance: buckets.withdrawable,
+        nonWithdrawable: buckets.nonWithdrawable,
+        walletAmount: buckets.total,
+      };
+    });
+
     return res.status(200).json({
       success: true,
       message: 'CSP list fetched successfully.',
-      enrollments: rows.map(toEnrollmentDto),
+      enrollments,
       // backward-compatible alias
-      csps: rows.map(toEnrollmentDto),
+      csps: enrollments,
     });
   } catch (error) {
     console.error('getCSP error:', error);

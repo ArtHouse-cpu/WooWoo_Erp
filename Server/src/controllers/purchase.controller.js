@@ -203,8 +203,35 @@ export const createPurchase = async (req, res) => {
 
 export const getPurchases = async (req, res) => {
   try {
-    const purchases = await Purchase.find().sort({ createdAt: -1 });
-    return res.status(200).json({ success: true, purchases });
+    const fromDate = String(req.query.fromDate ?? '').trim();
+    const toDate = String(req.query.toDate ?? '').trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 2000, 1), 5000);
+    const query = {};
+    const dateFilter = {};
+
+    if (fromDate) {
+      const from = new Date(`${fromDate}T00:00:00.000`);
+      if (!Number.isNaN(from.getTime())) dateFilter.$gte = from;
+    }
+    if (toDate) {
+      const to = new Date(`${toDate}T23:59:59.999`);
+      if (!Number.isNaN(to.getTime())) dateFilter.$lte = to;
+    }
+    if (Object.keys(dateFilter).length) {
+      query.invoiceDate = dateFilter;
+    }
+
+    const purchases = await Purchase.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      purchases,
+      total: purchases.length,
+      limit,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

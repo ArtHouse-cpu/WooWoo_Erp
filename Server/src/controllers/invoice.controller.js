@@ -948,6 +948,8 @@ const createInvoice = async (req, res) => {
 const getInvoices=async(req,res)=>{
     try {
         const search = String(req.query.search ?? '').trim();
+        const fromDate=String(req.query.fromDate ?? '').trim();
+        const toDate=String(req.query.toDate ?? '').trim();
         const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 5000);
         const query = {};
         if (search) {
@@ -958,9 +960,21 @@ const getInvoices=async(req,res)=>{
             { invoiceCode: regex },
           ];
         }
+        const dateFilter = {};
+        if(fromDate){
+          const from=new Date(`${fromDate}T00:00:00.000`);
+          if(!Number.isNaN(from.getTime())) dateFilter.$gte=from;
+        }
+
+        if(toDate){
+          const to=new Date(`${toDate}T23:59:59.999`);
+          if(!Number.isNaN(to.getTime())) dateFilter.$lte=to;
+        }
+        if (Object.keys(dateFilter).length) {
+          query.invoiceDate = dateFilter;
+        }
         const invoices = await Invoice.find(query)
           .sort({createdAt: -1})
-          // .sort({updatedAt: -1})
           .limit(limit)
           .select(
             'customerName customerPhone pendingAmount paymentBreakdown paymentStatus status invoiceCode createdAt updatedAt grandTotal returnedAmount createdBy mode salesPersonName invoiceDate items coupon referral membershipDiscount membershipType cashbackTotal discountTotal subTotal extraCharges invoiceBy notes',

@@ -325,9 +325,25 @@ export default function CspScreen() {
         Cell: ({ row }) => row.original.vendor?.name || "—",
       },
       {
-        accessorKey: "sailorSharePercent",
-        header: "Seller %",
-        Cell: ({ cell }) => `${Number(cell.getValue() ?? 70)}%`,
+        id: "withdrawable",
+        header: "Withdrawable",
+        Cell: ({ row }) => {
+          const amount = Number(
+            row.original.withdrawable ??
+              row.original.withdrawableBalance ??
+              row.original.affiliateBalance ??
+              0,
+          );
+          return (
+            <span className="font-semibold text-emerald-700">
+              ₹{" "}
+              {amount.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          );
+        },
       },
       {
         accessorKey: "status",
@@ -395,7 +411,8 @@ export default function CspScreen() {
           </h1>
           <p className="text-sm text-slate-500">
             Enroll Premium customers as sellers. A vendor record is linked
-            automatically. CSP products credit 70% to the seller wallet on invoice.
+            automatically. CSP product sales credit earnings to the seller&apos;s
+            withdrawable wallet.
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">

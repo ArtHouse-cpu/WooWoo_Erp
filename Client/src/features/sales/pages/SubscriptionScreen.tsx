@@ -237,6 +237,30 @@ export default function SubscriptionScreen() {
     return "active";
   };
 
+  /** True when membership end date is before today (calendar day). */
+  const isEndDatePassed = (raw: any): boolean => {
+    const endDateRaw = raw?.endDate ?? raw?.dueDate;
+    if (!endDateRaw) return false;
+    const endDate = new Date(endDateRaw);
+    if (Number.isNaN(endDate.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+    return endDate.getTime() < today.getTime();
+  };
+
+  const resolveDisplayStatus = (
+    subscription: any,
+    matchedPlanStatus?: string,
+  ): SubscriptionStatus => {
+    let status = toStatus(subscription?.status);
+    if (status === "cancelled" || status === "error") return status;
+    if (matchedPlanStatus === "Inactive") return "inactive";
+    // Past end date counts as expired even if DB status is still "active"
+    if (status === "expired" || isEndDatePassed(subscription)) return "expired";
+    return status;
+  };
+
   const fetchSubscriptions = async () => {
     setLoading(true);
     try {
@@ -271,10 +295,10 @@ export default function SubscriptionScreen() {
             (m: any) => m.planId === planId,
           );
 
-          let status = toStatus(subscription?.status);
-          if (matchedPlan?.status === "Inactive") {
-            status = "inactive";
-          }
+          const status = resolveDisplayStatus(
+            subscription,
+            matchedPlan?.status,
+          );
 
           return {
             id: index + 1,
@@ -351,6 +375,11 @@ export default function SubscriptionScreen() {
       const expiryOk = (() => {
         if (expiryFilter === "all") return true;
 
+        // Explicit expired filter: past end date OR status already expired
+        if (expiryFilter === "expired") {
+          return row.status === "expired" || isEndDatePassed(row.raw);
+        }
+
         const endDateRaw = row.raw?.endDate ?? row.raw?.dueDate;
         if (!endDateRaw) return false;
 
@@ -359,20 +388,19 @@ export default function SubscriptionScreen() {
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        endDate.setHours(0, 0, 0, 0);
 
-        const endStr = new Date(endDate);
-        endStr.setHours(0, 0, 0, 0);
+        const diffDays = Math.ceil(
+          (endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+        );
 
-        const diffTime = endStr.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
+        // Upcoming-expiry filters only show memberships that are still valid
         if (diffDays < 0) return false;
 
         if (expiryFilter === "day") return diffDays <= 1;
         if (expiryFilter === "week") return diffDays <= 7;
         if (expiryFilter === "month") return diffDays <= 30;
         if (expiryFilter === "year") return diffDays <= 365;
-        if (expiryFilter === "expired") return diffDays <= 0;
 
         return true;
       })();

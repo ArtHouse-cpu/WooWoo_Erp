@@ -5,6 +5,7 @@ import path from 'path';
 import {fileURLToPath} from 'url';
 import Expence from '../models/expence.model.js';
 import {uploadOnCloudinary} from '../utils/cloudinary.js';
+import { tryCatch } from 'bullmq';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -169,26 +170,55 @@ const validatePayload = payload => {
 
 export const getAllExpences = async (req, res) => {
   try {
-    const search = String(req.query.search ?? '').trim();
-    const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 5000);
-    const query = {};
 
-    if (search) {
-      const regex = new RegExp(escapeRegex(search), 'i');
-      query.$or = [{expenseCode: regex}, {title: regex}, {category: regex}, {paidTo: regex}, {notes: regex}];
+    const search=String(req.query.search ?? '').trim();
+    const fromDate=String(req.query.fromDate ?? '').trim();
+    const toDate=String(req.query.toDate ?? '').trim();
+    const limit=Math.min(Math.max(Number(req.query.limit)||200,1),6000);
+    const query={};
+    if(search){
+      const regex=new RegExp(escapeRegex(search),'i');
+      query.$or=[
+        {expensesCode:regex},
+        {title:regex},
+        {category:regex},
+        {paidTo:regex},
+        {notes:regex},
+      ]
+    }
+const dateFilter={};
+    if(fromDate){
+  const from = new Date(`${fromDate}T00:00:00.000`);
+      if (!Number.isNaN(from.getTime())) dateFilter.$gte = from;
     }
 
-    const expences = await Expence.find(query).sort({date: -1, createdAt: -1}).limit(limit).lean();
+     if (toDate) {
+      const to = new Date(`${toDate}T23:59:59.999`);
+      if (!Number.isNaN(to.getTime())) dateFilter.$lte = to;
+    }
+    if (Object.keys(dateFilter).length) {
+      query.date = dateFilter;
+    }
+
+    const expences =await Expence.find(query)
+    .sort({date: -1, createdAt: -1})
+    .limit(limit)
+    .lean();
+
     return res.status(200).json({
-      success: true,
-      message: 'Expenses fetched successfully.',
-      expences: expences.map(enrichExpence),
+      success:true,
+      message:'Expenses fetched successfully.',
+     expences: expences.map(enrichExpence),
       total: expences.length,
       limit,
-    });
+    })
+    
   } catch (error) {
     console.error('getAllExpences error:', error);
-    return res.status(500).json({success: false, message: error.message || 'Failed to fetch expenses.'});
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch expenses.',
+    });
   }
 };
 
