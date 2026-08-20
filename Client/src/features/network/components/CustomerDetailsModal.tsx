@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Camera, Mail, MapPin, Phone, X } from "lucide-react";
+import { Camera, Mail, MapPin, Phone, X, ShoppingBag } from "lucide-react";
 import Swal from "sweetalert2";
 import {
   customerPayloadToFormData,
@@ -7,6 +7,7 @@ import {
   type CustomerPayload,
 } from "@/services/apiClient";
 import UpdateCustomerModal from "./UpdateCustomerModal";
+import BuyMembershipModal from "./BuyMembershipModal";
 
 type CustomerDetails = CustomerPayload & {
   _id?: string;
@@ -51,6 +52,7 @@ export default function CustomerDetailsModal({
   const [uploading, setUploading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [updatingCustomer, setUpdatingCustomer] = useState(false);
+  const [buyMembershipOpen, setBuyMembershipOpen] = useState(false);
 
   const avatarUrl = useMemo(() => toAssetUrl(customer?.profileImage), [customer?.profileImage]);
   const initials = useMemo(() => getInitials(customer?.name), [customer?.name]);
@@ -258,19 +260,30 @@ export default function CustomerDetailsModal({
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                         Membership
                       </p>
-
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${customer.membershipEndDate &&
-                          new Date(customer.membershipEndDate) > new Date()
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-600"
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                            customer.membershipEndDate &&
+                            new Date(customer.membershipEndDate) > new Date()
+                              ? "bg-green-100 text-green-700"
+                              : "bg-red-100 text-red-600"
                           }`}
-                      >
-                        {customer.membershipEndDate &&
+                        >
+                          {customer.membershipEndDate &&
                           new Date(customer.membershipEndDate) > new Date()
-                          ? "Active"
-                          : "Expired"}
-                      </span>
+                            ? "Active"
+                            : "Expired"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setBuyMembershipOpen(true)}
+                          className="flex items-center gap-1 rounded-lg bg-violet-100 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-200 transition-colors"
+                          title="Buy / upgrade membership"
+                        >
+                          <ShoppingBag size={12} />
+                          Buy
+                        </button>
+                      </div>
                     </div>
 
                     {/* Membership Name */}
@@ -343,6 +356,18 @@ export default function CustomerDetailsModal({
           customer={customer as CustomerPayload}
           onUpdate={handleUpdateCustomerSubmit}
           loading={updatingCustomer}
+        />
+        <BuyMembershipModal
+          open={buyMembershipOpen}
+          onClose={() => setBuyMembershipOpen(false)}
+          customerId={String(customer._id ?? "")}
+          customerName={String(customer.name ?? "")}
+          customerEmail={String(customer.email ?? "")}
+          customerPhone={String(customer.mobile ?? "")}
+          onSuccess={() => {
+            setBuyMembershipOpen(false);
+            void onUpdated?.();
+          }}
         />
       </div>
 

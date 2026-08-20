@@ -1035,9 +1035,16 @@ export const getProducts = async (req, res) => {
       sortBy: sortByRaw,
       sortDir: sortDirRaw,
       includeStats,
+      cspEnrollmentId: cspEnrollmentIdRaw,
     } = req.query;
 
     const clauses = [];
+
+    // Filter by CSP enrollment ID (shows all products for a CSP owner)
+    const cspEnrollmentIdFilter = String(cspEnrollmentIdRaw || '').trim();
+    if (cspEnrollmentIdFilter && mongoose.Types.ObjectId.isValid(cspEnrollmentIdFilter)) {
+      clauses.push({ cspEnrollmentId: new mongoose.Types.ObjectId(cspEnrollmentIdFilter) });
+    }
 
     // Optional type filter: product | service (omit = all)
     const typeFilter = String(type || '').trim().toLowerCase();
@@ -1071,9 +1078,11 @@ export const getProducts = async (req, res) => {
           : { $and: clauses };
 
     const parsedLimit = Number(limitRaw ?? sizeRaw);
+    // When filtering by CSP enrollment, allow up to 2000 so all products are returned
+    const limitCap = cspEnrollmentIdFilter ? 2000 : 100;
     const limit = Math.min(
-      Math.max(Number.isFinite(parsedLimit) ? Math.trunc(parsedLimit) : 50, 1),
-      100,
+      Math.max(Number.isFinite(parsedLimit) ? Math.trunc(parsedLimit) : (cspEnrollmentIdFilter ? 2000 : 50), 1),
+      limitCap,
     );
 
     const parsedSkip = Number(skipRaw ?? startRaw);

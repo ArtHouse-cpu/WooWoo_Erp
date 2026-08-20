@@ -7,6 +7,7 @@ import {
   deleteExpencesById,
   getAllExpences,
   getExpencesById,
+  recordExpencePayment,
   updateExpencesById,
   uploadExpenceReceipt,
 } from '../controllers/expence.controller.js';
@@ -16,6 +17,7 @@ const router = express.Router();
 router.use(authenticateUser, attachStaffContext);
 
 router.get('/', requirePermission(PERMISSIONS.EXPENCE_READ), getAllExpences);
+router.post('/:id/payments', requirePermission(PERMISSIONS.EXPENCE_UPDATE), recordExpencePayment);
 router.get('/:id', requirePermission(PERMISSIONS.EXPENCE_READ), getExpencesById);
 router.post('/', requirePermission(PERMISSIONS.EXPENCE_CREATE), uploadExpenceReceipt.single('receipt'), addExpencesById);
 router.patch('/:id', requirePermission(PERMISSIONS.EXPENCE_UPDATE), uploadExpenceReceipt.single('receipt'), updateExpencesById);

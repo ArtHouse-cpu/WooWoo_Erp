@@ -49,11 +49,16 @@ function toAmount(...values: unknown[]) {
 }
 
 function getWalletRecordId(row: WalletRow) {
+  // If the backend signals no real wallet record exists, use customerId for auto-create
+  if (row.raw?.hasWalletRecord === false || row.raw?._id == null) {
+    return String(row.customerId ?? "").trim();
+  }
   const candidate = String(row.raw?._id ?? row.raw?.id ?? "").trim();
-  return candidate.length > 0 ? candidate : "";
+  return candidate.length > 0 ? candidate : String(row.customerId ?? "").trim();
 }
 
 function hasExistingWalletRecord(row: WalletRow) {
+  if (row.raw?.hasWalletRecord === false || row.raw?._id == null) return false;
   return getWalletRecordId(row).length > 0;
 }
 
@@ -437,7 +442,8 @@ export default function WalletScreen() {
 
     try {
       const walletRecordId = getWalletRecordId(row);
-      if (!walletRecordId && type === "credit") {
+      const existingRecord = hasExistingWalletRecord(row);
+      if (!existingRecord && type === "credit") {
         await handleCreateWallet(payload);
       } else {
         await handleUpdateWallet(walletRecordId, payload);

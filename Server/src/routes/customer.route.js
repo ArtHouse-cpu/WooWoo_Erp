@@ -9,6 +9,10 @@ import {
   importCustomers,
   checkCustomerPhone,
 } from '../controllers/customer.controller.js';
+import {
+  createMembershipOrder,
+  verifyMembershipPayment,
+} from '../controllers/razorpay.controller.js';
 import {authenticateUser} from '../middlewares/auth.middleware.js';
 import {attachStaffContext, requirePermission, requireAnyPermission} from '../middlewares/authorize.middleware.js';
 import {PERMISSIONS} from '../constants/permissions.js';
@@ -51,5 +55,17 @@ router.patch(
   editCustomer,
 );
 router.delete('/:id', requirePermission(PERMISSIONS.CUSTOMER_DELETE), deleteCustomer);
+
+// ── Razorpay membership purchase ─────────────────────────────────────────────
+router.post(
+  '/:customerId/membership/razorpay-order',
+  requirePermission(PERMISSIONS.SUBSCRIPTION_CREATE),
+  createMembershipOrder,
+);
+router.post(
+  '/:customerId/membership/razorpay-verify',
+  requirePermission(PERMISSIONS.SUBSCRIPTION_CREATE),
+  verifyMembershipPayment,
+);
 
 export default router;

@@ -1,28 +1,13 @@
 import PaymentOrder from '../models/paymentOrder.model.js';
 import {
-  createTxnId,
-  formatPayuAmount,
-  generatePaymentHash,
-  getPayuConfig,
-  verifyPaymentWithPayu,
-  verifyReverseHash,
-} from './payu.service.js';
+  createRazorpayOrder,
+  verifyRazorpaySignature,
+} from '../../../services/razorpay.service.js';
 import {validateMembershipCoupon} from './coupon.service.js';
 import {getMembershipOrderAmount} from '../constants/membershipPlans.js';
 import {activateMembership} from './auth.service.js';
 import Customer from '../../../models/customer.model.js';
 import {assertActiveMembershipPlan, resolvePlanMeta} from '../../../services/membershipPlan.service.js';
-
-const getPublicServerUrl = req => {
-  const configured = String(process.env.SERVER_PUBLIC_URL || '').replace(/\/$/, '');
-  if (configured) return configured;
-  const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
-  const host = req.get('x-forwarded-host') || req.get('host');
-  return `${proto}://${host}`;
-};
-
-const getCustomerAppUrl = () =>
-  String(process.env.CUSTOMER_APP_URL || 'http://localhost:5174').replace(/\/$/, '');
 
 const buildPricing = async ({customer, membershipType, couponCode}) => {
   const orderAmount = await getMembershipOrderAmount(membershipType);
@@ -51,10 +36,10 @@ const buildPricing = async ({customer, membershipType, couponCode}) => {
 };
 
 /**
- * Start PayU hosted checkout for membership purchase.
- * If payable is 0 (e.g. 100% coupon), activate immediately without PayU.
+ * Create a Razorpay order for membership purchase.
+ * If paidAmount is 0 (full coupon), activates immediately and returns mode:'free'.
  */
-export const initiateMembershipPayment = async (req, customerId, payload = {}) => {
+export const initiateRazorpayMembershipPayment = async (customerId, payload = {}) => {
   const membershipType = String(payload.membershipType || '').toLowerCase();
   const plan = await assertActiveMembershipPlan(membershipType);
   const planMeta = resolvePlanMeta(plan);
@@ -70,123 +55,99 @@ export const initiateMembershipPayment = async (req, customerId, payload = {}) =
     throw error;
   }
 
-  const pricing = await buildPricing({
-    customer,
-    membershipType,
-    couponCode: payload.couponCode,
-  });
+  const pricing = await buildPricing({customer, membershipType, couponCode: payload.couponCode});
 
-  // Fully discounted — no PayU needed
+  // Fully discounted — no payment needed
   if (pricing.paidAmount <= 0) {
     const result = await activateMembership(customerId, {
       membershipType,
       couponCode: pricing.couponCode || undefined,
       skipPaymentCheck: true,
     });
-    return {
-      mode: 'free',
-      activated: true,
-      customer: result.customer,
-      pricing,
-    };
+    return {mode: 'free', activated: true, customer: result.customer, pricing};
   }
 
-  const {key, salt, paymentUrl} = getPayuConfig();
-  const txnid = createTxnId();
-  const amount = formatPayuAmount(pricing.paidAmount);
-  const productinfo = planMeta.label;
-  const firstname = String(customer.name || 'Customer').trim().slice(0, 60) || 'Customer';
-  const email =
-    String(customer.email || '').trim() ||
-    `${customer.mobile || 'guest'}@customer.woowoo.local`;
-  const phone = String(customer.mobile || '').trim();
+  const receipt = `mbr_${String(customer.mobile || customerId).slice(-10)}_${Date.now().toString(36)}`.slice(0, 40);
 
-  const udf1 = String(customer._id);
-  const udf2 = membershipType;
-  const udf3 = pricing.couponCode || '';
-  const udf4 = amount;
-  const udf5 = txnid;
+  const rzpOrder = await createRazorpayOrder({
+    amount: pricing.paidAmount,
+    currency: 'INR',
+    receipt,
+    notes: {
+      customerId: String(customer._id),
+      customerName: String(customer.name || ''),
+      customerPhone: String(customer.mobile || ''),
+      membershipType,
+      planName: planMeta.label,
+    },
+  });
 
   const order = await PaymentOrder.create({
-    txnid,
+    txnid: rzpOrder.id,
     customer: customer._id,
     membershipType,
     couponCode: pricing.couponCode,
     orderAmount: pricing.orderAmount,
     discountAmount: pricing.discountAmount,
     paidAmount: pricing.paidAmount,
-    status: 'pending',
-    gateway: 'payu',
+    status: 'created',
+    gateway: 'razorpay',
   });
-
-  const hash = generatePaymentHash({
-    key,
-    salt,
-    txnid,
-    amount,
-    productinfo,
-    firstname,
-    email,
-    udf1,
-    udf2,
-    udf3,
-    udf4,
-    udf5,
-  });
-
-  const base = getPublicServerUrl(req);
-  const params = {
-    key,
-    txnid,
-    amount,
-    productinfo,
-    firstname,
-    email,
-    phone,
-    surl: `${base}/api/customer/payments/payu/success`,
-    furl: `${base}/api/customer/payments/payu/failure`,
-    udf1,
-    udf2,
-    udf3,
-    udf4,
-    udf5,
-    hash,
-    service_provider: 'payu_paisa',
-  };
 
   return {
-    mode: 'payu',
+    mode: 'razorpay',
     activated: false,
-    paymentUrl,
-    params,
-    orderId: String(order._id),
-    txnid,
+    orderId: rzpOrder.id,
+    amount: rzpOrder.amount,          // paise (for Razorpay widget)
+    amountInRupees: pricing.paidAmount,
+    currency: rzpOrder.currency,
+    keyId: String(process.env.RAZORPAY_KEY_ID || '').trim(),
+    dbOrderId: String(order._id),
     pricing,
+    customer: {
+      name: customer.name,
+      email: customer.email,
+      mobile: customer.mobile,
+    },
+    plan: {planName: planMeta.label, planId: membershipType},
   };
 };
 
-const redirectToCustomer = (res, query) => {
-  const url = new URL(`${getCustomerAppUrl()}/payment/result`);
-  Object.entries(query).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && String(v).length) {
-      url.searchParams.set(k, String(v));
-    }
-  });
-  return res.redirect(302, url.toString());
-};
+/**
+ * Verify Razorpay payment signature and activate membership.
+ */
+export const verifyRazorpayMembershipPayment = async (customerId, payload = {}) => {
+  const {razorpayOrderId, razorpayPaymentId, razorpaySignature} = payload;
 
-const finalizeSuccessfulPayment = async (order, body) => {
+  if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+    const error = new Error('razorpayOrderId, razorpayPaymentId, and razorpaySignature are required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const isValid = verifyRazorpaySignature({razorpayOrderId, razorpayPaymentId, razorpaySignature});
+  if (!isValid) {
+    const error = new Error('Payment verification failed. Invalid signature.');
+    error.status = 400;
+    throw error;
+  }
+
+  const order = await PaymentOrder.findOne({txnid: razorpayOrderId, customer: customerId});
+  if (!order) {
+    const error = new Error('Payment order not found.');
+    error.status = 404;
+    throw error;
+  }
+
   if (order.status === 'success' && order.activatedAt) {
-    return {alreadyActivated: true, order};
+    return {alreadyActivated: true, membershipType: order.membershipType, order};
   }
 
   order.status = 'success';
-  order.mihpayid = body.mihpayid || order.mihpayid;
-  order.bankRefNum = body.bank_ref_num || order.bankRefNum;
-  order.paymentMode = body.mode || order.paymentMode;
-  order.gatewayStatus = body.status || 'success';
-  order.rawResponse = body;
-  order.errorMessage = null;
+  order.gatewayStatus = 'captured';
+  order.paymentMode = 'razorpay';
+  order.mihpayid = razorpayPaymentId;
+  order.rawResponse = {razorpayOrderId, razorpayPaymentId};
   await order.save();
 
   await activateMembership(order.customer, {
@@ -199,130 +160,12 @@ const finalizeSuccessfulPayment = async (order, body) => {
   order.activatedAt = new Date();
   await order.save();
 
-  return {alreadyActivated: false, order};
-};
-
-/**
- * Handle PayU browser POST redirect (success / failure).
- */
-export const handlePayuCallback = async (req, res, {expectedSuccess}) => {
-  const body = req.body || {};
-  const txnid = String(body.txnid || '').trim();
-  const status = String(body.status || '').toLowerCase();
-
-  if (!txnid) {
-    return redirectToCustomer(res, {
-      status: 'failed',
-      message: 'Missing transaction id from PayU',
-    });
-  }
-
-  let config;
-  try {
-    config = getPayuConfig();
-  } catch (err) {
-    return redirectToCustomer(res, {
-      status: 'failed',
-      txnid,
-      message: err.message || 'PayU not configured',
-    });
-  }
-
-  const hashOk = verifyReverseHash(body, config.salt, config.key);
-  if (!hashOk) {
-    console.error('[PayU] Reverse hash mismatch for txnid', txnid);
-    return redirectToCustomer(res, {
-      status: 'failed',
-      txnid,
-      message: 'Payment verification failed (hash mismatch)',
-    });
-  }
-
-  const order = await PaymentOrder.findOne({txnid});
-  if (!order) {
-    return redirectToCustomer(res, {
-      status: 'failed',
-      txnid,
-      message: 'Payment order not found',
-    });
-  }
-
-  // Amount check
-  const expectedAmount = formatPayuAmount(order.paidAmount);
-  if (String(body.amount) !== expectedAmount) {
-    order.status = 'failed';
-    order.errorMessage = `Amount mismatch: expected ${expectedAmount}, got ${body.amount}`;
-    order.rawResponse = body;
-    await order.save();
-    return redirectToCustomer(res, {
-      status: 'failed',
-      txnid,
-      message: 'Payment amount mismatch',
-    });
-  }
-
-  const isSuccess = status === 'success';
-
-  if (expectedSuccess && isSuccess) {
-    try {
-      // Best-effort live verify (non-blocking for redirect if API fails)
-      try {
-        const verified = await verifyPaymentWithPayu(txnid);
-        const detail = verified?.transaction_details?.[txnid];
-        if (detail && String(detail.status).toLowerCase() === 'failure') {
-          order.status = 'failed';
-          order.gatewayStatus = detail.status;
-          order.rawResponse = {callback: body, verify: verified};
-          order.errorMessage = 'PayU verify_payment reported failure';
-          await order.save();
-          return redirectToCustomer(res, {
-            status: 'failed',
-            txnid,
-            message: 'Payment not confirmed by PayU',
-          });
-        }
-      } catch (verifyErr) {
-        console.warn('[PayU] verify_payment skipped:', verifyErr?.message || verifyErr);
-      }
-
-      await finalizeSuccessfulPayment(order, body);
-      return redirectToCustomer(res, {
-        status: 'success',
-        txnid,
-        membershipType: order.membershipType,
-        amount: expectedAmount,
-        message: 'Membership payment successful',
-      });
-    } catch (err) {
-      console.error('[PayU] Activate after payment failed:', err);
-      return redirectToCustomer(res, {
-        status: 'failed',
-        txnid,
-        message: err.message || 'Could not activate membership after payment',
-      });
-    }
-  }
-
-  order.status = isSuccess ? 'success' : 'failed';
-  order.gatewayStatus = body.status || status;
-  order.mihpayid = body.mihpayid || null;
-  order.bankRefNum = body.bank_ref_num || null;
-  order.paymentMode = body.mode || null;
-  order.errorMessage =
-    body.error_Message || body.error || (isSuccess ? null : 'Payment failed');
-  order.rawResponse = body;
-  await order.save();
-
-  return redirectToCustomer(res, {
-    status: 'failed',
-    txnid,
-    message: order.errorMessage || 'Payment failed or cancelled',
-  });
+  return {alreadyActivated: false, membershipType: order.membershipType, order};
 };
 
 export const getPaymentStatus = async (customerId, txnid) => {
   const order = await PaymentOrder.findOne({
-    txnid: String(txnid || '').trim().toUpperCase(),
+    txnid: String(txnid || '').trim(),
     customer: customerId,
   }).lean();
 
@@ -341,6 +184,6 @@ export const getPaymentStatus = async (customerId, txnid) => {
     orderAmount: order.orderAmount,
     couponCode: order.couponCode,
     activatedAt: order.activatedAt,
-    mihpayid: order.mihpayid,
+    gateway: order.gateway,
   };
 };

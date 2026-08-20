@@ -36,7 +36,7 @@ import {
 import { authApi } from "../../services/auth.service";
 import { getErrorMessage } from "../../services/axios";
 import { useAuthStore } from "../../store/authStore";
-import { redirectToPayu } from "../../utils/payuCheckout";
+import { loadRazorpayScript, openRazorpayCheckout } from "../../utils/razorpayCheckout";
 import {
   BenefitsSheet,
   CheckoutSheet,
@@ -520,7 +520,13 @@ export default function MembershipOnboardingPage() {
         return;
       }
 
-      const { data } = await authApi.initiatePayuPayment({
+      // Load Razorpay SDK first
+      const sdkLoaded = await loadRazorpayScript();
+      if (!sdkLoaded) {
+        throw new Error("Failed to load Razorpay. Check your internet connection and try again.");
+      }
+
+      const { data } = await authApi.initiateRazorpayPayment({
         membershipType,
         ...(couponCode ? { couponCode } : {}),
       });
@@ -544,13 +550,51 @@ export default function MembershipOnboardingPage() {
         return;
       }
 
-      if (payload.mode === "payu" && payload.paymentUrl && payload.params) {
-        redirectToPayu(payload.paymentUrl, payload.params);
+      if (payload.mode === "razorpay" && payload.orderId && payload.keyId) {
+        // Open Razorpay checkout widget
+        await new Promise<void>((resolve, reject) => {
+          openRazorpayCheckout({
+            keyId: payload.keyId!,
+            orderId: payload.orderId!,
+            amount: payload.amount ?? (payload.amountInRupees ?? 0) * 100,
+            description: `${payload.plan?.planName ?? "Membership"} Plan`,
+            prefill: {
+              name: payload.customer?.name,
+              email: payload.customer?.email,
+              contact: payload.customer?.mobile,
+            },
+            onSuccess: async (response) => {
+              try {
+                await authApi.verifyRazorpayPayment({
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                });
+                resolve();
+              } catch (err) {
+                reject(err);
+              }
+            },
+            onDismiss: () => reject(new Error("DISMISSED")),
+            onError: (desc) => reject(new Error(desc)),
+          });
+        });
+
+        await Swal.fire({
+          icon: "success",
+          title: "Membership activated!",
+          text: "Your membership is now active.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+        navigate("/home", { replace: true });
         return;
       }
 
       throw new Error("Unexpected payment response");
     } catch (error) {
+      // User closed the Razorpay modal — silent, no error popup
+      if (error instanceof Error && error.message === "DISMISSED") return;
       await Swal.fire({
         icon: "error",
         title: "Something went wrong",

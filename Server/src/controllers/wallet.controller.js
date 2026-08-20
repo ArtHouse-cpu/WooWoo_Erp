@@ -321,7 +321,7 @@ const getWallets = async (req, res) => {
   try {
     const search = String(req.query.search ?? "").trim();
     const limit = Math.min(Math.max(Number(req.query.limit) || 1000, 1), 5000);
-    const query = {};
+    const query = { isDeleted: { $ne: true } };
 
     if (search) {
       const regex = new RegExp(escapeRegex(search), "i");
@@ -331,7 +331,9 @@ const getWallets = async (req, res) => {
       ];
     }
 
-    const customers = await Customer.find(query).sort({ updatedAt: -1 }).limit(limit).lean();
+    // When searching, don't limit — the user needs to find a specific customer
+    const effectiveLimit = search ? 5000 : limit;
+    const customers = await Customer.find(query).sort({ updatedAt: -1 }).limit(effectiveLimit).lean();
     
     const customerIds = customers.map(c => c._id);
     const wallets = await Wallet.find({ customerId: { $in: customerIds } }).lean();
@@ -345,7 +347,7 @@ const getWallets = async (req, res) => {
       const w = walletMap[c._id.toString()];
       const buckets = resolveTwoBuckets(w, c);
       return {
-        _id: w ? w._id : c._id,
+        _id: w ? w._id : null,
         customerId: c._id,
         customerName: c.name,
         customerPhone: c.mobile,
@@ -359,6 +361,7 @@ const getWallets = async (req, res) => {
         transactions: w ? w.transactions : [],
         createdAt: w ? w.createdAt : c.createdAt,
         updatedAt: w ? w.updatedAt : c.updatedAt,
+        hasWalletRecord: !!w,
       };
     });
 
@@ -573,6 +576,21 @@ const updateWallet = async (req, res) => {
       wallet = await Wallet.findById(id);
       if (!wallet) {
         wallet = await Wallet.findOne({ customerId: id });
+      }
+    }
+
+    // Auto-create wallet if the id is actually a customerId with no wallet yet
+    if (!wallet && mongoose.Types.ObjectId.isValid(id)) {
+      const customer = await Customer.findById(id).lean();
+      if (customer) {
+        const seed = resolveTwoBuckets(null, customer);
+        wallet = await Wallet.create({
+          customerId: customer._id,
+          customerName: String(customer.name ?? customerName ?? "").trim(),
+          customerPhone: String(customer.mobile ?? customerPhone ?? "").trim(),
+          ...persistableBucketFields(seed),
+          transactions: [],
+        });
       }
     }
 

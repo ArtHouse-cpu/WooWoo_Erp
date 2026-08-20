@@ -138,27 +138,43 @@ export const authApi = {
     couponCode?: string;
   }) => api.post<ApiResponse<Customer>>("/membership/activate", payload),
 
-  initiatePayuPayment: (payload: {
+  initiateRazorpayPayment: (payload: {
     membershipType: string;
     couponCode?: string;
   }) =>
     api.post<
       ApiResponse<{
-        mode: "payu" | "free";
+        mode: "razorpay" | "free";
         activated?: boolean;
         customer?: Customer;
-        paymentUrl?: string;
-        params?: Record<string, string>;
-        txnid?: string;
         orderId?: string;
+        amount?: number;
+        amountInRupees?: number;
+        currency?: string;
+        keyId?: string;
+        dbOrderId?: string;
         pricing?: {
           orderAmount: number;
           discountAmount: number;
           paidAmount: number;
           couponCode?: string | null;
         };
+        plan?: { planName: string; planId: string };
+        customer?: { name?: string; email?: string; mobile?: string };
       }>
-    >("/payments/payu/initiate", payload),
+    >("/payments/razorpay/initiate", payload),
+
+  verifyRazorpayPayment: (payload: {
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+  }) =>
+    api.post<
+      ApiResponse<{
+        alreadyActivated: boolean;
+        membershipType: string;
+      }>
+    >("/payments/razorpay/verify", payload),
 
   getPaymentStatus: (txnid: string) =>
     api.get<

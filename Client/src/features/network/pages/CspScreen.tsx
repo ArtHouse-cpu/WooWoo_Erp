@@ -4,7 +4,7 @@ import {
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, Eye, Loader2, Package, Search, X } from "lucide-react";
 import Swal from "sweetalert2";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -12,6 +12,7 @@ import {
   handleEnrollCsp,
   handleGetAllCustomers,
   handleGetCspEnrollments,
+  handleGetCspProducts,
   handleUpdateCsp,
   type CspEnrollment,
 } from "@/services/apiClient";
@@ -39,6 +40,23 @@ const enrollmentCustomerId = (row: CspEnrollment): string => {
   return "";
 };
 
+type ProductRow = {
+  _id: string;
+  productName?: string;
+  serviceName?: string;
+  type?: string;
+  itemType?: string;
+  category?: string;
+  subCategory?: string;
+  sellingPrice?: number;
+  purchasePrice?: number;
+  discountType?: string;
+  discountValue?: number;
+  stockQty?: number;
+  stockStatus?: string;
+  variants?: { name: string; sellingPrice: number; purchasePrice: number }[];
+};
+
 export default function CspScreen() {
   const [rows, setRows] = useState<CspEnrollment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -56,6 +74,32 @@ export default function CspScreen() {
     "active",
   );
   const searchWrapRef = useRef<HTMLDivElement>(null);
+
+  // Products modal state
+  const [productsModal, setProductsModal] = useState<{
+    open: boolean;
+    csp: CspEnrollment | null;
+    products: ProductRow[];
+    loading: boolean;
+  }>({ open: false, csp: null, products: [], loading: false });
+
+  const openProductsModal = async (csp: CspEnrollment) => {
+    setProductsModal({ open: true, csp, products: [], loading: true });
+    try {
+      const res = await handleGetCspProducts(csp._id);
+      const list: ProductRow[] = Array.isArray(res?.products)
+        ? res.products
+        : Array.isArray(res?.data)
+          ? res.data
+          : [];
+      setProductsModal({ open: true, csp, products: list, loading: false });
+    } catch {
+      setProductsModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const closeProductsModal = () =>
+    setProductsModal({ open: false, csp: null, products: [], loading: false });
 
   const fetchRows = async () => {
     try {
@@ -307,19 +351,30 @@ export default function CspScreen() {
         id: "actions",
         header: "Actions",
         Cell: ({ row }) => (
-          <Can anyOf={[PERMISSIONS.CSP_WRITE, PERMISSIONS.CUSTOMER_UPDATE]}>
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => toggleStatus(row.original)}
-              className="rounded bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200"
+              title="View assigned products"
+              onClick={() => openProductsModal(row.original)}
+              className="inline-flex items-center gap-1 rounded bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
             >
-              {row.original.status === "active" ? "Deactivate" : "Activate"}
+              <Eye size={14} />
+              Products
             </button>
-          </Can>
+            <Can anyOf={[PERMISSIONS.CSP_WRITE, PERMISSIONS.CUSTOMER_UPDATE]}>
+              <button
+                type="button"
+                onClick={() => toggleStatus(row.original)}
+                className="rounded bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200"
+              >
+                {row.original.status === "active" ? "Deactivate" : "Activate"}
+              </button>
+            </Can>
+          </div>
         ),
       },
     ],
-    [],
+    [rows],
   );
 
   const table = useMaterialReactTable({
@@ -368,6 +423,166 @@ export default function CspScreen() {
       </div>
 
       <MaterialReactTable table={table} />
+
+      {/* ── Assigned Products Modal ─────────────────────────────────── */}
+      {productsModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="flex w-full max-w-3xl flex-col rounded-2xl bg-white shadow-xl" style={{ maxHeight: "90vh" }}>
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Assigned Products
+                </h2>
+                {productsModal.csp && (
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    CSP Owner:{" "}
+                    <span className="font-medium text-slate-700">
+                      {productsModal.csp.customer?.name ||
+                        productsModal.csp.displayName ||
+                        "—"}
+                    </span>
+                    {(productsModal.csp.mobile ||
+                      productsModal.csp.customer?.mobile) && (
+                      <span className="ml-2 text-slate-400">
+                        {productsModal.csp.mobile ||
+                          productsModal.csp.customer?.mobile}
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={closeProductsModal}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+              {productsModal.loading ? (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                  <Loader2 size={32} className="animate-spin" />
+                  <p className="mt-3 text-sm">Loading products…</p>
+                </div>
+              ) : productsModal.products.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                  <Package size={40} className="text-slate-300" />
+                  <p className="mt-3 text-sm font-medium text-slate-500">
+                    No products assigned
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    This CSP owner has no products linked yet.
+                  </p>
+                </div>
+              ) : (
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="pb-2 pr-4 font-semibold text-slate-600">#</th>
+                      <th className="pb-2 pr-4 font-semibold text-slate-600">Product Name</th>
+                      <th className="pb-2 pr-4 font-semibold text-slate-600">Type</th>
+                      <th className="pb-2 pr-4 font-semibold text-slate-600">Category</th>
+                      <th className="pb-2 pr-4 text-right font-semibold text-slate-600">Selling Price</th>
+                      <th className="pb-2 pr-4 text-right font-semibold text-slate-600">Purchase Price</th>
+                      <th className="pb-2 text-right font-semibold text-slate-600">Discount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productsModal.products.map((p, idx) => {
+                      const name = p.productName || p.serviceName || "—";
+                      const itemType = p.itemType || p.type || "product";
+                      const discountLabel =
+                        p.discountValue && p.discountValue > 0
+                          ? p.discountType === "percentage"
+                            ? `${p.discountValue}%`
+                            : `₹${p.discountValue}`
+                          : "—";
+                      return (
+                        <tr
+                          key={p._id}
+                          className="border-b border-slate-50 last:border-0 hover:bg-slate-50"
+                        >
+                          <td className="py-2.5 pr-4 text-slate-400">{idx + 1}</td>
+                          <td className="py-2.5 pr-4 font-medium text-slate-800">
+                            {name}
+                            {Array.isArray(p.variants) && p.variants.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {p.variants.map((v, vi) => (
+                                  <span
+                                    key={vi}
+                                    className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500"
+                                  >
+                                    {v.name} · ₹{v.sellingPrice}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2.5 pr-4">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                itemType === "service"
+                                  ? "bg-purple-50 text-purple-700"
+                                  : "bg-blue-50 text-blue-700"
+                              }`}
+                            >
+                              {itemType}
+                            </span>
+                          </td>
+                          <td className="py-2.5 pr-4 text-slate-500">
+                            {p.category || "—"}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right font-semibold text-slate-800">
+                            ₹{Number(p.sellingPrice ?? 0).toLocaleString("en-IN")}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right text-slate-500">
+                            ₹{Number(p.purchasePrice ?? 0).toLocaleString("en-IN")}
+                          </td>
+                          <td className="py-2.5 text-right text-slate-500">
+                            {discountLabel}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Footer */}
+            {!productsModal.loading && productsModal.products.length > 0 && (
+              <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3">
+                <p className="text-xs text-slate-400">
+                  {productsModal.products.length} product
+                  {productsModal.products.length !== 1 ? "s" : ""} assigned
+                </p>
+                <button
+                  type="button"
+                  onClick={closeProductsModal}
+                  className="rounded-lg border border-slate-200 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+            {!productsModal.loading && productsModal.products.length === 0 && (
+              <div className="flex justify-end border-t border-slate-100 px-6 py-3">
+                <button
+                  type="button"
+                  onClick={closeProductsModal}
+                  className="rounded-lg border border-slate-200 px-4 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showEnroll && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">

@@ -16,9 +16,8 @@ import {
 } from '../controllers/auth.controller.js';
 import {validateCoupon} from '../controllers/coupon.controller.js';
 import {
-  initiatePayment,
-  payuSuccess,
-  payuFailure,
+  initiateRazorpayPayment,
+  verifyRazorpayPayment,
   paymentStatus,
 } from '../controllers/payment.controller.js';
 import {getReferralDashboard} from '../controllers/referral.controller.js';
@@ -66,7 +65,7 @@ router.post(
   '/login/otp',
   customerOtpLimiter,
   validateRequest(otpLoginSchema),
-  loginOtp, 
+  loginOtp,
 );
 router.post(
   '/verify-otp',
@@ -95,10 +94,6 @@ router.post('/refresh-token', refreshToken);
 router.post('/logout', logout);
 
 router.get('/membership/plans', getCustomerMembershipPlans);
-
-// PayU browser callbacks (no auth — PayU server redirect POST)
-router.post('/payments/payu/success', payuSuccess);
-router.post('/payments/payu/failure', payuFailure);
 
 router.get('/me', authenticateCustomer, authorizeCustomer('active'), me);
 router.get(
@@ -151,12 +146,20 @@ router.post(
   validateRequest(validateMembershipCouponSchema),
   validateCoupon,
 );
+
+// ── Razorpay payment routes ───────────────────────────────────────────────────
 router.post(
-  '/payments/payu/initiate',
+  '/payments/razorpay/initiate',
   authenticateCustomer,
   authorizeCustomer('active'),
   validateRequest(initiatePaymentSchema),
-  initiatePayment,
+  initiateRazorpayPayment,
+);
+router.post(
+  '/payments/razorpay/verify',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  verifyRazorpayPayment,
 );
 router.get(
   '/payments/:txnid',

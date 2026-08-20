@@ -329,11 +329,55 @@ export const handleGetAllExpences = async (
   };
 };
 
+export type ExpencePaymentBreakdown = {
+  cash?: number;
+  upi?: number;
+  card?: number;
+  wallet?: number;
+};
+
+export type ExpenceStaffRef = {
+  m_staff_id?: string | null;
+  m_staff_name?: string | null;
+  m_staff_email?: string | null;
+};
+
+export type ExpencePaymentRecord = {
+  _id?: string;
+  amount: number;
+  mode: string;
+  paymentBreakdown?: ExpencePaymentBreakdown;
+  receivedBy?: ExpenceStaffRef;
+  notes?: string;
+  paidAt?: string;
+};
+
+export type RecordExpencePaymentPayload = {
+  amount: number;
+  mode: string;
+  isMultiMode?: boolean;
+  paymentBreakdown?: ExpencePaymentBreakdown;
+  receivedBy?: ExpenceStaffRef;
+  notes?: string;
+  paidAt?: string;
+};
+
 export type CreateExpencePayload = {
   expenseCode?: string;
   title: string;
   category: string;
   amount: number;
+  paidAmount?: number;
+  dueAmount?: number;
+  paymentBreakdown?: ExpencePaymentBreakdown;
+  initialPayment?: {
+    mode?: string;
+    isMultiMode?: boolean;
+    paymentBreakdown?: ExpencePaymentBreakdown;
+    receivedBy?: ExpenceStaffRef;
+    notes?: string;
+    paidAt?: string;
+  };
   paidTo: string;
   vendorId?: string | null;
   mode: string;
@@ -341,16 +385,8 @@ export type CreateExpencePayload = {
   date: string;
   notes?: string;
   receiptUrl?: string | null;
-  createdBy?: {
-    m_staff_id?: string | null;
-    m_staff_name?: string | null;
-    m_staff_email?: string | null;
-  };
-  addedBy?: {
-    m_staff_id?: string | null;
-    m_staff_name?: string | null;
-    m_staff_email?: string | null;
-  };
+  createdBy?: ExpenceStaffRef;
+  addedBy?: ExpenceStaffRef;
 };
 
 export function expencePayloadToFormData(
@@ -361,6 +397,10 @@ export function expencePayloadToFormData(
   for (const [key, value] of Object.entries(payload)) {
     if (value === undefined || value === null) continue;
     if (key === "createdBy" || key === "addedBy") {
+      fd.append(key, JSON.stringify(value));
+      continue;
+    }
+    if (key === "initialPayment" || key === "paymentBreakdown") {
       fd.append(key, JSON.stringify(value));
       continue;
     }
@@ -427,6 +467,19 @@ export const handleDeleteExpence = async (id: string) => {
   return response.data as {
     success: boolean;
     message?: string;
+  };
+};
+
+export const handleRecordExpencePayment = async (
+  id: string,
+  payload: RecordExpencePaymentPayload,
+) => {
+  const response = await axiosInstance.post(`/api/expences/${id}/payments`, payload);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    expence?: any;
+    payment?: ExpencePaymentRecord;
   };
 };
 
@@ -1279,6 +1332,62 @@ export const handleDeleteMembership = async (id: string) => {
   return response.data;
 };
 
+// ── Razorpay membership purchase ─────────────────────────────────────────────
+
+export type RazorpayOrderResponse = {
+  success: boolean;
+  orderId: string;
+  amount: number;         // paise
+  amountInRupees: number;
+  currency: string;
+  keyId: string;
+  planId: string;
+  plan: {
+    _id: string;
+    planId: string;
+    displayName: string;
+    pricing: { period?: string; amount?: number; grossAmount?: number };
+  };
+  customer: { name?: string; mobile?: string; email?: string };
+  message?: string;
+};
+
+export const handleCreateMembershipRazorpayOrder = async (
+  customerId: string,
+  planId: string,
+): Promise<RazorpayOrderResponse> => {
+  const response = await axiosInstance.post(
+    `/customer/${customerId}/membership/razorpay-order`,
+    { planId },
+  );
+  return response.data as RazorpayOrderResponse;
+};
+
+export const handleVerifyMembershipRazorpayPayment = async (
+  customerId: string,
+  payload: {
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+    planId: string;
+    startDate?: string;
+    endDate?: string;
+    notes?: string;
+  },
+) => {
+  const response = await axiosInstance.post(
+    `/customer/${customerId}/membership/razorpay-verify`,
+    payload,
+  );
+  return response.data as {
+    success: boolean;
+    message?: string;
+    razorpayOrderId?: string;
+    razorpayPaymentId?: string;
+    subscription?: unknown;
+  };
+};
+
 export type SpacePayload = {
   _id?: string;
   name: string;
@@ -1787,6 +1896,18 @@ export const handleUpdateCsp = async (
     success: boolean;
     enrollment?: CspEnrollment;
     message?: string;
+  };
+};
+
+export const handleGetCspProducts = async (cspEnrollmentId: string) => {
+  const response = await axiosInstance.get("/product", {
+    params: { cspEnrollmentId, limit: 2000 },
+  });
+  return response.data as {
+    success?: boolean;
+    products?: any[];
+    data?: any[];
+    total?: number;
   };
 };
 

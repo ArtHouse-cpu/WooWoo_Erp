@@ -76,7 +76,7 @@ const CATEGORY_OPTIONS = [
   "Other",
 ];
 
-const MODE_OPTIONS = ["Cash", "UPI", "Card", "Bank Transfer", "Wallet"];
+const MODE_OPTIONS = ["Cash", "UPI", "Card", "Bank Transfer", "Wallet", "Due"];
 const STATUS_OPTIONS = ["Paid", "Pending", "Cancelled"];
 
 function toForm(initial?: ExpenseModalValues | null) {
@@ -92,7 +92,7 @@ function toForm(initial?: ExpenseModalValues | null) {
         : String(initial.amount),
     paidTo: initial.paidTo || "",
     vendorId: initial.vendorId || "",
-    mode: initial.mode || "",
+    mode: initial.status === "Pending" ? "Due" : initial.mode || "",
     status: initial.status || "Paid",
     date: initial.date || "",
     receipt: null,
@@ -201,6 +201,7 @@ const ExpenseModal = ({
     setFormData((prev) => ({
       ...prev,
       [name]: value,
+      ...(name === "status" && value === "Pending" ? { mode: "Due" } : {}),
     }));
   };
 
@@ -262,7 +263,7 @@ const ExpenseModal = ({
       paidTo,
       vendorId: formData.vendorId,
       date: formData.date || new Date().toISOString().split("T")[0],
-      mode: formData.mode || undefined,
+      mode: formData.status === "Pending" ? "Due" : formData.mode || undefined,
       status: formData.status || undefined,
       receipt: formData.receipt,
       receiptUrl: formData.receiptUrl,

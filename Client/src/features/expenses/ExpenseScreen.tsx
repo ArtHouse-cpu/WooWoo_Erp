@@ -10,10 +10,16 @@ import {
   Eye,
   SquarePen,
   Trash2,
+  IndianRupee,
+  Ellipsis,
+  XCircle,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
 import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
+import ExpenseReceivePaymentModal, {
+  type ExpensePaymentTarget,
+} from "./Modal/ExpenseReceivePaymentModal";
 import ExpenseModal, {
   type ExpenseDraft,
   type ExpenseModalMode,
@@ -41,7 +47,7 @@ type ExpenseCategory =
   | "Other";
 
 type ExpenseStatus = "Paid" | "Pending" | "Cancelled";
-type PaymentMode = "Cash" | "UPI" | "Card" | "Bank Transfer" | "Wallet";
+type PaymentMode = "Cash" | "UPI" | "Card" | "Bank Transfer" | "Wallet" | "Due";
 
 type ExpenseRow = {
   id: number;
@@ -50,6 +56,8 @@ type ExpenseRow = {
   title: string;
   category: ExpenseCategory;
   amount: number;
+  paidAmount: number;
+  dueAmount: number;
   paidTo: string;
   vendorId: string;
   mode: PaymentMode;
@@ -61,6 +69,7 @@ type ExpenseRow = {
   createdById: string;
   notes: string;
   receiptUrl: string;
+  payments: ExpensePaymentTarget["payments"];
 };
 
 const CATEGORIES: ExpenseCategory[] = [
@@ -73,7 +82,7 @@ const CATEGORIES: ExpenseCategory[] = [
   "Travel",
   "Other",
 ];
-const MODES: PaymentMode[] = ["Cash", "UPI", "Card", "Bank Transfer", "Wallet"];
+const MODES: PaymentMode[] = ["Cash", "UPI", "Card", "Bank Transfer", "Wallet", "Due"];
 const STATUSES: ExpenseStatus[] = ["Paid", "Pending", "Cancelled"];
 
 function asCategory(value: unknown): ExpenseCategory {
@@ -81,8 +90,10 @@ function asCategory(value: unknown): ExpenseCategory {
   return (CATEGORIES as string[]).includes(v) ? (v as ExpenseCategory) : "Other";
 }
 
-function asMode(value: unknown): PaymentMode {
+function asMode(value: unknown, status?: ExpenseStatus): PaymentMode {
+  if (status === "Pending") return "Due";
   const v = String(value ?? "").trim();
+  if (v === "CREDIT" || v.toLowerCase() === "due") return "Cash";
   return (MODES as string[]).includes(v) ? (v as PaymentMode) : "Cash";
 }
 
@@ -103,6 +114,7 @@ function mapCheckoutModeToExpenseMode(
   if (m === "CARD") return "Card";
   if (m === "WALLET") return "Wallet";
   if (m === "BANK TRANSFER") return "Bank Transfer";
+  if (m === "CREDIT" || m === "DUE") return "Due";
   if (m === "MULTI") {
     const ranked: Array<[PaymentMode, number]> = [
       ["Cash", Number(breakdown.cash) || 0],
@@ -141,17 +153,37 @@ function staffId(value: unknown): string {
 function mapExpenceToRow(item: any, index: number): ExpenseRow {
   const createdName = staffName(item?.createdBy);
   const addedName = staffName(item?.addedBy);
+  const status = asStatus(item?.status);
+  const amount = Number(item?.amount) || 0;
+  const paidAmount =
+    status === "Paid"
+      ? item?.paidAmount != null
+        ? Number(item.paidAmount) || 0
+        : amount
+      : item?.paidAmount != null
+        ? Number(item.paidAmount) || 0
+        : Number(item?.totalReceivedAmount) || 0;
+  const dueAmount =
+    status === "Pending"
+      ? item?.dueAmount != null
+        ? Number(item.dueAmount) || 0
+        : item?.remainingAmount != null
+          ? Number(item.remainingAmount) || 0
+          : Math.max(0, amount - paidAmount)
+      : 0;
   return {
     id: index + 1,
     _id: String(item?._id ?? ""),
     expenseCode: String(item?.expenseCode || `EXP-${index + 1}`),
     title: String(item?.title || "").trim() || "Untitled expense",
     category: asCategory(item?.category),
-    amount: Number(item?.amount) || 0,
+    amount,
+    paidAmount,
+    dueAmount,
     paidTo: String(item?.paidTo || "").trim() || "—",
     vendorId: String(item?.vendorId?._id || item?.vendorId || "").trim(),
-    mode: asMode(item?.mode),
-    status: asStatus(item?.status),
+    mode: asMode(item?.mode, status),
+    status,
     date: toDateYmd(item?.date || item?.createdAt),
     createdBy: createdName || "—",
     createdById: staffId(item?.createdBy),
@@ -159,6 +191,20 @@ function mapExpenceToRow(item: any, index: number): ExpenseRow {
     addedById: staffId(item?.addedBy) || staffId(item?.createdBy),
     notes: String(item?.notes || "").trim(),
     receiptUrl: String(item?.receiptUrl || "").trim(),
+    payments: Array.isArray(item?.payments) ? item.payments : [],
+  };
+}
+
+function rowToPaymentTarget(row: ExpenseRow): ExpensePaymentTarget {
+  return {
+    _id: row._id,
+    expenseCode: row.expenseCode,
+    title: row.title,
+    paidTo: row.paidTo,
+    amount: row.amount,
+    dueAmount: row.dueAmount,
+    paidAmount: row.paidAmount,
+    payments: row.payments,
   };
 }
 
@@ -255,6 +301,7 @@ const MODE_STYLES: Record<PaymentMode, string> = {
   Card: "bg-blue-100 text-blue-700",
   "Bank Transfer": "bg-teal-100 text-teal-700",
   Wallet: "bg-amber-100 text-amber-700",
+  Due: "bg-orange-100 text-orange-700",
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -277,6 +324,12 @@ const ExpenseScreen = () => {
   const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
   const [expenseFormKey, setExpenseFormKey] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [receivePaymentOpen, setReceivePaymentOpen] = useState(false);
+  const [receivePaymentTarget, setReceivePaymentTarget] =
+    useState<ExpensePaymentTarget | null>(null);
+  const [selectedActionRow, setSelectedActionRow] = useState<ExpenseRow | null>(
+    null,
+  );
 
   const selectedLabel =
     dateFilterOptions.find((o) => o.value === dateFilter)?.label ?? "This Year";
@@ -343,6 +396,12 @@ const ExpenseScreen = () => {
     setIsExpenseModalOpen(true);
   }, []);
 
+  const openReceivePaymentModal = useCallback((row: ExpenseRow) => {
+    if (row.status !== "Pending" || row.dueAmount <= 0) return;
+    setReceivePaymentTarget(rowToPaymentTarget(row));
+    setReceivePaymentOpen(true);
+  }, []);
+
   const handleDeleteExpense = useCallback(async (row: ExpenseRow) => {
     const result = await Swal.fire({
       title: "Delete Expense?",
@@ -381,7 +440,10 @@ const ExpenseScreen = () => {
           vendorId: draft.vendorId || null,
           date: draft.date,
           notes: draft.description,
-          mode: draft.mode || activeExpense.mode,
+          mode:
+            (draft.status || activeExpense.status) === "Pending"
+              ? "Due"
+              : draft.mode || activeExpense.mode,
           status: draft.status || activeExpense.status,
           receiptUrl: draft.receipt ? undefined : draft.receiptUrl || "",
         },
@@ -488,15 +550,38 @@ const ExpenseScreen = () => {
       {
         accessorKey: "mode",
         header: "Mode",
-        Cell: ({ row }: { row: { original: ExpenseRow } }) => (
-          <span
-            className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ${
-              MODE_STYLES[row.original.mode]
-            }`}
-          >
-            {row.original.mode}
-          </span>
-        ),
+        Cell: ({ row }: { row: { original: ExpenseRow } }) => {
+          const isPendingDue =
+            row.original.status === "Pending" && row.original.dueAmount > 0;
+          if (isPendingDue) {
+            const dueAmount = Number(row.original.dueAmount ?? 0);
+            return (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openReceivePaymentModal(row.original);
+                }}
+                className="inline-flex rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-200"
+              >
+                Due ₹{" "}
+                {dueAmount.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </button>
+            );
+          }
+          return (
+            <span
+              className={`inline-flex rounded-md px-2.5 py-1 text-xs font-semibold ${
+                MODE_STYLES[row.original.mode]
+              }`}
+            >
+              {row.original.mode}
+            </span>
+          );
+        },
         size: 130,
       },
       {
@@ -539,62 +624,38 @@ const ExpenseScreen = () => {
         },
         size: 120,
       },
-      {
-        accessorKey: "addedBy",
-        header: "Added By",
-        size: 130,
-      },
-      {
-        accessorKey: "createdBy",
-        header: "Created By",
-        size: 130,
-      },
+      // {
+      //   accessorKey: "addedBy",
+      //   header: "Added By",
+      //   size: 130,
+      // },
+      // {
+      //   accessorKey: "createdBy",
+      //   header: "Created By",
+      //   size: 130,
+      // },
       {
         id: "actions",
         header: "Actions",
         enableSorting: false,
         enableColumnActions: false,
         Cell: ({ row }: { row: { original: ExpenseRow } }) => (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              title="View expense"
-              onClick={(e) => {
-                e.stopPropagation();
-                openViewModal(row.original);
-              }}
-              className="cursor-pointer rounded bg-violet-100 px-2.5 py-2 text-sm hover:bg-violet-200"
-            >
-              <Eye size={16} className="text-violet-700" />
-            </button>
-            <button
-              type="button"
-              title="Edit expense"
-              onClick={(e) => {
-                e.stopPropagation();
-                openEditModal(row.original);
-              }}
-              className="cursor-pointer rounded bg-green-100 px-2.5 py-2 text-sm hover:bg-green-200"
-            >
-              <SquarePen size={16} className="text-green-700" />
-            </button>
-            <button
-              type="button"
-              title="Delete expense"
-              onClick={(e) => {
-                e.stopPropagation();
-                void handleDeleteExpense(row.original);
-              }}
-              className="cursor-pointer rounded bg-red-100 px-2.5 py-2 text-sm hover:bg-red-200"
-            >
-              <Trash2 size={16} className="text-red-600" />
-            </button>
-          </div>
+          <button
+            type="button"
+            title="More actions"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedActionRow(row.original);
+            }}
+            className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+          >
+            <Ellipsis size={18} />
+          </button>
         ),
-        size: 160,
+        size: 110,
       },
     ],
-    [openViewModal, openEditModal, handleDeleteExpense],
+    [],
   );
 
   const table = useMaterialReactTable({
@@ -641,12 +702,10 @@ const ExpenseScreen = () => {
   });
 
   const totalAmount = filteredData.reduce((sum, r) => sum + r.amount, 0);
-  const paidAmount = filteredData
-    .filter((r) => r.status === "Paid")
-    .reduce((sum, r) => sum + r.amount, 0);
+  const paidAmount = filteredData.reduce((sum, r) => sum + r.paidAmount, 0);
   const pendingAmount = filteredData
     .filter((r) => r.status === "Pending")
-    .reduce((sum, r) => sum + r.amount, 0);
+    .reduce((sum, r) => sum + r.dueAmount, 0);
 
   return (
     <div className="min-w-0 space-y-4 p-1">
@@ -773,6 +832,119 @@ const ExpenseScreen = () => {
         </div>
       </div>
 
+      {selectedActionRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Expense Actions
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {selectedActionRow.expenseCode} · {selectedActionRow.title}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedActionRow(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+            <div className="space-y-3 p-5">
+              {selectedActionRow.status === "Pending" &&
+              selectedActionRow.dueAmount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const row = selectedActionRow;
+                    setSelectedActionRow(null);
+                    openReceivePaymentModal(row);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg border border-amber-100 bg-amber-50 p-3 text-left transition-colors hover:bg-amber-100"
+                >
+                  <div className="rounded-full bg-amber-200 p-2 text-amber-700">
+                    <IndianRupee size={18} />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-amber-800">
+                      Receive Payment
+                    </div>
+                    <div className="text-xs text-amber-700/80">
+                      Record a payment against this due
+                    </div>
+                  </div>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  const row = selectedActionRow;
+                  setSelectedActionRow(null);
+                  openViewModal(row);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
+              >
+                <div className="rounded-full bg-violet-100 p-2 text-violet-600">
+                  <Eye size={18} />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-800">
+                    View Expense
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    View in read-only mode
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const row = selectedActionRow;
+                  setSelectedActionRow(null);
+                  openEditModal(row);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
+              >
+                <div className="rounded-full bg-green-100 p-2 text-green-700">
+                  <SquarePen size={18} />
+                </div>
+                <div>
+                  <div className="font-semibold text-gray-800">
+                    Edit Expense
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Modify expense details
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const row = selectedActionRow;
+                  setSelectedActionRow(null);
+                  void handleDeleteExpense(row);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
+              >
+                <div className="rounded-full bg-red-200 p-2 text-red-700">
+                  <Trash2 size={18} />
+                </div>
+                <div>
+                  <div className="font-semibold text-red-700">
+                    Delete Expense
+                  </div>
+                  <div className="text-xs text-red-600/70">
+                    Permanently remove
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ExpenseModal
         key={
           modalMode === "create"
@@ -821,17 +993,59 @@ const ExpenseScreen = () => {
         checkoutContext="expense"
         onConfirmPayment={async (payment) => {
           if (!expenseDraft) return;
-          const mode = mapCheckoutModeToExpenseMode(
-            payment.mode,
-            payment.paymentBreakdown,
-          );
           const status: ExpenseStatus =
             payment.dueAmount > 0 ? "Pending" : "Paid";
+          const mode: PaymentMode =
+            status === "Pending"
+              ? "Due"
+              : mapCheckoutModeToExpenseMode(
+                  payment.mode,
+                  payment.paymentBreakdown,
+                );
+          const paidAmount =
+            payment.dueAmount > 0
+              ? payment.paymentBreakdown.paidAmount
+              : payment.finalAmount;
+          const dueAmount = payment.dueAmount;
+          const isMulti =
+            String(payment.mode || "")
+              .toUpperCase()
+              .replace(/_/g, " ") === "MULTI";
           await handleCreateExpence(
             {
             title: expenseDraft.title,
             category: expenseDraft.category || "Other",
             amount: expenseDraft.amount,
+            paidAmount,
+            dueAmount,
+            paymentBreakdown: {
+              cash: payment.paymentBreakdown.cash,
+              upi: payment.paymentBreakdown.upi,
+              card: payment.paymentBreakdown.card,
+              wallet: payment.paymentBreakdown.wallet,
+            },
+            initialPayment:
+              paidAmount > 0
+                ? {
+                    mode: isMulti ? "Multi" : mode,
+                    isMultiMode: isMulti,
+                    paymentBreakdown: {
+                      cash: payment.paymentBreakdown.cash,
+                      upi: payment.paymentBreakdown.upi,
+                      card: payment.paymentBreakdown.card,
+                      wallet: payment.paymentBreakdown.wallet,
+                    },
+                    receivedBy: {
+                      m_staff_id:
+                        payment.invoiceBy?.employeeId ||
+                        payment.invoiceBy?.staffId ||
+                        null,
+                      m_staff_name: payment.invoiceBy?.staffName || null,
+                      m_staff_email: payment.invoiceBy?.email || null,
+                    },
+                    paidAt: payment.verifiedAt || new Date().toISOString(),
+                  }
+                : undefined,
             paidTo: expenseDraft.paidTo,
             vendorId: expenseDraft.vendorId || null,
             mode,
@@ -869,6 +1083,15 @@ const ExpenseScreen = () => {
           });
           void fetchExpenses();
         }}
+      />
+      <ExpenseReceivePaymentModal
+        open={receivePaymentOpen}
+        onClose={() => {
+          setReceivePaymentOpen(false);
+          setReceivePaymentTarget(null);
+        }}
+        expense={receivePaymentTarget}
+        onSuccess={() => void fetchExpenses()}
       />
     </div>
   );

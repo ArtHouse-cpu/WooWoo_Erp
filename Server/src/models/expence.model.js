@@ -15,6 +15,33 @@ const expenceSchema = new mongoose.Schema(
       default: 'Other',
     },
     amount: {type: Number, required: true, min: 0},
+    paidAmount: {type: Number, min: 0, default: 0},
+    dueAmount: {type: Number, min: 0, default: 0},
+    paymentBreakdown: {
+      cash: {type: Number, min: 0, default: 0},
+      upi: {type: Number, min: 0, default: 0},
+      card: {type: Number, min: 0, default: 0},
+      wallet: {type: Number, min: 0, default: 0},
+    },
+    payments: [
+      {
+        amount: {type: Number, required: true, min: 0},
+        mode: {type: String, trim: true, default: 'Cash'},
+        paymentBreakdown: {
+          cash: {type: Number, min: 0, default: 0},
+          upi: {type: Number, min: 0, default: 0},
+          card: {type: Number, min: 0, default: 0},
+          wallet: {type: Number, min: 0, default: 0},
+        },
+        receivedBy: {
+          m_staff_id: {type: String, default: null},
+          m_staff_name: {type: String, default: null},
+          m_staff_email: {type: String, default: null},
+        },
+        notes: {type: String, trim: true, default: ''},
+        paidAt: {type: Date, default: Date.now},
+      },
+    ],
     paidTo: {type: String, trim: true, default: ''},
     vendorId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -25,7 +52,7 @@ const expenceSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: 'Cash',
-      enum: ['Cash', 'UPI', 'Card', 'Bank Transfer', 'Wallet'],
+      enum: ['Cash', 'UPI', 'Card', 'Bank Transfer', 'Wallet', 'Due'],
     },
     status: {
       type: String,
