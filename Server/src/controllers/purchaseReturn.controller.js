@@ -79,11 +79,31 @@ console.log("createPurchaseReturn controller:",req.body)
 
 export const getPurchaseReturns = async (req, res) => {
     try {
-        const purchaseReturns = await PurchaseReturn.find().sort({ createdAt: -1 });
+        const limit = Math.min(Math.max(Number(req.query.limit) || 2000, 1), 5000);
+        const  fromDate=String(req.query.fromDate ?? '').trim();
+        const toDate=String(req.query.toDate ?? '').trim();
+        const query={};
+        const dateFilter={};
+        if(fromDate){
+            const from=new Date(`${fromDate}T00:00:00.000`);
+            if(!Number.isNaN(from.getTime())) dateFilter.$gte=from;
+        }
+        if(toDate){
+            const to=new Date(`${toDate}T23:59:59.999`);
+            if(!Number.isNaN(to.getTime())) dateFilter.$lte=to;
+        }
+        if(Object.keys(dateFilter).length){
+            query.createdAt=dateFilter;
+        }
+        const purchaseReturns = await PurchaseReturn.find(query).sort({ createdAt: -1 })
+            .limit(limit)
+            .lean();
         return res.status(200).json({
             success: true,
             message: "Purchase returns fetched successfully.",
             purchaseReturns,
+            total: purchaseReturns.length,
+            limit,
         });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });

@@ -14,6 +14,12 @@ import {
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { handleGetQuotations, handleDeleteQuotation, handleUpdateQuotationStatus } from "@/services/apiClient";
+import {
+  DATE_PRESET_OPTIONS,
+  getTodayYmd,
+  rangeForPreset,
+  type DatePreset,
+} from "@/utils/datePresets";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
   toQuotationPdfRecord,
@@ -44,6 +50,9 @@ export default function QuotationScreen() {
   const navigate = useNavigate();
   const [data, setData] = useState<QuotationRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [datePreset, setDatePreset] = useState<DatePreset>("today");
+  const [fromDate, setFromDate] = useState(getTodayYmd);
+  const [toDate, setToDate] = useState(getTodayYmd);
   const [selectedActionRow, setSelectedActionRow] = useState<QuotationRow | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewData, setViewData] = useState<any>(null);
@@ -51,8 +60,8 @@ export default function QuotationScreen() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await handleGetQuotations();
-     const formatted = res.quotations.map((q: any, i: number) => ({
+      const res = await handleGetQuotations("", undefined, fromDate, toDate);
+     const formatted = (Array.isArray(res?.quotations) ? res.quotations : []).map((q: any, i: number) => ({
           id: i + 1,
           amount: q.grandTotal ?? 0,
           status: q.status || "draft",
@@ -67,14 +76,15 @@ export default function QuotationScreen() {
         setData(formatted);
     } catch (error) {
       console.error("Error fetching data:", error);
+      setData([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    void fetchData();
+  }, [fromDate, toDate]);
 
   const handleAction = async (action: "view" | "edit" | "delete" | "reject" | "accept" | "convert") => {
     if (!selectedActionRow) return;
@@ -306,6 +316,73 @@ export default function QuotationScreen() {
           </Can>
         </div>
       </div>
+
+      <div className="mb-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <select
+            value={datePreset}
+            onChange={(e) => {
+              const preset = e.target.value as DatePreset;
+              setDatePreset(preset);
+              if (preset === "custom") return;
+              const range = rangeForPreset(preset);
+              setFromDate(range.from);
+              setToDate(range.to);
+            }}
+            className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+          >
+            {DATE_PRESET_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              From
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setDatePreset("custom");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              To
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setDatePreset("custom");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+          {(fromDate || toDate || datePreset !== "all") && (
+            <button
+              type="button"
+              onClick={() => {
+                setDatePreset("all");
+                setFromDate("");
+                setToDate("");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
       <MaterialReactTable table={table} />
 
       {selectedActionRow && (

@@ -7,7 +7,7 @@ import {
   createAndSendOtp,
   verifyOtpCode,
 } from './otp.service.js';
-import {sendMembershipPurchaseWhatsApp, sendAccountCreatedWhatsApp} from './whatsapp.service.js';
+import {sendMembershipPurchaseWhatsApp, sendMembershipChangeWhatsApp, sendAccountCreatedWhatsApp} from './whatsapp.service.js';
 import {validateMembershipCoupon} from './coupon.service.js';
 import Coupon from '../../../models/coupon.model.js';
 import PaymentOrder from '../models/paymentOrder.model.js';
@@ -744,6 +744,15 @@ export const activateMembership = async (customerId, payload = {}) => {
     throw error;
   }
 
+  const priorMembershipType = String(customer.membershipType || 'none')
+    .trim()
+    .toLowerCase();
+  const isMembershipUpgrade =
+    Boolean(priorMembershipType) &&
+    priorMembershipType !== 'none' &&
+    !priorMembershipType.includes('junior') &&
+    !priorMembershipType.includes('junoir');
+
   let orderAmount = null;
   let discountAmount = 0;
   let couponCode = null;
@@ -1028,13 +1037,23 @@ export const activateMembership = async (customerId, payload = {}) => {
   const cashbackLabel = String(safeCashback);
   let whatsapp = null;
   try {
-    whatsapp = await sendMembershipPurchaseWhatsApp({
-      to: customer.mobile,
-      name: customer.name || 'Member',
-      membershipLabel: planMeta.label,
-      validity: planMeta.validity,
-      cashbackLabel,
-    });
+    if (isMembershipUpgrade) {
+      whatsapp = await sendMembershipChangeWhatsApp({
+        to: customer.mobile,
+        customerName: customer.name || 'Member',
+        membershipName: planMeta.label,
+        validity: planMeta.validity,
+        cashbackAmount: cashbackLabel,
+      });
+    } else {
+      whatsapp = await sendMembershipPurchaseWhatsApp({
+        to: customer.mobile,
+        name: customer.name || 'Member',
+        membershipLabel: planMeta.label,
+        validity: planMeta.validity,
+        cashbackLabel,
+      });
+    }
   } catch (err) {
     console.error('[Membership] WhatsApp send error:', err?.message || err);
     whatsapp = {delivered: false, error: err?.message || 'WhatsApp send failed'};

@@ -108,7 +108,10 @@ export const handleResetPassword = async (payload: {
   newPassword: string;
 }) => {
   try {
-    const response = await axiosInstance.patch("/auth/forgot-password", payload);
+    const response = await axiosInstance.patch(
+      "/auth/forgot-password",
+      payload,
+    );
     return response.data;
   } catch (error) {
     console.log("Error resetting password:", error);
@@ -128,8 +131,8 @@ export type CreateInvoicePayload = {
   search: string;
   signal?: AbortSignal;
   limit?: number;
-  fromDate:string,
-  toDate:string,
+  fromDate: string;
+  toDate: string;
   customerName: string;
   customerPhone: string;
   /** Exact CRM customer linked to this invoice (preferred over name search). */
@@ -216,7 +219,6 @@ export type CouponPayload = {
 };
 
 export const handleCreateInvoice = async (payload: CreateInvoicePayload) => {
- 
   try {
     const response = await axiosInstance.post("/invoice", payload);
     return response.data;
@@ -237,7 +239,9 @@ export type VerifiedStaff = {
 };
 
 export const handleVerifyStaffPin = async (pin: string) => {
-  const response = await axiosInstance.post("/access/staff/verify-pin", { pin });
+  const response = await axiosInstance.post("/access/staff/verify-pin", {
+    pin,
+  });
   return response.data as {
     success: boolean;
     message?: string;
@@ -250,7 +254,10 @@ export const handleSetStaffPin = async (
   staffId: string,
   payload: { pin?: string } = {},
 ) => {
-  const response = await axiosInstance.post(`/access/staff/${staffId}/pin`, payload);
+  const response = await axiosInstance.post(
+    `/access/staff/${staffId}/pin`,
+    payload,
+  );
   return response.data as {
     success: boolean;
     message?: string;
@@ -305,7 +312,12 @@ export const handleGetInvoices = async (
 ) => {
   try {
     const response = await axiosInstance.get("/invoice", {
-      params: { search: search.trim(), limit ,...(fromDate ? { fromDate } : {}), ...(toDate ? { toDate } : {}) },
+      params: {
+        search: search.trim(),
+        limit,
+        ...(fromDate ? { fromDate } : {}),
+        ...(toDate ? { toDate } : {}),
+      },
       signal,
     });
     return response.data;
@@ -449,7 +461,10 @@ export const handleCreateExpence = async (
   };
 };
 
-export const handleGetExpenceById = async (id: string, signal?: AbortSignal) => {
+export const handleGetExpenceById = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
   const response = await axiosInstance.get(`/api/expences/${id}`, { signal });
   return response.data as {
     success: boolean;
@@ -490,7 +505,10 @@ export const handleRecordExpencePayment = async (
   id: string,
   payload: RecordExpencePaymentPayload,
 ) => {
-  const response = await axiosInstance.post(`/api/expences/${id}/payments`, payload);
+  const response = await axiosInstance.post(
+    `/api/expences/${id}/payments`,
+    payload,
+  );
   return response.data as {
     success: boolean;
     message?: string;
@@ -499,7 +517,10 @@ export const handleRecordExpencePayment = async (
   };
 };
 
-export const handleUpdateInvoice = async (id: string, payload: Partial<CreateInvoicePayload>) => {
+export const handleUpdateInvoice = async (
+  id: string,
+  payload: Partial<CreateInvoicePayload>,
+) => {
   try {
     const response = await axiosInstance.patch(`/invoice/${id}`, payload);
     return response.data;
@@ -569,7 +590,9 @@ export type CreateQuotationPayload = {
   };
 };
 
-export const handleCreateQuotation = async (payload: CreateQuotationPayload) => {
+export const handleCreateQuotation = async (
+  payload: CreateQuotationPayload,
+) => {
   try {
     const response = await axiosInstance.post("/quotation", payload);
     return response.data;
@@ -579,10 +602,21 @@ export const handleCreateQuotation = async (payload: CreateQuotationPayload) => 
   }
 };
 
-export const handleGetQuotations = async (search = "", signal?: AbortSignal) => {
+export const handleGetQuotations = async (
+  search = "",
+  signal?: AbortSignal,
+  fromDate = "",
+  toDate = "",
+  limit = 2000,
+) => {
   try {
     const response = await axiosInstance.get("/quotation", {
-      params: { search: search.trim() },
+      params: {
+        search: search.trim(),
+        limit,
+        ...(fromDate ? { fromDate } : {}),
+        ...(toDate ? { toDate } : {}),
+      },
       signal,
     });
     return response.data;
@@ -592,7 +626,10 @@ export const handleGetQuotations = async (search = "", signal?: AbortSignal) => 
   }
 };
 
-export const handleUpdateQuotation = async (id: string, payload: Partial<CreateQuotationPayload>) => {
+export const handleUpdateQuotation = async (
+  id: string,
+  payload: Partial<CreateQuotationPayload>,
+) => {
   try {
     const response = await axiosInstance.patch(`/quotation/${id}`, payload);
     return response.data;
@@ -602,9 +639,14 @@ export const handleUpdateQuotation = async (id: string, payload: Partial<CreateQ
   }
 };
 
-export const handleUpdateQuotationStatus = async (id: string, status: string) => {
+export const handleUpdateQuotationStatus = async (
+  id: string,
+  status: string,
+) => {
   try {
-    const response = await axiosInstance.patch(`/quotation/${id}/status`, { status });
+    const response = await axiosInstance.patch(`/quotation/${id}/status`, {
+      status,
+    });
     return response.data;
   } catch (error) {
     console.log("Error updating quotation status:", error);
@@ -641,7 +683,10 @@ export const handleCreateCoupon = async (payload: CouponPayload) => {
   return response.data;
 };
 
-export const handleUpdateCoupon = async (id: string, payload: Partial<CouponPayload>) => {
+export const handleUpdateCoupon = async (
+  id: string,
+  payload: Partial<CouponPayload>,
+) => {
   const response = await axiosInstance.patch(`/coupon/${id}`, payload);
   return response.data;
 };
@@ -693,7 +738,6 @@ export const handleValidateReferralDiscount = async (payload: {
   return response.data;
 };
 
-
 export type ReturnSaleItemPayload = CreateInvoiceItemPayload;
 
 export type CreateReturnSalePayload = {
@@ -739,24 +783,33 @@ export const handleGetReturnSales = async (
   limit = 100,
   signal?: AbortSignal,
   originalInvoiceId?: string,
+  fromDate = "",
+  toDate = "",
 ) => {
-  const response = await axiosInstance.get("/returnsales", {//return sales Api Call 
+  const response = await axiosInstance.get("/returnsales", {
     params: {
       search: search.trim(),
       limit,
       ...(originalInvoiceId ? { originalInvoiceId } : {}),
+      ...(fromDate ? { fromDate } : {}),
+      ...(toDate ? { toDate } : {}),
     },
     signal,
   });
   return response.data;
 };
 
-export const handleGetReturnSaleById = async (id: string, signal?: AbortSignal) => {
+export const handleGetReturnSaleById = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
   const response = await axiosInstance.get(`/returnsales/${id}`, { signal });
   return response.data;
 };
 
-export const handleCreateReturnSale = async (payload: CreateReturnSalePayload) => {
+export const handleCreateReturnSale = async (
+  payload: CreateReturnSalePayload,
+) => {
   const response = await axiosInstance.post("/returnsales", payload);
   return response.data;
 };
@@ -878,12 +931,17 @@ export const handleGetAllSubscriptions = async (
   };
 };
 
-export const handleGetSubscriptionById = async (id: string, signal?: AbortSignal) => {
+export const handleGetSubscriptionById = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
   const response = await axiosInstance.get(`/subscriptions/${id}`, { signal });
   return response.data;
 };
 
-export const handleCreateSubscription = async (payload: CreateSubscriptionPayload) => {
+export const handleCreateSubscription = async (
+  payload: CreateSubscriptionPayload,
+) => {
   const response = await axiosInstance.post("/subscriptions", payload);
   return response.data;
 };
@@ -901,7 +959,9 @@ export const handleDeleteSubscription = async (id: string) => {
   return response.data;
 };
 
-export const handleSendMembershipRenewalWhatsApp = async (subscriptionId: string) => {
+export const handleSendMembershipRenewalWhatsApp = async (
+  subscriptionId: string,
+) => {
   const response = await axiosInstance.post(
     `/subscriptions/${subscriptionId}/whatsapp-renewal`,
   );
@@ -925,10 +985,10 @@ export type CustomerPayload = {
   _id?: string;
   name: string;
   mobile: string;
-  membershipType?: string|null;
-  membershipPlanId?: string|null;
+  membershipType?: string | null;
+  membershipPlanId?: string | null;
   /** Priority of customer's current membership plan */
-  priority?: number|null;
+  priority?: number | null;
   email?: string;
   gstin?: string;
   companyName?: string;
@@ -968,7 +1028,11 @@ export function customerPayloadToFormData(
     if (key === "createdBy") continue;
     if (key === "profileImage") continue;
 
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
       fd.append(key, String(value));
       continue;
     }
@@ -1042,7 +1106,9 @@ export const handleGetAllCustomers = async (
   while (all.length < total) {
     const data = await handleGetCustomers(search, signal, size, page);
     const batch = Array.isArray(data?.customers) ? data.customers : [];
-    total = Number.isFinite(Number(data?.total)) ? Number(data.total) : batch.length;
+    total = Number.isFinite(Number(data?.total))
+      ? Number(data.total)
+      : batch.length;
     all.push(...batch);
     if (!batch.length || batch.length < size || data?.hasMore === false) break;
     page += 1;
@@ -1056,15 +1122,21 @@ export const handleGetAllCustomers = async (
   };
 };
 
-export const handleCreateCustomer = async (payload: CustomerPayload | FormData) => {
+export const handleCreateCustomer = async (
+  payload: CustomerPayload | FormData,
+) => {
   try {
-    const response = await axiosInstance.post("/customer", payload, payload instanceof FormData
-      ? {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      : undefined);
+    const response = await axiosInstance.post(
+      "/customer",
+      payload,
+      payload instanceof FormData
+        ? {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        : undefined,
+    );
     return response.data;
   } catch (error) {
     console.log("Error creating customer:", error);
@@ -1159,7 +1231,13 @@ export type WalletTransactionPayload = {
   amount: number;
   note?: string;
   /** Which wallet type to credit: withdrawable | nonWithdrawable */
-  walletType?: "withdrawable" | "nonWithdrawable" | "general" | "cashback" | "affiliate" | string;
+  walletType?:
+    | "withdrawable"
+    | "nonWithdrawable"
+    | "general"
+    | "cashback"
+    | "affiliate"
+    | string;
   minimumBalance?: number;
   referenceType?: string;
   referenceId?: string;
@@ -1186,7 +1264,6 @@ export type WalletRecord = {
   createdAt?: string;
   transactions?: Array<Record<string, unknown>>;
 };
-
 
 export const handleGetWallets = async (
   params?: { search?: string; limit?: number },
@@ -1242,7 +1319,10 @@ export const handleUpdateWallet = async (
 };
 
 export const handleBulkWalletUpdate = async (
-  payload: Pick<WalletTransactionPayload, "type" | "amount" | "note" | "minimumBalance" | "createdBy">,
+  payload: Pick<
+    WalletTransactionPayload,
+    "type" | "amount" | "note" | "minimumBalance" | "createdBy"
+  >,
 ) => {
   try {
     const response = await axiosInstance.patch("/wallet/bulk", payload);
@@ -1255,7 +1335,9 @@ export const handleBulkWalletUpdate = async (
 
 export const handleGetWalletInstructions = async (signal?: AbortSignal) => {
   try {
-    const response = await axiosInstance.get("/wallet/instructions", { signal });
+    const response = await axiosInstance.get("/wallet/instructions", {
+      signal,
+    });
     return response.data;
   } catch (error) {
     console.log("Error fetching wallet instructions:", error);
@@ -1350,7 +1432,9 @@ export const handleGetMemberships = async (
   return response.data;
 };
 
-export const handleCreateMembership = async (payload: MembershipPlanPayload) => {
+export const handleCreateMembership = async (
+  payload: MembershipPlanPayload,
+) => {
   const response = await axiosInstance.post("/membership", payload);
   return response.data;
 };
@@ -1373,7 +1457,7 @@ export const handleDeleteMembership = async (id: string) => {
 export type RazorpayOrderResponse = {
   success: boolean;
   orderId: string;
-  amount: number;         // paise
+  amount: number; // paise
   amountInRupees: number;
   currency: string;
   keyId: string;
@@ -1463,9 +1547,11 @@ export const spacePayloadToFormData = (
 ) => {
   const fd = new FormData();
   if (payload.name !== undefined) fd.append("name", String(payload.name));
-  if (payload.category !== undefined) fd.append("category", String(payload.category));
+  if (payload.category !== undefined)
+    fd.append("category", String(payload.category));
   if (payload.price !== undefined) fd.append("price", String(payload.price));
-  if (payload.capacity !== undefined) fd.append("capacity", String(payload.capacity));
+  if (payload.capacity !== undefined)
+    fd.append("capacity", String(payload.capacity));
   if (payload.status !== undefined) fd.append("status", String(payload.status));
   if (payload.description !== undefined) {
     fd.append("description", String(payload.description));
@@ -1474,9 +1560,7 @@ export const spacePayloadToFormData = (
   return fd;
 };
 
-export const handleCreateSpace = async (
-  payload: SpacePayload | FormData,
-) => {
+export const handleCreateSpace = async (payload: SpacePayload | FormData) => {
   const response = await axiosInstance.post(
     "/space",
     payload,
@@ -1542,7 +1626,8 @@ export const foodPayloadToFormData = (
 ) => {
   const fd = new FormData();
   if (payload.name !== undefined) fd.append("name", String(payload.name));
-  if (payload.category !== undefined) fd.append("category", String(payload.category));
+  if (payload.category !== undefined)
+    fd.append("category", String(payload.category));
   if (payload.price !== undefined) fd.append("price", String(payload.price));
   if (payload.stock !== undefined) fd.append("stock", String(payload.stock));
   if (payload.unit !== undefined) fd.append("unit", String(payload.unit));
@@ -1665,15 +1750,26 @@ export const handleGetPurchases = async (
   return response.data;
 };
 
-export const handleGetPurchaseById = async (id: string, signal?: AbortSignal) => {
+export const handleGetPurchaseById = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
   const response = await axiosInstance.get(`/purchase/${id}`, { signal });
   return response.data;
 };
 
-export const handleCreatePurchase = async (payload: PurchasePayload | FormData) => {
-  const response = await axiosInstance.post("/purchase", payload, payload instanceof FormData ? {
-    headers: { "Content-Type": "multipart/form-data" }
-  } : undefined);
+export const handleCreatePurchase = async (
+  payload: PurchasePayload | FormData,
+) => {
+  const response = await axiosInstance.post(
+    "/purchase",
+    payload,
+    payload instanceof FormData
+      ? {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      : undefined,
+  );
   return response.data;
 };
 
@@ -1681,9 +1777,15 @@ export const handleUpdatePurchase = async (
   id: string,
   payload: Partial<PurchasePayload> | FormData,
 ) => {
-  const response = await axiosInstance.patch(`/purchase/${id}`, payload, payload instanceof FormData ? {
-    headers: { "Content-Type": "multipart/form-data" }
-  } : undefined);
+  const response = await axiosInstance.patch(
+    `/purchase/${id}`,
+    payload,
+    payload instanceof FormData
+      ? {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      : undefined,
+  );
   return response.data;
 };
 
@@ -1692,17 +1794,34 @@ export const handleDeletePurchase = async (id: string) => {
   return response.data;
 };
 
-export const handleGetPurchaseReturns = async (signal?: AbortSignal) => {
-  const response = await axiosInstance.get("/purchaseReturn", { signal });
+export const handleGetPurchaseReturns = async (
+  signal?: AbortSignal,
+  fromDate = "",
+  toDate = "",
+  limit = 2000,
+) => {
+  const response = await axiosInstance.get("/purchaseReturn", {
+    params: {
+      limit,
+      ...(fromDate ? { fromDate } : {}),
+      ...(toDate ? { toDate } : {}),
+    },
+    signal,
+  });
   return response.data;
 };
 
-export const handleGetPurchaseReturnById = async (id: string, signal?: AbortSignal) => {
+export const handleGetPurchaseReturnById = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
   const response = await axiosInstance.get(`/purchaseReturn/${id}`, { signal });
   return response.data;
 };
 
-export const handleCreatePurchaseReturn = async (payload: PurchaseReturnPayload) => {
+export const handleCreatePurchaseReturn = async (
+  payload: PurchaseReturnPayload,
+) => {
   const response = await axiosInstance.post("/purchaseReturn", payload);
   return response.data;
 };
@@ -1760,20 +1879,42 @@ export type PurchaseOrderPayload = {
   purchaser?: string;
 };
 
-export const handleGetPurchasesOrder = async (signal?: AbortSignal) => {
-  const response = await axiosInstance.get("/purchaseOrder", { signal });
+export const handleGetPurchasesOrder = async (signal?: AbortSignal,
+  fromDate = "",
+  toDate = "",
+  limit=5000,
+) => {
+  const response = await axiosInstance.get("/purchaseOrder", {
+    params: {
+      limit,
+      ...(fromDate ? { fromDate } : {}),
+      ...(toDate ? { toDate } : {}),
+    },
+    signal,
+  });
   return response.data;
 };
 
-export const handleGetPurchaseOrderById = async (id: string, signal?: AbortSignal) => {
+export const handleGetPurchaseOrderById = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
   const response = await axiosInstance.get(`/purchaseOrder/${id}`, { signal });
   return response.data;
 };
 
-export const handleCreatePurchaseOrder = async (payload: PurchasePayload | FormData) => {
-  const response = await axiosInstance.post("/purchaseOrder", payload, payload instanceof FormData ? {
-    headers: { "Content-Type": "multipart/form-data" }
-  } : undefined);
+export const handleCreatePurchaseOrder = async (
+  payload: PurchasePayload | FormData,
+) => {
+  const response = await axiosInstance.post(
+    "/purchaseOrder",
+    payload,
+    payload instanceof FormData
+      ? {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      : undefined,
+  );
   return response.data;
 };
 
@@ -1781,9 +1922,15 @@ export const handleUpdatePurchaseOrder = async (
   id: string,
   payload: Partial<PurchasePayload> | FormData,
 ) => {
-  const response = await axiosInstance.patch(`/purchaseOrder/${id}`, payload, payload instanceof FormData ? {
-    headers: { "Content-Type": "multipart/form-data" }
-  } : undefined);
+  const response = await axiosInstance.patch(
+    `/purchaseOrder/${id}`,
+    payload,
+    payload instanceof FormData
+      ? {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      : undefined,
+  );
   return response.data;
 };
 
@@ -1860,7 +2007,10 @@ export const handleCreateVendor = async (payload: VendorPayload) => {
   return response.data;
 };
 
-export const handleUpdateVendor = async (id: string, payload: Partial<VendorPayload>) => {
+export const handleUpdateVendor = async (
+  id: string,
+  payload: Partial<VendorPayload>,
+) => {
   const response = await axiosInstance.patch(`/vendor/${id}`, payload);
   return response.data;
 };
@@ -2175,7 +2325,7 @@ export const handleBulkUploadProducts = async (
   }
 };
 
-export const handleBulkUpload=async(formData:FormData)=>{
+export const handleBulkUpload = async (formData: FormData) => {
   try {
     const response = await axiosInstance.post("/product/bulkUpload", formData, {
       headers: {
@@ -2187,7 +2337,7 @@ export const handleBulkUpload=async(formData:FormData)=>{
     console.log("Error creating product:", error);
     throw error;
   }
-}
+};
 
 export const handleUpdateProduct = async (id: string, formData: FormData) => {
   try {
@@ -2223,7 +2373,9 @@ export const handleGetCategories = async (signal?: AbortSignal) => {
   }
 };
 
-export const handleCreateCategories = async (payload: { categories: Array<{ name: string }> }) => {
+export const handleCreateCategories = async (payload: {
+  categories: Array<{ name: string }>;
+}) => {
   try {
     const response = await axiosInstance.post("/api/categories", payload);
     return response.data;
@@ -2243,7 +2395,10 @@ export const handleGetSubCategories = async (signal?: AbortSignal) => {
   }
 };
 
-export const handleCreateSubCategory = async (payload: { name: string; categoryId: string }) => {
+export const handleCreateSubCategory = async (payload: {
+  name: string;
+  categoryId: string;
+}) => {
   try {
     const response = await axiosInstance.post("/api/subCategories", payload);
     return response.data;
@@ -2256,7 +2411,7 @@ export const handleCreateSubCategory = async (payload: { name: string; categoryI
 export const handleUpdateCategory = async (id: string, name: string) => {
   try {
     const response = await axiosInstance.patch("/api/categories", {
-      categories: [{ _id: id, name }]
+      categories: [{ _id: id, name }],
     });
     return response.data;
   } catch (error) {
@@ -2275,9 +2430,16 @@ export const handleDeleteCategory = async (id: string) => {
   }
 };
 
-export const handleUpdateSubCategory = async (id: string, name: string, categoryId?: string) => {
+export const handleUpdateSubCategory = async (
+  id: string,
+  name: string,
+  categoryId?: string,
+) => {
   try {
-    const response = await axiosInstance.patch(`/api/subCategories/${id}`, { name, categoryId });
+    const response = await axiosInstance.patch(`/api/subCategories/${id}`, {
+      name,
+      categoryId,
+    });
     return response.data;
   } catch (error) {
     console.log("Error updating subcategory:", error);
@@ -2305,7 +2467,11 @@ export const handleGetMyCompanies = async (signal?: AbortSignal) => {
   }
 };
 
-export const handleCreateCompany = async (payload: { name: string; branch: string; logo?: string }) => {
+export const handleCreateCompany = async (payload: {
+  name: string;
+  branch: string;
+  logo?: string;
+}) => {
   try {
     const response = await axiosInstance.post("/company", payload);
     return response.data;
@@ -2317,7 +2483,9 @@ export const handleCreateCompany = async (payload: { name: string; branch: strin
 
 export const handleSwitchCompany = async (companyId: string) => {
   try {
-    const response = await axiosInstance.patch("/company/switch", { companyId });
+    const response = await axiosInstance.patch("/company/switch", {
+      companyId,
+    });
     return response.data;
   } catch (error) {
     console.log("Error switching company:", error);
@@ -2357,7 +2525,9 @@ export const handleGetAffiliateOverview = async (signal?: AbortSignal) => {
 
 export const handleGetAffiliateLeaderboard = async (signal?: AbortSignal) => {
   try {
-    const response = await axiosInstance.get("/affiliate/leaderboard", { signal });
+    const response = await axiosInstance.get("/affiliate/leaderboard", {
+      signal,
+    });
     return response.data;
   } catch (error) {
     console.log("Error fetching affiliate leaderboard:", error);
@@ -2367,7 +2537,9 @@ export const handleGetAffiliateLeaderboard = async (signal?: AbortSignal) => {
 
 export const handleGetAffiliateWalletSummary = async (signal?: AbortSignal) => {
   try {
-    const response = await axiosInstance.get("/affiliate/wallet-summary", { signal });
+    const response = await axiosInstance.get("/affiliate/wallet-summary", {
+      signal,
+    });
     return response.data;
   } catch (error) {
     console.log("Error fetching wallet summary:", error);
@@ -2375,9 +2547,15 @@ export const handleGetAffiliateWalletSummary = async (signal?: AbortSignal) => {
   }
 };
 
-export const handleGetAffiliatesList = async (params?: Record<string, string>, signal?: AbortSignal) => {
+export const handleGetAffiliatesList = async (
+  params?: Record<string, string>,
+  signal?: AbortSignal,
+) => {
   try {
-    const response = await axiosInstance.get("/affiliate/list", { params, signal });
+    const response = await axiosInstance.get("/affiliate/list", {
+      params,
+      signal,
+    });
     return response.data;
   } catch (error) {
     console.log("Error fetching affiliates list:", error);
@@ -2385,9 +2563,14 @@ export const handleGetAffiliatesList = async (params?: Record<string, string>, s
   }
 };
 
-export const handleGetAffiliateById = async (id: string, signal?: AbortSignal) => {
+export const handleGetAffiliateById = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
   try {
-    const response = await axiosInstance.get(`/affiliate/affiliates/${id}`, { signal });
+    const response = await axiosInstance.get(`/affiliate/affiliates/${id}`, {
+      signal,
+    });
     return response.data;
   } catch (error) {
     console.log("Error fetching affiliate detail:", error);
@@ -2395,9 +2578,15 @@ export const handleGetAffiliateById = async (id: string, signal?: AbortSignal) =
   }
 };
 
-export const handleGetPayoutsList = async (params?: Record<string, string>, signal?: AbortSignal) => {
+export const handleGetPayoutsList = async (
+  params?: Record<string, string>,
+  signal?: AbortSignal,
+) => {
   try {
-    const response = await axiosInstance.get("/affiliate/payouts", { params, signal });
+    const response = await axiosInstance.get("/affiliate/payouts", {
+      params,
+      signal,
+    });
     return response.data;
   } catch (error) {
     console.log("Error fetching payouts list:", error);
@@ -2407,7 +2596,10 @@ export const handleGetPayoutsList = async (params?: Record<string, string>, sign
 
 export const handleCreateManualPayout = async (payload: any) => {
   try {
-    const response = await axiosInstance.post("/affiliate/payouts/manual", payload);
+    const response = await axiosInstance.post(
+      "/affiliate/payouts/manual",
+      payload,
+    );
     return response.data;
   } catch (error) {
     console.log("Error creating manual payout:", error);
@@ -2417,7 +2609,10 @@ export const handleCreateManualPayout = async (payload: any) => {
 
 export const handleUpdatePayoutStatus = async (id: string, payload: any) => {
   try {
-    const response = await axiosInstance.put(`/affiliate/payouts/${id}`, payload);
+    const response = await axiosInstance.put(
+      `/affiliate/payouts/${id}`,
+      payload,
+    );
     return response.data;
   } catch (error) {
     console.log("Error updating payout status:", error);
@@ -2490,7 +2685,10 @@ export const handleUpdateAccessRole = async (
   roleId: string,
   payload: { name?: string; description?: string; permissions?: string[] },
 ) => {
-  const response = await axiosInstance.patch(`/access/roles/${roleId}`, payload);
+  const response = await axiosInstance.patch(
+    `/access/roles/${roleId}`,
+    payload,
+  );
   return response.data;
 };
 
@@ -2515,7 +2713,10 @@ export const handleUpdateAccessStaff = async (
     roleId?: string | null;
   },
 ) => {
-  const response = await axiosInstance.patch(`/access/staff/${staffId}`, payload);
+  const response = await axiosInstance.patch(
+    `/access/staff/${staffId}`,
+    payload,
+  );
   return response.data;
 };
 
@@ -2524,7 +2725,9 @@ export const handleDeleteAccessStaff = async (staffId: string) => {
   return response.data;
 };
 
-export const handleBulkCreateSubscriptions = async (payload: { subscriptions: any[] }) => {
+export const handleBulkCreateSubscriptions = async (payload: {
+  subscriptions: any[];
+}) => {
   try {
     const response = await axiosInstance.post("/subscriptions/bulk", payload);
     return response.data;

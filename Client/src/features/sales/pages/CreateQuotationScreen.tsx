@@ -94,9 +94,9 @@ export default function CreateQuotationScreen({
 
   const [draftName, setDraftName] = useState("");
   const [draftQty, setDraftQty] = useState("1");
-  const [draftPrice, setDraftPrice] = useState("0");
-  const [draftDiscount, setDraftDiscount] = useState("0");
-  const [draftCashback, setDraftCashback] = useState("0");
+  const [draftPrice, setDraftPrice] = useState("");
+  const [draftDiscount, setDraftDiscount] = useState("");
+  const [draftCashback, setDraftCashback] = useState("");
   const [draftImage, setDraftImage] = useState("");
   const [draftCategory, setDraftCategory] = useState("General");
   const [draftIsCsp, setDraftIsCsp] = useState(false);
@@ -289,9 +289,9 @@ export default function CreateQuotationScreen({
     ]);
     setDraftName("");
     setDraftQty("1");
-    setDraftPrice("0");
-    setDraftDiscount("0");
-    setDraftCashback("0");
+    setDraftPrice("");
+    setDraftDiscount("");
+    setDraftCashback("");
     setDraftImage("");
     setDraftCategory("General");
     setDraftIsCsp(false);
@@ -594,86 +594,93 @@ export default function CreateQuotationScreen({
   };
 
   const content = (
-    <div className="min-w-0 space-y-4 p-1 sm:p-2">
-      <CreateInvoiceHeader
-        title={mode === "create" ? "Create Quotation" : mode === "edit" ? "Edit Quotation" : "View Quotation"}
-        prefix="QUOT- "
-        invoiceNo={quotationNo}
-        onBack={handleBack}
-        onSaveDraft={() => handleSaveDraft()}
-        onSavePrint={handleSavePrint}
-        onSave={() => setCheckoutOpen(true)}
-        isSaving={saving}
-        mode={mode}
-      />
+    <div className="min-w-0 space-y-3 p-1 sm:space-y-4 sm:p-2">
+      <div className="sticky top-0 z-30 space-y-3 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-sm backdrop-blur-md sm:p-4">
+        <CreateInvoiceHeader
+          embedded
+          title={mode === "create" ? "Create Quotation" : mode === "edit" ? "Edit Quotation" : "View Quotation"}
+          prefix="QUOT- "
+          invoiceNo={quotationNo}
+          onBack={handleBack}
+          onSaveDraft={() => handleSaveDraft()}
+          onSavePrint={handleSavePrint}
+          onSave={() => setCheckoutOpen(true)}
+          isSaving={saving}
+          mode={mode}
+        />
+        <div className="border-t border-slate-100 pt-3">
+          <InvoiceDetailsSection
+            embedded
+            customer={customer}
+            phone={phone}
+            membership={membership}
+            membershipPlanId={membershipPlanId}
+            membershipPlans={membershipPlans}
+            customerOptions={customers}
+            loadingCustomers={loadingCustomers}
+            customerDropdownOpen={mode !== "view" && customerDropdownOpen}
+            invoiceDate={quotationDate}
+            dueDate={dueDate}
+            dueDateMin={today}
+            sectionTitle="Quotation Details"
+            dateLabel="Quotation Date"
+            billedByLabel="Quoted By"
+            selectorLabel="Select Customer"
+            createLabel="Customer"
+            salesPerson={
+              mode === "view" || mode === "edit" ? createdByDisplay : salesPerson
+            }
+            billBy={
+              mode === "view" || mode === "edit" ? billBy || "—" : undefined
+            }
+            readOnly={mode === "view"}
+            onCustomerChange={(value) => {
+              setCustomer(value);
+              setPhone("");
+              setMembership("none");
+              setMembershipPlanId(null);
+            }}
+            onPickCustomer={(selectedCustomer) => {
+              const mType = selectedCustomer.membershipType ?? "none";
+              const mId = toMembershipPlanId(selectedCustomer.membershipPlanId);
+              setCustomer(selectedCustomer.name);
+              setPhone(selectedCustomer.mobile);
+              setMembership(mType);
+              setMembershipPlanId(mId);
+              setCustomers([]);
+              setCustomerDropdownOpen(false);
+              setItems((prev) =>
+                prev.map((item) => {
+                  const plan = resolveMembershipPlan(membershipPlans, mType, mId);
+                  const stacked = calcStackedLineBenefits({
+                    unitPrice: item.unitPrice,
+                    qty: item.qty,
+                    category: item.category || "General",
+                    plan,
+                    discountType: item.productDiscountType,
+                    discountValue: item.productDiscountValue,
+                    isCsp: Boolean(item.isCsp),
+                  });
+                  return {
+                    ...item,
+                    discount: stacked.discount,
+                    cashback: stacked.cashback,
+                    productDiscountAmount: stacked.productDiscount,
+                    membershipDiscountAmount: stacked.membershipDiscount,
+                  };
+                }),
+              );
+            }}
+            onOpenCreateCustomer={() => setShowCreateCustomerModal(true)}
+            onOpenCustomerDropdown={() => setCustomerDropdownOpen(true)}
+            onCloseCustomerDropdown={() => setCustomerDropdownOpen(false)}
+            onPhoneChange={setPhone}
+            onInvoiceDateChange={setQuotationDate}
+            onDueDateChange={setDueDate}
+          />
+        </div>
+      </div>
       <div className={mode === "view" ? "pointer-events-none opacity-90" : ""}>
-      <InvoiceDetailsSection
-        customer={customer}
-        phone={phone}
-        membership={membership}
-        membershipPlanId={membershipPlanId}
-        membershipPlans={membershipPlans}
-        customerOptions={customers}
-        loadingCustomers={loadingCustomers}
-        customerDropdownOpen={mode !== "view" && customerDropdownOpen}
-        invoiceDate={quotationDate}
-        dueDate={dueDate}
-        dueDateMin={today}
-        dateLabel="Quotation Date"
-        billedByLabel="Quoted By"
-        selectorLabel="Select Customer"
-        createLabel="Create Customer"
-        salesPerson={
-          mode === "view" || mode === "edit" ? createdByDisplay : salesPerson
-        }
-        billBy={
-          mode === "view" || mode === "edit" ? billBy || "—" : undefined
-        }
-        readOnly={mode === "view"}
-        onCustomerChange={(value) => {
-          setCustomer(value);
-          setPhone("");
-          setMembership("none");
-          setMembershipPlanId(null);
-        }}
-        onPickCustomer={(selectedCustomer) => {
-          const mType = selectedCustomer.membershipType ?? "none";
-          const mId = toMembershipPlanId(selectedCustomer.membershipPlanId);
-          setCustomer(selectedCustomer.name);
-          setPhone(selectedCustomer.mobile);
-          setMembership(mType);
-          setMembershipPlanId(mId);
-          setCustomers([]);
-          setCustomerDropdownOpen(false);
-          setItems((prev) =>
-            prev.map((item) => {
-              const plan = resolveMembershipPlan(membershipPlans, mType, mId);
-              const stacked = calcStackedLineBenefits({
-                unitPrice: item.unitPrice,
-                qty: item.qty,
-                category: item.category || "General",
-                plan,
-                discountType: item.productDiscountType,
-                discountValue: item.productDiscountValue,
-                isCsp: Boolean(item.isCsp),
-              });
-              return {
-                ...item,
-                discount: stacked.discount,
-                cashback: stacked.cashback,
-                productDiscountAmount: stacked.productDiscount,
-                membershipDiscountAmount: stacked.membershipDiscount,
-              };
-            }),
-          );
-        }}
-        onOpenCreateCustomer={() => setShowCreateCustomerModal(true)}
-        onOpenCustomerDropdown={() => setCustomerDropdownOpen(true)}
-        onCloseCustomerDropdown={() => setCustomerDropdownOpen(false)}
-        onPhoneChange={setPhone}
-        onInvoiceDateChange={setQuotationDate}
-        onDueDateChange={setDueDate}
-      />
       {showCreateCustomerModal && (
         <CreateCustomerModal
           onClose={() => setShowCreateCustomerModal(false)}
@@ -703,7 +710,10 @@ export default function CreateQuotationScreen({
                 false,
               );
               if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
-              setDraftCashback(String(benefits.cashback));
+              else setDraftDiscount("");
+              setDraftCashback(
+                benefits.cashback > 0 ? String(benefits.cashback) : "",
+              );
             }
           }
           if (field === "price") setDraftPrice(value);

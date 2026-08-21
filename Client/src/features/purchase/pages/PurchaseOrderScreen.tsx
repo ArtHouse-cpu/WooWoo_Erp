@@ -20,6 +20,12 @@ import {
   handleCreatePurchase,
   type PurchasePayload,
 } from "@/services/apiClient";
+import {
+  DATE_PRESET_OPTIONS,
+  getTodayYmd,
+  rangeForPreset,
+  type DatePreset,
+} from "@/utils/datePresets";
 import { useNavigate } from "react-router-dom";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import Can from "@/components/rbac/Can";
@@ -146,6 +152,9 @@ export default function PurchaseOrderScreen() {
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
   const [activeTab, setActiveTab] = useState<POTabStatus | "All">("All");
   const [search, setSearch] = useState("");
+  const [datePreset, setDatePreset] = useState<DatePreset>("today");
+  const [fromDate, setFromDate] = useState(getTodayYmd);
+  const [toDate, setToDate] = useState(getTodayYmd);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<PurchaseOrderListRow[]>([]);
   const [selectedActionRow, setSelectedActionRow] =
@@ -157,7 +166,11 @@ export default function PurchaseOrderScreen() {
   const fetchPurchasesOrder = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await handleGetPurchasesOrder();
+      const response = await handleGetPurchasesOrder(
+        undefined,
+        fromDate,
+        toDate,
+      );
       const list = Array.isArray(response?.purchaseOrders)
         ? response.purchaseOrders
         : [];
@@ -224,7 +237,7 @@ export default function PurchaseOrderScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fromDate, toDate]);
 
   useEffect(() => {
     void fetchPurchasesOrder();
@@ -804,7 +817,71 @@ export default function PurchaseOrderScreen() {
         ))}
       </div>
 
-  
+      <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <select
+            value={datePreset}
+            onChange={(e) => {
+              const preset = e.target.value as DatePreset;
+              setDatePreset(preset);
+              if (preset === "custom") return;
+              const range = rangeForPreset(preset);
+              setFromDate(range.from);
+              setToDate(range.to);
+            }}
+            className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+          >
+            {DATE_PRESET_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              From
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setDatePreset("custom");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              To
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setDatePreset("custom");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+          {(fromDate || toDate || datePreset !== "all") && (
+            <button
+              type="button"
+              onClick={() => {
+                setDatePreset("all");
+                setFromDate("");
+                setToDate("");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
 
       <MaterialReactTable table={table} />
 

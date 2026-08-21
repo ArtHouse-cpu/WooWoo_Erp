@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   Briefcase,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -404,14 +403,12 @@ export default function HomeScreen() {
   const [tab, setTab] = useState<TabKey>("bills");
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilter>("month");
-  const [dateOpen, setDateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "Paid" | "Pending">(
     "all",
   );
   const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [menuId, setMenuId] = useState<string | null>(null);
-  const dateRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
 
   const [bills, setBills] = useState<RecentBill[]>([]);
@@ -442,8 +439,6 @@ export default function HomeScreen() {
   useEffect(() => {
     const onDocClick = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (dateRef.current && !dateRef.current.contains(target))
-        setDateOpen(false);
       if (filterRef.current && !filterRef.current.contains(target)) {
         setFilterOpen(false);
       }
@@ -929,16 +924,42 @@ export default function HomeScreen() {
 
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-5 font-sans">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-            Dashboard
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Welcome back, {welcomeName}!
-          </p>
+      <section className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+              Dashboard
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Welcome back, {welcomeName}!
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setDateFilter("today")}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm ${
+                dateFilter === "today"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => setDateFilter("month")}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm ${
+                dateFilter === "month"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              This Month
+            </button>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="hidden flex-wrap items-center gap-2 sm:flex">
           <button
             type="button"
             onClick={() => setOpenPos(true)}
@@ -974,7 +995,7 @@ export default function HomeScreen() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
         <RevenueCard
           title="Revenue"
           period={periodLabel}
@@ -1091,7 +1112,7 @@ export default function HomeScreen() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:p-4">
+        <div className="flex items-center gap-2 p-3 sm:p-4">
           <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
             <Search size={16} className="shrink-0 text-gray-400" />
             <input
@@ -1099,52 +1120,24 @@ export default function HomeScreen() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={searchPlaceholder}
-              className="w-full bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
+              className="w-full min-w-0 bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
             />
           </div>
-          <div className="flex gap-2">
-            <div className="relative" ref={dateRef}>
-              <button
-                type="button"
-                onClick={() => setDateOpen((v) => !v)}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                <CalendarDays size={16} className="text-gray-400" />
-                {DATE_OPTIONS.find((o) => o.value === dateFilter)?.label}
-              </button>
-              {dateOpen ? (
-                <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg">
-                  {DATE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        setDateFilter(opt.value);
-                        setDateOpen(false);
-                      }}
-                      className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                        dateFilter === opt.value
-                          ? "font-semibold text-blue-600"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-            <div className="relative" ref={filterRef}>
+          {tab === "bills" ? (
+            <div className="relative shrink-0" ref={filterRef}>
               <button
                 type="button"
                 onClick={() => setFilterOpen((v) => !v)}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="inline-flex h-[42px] items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:px-3"
+                aria-label="Filter by payment status"
               >
-                <Filter size={16} className="text-gray-400" />
-                Filter
+                <Filter size={16} className="shrink-0 text-gray-400" />
+                <span className="max-w-[4.5rem] truncate sm:max-w-none">
+                  {statusFilter === "all" ? "All" : statusFilter}
+                </span>
               </button>
-              {filterOpen && tab === "bills" ? (
-                <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg">
+              {filterOpen ? (
+                <div className="absolute right-0 z-20 mt-1 w-36 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 shadow-lg">
                   {(["all", "Paid", "Pending"] as const).map((opt) => (
                     <button
                       key={opt}
@@ -1159,13 +1152,13 @@ export default function HomeScreen() {
                           : "text-gray-700"
                       }`}
                     >
-                      {opt === "all" ? "All status" : opt}
+                      {opt === "all" ? "All" : opt}
                     </button>
                   ))}
                 </div>
               ) : null}
             </div>
-          </div>
+          ) : null}
         </div>
 
         <div className="flex items-end justify-between px-4 pb-3">

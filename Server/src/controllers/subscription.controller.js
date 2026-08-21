@@ -12,7 +12,7 @@ import {
 import {validateReferralDiscountForOrder} from './affiliate.controller.js';
 import {validateCouponForOrder} from './coupon.controller.js';
 import {creditReferralDiscountToInviter, markReferralDiscountUsed} from '../modules/customer/services/referral.service.js';
-import {sendNewMembershipWhatsApp, sendMembershipRenewalWhatsApp} from '../modules/customer/services/whatsapp.service.js';
+import {sendNewMembershipWhatsApp, sendMembershipRenewalWhatsApp, sendMembershipChangeWhatsApp} from '../modules/customer/services/whatsapp.service.js';
 import {resolvePlanMeta} from '../services/membershipPlan.service.js';
 import {appendTransaction} from './wallet.controller.js';
 import Invoice from '../models/invoice.model.js';
@@ -203,11 +203,17 @@ export const createSubscription = async (req, res) => {
     // Junior: always allowed (priority rules do not apply).
     // Non-Junior: only allow if newPriority > customer's current priority.
     // Bulk historical import skips this gate (allowPastEndDate flag).
-    if (!juniorMembership && !req.body?.allowPastEndDate) {
-      const currentPriority = await getCustomerUpgradePriority(
+    let priorCustomerPriority = 0;
+    try {
+      priorCustomerPriority = await getCustomerUpgradePriority(
         parsed.data.customerPhone,
       );
-      if (currentPriority > 0 && newPriority <= currentPriority) {
+    } catch {
+      priorCustomerPriority = 0;
+    }
+
+    if (!juniorMembership && !req.body?.allowPastEndDate) {
+      if (priorCustomerPriority > 0 && newPriority <= priorCustomerPriority) {
         return res.status(409).json({
           success: false,
           message:
@@ -215,6 +221,10 @@ export const createSubscription = async (req, res) => {
         });
       }
     }
+
+    // Upgrade = customer already had a paid/main membership before this successful create
+    const isMembershipUpgrade =
+      !juniorMembership && priorCustomerPriority > 0 && !req.body?.allowPastEndDate;
 
     let referralDiscount = 0;
     let appliedReferral = null;
@@ -554,16 +564,29 @@ export const createSubscription = async (req, res) => {
         if (whatsappTo) {
           void (async () => {
             try {
-              await sendNewMembershipWhatsApp({
-                to: whatsappTo,
-                name: customer?.name || parsed.data.customerName || 'Member',
-                membershipLabel,
-                validity,
-                cashbackLabel: String(safeCashback),
-              });
+              if (isMembershipUpgrade) {
+                await sendMembershipChangeWhatsApp({
+                  to: whatsappTo,
+                  customerName:
+                    customer?.name || parsed.data.customerName || 'Member',
+                  membershipName: membershipLabel,
+                  validity,
+                  cashbackAmount: String(safeCashback),
+                });
+              } else {
+                await sendNewMembershipWhatsApp({
+                  to: whatsappTo,
+                  name: customer?.name || parsed.data.customerName || 'Member',
+                  membershipLabel,
+                  validity,
+                  cashbackLabel: String(safeCashback),
+                });
+              }
             } catch (waError) {
               console.error(
-                '[NewMembership] WhatsApp send error:',
+                isMembershipUpgrade
+                  ? '[MembershipChange] WhatsApp send error:'
+                  : '[NewMembership] WhatsApp send error:',
                 waError?.message || waError,
               );
             }
@@ -698,6 +721,9 @@ export const updateSubscription = async (req, res) => {
       });
     }
 
+    let shouldNotifyMembershipChange = false;
+    let upgradeNotifyContext = null;
+
     if (parsed.data.customerPhone || parsed.data.membershipType || parsed.data.endDate || parsed.data.priority !== undefined) {
       const existing = await Subscription.findById(id).lean();
       if (!existing) {
@@ -709,6 +735,13 @@ export const updateSubscription = async (req, res) => {
         parsed.data.membershipType ?? existing.membershipType ?? 'general',
       ).toLowerCase();
       const juniorMembership = isJuniorMembership(nextMembershipType);
+
+      const changingPlan =
+        String(parsed.data.membershipId ?? existing.membershipId) !==
+          String(existing.membershipId) ||
+        String(parsed.data.membershipPlanId ?? existing.membershipPlanId) !==
+          String(existing.membershipPlanId) ||
+        nextMembershipType !== String(existing.membershipType || '').toLowerCase();
 
       if (!juniorMembership) {
         const newPriority = await resolveMembershipPriority({
@@ -724,12 +757,6 @@ export const updateSubscription = async (req, res) => {
         const currentPriority = await getCustomerUpgradePriority(nextCustomerPhone);
         // Allow keeping same plan on edit; block only when changing to lower/equal priority from a different plan
         const existingPriority = Math.max(0, Number(existing.priority ?? 0) || 0);
-        const changingPlan =
-          String(parsed.data.membershipId ?? existing.membershipId) !==
-            String(existing.membershipId) ||
-          String(parsed.data.membershipPlanId ?? existing.membershipPlanId) !==
-            String(existing.membershipPlanId) ||
-          nextMembershipType !== String(existing.membershipType || '').toLowerCase();
 
         if (
           changingPlan &&
@@ -743,6 +770,20 @@ export const updateSubscription = async (req, res) => {
               'Membership upgrade not allowed. New plan priority must be higher than the customer\'s current membership priority.',
           });
         }
+      }
+
+      if (changingPlan && !juniorMembership) {
+        shouldNotifyMembershipChange = true;
+        upgradeNotifyContext = {
+          phone: nextCustomerPhone,
+          membershipType: nextMembershipType,
+          membershipId: parsed.data.membershipId ?? existing.membershipId,
+          membershipPlanId:
+            parsed.data.membershipPlanId ?? existing.membershipPlanId,
+          startDate: parsed.data.startDate ?? existing.startDate,
+          endDate: parsed.data.endDate ?? existing.endDate,
+          customerName: parsed.data.customerName ?? existing.customerName,
+        };
       }
     }
 
@@ -804,6 +845,66 @@ export const updateSubscription = async (req, res) => {
           },
         );
       }
+    }
+
+    // After successful upgrade edit — notify via membershipchange WhatsApp
+    if (shouldNotifyMembershipChange && upgradeNotifyContext) {
+      void (async () => {
+        try {
+          const phone = String(upgradeNotifyContext.phone || '').trim();
+          const customer = await Customer.findOne({
+            mobile: phone,
+            isDeleted: {$ne: true},
+          })
+            .select('name mobile whatsappNumber')
+            .lean();
+          const whatsappTo =
+            String(customer?.whatsappNumber || '').trim() ||
+            String(customer?.mobile || phone).trim();
+          if (!whatsappTo) return;
+
+          let membershipLabel = String(
+            upgradeNotifyContext.membershipType || 'Membership',
+          );
+          let validity = formatSubscriptionValidity({
+            startDate: upgradeNotifyContext.startDate,
+            endDate: upgradeNotifyContext.endDate,
+          });
+          let cashbackAmount = 0;
+          try {
+            const plan = upgradeNotifyContext.membershipId
+              ? await Membership.findById(upgradeNotifyContext.membershipId).lean()
+              : await Membership.findOne({
+                  planId: String(upgradeNotifyContext.membershipType || '').toLowerCase(),
+                }).lean();
+            if (plan) {
+              const meta = resolvePlanMeta(plan);
+              membershipLabel = meta.label || membershipLabel;
+              validity = meta.validity || validity;
+              cashbackAmount = Math.max(
+                0,
+                Number(plan?.walletCashback?.amount ?? 0) || 0,
+              );
+            }
+          } catch {
+            /* keep defaults */
+          }
+
+          await sendMembershipChangeWhatsApp({
+            to: whatsappTo,
+            customerName:
+              customer?.name || upgradeNotifyContext.customerName || 'Member',
+            membershipName: membershipLabel,
+            validity,
+            cashbackAmount: String(cashbackAmount),
+          });
+        } catch (waError) {
+          console.error(
+            '[MembershipChange] updateSubscription WhatsApp error:',
+            waError?.message || waError,
+          );
+        }
+      })();
     }
 
     return res.status(200).json({

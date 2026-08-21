@@ -30,25 +30,27 @@ export default function RevenueCard({
   loading = false,
 }: RevenueCardProps) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
-      <div className="mb-3 flex items-start justify-between gap-3">
+    <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm sm:p-5">
+      <div className="mb-2 flex items-start justify-between gap-2 sm:mb-3 sm:gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-gray-800">{title}</p>
+          <p className="truncate text-xs font-semibold text-gray-800 sm:text-sm">
+            {title}
+          </p>
           {period ? (
-            <p className="mt-0.5 text-xs text-gray-400">{period}</p>
+            <p className="mt-0.5 text-[10px] text-gray-400 sm:text-xs">{period}</p>
           ) : null}
         </div>
         <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconWrapClass}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl ${iconWrapClass}`}
         >
-          <Icon size={18} className={iconClass} />
+          <Icon size={16} className={iconClass} />
         </span>
       </div>
 
       {loading ? (
-        <div className="mb-3 h-9 w-36 animate-pulse rounded-md bg-gray-100" />
+        <div className="mb-2 h-7 w-24 animate-pulse rounded-md bg-gray-100 sm:mb-3 sm:h-9 sm:w-36" />
       ) : (
-        <p className="mb-3 text-2xl font-bold tracking-tight text-gray-900 sm:text-[28px]">
+        <p className="mb-2 text-lg font-bold tracking-tight text-gray-900 sm:mb-3 sm:text-2xl sm:text-[28px]">
           {value}
         </p>
       )}
@@ -58,14 +60,17 @@ export default function RevenueCard({
           {Array.from({ length: 3 }).map((_, i) => (
             <span
               key={i}
-              className="h-4 w-16 animate-pulse rounded bg-gray-100"
+              className="h-3 w-12 animate-pulse rounded bg-gray-100 sm:h-4 sm:w-16"
             />
           ))}
         </div>
       ) : breakdown.length > 0 ? (
-        <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+        <div className="flex flex-wrap gap-x-2 gap-y-1 sm:gap-x-3 sm:gap-y-1.5">
           {breakdown.map((item) => (
-            <span key={item.label} className="text-[11px] font-medium leading-tight">
+            <span
+              key={item.label}
+              className="text-[10px] font-medium leading-tight sm:text-[11px]"
+            >
               <span className="text-gray-400">{item.label} </span>
               <span className={item.colorClass}>{item.value}</span>
             </span>

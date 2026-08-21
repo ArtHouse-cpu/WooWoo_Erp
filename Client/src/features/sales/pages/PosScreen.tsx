@@ -20,7 +20,7 @@ import {
   handleGetInvoices,
 } from "@/services/apiClient";
 import {
-  DATE_PRESET_OPTIONS,
+  SALES_DATE_PRESET_OPTIONS,
   getTodayYmd,
   rangeForPreset,
   type DatePreset,
@@ -291,18 +291,19 @@ export default function PosScreen() {
         accessorKey: "amount",
         header: "Amount",
         Cell: ({ row }: { row: { original: PosRow } }) => (
-          <div className="flex flex-col">
-            <span className="font-semibold text-gray-800">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-bold tabular-nums text-gray-900">
               {`₹ ${row.original.amount.toLocaleString("en-IN", {
                 minimumFractionDigits: 2,
               })}`}
             </span>
             {row.original.returnedAmount > 0 ? (
               <span className="text-[10px] font-semibold text-rose-600">
-                Returned −₹
+                −₹
                 {row.original.returnedAmount.toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
-                })}
+                })}{" "}
+                returned
               </span>
             ) : null}
           </div>
@@ -316,21 +317,21 @@ export default function PosScreen() {
           const value = cell.getValue();
           const badgeClass =
             value === "Pending"
-              ? "bg-yellow-100 text-yellow-700"
+              ? "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200"
               : value === "Paid"
-                ? "bg-green-100 text-green-700"
+                ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
                 : value === "Draft"
-                  ? "bg-slate-100 text-slate-700"
-                  : "bg-red-100 text-red-700";
+                  ? "bg-slate-50 text-slate-600 ring-1 ring-inset ring-slate-200"
+                  : "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200";
           return (
             <span
-              className={`px-2.5 py-1 text-xs font-semibold rounded-md ${badgeClass}`}
+              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${badgeClass}`}
             >
-              {value.toLowerCase()}
+              {value}
             </span>
           );
         },
-        size: 120,
+        size: 110,
       },
       {
         accessorKey: "mode",
@@ -353,9 +354,9 @@ export default function PosScreen() {
                   setSelectedDueRow(row.original);
                   setDueModalOpen(true);
                 }}
-                className="px-2.5 py-1 text-xs font-semibold rounded-md bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
+                className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100"
               >
-                {`Due ₹ ${dueAmount.toLocaleString("en-IN", {
+                {`Due ₹${dueAmount.toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}`}
@@ -364,63 +365,69 @@ export default function PosScreen() {
           }
 
           const modeStyles: Record<string, string> = {
-            WALLET: "bg-gray-100 text-gray-700",
-            UPI: "bg-indigo-100 text-indigo-700",
-            CARD: "bg-sky-100 text-sky-700",
-            MULTI: "bg-purple-100 text-purple-700",
-            CASH: "bg-green-100 text-green-700",
-            DRAFT: "bg-slate-100 text-slate-700",
+            WALLET: "bg-slate-50 text-slate-700 ring-slate-200",
+            UPI: "bg-violet-50 text-violet-700 ring-violet-200",
+            CARD: "bg-sky-50 text-sky-700 ring-sky-200",
+            MULTI: "bg-indigo-50 text-indigo-700 ring-indigo-200",
+            CASH: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+            DRAFT: "bg-slate-50 text-slate-600 ring-slate-200",
           };
 
           const className =
             modeStyles[String(value ?? "").toUpperCase()] ||
-            "bg-gray-100 text-gray-700";
+            "bg-slate-50 text-slate-700 ring-slate-200";
           return (
             <span
-              className={`px-2.5 py-1 text-xs font-semibold rounded-md ${className}`}
+              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${className}`}
             >
               {value}
             </span>
           );
         },
-        size: 100,
+        size: 110,
       },
       {
         accessorKey: "bill",
-        header: "Bill #",
+        header: "Bill No.",
         Cell: ({ row }: { row: { original: PosRow } }) => (
-          <div>
-            <div className="font-medium text-gray-800">{row.original.bill}</div>
-            <div className="text-xs text-gray-500">by {row.original.owner}</div>
+          <div className="min-w-0">
+            <div className="truncate font-semibold text-gray-900">
+              {row.original.bill}
+            </div>
+            <div className="truncate text-xs text-gray-500">
+              by {row.original.owner || "—"}
+            </div>
           </div>
         ),
-        size: 180,
+        size: 160,
       },
       {
         accessorKey: "customer",
         header: "Customer",
         Cell: ({ row }: { row: { original: PosRow } }) => (
-          <div>
-            <div className="font-medium text-gray-800">
+          <div className="min-w-0">
+            <div className="truncate font-medium text-gray-900">
               {row.original.customer}
             </div>
-            <div className="text-xs text-gray-500">{row.original.phone}</div>
+            <div className="truncate text-xs text-gray-500">
+              {row.original.phone}
+            </div>
           </div>
         ),
         size: 180,
       },
       {
         accessorKey: "date",
-        header: "Date",
+        header: "Date & Time",
         Cell: ({ row }: { row: { original: PosRow } }) => (
-          <div>
+          <div className="min-w-0">
             <div className="font-medium text-gray-800">{row.original.date}</div>
             <div className="text-xs text-gray-500">
               {row.original.createdTime}
             </div>
           </div>
         ),
-        size: 170,
+        size: 150,
       },
       // {accessorKey: "salesPerson", header: "Sales", size: 100},
       {
@@ -615,6 +622,22 @@ export default function PosScreen() {
     [],
   );
 
+  const openInvoiceRow = async (rowData: PosRow) => {
+    if (rowData.status === "Draft") {
+      navigate("/create-invoice", {
+        state: { invoice: rowData.raw, mode: "edit" },
+      });
+      return;
+    }
+    try {
+      const res = await handleGetInvoice(rowData._id);
+      setViewInvoiceData(res?.invoice ?? rowData.raw);
+    } catch {
+      setViewInvoiceData(rowData.raw);
+    }
+    setViewInvoiceOpen(true);
+  };
+
   const table = useMaterialReactTable({
     columns,
     data: filteredData,
@@ -628,50 +651,73 @@ export default function PosScreen() {
     enableDensityToggle: false,
     enableFullScreenToggle: false,
     enableHiding: false,
+    enableStickyHeader: true,
     muiTableHeadCellProps: {
       sx: {
         fontWeight: 700,
-        color: "#111827",
-        fontSize: "12px",
-        backgroundColor: "#f9fafb",
+        color: "#374151",
+        fontSize: "11px",
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        backgroundColor: "#f8fafc",
+        borderBottom: "1px solid #e2e8f0",
+        py: 1.5,
+        whiteSpace: "nowrap",
       },
     },
     muiTableBodyCellProps: {
       sx: {
         fontSize: "13px",
+        py: 1.75,
+        borderBottom: "1px solid #f1f5f9",
+        whiteSpace: "nowrap",
       },
     },
     muiTableBodyRowProps: ({ row }) => ({
       onClick: () => {
-        const rowData = row.original as PosRow;
-        if (rowData.status !== "Draft") return;
-        navigate("/create-invoice", {
-          state: { invoice: rowData.raw, mode: "edit" },
-        });
+        void openInvoiceRow(row.original as PosRow);
       },
       sx: {
-        cursor:
-          (row.original as PosRow).status === "Draft" ? "pointer" : "default",
+        cursor: "pointer",
+        transition: "background-color 0.15s ease",
+        "&:hover": {
+          backgroundColor: "#f8fafc",
+        },
       },
     }),
     muiTablePaperProps: {
       elevation: 0,
       square: false,
-      style: {
-        boxShadow: "none",
-        border: "1px solid #e5e7eb",
-        borderRadius: "10px",
+      sx: {
+        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+        border: "1px solid #e2e8f0",
+        borderRadius: "16px",
         overflow: "hidden",
       },
     },
     muiTableContainerProps: {
       sx: {
         maxWidth: "100%",
+        maxHeight: "min(62vh, 640px)",
         overflowX: "auto",
         WebkitOverflowScrolling: "touch",
       },
     },
   });
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<PosRow["status"] | "All", number> = {
+      All: data.length,
+      Paid: 0,
+      Pending: 0,
+      Cancelled: 0,
+      Draft: 0,
+    };
+    for (const row of data) {
+      counts[row.status] += 1;
+    }
+    return counts;
+  }, [data]);
 
   const totalAmount = filteredData.reduce((sum, row) => sum + row.amount, 0);
   const paidAmount = filteredData
@@ -685,21 +731,26 @@ export default function PosScreen() {
     0,
   );
 
+  const controlClass =
+    "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+
   return (
-    <div className="min-w-0 space-y-4 p-1">
+    <div className="min-w-0 space-y-3 p-1 sm:space-y-4">
+      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
             Sales
           </h1>
-          <span className="rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">
-            {filteredData.length}
+          <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
+            {statusCounts.All}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-[22rem]">
           <Can permission={PERMISSIONS.INVOICE_CREATE}>
             <button
-              className="rounded-md bg-violet-100 px-3 py-2 text-sm font-semibold text-violet-700"
+              type="button"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => setPosModalOpen(true)}
             >
               POS Billing
@@ -707,7 +758,8 @@ export default function PosScreen() {
           </Can>
           <Can permission={PERMISSIONS.INVOICE_CREATE}>
             <button
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+              type="button"
+              className="h-10 w-full rounded-xl bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
               onClick={() => navigate("/create-invoice")}
             >
               + Create Invoice
@@ -716,42 +768,76 @@ export default function PosScreen() {
         </div>
       </div>
 
-      <div className="hide-scrollbar flex items-center gap-4 overflow-x-auto border-b border-gray-200 pb-2 sm:gap-6">
-        <button
-          onClick={() => setActiveTab("All")}
-          className={`shrink-0 text-sm font-medium ${activeTab === "All" ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "text-gray-500"}`}
-        >
-          All{" "}
-          <span className="text-xs text-gray-400">{filteredData.length}</span>
-        </button>
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`shrink-0 text-sm font-medium ${activeTab === tab ? "border-b-2 border-blue-600 pb-1 text-blue-700" : "text-gray-500"}`}
-          >
-            {tab}
-          </button>
-        ))}
+      {/* Status tabs */}
+      <div className="hide-scrollbar -mx-1 overflow-x-auto px-1">
+        <div className="flex min-w-max items-stretch gap-1 border-b border-slate-200">
+          {(
+            [
+              { key: "All" as const, label: "All" },
+              ...tabs.map((t) => ({ key: t, label: t })),
+            ] as { key: PosRow["status"] | "All"; label: string }[]
+          ).map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`relative shrink-0 px-3.5 pb-2.5 pt-1 text-sm font-medium transition ${
+                  active
+                    ? "text-blue-700"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                {tab.label}
+                <span
+                  className={`ml-1.5 text-xs ${active ? "text-blue-500" : "text-slate-400"}`}
+                >
+                  {statusCounts[tab.key]}
+                </span>
+                {active ? (
+                  <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-blue-600" />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="relative min-w-0 w-full flex-1 sm:min-w-[200px]">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search invoices..."
-            className="h-10 w-full rounded-md border border-gray-200 pl-9 pr-3 text-sm outline-none focus:border-blue-400"
-          />
+      {/* Compact filters */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search invoice no., customer or mobile"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-10 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+          <select
+            value={activeTab}
+            onChange={(e) =>
+              setActiveTab(e.target.value as PosRow["status"] | "All")
+            }
+            className="h-11 w-[7.5rem] shrink-0 rounded-xl border border-slate-200 bg-white px-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:w-40 sm:px-3"
+            aria-label="Payment status"
+          >
+            <option value="All">All statuses</option>
+            {tabs.map((tab) => (
+              <option key={tab} value={tab}>
+                {tab}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Date preset + From / To */}
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <select
             value={datePreset}
             onChange={(e) => {
@@ -762,83 +848,90 @@ export default function PosScreen() {
               setFromDate(range.from);
               setToDate(range.to);
             }}
-            className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            className={`${controlClass} min-w-0 flex-1 sm:max-w-[11rem] sm:flex-none`}
           >
-            {DATE_PRESET_OPTIONS.map((opt) => (
+            {SALES_DATE_PRESET_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
-          <div className="flex items-center gap-2">
-            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
-              From
-            </label>
-            <input
-              type="date"
-              value={fromDate}
-              max={toDate || undefined}
-              onChange={(e) => {
-                setFromDate(e.target.value);
-                setDatePreset("custom");
-              }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
-              To
-            </label>
-            <input
-              type="date"
-              value={toDate}
-              min={fromDate || undefined}
-              onChange={(e) => {
-                setToDate(e.target.value);
-                setDatePreset("custom");
-              }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
-            />
-          </div>
-          {(fromDate || toDate || datePreset !== "all") && (
-            <button
-              type="button"
-              onClick={() => {
-                setDatePreset("all");
-                setFromDate("");
-                setToDate("");
-              }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              Clear
-            </button>
-          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setActiveTab("All");
+              setDatePreset("today");
+              const range = rangeForPreset("today");
+              setFromDate(range.from);
+              setToDate(range.to);
+            }}
+            className="h-10 shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Clear
+          </button>
+
+          {datePreset === "custom" ? (
+            <>
+              <div className="flex w-full items-center gap-2 sm:w-auto">
+                <label className="shrink-0 text-xs font-medium text-slate-500">
+                  From
+                </label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  onChange={(e) => {
+                    setFromDate(e.target.value);
+                    setDatePreset("custom");
+                  }}
+                  className={controlClass}
+                />
+              </div>
+              <div className="flex w-full items-center gap-2 sm:w-auto">
+                <label className="shrink-0 text-xs font-medium text-slate-500">
+                  To
+                </label>
+                <input
+                  type="date"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={(e) => {
+                    setToDate(e.target.value);
+                    setDatePreset("custom");
+                  }}
+                  className={controlClass}
+                />
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
 
-      <div className="table-scroll min-w-0">
+      <div className="table-scroll min-w-0 overflow-hidden rounded-2xl">
         <MaterialReactTable table={table} />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="rounded bg-gray-100 px-2 py-1 text-gray-700">
-            Total ₹{" "}
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm sm:px-4">
+        <div className="flex min-w-max items-center gap-2 text-xs sm:text-sm">
+          <span className="rounded-lg bg-slate-100 px-2.5 py-1.5 font-medium text-slate-700">
+            Total ₹
             {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </span>
-          <span className="rounded bg-green-100 px-2 py-1 text-green-700">
-            Paid ₹{" "}
+          <span className="rounded-lg bg-emerald-50 px-2.5 py-1.5 font-medium text-emerald-700">
+            Paid ₹
             {paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
           </span>
-          <span className="rounded bg-yellow-100 px-2 py-1 text-yellow-700">
-            Pending ₹{" "}
+          <span className="rounded-lg bg-amber-50 px-2.5 py-1.5 font-medium text-amber-700">
+            Pending ₹
             {pendingAmount.toLocaleString("en-IN", {
               minimumFractionDigits: 2,
             })}
           </span>
           {returnedAmount > 0 ? (
-            <span className="rounded bg-rose-100 px-2 py-1 text-rose-700">
-              Returned −₹{" "}
+            <span className="rounded-lg bg-rose-50 px-2.5 py-1.5 font-medium text-rose-700">
+              Returned −₹
               {returnedAmount.toLocaleString("en-IN", {
                 minimumFractionDigits: 2,
               })}

@@ -372,9 +372,24 @@ export const createReturnSale = async (req, res) => {
 
 export const getReturnSales = async (req, res) => {
   try {
+    const fromDate = String(req.query.fromDate ?? '').trim();
+    const toDate = String(req.query.toDate ?? '').trim();
     const search = String(req.query.search ?? '').trim();
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
     const query = {};
+    const dateFilter = {};
+    if(fromDate){
+      const from=new Date(`${fromDate}T00:00:00.000`);
+      if(!Number.isNaN(from.getTime())) dateFilter.$gte=from;
+    }
+
+    if(toDate){
+      const to=new Date(`${toDate}T23:59:59.999`);
+      if(!Number.isNaN(to.getTime())) dateFilter.$lte=to;
+    }
+    if(Object.keys(dateFilter).length){
+      query.createdAt=dateFilter;
+    }
 
     if (search) {
       const regex = new RegExp(escapeRegex(search), 'i');
@@ -403,6 +418,8 @@ export const getReturnSales = async (req, res) => {
       success: true,
       message: 'Return sales fetched successfully.',
       returnSales,
+      total: returnSales.length,
+      limit,
     });
   } catch (error) {
     console.error('getReturnSales error:', error);

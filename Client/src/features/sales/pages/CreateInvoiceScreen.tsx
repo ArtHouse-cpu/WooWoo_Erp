@@ -99,11 +99,11 @@ export default function CreateInvoiceScreen({
 
   const [draftName, setDraftName] = useState("");
   const [draftQty, setDraftQty] = useState("1");
-  const [draftPrice, setDraftPrice] = useState("0");
-  const [draftDiscount, setDraftDiscount] = useState("0");
+  const [draftPrice, setDraftPrice] = useState("");
+  const [draftDiscount, setDraftDiscount] = useState("");
   const [draftImage, setDraftImage] = useState("");
   const [draftCategory, setDraftCategory] = useState("General");
-  const [draftCashback, setDraftCashback] = useState("0");
+  const [draftCashback, setDraftCashback] = useState("");
   const [draftIsCsp, setDraftIsCsp] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [membershipPlans, setMembershipPlans] = useState<MembershipPlanPayload[]>([]);
@@ -386,9 +386,9 @@ export default function CreateInvoiceScreen({
     ]);
     setDraftName("");
     setDraftQty("1");
-    setDraftPrice("0");
-    setDraftDiscount("0");
-    setDraftCashback("0");
+    setDraftPrice("");
+    setDraftDiscount("");
+    setDraftCashback("");
     setDraftImage("");
     setDraftCategory("General");
     setDraftIsCsp(false);
@@ -911,21 +911,23 @@ export default function CreateInvoiceScreen({
   };
 
   const content = (
-    <div className="min-w-0 space-y-4 p-1 sm:p-2">
-      <CreateInvoiceHeader
-        invoiceNo={invoiceNo}
-        onBack={handleBack}
-        onSaveDraft={handleSaveDraft}
-        onSavePrint={handleSavePrint}
-        onSave={() => {
-          if (validateBeforeCheckout()) setOpenCheckout(true);
-        }}
-        isSaving={saving}
-        mode={mode}
-      />
-      <div className={`${mode === "view" ? "pointer-events-none opacity-90" : ""}`}>
-        <div className="space-y-4">
+    <div className="min-w-0 space-y-3 p-1 pb-24 sm:space-y-4 sm:p-2 lg:pb-4">
+      <div className="sticky top-0 z-30 space-y-3 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-sm backdrop-blur-md sm:p-4">
+        <CreateInvoiceHeader
+          embedded
+          invoiceNo={invoiceNo}
+          onBack={handleBack}
+          onSaveDraft={handleSaveDraft}
+          onSavePrint={handleSavePrint}
+          onSave={() => {
+            if (validateBeforeCheckout()) setOpenCheckout(true);
+          }}
+          isSaving={saving}
+          mode={mode}
+        />
+        <div className="border-t border-slate-100 pt-3">
           <InvoiceDetailsSection
+            embedded
             customer={customer}
             phone={phone}
             membership={membership}
@@ -998,6 +1000,10 @@ export default function CreateInvoiceScreen({
             onInvoiceDateChange={setInvoiceDate}
             onDueDateChange={setDueDate}
           />
+        </div>
+      </div>
+      <div className={`${mode === "view" ? "pointer-events-none opacity-90" : ""}`}>
+        <div className="space-y-3 sm:space-y-4">
           {showCreateCustomerModal && mode !== "view" && (
             <CreateCustomerModal
               onClose={() => setShowCreateCustomerModal(false)}
@@ -1029,7 +1035,10 @@ export default function CreateInvoiceScreen({
                     false,
                   );
                   if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
-                  setDraftCashback(String(benefits.cashback));
+                  else setDraftDiscount("");
+                  setDraftCashback(
+                    benefits.cashback > 0 ? String(benefits.cashback) : "",
+                  );
                 }
               }
               if (field === "price") {
@@ -1044,7 +1053,10 @@ export default function CreateInvoiceScreen({
                     false,
                   );
                   if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
-                  setDraftCashback(String(benefits.cashback));
+                  else setDraftDiscount("");
+                  setDraftCashback(
+                    benefits.cashback > 0 ? String(benefits.cashback) : "",
+                  );
                 }
               }
               if (field === "discount") setDraftDiscount(value);
@@ -1053,7 +1065,7 @@ export default function CreateInvoiceScreen({
                 const next = value === "true";
                 setDraftIsCsp(next);
                 if (next) {
-                  setDraftCashback("0");
+                  setDraftCashback("");
                 }
               }
               if (field === "category") {
@@ -1069,10 +1081,12 @@ export default function CreateInvoiceScreen({
                     false,
                   );
                   if (benefits.discount > 0) setDraftDiscount(String(benefits.discount));
-                  // Always set cashback (including 0) so stale values don't stick
-                  setDraftCashback(String(benefits.cashback));
+                  else setDraftDiscount("");
+                  setDraftCashback(
+                    benefits.cashback > 0 ? String(benefits.cashback) : "",
+                  );
                 } else {
-                  setDraftCashback("0");
+                  setDraftCashback("");
                 }
               }
               if (field === "cashback") {
@@ -1111,7 +1125,7 @@ export default function CreateInvoiceScreen({
           />
           )}
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+          <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-12">
             <NotesSection notes={notes} onChange={setNotes} />
             <InvoiceSummaryCard
               subTotal={subTotal}
@@ -1168,6 +1182,35 @@ export default function CreateInvoiceScreen({
             await handleSave(payment);
           }}
         />
+      )}
+
+      {/* Mobile sticky checkout bar */}
+      {mode !== "view" && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-md lg:hidden">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Grand Total · {items.length} item{items.length === 1 ? "" : "s"}
+              </div>
+              <div className="truncate text-lg font-bold tabular-nums text-slate-900">
+                ₹{" "}
+                {grandTotal.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                })}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => {
+                if (validateBeforeCheckout()) setOpenCheckout(true);
+              }}
+              className="h-12 min-w-[8.5rem] shrink-0 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Checkout"}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -4,6 +4,7 @@ export type DatePreset =
   | "all"
   | "today"
   | "yesterday"
+  | "week"
   | "month"
   | "year"
   | "custom";
@@ -12,10 +13,21 @@ export const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
   { value: "all", label: "All Dates" },
   { value: "today", label: "Today" },
   { value: "yesterday", label: "Yesterday" },
+  { value: "week", label: "This Week" },
   { value: "month", label: "This Month" },
   { value: "year", label: "This Year" },
   { value: "custom", label: "Custom Range" },
 ];
+
+/** Compact presets for Sales / POS filter bar */
+export const SALES_DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] =
+  [
+    { value: "today", label: "Today" },
+    { value: "yesterday", label: "Yesterday" },
+    { value: "week", label: "This Week" },
+    { value: "month", label: "This Month" },
+    { value: "custom", label: "Custom Range" },
+  ];
 
 export function toDateYmd(value: Date): string {
   const y = value.getFullYear();
@@ -42,6 +54,12 @@ export function rangeForPreset(preset: DatePreset): { from: string; to: string }
     y.setDate(y.getDate() - 1);
     const ymd = toDateYmd(y);
     return { from: ymd, to: ymd };
+  }
+  if (preset === "week") {
+    const start = new Date(today);
+    const day = start.getDay() || 7; // Monday start
+    start.setDate(start.getDate() - (day - 1));
+    return { from: toDateYmd(start), to: toDateYmd(today) };
   }
   if (preset === "month") {
     const start = new Date(today.getFullYear(), today.getMonth(), 1);

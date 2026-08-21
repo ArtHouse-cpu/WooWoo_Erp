@@ -146,14 +146,15 @@ export default function InvoiceSummaryCard({
       paymentBreakdown != null);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:col-span-4">
-      <h3 className="mb-3 text-sm font-semibold text-gray-800">
-        {title}
-      </h3>
-      <div className="space-y-2 text-sm">
-        <div className="flex items-center justify-between text-gray-600">
+    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 lg:col-span-4">
+      <h3 className="mb-3 text-sm font-semibold text-slate-800">{title}</h3>
+      <div className="space-y-2.5 text-sm">
+        <div className="flex items-center justify-between text-slate-600">
           <span>Sub Total</span>
-          <span>₹ {subTotal.toFixed(2)}</span>
+          <span className="tabular-nums">
+            ₹{" "}
+            {subTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+          </span>
         </div>
         {productDiscountTotal > 0 || membershipDiscountTotal > 0 ? (
           <>
@@ -278,9 +279,14 @@ export default function InvoiceSummaryCard({
             </div>
           </>
         ) : (
-          <div className="flex items-center justify-between text-base font-semibold text-gray-900">
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5 text-base font-semibold text-slate-900">
             <span>{isQuotationSummary ? "Quoted Amount" : "Grand Total"}</span>
-            <span>₹ {grandTotal.toFixed(2)}</span>
+            <span className="tabular-nums">
+              ₹{" "}
+              {grandTotal.toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+              })}
+            </span>
           </div>
         )}
         {isQuotationSummary && (billSavings > 0 || cashbackTotal > 0) && (
@@ -346,9 +352,9 @@ export default function InvoiceSummaryCard({
           type="button"
           onClick={onSave}
           disabled={isSaving}
-          className="mt-4 w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+          className="mt-4 hidden h-11 w-full rounded-xl bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60 lg:block"
         >
-          {isSaving ? "Paid" : "Checkout"}
+          {isSaving ? "Processing…" : "Checkout"}
         </button>
       )}
     </div>

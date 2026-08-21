@@ -59,6 +59,40 @@ const getMembershipTemplateConfig = () => {
   };
 };
 
+/** Meta template `membershipchange` — sent after a successful membership upgrade. */
+const getMembershipChangeTemplateConfig = () => {
+  const {phoneNumberId, accessToken, language} = getConfig();
+  const templateName = (
+    process.env.WHATSAPP_MEMBERSHIP_CHANGE_TEMPLATE ||
+    'membershipchange'
+  ).trim();
+  const changeLanguage = (
+    process.env.WHATSAPP_MEMBERSHIP_CHANGE_TEMPLATE_LANGUAGE ||
+    process.env.WHATSAPP_MEMBERSHIP_TEMPLATE_LANGUAGE ||
+    language ||
+    'en_US'
+  ).trim();
+  const urlButtonParam = (
+    process.env.WHATSAPP_MEMBERSHIP_CHANGE_URL_PARAM ||
+    process.env.WHATSAPP_MEMBERSHIP_VIEW_URL_PARAM ||
+    ''
+  ).trim();
+  const companyName = (
+    process.env.WHATSAPP_COMPANY_NAME ||
+    process.env.COMPANY_NAME ||
+    'WOOWOO Art House'
+  ).trim();
+
+  return {
+    phoneNumberId,
+    accessToken,
+    templateName,
+    language: changeLanguage,
+    urlButtonParam,
+    companyName,
+  };
+};
+
 const getAccountCreatedTemplateConfig = () => {
   const {phoneNumberId, accessToken, language} = getConfig();
   // Customer portal uses `accountcreated` (approved). `newaccount` is optional alias only if approved in Meta.
@@ -476,7 +510,6 @@ export const sendMembershipPurchaseWhatsApp = async ({
 
   const templateNames = templateNameCandidates(templateName, [
     'membershippurchase',
-    'membershipchange',
     'newmembership',
   ]);
 
@@ -582,6 +615,228 @@ export const sendMembershipPurchaseWhatsApp = async ({
 
 /** Alias used by Admin Create Subscription activation. */
 export const sendNewMembershipWhatsApp = sendMembershipPurchaseWhatsApp;
+
+/**
+ * Build Meta Cloud API payload for `membershipchange`.
+ * Reference body (positional):
+ *  {{1}} customerName
+ *  {{2}} membershipName
+ *  {{3}} validity (e.g. School Life / Yearly)
+ *  {{4}} cashbackAmount — digits only when Meta text already has ₹
+ * Optional URL button index 0 = Visit Membership.
+ */
+const buildMembershipChangeTemplatePayload = ({
+  to,
+  templateName,
+  language,
+  bodyParams,
+  urlButtonParam,
+}) => {
+  const components = [
+    {
+      type: 'body',
+      parameters: bodyParams.map(text => ({
+        type: 'text',
+        text: String(text ?? ''),
+      })),
+    },
+  ];
+
+  if (urlButtonParam) {
+    components.push({
+      type: 'button',
+      sub_type: 'url',
+      index: '0',
+      parameters: [{type: 'text', text: String(urlButtonParam)}],
+    });
+  }
+
+  return {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: {code: language},
+      components,
+    },
+  };
+};
+
+/**
+ * Send Meta template `membershipchange` after a successful membership upgrade.
+ * Dynamic fields: customerName, membershipName, cashbackAmount, companyName (+ validity).
+ * CTA: Visit Membership (URL button).
+ */
+export const sendMembershipChangeWhatsApp = async ({
+  to,
+  customerName,
+  membershipName,
+  cashbackAmount,
+  companyName,
+  validity,
+  visitUrlParam,
+}) => {
+  const {
+    phoneNumberId,
+    accessToken,
+    templateName,
+    language,
+    urlButtonParam,
+    companyName: defaultCompany,
+  } = getMembershipChangeTemplateConfig();
+
+  const name = String(customerName || 'Member').trim() || 'Member';
+  const plan = String(membershipName || 'Membership').trim() || 'Membership';
+  const validityLabel = String(validity || 'Yearly').trim() || 'Yearly';
+  const company =
+    String(companyName || defaultCompany || 'WOOWOO Art House').trim() ||
+    'WOOWOO Art House';
+  const cashbackParam = resolveCashbackTemplateParam(cashbackAmount, {
+    fallbackEnvKeys: [
+      'WHATSAPP_MEMBERSHIP_CASHBACK',
+      'MEMBERSHIP_WELCOME_CASHBACK',
+    ],
+  });
+  const plainCashback = formatAmountPlain(cashbackParam);
+  const buttonParam = String(visitUrlParam || urlButtonParam || '').trim();
+
+  if (!phoneNumberId || !accessToken) {
+    console.log('[MembershipChange][WhatsApp stub]', {
+      to,
+      name,
+      plan,
+      validityLabel,
+      cashbackParam,
+      company,
+      buttonParam,
+    });
+    return {
+      channel: 'whatsapp-stub',
+      delivered: false,
+      stub: true,
+      bodyParams: [name, plan, validityLabel, cashbackParam],
+    };
+  }
+
+  const recipient = toWhatsAppRecipient(to);
+  if (!recipient) {
+    const error = new Error('Invalid mobile / WhatsApp number');
+    error.status = 400;
+    throw error;
+  }
+
+  // Prefer image/reference shape: name, plan, validity, cashback.
+  // Also try variants that include companyName if Meta template expects it.
+  const bodyModes = [
+    [name, plan, validityLabel, cashbackParam],
+    [name, plan, validityLabel, plainCashback],
+    [name, plan, cashbackParam, company],
+    [name, plan, plainCashback, company],
+    [name, plan, validityLabel, cashbackParam, company],
+    [name, plan, validityLabel, plainCashback, company],
+  ];
+
+  const buttonModes = buttonParam ? [buttonParam, ''] : ['', 'membership'];
+  const templateNames = templateNameCandidates(templateName, [
+    'membershipchange',
+  ]);
+
+  let lastError = null;
+  for (const activeTemplate of templateNames) {
+    for (const lang of languageCandidates(language)) {
+      for (const bodyParams of bodyModes) {
+        for (const btn of buttonModes) {
+          const payload = buildMembershipChangeTemplatePayload({
+            to: recipient,
+            templateName: activeTemplate,
+            language: lang,
+            bodyParams,
+            urlButtonParam: btn || null,
+          });
+
+          const result = await postTemplateMessage({
+            phoneNumberId,
+            accessToken,
+            payload,
+          });
+
+          if (result.ok) {
+            const messageId = result.json?.messages?.[0]?.id || null;
+            console.log(
+              `[MembershipChange][WhatsApp] delivered to=${recipient} template=${activeTemplate} lang=${lang} id=${messageId}`,
+            );
+            return {
+              channel: 'whatsapp',
+              delivered: true,
+              messageId,
+              templateName: activeTemplate,
+              language: lang,
+              bodyParams,
+            };
+          }
+
+          lastError =
+            result.json?.error || {message: result.raw, status: result.status};
+          const message = String(lastError.message || '');
+
+          if (
+            lastError.code === 190 ||
+            /oauth|access token|authenticat/i.test(message)
+          ) {
+            break;
+          }
+          if (isMissingTemplateError(lastError)) {
+            break;
+          }
+          if (/button|component|parameter|expected|number of params/i.test(message)) {
+            continue;
+          }
+          break;
+        }
+
+        if (
+          lastError?.code === 190 ||
+          isMissingTemplateError(lastError) ||
+          /oauth|access token|authenticat/i.test(String(lastError?.message || ''))
+        ) {
+          break;
+        }
+      }
+
+      if (
+        lastError?.code === 190 ||
+        /oauth|access token|authenticat/i.test(String(lastError?.message || ''))
+      ) {
+        break;
+      }
+      if (isMissingTemplateError(lastError)) {
+        continue;
+      }
+    }
+
+    if (
+      lastError?.code === 190 ||
+      /oauth|access token|authenticat/i.test(String(lastError?.message || ''))
+    ) {
+      break;
+    }
+  }
+
+  const metaMessage =
+    lastError?.error_user_msg ||
+    lastError?.message ||
+    'Unknown WhatsApp API error';
+  console.error('[MembershipChange][WhatsApp] failed:', lastError);
+
+  return {
+    channel: 'whatsapp',
+    delivered: false,
+    error: metaMessage,
+    meta: lastError,
+  };
+};
 
 const buildAccountCreatedTemplatePayload = ({
   to,

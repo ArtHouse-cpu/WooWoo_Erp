@@ -47,7 +47,7 @@ type Props = {
 };
 
 const inputStyle =
-  "h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-500";
+  "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
 const SOURCE_BADGE: Record<
   CatalogueLookupItem["sourceType"],
@@ -270,9 +270,15 @@ export default function ProductsServicesSection({
     // Set category first (parent may recalculate membership), then lock discount/cashback.
     onDraftChange("category", lineCategory);
     onDraftChange("name", displayName);
-    onDraftChange("price", String(sellingPrice));
-    onDraftChange("discount", String(stacked.discount));
-    onDraftChange("cashback", String(stacked.cashback));
+    onDraftChange("price", sellingPrice > 0 ? String(sellingPrice) : "");
+    onDraftChange(
+      "discount",
+      stacked.discount > 0 ? String(stacked.discount) : "",
+    );
+    onDraftChange(
+      "cashback",
+      stacked.cashback > 0 ? String(stacked.cashback) : "",
+    );
     onDraftChange("isCsp", isCsp ? "true" : "false");
     onDraftChange(
       "image",
@@ -368,21 +374,19 @@ export default function ProductsServicesSection({
   });
 
   return (
-    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-800">
+    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-800">
           {readOnly ? "Sold Products & Items" : "Products & Services"}
         </h2>
-        {readOnly && (
-          <span className="text-xs text-gray-500">
-            {items.length} item{items.length === 1 ? "" : "s"}
-          </span>
-        )}
+        <span className="rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
+          {items.length} item{items.length === 1 ? "" : "s"}
+        </span>
       </div>
 
       {!readOnly && (
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-        <div className="relative md:col-span-4" ref={searchContainerRef}>
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-12">
+        <div className="relative col-span-2 md:col-span-4" ref={searchContainerRef}>
           <input
             value={draft.name}
             onChange={(e) => {
@@ -390,15 +394,15 @@ export default function ProductsServicesSection({
               setDropdownOpen(true);
             }}
             onFocus={() => setDropdownOpen(true)}
-            placeholder="Search product or variant..."
+            placeholder="Search product or variant…"
             className={inputStyle}
           />
           {dropdownOpen && (
-            <div className="absolute left-0 mt-1 w-full rounded-md border border-gray-200 bg-white py-1 shadow-lg z-10">
+            <div className="absolute left-0 z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
               {loadingProducts ? (
-                <div className="px-3 py-2 text-sm text-gray-500">Searching...</div>
+                <div className="px-3 py-2 text-sm text-slate-500">Searching…</div>
               ) : catalogueItems.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-gray-500">No items found</div>
+                <div className="px-3 py-2 text-sm text-slate-500">No items found</div>
               ) : (
                 <div className="max-h-48 overflow-y-auto">
                   {catalogueItems.map((p) => {
@@ -411,12 +415,12 @@ export default function ProductsServicesSection({
                       <div
                         key={`${p.sourceType}-${p._id}`}
                         onClick={() => handleSelectProduct(p)}
-                        className="cursor-pointer px-3 py-2 text-sm hover:bg-gray-50"
+                        className="cursor-pointer px-3 py-2.5 text-sm hover:bg-slate-50"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <CatalogueItemLabel item={p} className="min-w-0 flex-1" />
                           <span
-                            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                               p.variantName
                                 ? "bg-violet-50 text-violet-700"
                                 : badge.className
@@ -425,7 +429,7 @@ export default function ProductsServicesSection({
                             {p.variantName ? "Variant" : badge.label}
                           </span>
                         </div>
-                        <div className="mt-0.5 text-xs text-gray-500">
+                        <div className="mt-0.5 text-xs text-slate-500">
                           ₹{p.sellingPrice}
                           {stockLabel}
                         </div>
@@ -439,7 +443,7 @@ export default function ProductsServicesSection({
                   setDropdownOpen(false);
                   setShowCreateModal(true);
                 }}
-                className="cursor-pointer border-t border-gray-100 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-gray-50 flex items-center gap-1"
+                className="flex cursor-pointer items-center gap-1 border-t border-slate-100 px-3 py-2.5 text-sm font-medium text-blue-600 hover:bg-slate-50"
               >
                 <Plus size={14} /> Add New Product
               </div>
@@ -447,11 +451,11 @@ export default function ProductsServicesSection({
           )}
         </div>
 
-        <div className="md:col-span-2 flex items-center border rounded-md border-gray-200 overflow-hidden">
+        <div className="col-span-1 flex h-11 items-center overflow-hidden rounded-xl border border-slate-200 md:col-span-2">
           <button
             type="button"
             onClick={() => updateDraftQty(-1)}
-            className="h-full px-2 bg-gray-50 hover:bg-gray-100 border-r border-gray-200 text-gray-600"
+            className="h-full border-r border-slate-200 bg-slate-50 px-2.5 text-slate-600 hover:bg-slate-100"
           >
             <Minus size={14} />
           </button>
@@ -461,12 +465,12 @@ export default function ProductsServicesSection({
             type="number"
             min={1}
             placeholder="Qty"
-            className="h-full w-full bg-white px-2 text-sm text-center text-gray-700 outline-none"
+            className="h-full w-full bg-white px-1 text-center text-sm text-slate-700 outline-none"
           />
           <button
             type="button"
             onClick={() => updateDraftQty(1)}
-            className="h-full px-2 bg-gray-50 hover:bg-gray-100 border-l border-gray-200 text-gray-600"
+            className="h-full border-l border-slate-200 bg-slate-50 px-2.5 text-slate-600 hover:bg-slate-100"
           >
             <Plus size={14} />
           </button>
@@ -477,33 +481,34 @@ export default function ProductsServicesSection({
           onChange={(e) => onDraftChange("price", e.target.value)}
           type="number"
           min={0}
-          placeholder="Unit Price"
-          className={`${inputStyle} md:col-span-2`}
+          placeholder="Price"
+          className={`${inputStyle} col-span-1 md:col-span-2`}
         />
         <input
           value={draft.discount}
           onChange={(e) => onDraftChange("discount", e.target.value)}
           type="number"
           min={0}
-          placeholder="Discount"
+          placeholder="Disc."
           title={
             draft.isCsp === "true"
               ? "Product discount (membership discount does not apply to CSP)"
               : undefined
           }
-          className={`${inputStyle} md:col-span-1`}
+          className={`${inputStyle} col-span-1 md:col-span-1`}
         />
         <input
           value={draft.cashback}
           onChange={(e) => onDraftChange("cashback", e.target.value)}
           type="number"
           min={0}
-          placeholder="Cashback"
-          className={`${inputStyle} md:col-span-1`}
+          placeholder="CB"
+          className={`${inputStyle} col-span-1 md:col-span-1`}
         />
         <button
+          type="button"
           onClick={handleAddToBill}
-          className="inline-flex h-10 items-center justify-center gap-1 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white md:col-span-2"
+          className="col-span-2 inline-flex h-11 items-center justify-center gap-1 rounded-xl bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 md:col-span-2"
         >
           <Plus size={14} /> Add
         </button>
@@ -512,14 +517,17 @@ export default function ProductsServicesSection({
 
       {!readOnly && (
       /* Instamart Catalogue Grid */
-      <div className="border-t border-gray-100 pt-4 mt-4 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <div className="mt-1 space-y-3 border-t border-slate-100 pt-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-700">Quick Select Menu</h3>
-            {loadingGrid && <span className="text-xs text-gray-400 animate-pulse">Loading menu...</span>}
+            <h3 className="text-sm font-semibold text-slate-700">Quick Select</h3>
+            {loadingGrid && (
+              <span className="animate-pulse text-xs text-slate-400">
+                Loading…
+              </span>
+            )}
           </div>
-          {/* Category tabs */}
-          <div className="flex flex-wrap gap-1.5">
+          <div className="hide-scrollbar flex gap-1.5 overflow-x-auto pb-0.5">
             {[
               { id: "all", label: "All" },
               { id: "product", label: "Products" },
@@ -528,19 +536,26 @@ export default function ProductsServicesSection({
               { id: "food", label: "Foods" },
             ].map((tab) => {
               const isActive = selectedType === tab.id;
-              const count = gridItems.filter(i => tab.id === 'all' || i.sourceType === tab.id).length;
+              const count = gridItems.filter(
+                (i) => tab.id === "all" || i.sourceType === tab.id,
+              ).length;
               return (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setSelectedType(tab.id)}
-                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 border ${
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                     isActive
-                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 hover:border-gray-300"
+                      ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                      : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
                   }`}
                 >
-                  {tab.label} <span className={`text-[10px] ml-0.5 ${isActive ? "text-blue-100" : "text-gray-400"}`}>({count})</span>
+                  {tab.label}{" "}
+                  <span
+                    className={`ml-0.5 text-[10px] ${isActive ? "text-blue-100" : "text-slate-400"}`}
+                  >
+                    ({count})
+                  </span>
                 </button>
               );
             })}
@@ -548,34 +563,38 @@ export default function ProductsServicesSection({
         </div>
 
         {filteredGridItems.length === 0 ? (
-          <div className="text-center py-8 text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-            {loadingGrid ? "Fetching items from database..." : "No items found in database matching search."}
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 py-8 text-center text-sm text-slate-500">
+            {loadingGrid
+              ? "Fetching items…"
+              : "No items match your search."}
           </div>
         ) : (
-          <div className="flex gap-2 overflow-x-auto p-1 pb-2 custom-scrollbar scroll-smooth whitespace-nowrap">
+          <div className="hide-scrollbar flex gap-2.5 overflow-x-auto scroll-smooth pb-1">
             {filteredGridItems.map((item) => {
               const badge = SOURCE_BADGE[item.sourceType] || SOURCE_BADGE.product;
               const itemInCart = items.find(
-                (i) => i.productName.toLowerCase() === (item.productName || item.name || "").toLowerCase()
+                (i) =>
+                  i.productName.toLowerCase() ===
+                  (item.productName || item.name || "").toLowerCase(),
               );
               const hasImage = item.imageUrl && !imageErrors[item._id];
-              
+
               return (
                 <div
                   key={`${item.sourceType}-${item._id}`}
-                  className="flex-shrink-0 w-32 sm:w-36 group relative border border-gray-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 rounded-xl bg-white p-2.5 flex flex-col justify-between whitespace-normal"
+                  className="group relative flex w-[8.5rem] shrink-0 flex-col justify-between rounded-2xl border border-slate-100 bg-white p-2.5 transition hover:border-blue-200 hover:shadow-md sm:w-36"
                 >
-                  {/* Veg / Non-Veg badge */}
                   {item.sourceType === "food" && (
-                    <span className="absolute top-1 right-1 p-0.5 bg-white rounded shadow-sm border border-gray-100 flex items-center justify-center z-10">
+                    <span className="absolute right-1 top-1 z-10 flex items-center justify-center rounded border border-slate-100 bg-white p-0.5 shadow-sm">
                       <span
-                        className={`w-2.5 h-2.5 border flex items-center justify-center ${
-                          item.isVeg !== false ? "border-green-600" : "border-red-600"
+                        className={`flex h-2.5 w-2.5 items-center justify-center border ${
+                          item.isVeg !== false
+                            ? "border-green-600"
+                            : "border-red-600"
                         }`}
-                        style={{ padding: "0.5px" }}
                       >
                         <span
-                          className={`w-1 h-1 rounded-full ${
+                          className={`h-1 w-1 rounded-full ${
                             item.isVeg !== false ? "bg-green-600" : "bg-red-600"
                           }`}
                         />
@@ -584,24 +603,21 @@ export default function ProductsServicesSection({
                   )}
 
                   <div>
-                    {/* Item Image with Fallback */}
-                    <div className="relative w-full h-16 mb-1 rounded-lg overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center">
+                    <div className="relative mb-1 flex h-16 w-full items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
                       {hasImage ? (
                         <img
                           src={item.imageUrl!}
                           alt={item.name}
                           onError={() => handleImageError(item._id)}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center text-blue-500 font-bold uppercase text-sm select-none">
+                        <div className="flex h-full w-full select-none items-center justify-center bg-gradient-to-br from-blue-50 to-sky-50 text-sm font-bold uppercase text-blue-500">
                           {(item.productName || item.name || "P").charAt(0)}
                         </div>
                       )}
-                      
-                      {/* Source badge overlay */}
                       <span
-                        className={`absolute bottom-0.5 left-0.5 rounded px-1 py-0.2 text-[8px] font-bold uppercase tracking-wider shadow-sm ${
+                        className={`absolute bottom-0.5 left-0.5 rounded px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider shadow-sm ${
                           item.variantName
                             ? "bg-violet-50 text-violet-700"
                             : badge.className
@@ -611,7 +627,6 @@ export default function ProductsServicesSection({
                       </span>
                     </div>
 
-                    {/* Clear product + variant title */}
                     <CatalogueItemLabel
                       item={item}
                       compact
@@ -622,23 +637,22 @@ export default function ProductsServicesSection({
                         {item.cspLabel || "CSP"}
                       </span>
                     )}
-
-                    {/* Category */}
-                    <div className="text-[9px] text-gray-400 font-medium mt-0.5">
+                    <div className="mt-0.5 text-[9px] font-medium text-slate-400">
                       {item.category || "General"}
                     </div>
                   </div>
 
                   <div className="mt-1">
-                    {/* Price and Stock */}
-                    <div className="flex items-baseline justify-between gap-1 flex-wrap">
-                      <span className="text-[11px] sm:text-xs font-bold text-gray-900">₹{item.sellingPrice}</span>
+                    <div className="flex flex-wrap items-baseline justify-between gap-1">
+                      <span className="text-xs font-bold tabular-nums text-slate-900">
+                        ₹{item.sellingPrice}
+                      </span>
                       {item.trackStock && item.stockQty != null && (
                         <span
-                          className={`text-[8px] sm:text-[9px] font-medium ${
+                          className={`text-[9px] font-medium ${
                             Number(item.stockQty) <= 0
                               ? "text-red-500"
-                              : "text-gray-400"
+                              : "text-slate-400"
                           }`}
                         >
                           {Number(item.stockQty) <= 0
@@ -648,31 +662,34 @@ export default function ProductsServicesSection({
                       )}
                     </div>
 
-                    {/* Add / Qty Control button */}
                     {itemInCart ? (
-                      <div className="flex items-center justify-between border border-blue-600 bg-blue-50 rounded-lg h-6 px-1 mt-1 text-blue-600 font-semibold text-xs">
+                      <div className="mt-1 flex h-7 items-center justify-between rounded-lg border border-blue-600 bg-blue-50 px-1 text-xs font-semibold text-blue-600">
                         <button
                           type="button"
                           onClick={() => handleDecrementGridItem(itemInCart)}
-                          className="p-0.5 hover:bg-blue-100 rounded transition-colors"
+                          className="rounded p-0.5 transition hover:bg-blue-100"
                         >
-                          <Minus size={10} />
+                          <Minus size={12} />
                         </button>
-                        <span className="px-0.5 text-[10px]">{itemInCart.qty}</span>
+                        <span className="px-0.5 text-[11px]">{itemInCart.qty}</span>
                         <button
                           type="button"
-                          onClick={() => handleIncrementGridItem(item, itemInCart)}
-                          className="p-0.5 hover:bg-blue-100 rounded transition-colors"
+                          onClick={() =>
+                            handleIncrementGridItem(item, itemInCart)
+                          }
+                          className="rounded p-0.5 transition hover:bg-blue-100"
                         >
-                          <Plus size={10} />
+                          <Plus size={12} />
                         </button>
                       </div>
                     ) : (
                       <button
                         type="button"
                         onClick={() => handleAddGridItem(item)}
-                        disabled={item.trackStock && Number(item.stockQty ?? 0) <= 0}
-                        className="w-full mt-1 h-6 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400 font-bold text-[10px] transition-all duration-200 flex items-center justify-center gap-0.5 shadow-sm"
+                        disabled={
+                          item.trackStock && Number(item.stockQty ?? 0) <= 0
+                        }
+                        className="mt-1 flex h-7 w-full items-center justify-center gap-0.5 rounded-lg border border-blue-600 text-[10px] font-bold text-blue-600 shadow-sm transition hover:bg-blue-600 hover:text-white disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                       >
                         <Plus size={10} /> Add
                       </button>
@@ -686,18 +703,156 @@ export default function ProductsServicesSection({
       </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      {/* Mobile line-item cards */}
+      <div className="space-y-2 md:hidden">
+        {items.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-8 text-center text-sm text-slate-500">
+            {readOnly
+              ? documentKind === "quotation"
+                ? "No products on this quotation."
+                : "No products were sold on this invoice."
+              : documentKind === "quotation"
+                ? "Search or add products to start creating quotation."
+                : "Search or tap Quick Select to add items."}
+          </div>
+        ) : (
+          items.map((item) => {
+            const lineTotal = item.qty * item.unitPrice - item.discount;
+            return (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-slate-200 bg-slate-50/40 p-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-slate-900">
+                      {item.productName}
+                    </div>
+                    {item.isCsp && (
+                      <span className="mt-1 inline-flex rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
+                        {item.cspLabel || "CSP"}
+                      </span>
+                    )}
+                    <div className="mt-1 text-xs text-slate-500">
+                      ₹ {item.unitPrice.toFixed(2)} each
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold tabular-nums text-slate-900">
+                      ₹ {lineTotal.toFixed(2)}
+                    </div>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveItem(item.id)}
+                        className="mt-1 rounded-lg bg-rose-50 p-1.5 text-rose-600 hover:bg-rose-100"
+                        aria-label="Remove item"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Qty
+                    </div>
+                    {readOnly ? (
+                      <div className="text-center text-sm font-semibold">
+                        {item.qty}
+                      </div>
+                    ) : (
+                      <div className="flex h-9 items-center justify-between rounded-lg border border-slate-200 bg-white px-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onUpdateItemQty(item.id, item.qty - 1)
+                          }
+                          className="rounded p-1 text-slate-600 hover:bg-slate-50"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span className="text-sm font-semibold">{item.qty}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onUpdateItemQty(item.id, item.qty + 1)
+                          }
+                          className="rounded p-1 text-slate-600 hover:bg-slate-50"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      Disc.
+                    </div>
+                    {readOnly ? (
+                      <div className="text-sm font-medium">
+                        ₹ {Number(item.discount || 0).toFixed(2)}
+                      </div>
+                    ) : (
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.discount}
+                        onChange={(e) =>
+                          onUpdateItemDiscount(
+                            item.id,
+                            Number(e.target.value),
+                          )
+                        }
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-right text-sm outline-none focus:border-blue-500"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                      CB
+                    </div>
+                    {readOnly ? (
+                      <div className="text-sm font-medium">
+                        ₹ {Number(item.cashback || 0).toFixed(2)}
+                      </div>
+                    ) : (
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.cashback}
+                        onChange={(e) =>
+                          onUpdateItemCashback?.(
+                            item.id,
+                            Number(e.target.value),
+                          )
+                        }
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-right text-sm outline-none focus:border-blue-500"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 md:block">
         <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
             <tr>
-              <th className="px-3 py-2 text-left">Product Name</th>
-              <th className="px-3 py-2 text-center">Qty</th>
-              <th className="px-3 py-2 text-right">Unit Price</th>
-              <th className="px-3 py-2 text-right">Discount</th>
-              <th className="px-3 py-2 text-right">Cashback</th>
-              <th className="px-3 py-2 text-right">Total</th>
+              <th className="px-3 py-2.5 text-left">Product Name</th>
+              <th className="px-3 py-2.5 text-center">Qty</th>
+              <th className="px-3 py-2.5 text-right">Unit Price</th>
+              <th className="px-3 py-2.5 text-right">Discount</th>
+              <th className="px-3 py-2.5 text-right">Cashback</th>
+              <th className="px-3 py-2.5 text-right">Total</th>
               {!readOnly && (
-                <th className="px-3 py-2 text-center">Action</th>
+                <th className="px-3 py-2.5 text-center">Action</th>
               )}
             </tr>
           </thead>

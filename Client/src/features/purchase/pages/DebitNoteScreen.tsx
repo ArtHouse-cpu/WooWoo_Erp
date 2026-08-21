@@ -7,6 +7,12 @@ import {
 import { Download, Edit, MoreHorizontal, SendHorizontal, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { handleGetPurchaseReturns } from "@/services/apiClient";
+import {
+  DATE_PRESET_OPTIONS,
+  getTodayYmd,
+  rangeForPreset,
+  type DatePreset,
+} from "@/utils/datePresets";
 import Swal from "sweetalert2";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
@@ -57,6 +63,9 @@ type PurchaseReturnApiItem = {
 export default function DebitNoteScreen() {
   const navigate = useNavigate();
   const [data, setData] = useState<DebitNoteRow[]>([]);
+  const [datePreset, setDatePreset] = useState<DatePreset>("today");
+  const [fromDate, setFromDate] = useState(getTodayYmd);
+  const [toDate, setToDate] = useState(getTodayYmd);
   const [selectedActionRow, setSelectedActionRow] = useState<DebitNoteRow | null>(
     null,
   );
@@ -291,7 +300,11 @@ export default function DebitNoteScreen() {
 
     const fetchPurchaseReturns = async () => {
       try {
-        const response = await handleGetPurchaseReturns(controller.signal);
+        const response = await handleGetPurchaseReturns(
+          controller.signal,
+          fromDate,
+          toDate,
+        );
         const purchaseReturns = Array.isArray(response?.purchaseReturns)
           ? response.purchaseReturns
           : [];
@@ -330,17 +343,19 @@ export default function DebitNoteScreen() {
 
         setData(mappedRows);
       } catch (error) {
+        if ((error as { name?: string })?.name === "CanceledError") return;
+        if ((error as { code?: string })?.code === "ERR_CANCELED") return;
         console.log("Error fetching purchase returns:", error);
         setData([]);
       }
     };
 
-    fetchPurchaseReturns();
+    void fetchPurchaseReturns();
 
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [fromDate, toDate]);
 
   const table = useMaterialReactTable({
     columns,
@@ -376,6 +391,72 @@ export default function DebitNoteScreen() {
               Create Purchase Return/Debit Note
             </button>
           </Can>
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <select
+            value={datePreset}
+            onChange={(e) => {
+              const preset = e.target.value as DatePreset;
+              setDatePreset(preset);
+              if (preset === "custom") return;
+              const range = rangeForPreset(preset);
+              setFromDate(range.from);
+              setToDate(range.to);
+            }}
+            className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+          >
+            {DATE_PRESET_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              From
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              max={toDate || undefined}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setDatePreset("custom");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
+              To
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setDatePreset("custom");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            />
+          </div>
+          {(fromDate || toDate || datePreset !== "all") && (
+            <button
+              type="button"
+              onClick={() => {
+                setDatePreset("all");
+                setFromDate("");
+                setToDate("");
+              }}
+              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
