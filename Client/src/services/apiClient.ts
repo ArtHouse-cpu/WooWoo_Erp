@@ -394,6 +394,7 @@ export type CreateExpencePayload = {
   expenseCode?: string;
   title: string;
   category: string;
+  segment?: string;
   amount: number;
   paidAmount?: number;
   dueAmount?: number;
@@ -408,6 +409,7 @@ export type CreateExpencePayload = {
   };
   paidTo: string;
   vendorId?: string | null;
+  paidBy?: ExpenceStaffRef;
   mode: string;
   status?: string;
   date: string;
@@ -424,7 +426,7 @@ export function expencePayloadToFormData(
   const fd = new FormData();
   for (const [key, value] of Object.entries(payload)) {
     if (value === undefined || value === null) continue;
-    if (key === "createdBy" || key === "addedBy") {
+    if (key === "createdBy" || key === "addedBy" || key === "paidBy") {
       fd.append(key, JSON.stringify(value));
       continue;
     }

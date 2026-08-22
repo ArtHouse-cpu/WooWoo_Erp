@@ -530,3 +530,117 @@ export function getMembershipBadgeClassName(
     String(plan?.displayName ?? membershipType ?? "membership").trim();
   return THEME_CLASS[hashThemeKey(seed)];
 }
+
+export type MembershipBenefitLine = { emoji: string; text: string };
+
+const CORE_BENEFIT_META: Record<
+  string,
+  { plural: string }
+> = {
+  products: { plural: "products" },
+  services: { plural: "services" },
+  food: { plural: "food" },
+  space: { plural: "spaces" },
+};
+
+/** Only food, products, spaces, and services are shown as subscription benefits. */
+const CORE_BENEFIT_KEYS = ["products", "services", "food", "space"] as const;
+const CORE_BENEFIT_KEY_SET = new Set<string>(CORE_BENEFIT_KEYS);
+
+function canonicalCoreBenefitKey(raw: string): string | null {
+  const key = String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+  if (!key) return null;
+  if (key === "product" || key === "store") return "products";
+  if (key === "service") return "services";
+  if (key === "spaces") return "space";
+  if (CORE_BENEFIT_KEY_SET.has(key)) return key;
+  return null;
+}
+
+function joinCategoryLabels(labels: string[]): string {
+  if (labels.length === 0) return "";
+  if (labels.length === 1) return labels[0];
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
+/**
+ * Human-readable benefit bullets from a membership plan.
+ * Only products, services, food, and spaces (discount + cashback).
+ */
+export function buildMembershipBenefitLines(plan: {
+  usageLimits?: unknown;
+  pricing?: { period?: string } | null;
+  walletCashback?: { amount?: number } | null;
+  customerDisplay?: {
+    features?: Array<{ label?: string } | string> | null;
+    badgeLabel?: string;
+  } | null;
+  period?: string;
+  walletCashbackAmount?: number;
+}): MembershipBenefitLine[] {
+  const limits = normalizeUsageLimits(plan.usageLimits);
+  const merged: Record<string, { discount: number; cashback: number }> = {};
+  for (const [rawKey, row] of Object.entries(limits)) {
+    const key = canonicalCoreBenefitKey(rawKey);
+    if (!key) continue;
+    const discount = Math.max(0, Number(row.discount ?? 0) || 0);
+    const cashback = Math.max(0, Number(row.cashback ?? 0) || 0);
+    if (discount <= 0 && cashback <= 0) continue;
+    const prev = merged[key] ?? { discount: 0, cashback: 0 };
+    merged[key] = {
+      discount: Math.max(prev.discount, discount),
+      cashback: Math.max(prev.cashback, cashback),
+    };
+  }
+
+  const lines: MembershipBenefitLine[] = [];
+  const coreEntries = CORE_BENEFIT_KEYS.filter((k) => merged[k]).map(
+    (k) => [k, merged[k]] as [string, { discount: number; cashback: number }],
+  );
+
+  const groupByValue = (
+    entries: Array<[string, { discount: number; cashback: number }]>,
+    field: "discount" | "cashback",
+  ) => {
+    const map = new Map<number, string[]>();
+    for (const [key, row] of entries) {
+      const value = row[field];
+      if (value <= 0) continue;
+      const list = map.get(value) ?? [];
+      list.push(key);
+      list.sort(
+        (a, b) =>
+          CORE_BENEFIT_KEYS.indexOf(a as (typeof CORE_BENEFIT_KEYS)[number]) -
+          CORE_BENEFIT_KEYS.indexOf(b as (typeof CORE_BENEFIT_KEYS)[number]),
+      );
+      map.set(value, list);
+    }
+    return map;
+  };
+
+  for (const [pct, keys] of [...groupByValue(coreEntries, "discount").entries()].sort(
+    (a, b) => b[0] - a[0],
+  )) {
+    const labels = keys.map((k) => CORE_BENEFIT_META[k]?.plural ?? k);
+    lines.push({
+      emoji: "💰",
+      text: `Get ${pct}% off on all ${joinCategoryLabels(labels)}.`,
+    });
+  }
+
+  for (const [pct, keys] of [...groupByValue(coreEntries, "cashback").entries()].sort(
+    (a, b) => b[0] - a[0],
+  )) {
+    const labels = keys.map((k) => CORE_BENEFIT_META[k]?.plural ?? k);
+    lines.push({
+      emoji: "🎁",
+      text: `Earn ${pct}% cashback on ${joinCategoryLabels(labels)}.`,
+    });
+  }
+
+  return lines;
+}

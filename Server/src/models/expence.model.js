@@ -9,6 +9,7 @@ const expenceSchema = new mongoose.Schema(
       ref: 'ExpenceCategory',
       default: null,
     },
+    segment: { type: String, trim: true, default: '', enum: ['Store','Cafe','Services','Space','general',''] },
     category: {
       type: String,
       trim: true,
@@ -47,6 +48,11 @@ const expenceSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Vendor',
       default: null,
+    },
+    paidBy: {
+      m_staff_id: {type: String, default: null},
+      m_staff_name: {type: String, default: null},
+      m_staff_email: {type: String, default: null},
     },
     mode: {
       type: String,

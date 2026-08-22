@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { X, ShoppingCart, Trash2, User, FileText } from "lucide-react";
+import {
+  X,
+  ShoppingCart,
+  Trash2,
+  User,
+  FileText,
+  Search,
+  Phone,
+  Plus,
+  Minus,
+  Tag,
+  UserPlus,
+  CalendarDays,
+} from "lucide-react";
 import Swal from "sweetalert2";
 import {
   handleCreateProduct,
@@ -113,7 +126,10 @@ export default function CreatePosScreen({
   const [saving, setSaving] = useState(false);
   const staff = useAppSelector((state) => state.user);
   const [invoiceNo] = useState(getNextInvoiceNumber());
+  const [invoiceDate, setInvoiceDate] = useState(todayStr);
+  const [dueDate, setDueDate] = useState(todayStr);
   const [extraCharges, setExtraCharges] = useState<Array<{ label: string; amount: number }>>([]);
+  const staffName = staff.m_staff_name || "Staff";
 
   const [items, setItems] = useState<PosItem[]>([]);
 
@@ -161,6 +177,9 @@ export default function CreatePosScreen({
         if (it.id !== id) return it;
 
         let nextValue = Number(value);
+        if (field === "qty" && (!Number.isFinite(nextValue) || nextValue < 1)) {
+          nextValue = 1;
+        }
         if (
           field === "qty" &&
           it.stockQty != null &&
@@ -411,6 +430,9 @@ export default function CreatePosScreen({
     return roundToPaise(item.qty * item.price - item.discount);
   };
 
+  /** Hide default zeros in editable number fields */
+  const emptyableNum = (n: number) => (Number(n) === 0 ? "" : String(n));
+
   const discountTotal = useMemo(
     () => items.reduce((sum, item) => sum + item.discount, 0),
     [items],
@@ -515,8 +537,8 @@ export default function CreatePosScreen({
         customerName: customer.trim() || "Walk-in Customer",
         customerPhone: phone.trim(),
         customerId: payment.customerId || customerId || undefined,
-        invoiceDate: todayStr,
-        dueDate: todayStr,
+        invoiceDate: invoiceDate || todayStr,
+        dueDate: dueDate || invoiceDate || todayStr,
         salesPersonName:
           payment.invoiceBy?.staffName?.trim() ||
           staff.m_staff_name ||
@@ -582,8 +604,8 @@ export default function CreatePosScreen({
         customerName: customer.trim() || "Walk-in Customer",
         customerPhone: phone.trim(),
         customerId: customerId || undefined,
-        invoiceDate: todayStr,
-        dueDate: todayStr,
+        invoiceDate: invoiceDate || todayStr,
+        dueDate: dueDate || invoiceDate || todayStr,
         salesPersonName: staff.m_staff_name || "POS",
         notes: "POS Draft Transaction",
         items: items.map((item) => ({
@@ -780,15 +802,21 @@ export default function CreatePosScreen({
         <div className="flex h-dvh max-h-dvh w-full max-w-7xl flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:w-[95%] sm:rounded-2xl">
           {/* Header */}
           <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-3 py-3 sm:px-6 sm:py-4">
-            <h2 className="text-lg font-semibold sm:text-xl">POS Billing</h2>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
+                POS Billing
+              </h2>
+              <div className="mt-0.5 truncate text-[11px] text-slate-400">
+                #{invoiceNo}
+                <span className="hidden sm:inline"> · By {staffName}</span>
+              </div>
+            </div>
             <button
               type="button"
               onClick={handleRequestClose}
-              className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-black"
+              className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
             >
-
               <X size={18} />
-
             </button>
           </div>
 
@@ -832,27 +860,27 @@ export default function CreatePosScreen({
           )}
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-3 pb-3 [-webkit-overflow-scrolling:touch] sm:px-6 sm:pb-6">
-          {/* Main Layout Grid */}
-          <div className="mt-3 grid min-w-0 grid-cols-1 gap-5 lg:mt-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-            {/* Left Column: Form & Cart */}
-            <div className="min-w-0 space-y-4">
-              {/* Customer Section */}
-              <div className="mt-4 flex flex-col gap-2 rounded-xl bg-slate-50 p-4 border border-slate-100">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider">Customer Details</h3>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateCustomerModal(true)}
-                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700"
-                  >
-                    + Create New Customer
-                  </button>
-                </div>
-
-                <div className="relative mt-2">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <div className="relative min-w-0 flex-1">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <div className="mt-3 grid min-w-0 grid-cols-1 gap-4 lg:mt-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-5">
+            <div className="min-w-0 space-y-3 sm:space-y-4">
+              {/* Customer + dates — single card */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-12">
+                  <div className="relative col-span-1 min-w-0 lg:col-span-4">
+                    <div className="mb-1.5 flex items-center justify-between gap-1">
+                      <label className="text-xs font-semibold text-slate-600">
+                        Select Customer
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateCustomerModal(true)}
+                        className="inline-flex items-center gap-0.5 rounded-md bg-violet-50 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-100"
+                      >
+                        <UserPlus size={11} />
+                        Add
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <User className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <input
                         value={customer}
                         onChange={(e) => {
@@ -865,22 +893,34 @@ export default function CreatePosScreen({
                             setCustomerId(null);
                           }
                         }}
-                        placeholder="Search customer by name or phone..."
-                        className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 outline-none transition-all"
+                        onFocus={() => setCustomerDropdownOpen(true)}
+                        onBlur={() =>
+                          window.setTimeout(
+                            () => setCustomerDropdownOpen(false),
+                            150,
+                          )
+                        }
+                        placeholder="Search customer…"
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                       />
-
-                      {customerDropdownOpen && (loadingCustomers || customers.length > 0) && (
-                        <div className="absolute top-full left-0 right-0 z-[60] mt-1 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                    </div>
+                    {customerDropdownOpen &&
+                      (loadingCustomers || customers.length > 0) && (
+                        <div className="absolute left-0 right-0 z-[60] mt-1 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl sm:right-auto sm:w-80">
                           {loadingCustomers ? (
-                            <div className="px-4 py-3 text-sm text-slate-500">Searching customers...</div>
+                            <div className="px-4 py-3 text-sm text-slate-500">
+                              Searching…
+                            </div>
                           ) : (
                             customers.map((c) => (
                               <button
                                 key={c._id}
                                 type="button"
-                                onClick={() => {
+                                onMouseDown={() => {
                                   const mType = c.membershipType ?? "none";
-                                  const mId = toMembershipPlanId(c.membershipPlanId);
+                                  const mId = toMembershipPlanId(
+                                    c.membershipPlanId,
+                                  );
                                   setCustomer(c.name);
                                   setPhone(c.mobile);
                                   setMembership(mType);
@@ -888,7 +928,6 @@ export default function CreatePosScreen({
                                   setCustomerId(c._id);
                                   setCustomers([]);
                                   setCustomerDropdownOpen(false);
-
                                   setItems((prev) =>
                                     prev.map((item) => {
                                       const stacked = stackLineBenefits(
@@ -913,95 +952,165 @@ export default function CreatePosScreen({
                                     }),
                                   );
                                 }}
-                                className="flex w-full items-center justify-between px-4 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0"
+                                className="flex w-full items-center justify-between border-b border-slate-50 px-3 py-2.5 text-left last:border-0 hover:bg-slate-50"
                               >
-                                <div className="text-left">
-                                  <div className="text-sm font-bold text-slate-700">{c.name}</div>
-                                  <div className="text-xs text-slate-500">{c.mobile}</div>
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold text-slate-800">
+                                    {c.name}
+                                  </div>
+                                  <div className="text-xs text-slate-500">
+                                    {c.mobile}
+                                  </div>
                                 </div>
-                                {c.membershipType && c.membershipType !== "none" && (
-                                  <MembershipBadge
-                                    membershipType={c.membershipType}
-                                    membershipPlanId={toMembershipPlanId(
-                                      c.membershipPlanId,
-                                    )}
-                                    membershipPlans={membershipPlans}
-                                  />
-                                )}
+                                {c.membershipType &&
+                                  c.membershipType !== "none" && (
+                                    <MembershipBadge
+                                      membershipType={c.membershipType}
+                                      membershipPlanId={toMembershipPlanId(
+                                        c.membershipPlanId,
+                                      )}
+                                      membershipPlans={membershipPlans}
+                                    />
+                                  )}
                               </button>
-                            )))}
+                            ))
+                          )}
                         </div>
                       )}
-                    </div>
+                  </div>
 
-                    {customer && (
-                      <div className="flex min-w-0 items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50/50 px-4 py-2">
-                        <div className="text-xs">
-                          <div className="font-bold text-indigo-900">{customer}</div>
-                          <div className="text-indigo-600 font-medium">{phone}</div>
-                        </div>
-                        {membership !== "none" && (
+                  <div className="col-span-1 min-w-0 lg:col-span-3">
+                    <div className="mb-1.5 flex items-center justify-between gap-1">
+                      <label className="text-xs font-semibold text-slate-600">
+                        Phone
+                      </label>
+                      {membership && membership !== "none" ? (
+                        <div className="origin-right scale-90">
                           <MembershipBadge
                             membershipType={membership}
                             membershipPlanId={membershipPlanId}
                             membershipPlans={membershipPlans}
                           />
-                        )}
-                      </div>
-                    )}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="relative">
+                      <Phone className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="Phone"
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-span-1 lg:col-span-2">
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                      Invoice Date
+                    </label>
+                    <div className="relative">
+                      <CalendarDays className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="date"
+                        value={invoiceDate}
+                        onChange={(e) => setInvoiceDate(e.target.value)}
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-8 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="col-span-1 lg:col-span-3">
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                      Due Date
+                    </label>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      min={invoiceDate || undefined}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                    />
                   </div>
                 </div>
+
+                {customer ? (
+                  <div className="mt-2 flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2 lg:hidden">
+                    <User size={14} className="shrink-0 text-violet-600" />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-violet-950">
+                        {customer}
+                      </div>
+                      {phone ? (
+                        <div className="truncate text-xs text-violet-700">
+                          {phone}
+                        </div>
+                      ) : null}
+                    </div>
+                    {membership !== "none" && (
+                      <MembershipBadge
+                        membershipType={membership}
+                        membershipPlanId={membershipPlanId}
+                        membershipPlans={membershipPlans}
+                      />
+                    )}
+                  </div>
+                ) : null}
               </div>
 
-              {/* Search Section */}
-              <div className="mt-4 flex w-full min-w-0 flex-col gap-2 sm:mt-6 sm:flex-row sm:items-center sm:gap-3">
-                <div className="flex min-w-0 items-center gap-2">
+              {/* Search + Qty + Add */}
+              <div className="flex items-end gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     value={searchText}
                     onChange={(e) => {
                       setSearchText(e.target.value);
                       setSelectedProduct(null);
                     }}
-                    placeholder="Search product, space, service, food..."
-                    className="min-w-0 flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    placeholder="Search item or scan barcode"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                   />
-
+                </div>
+                <div className="w-14 shrink-0 sm:w-16">
+                  <div className="mb-1 text-center text-[10px] font-semibold uppercase text-slate-400">
+                    Qty
+                  </div>
                   <input
                     type="number"
-                    placeholder="Qty"
+                    min={1}
                     value={draftQty}
                     onChange={(e) => setDraftQty(e.target.value)}
-                    className="w-16 shrink-0 border border-gray-300 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-violet-500 sm:w-20"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white text-center text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                   />
                 </div>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={addItem}
-                    className="flex-1 bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 transition sm:flex-none"
-                  >
-                    Add Item
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(true)}
-                    className="text-violet-600 text-sm font-medium hover:underline whitespace-nowrap"
-                  >
-                    + Add New Product
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl bg-violet-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 sm:px-4"
+                >
+                  <Plus size={16} />
+                  <span className="hidden xs:inline sm:inline">Add Item</span>
+                  <span className="sm:hidden">Add</span>
+                </button>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="text-xs font-semibold text-violet-600 hover:underline"
+              >
+                + Add New Product
+              </button>
 
-              {/* Search Results (optional UI) */}
               {(loadingProducts || products.length > 0) && (
-                <div className="mt-2 rounded-xl border border-gray-200 bg-white">
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
                   {loadingProducts ? (
-                    <div className="px-3 py-2 text-sm text-gray-500">
-                      Searching...
+                    <div className="px-3 py-2 text-sm text-slate-500">
+                      Searching…
                     </div>
                   ) : (
-                    <div className="max-h-56 overflow-auto">
+                    <div className="max-h-48 overflow-auto">
                       {products.map((p) => (
                         <button
                           key={`${p.sourceType || "product"}-${p._id}`}
@@ -1011,23 +1120,26 @@ export default function CreatePosScreen({
                             setSelectedProduct(p);
                             setProducts([]);
                           }}
-                          className="flex w-full flex-col gap-0.5 border-b border-gray-100 px-3 py-2 text-left hover:bg-gray-50"
+                          className="flex w-full flex-col gap-0.5 border-b border-slate-100 px-3 py-2.5 text-left hover:bg-slate-50"
                         >
-                          <span className="flex items-center justify-between gap-2 text-sm font-medium text-gray-800">
-                            <span className="truncate">{p.productName ?? p.name}</span>
+                          <span className="flex items-center justify-between gap-2 text-sm font-medium text-slate-800">
+                            <span className="truncate">
+                              {p.productName ?? p.name}
+                            </span>
                             <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
                               {p.sourceType || "product"}
                             </span>
                           </span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-slate-500">
                             {(() => {
                               const original = Number(p.sellingPrice ?? 0) || 0;
-                              const productDiscount = calcCatalogueProductDiscount(
-                                original,
-                                1,
-                                p.discountType,
-                                p.discountValue,
-                              );
+                              const productDiscount =
+                                calcCatalogueProductDiscount(
+                                  original,
+                                  1,
+                                  p.discountType,
+                                  p.discountValue,
+                                );
                               const finalPrice = Math.max(
                                 0,
                                 original - productDiscount,
@@ -1035,7 +1147,7 @@ export default function CreatePosScreen({
                               if (productDiscount > 0 && finalPrice < original) {
                                 return (
                                   <>
-                                    <s className="text-gray-400">
+                                    <s className="text-slate-400">
                                       ₹{original.toLocaleString("en-IN")}
                                     </s>{" "}
                                     <span className="font-semibold text-emerald-700">
@@ -1047,7 +1159,7 @@ export default function CreatePosScreen({
                               return `₹${original.toLocaleString("en-IN")}`;
                             })()}
                             {p.trackStock && p.stockQty != null
-                              ? ` | Qty: ${p.stockQty}`
+                              ? ` · Qty: ${p.stockQty}`
                               : ""}
                           </span>
                         </button>
@@ -1057,229 +1169,422 @@ export default function CreatePosScreen({
                 </div>
               )}
 
-              {/* Table — swipe sideways on phone; page still scrolls vertically */}
-              <div className="mt-4 overflow-x-auto overscroll-x-contain rounded-xl border touch-pan-x [scrollbar-width:thin] [-webkit-overflow-scrolling:touch] sm:mt-6">
-                <table className="w-max min-w-[640px] text-sm sm:w-full sm:min-w-[720px]">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-3 text-left whitespace-nowrap">Product</th>
-                      <th className="p-3 whitespace-nowrap">Qty</th>
-                      <th className="p-3 whitespace-nowrap">Price</th>
-                      <th className="p-3 whitespace-nowrap">Discount</th>
-                      <th className="p-3 whitespace-nowrap">Cashback</th>
-                      <th className="p-3 whitespace-nowrap">Total</th>
-                      <th className="p-3 whitespace-nowrap">Action</th>
-                    </tr>
-                  </thead>
+              {/* Mobile catalogue rail */}
+              <div className="lg:hidden">
+                <ProductSidebar
+                  variant="rail"
+                  cartItems={items}
+                  onAddItem={addSidebarItem}
+                  onRemoveItem={removeSidebarItem}
+                  onIncrementItem={incrementSidebarItem}
+                  onDecrementItem={decrementSidebarItem}
+                  title="Catalogue"
+                />
+              </div>
 
-                  <tbody>
-                    {items.map((item) => (
-                      <tr key={item.id} className="border-t">
-                        <td className="p-3 min-w-[160px]">
-                          <div className="flex items-center gap-2 font-medium">
-                            <span>{item.name}</span>
+              {/* Mobile cart cards */}
+              <div className="space-y-2 lg:hidden">
+                {items.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-8 text-center text-sm text-slate-500">
+                    Search or tap Catalogue to add items.
+                  </div>
+                ) : (
+                  items.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-slate-400">
+                              #{idx + 1}
+                            </span>
+                            <span className="truncate font-semibold text-slate-900">
+                              {item.name}
+                            </span>
                             {item.isCsp && (
-                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                              <span className="rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-800">
                                 CSP
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-green-600">
-                            Avl Stock: {(item.stockQty ?? 0) - item.qty}
+                          {item.stockQty != null && (
+                            <div
+                              className={`mt-0.5 text-[11px] font-medium ${
+                                item.stockQty - item.qty < 0
+                                  ? "text-red-600"
+                                  : "text-emerald-600"
+                              }`}
+                            >
+                              Stock: {item.stockQty - item.qty}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-bold tabular-nums text-slate-900">
+                            ₹
+                            {calculateTotal(item).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                            })}
                           </div>
-                        </td>
-
-                        {/* Qty Input */}
-                        <td className="p-3 text-center">
-                          <input
-                            type="number"
-                            value={item.qty}
-                            onChange={(e) =>
-                              handleChange(item.id, "qty", e.target.value)
-                            }
-                            className="w-16 border rounded px-2 py-1 text-center"
-                          />
-                        </td>
-
-                        {/* Price Input */}
-                        <td className="p-3 text-center">
-                          <input
-                            type="number"
-                            value={item.price}
-                            onChange={(e) =>
-                              handleChange(item.id, "price", e.target.value)
-                            }
-                            className="w-20 border rounded px-2 py-1 text-center"
-                          />
-                        </td>
-
-                        {/* Discount Input — CSP still shows catalogue product discount */}
-                        <td className="p-3 text-center">
-                          <input
-                            type="number"
-                            value={item.discount}
-                            title={
-                              item.isCsp
-                                ? "Product discount (membership discount does not apply to CSP)"
-                                : undefined
-                            }
-                            onChange={(e) =>
-                              handleChange(item.id, "discount", e.target.value)
-                            }
-                            className="w-20 border rounded px-2 py-1 text-center"
-                          />
-                        </td>
-
-                        {/* Cashback */}
-                        <td className="p-3 text-center">
-                          <input
-                            type="number"
-                            value={item.cashback}
-                            disabled={Boolean(item.isCsp)}
-                            title={
-                              item.isCsp
-                                ? "Membership cashback does not apply to CSP"
-                                : undefined
-                            }
-                            onChange={(e) =>
-                              handleChange(item.id, "cashback", e.target.value)
-                            }
-                            className="w-20 border rounded px-2 py-1 text-center disabled:bg-gray-50 disabled:text-gray-400"
-                          />
-                        </td>
-
-                        {/* Total */}
-                        <td className="p-3 text-center font-semibold">
-                          ₹
-                          {calculateTotal(item).toLocaleString("en-IN", {
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 2,
-                          })}
-                        </td>
-
-                        {/* Delete */}
-                        <td className="p-3 text-center">
                           <button
                             type="button"
                             onClick={() => removeItem(item.id)}
-                            className="inline-flex rounded p-1 text-red-600 hover:bg-red-50"
-                            aria-label="Remove item"
+                            className="mt-1 rounded-lg bg-rose-50 p-1.5 text-rose-600"
+                            aria-label="Remove"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 size={14} />
                           </button>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-4 gap-2">
+                        <div>
+                          <div className="mb-1 text-[10px] font-semibold uppercase text-slate-400">
+                            Qty
+                          </div>
+                          <div className="flex h-9 items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleChange(item.id, "qty", item.qty - 1)
+                              }
+                              className="rounded p-1 text-slate-600"
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <span className="text-sm font-semibold">
+                              {item.qty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleChange(item.id, "qty", item.qty + 1)
+                              }
+                              className="rounded p-1 text-slate-600"
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="mb-1 text-[10px] font-semibold uppercase text-slate-400">
+                            Price
+                          </div>
+                          <input
+                            type="number"
+                            min={0}
+                            value={emptyableNum(item.price)}
+                            placeholder="0"
+                            onChange={(e) =>
+                              handleChange(item.id, "price", e.target.value)
+                            }
+                            className="h-9 w-full rounded-lg border border-slate-200 px-1.5 text-right text-sm outline-none focus:border-violet-500"
+                          />
+                        </div>
+                        <div>
+                          <div className="mb-1 text-[10px] font-semibold uppercase text-slate-400">
+                            Disc.
+                          </div>
+                          <input
+                            type="number"
+                            min={0}
+                            value={emptyableNum(item.discount)}
+                            placeholder="0"
+                            onChange={(e) =>
+                              handleChange(item.id, "discount", e.target.value)
+                            }
+                            className="h-9 w-full rounded-lg border border-slate-200 px-1.5 text-right text-sm outline-none focus:border-violet-500"
+                          />
+                        </div>
+                        <div>
+                          <div className="mb-1 text-[10px] font-semibold uppercase text-slate-400">
+                            CB
+                          </div>
+                          <input
+                            type="number"
+                            min={0}
+                            value={emptyableNum(item.cashback)}
+                            placeholder="0"
+                            disabled={Boolean(item.isCsp)}
+                            onChange={(e) =>
+                              handleChange(item.id, "cashback", e.target.value)
+                            }
+                            className="h-9 w-full rounded-lg border border-slate-200 px-1.5 text-right text-sm outline-none focus:border-violet-500 disabled:bg-slate-50 disabled:text-slate-400"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 lg:block">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                    <tr>
+                      <th className="p-3 text-left">#</th>
+                      <th className="p-3 text-left">Product</th>
+                      <th className="p-3 text-center">Qty</th>
+                      <th className="p-3 text-center">Price (₹)</th>
+                      <th className="p-3 text-center">Discount (₹)</th>
+                      <th className="p-3 text-center">Cashback</th>
+                      <th className="p-3 text-center">Total (₹)</th>
+                      <th className="p-3 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          className="px-3 py-10 text-center text-slate-500"
+                        >
+                          Search or pick from catalogue to add items.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      items.map((item, idx) => (
+                        <tr key={item.id} className="border-t border-slate-100">
+                          <td className="p-3 text-slate-400">{idx + 1}</td>
+                          <td className="p-3 min-w-[160px]">
+                            <div className="flex items-center gap-2 font-medium">
+                              <span>{item.name}</span>
+                              {item.isCsp && (
+                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                                  CSP
+                                </span>
+                              )}
+                            </div>
+                            {item.stockQty != null && (
+                              <div className="text-xs text-emerald-600">
+                                Stock: {(item.stockQty ?? 0) - item.qty}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <div className="mx-auto flex w-28 items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleChange(item.id, "qty", item.qty - 1)
+                                }
+                                className="rounded border border-slate-200 p-1"
+                              >
+                                <Minus size={12} />
+                              </button>
+                              <input
+                                type="number"
+                                value={item.qty}
+                                onChange={(e) =>
+                                  handleChange(item.id, "qty", e.target.value)
+                                }
+                                className="w-12 rounded border border-slate-200 px-1 py-1 text-center"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleChange(item.id, "qty", item.qty + 1)
+                                }
+                                className="rounded border border-slate-200 p-1"
+                              >
+                                <Plus size={12} />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="p-3 text-center">
+                            <input
+                              type="number"
+                              value={emptyableNum(item.price)}
+                              placeholder="0"
+                              onChange={(e) =>
+                                handleChange(item.id, "price", e.target.value)
+                              }
+                              className="w-20 rounded border border-slate-200 px-2 py-1 text-center"
+                            />
+                          </td>
+                          <td className="p-3 text-center">
+                            <input
+                              type="number"
+                              value={emptyableNum(item.discount)}
+                              placeholder="0"
+                              onChange={(e) =>
+                                handleChange(
+                                  item.id,
+                                  "discount",
+                                  e.target.value,
+                                )
+                              }
+                              className="w-20 rounded border border-slate-200 px-2 py-1 text-center"
+                            />
+                          </td>
+                          <td className="p-3 text-center">
+                            <input
+                              type="number"
+                              value={emptyableNum(item.cashback)}
+                              placeholder="0"
+                              disabled={Boolean(item.isCsp)}
+                              onChange={(e) =>
+                                handleChange(
+                                  item.id,
+                                  "cashback",
+                                  e.target.value,
+                                )
+                              }
+                              className="w-20 rounded border border-slate-200 px-2 py-1 text-center disabled:bg-slate-50"
+                            />
+                          </td>
+                          <td className="p-3 text-center font-semibold">
+                            ₹
+                            {calculateTotal(item).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="p-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeItem(item.id)}
+                              className="inline-flex rounded p-1 text-red-600 hover:bg-red-50"
+                              aria-label="Remove item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
 
               {/* Billing Summary */}
-              <div className="mt-4 flex flex-col gap-4 border-t pt-4 sm:mt-6">
-                {/* Top Row */}
-                <div className="flex items-center justify-between">
-                  {/* Left: Items Count */}
-                  <div className="text-sm text-gray-500">
-                    Items:{" "}
-                    <span className="font-medium text-gray-700">
-                      {items.length}
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Items ({items.length})</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Sub Total</span>
+                    <span className="tabular-nums">
+                      ₹
+                      {subTotal.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}
                     </span>
                   </div>
-
-                  {/* Center: Actions */}
-
-
-                  {/* Right: Total */}
-                  <div className="text-right">
-                    <div className="text-xs text-gray-500">Grand Total</div>
-                    <div className="text-xl font-bold text-gray-900">
+                  {discountTotal > 0 && (
+                    <div className="flex justify-between font-medium text-rose-600">
+                      <span>Discount</span>
+                      <span className="tabular-nums">
+                        − ₹
+                        {discountTotal.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
+                    <span className="text-base font-semibold text-slate-900">
+                      Grand Total
+                    </span>
+                    <span className="text-xl font-bold tabular-nums text-slate-900">
                       ₹{" "}
                       {grandTotal.toLocaleString("en-IN", {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
+                        minimumFractionDigits: 2,
                       })}
-                    </div>
-                    {Math.abs(roundOff) >= 0.005 && (
-                      <div className="mt-0.5 text-[11px] text-slate-500">
-                        Bill ₹
-                        {billTotalBeforeRoundOff.toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                        {" · "}
-                        Round off {roundOff >= 0 ? "+" : "−"}₹
-                        {Math.abs(roundOff).toFixed(2)}
-                      </div>
-                    )}
-                    {cashbackTotal > 0 && (
-                      <div className="mt-1 text-xs font-medium text-emerald-600">
-                        +₹ {cashbackTotal.toFixed(2)} cashback
-                      </div>
-                    )}
+                    </span>
                   </div>
+                  {Math.abs(roundOff) >= 0.005 && (
+                    <div className="text-[11px] text-slate-500">
+                      Bill ₹
+                      {billTotalBeforeRoundOff.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}
+                      {" · "}
+                      Round off {roundOff >= 0 ? "+" : "−"}₹
+                      {Math.abs(roundOff).toFixed(2)}
+                    </div>
+                  )}
+                  {cashbackTotal > 0 && (
+                    <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-emerald-700 ring-1 ring-inset ring-emerald-100">
+                      <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
+                        <Tag size={14} />
+                        Cashback
+                      </span>
+                      <span className="font-bold tabular-nums">
+                        + ₹
+                        {cashbackTotal.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Extra Charges Section */}
-                <div className="border-t pt-3">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Extra Charges</span>
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <Tag size={12} /> Extra Charges
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExtraCharges([
+                          ...extraCharges,
+                          { label: "New Charge", amount: 0 },
+                        ])
+                      }
+                      className="text-[11px] font-bold text-violet-600 hover:underline"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  {extraCharges.map((charge, idx) => (
+                    <div
+                      key={idx}
+                      className="mb-1.5 flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5"
+                    >
+                      <input
+                        type="text"
+                        value={charge.label}
+                        onChange={(e) => {
+                          const next = [...extraCharges];
+                          next[idx].label = e.target.value;
+                          setExtraCharges(next);
+                        }}
+                        className="flex-1 bg-transparent text-xs font-medium text-slate-600 outline-none"
+                      />
+                      <span className="text-xs text-slate-400">₹</span>
+                      <input
+                        type="number"
+                        value={charge.amount || ""}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const next = [...extraCharges];
+                          next[idx].amount = Number(e.target.value);
+                          setExtraCharges(next);
+                        }}
+                        className="w-16 border-b border-slate-200 bg-transparent text-right text-xs font-bold outline-none focus:border-violet-600"
+                      />
                       <button
                         type="button"
-                        onClick={() => setExtraCharges([...extraCharges, { label: "New Charge", amount: 0 }])}
-                        className="text-[10px] font-bold text-indigo-600 hover:underline"
+                        onClick={() => {
+                          const next = [...extraCharges];
+                          next.splice(idx, 1);
+                          setExtraCharges(next);
+                        }}
+                        className="text-slate-300 hover:text-red-500"
                       >
-                        + ADD CHARGE
+                        ×
                       </button>
                     </div>
-
-                    {extraCharges.map((charge, idx) => (
-                      <div key={idx} className="flex items-center gap-3 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
-                        <input
-                          type="text"
-                          value={charge.label}
-                          onChange={(e) => {
-                            const next = [...extraCharges];
-                            next[idx].label = e.target.value;
-                            setExtraCharges(next);
-                          }}
-                          className="flex-1 bg-transparent border-none focus:ring-0 text-xs font-medium text-slate-600 outline-none"
-                        />
-                        <div className="flex items-center gap-1">
-                          <span className="text-slate-400 text-xs">₹</span>
-                          <input
-                            type="number"
-                            value={charge.amount || ""}
-                            onChange={(e) => {
-                              const next = [...extraCharges];
-                              next[idx].amount = Number(e.target.value);
-                              setExtraCharges(next);
-                            }}
-                            className="w-20 bg-transparent border-b border-slate-200 focus:border-indigo-600 outline-none text-right text-xs font-bold text-slate-700"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const next = [...extraCharges];
-                              next.splice(idx, 1);
-                              setExtraCharges(next);
-                            }}
-                            className="text-slate-300 hover:text-red-500 text-sm ml-1"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  ))}
                 </div>
-
-
               </div>
             </div>
 
-
-            <aside className="h-[min(52dvh,440px)] min-h-[260px] overflow-hidden lg:sticky lg:top-0 lg:h-[70vh]">
+            <aside className="hidden h-[min(52dvh,440px)] min-h-[260px] overflow-hidden lg:sticky lg:top-0 lg:block lg:h-[70vh]">
               <ProductSidebar
                 cartItems={items}
                 onAddItem={addSidebarItem}
@@ -1292,12 +1597,12 @@ export default function CreatePosScreen({
           </div>
           </div>
 
-          <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:justify-end sm:gap-3 sm:px-6">
+          <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-100 bg-white px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:gap-3 sm:px-6">
             <button
               type="button"
               onClick={handleSaveDraft}
               disabled={items.length === 0 || saving}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 sm:flex-none sm:px-6"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 sm:min-w-[9rem]"
             >
               <FileText size={18} />
               Save Draft
@@ -1306,9 +1611,11 @@ export default function CreatePosScreen({
               type="button"
               onClick={openCheckoutModal}
               disabled={items.length === 0 || saving}
-              className="flex flex-[1.4] items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600 sm:flex-none sm:px-8"
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600 sm:min-w-[9rem]"
             >
-              {saving ? "Processing..." : (
+              {saving ? (
+                "Processing..."
+              ) : (
                 <>
                   <ShoppingCart size={18} />
                   Checkout

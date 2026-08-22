@@ -34,7 +34,6 @@ import {
 import { useAppSelector } from "@/store/hooks";
 import {
   DATE_PRESET_OPTIONS,
-  getTodayYmd,
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
@@ -51,6 +50,8 @@ type ExpenseCategory =
   | "Travel"
   | "Other";
 
+  type Segements="Store"|"Cafe"|"Services"|"Space"|"general";
+
 type ExpenseStatus = "Paid" | "Pending" | "Cancelled";
 type PaymentMode = "Cash" | "UPI" | "Card" | "Bank Transfer" | "Wallet" | "Due";
 
@@ -60,11 +61,17 @@ type ExpenseRow = {
   expenseCode: string;
   title: string;
   category: ExpenseCategory;
+  segment: Segements;
   amount: number;
   paidAmount: number;
   dueAmount: number;
   paidTo: string;
   vendorId: string;
+  paidBy: {
+    m_staff_id: string;
+    m_staff_name: string;
+    m_staff_email: string;
+  };
   mode: PaymentMode;
   status: ExpenseStatus;
   date: string;
@@ -87,6 +94,7 @@ const CATEGORIES: ExpenseCategory[] = [
   "Travel",
   "Other",
 ];
+const SEGMENTS: Segements[] = ["Store","Cafe","Services","Space","general"];
 const MODES: PaymentMode[] = [
   "Cash",
   "UPI",
@@ -102,6 +110,13 @@ function asCategory(value: unknown): ExpenseCategory {
   return (CATEGORIES as string[]).includes(v)
     ? (v as ExpenseCategory)
     : "Other";
+}
+
+function asSegment(value: unknown): Segements {
+  const v = String(value ?? "").trim();
+  return (SEGMENTS as string[]).includes(v)
+    ? (v as Segements)
+    : "general";
 }
 
 function asMode(value: unknown, status?: ExpenseStatus): PaymentMode {
@@ -191,11 +206,24 @@ function mapExpenceToRow(item: any, index: number): ExpenseRow {
     expenseCode: String(item?.expenseCode || `EXP-${index + 1}`),
     title: String(item?.title || "").trim() || "Untitled expense",
     category: asCategory(item?.category),
+    segment: asSegment(item?.segment ?? item?.segement),
     amount,
     paidAmount,
     dueAmount,
     paidTo: String(item?.paidTo || "").trim() || "—",
     vendorId: String(item?.vendorId?._id || item?.vendorId || "").trim(),
+    paidBy: {
+      m_staff_id: staffId(item?.paidBy) || staffId(item?.addedBy),
+      m_staff_name:
+        staffName(item?.paidBy) || staffName(item?.addedBy) || "",
+      m_staff_email: String(
+        (item?.paidBy as { m_staff_email?: string } | undefined)
+          ?.m_staff_email ||
+          (item?.addedBy as { m_staff_email?: string } | undefined)
+            ?.m_staff_email ||
+          "",
+      ).trim(),
+    },
     mode: asMode(item?.mode, status),
     status,
     date: toDateYmd(item?.date || item?.createdAt),
@@ -227,9 +255,11 @@ function rowToModalValues(row: ExpenseRow): ExpenseModalValues {
     title: row.title,
     description: row.notes,
     category: row.category,
+    segment: row.segment,
     amount: row.amount,
     paidTo: row.paidTo === "—" ? "" : row.paidTo,
     vendorId: row.vendorId,
+    paidBy: row.paidBy,
     date: row.date,
     mode: row.mode,
     status: row.status,
@@ -288,9 +318,9 @@ const ExpenseScreen = () => {
   const [rows, setRows] = useState<ExpenseRow[]>([]);
   const [activeTab, setActiveTab] = useState<ExpenseStatus | "All">("All");
   const [search, setSearch] = useState("");
-  const [datePreset, setDatePreset] = useState<DatePreset>("today");
-  const [fromDate, setFromDate] = useState(getTodayYmd);
-  const [toDate, setToDate] = useState(getTodayYmd);
+  const [datePreset, setDatePreset] = useState<DatePreset>("week");
+  const [fromDate, setFromDate] = useState(() => rangeForPreset("week").from);
+  const [toDate, setToDate] = useState(() => rangeForPreset("week").to);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ExpenseModalMode>("create");
   const [activeExpense, setActiveExpense] = useState<ExpenseRow | null>(null);
@@ -411,9 +441,11 @@ const ExpenseScreen = () => {
         {
           title: draft.title,
           category: draft.category || "Other",
+          segment: draft.segment || "general",
           amount: draft.amount,
           paidTo: draft.paidTo,
           vendorId: draft.vendorId || null,
+          paidBy: draft.paidBy,
           date: draft.date,
           notes: draft.description,
           mode:
@@ -686,21 +718,23 @@ const ExpenseScreen = () => {
   return (
     <div className="min-w-0 space-y-4 p-1">
       {/* ── Header ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="truncate text-lg font-semibold text-gray-900 sm:text-2xl">
             Expenses
           </h1>
-          <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">
+          <span className="shrink-0 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">
             {filteredData.length}
           </span>
         </div>
         <button
+          type="button"
           onClick={openCreateModal}
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md bg-blue-600 px-2.5 text-xs font-semibold text-white hover:bg-blue-700 sm:h-9 sm:gap-1.5 sm:px-3 sm:text-sm"
         >
-          <Plus size={16} />
-          Add Expense
+          <Plus size={14} className="sm:size-4" />
+          <span className="sm:hidden">Add</span>
+          <span className="hidden sm:inline">Add Expense</span>
         </button>
       </div>
 
@@ -728,22 +762,23 @@ const ExpenseScreen = () => {
       </div>
 
       {/* ── Search + date filter ── */}
-      <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="relative min-w-0 w-full flex-1 sm:min-w-[200px]">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search expenses..."
-            className="h-10 w-full rounded-md border border-gray-200 pl-9 pr-3 text-sm outline-none focus:border-blue-400"
-          />
-        </div>
+      <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:gap-3">
+        {/* Mobile: search | This Week preset side-by-side; desktop: search grows */}
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search expenses..."
+              className="h-10 w-full rounded-md border border-gray-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-blue-400 sm:h-10"
+            />
+          </div>
 
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <select
             value={datePreset}
             onChange={(e) => {
@@ -754,7 +789,8 @@ const ExpenseScreen = () => {
               setFromDate(range.from);
               setToDate(range.to);
             }}
-            className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            aria-label="Date filter"
+            className="h-10 w-[8.25rem] shrink-0 rounded-md border border-gray-200 bg-white px-2 text-sm font-medium text-gray-700 outline-none focus:border-blue-400 sm:w-44 sm:px-3"
           >
             {DATE_PRESET_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -762,58 +798,55 @@ const ExpenseScreen = () => {
               </option>
             ))}
           </select>
+        </div>
 
-          {/* From Date */}
-          <div className="flex items-center gap-2">
-            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
-              From
-            </label>
-
-            <input
-              type="date"
-              value={fromDate}
-              max={toDate || undefined}
-              onChange={(e) => {
-                setFromDate(e.target.value);
-                setDatePreset("custom");
-              }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none transition focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
-            />
-          </div>
-
-          {/* To Date */}
-          <div className="flex items-center gap-2">
-            <label className="whitespace-nowrap text-xs font-medium text-gray-500">
-              To
-            </label>
-
-            <input
-              type="date"
-              value={toDate}
-              min={fromDate || undefined}
-              onChange={(e) => {
-                setToDate(e.target.value);
-                setDatePreset("custom");
-              }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none transition focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
-            />
-          </div>
-
-          {/* Clear */}
-          {(fromDate || toDate || datePreset !== "all") && (
+        {/* Custom range: From → To + Clear range (only when Custom is selected) */}
+        {datePreset === "custom" && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="flex items-center gap-2">
+              <label className="w-10 shrink-0 text-xs font-medium text-gray-500 sm:w-auto">
+                From
+              </label>
+              <input
+                type="date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => {
+                  setFromDate(e.target.value);
+                  setDatePreset("custom");
+                }}
+                className="h-10 min-w-0 flex-1 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none transition focus:border-blue-400 focus:ring-1 focus:ring-blue-100 sm:flex-none"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="w-10 shrink-0 text-xs font-medium text-gray-500 sm:w-auto">
+                To
+              </label>
+              <input
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setDatePreset("custom");
+                }}
+                className="h-10 min-w-0 flex-1 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none transition focus:border-blue-400 focus:ring-1 focus:ring-blue-100 sm:flex-none"
+              />
+            </div>
             <button
               type="button"
               onClick={() => {
-                setDatePreset("all");
-                setFromDate("");
-                setToDate("");
+                setDatePreset("week");
+                const range = rangeForPreset("week");
+                setFromDate(range.from);
+                setToDate(range.to);
               }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              className="h-9 w-full rounded-md border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 sm:h-10 sm:w-auto sm:px-3"
             >
-              Clear
+              Clear range
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* ── Table ── */}
@@ -1024,6 +1057,7 @@ const ExpenseScreen = () => {
             {
               title: expenseDraft.title,
               category: expenseDraft.category || "Other",
+              segment: expenseDraft.segment || "general",
               amount: expenseDraft.amount,
               paidAmount,
               dueAmount,
@@ -1057,6 +1091,7 @@ const ExpenseScreen = () => {
                   : undefined,
               paidTo: expenseDraft.paidTo,
               vendorId: expenseDraft.vendorId || null,
+              paidBy: expenseDraft.paidBy,
               mode,
               status,
               date: expenseDraft.date,

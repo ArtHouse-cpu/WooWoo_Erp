@@ -2,8 +2,10 @@ import { ImagePlus, X, ArrowRight, Save, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useAppSelector } from "@/store/hooks";
 import {
   handleCreateVendor,
+  handleGetAccessStaff,
   handleGetVendors,
   type CustomerPayload,
   type VendorPayload,
@@ -12,13 +14,21 @@ import AddVendorModal from "@/features/purchase/Modal/AddVendorModal";
 
 export type ExpenseModalMode = "create" | "edit" | "view";
 
+export type ExpensePaidBy = {
+  m_staff_id?: string | null;
+  m_staff_name?: string | null;
+  m_staff_email?: string | null;
+};
+
 export type ExpenseDraft = {
   title: string;
   description: string;
   category: string;
+  segment?: string;
   amount: number;
   paidTo: string;
   vendorId?: string;
+  paidBy?: ExpensePaidBy;
   date: string;
   mode?: string;
   status?: string;
@@ -41,6 +51,14 @@ type VendorOption = {
   companyName?: string;
 };
 
+type StaffOption = {
+  _id: string;
+  m_staff_id: string;
+  fullName: string;
+  email: string;
+  phoneNumber?: string;
+};
+
 interface ExpenseModalProps {
   isOpen: boolean;
   mode?: ExpenseModalMode;
@@ -55,9 +73,13 @@ const EMPTY_FORM = {
   title: "",
   description: "",
   category: "",
+  segment: "",
   amount: "",
   paidTo: "",
   vendorId: "",
+  paidByName: "",
+  paidById: "",
+  paidByEmail: "",
   mode: "",
   status: "Paid",
   date: "",
@@ -75,6 +97,7 @@ const CATEGORY_OPTIONS = [
   "Travel",
   "Other",
 ];
+const SEGMENT_OPTIONS = ["Store", "Cafe", "Services", "Space", "general"];
 
 const MODE_OPTIONS = ["Cash", "UPI", "Card", "Bank Transfer", "Wallet", "Due"];
 const STATUS_OPTIONS = ["Paid", "Pending", "Cancelled"];
@@ -86,12 +109,16 @@ function toForm(initial?: ExpenseModalValues | null) {
     title: initial.title || "",
     description: initial.description || "",
     category: initial.category || "",
+    segment: initial.segment || "",
     amount:
       initial.amount === undefined || initial.amount === null
         ? ""
         : String(initial.amount),
     paidTo: initial.paidTo || "",
     vendorId: initial.vendorId || "",
+    paidByName: String(initial.paidBy?.m_staff_name ?? "").trim(),
+    paidById: String(initial.paidBy?.m_staff_id ?? "").trim(),
+    paidByEmail: String(initial.paidBy?.m_staff_email ?? "").trim(),
     mode: initial.status === "Pending" ? "Due" : initial.mode || "",
     status: initial.status || "Paid",
     date: initial.date || "",
@@ -113,6 +140,7 @@ const ExpenseModal = ({
   const isView = mode === "view";
   const isEdit = mode === "edit";
   const isCreate = mode === "create";
+  const currentUser = useAppSelector((state) => state.user);
 
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [preview, setPreview] = useState<string | null>(null);
@@ -120,18 +148,36 @@ const ExpenseModal = ({
   const [vendors, setVendors] = useState<VendorOption[]>([]);
   const [loadingVendors, setLoadingVendors] = useState(false);
   const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
+  const [allStaff, setAllStaff] = useState<StaffOption[]>([]);
+  const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [paidByDropdownOpen, setPaidByDropdownOpen] = useState(false);
   const [showCreateVendor, setShowCreateVendor] = useState(false);
   const [creatingVendor, setCreatingVendor] = useState(false);
   const debouncedVendorSearch = useDebounce(formData.paidTo.trim(), 250);
+  const debouncedPaidBySearch = useDebounce(formData.paidByName.trim(), 250);
 
   useEffect(() => {
     if (!isOpen) return;
-    setFormData(toForm(initialExpense));
+    const base = toForm(initialExpense);
+    // Default Paid By to logged-in user on create when not prefilled
+    if (
+      mode === "create" &&
+      !base.paidById &&
+      !base.paidByName &&
+      currentUser.m_staff_name
+    ) {
+      base.paidByName = String(currentUser.m_staff_name);
+      base.paidById = String(currentUser.m_staff_id || "");
+      base.paidByEmail = String(currentUser.m_staff_email || "");
+    }
+    setFormData(base);
     setPreview(initialExpense?.receiptUrl || null);
     setVendorDropdownOpen(false);
+    setPaidByDropdownOpen(false);
     setShowCreateVendor(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [isOpen, initialExpense]);
+  }, [isOpen, initialExpense, mode, currentUser]);
 
   useEffect(() => {
     if (!isOpen || isView) return;
@@ -163,6 +209,38 @@ const ExpenseModal = ({
   }, [isOpen, isView]);
 
   useEffect(() => {
+    if (!isOpen || isView) return;
+    const controller = new AbortController();
+    const loadStaff = async () => {
+      try {
+        setLoadingStaff(true);
+        const response = await handleGetAccessStaff("", controller.signal);
+        const list = Array.isArray(response?.staff) ? response.staff : [];
+        const mapped: StaffOption[] = list
+          .map((item: any) => ({
+            _id: String(item?._id ?? ""),
+            m_staff_id: String(item?.m_staff_id ?? item?._id ?? "").trim(),
+            fullName: String(item?.fullName ?? "").trim(),
+            email: String(item?.email ?? "").trim(),
+            phoneNumber: String(item?.phoneNumber ?? "").trim(),
+          }))
+          .filter((item: StaffOption) => Boolean(item.fullName));
+        setAllStaff(mapped);
+        setStaffOptions(mapped);
+      } catch {
+        if (!controller.signal.aborted) {
+          setAllStaff([]);
+          setStaffOptions([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoadingStaff(false);
+      }
+    };
+    void loadStaff();
+    return () => controller.abort();
+  }, [isOpen, isView]);
+
+  useEffect(() => {
     if (!vendorDropdownOpen) return;
     if (!debouncedVendorSearch) {
       setVendors(allVendors);
@@ -179,6 +257,25 @@ const ExpenseModal = ({
       ),
     );
   }, [debouncedVendorSearch, allVendors, vendorDropdownOpen]);
+
+  useEffect(() => {
+    if (!paidByDropdownOpen) return;
+    if (!debouncedPaidBySearch) {
+      setStaffOptions(allStaff);
+      return;
+    }
+    const term = debouncedPaidBySearch.toLowerCase();
+    setStaffOptions(
+      allStaff.filter((item) =>
+        [item.fullName, item.email, item.m_staff_id, item.phoneNumber].some(
+          (value) =>
+            String(value ?? "")
+              .toLowerCase()
+              .includes(term),
+        ),
+      ),
+    );
+  }, [debouncedPaidBySearch, allStaff, paidByDropdownOpen]);
 
   if (!isOpen) return null;
 
@@ -202,6 +299,17 @@ const ExpenseModal = ({
       ...prev,
       [name]: value,
       ...(name === "status" && value === "Pending" ? { mode: "Due" } : {}),
+    }));
+  };
+
+  const handleSegmentChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    if (isView) return;
+    const { value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      segment: value,
     }));
   };
 
@@ -255,13 +363,27 @@ const ExpenseModal = ({
       await Swal.fire("Invalid amount", "Enter a valid expense amount.", "warning");
       return null;
     }
+    if (!formData.paidByName.trim()) {
+      await Swal.fire(
+        "Paid By required",
+        "Please select who paid for this expense.",
+        "warning",
+      );
+      return null;
+    }
     return {
       title,
       description: formData.description.trim(),
       category: formData.category || "Other",
+      segment: formData.segment,
       amount,
       paidTo,
       vendorId: formData.vendorId,
+      paidBy: {
+        m_staff_id: formData.paidById || null,
+        m_staff_name: formData.paidByName.trim(),
+        m_staff_email: formData.paidByEmail || null,
+      },
       date: formData.date || new Date().toISOString().split("T")[0],
       mode: formData.status === "Pending" ? "Due" : formData.mode || undefined,
       status: formData.status || undefined,
@@ -362,26 +484,33 @@ const ExpenseModal = ({
 
         <form onSubmit={handleSubmit}>
           <div className="grid max-h-[70vh] grid-cols-1 gap-4 overflow-y-auto px-6 py-5 md:grid-cols-2">
-            <div>
+            <div className="md:col-span-2">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Amount
+                Amount <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="number"
-                name="amount"
-                value={formData.amount}
-                onChange={handleChange}
-                placeholder="e.g. 45000"
-                min="0"
-                required={!isView}
-                readOnly={isView}
-                className={fieldClass}
-              />
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">
+                  ₹
+                </span>
+                <input
+                  type="number"
+                  name="amount"
+                  value={formData.amount}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  required={!isView}
+                  readOnly={isView}
+                  className={`${fieldClass} pl-8`}
+                />
+              </div>
             </div>
+
             <div className="relative">
               <div className="mb-1.5 flex items-center justify-between">
                 <label className="block text-sm font-medium text-gray-700">
-                  Paid To (Vendor)
+                  Paid To (Vendor) <span className="text-rose-500">*</span>
                 </label>
                 {!isView ? (
                   <button
@@ -469,9 +598,92 @@ const ExpenseModal = ({
               ) : null}
             </div>
 
+            <div className="relative">
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Paid By <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                {!isView ? (
+                  <Search
+                    size={15}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                ) : null}
+                <input
+                  type="text"
+                  name="paidByName"
+                  value={formData.paidByName}
+                  onChange={(e) => {
+                    if (isView) return;
+                    setFormData((prev) => ({
+                      ...prev,
+                      paidByName: e.target.value,
+                      paidById: "",
+                      paidByEmail: "",
+                    }));
+                    setPaidByDropdownOpen(true);
+                  }}
+                  onFocus={() => {
+                    if (!isView) setPaidByDropdownOpen(true);
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => setPaidByDropdownOpen(false), 150);
+                  }}
+                  placeholder="Search staff / payer..."
+                  required={!isView}
+                  readOnly={isView}
+                  autoComplete="off"
+                  className={`${fieldClass} ${isView ? "" : "pl-9"}`}
+                />
+              </div>
+              {!isView && paidByDropdownOpen && loadingStaff ? (
+                <p className="mt-2 text-xs text-gray-500">Loading users...</p>
+              ) : null}
+              {!isView &&
+              paidByDropdownOpen &&
+              !loadingStaff &&
+              staffOptions.length > 0 ? (
+                <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                  {staffOptions.map((item) => (
+                    <button
+                      key={item._id}
+                      type="button"
+                      onMouseDown={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          paidByName: item.fullName,
+                          paidById: item.m_staff_id || item._id,
+                          paidByEmail: item.email,
+                        }));
+                        setPaidByDropdownOpen(false);
+                      }}
+                      className="flex w-full flex-col border-b border-gray-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-gray-50"
+                    >
+                      <span className="font-medium text-gray-800">
+                        {item.fullName}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {[item.m_staff_id, item.email, item.phoneNumber]
+                          .filter(Boolean)
+                          .join(" • ")}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {!isView &&
+              paidByDropdownOpen &&
+              !loadingStaff &&
+              staffOptions.length === 0 ? (
+                <p className="mt-2 text-xs text-gray-500">
+                  No users found. Check Access staff permissions.
+                </p>
+              ) : null}
+            </div>
+
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Title
+                Title <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
@@ -486,7 +698,7 @@ const ExpenseModal = ({
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Date
+                Date <span className="text-rose-500">*</span>
               </label>
               <input
                 type="date"
@@ -516,7 +728,27 @@ const ExpenseModal = ({
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Category
+                Segment <span className="text-rose-500">*</span>
+              </label>
+              <select
+                name="segment"
+                value={formData.segment}
+                onChange={handleSegmentChange}
+                required={!isView}
+                disabled={isView}
+                className={fieldClass}
+              >
+                <option value="">Select segment</option>
+                {SEGMENT_OPTIONS.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Category <span className="text-rose-500">*</span>
               </label>
               <select
                 name="category"

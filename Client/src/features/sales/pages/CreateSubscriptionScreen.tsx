@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -17,9 +17,27 @@ import {
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
-import { getCustomerMembershipTypeFromPlan } from "../utils/membershipInvoiceUtils";
+import { getCustomerMembershipTypeFromPlan, buildMembershipBenefitLines } from "../utils/membershipInvoiceUtils";
 import { printThermalReceipt } from "@/utils/printUtils";
-import { Camera, Download, Printer, X } from "lucide-react";
+import {
+  Camera,
+  Download,
+  X,
+  CreditCard,
+  Search,
+  Phone,
+  UserPlus,
+  User,
+  CalendarDays,
+  FileText,
+  ShoppingCart,
+  Crown,
+  Star,
+  Gem,
+  GraduationCap,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 
 const today = new Date().toISOString().split("T")[0];
 const SUBSCRIPTION_SEQ_KEY = "wooerp-subscription-seq";
@@ -305,6 +323,8 @@ type MembershipOption = {
   priority: number;
   /** Fixed ₹ credited to wallet when this plan is purchased */
   walletCashbackAmount: number;
+  usageLimits?: Record<string, { discount?: number; cashback?: number }>;
+  features?: Array<{ label: string }>;
 };
 
 type StudentForm = {
@@ -337,6 +357,102 @@ const isJuniorPlan = (
   const text = `${plan?.planId ?? ""} ${plan?.displayName ?? ""}`.toLowerCase();
   return text.includes("junior") || text.includes("junoir");
 };
+
+/** Themed icon + colors for membership plan cards (matches Create Subscription UI). */
+function getMembershipPlanVisual(plan: {
+  displayName?: string;
+  planId?: string;
+  priority?: number;
+}): {
+  Icon: LucideIcon;
+  accent: string;
+  iconWrap: string;
+  selectedRing: string;
+  badge: string;
+} {
+  const text = `${plan.planId ?? ""} ${plan.displayName ?? ""}`.toLowerCase();
+  if (text.includes("junior") || text.includes("junoir")) {
+    return {
+      Icon: GraduationCap,
+      accent: "text-sky-700",
+      iconWrap: "bg-sky-50 text-sky-600 ring-sky-100",
+      selectedRing: "border-sky-500 ring-sky-100 bg-sky-50/40",
+      badge: "bg-sky-100 text-sky-700",
+    };
+  }
+  if (text.includes("elite")) {
+    return {
+      Icon: Crown,
+      accent: "text-amber-800",
+      iconWrap: "bg-amber-50 text-amber-600 ring-amber-100",
+      selectedRing: "border-amber-500 ring-amber-100 bg-amber-50/40",
+      badge: "bg-amber-100 text-amber-800",
+    };
+  }
+  if (text.includes("premium")) {
+    return {
+      Icon: Gem,
+      accent: "text-emerald-700",
+      iconWrap: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+      selectedRing: "border-emerald-500 ring-emerald-100 bg-emerald-50/40",
+      badge: "bg-emerald-100 text-emerald-700",
+    };
+  }
+  if (text.includes("special")) {
+    return {
+      Icon: Star,
+      accent: "text-violet-700",
+      iconWrap: "bg-violet-50 text-violet-600 ring-violet-100",
+      selectedRing: "border-violet-500 ring-violet-100 bg-violet-50/40",
+      badge: "bg-violet-100 text-violet-700",
+    };
+  }
+  if (text.includes("general")) {
+    return {
+      Icon: Crown,
+      accent: "text-violet-700",
+      iconWrap: "bg-violet-50 text-violet-600 ring-violet-100",
+      selectedRing: "border-violet-500 ring-violet-100 bg-violet-50/40",
+      badge: "bg-violet-100 text-violet-700",
+    };
+  }
+  // Fallback cycles by priority so unknown plans still get distinct icons
+  const icons = [Crown, Star, Gem, Sparkles, GraduationCap] as LucideIcon[];
+  const themes = [
+    {
+      accent: "text-violet-700",
+      iconWrap: "bg-violet-50 text-violet-600 ring-violet-100",
+      selectedRing: "border-violet-500 ring-violet-100 bg-violet-50/40",
+      badge: "bg-violet-100 text-violet-700",
+    },
+    {
+      accent: "text-indigo-700",
+      iconWrap: "bg-indigo-50 text-indigo-600 ring-indigo-100",
+      selectedRing: "border-indigo-500 ring-indigo-100 bg-indigo-50/40",
+      badge: "bg-indigo-100 text-indigo-700",
+    },
+    {
+      accent: "text-emerald-700",
+      iconWrap: "bg-emerald-50 text-emerald-600 ring-emerald-100",
+      selectedRing: "border-emerald-500 ring-emerald-100 bg-emerald-50/40",
+      badge: "bg-emerald-100 text-emerald-700",
+    },
+    {
+      accent: "text-amber-800",
+      iconWrap: "bg-amber-50 text-amber-600 ring-amber-100",
+      selectedRing: "border-amber-500 ring-amber-100 bg-amber-50/40",
+      badge: "bg-amber-100 text-amber-800",
+    },
+    {
+      accent: "text-sky-700",
+      iconWrap: "bg-sky-50 text-sky-600 ring-sky-100",
+      selectedRing: "border-sky-500 ring-sky-100 bg-sky-50/40",
+      badge: "bg-sky-100 text-sky-700",
+    },
+  ];
+  const idx = Math.abs(Number(plan.priority ?? 0)) % themes.length;
+  return { Icon: icons[idx], ...themes[idx] };
+}
 
 const getCustomerMembershipType = (
   plan?: Pick<MembershipOption, "planId" | "displayName"> | null,
@@ -637,6 +753,22 @@ export default function CreateSubscriptionScreen({
   );
   const juniorSelected = isJuniorPlan(selectedMembership);
 
+  const selectedPlanBenefits = useMemo(
+    () =>
+      selectedMembership
+        ? buildMembershipBenefitLines({
+            usageLimits: selectedMembership.usageLimits,
+            period: selectedMembership.period,
+            walletCashbackAmount: selectedMembership.walletCashbackAmount,
+            customerDisplay: {
+              features: selectedMembership.features,
+              badgeLabel: selectedMembership.period,
+            },
+          })
+        : [],
+    [selectedMembership],
+  );
+
   /** Effective customer priority for upgrade rules (Junior = 0). */
   const effectiveCustomerPriority = useMemo(() => {
     const mType = String(
@@ -896,6 +1028,19 @@ export default function CreateSubscriptionScreen({
               0,
               Number(m?.walletCashback?.amount ?? 0) || 0,
             ),
+            usageLimits:
+              m?.usageLimits && typeof m.usageLimits === "object"
+                ? m.usageLimits
+                : undefined,
+            features: Array.isArray(m?.customerDisplay?.features)
+              ? m.customerDisplay.features
+                  .map((f: { label?: string } | string) =>
+                    typeof f === "string"
+                      ? { label: f }
+                      : { label: String(f?.label ?? "").trim() },
+                  )
+                  .filter((f: { label: string }) => Boolean(f.label))
+              : undefined,
           }))
           .filter((m: MembershipOption) => Boolean(m._id));
         setMemberships(mapped);
@@ -1338,93 +1483,118 @@ export default function CreateSubscriptionScreen({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between border-b bg-gray-50 px-6 py-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-800">
-                  {mode === "edit"
-                    ? "Edit Subscription"
-                    : mode === "upgrade"
-                      ? "Upgrade Subscription"
-                      : mode === "view"
-                        ? "View Subscription"
-                        : "Create Subscription"}
-                </h2>
-                <p className="text-xs text-gray-500">
-                  {mode === "upgrade" ? (
-                    "Only higher-priority plans (and Junior) are available"
-                  ) : (
-                    <>
-                      Invoice No:{" "}
-                      <span className="font-semibold">{subscriptionNo}</span>
-                    </>
-                  )}
-                </p>
+            {/* Header */}
+            <div className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-md sm:px-6 sm:py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
+                    <CreditCard size={20} strokeWidth={2} />
+                  </span>
+                  <div className="min-w-0 pt-0.5">
+                    <h2 className="text-base font-bold leading-tight tracking-tight text-slate-900 sm:text-lg">
+                      {mode === "edit"
+                        ? "Edit Subscription"
+                        : mode === "upgrade"
+                          ? "Upgrade Subscription"
+                          : mode === "view"
+                            ? "View Subscription"
+                            : "Create Subscription"}
+                    </h2>
+                    <div className="mt-1.5 inline-flex max-w-full items-center truncate rounded-full bg-violet-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 sm:text-xs">
+                      {mode === "upgrade"
+                        ? "Higher-priority plans only"
+                        : `Invoice No: ${subscriptionNo}`}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (mode !== "view") {
+                      const result = await Swal.fire({
+                        title: "Are you sure?",
+                        text: "Any unsaved changes will be lost.",
+                        icon: "warning",
+                        showCancelButton: true,
+                        confirmButtonColor: "#7C3AED",
+                        cancelButtonColor: "#6B7280",
+                        confirmButtonText: "Yes, Close",
+                        cancelButtonText: "Cancel",
+                      });
+                      if (!result.isConfirmed) return;
+                    }
+                    if (onClose) onClose();
+                    else navigate(-1);
+                  }}
+                  className="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50"
+                  aria-label="Close"
+                >
+                  <X size={18} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  if (mode !== "view") {
-                    const result = await Swal.fire({
-                      title: "Are you sure?",
-                      text: "Any unsaved changes will be lost.",
-                      icon: "warning",
-                      showCancelButton: true,
-                      confirmButtonColor: "#4F46E5",
-                      cancelButtonColor: "#6B7280",
-                      confirmButtonText: "Yes, Close",
-                      cancelButtonText: "Cancel",
-                    });
-                    if (!result.isConfirmed) return;
-                  }
-                  if (onClose) onClose();
-                  else navigate(-1);
-                }}
-                className="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-black"
-              >
-                <X size={18} />
-              </button>
             </div>
 
-            <div className="space-y-5 p-6">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-4 p-4 sm:space-y-5 sm:p-6">
+              {/* Customer + Phone */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                     Customer
                   </label>
-                  <input
-                    value={customer}
-                    readOnly={mode === "view"}
-                    disabled={mode === "view"}
-                    onChange={(e) => {
-                      if (mode === "view") return;
-                      setCustomer(e.target.value);
-                      setSelectedCustomerId("");
-                      setPhone("");
-                      setMembership("-");
-                      setCustomerDropdownOpen(true);
-                    }}
-                    onFocus={() => {
-                      if (mode === "view") return;
-                      setCustomerDropdownOpen(true);
-                    }}
-                    placeholder={
-                      mode === "view"
-                        ? "Customer name"
-                        : "Search customer by name or phone"
-                    }
-                    className={`h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none ${
-                      mode === "view"
-                        ? "cursor-not-allowed bg-gray-50 text-gray-700"
-                        : "focus:border-blue-500"
-                    }`}
-                  />
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={customer}
+                      readOnly={mode === "view"}
+                      disabled={mode === "view"}
+                      onChange={(e) => {
+                        if (mode === "view") return;
+                        setCustomer(e.target.value);
+                        setSelectedCustomerId("");
+                        setPhone("");
+                        setMembership("-");
+                        setCustomerDropdownOpen(true);
+                      }}
+                      onFocus={() => {
+                        if (mode === "view") return;
+                        setCustomerDropdownOpen(true);
+                      }}
+                      onBlur={() =>
+                        window.setTimeout(
+                          () => setCustomerDropdownOpen(false),
+                          150,
+                        )
+                      }
+                      placeholder={
+                        mode === "view"
+                          ? "Customer name"
+                          : "Search by name or phone"
+                      }
+                      className={`h-11 w-full rounded-xl border border-slate-200 pl-9 text-sm outline-none transition ${
+                        mode === "view"
+                          ? "cursor-not-allowed bg-slate-50 pr-3 text-slate-700"
+                          : "bg-white pr-10 focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                      }`}
+                    />
+                    {mode !== "view" && (
+                      <button
+                        type="button"
+                        title="Add customer"
+                        aria-label="Add customer"
+                        onClick={() => setShowCreateCustomerModal(true)}
+                        className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-violet-600 transition hover:bg-violet-50"
+                      >
+                        <UserPlus size={16} strokeWidth={2.25} />
+                      </button>
+                    )}
+                  </div>
                   {mode !== "view" &&
                     customerDropdownOpen &&
                     (loadingCustomers || customers.length > 0) && (
-                      <div className="mt-1 max-h-48 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg z-20 relative">
+                      <div className="relative z-20 mt-1 max-h-48 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
                         {loadingCustomers ? (
-                          <div className="p-2 text-sm text-gray-500">
-                            Searching...
+                          <div className="p-3 text-sm text-slate-500">
+                            Searching…
                           </div>
                         ) : (
                           customers.map((selectedCustomer) => {
@@ -1439,11 +1609,13 @@ export default function CreateSubscriptionScreen({
                               <button
                                 key={selectedCustomer._id}
                                 type="button"
-                                onClick={() => {
+                                onMouseDown={() => {
                                   setSelectedCustomerId(selectedCustomer._id);
                                   setCustomer(selectedCustomer.name);
                                   setPhone(selectedCustomer.mobile);
-                                  setMembership(hasMembership ? mType : "none");
+                                  setMembership(
+                                    hasMembership ? mType : "none",
+                                  );
                                   const isJuniorCust =
                                     mType.toLowerCase().includes("junior") ||
                                     mType.toLowerCase().includes("junoir");
@@ -1462,18 +1634,18 @@ export default function CreateSubscriptionScreen({
                                     setSelectedMembershipId("");
                                   }
                                 }}
-                                className="flex w-full items-center justify-between gap-3 border-b border-gray-100 px-3 py-2.5 text-left text-sm hover:bg-gray-50 last:border-0"
+                                className="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 text-left text-sm last:border-0 hover:bg-slate-50"
                               >
                                 <div className="min-w-0">
-                                  <div className="truncate font-medium text-gray-800">
+                                  <div className="truncate font-medium text-slate-800">
                                     {selectedCustomer.name}
                                   </div>
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-slate-500">
                                     {selectedCustomer.mobile}
                                   </div>
                                 </div>
                                 {hasMembership ? (
-                                  <span className="shrink-0 rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
+                                  <span className="shrink-0 rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-violet-700">
                                     {mType}
                                   </span>
                                 ) : (
@@ -1487,67 +1659,53 @@ export default function CreateSubscriptionScreen({
                         )}
                       </div>
                     )}
-                  {mode === "view"
+                  {(mode === "view"
                     ? membership &&
                       membership !== "-" &&
-                      membership.toLowerCase() !== "none" && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className="text-[11px] text-gray-500">
-                            Current membership
-                          </span>
-                          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
-                            {membership}
-                          </span>
-                        </div>
-                      )
+                      membership.toLowerCase() !== "none"
                     : selectedCustomerId &&
                       membership &&
                       membership !== "-" &&
-                      membership.toLowerCase() !== "none" && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className="text-[11px] text-gray-500">
-                            Current membership
-                          </span>
-                          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
-                            {membership}
-                          </span>
-                        </div>
-                      )}
-                  {mode !== "view" && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateCustomerModal(true)}
-                      className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
-                    >
-                      + Add New Customer
-                    </button>
+                      membership.toLowerCase() !== "none") && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-[11px] text-slate-500">
+                        Current membership
+                      </span>
+                      <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-violet-700">
+                        {membership}
+                      </span>
+                    </div>
                   )}
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                     Phone Number
                   </label>
-                  <input
-                    value={phone}
-                    readOnly={mode === "view"}
-                    disabled={mode === "view"}
-                    onChange={(e) => {
-                      if (mode === "view") return;
-                      setPhone(e.target.value);
-                    }}
-                    placeholder="Customer phone number"
-                    className={`h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none ${
-                      mode === "view"
-                        ? "cursor-not-allowed bg-gray-50 text-gray-700"
-                        : "focus:border-blue-500"
-                    }`}
-                  />
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={phone}
+                      readOnly={mode === "view"}
+                      disabled={mode === "view"}
+                      onChange={(e) => {
+                        if (mode === "view") return;
+                        setPhone(e.target.value);
+                      }}
+                      placeholder="Customer phone number"
+                      className={`h-11 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none transition ${
+                        mode === "view"
+                          ? "cursor-not-allowed bg-slate-50 text-slate-700"
+                          : "bg-white focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
 
+              {/* Membership plan cards */}
               <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-600">
+                <label className="mb-2 block text-xs font-semibold text-slate-600">
                   Membership Plan
                   {mode === "upgrade" && effectiveCustomerPriority > 0 ? (
                     <span className="ml-2 font-normal text-violet-600">
@@ -1555,98 +1713,149 @@ export default function CreateSubscriptionScreen({
                     </span>
                   ) : null}
                 </label>
-                <select
-                  value={selectedMembershipId}
-                  onChange={(e) => {
-                    setSelectedMembershipId(e.target.value);
-                    setEndDateManuallyEdited(false);
-                  }}
-                  disabled={mode === "view"}
-                  className="h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                >
-                  <option value="">
-                    {loadingMemberships
-                      ? "Loading memberships..."
-                      : mode === "upgrade"
-                        ? "Select upgrade plan"
-                        : "Select membership plan"}
-                  </option>
-                  {selectableMemberships.map((m) => (
-                    <option key={m._id} value={m._id}>
-                      {`${m.displayName} • ₹${m.amount.toLocaleString("en-IN")} / ${m.period} • P${m.priority}${
-                        m.walletCashbackAmount > 0
-                          ? ` • Cashback ₹${m.walletCashbackAmount.toLocaleString("en-IN")}`
-                          : ""
-                      } • ${m.planId}`}
-                    </option>
-                  ))}
-                </select>
-                {mode === "upgrade" &&
-                  !loadingMemberships &&
-                  selectableMemberships.length === 0 && (
-                    <p className="mt-1 text-xs text-amber-600">
-                      No higher-priority plans available for this customer.
-                      Junior is always listed when configured.
-                    </p>
-                  )}
+                {loadingMemberships ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center text-sm text-slate-500">
+                    Loading memberships…
+                  </div>
+                ) : selectableMemberships.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 py-8 text-center text-sm text-amber-700">
+                    {mode === "upgrade"
+                      ? "No higher-priority plans available. Junior is listed when configured."
+                      : "No active membership plans found."}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-4">
+                    {selectableMemberships.map((m) => {
+                      const selected = selectedMembershipId === m._id;
+                      const visual = getMembershipPlanVisual(m);
+                      const Icon = visual.Icon;
+                      return (
+                        <button
+                          key={m._id}
+                          type="button"
+                          disabled={mode === "view"}
+                          onClick={() => {
+                            if (mode === "view") return;
+                            setSelectedMembershipId(m._id);
+                            setEndDateManuallyEdited(false);
+                          }}
+                          className={`relative flex flex-col items-center rounded-2xl border p-3 text-center shadow-sm transition sm:p-4 ${
+                            selected
+                              ? `${visual.selectedRing} ring-2`
+                              : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-md"
+                          } ${mode === "view" ? "cursor-default" : ""}`}
+                        >
+                          <span
+                            className={`absolute left-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full border ${
+                              selected
+                                ? "border-violet-600 bg-violet-600"
+                                : "border-slate-300 bg-white"
+                            }`}
+                          >
+                            {selected ? (
+                              <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                            ) : null}
+                          </span>
+                          <span
+                            className={`mb-2 flex h-11 w-11 items-center justify-center rounded-2xl ring-1 ring-inset ${visual.iconWrap}`}
+                          >
+                            <Icon size={22} strokeWidth={1.75} />
+                          </span>
+                          <div
+                            className={`text-sm font-bold leading-tight ${visual.accent}`}
+                          >
+                            {m.displayName}
+                          </div>
+                          <div className="mt-1 text-xs font-semibold tabular-nums text-slate-800">
+                            ₹{m.amount.toLocaleString("en-IN")}{" "}
+                            <span className="font-normal text-slate-500">
+                              / {m.period}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-[10px] font-medium text-slate-500">
+                            P{m.priority}
+                            {m.walletCashbackAmount > 0
+                              ? ` · Cashback ₹${m.walletCashbackAmount.toLocaleString("en-IN")}`
+                              : ""}
+                          </div>
+                          <span
+                            className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${visual.badge}`}
+                          >
+                            {m.displayName}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">
+              {/* Created By + dates */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+                <div className="col-span-2 hidden sm:col-span-1 sm:block">
+                  <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                     Created By
                   </label>
-                  <input
-                    value={salesPerson}
-                    disabled
-                    className="h-10 w-full rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-600"
-                  />
+                  <div className="relative">
+                    <User className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={salesPerson}
+                      disabled
+                      className="h-10 w-full cursor-not-allowed rounded-xl border border-slate-100 bg-slate-50 pl-8 pr-2 text-xs text-slate-500"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                     Start Date
                   </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    disabled={mode === "view"}
-                    onChange={(e) => {
-                      if (mode === "view") return;
-                      setStartDate(e.target.value);
-                      setEndDateManuallyEdited(false);
-                    }}
-                    className={`h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none ${
-                      mode === "view"
-                        ? "cursor-not-allowed bg-gray-50 text-gray-700"
-                        : "focus:border-blue-500"
-                    }`}
-                  />
+                  <div className="relative">
+                    <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="date"
+                      value={startDate}
+                      disabled={mode === "view"}
+                      onChange={(e) => {
+                        if (mode === "view") return;
+                        setStartDate(e.target.value);
+                        setEndDateManuallyEdited(false);
+                      }}
+                      className={`h-11 w-full rounded-xl border border-slate-200 px-3 pr-9 text-sm outline-none transition ${
+                        mode === "view"
+                          ? "cursor-not-allowed bg-slate-50 text-slate-700"
+                          : "bg-white focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                      }`}
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-600">
                     End Date
                   </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    min={startDate}
-                    disabled={mode === "view"}
-                    onChange={(e) => {
-                      if (mode === "view") return;
-                      setEndDate(e.target.value);
-                      setEndDateManuallyEdited(true);
-                    }}
-                    className={`h-10 w-full rounded-md border border-gray-200 px-3 text-sm outline-none ${
-                      mode === "view"
-                        ? "cursor-not-allowed bg-gray-50 text-gray-700"
-                        : "focus:border-blue-500"
-                    }`}
-                  />
+                  <div className="relative">
+                    <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="date"
+                      value={endDate}
+                      min={startDate}
+                      disabled={mode === "view"}
+                      onChange={(e) => {
+                        if (mode === "view") return;
+                        setEndDate(e.target.value);
+                        setEndDateManuallyEdited(true);
+                      }}
+                      className={`h-11 w-full rounded-xl border border-slate-200 px-3 pr-9 text-sm outline-none transition ${
+                        mode === "view"
+                          ? "cursor-not-allowed bg-slate-50 text-slate-700"
+                          : "bg-white focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
 
               {juniorSelected && (
-                <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/40 p-4">
+                <div className="space-y-3 rounded-2xl border border-orange-200 bg-orange-50/40 p-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-orange-800">
                       Junior Student Details
@@ -1655,7 +1864,7 @@ export default function CreateSubscriptionScreen({
                       <button
                         type="button"
                         onClick={addStudent}
-                        className="rounded-md bg-orange-600 px-3 py-1 text-xs font-semibold text-white hover:bg-orange-700"
+                        className="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700"
                       >
                         + Add More Student
                       </button>
@@ -1665,13 +1874,13 @@ export default function CreateSubscriptionScreen({
                   {students.map((student, index) => (
                     <div
                       key={`student-${index}`}
-                      className="space-y-3 rounded-md border border-orange-200 bg-white p-3"
+                      className="space-y-3 rounded-xl border border-orange-200 bg-white p-3"
                     >
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-gray-700">
+                        <p className="text-xs font-semibold text-slate-700">
                           Student {index + 1}
                         </p>
-                        {students.length > 1 && (
+                        {students.length > 1 && mode !== "view" && (
                           <button
                             type="button"
                             onClick={() => removeStudent(index)}
@@ -1684,87 +1893,90 @@ export default function CreateSubscriptionScreen({
                       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <input
                           value={student.studentName}
+                          disabled={mode === "view"}
                           onChange={(e) =>
                             updateStudent(index, "studentName", e.target.value)
                           }
                           placeholder="Student Name"
-                          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                          className="h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500"
                         />
                         <input
                           value={student.schoolName}
+                          disabled={mode === "view"}
                           onChange={(e) =>
                             updateStudent(index, "schoolName", e.target.value)
                           }
                           placeholder="School Name"
-                          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                          className="h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500"
                         />
                         <div className="flex flex-col">
-                          <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
+                          <label className="mb-0.5 ml-1 text-[10px] font-bold text-slate-500">
                             DOB
                           </label>
                           <input
                             type="date"
                             value={student.dob}
+                            disabled={mode === "view"}
                             onChange={(e) =>
                               updateStudent(index, "dob", e.target.value)
                             }
-                            className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                            className="h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500"
                           />
                         </div>
                         <div className="flex flex-col">
-                          <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
+                          <label className="mb-0.5 ml-1 text-[10px] font-bold text-slate-500">
                             Gender
                           </label>
                           <select
                             value={student.gender}
+                            disabled={mode === "view"}
                             onChange={(e) =>
                               updateStudent(index, "gender", e.target.value)
                             }
-                            className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                            className="h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500"
                           >
-                            <option value="">Select Gender</option>
-                            <option value="Boy">Boy</option>
-                            <option value="Girl">Girl</option>
+                            <option value="">Select gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
                           </select>
                         </div>
-                        <div className="flex flex-col">
-                          <label className="mb-0.5 ml-1 text-[10px] font-bold text-gray-500">
-                            Class / STD
-                          </label>
-                          <input
-                            type="number"
-                            value={student.classStd}
-                            onChange={(e) =>
-                              updateStudent(index, "classStd", e.target.value)
-                            }
-                            placeholder="Class / STD"
-                            className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
-                          />
-                        </div>
+                        <input
+                          value={student.classStd}
+                          disabled={mode === "view"}
+                          onChange={(e) =>
+                            updateStudent(index, "classStd", e.target.value)
+                          }
+                          placeholder="Class / Std"
+                          className="h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500"
+                        />
                         <input
                           value={student.relation}
+                          disabled={mode === "view"}
                           onChange={(e) =>
                             updateStudent(index, "relation", e.target.value)
                           }
                           placeholder="Relation"
-                          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                          className="h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500"
                         />
                         <input
                           value={student.parentName}
+                          disabled={mode === "view"}
                           onChange={(e) =>
                             updateStudent(index, "parentName", e.target.value)
                           }
                           placeholder="Parent Name"
-                          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                          className="h-10 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500 md:col-span-2"
                         />
                         <div className="md:col-span-1">
-                          <label className="mb-1 block text-xs font-semibold text-gray-600">
-                            Student ID Photo
+                          <label className="mb-1 block text-xs font-semibold text-slate-600">
+                            Student ID
                           </label>
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
                               value={student.studentIdUpload}
+                              disabled={mode === "view"}
                               onChange={(e) =>
                                 updateStudent(
                                   index,
@@ -1772,42 +1984,45 @@ export default function CreateSubscriptionScreen({
                                   e.target.value,
                                 )
                               }
-                              placeholder="ID Photo (URL/Upload)"
-                              className="h-10 flex-1 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                              placeholder="Student ID (URL/Upload)"
+                              className="h-10 flex-1 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500"
                             />
-                            <button
-                              type="button"
-                              className="flex h-10 items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3 text-gray-600 hover:bg-gray-100"
-                              onClick={() => {
-                                const input = document.createElement("input");
-                                input.type = "file";
-                                input.accept = "image/*";
-                                input.onchange = (e) => {
-                                  const file = (e.target as HTMLInputElement)
-                                    .files?.[0];
-                                  if (file) {
-                                    updateStudent(
-                                      index,
-                                      "studentIdUpload",
-                                      file.name,
-                                    );
-                                  }
-                                };
-                                input.click();
-                              }}
-                            >
-                              <Camera size={18} />
-                            </button>
+                            {mode !== "view" && (
+                              <button
+                                type="button"
+                                className="flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-slate-600 hover:bg-slate-100"
+                                onClick={() => {
+                                  const input = document.createElement("input");
+                                  input.type = "file";
+                                  input.accept = "image/*";
+                                  input.onchange = (e) => {
+                                    const file = (e.target as HTMLInputElement)
+                                      .files?.[0];
+                                    if (file) {
+                                      updateStudent(
+                                        index,
+                                        "studentIdUpload",
+                                        file.name,
+                                      );
+                                    }
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                <Camera size={18} />
+                              </button>
+                            )}
                           </div>
                         </div>
                         <div className="md:col-span-1">
-                          <label className="mb-1 block text-xs font-semibold text-gray-600">
+                          <label className="mb-1 block text-xs font-semibold text-slate-600">
                             Form Image
                           </label>
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
                               value={student.formImageUpload}
+                              disabled={mode === "view"}
                               onChange={(e) =>
                                 updateStudent(
                                   index,
@@ -1816,31 +2031,33 @@ export default function CreateSubscriptionScreen({
                                 )
                               }
                               placeholder="Form Image (URL/Upload)"
-                              className="h-10 flex-1 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-500"
+                              className="h-10 flex-1 rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500"
                             />
-                            <button
-                              type="button"
-                              className="flex h-10 items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3 text-gray-600 hover:bg-gray-100"
-                              onClick={() => {
-                                const input = document.createElement("input");
-                                input.type = "file";
-                                input.accept = "image/*";
-                                input.onchange = (e) => {
-                                  const file = (e.target as HTMLInputElement)
-                                    .files?.[0];
-                                  if (file) {
-                                    updateStudent(
-                                      index,
-                                      "formImageUpload",
-                                      file.name,
-                                    );
-                                  }
-                                };
-                                input.click();
-                              }}
-                            >
-                              <Camera size={18} />
-                            </button>
+                            {mode !== "view" && (
+                              <button
+                                type="button"
+                                className="flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-slate-600 hover:bg-slate-100"
+                                onClick={() => {
+                                  const input = document.createElement("input");
+                                  input.type = "file";
+                                  input.accept = "image/*";
+                                  input.onchange = (e) => {
+                                    const file = (e.target as HTMLInputElement)
+                                      .files?.[0];
+                                    if (file) {
+                                      updateStudent(
+                                        index,
+                                        "formImageUpload",
+                                        file.name,
+                                      );
+                                    }
+                                  };
+                                  input.click();
+                                }}
+                              >
+                                <Camera size={18} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1850,54 +2067,96 @@ export default function CreateSubscriptionScreen({
               )}
 
               <div>
-                <label className="mb-1 block text-xs font-semibold text-gray-600">
-                  Notes
+                <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                  Notes (Optional)
                 </label>
-                <textarea
-                  value={notes}
-                  readOnly={mode === "view"}
-                  disabled={mode === "view"}
-                  onChange={(e) => {
-                    if (mode === "view") return;
-                    setNotes(e.target.value);
-                  }}
-                  className={`min-h-[72px] w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none ${
-                    mode === "view"
-                      ? "cursor-not-allowed bg-gray-50 text-gray-700"
-                      : "focus:border-blue-500"
-                  }`}
-                  placeholder="Add notes for this subscription..."
-                />
+                <div className="relative">
+                  <FileText className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <textarea
+                    value={notes}
+                    readOnly={mode === "view"}
+                    disabled={mode === "view"}
+                    onChange={(e) => {
+                      if (mode === "view") return;
+                      setNotes(e.target.value);
+                    }}
+                    className={`min-h-[80px] w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none transition ${
+                      mode === "view"
+                        ? "cursor-not-allowed bg-slate-50 text-slate-700"
+                        : "bg-white focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                    }`}
+                    placeholder="Add notes for this subscription…"
+                  />
+                </div>
               </div>
 
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Invoice Number</span>
-                  <span className="font-semibold text-gray-800">
-                    {subscriptionNo}
+              {/* Invoice summary */}
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3.5">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-violet-600 shadow-sm ring-1 ring-violet-100">
+                    <FileText size={16} />
                   </span>
+                  <div className="min-w-0">
+                    <div className="truncate text-xs text-violet-600">
+                      Invoice Number {subscriptionNo}
+                    </div>
+                    <div className="text-base font-bold tabular-nums text-violet-950 sm:text-lg">
+                      Total Amount ₹{" "}
+                      {grandTotal.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Total Amount</span>
-                  <span className="text-lg font-semibold text-gray-900">
-                    ₹{" "}
-                    {grandTotal.toLocaleString("en-IN", {
-                      minimumFractionDigits: 2,
-                    })}
-                  </span>
+              </div>
+
+              {/* Benefits — from selected membership usageLimits / wallet / period */}
+              <div>
+                <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-violet-800">
+                  <Star size={14} className="text-violet-500" />
+                  Subscription Benefits
                 </div>
+                {!selectedMembership ? (
+                  <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3 text-xs text-slate-500">
+                    Select a membership plan to see its benefits.
+                  </p>
+                ) : selectedPlanBenefits.length === 0 ? (
+                  <p className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3 text-xs text-slate-500">
+                    No specific benefits configured for this plan.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {selectedPlanBenefits.map((line) => (
+                      <div
+                        key={`${line.emoji}-${line.text}`}
+                        className="flex items-start gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2.5"
+                      >
+                        <span
+                          className="mt-0.5 shrink-0 text-base leading-none"
+                          aria-hidden
+                        >
+                          {line.emoji}
+                        </span>
+                        <span className="text-xs leading-snug text-slate-600">
+                          {line.text}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 border-t bg-gray-50 px-6 py-4">
+            <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-slate-100 bg-white/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md sm:flex sm:justify-end sm:gap-3 sm:px-6">
               <button
                 type="button"
                 onClick={() => {
                   if (onClose) onClose();
                   else navigate(-1);
                 }}
-                className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 sm:min-w-[8.5rem]"
               >
+                <X size={16} />
                 {mode === "view" ? "Close" : "Cancel"}
               </button>
               {mode !== "view" && (
@@ -1907,9 +2166,9 @@ export default function CreateSubscriptionScreen({
                     if (validateBeforeCheckout()) setOpenCheckout(true);
                   }}
                   disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[8.5rem]"
                 >
-                  <Printer size={16} />
+                  <ShoppingCart size={16} />
                   Checkout
                 </button>
               )}

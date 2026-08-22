@@ -146,6 +146,9 @@ const buildPayload = (body = {}, {isUpdate = false} = {}) => {
     const categoryId = String(body.categoryId ?? '').trim();
     payload.categoryId = mongoose.Types.ObjectId.isValid(categoryId) ? categoryId : null;
   }
+  if (!isUpdate || body.segment !== undefined || body.segement !== undefined) {
+    payload.segment = String(body.segment ?? body.segement ?? '').trim();
+  }
   if (!isUpdate || body.amount !== undefined) payload.amount = round2(Math.max(0, Number(body.amount ?? 0) || 0));
   if (!isUpdate || body.paidTo !== undefined) payload.paidTo = String(body.paidTo ?? '').trim();
   if (!isUpdate || body.vendorId !== undefined) {
@@ -268,6 +271,11 @@ export const addExpencesById = async (req, res) => {
       m_staff_name: req.user?.name ?? null,
       m_staff_email: req.user?.email ?? null,
     };
+    const paidBy = parseMaybeJson(req.body?.paidBy) ?? {
+      m_staff_id: addedBy?.m_staff_id ?? req.user?.userId ?? null,
+      m_staff_name: addedBy?.m_staff_name ?? req.user?.name ?? null,
+      m_staff_email: addedBy?.m_staff_email ?? req.user?.email ?? null,
+    };
 
     const total = payload.amount;
     const hasPaidField = req.body?.paidAmount !== undefined && req.body?.paidAmount !== '';
@@ -326,7 +334,7 @@ export const addExpencesById = async (req, res) => {
       });
     }
 
-    const expence = await Expence.create({...payload, createdBy, addedBy, payments});
+    const expence = await Expence.create({...payload, createdBy, addedBy, paidBy, payments});
     return res.status(201).json({
       success: true,
       message: 'Expense created successfully.',
@@ -359,6 +367,15 @@ export const updateExpencesById = async (req, res) => {
       });
     }
     if (receiptUrl) payload.receiptUrl = receiptUrl;
+
+    const paidBy = parseMaybeJson(req.body?.paidBy);
+    if (paidBy && typeof paidBy === 'object') {
+      payload.paidBy = {
+        m_staff_id: paidBy.m_staff_id ?? null,
+        m_staff_name: paidBy.m_staff_name ?? null,
+        m_staff_email: paidBy.m_staff_email ?? null,
+      };
+    }
 
     if (Object.keys(payload).length === 0) {
       return res.status(400).json({success: false, message: 'No valid fields to update.'});
