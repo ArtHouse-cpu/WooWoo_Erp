@@ -11,7 +11,6 @@ import {
   Minus,
   Tag,
   UserPlus,
-  CalendarDays,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import {
@@ -1006,23 +1005,20 @@ export default function CreatePosScreen({
                     </div>
                   </div>
 
-                  <div className="col-span-1 lg:col-span-2">
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                  <div className="col-span-1 min-w-0 lg:col-span-2">
+                    <label className="mb-1.5 block truncate text-xs font-semibold text-slate-600">
                       Invoice Date
                     </label>
-                    <div className="relative">
-                      <CalendarDays className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="date"
-                        value={invoiceDate}
-                        onChange={(e) => setInvoiceDate(e.target.value)}
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-8 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
-                      />
-                    </div>
+                    <input
+                      type="date"
+                      value={invoiceDate}
+                      onChange={(e) => setInvoiceDate(e.target.value)}
+                      className="box-border h-11 w-full min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-2 text-xs outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 sm:px-3 sm:text-sm [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-datetime-edit]:min-w-0"
+                    />
                   </div>
 
-                  <div className="col-span-1 lg:col-span-3">
-                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                  <div className="col-span-1 min-w-0 lg:col-span-3">
+                    <label className="mb-1.5 block truncate text-xs font-semibold text-slate-600">
                       Due Date
                     </label>
                     <input
@@ -1030,33 +1026,10 @@ export default function CreatePosScreen({
                       value={dueDate}
                       min={invoiceDate || undefined}
                       onChange={(e) => setDueDate(e.target.value)}
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                      className="box-border h-11 w-full min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-2 text-xs outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 sm:px-3 sm:text-sm [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-datetime-edit]:min-w-0"
                     />
                   </div>
                 </div>
-
-                {customer ? (
-                  <div className="mt-2 flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2 lg:hidden">
-                    <User size={14} className="shrink-0 text-violet-600" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-violet-950">
-                        {customer}
-                      </div>
-                      {phone ? (
-                        <div className="truncate text-xs text-violet-700">
-                          {phone}
-                        </div>
-                      ) : null}
-                    </div>
-                    {membership !== "none" && (
-                      <MembershipBadge
-                        membershipType={membership}
-                        membershipPlanId={membershipPlanId}
-                        membershipPlans={membershipPlans}
-                      />
-                    )}
-                  </div>
-                ) : null}
               </div>
 
               {/* Search + Qty + Add */}
