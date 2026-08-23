@@ -36,6 +36,7 @@ import {fileURLToPath} from 'url';
 import sentAnnouncement from './routes/sendAnnouncement.router.js';
 import expenceRoutes from './routes/expence.router.js';
 import expenceCategoryRoutes from './routes/expenceCategory.router.js';
+import dashboardRoutes from './routes/dashboard.route.js';
 // import activityRoutes from './routes/activity.route.js';
 
 // Load environment variables
@@ -119,6 +120,7 @@ app.use('/api/announcement', sentAnnouncement);
 
 app.use('/api/expences', expenceRoutes);
 app.use('/api/expences/category', expenceCategoryRoutes);
+app.use('/dashboard', dashboardRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

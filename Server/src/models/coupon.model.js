@@ -62,6 +62,16 @@ const couponSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /** Where coupon applies: all | store | space | service | food | membership */
+    applicableOn: {
+      type: [
+        {
+          type: String,
+          enum: ['all', 'store', 'space', 'service', 'food', 'membership'],
+        },
+      ],
+      default: ['all'],
+    },
     isActive: {
       type: Boolean,
       default: true,

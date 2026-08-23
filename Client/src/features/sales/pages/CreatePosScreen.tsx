@@ -23,8 +23,10 @@ import {
   type CustomerPayload,
   type MembershipPlanPayload,
   type CatalogueLookupItem,
+  type VerifiedStaff,
 } from "@/services/apiClient";
 import CreateProductModal from "../components/invoice/Modal/CreateProductModal";
+import StaffVerifyModal from "../components/invoice/Modal/StaffVerifyModal";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import ProductSidebar from "../components/ProductSidebar";
 import MembershipBadge from "../components/invoice/MembershipBadge";
@@ -104,6 +106,7 @@ export default function CreatePosScreen({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [openCheckout, setOpenCheckout] = useState(false);
+  const [openDraftPin, setOpenDraftPin] = useState(false);
   const [searchText, setSearchText] = useState("");
   const debouncedSearchText = useDebounce(searchText.trim(), 300);
   const [products, setProducts] = useState<any[]>([]);
@@ -596,7 +599,27 @@ export default function CreatePosScreen({
       setSaving(false);
     }
   };
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (verified?: {
+    staff: VerifiedStaff;
+    verifiedAt: string;
+  }) => {
+    if (!items.length) {
+      Swal.fire("Empty cart", "Add at least one item before saving a draft.", "warning");
+      return;
+    }
+    // Require staff PIN so we know who saved the draft
+    if (!verified?.staff) {
+      setOpenDraftPin(true);
+      return;
+    }
+
+    const verifiedStaff = verified.staff;
+    const salesPersonName =
+      verifiedStaff.staffName ||
+      verifiedStaff.name ||
+      staff.m_staff_name ||
+      "POS";
+
     try {
       setSaving(true);
       await handleCreateInvoice({
@@ -605,7 +628,14 @@ export default function CreatePosScreen({
         customerId: customerId || undefined,
         invoiceDate: invoiceDate || todayStr,
         dueDate: dueDate || invoiceDate || todayStr,
-        salesPersonName: staff.m_staff_name || "POS",
+        salesPersonName,
+        invoiceBy: {
+          staffId: verifiedStaff.staffId || verifiedStaff.m_staff_id || "",
+          staffName: salesPersonName,
+          employeeId: verifiedStaff.employeeId || "",
+          email: verifiedStaff.email || "",
+        },
+        verifiedAt: verified.verifiedAt || null,
         notes: "POS Draft Transaction",
         items: items.map((item) => ({
           productName: item.name,
@@ -632,17 +662,30 @@ export default function CreatePosScreen({
         },
         pendingAmount: grandTotal,
         createdBy: {
-          m_staff_id: staff.m_staff_id,
-          m_staff_name: staff.m_staff_name,
-          m_staff_email: staff.m_staff_email,
+          m_staff_id:
+            verifiedStaff.m_staff_id ||
+            verifiedStaff.staffId ||
+            staff.m_staff_id,
+          m_staff_name: salesPersonName,
+          m_staff_email:
+            verifiedStaff.email || staff.m_staff_email || null,
         },
       });
 
-      await Swal.fire("Success", "Draft POS Transaction saved.", "success");
+      await Swal.fire(
+        "Success",
+        `Draft saved by ${salesPersonName}.`,
+        "success",
+      );
       setItems([]);
-      requestClose(); // Automatically close the modal on success
-    } catch (error: any) {
-      Swal.fire("Error", "Could not save draft.", "error");
+      requestClose();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      Swal.fire(
+        "Error",
+        err?.response?.data?.message ?? "Could not save draft.",
+        "error",
+      );
     } finally {
       setSaving(false);
     }
@@ -885,6 +928,8 @@ export default function CreatePosScreen({
                         onChange={(e) => {
                           setCustomer(e.target.value);
                           setCustomerDropdownOpen(true);
+                          // Typing again unlocks phone (no longer a picked CRM customer)
+                          if (customerId) setCustomerId(null);
                           if (!e.target.value) {
                             setPhone("");
                             setMembership("none");
@@ -999,26 +1044,27 @@ export default function CreatePosScreen({
                         type="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
+                        disabled={Boolean(customerId)}
                         placeholder="Phone"
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </div>
                   </div>
 
                   <div className="col-span-1 min-w-0 lg:col-span-2">
-                    <label className="mb-1.5 block truncate text-xs font-semibold text-slate-600">
+                    <label className="mb-1 block truncate text-[10px] font-semibold text-slate-600 sm:mb-1.5 sm:text-xs">
                       Invoice Date
                     </label>
                     <input
                       type="date"
                       value={invoiceDate}
                       onChange={(e) => setInvoiceDate(e.target.value)}
-                      className="box-border h-11 w-full min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-2 text-xs outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 sm:px-3 sm:text-sm [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-datetime-edit]:min-w-0"
+                      className="box-border h-9 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-1 text-[11px] outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 sm:h-11 sm:rounded-xl sm:px-3 sm:text-sm [&::-webkit-calendar-picker-indicator]:scale-75 sm:[&::-webkit-calendar-picker-indicator]:scale-100 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                     />
                   </div>
 
                   <div className="col-span-1 min-w-0 lg:col-span-3">
-                    <label className="mb-1.5 block truncate text-xs font-semibold text-slate-600">
+                    <label className="mb-1 block truncate text-[10px] font-semibold text-slate-600 sm:mb-1.5 sm:text-xs">
                       Due Date
                     </label>
                     <input
@@ -1026,7 +1072,7 @@ export default function CreatePosScreen({
                       value={dueDate}
                       min={invoiceDate || undefined}
                       onChange={(e) => setDueDate(e.target.value)}
-                      className="box-border h-11 w-full min-w-0 max-w-full rounded-xl border border-slate-200 bg-white px-2 text-xs outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 sm:px-3 sm:text-sm [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-datetime-edit]:min-w-0"
+                      className="box-border h-9 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-1 text-[11px] outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 sm:h-11 sm:rounded-xl sm:px-3 sm:text-sm [&::-webkit-calendar-picker-indicator]:scale-75 sm:[&::-webkit-calendar-picker-indicator]:scale-100 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                     />
                   </div>
                 </div>
@@ -1573,7 +1619,7 @@ export default function CreatePosScreen({
           <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-slate-100 bg-white px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:gap-3 sm:px-6">
             <button
               type="button"
-              onClick={handleSaveDraft}
+              onClick={() => void handleSaveDraft()}
               disabled={items.length === 0 || saving}
               className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 sm:min-w-[9rem]"
             >
@@ -1637,6 +1683,15 @@ export default function CreatePosScreen({
             onConfirmPayment={async (payment) => {
               setOpenCheckout(false);
               await handleSave(payment);
+            }}
+          />
+
+          <StaffVerifyModal
+            open={openDraftPin}
+            onClose={() => setOpenDraftPin(false)}
+            onVerified={({ staff: verified, verifiedAt }) => {
+              setOpenDraftPin(false);
+              void handleSaveDraft({ staff: verified, verifiedAt });
             }}
           />
         </div>

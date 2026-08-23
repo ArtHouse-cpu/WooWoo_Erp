@@ -33,6 +33,7 @@ import { roundPayable, roundToPaise } from "../../../utils/paymentRoundOff";
 import StaffVerifyModal from "./StaffVerifyModal";
 import type { VerifiedStaff } from "@/services/apiClient";
 import { resolveWalletBalance } from "@/utils/resolveWalletBalance";
+import { normalizeLineType } from "@/features/sales/utils/itemClassification";
 
 type CheckoutItem = {
   id?: number;
@@ -43,10 +44,41 @@ type CheckoutItem = {
   cashback?: number;
   image?: string;
   category?: string;
+  lineCategory?: string;
+  sourceType?: string;
   isCsp?: boolean;
   productDiscountAmount?: number;
   membershipDiscountAmount?: number;
 };
+
+/** Map cart line types → coupon applicableOn scopes (store = products). */
+function couponScopesFromCheckoutItems(
+  items: CheckoutItem[],
+  forcedContext?: string | null,
+): string[] {
+  if (forcedContext) {
+    const t = String(forcedContext).trim().toLowerCase();
+    if (t === "membership") return ["membership"];
+    if (t === "food") return ["food"];
+    if (t === "space") return ["space"];
+    if (t === "service" || t === "services") return ["service"];
+    if (t === "store" || t === "product" || t === "products") return ["store"];
+    if (t === "all") return ["store", "space", "service", "food", "membership"];
+  }
+  const scopes = new Set<string>();
+  for (const item of items) {
+    const raw =
+      item.lineCategory || item.sourceType || item.category || "product";
+    const line = normalizeLineType(raw);
+    if (line === "food") scopes.add("food");
+    else if (line === "space") scopes.add("space");
+    else if (line === "service") scopes.add("service");
+    else if (String(raw).toLowerCase().includes("membership")) {
+      scopes.add("membership");
+    } else scopes.add("store");
+  }
+  return scopes.size ? [...scopes] : ["store"];
+}
 
 type Props = {
   open: boolean;
@@ -76,6 +108,17 @@ type Props = {
    * Full / Partial / Due toggle is always shown; Due = full amount outstanding.
    */
   checkoutContext?: "sale" | "purchase" | "expense";
+  /**
+   * Force coupon section when cart items don't carry category
+   * (e.g. membership checkout → "membership", food bill → "food").
+   */
+  couponApplicableContext?:
+    | "store"
+    | "space"
+    | "service"
+    | "food"
+    | "membership"
+    | "all";
   onConfirmPayment?: (payload: {
     mode: string;
     paymentStatus: "full" | "partial";
@@ -331,6 +374,7 @@ export default function CheckoutModal({
   extraCharges = [],
   membershipPlans = DEFAULT_MEMBERSHIP_PLANS,
   checkoutContext = "sale",
+  couponApplicableContext,
   onConfirmPayment,
 }: Props) {
   const isPurchaseCheckout = checkoutContext === "purchase";
@@ -714,6 +758,16 @@ export default function CheckoutModal({
           code,
           orderAmount: orderAmountForCoupon,
           customerPhone: customerSearch.trim() || undefined,
+          applicableContexts: couponScopesFromCheckoutItems(
+            items,
+            couponApplicableContext,
+          ),
+          items: items.map((it) => ({
+            name: it.name,
+            category: it.category,
+            lineCategory: it.lineCategory,
+            sourceType: it.sourceType,
+          })),
         });
         const discount = Number(response?.discountAmount ?? 0);
         if (discount <= 0) {

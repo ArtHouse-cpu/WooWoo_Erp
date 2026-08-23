@@ -1123,6 +1123,8 @@ export default function FoodBill() {
           code,
           orderAmount: orderAmountForCoupon,
           customerPhone: selectedCustomer.phone || undefined,
+          applicableContext: "food",
+          applicableContexts: ["food"],
         });
         const discount = Number(response?.discountAmount ?? 0);
         if (discount <= 0) {

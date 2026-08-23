@@ -318,9 +318,9 @@ const ExpenseScreen = () => {
   const [rows, setRows] = useState<ExpenseRow[]>([]);
   const [activeTab, setActiveTab] = useState<ExpenseStatus | "All">("All");
   const [search, setSearch] = useState("");
-  const [datePreset, setDatePreset] = useState<DatePreset>("week");
-  const [fromDate, setFromDate] = useState(() => rangeForPreset("week").from);
-  const [toDate, setToDate] = useState(() => rangeForPreset("week").to);
+  const [datePreset, setDatePreset] = useState<DatePreset>("month");
+  const [fromDate, setFromDate] = useState(() => rangeForPreset("month").from);
+  const [toDate, setToDate] = useState(() => rangeForPreset("month").to);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ExpenseModalMode>("create");
   const [activeExpense, setActiveExpense] = useState<ExpenseRow | null>(null);

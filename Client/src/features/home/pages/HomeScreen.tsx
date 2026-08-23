@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   Briefcase,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -13,6 +14,7 @@ import {
   Package,
   Search,
   ShoppingCart,
+  Ticket,
   TrendingUp,
   UserPlus,
   Users,
@@ -22,18 +24,18 @@ import {
 import {
   customerPayloadToFormData,
   handleCreateCustomer,
-  handleGetAllSubscriptions,
-  handleGetCspEnrollments,
   handleGetCustomers,
+  handleGetDashboardSummary,
   handleGetFoods,
   handleGetInvoices,
   handleGetMemberships,
   handleGetProducts,
-  handleGetPurchases,
   handleGetServices,
   handleGetSpaces,
-  handleGetVendors,
+  handleGetSubscriptions,
   type CustomerPayload,
+  type DashboardPeriod,
+  type DashboardSummaryData,
   type MembershipPlanPayload,
 } from "@/services/apiClient";
 import { usePermission } from "@/hooks/usePermission";
@@ -52,6 +54,7 @@ type TabKey =
   | "bills"
   | "customers"
   | "memberships"
+  | "subscriptions"
   | "products"
   | "spaces"
   | "services"
@@ -89,6 +92,7 @@ type GenericRow = {
   meta: string;
   amount?: string;
   badge?: string;
+  createdAt?: Date | null;
 };
 
 const PAGE_SIZE = 5;
@@ -114,28 +118,55 @@ const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: "bills", label: "Bills", icon: Monitor },
   { key: "customers", label: "Customers", icon: Users },
   { key: "memberships", label: "Memberships", icon: Crown },
+  { key: "subscriptions", label: "Subscriptions", icon: Ticket },
   { key: "products", label: "Products", icon: Package },
   { key: "spaces", label: "Spaces", icon: MapPin },
   { key: "services", label: "Services", icon: Briefcase },
   { key: "food", label: "Food", icon: Utensils },
 ];
 
-const DATE_OPTIONS: { value: DateFilter; label: string }[] = [
+const KPI_PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
   { value: "today", label: "Today" },
-  { value: "week", label: "This Week" },
-  { value: "month", label: "This Month" },
-  { value: "year", label: "This Year" },
-  { value: "all", label: "All Time" },
+  { value: "this_month", label: "This Month" },
+  { value: "last_month", label: "Last Month" },
+  { value: "lifetime", label: "Lifetime" },
 ];
 
-const MEMBERSHIP_ABBREV: Record<string, string> = {
-  gold: "GM",
-  general: "GM",
-  silver: "SM",
-  premium: "PM",
-  junior: "JM",
-  platinum: "PL",
-};
+/** Local YYYY-MM-DD for dashboard fromDate/toDate (avoids UTC day shift). */
+function kpiPeriodBounds(period: DashboardPeriod): {
+  fromDate?: string;
+  toDate?: string;
+} {
+  if (period === "lifetime") return {};
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const toYmd = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+  const to = toYmd(today);
+  if (period === "today") return { fromDate: to, toDate: to };
+  if (period === "this_month") {
+    return {
+      fromDate: toYmd(new Date(today.getFullYear(), today.getMonth(), 1)),
+      toDate: to,
+    };
+  }
+  const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const last = new Date(today.getFullYear(), today.getMonth(), 0);
+  return { fromDate: toYmd(first), toDate: toYmd(last) };
+}
+
+const MEMBERSHIP_BREAKDOWN_COLORS = [
+  "text-blue-600",
+  "text-emerald-600",
+  "text-violet-600",
+  "text-rose-600",
+  "text-amber-600",
+  "text-indigo-600",
+];
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -210,52 +241,6 @@ function inDateRange(date: Date | null, filter: DateFilter) {
   return date >= start;
 }
 
-/** Local YYYY-MM-DD — same day basis as SubscriptionScreen date filters. */
-function toLocalYmd(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function periodBoundsYmd(filter: DateFilter): { from: string; to: string } | null {
-  if (filter === "all") return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const to = toLocalYmd(today);
-  if (filter === "today") return { from: to, to };
-  if (filter === "week") {
-    const start = new Date(today);
-    const day = start.getDay() || 7;
-    start.setDate(start.getDate() - (day - 1));
-    return { from: toLocalYmd(start), to };
-  }
-  if (filter === "month") {
-    return {
-      from: toLocalYmd(new Date(today.getFullYear(), today.getMonth(), 1)),
-      to,
-    };
-  }
-  return { from: toLocalYmd(new Date(today.getFullYear(), 0, 1)), to };
-}
-
-/** Same date fields SubscriptionScreen uses for From/To filtering. */
-function subscriptionSaleYmd(sub: Record<string, unknown>): string | null {
-  for (const key of ["invoiceDate", "startDate", "createdAt", "updatedAt"] as const) {
-    const parsed = parseDate(sub[key]);
-    if (parsed) return toLocalYmd(parsed);
-  }
-  return null;
-}
-
-/** Same Amount column as SubscriptionScreen: grandTotal (received from customer). */
-function subscriptionReceivedAmount(sub: Record<string, unknown>): number {
-  const status = String(sub.status ?? "").toLowerCase();
-  if (status === "cancelled" || status === "draft") return 0;
-  const n = Number(sub.grandTotal ?? sub.amount ?? 0);
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
 function toStatus(raw: unknown, dueAmount: number): RecentBill["status"] {
   const v = String(raw ?? "").toLowerCase();
   if (v === "cancelled") return "Cancelled";
@@ -312,44 +297,6 @@ function lineAmount(rec: Record<string, unknown>): number {
   );
 }
 
-/** Split a bill's net amount across Store / Space / Services / Food / Membership. */
-function allocateBillRevenue(
-  bill: RecentBill,
-): Record<BillCategory, number> {
-  const buckets = emptyRevenueBuckets();
-  const amount = Math.max(0, Number(bill.amount) || 0);
-  if (!(amount > 0) || bill.status === "Cancelled") return buckets;
-
-  const items = Array.isArray(bill.raw?.items) ? bill.raw.items : [];
-  if (items.length === 0) {
-    buckets[bill.category || "Store"] = amount;
-    return buckets;
-  }
-
-  const lineBuckets = emptyRevenueBuckets();
-  let lineSum = 0;
-  for (const item of items) {
-    const rec = item as Record<string, unknown>;
-    const amt = lineAmount(rec);
-    if (!(amt > 0)) continue;
-    const cat = categoryFromLine(rec);
-    lineBuckets[cat] += amt;
-    lineSum += amt;
-  }
-
-  if (!(lineSum > 0)) {
-    buckets[bill.category || "Store"] = amount;
-    return buckets;
-  }
-
-  // Scale line totals to net bill amount (membership discounts / round-offs)
-  const scale = amount / lineSum;
-  (Object.keys(lineBuckets) as BillCategory[]).forEach((key) => {
-    buckets[key] = Math.round(lineBuckets[key] * scale * 100) / 100;
-  });
-  return buckets;
-}
-
 function billCategoryFromItems(items: unknown): BillCategory {
   if (!Array.isArray(items) || items.length === 0) return "Store";
   const totals = emptyRevenueBuckets();
@@ -360,20 +307,6 @@ function billCategoryFromItems(items: unknown): BillCategory {
   return (Object.entries(totals) as [BillCategory, number][]).sort(
     (a, b) => b[1] - a[1],
   )[0][0];
-}
-
-function membershipAbbrev(label: string) {
-  const raw = label.trim();
-  if (!raw) return "";
-  const lower = raw.toLowerCase();
-  for (const [key, code] of Object.entries(MEMBERSHIP_ABBREV)) {
-    if (lower.includes(key)) return code;
-  }
-  const words = raw.split(/\s+/).filter(Boolean);
-  if (words.length >= 2) {
-    return `${words[0][0]}${words[1][0]}`.toUpperCase();
-  }
-  return raw.slice(0, 2).toUpperCase();
 }
 
 function statusStyles(status: RecentBill["status"]) {
@@ -402,7 +335,14 @@ export default function HomeScreen() {
 
   const [tab, setTab] = useState<TabKey>("bills");
   const [search, setSearch] = useState("");
-  const [dateFilter, setDateFilter] = useState<DateFilter>("month");
+  /** Bills / customers table filter (independent of KPI dropdown). */
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  /** KPI cards period — drives /dashboard/summary */
+  const [kpiPeriod, setKpiPeriod] = useState<DashboardPeriod>("today");
+  const [kpiOpen, setKpiOpen] = useState(false);
+  const [dashboardSummary, setDashboardSummary] =
+    useState<DashboardSummaryData | null>(null);
+  const [cardsLoading, setCardsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | "Paid" | "Pending">(
     "all",
   );
@@ -410,18 +350,13 @@ export default function HomeScreen() {
   const [page, setPage] = useState(1);
   const [menuId, setMenuId] = useState<string | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
+  const kpiRef = useRef<HTMLDivElement>(null);
 
   const [bills, setBills] = useState<RecentBill[]>([]);
-  const [membershipSales, setMembershipSales] = useState<
-    { id: string; amount: number; ymd: string | null }[]
-  >([]);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [membershipPlans, setMembershipPlans] = useState<
     MembershipPlanPayload[]
   >([]);
-  const [vendorCount, setVendorCount] = useState(0);
-  const [cspCount, setCspCount] = useState(0);
-  const [purchaseMonthTotal, setPurchaseMonthTotal] = useState(0);
   const [kpisLoading, setKpisLoading] = useState(true);
   const [billsLoading, setBillsLoading] = useState(true);
 
@@ -429,6 +364,7 @@ export default function HomeScreen() {
   const [spaces, setSpaces] = useState<GenericRow[]>([]);
   const [services, setServices] = useState<GenericRow[]>([]);
   const [foods, setFoods] = useState<GenericRow[]>([]);
+  const [subscriptions, setSubscriptions] = useState<GenericRow[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
 
   const welcomeName =
@@ -441,6 +377,9 @@ export default function HomeScreen() {
       const target = event.target as Node;
       if (filterRef.current && !filterRef.current.contains(target)) {
         setFilterOpen(false);
+      }
+      if (kpiRef.current && !kpiRef.current.contains(target)) {
+        setKpiOpen(false);
       }
       setMenuId(null);
     };
@@ -461,26 +400,16 @@ export default function HomeScreen() {
         const [
           invoiceRes,
           customerRes,
-          vendorRes,
-          cspRes,
-          purchaseRes,
           membershipRes,
-          subscriptionRes,
         ] = await Promise.allSettled([
           // Home KPIs: load sales even if menu path checks are narrow
           handleGetInvoices("", undefined, 2000),
           canPath("/customers")
             ? handleGetCustomers("", undefined, 2000, 1)
             : Promise.resolve(null),
-          canPath("/vendors") ? handleGetVendors() : Promise.resolve(null),
-          canPath("/csp")
-            ? handleGetCspEnrollments({ status: "active" })
-            : Promise.resolve(null),
-          canPath("/purchase") ? handleGetPurchases() : Promise.resolve(null),
           canPath("/membership") || canPath("/manage-plans")
             ? handleGetMemberships({ status: "Active" })
             : Promise.resolve(null),
-          handleGetAllSubscriptions(""),
         ]);
 
         if (!alive) return;
@@ -529,28 +458,6 @@ export default function HomeScreen() {
         setBills(mappedBills);
         setBillsLoading(false);
 
-        const subscriptionList =
-          subscriptionRes.status === "fulfilled" &&
-          Array.isArray(
-            (subscriptionRes.value as { subscriptions?: unknown[] })
-              ?.subscriptions,
-          )
-            ? (
-                subscriptionRes.value as {
-                  subscriptions: Record<string, unknown>[];
-                }
-              ).subscriptions
-            : [];
-
-        setMembershipSales(
-          subscriptionList.map((sub, i) => ({
-            id: String(sub?._id ?? sub?.subscriptionCode ?? i),
-            // Exact same figure as Subscription table "Amount" (money received)
-            amount: subscriptionReceivedAmount(sub),
-            ymd: subscriptionSaleYmd(sub),
-          })),
-        );
-
         const plans =
           membershipRes.status === "fulfilled" &&
           Array.isArray(membershipRes.value?.memberships)
@@ -578,46 +485,9 @@ export default function HomeScreen() {
             createdAt: parseDate(c?.createdAt),
           })),
         );
-
-        const vendors =
-          vendorRes.status === "fulfilled"
-            ? Array.isArray(vendorRes.value?.vendors)
-              ? vendorRes.value.vendors
-              : Array.isArray(vendorRes.value)
-                ? vendorRes.value
-                : []
-            : [];
-        setVendorCount(vendors.length);
-
-        const csps =
-          cspRes.status === "fulfilled"
-            ? Array.isArray(cspRes.value?.enrollments)
-              ? cspRes.value.enrollments
-              : Array.isArray(cspRes.value?.csps)
-                ? cspRes.value.csps
-                : []
-            : [];
-        setCspCount(csps.length);
-
-        const purchases =
-          purchaseRes.status === "fulfilled" &&
-          Array.isArray(purchaseRes.value?.purchases)
-            ? purchaseRes.value.purchases
-            : [];
-        const monthPurchases = purchases.reduce(
-          (sum: number, row: Record<string, unknown>) => {
-            const when =
-              parseDate(row?.invoiceDate) || parseDate(row?.createdAt);
-            if (!inDateRange(when, "month")) return sum;
-            return sum + Number(row?.grandTotal ?? row?.amount ?? 0);
-          },
-          0,
-        );
-        setPurchaseMonthTotal(monthPurchases);
       } catch {
         if (alive) {
           setBills([]);
-          setMembershipSales([]);
           setCustomers([]);
         }
       } finally {
@@ -634,11 +504,105 @@ export default function HomeScreen() {
   }, [canPath]);
 
   useEffect(() => {
-    if (tab === "bills" || tab === "customers" || tab === "memberships") return;
+    let alive = true;
+    const controller = new AbortController();
+    const loadCards = async () => {
+      setCardsLoading(true);
+      try {
+        const bounds = kpiPeriodBounds(kpiPeriod);
+        const response = await handleGetDashboardSummary(
+          {
+            period: kpiPeriod,
+            ...bounds,
+          },
+          controller.signal,
+        );
+        if (!alive) return;
+        if (response?.success && response.data) {
+          setDashboardSummary(response.data);
+        } else {
+          throw new Error(response?.message || "Failed to load dashboard");
+        }
+      } catch (error: unknown) {
+        if (!alive) return;
+        const err = error as {
+          name?: string;
+          code?: string;
+          response?: { data?: { message?: string } };
+        };
+        if (
+          err?.name === "CanceledError" ||
+          err?.name === "AbortError" ||
+          err?.code === "ERR_CANCELED"
+        ) {
+          return;
+        }
+        await Swal.fire({
+          icon: "error",
+          title: "Dashboard update failed",
+          text:
+            err?.response?.data?.message ||
+            "Could not refresh dashboard cards. Previous values are kept.",
+          timer: 2800,
+          showConfirmButton: false,
+        });
+      } finally {
+        if (alive) setCardsLoading(false);
+      }
+    };
+    void loadCards();
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [kpiPeriod]);
+
+  useEffect(() => {
+    if (
+      tab === "bills" ||
+      tab === "customers" ||
+      tab === "memberships"
+    ) {
+      return;
+    }
     let alive = true;
     const load = async () => {
       setTabLoading(true);
       try {
+        if (tab === "subscriptions" && subscriptions.length === 0) {
+          const res = await handleGetSubscriptions("", 100);
+          if (!alive) return;
+          const list = Array.isArray(res?.subscriptions)
+            ? res.subscriptions
+            : [];
+          setSubscriptions(
+            list.map((s: Record<string, unknown>, i: number) => {
+              const plan = String(
+                s?.membershipType ||
+                  s?.membershipPlan ||
+                  s?.planId ||
+                  "Membership",
+              );
+              const code = String(
+                s?.subscriptionCode ??
+                  `SUB-${s?.subscriptionNumber ?? i + 1}`,
+              );
+              return {
+                id: String(s?._id ?? i),
+                title: String(s?.customerName || s?.name || "Customer"),
+                subtitle: `${plan} · ${code}`,
+                meta: String(s?.status || "active"),
+                amount: formatMoney(
+                  Number(s?.grandTotal ?? s?.amount ?? 0),
+                ),
+                createdAt:
+                  parseDate(s?.invoiceDate) ||
+                  parseDate(s?.startDate) ||
+                  parseDate(s?.createdAt),
+              };
+            }),
+          );
+        }
         if (tab === "products" && products.length === 0) {
           const res = await handleGetProducts({ type: "product", limit: 50 });
           if (!alive) return;
@@ -715,70 +679,32 @@ export default function HomeScreen() {
     return () => {
       alive = false;
     };
-  }, [tab, products.length, spaces.length, services.length, foods.length]);
+  }, [
+    tab,
+    products.length,
+    spaces.length,
+    services.length,
+    foods.length,
+    subscriptions.length,
+  ]);
 
-  const periodLabel =
-    DATE_OPTIONS.find((o) => o.value === dateFilter)?.label ?? "This Month";
+  const kpiPeriodLabel =
+    KPI_PERIOD_OPTIONS.find((o) => o.value === kpiPeriod)?.label ?? "Today";
 
-  const periodBills = useMemo(
-    () => bills.filter((b) => inDateRange(b.createdAt, dateFilter)),
-    [bills, dateFilter],
+  const revenue = dashboardSummary?.revenue;
+  const membershipSummary = dashboardSummary?.membership;
+  const networkSummary = dashboardSummary?.network;
+  const purchaseExpense = dashboardSummary?.purchaseExpense;
+
+  const membershipBreakdown = useMemo(
+    () =>
+      (membershipSummary?.breakdown ?? []).map((row, i) => ({
+        label: row.code,
+        value: formatCount(row.count),
+        colorClass: MEMBERSHIP_BREAKDOWN_COLORS[i % MEMBERSHIP_BREAKDOWN_COLORS.length],
+      })),
+    [membershipSummary],
   );
-
-  const revenueBreakdown = useMemo(() => {
-    const buckets = emptyRevenueBuckets();
-    for (const bill of periodBills) {
-      const allocated = allocateBillRevenue(bill);
-      (Object.keys(allocated) as BillCategory[]).forEach((key) => {
-        buckets[key] += allocated[key];
-      });
-    }
-
-    // Membership cash received = Subscription table Amount for this period only
-    // (ignore any POS line tagged Membership to avoid double-count)
-    buckets.Membership = 0;
-    const bounds = periodBoundsYmd(dateFilter);
-    for (const sale of membershipSales) {
-      if (!(sale.amount > 0)) continue;
-      if (bounds) {
-        if (!sale.ymd) continue;
-        if (sale.ymd < bounds.from || sale.ymd > bounds.to) continue;
-      }
-      buckets.Membership += sale.amount;
-    }
-    return buckets;
-  }, [periodBills, membershipSales, dateFilter]);
-
-  const revenueTotal = Object.values(revenueBreakdown).reduce(
-    (a, b) => a + b,
-    0,
-  );
-
-  const membershipBreakdown = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const c of customers) {
-      if (!c.membership || c.membership === "Visitor") continue;
-      const code = membershipAbbrev(c.membership);
-      counts.set(code, (counts.get(code) || 0) + 1);
-    }
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-      .map(([label, value], i) => ({
-        label,
-        value: formatCount(value),
-        colorClass: [
-          "text-blue-600",
-          "text-emerald-600",
-          "text-violet-600",
-          "text-rose-600",
-        ][i],
-      }));
-  }, [customers]);
-
-  const membershipTotal = customers.filter(
-    (c) => c.membership && c.membership !== "Visitor",
-  ).length;
 
   const filteredBills = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -829,26 +755,32 @@ export default function HomeScreen() {
   const genericRows =
     tab === "memberships"
       ? membershipRows
-      : tab === "products"
-        ? products
-        : tab === "spaces"
-          ? spaces
-          : tab === "services"
-            ? services
-            : tab === "food"
-              ? foods
-              : [];
+      : tab === "subscriptions"
+        ? subscriptions
+        : tab === "products"
+          ? products
+          : tab === "spaces"
+            ? spaces
+            : tab === "services"
+              ? services
+              : tab === "food"
+                ? foods
+                : [];
 
   const filteredGeneric = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return genericRows;
-    return genericRows.filter(
-      (row) =>
+    return genericRows.filter((row) => {
+      if (row.createdAt !== undefined && !inDateRange(row.createdAt ?? null, dateFilter)) {
+        return false;
+      }
+      if (!term) return true;
+      return (
         row.title.toLowerCase().includes(term) ||
         row.subtitle.toLowerCase().includes(term) ||
-        row.meta.toLowerCase().includes(term),
-    );
-  }, [genericRows, search]);
+        row.meta.toLowerCase().includes(term)
+      );
+    });
+  }, [genericRows, search, dateFilter]);
 
   const tableTotal =
     tab === "bills"
@@ -868,7 +800,9 @@ export default function HomeScreen() {
       ? "Search by invoice no., customer name or phone..."
       : tab === "customers"
         ? "Search customers by name or phone..."
-        : `Search ${tab}...`;
+        : tab === "subscriptions"
+          ? "Search subscriptions by customer, plan or status..."
+          : `Search ${tab}...`;
 
   const handleCreateCustomerSubmit = async (args: {
     payload: CustomerPayload;
@@ -916,6 +850,7 @@ export default function HomeScreen() {
     bills: canPath("/pos") ? "/pos" : "/invoices",
     customers: "/customers",
     memberships: "/manage-plans",
+    subscriptions: "/subscriptions",
     products: "/products",
     spaces: "/spaces",
     services: "/services",
@@ -934,29 +869,51 @@ export default function HomeScreen() {
               Welcome back, {welcomeName}!
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+          <div className="relative shrink-0" ref={kpiRef}>
             <button
               type="button"
-              onClick={() => setDateFilter("today")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm ${
-                dateFilter === "today"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-600 hover:bg-gray-50"
-              }`}
+              onClick={() => setKpiOpen((open) => !open)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 sm:h-10 sm:text-sm"
+              aria-haspopup="listbox"
+              aria-expanded={kpiOpen}
             >
-              Today
+              <span className="max-w-[7.5rem] truncate sm:max-w-none">
+                {kpiPeriodLabel}
+              </span>
+              <ChevronDown
+                size={14}
+                className={`shrink-0 text-gray-400 transition ${kpiOpen ? "rotate-180" : ""}`}
+              />
             </button>
-            <button
-              type="button"
-              onClick={() => setDateFilter("month")}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm ${
-                dateFilter === "month"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              This Month
-            </button>
+            {kpiOpen ? (
+              <div
+                role="listbox"
+                className="absolute right-0 z-30 mt-1.5 min-w-[10.5rem] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+              >
+                {KPI_PERIOD_OPTIONS.map((opt) => {
+                  const active = opt.value === kpiPeriod;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      onClick={() => {
+                        setKpiPeriod(opt.value);
+                        setKpiOpen(false);
+                      }}
+                      className={`flex w-full items-center px-3 py-2 text-left text-sm transition ${
+                        active
+                          ? "bg-blue-50 font-semibold text-blue-700"
+                          : "text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="hidden flex-wrap items-center gap-2 sm:flex">
@@ -998,89 +955,89 @@ export default function HomeScreen() {
       <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
         <RevenueCard
           title="Revenue"
-          period={periodLabel}
-          value={formatMoney(revenueTotal)}
+          period={kpiPeriodLabel}
+          value={formatMoney(revenue?.total ?? 0)}
           icon={TrendingUp}
           iconWrapClass="bg-blue-600"
-          loading={kpisLoading}
+          loading={cardsLoading}
           breakdown={[
             {
               label: "Store",
-              value: formatCompact(revenueBreakdown.Store),
+              value: formatCompact(revenue?.store ?? 0),
               colorClass: "text-blue-600",
             },
             {
               label: "Space",
-              value: formatCompact(revenueBreakdown.Space),
+              value: formatCompact(revenue?.space ?? 0),
               colorClass: "text-emerald-600",
             },
             {
               label: "Services",
-              value: formatCompact(revenueBreakdown.Services),
+              value: formatCompact(revenue?.services ?? 0),
               colorClass: "text-violet-600",
             },
             {
               label: "Food",
-              value: formatCompact(revenueBreakdown.Food),
+              value: formatCompact(revenue?.food ?? 0),
               colorClass: "text-rose-600",
             },
             {
               label: "Membership",
-              value: formatMoney(revenueBreakdown.Membership),
+              value: formatMoney(revenue?.membership ?? 0),
               colorClass: "text-indigo-600",
             },
           ]}
         />
         <RevenueCard
           title="Membership"
-          period="Total"
-          value={formatCount(membershipTotal)}
+          period={kpiPeriodLabel}
+          value={formatCount(membershipSummary?.total ?? 0)}
           icon={Crown}
           iconWrapClass="bg-violet-600"
-          loading={kpisLoading}
+          loading={cardsLoading}
           breakdown={membershipBreakdown}
         />
         <RevenueCard
           title="Network"
-          period="Total"
-          value={formatCount(customers.length + vendorCount + cspCount)}
+          period={kpiPeriodLabel}
+          value={formatCount(networkSummary?.total ?? 0)}
           icon={UserPlus}
           iconWrapClass="bg-emerald-600"
-          loading={kpisLoading}
+          loading={cardsLoading}
           breakdown={[
             {
               label: "Customers",
-              value: formatCount(customers.length),
+              value: formatCount(networkSummary?.customers ?? 0),
               colorClass: "text-emerald-600",
             },
             {
               label: "Vendors",
-              value: formatCount(vendorCount),
+              value: formatCount(networkSummary?.vendors ?? 0),
               colorClass: "text-blue-600",
             },
             {
               label: "CSP",
-              value: formatCount(cspCount),
+              value: formatCount(networkSummary?.csp ?? 0),
               colorClass: "text-rose-600",
             },
           ]}
         />
         <RevenueCard
           title="Purchase & Expense"
-          period="This Month"
-          value={formatMoney(purchaseMonthTotal)}
+          period={kpiPeriodLabel}
+          value={formatMoney(purchaseExpense?.total ?? 0)}
           icon={ShoppingCart}
           iconWrapClass="bg-orange-500"
-          loading={kpisLoading}
+          loading={cardsLoading}
           breakdown={[
             {
               label: "Purchase",
-              value: formatMoney(purchaseMonthTotal),
+              value: formatMoney(purchaseExpense?.purchase ?? 0),
               colorClass: "text-blue-600",
             },
             {
-              label: "Expenses",
-              value: formatMoney(0),
+              label: "Total Expenses",
+              value: formatMoney(purchaseExpense?.expense ?? 0),
               colorClass: "text-orange-600",
             },
           ]}
@@ -1169,7 +1126,9 @@ export default function HomeScreen() {
             <p className="text-xs text-gray-500">
               {tab === "bills"
                 ? "Manage and view all your transaction bills."
-                : `Browse ${tab} from this dashboard.`}
+                : tab === "subscriptions"
+                  ? "Recent membership subscriptions from this dashboard."
+                  : `Browse ${TABS.find((t) => t.key === tab)?.label ?? tab} from this dashboard.`}
             </p>
           </div>
           <button
@@ -1372,8 +1331,12 @@ export default function HomeScreen() {
             <table className="min-w-[640px] w-full text-sm">
               <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                 <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Category</th>
+                  <th className="px-4 py-3">
+                    {tab === "subscriptions" ? "Customer" : "Name"}
+                  </th>
+                  <th className="px-4 py-3">
+                    {tab === "subscriptions" ? "Plan" : "Category"}
+                  </th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Amount</th>
                 </tr>

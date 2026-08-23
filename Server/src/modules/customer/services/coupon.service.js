@@ -22,6 +22,7 @@ export const validateMembershipCoupon = async ({
     code,
     orderAmount,
     customerPhone,
+    applicableContext: 'membership',
   });
 
   if (!result.ok) {

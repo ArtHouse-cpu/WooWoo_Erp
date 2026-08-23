@@ -391,6 +391,9 @@ const customerSchema = new mongoose.Schema(
 // =========================
 customerSchema.index({ name: 1 });
 customerSchema.index({ mobile: 1 }, { unique: true });
+// List endpoint sorts by newest first — compound matches sort + stable tiebreak
+customerSchema.index({ createdAt: -1, _id: -1 });
+customerSchema.index({ isDeleted: 1, createdAt: -1 });
 // Only enforce uniqueness when a real portal customerId is present
 customerSchema.index(
   { customerId: 1 },

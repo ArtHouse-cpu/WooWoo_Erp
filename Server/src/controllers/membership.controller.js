@@ -177,25 +177,89 @@ export const createMembership = async (req, res) => {
 
 export const getMemberships = async (req, res) => {
   try {
-    const { search = '', planType, status } = req.query;
-    const query = {};
+    const {
+      search = '',
+      planType,
+      status,
+      fromDate,
+      toDate,
+    } = req.query;
 
-    if (planType && String(planType).trim() && String(planType) !== 'All') {
+    const query = {};
+    const dateFilter = {};
+
+    const limit = Math.min(
+      Math.max(Number(req.query.limit) || 2000, 1),
+      5000
+    );
+
+    // Date filter
+    if (fromDate) {
+      const from = new Date(`${fromDate}T00:00:00.000`);
+
+      if (!Number.isNaN(from.getTime())) {
+        dateFilter.$gte = from;
+      }
+    }
+
+    if (toDate) {
+      const to = new Date(`${toDate}T23:59:59.999`);
+
+      if (!Number.isNaN(to.getTime())) {
+        dateFilter.$lte = to;
+      }
+    }
+
+    if (Object.keys(dateFilter).length) {
+      query.createdAt = dateFilter;
+    }
+
+    // Plan type filter
+    if (
+      planType &&
+      String(planType).trim() &&
+      String(planType) !== 'All'
+    ) {
       query.planType = String(planType).trim();
     }
-    if (status && String(status).trim() && String(status) !== 'All') {
+
+    // Status filter
+    if (
+      status &&
+      String(status).trim() &&
+      String(status) !== 'All'
+    ) {
       query.status = String(status).trim();
     }
 
+    // Search filter
     const s = String(search).trim();
+
     if (s) {
       query.$or = [
-        { planId: { $regex: s, $options: 'i' } },
-        { displayName: { $regex: s, $options: 'i' } },
+        {
+          planId: {
+            $regex: s,
+            $options: 'i',
+          },
+        },
+        {
+          displayName: {
+            $regex: s,
+            $options: 'i',
+          },
+        },
       ];
     }
 
-    const memberships = await Membership.find(query).sort({ priority: 1, createdAt: -1 });
+    const memberships = await Membership.find(query)
+      .sort({
+        priority: 1,
+        createdAt: -1,
+      })
+      .limit(limit)
+      .lean();
+
     return res.status(200).json({
       success: true,
       message: 'Memberships fetched successfully.',
@@ -203,7 +267,8 @@ export const getMemberships = async (req, res) => {
     });
   } catch (error) {
     console.error('getMemberships error:', error);
-    return res.status(500).json({ 
+
+    return res.status(500).json({
       success: false,
       message: 'Failed to fetch memberships.',
     });

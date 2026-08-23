@@ -384,6 +384,35 @@ const createCustomer = async (req, res) => {
 const CUSTOMER_LIST_PROJECTION =
   'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId priority walletAmount closingBalance cashbackBalance affiliateBalance withdrawable nonWithdrawable referralCode referredBy status createdAt updatedAt createdBy';
 
+/** Build list filter — avoid broad case-insensitive $or scans when possible. */
+const buildCustomerListQuery = searchRaw => {
+  const query = {isDeleted: {$ne: true}};
+  const search = String(searchRaw ?? '').trim();
+  if (!search) return query;
+
+  const digits = search.replace(/\D/g, '');
+  const compact = search.replace(/[\s+\-()]/g, '');
+  // Phone-ish input: use prefix on unique indexed mobile (index-friendly)
+  if (digits.length >= 3 && digits === compact) {
+    query.mobile = new RegExp(`^${escapeRegex(digits)}`);
+    return query;
+  }
+
+  const escaped = escapeRegex(search);
+  const contains = new RegExp(escaped, 'i');
+  const prefix = new RegExp(`^${escaped}`, 'i');
+
+  query.$or = [
+    {name: prefix},
+    {mobile: contains},
+    {email: contains},
+    {companyName: contains},
+    {gstin: contains},
+    {referralCode: prefix},
+  ];
+  return query;
+};
+
 const getCustomerById = async (req, res) => {
   try {
     const {id} = req.params;
@@ -425,48 +454,52 @@ const getCustomerById = async (req, res) => {
 const getCustomers = async (req, res) => {
   try {
     const search = String(req.query.search ?? '').trim();
-    // Allow large list fetches for CRM; keep a hard cap for safety
-    const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 10000);
-    const page = Math.max(Number(req.query.page) || 1, 1);
+
+    const limit = Math.min(
+      Math.max(Number(req.query.limit) || 50, 1),
+      5000,
+    );
+
+    const page = Math.max(1, Number(req.query.page) || 1);
     const skip = (page - 1) * limit;
-    const query = {isDeleted: {$ne: true}};
+    const includeTotal = String(req.query.includeTotal ?? 'true') !== 'false';
 
-    if (search) {
-      const regex = new RegExp(escapeRegex(search), 'i');
-      query.$or = [
-        {name: regex},
-        {mobile: regex},
-        {email: regex},
-        {companyName: regex},
-        {gstin: regex},
-        {referralCode: regex},
-      ];
-    }
+    const query = buildCustomerListQuery(search);
 
-    // List payload must stay light — exclude heavy/nested fields that blow up
-    // empty-search responses (profileImage base64, coupon history, etc.)
-    const [customers, total] = await Promise.all([
-      Customer.find(query)
-        .select(CUSTOMER_LIST_PROJECTION)
-        .sort({createdAt: -1})
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Customer.countDocuments(query),
-    ]);
+    const findQuery = Customer.find(query)
+      .select(CUSTOMER_LIST_PROJECTION)
+      .sort({createdAt: -1, _id: -1})
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // countDocuments is expensive on large collections — skip when client asks
+    const countPromise = includeTotal
+      ? Customer.countDocuments(query)
+      : Promise.resolve(null);
+
+    const [customers, total] = await Promise.all([findQuery, countPromise]);
+
+    const resolvedTotal = total == null ? null : total;
+    const hasMore =
+      resolvedTotal != null
+        ? skip + customers.length < resolvedTotal
+        : customers.length === limit;
 
     return res.status(200).json({
       success: true,
       message: 'Customers fetched successfully.',
       customers,
-      total,
+      total: resolvedTotal,
       limit,
       page,
-      totalPages: Math.max(1, Math.ceil(total / limit)),
-      hasMore: skip + customers.length < total,
+      totalPages:
+        resolvedTotal == null ? null : Math.ceil(resolvedTotal / limit),
+      hasMore,
     });
   } catch (error) {
     console.error('getCustomers error:', error);
+
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch customers.',

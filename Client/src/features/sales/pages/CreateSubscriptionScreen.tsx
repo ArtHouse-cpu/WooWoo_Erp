@@ -2217,6 +2217,7 @@ export default function CreateSubscriptionScreen({
             setOpenCheckout(false);
             await handleSaveSubscription(payment);
           }}
+          couponApplicableContext="membership"
         />
       )}
       {mode === "view" && (

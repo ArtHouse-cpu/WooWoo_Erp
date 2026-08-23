@@ -5,6 +5,79 @@ import Customer from '../models/customer.model.js';
 
 const normalizeCode = (value) => String(value ?? '').trim().toUpperCase();
 
+const APPLICABLE_ON = new Set([
+  'all',
+  'store',
+  'space',
+  'service',
+  'food',
+  'membership',
+]);
+
+const normalizeApplicableOn = (raw) => {
+  const list = Array.isArray(raw)
+    ? raw.map((v) => String(v ?? '').trim().toLowerCase()).filter(Boolean)
+    : [];
+  const unique = [...new Set(list.filter((v) => APPLICABLE_ON.has(v)))];
+  if (!unique.length || unique.includes('all')) return ['all'];
+  return unique;
+};
+
+/** Map line category / sourceType → coupon applicableOn scope. */
+export const mapLineToCouponScope = (raw) => {
+  const lower = String(raw ?? '')
+    .trim()
+    .toLowerCase();
+  if (!lower) return 'store';
+  if (lower === 'food' || lower === 'foods') return 'food';
+  if (lower === 'space' || lower === 'spaces' || lower === 'studio') return 'space';
+  if (lower === 'service' || lower === 'services') return 'service';
+  if (lower === 'membership' || lower === 'subscription') return 'membership';
+  // product / store / general / catalogue → store (all products)
+  return 'store';
+};
+
+export const scopesFromItems = (items = []) => {
+  const set = new Set();
+  for (const item of items) {
+    const scope = mapLineToCouponScope(
+      item?.lineCategory ||
+        item?.sourceType ||
+        item?.category ||
+        item?.type ||
+        item?.productCategory,
+    );
+    set.add(scope);
+  }
+  return [...set];
+};
+
+/**
+ * Coupon is valid for this cart when:
+ * - applicableOn includes "all", OR
+ * - every cart scope is covered by the coupon scopes
+ *   (e.g. food coupon only if cart is food-only; store coupon only for products)
+ */
+export const couponMatchesCartScopes = (couponApplicableOn, cartScopes = []) => {
+  const scopes = normalizeApplicableOn(couponApplicableOn);
+  if (scopes.includes('all')) return {ok: true};
+  if (!cartScopes.length) {
+    return {
+      ok: false,
+      message: 'This coupon requires a checkout section (store, space, service, food, or membership).',
+    };
+  }
+  const uncovered = cartScopes.filter((s) => !scopes.includes(s));
+  if (uncovered.length) {
+    const allowed = scopes.join(', ');
+    return {
+      ok: false,
+      message: `This coupon applies only to: ${allowed}. It cannot be used on this bill.`,
+    };
+  }
+  return {ok: true};
+};
+
 const calculateCouponDiscount = ({ coupon, orderAmount }) => {
   const amount = Number(orderAmount ?? 0);
   if (!Number.isFinite(amount) || amount <= 0) return 0;
@@ -26,6 +99,9 @@ export const validateCouponForOrder = async ({
   orderAmount,
   customerPhone,
   ignoreInvoiceId = null,
+  applicableContext = null,
+  applicableContexts = null,
+  items = null,
 }) => {
   const normalizedCode = normalizeCode(code);
   if (!normalizedCode) {
@@ -47,6 +123,28 @@ export const validateCouponForOrder = async ({
   }
   if (coupon.expiresAt && now > coupon.expiresAt) {
     return { ok: false, message: 'Coupon has expired.' };
+  }
+
+  // Resolve cart scopes: explicit list > single context > derive from items
+  let cartScopes = [];
+  if (Array.isArray(applicableContexts) && applicableContexts.length) {
+    cartScopes = [
+      ...new Set(
+        applicableContexts
+          .map((s) => mapLineToCouponScope(s))
+          .filter((s) => APPLICABLE_ON.has(s) && s !== 'all'),
+      ),
+    ];
+  } else if (applicableContext) {
+    const mapped = mapLineToCouponScope(applicableContext);
+    if (mapped !== 'all') cartScopes = [mapped];
+  } else if (Array.isArray(items) && items.length) {
+    cartScopes = scopesFromItems(items);
+  }
+
+  const scopeCheck = couponMatchesCartScopes(coupon.applicableOn, cartScopes);
+  if (!scopeCheck.ok) {
+    return { ok: false, message: scopeCheck.message };
   }
 
   const minOrder = Number(coupon.minOrderAmount ?? 0);
@@ -160,13 +258,18 @@ export const createCoupon = async (req, res) => {
       startsAt,
       expiresAt,
       usageLimit:
-        body.usageLimit === null || body.usageLimit === undefined
+        body.usageLimit === null ||
+        body.usageLimit === undefined ||
+        Number(body.usageLimit) <= 0
           ? null
           : Number(body.usageLimit),
       perCustomerLimit:
-        body.perCustomerLimit === null || body.perCustomerLimit === undefined
+        body.perCustomerLimit === null ||
+        body.perCustomerLimit === undefined ||
+        Number(body.perCustomerLimit) <= 0
           ? null
           : Number(body.perCustomerLimit),
+      applicableOn: normalizeApplicableOn(body.applicableOn),
       isActive: Boolean(body.isActive ?? true),
       createdBy: body.createdBy ?? undefined,
     });
@@ -232,11 +335,19 @@ export const updateCoupon = async (req, res) => {
     }
     if (body.expiresAt !== undefined) patch.expiresAt = new Date(body.expiresAt);
     if (body.usageLimit !== undefined) {
-      patch.usageLimit = body.usageLimit === null ? null : Number(body.usageLimit);
+      patch.usageLimit =
+        body.usageLimit === null || Number(body.usageLimit) <= 0
+          ? null
+          : Number(body.usageLimit);
     }
     if (body.perCustomerLimit !== undefined) {
       patch.perCustomerLimit =
-        body.perCustomerLimit === null ? null : Number(body.perCustomerLimit);
+        body.perCustomerLimit === null || Number(body.perCustomerLimit) <= 0
+          ? null
+          : Number(body.perCustomerLimit);
+    }
+    if (body.applicableOn !== undefined) {
+      patch.applicableOn = normalizeApplicableOn(body.applicableOn);
     }
     if (body.isActive !== undefined) patch.isActive = Boolean(body.isActive);
 
@@ -312,8 +423,22 @@ export const deactivateCoupon = async (req, res) => {
 
 export const validateCoupon = async (req, res) => {
   try {
-    const { code, orderAmount, customerPhone } = req.body ?? {};
-    const result = await validateCouponForOrder({ code, orderAmount, customerPhone });
+    const {
+      code,
+      orderAmount,
+      customerPhone,
+      applicableContext,
+      applicableContexts,
+      items,
+    } = req.body ?? {};
+    const result = await validateCouponForOrder({
+      code,
+      orderAmount,
+      customerPhone,
+      applicableContext,
+      applicableContexts,
+      items,
+    });
     if (!result.ok) {
       return res.status(400).json({ success: false, message: result.message });
     }
@@ -325,6 +450,7 @@ export const validateCoupon = async (req, res) => {
         title: result.coupon.title,
         discountType: result.coupon.discountType,
         discountValue: result.coupon.discountValue,
+        applicableOn: normalizeApplicableOn(result.coupon.applicableOn),
       },
       discountAmount: result.discountAmount,
     });

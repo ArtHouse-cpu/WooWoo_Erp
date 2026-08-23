@@ -198,6 +198,14 @@ export type CreateInvoicePayload = {
   };
 };
 
+export type CouponApplicableOn =
+  | "all"
+  | "store"
+  | "space"
+  | "service"
+  | "food"
+  | "membership";
+
 export type CouponPayload = {
   code: string;
   title: string;
@@ -210,6 +218,7 @@ export type CouponPayload = {
   expiresAt: string;
   usageLimit?: number | null;
   perCustomerLimit?: number | null;
+  applicableOn?: CouponApplicableOn[];
   isActive?: boolean;
   createdBy?: {
     m_staff_id?: string | null;
@@ -712,6 +721,17 @@ export const handleValidateCoupon = async (payload: {
   code: string;
   orderAmount: number;
   customerPhone?: string;
+  /** Single checkout section: store | space | service | food | membership */
+  applicableContext?: string;
+  /** All sections present in the cart (preferred for mixed bills) */
+  applicableContexts?: string[];
+  items?: Array<{
+    category?: string;
+    lineCategory?: string;
+    sourceType?: string;
+    productName?: string;
+    name?: string;
+  }>;
 }) => {
   const response = await axiosInstance.post("/coupon/validate", payload);
   return response.data;
@@ -895,9 +915,17 @@ export const handleGetSubscriptions = async (
   limit = 5000,
   signal?: AbortSignal,
   page = 1,
+  fromDate?: string,
+  toDate?: string,
 ) => {
   const response = await axiosInstance.get("/subscriptions", {
-    params: { search: search.trim(), limit, page },
+    params: {
+      search: search.trim(),
+      limit,
+      page,
+      ...(fromDate?.trim() ? { fromDate: fromDate.trim() } : {}),
+      ...(toDate?.trim() ? { toDate: toDate.trim() } : {}),
+    },
     signal,
   });
   return response.data;
@@ -908,6 +936,8 @@ export const handleGetAllSubscriptions = async (
   search = "",
   signal?: AbortSignal,
   pageSize = 2000,
+  fromDate?: string,
+  toDate?: string,
 ) => {
   const size = Math.min(Math.max(Number(pageSize) || 2000, 1), 10000);
   const all: any[] = [];
@@ -915,7 +945,14 @@ export const handleGetAllSubscriptions = async (
   let total = Infinity;
 
   while (all.length < total) {
-    const data = await handleGetSubscriptions(search, size, signal, page);
+    const data = await handleGetSubscriptions(
+      search,
+      size,
+      signal,
+      page,
+      fromDate,
+      toDate,
+    );
     const batch = Array.isArray(data?.subscriptions) ? data.subscriptions : [];
     total = Number.isFinite(Number(data?.total))
       ? Number(data.total)
@@ -1055,7 +1092,7 @@ export function customerPayloadToFormData(
 export const handleGetCustomers = async (
   search = "",
   signal?: AbortSignal,
-  limit = 2000,
+  limit = 50,
   page = 1,
 ) => {
   try {
@@ -2725,6 +2762,64 @@ export const handleUpdateAccessStaff = async (
 export const handleDeleteAccessStaff = async (staffId: string) => {
   const response = await axiosInstance.delete(`/access/staff/${staffId}`);
   return response.data;
+};
+
+export type DashboardPeriod =
+  | "today"
+  | "this_month"
+  | "last_month"
+  | "lifetime";
+
+export type DashboardSummaryData = {
+  revenue: {
+    total: number;
+    store: number;
+    space: number;
+    services: number;
+    food: number;
+    membership: number;
+  };
+  membership: {
+    total: number;
+    breakdown: Array<{ code: string; count: number }>;
+  };
+  network: {
+    total: number;
+    customers: number;
+    vendors: number;
+    csp: number;
+  };
+  purchaseExpense: {
+    total: number;
+    purchase: number;
+    expense: number;
+  };
+};
+
+export const handleGetDashboardSummary = async (
+  params: {
+    period?: DashboardPeriod;
+    fromDate?: string;
+    toDate?: string;
+  } = {},
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/dashboard/summary", {
+    params: {
+      period: params.period ?? "today",
+      ...(params.fromDate ? { fromDate: params.fromDate } : {}),
+      ...(params.toDate ? { toDate: params.toDate } : {}),
+    },
+    signal,
+  });
+  return response.data as {
+    success: boolean;
+    period?: string;
+    fromDate?: string | null;
+    toDate?: string | null;
+    data?: DashboardSummaryData;
+    message?: string;
+  };
 };
 
 export const handleBulkCreateSubscriptions = async (payload: {

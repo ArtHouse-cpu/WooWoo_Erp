@@ -603,6 +603,7 @@ const createInvoice = async (req, res) => {
         code: coupon.code,
         orderAmount: preCouponAmount,
         customerPhone,
+        items: req.body.items || normalizedItems,
       });
       if (!couponValidation.ok) {
         return res.status(400).json({
@@ -1259,6 +1260,7 @@ const updateInvoice = async (req, res) => {
           orderAmount: Number(updateData.subTotal ?? existingInvoice.subTotal) - Number(updateData.discountTotal ?? existingInvoice.discountTotal ?? 0) + extraChargesTotal,
           customerPhone: String(updateData.customerPhone ?? existingInvoice.customerPhone ?? '').trim(),
           ignoreInvoiceId: id,
+          items: updateData.items ?? existingInvoice.items,
         });
         if (!couponValidation.ok) {
           return res.status(400).json({

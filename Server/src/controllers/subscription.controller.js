@@ -268,6 +268,7 @@ export const createSubscription = async (req, res) => {
         code: coupon.code,
         orderAmount: Math.max(0, parsed.data.subTotal - referralDiscount),
         customerPhone: parsed.data.customerPhone,
+        applicableContext: 'membership',
       });
       if (!couponValidation.ok) {
         return res.status(400).json({
@@ -614,61 +615,99 @@ export const createSubscription = async (req, res) => {
   }
 };
 
+// export const getSubscriptions = async (req, res) => {
+//   try {
+//     // Repair legacy portal activations that updated Customer but never created Subscription
+//     const now = Date.now();
+//     if (now - lastMembershipSubBackfillAt > MEMBERSHIP_SUB_BACKFILL_TTL_MS) {
+//       lastMembershipSubBackfillAt = now;
+//       try {
+//         const {backfillMissingMembershipSubscriptions} = await import(
+//           '../services/subscriptionFromMembership.service.js'
+//         );
+//         await backfillMissingMembershipSubscriptions({limit: 300});
+//       } catch (syncErr) {
+//         console.warn(
+//           '[getSubscriptions] membership→subscription backfill skipped:',
+//           syncErr?.message || syncErr,
+//         );
+//       }
+//     }
+
+//     const search = String(req.query.search ?? '').trim();
+//     // Admin subscription table needs the full list; allow up to 10k (was capped at 200).
+//     const limit = Math.min(Math.max(Number(req.query.limit) || 2000, 1), 10000);
+//     const page = Math.max(Number(req.query.page) || 1, 1);
+//     const skip = (page - 1) * limit;
+//     const status = String(req.query.status ?? '').trim().toLowerCase();
+
+//     const query = {};
+//     if (status && status !== 'all') query.status = status;
+
+//     if (search) {
+//       const regex = new RegExp(escapeRegex(search), 'i');
+//       query.$or = [
+//         {subscriptionCode: regex},
+//         {customerName: regex},
+//         {customerPhone: regex},
+//       ];
+//     }
+
+//     const [subscriptions, total] = await Promise.all([
+//       Subscription.find(query)
+//         .sort({createdAt: -1})
+//         .skip(skip)
+//         .limit(limit)
+//         .lean(),
+//       Subscription.countDocuments(query),
+//     ]);
+
+//     return res.status(200).json({
+//       success: true,
+//       message: 'Subscriptions fetched successfully.',
+//       subscriptions,
+//       total,
+//       page,
+//       limit,
+//       hasMore: skip + subscriptions.length < total,
+//     });
+//   } catch (error) {
+//     console.error('getSubscriptions error:', error);
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Failed to fetch subscriptions.',
+//     });
+//   }
+// };
+
+
 export const getSubscriptions = async (req, res) => {
   try {
-    // Repair legacy portal activations that updated Customer but never created Subscription
-    const now = Date.now();
-    if (now - lastMembershipSubBackfillAt > MEMBERSHIP_SUB_BACKFILL_TTL_MS) {
-      lastMembershipSubBackfillAt = now;
-      try {
-        const {backfillMissingMembershipSubscriptions} = await import(
-          '../services/subscriptionFromMembership.service.js'
-        );
-        await backfillMissingMembershipSubscriptions({limit: 300});
-      } catch (syncErr) {
-        console.warn(
-          '[getSubscriptions] membership→subscription backfill skipped:',
-          syncErr?.message || syncErr,
-        );
-      }
-    }
-
     const search = String(req.query.search ?? '').trim();
-    // Admin subscription table needs the full list; allow up to 10k (was capped at 200).
-    const limit = Math.min(Math.max(Number(req.query.limit) || 2000, 1), 10000);
-    const page = Math.max(Number(req.query.page) || 1, 1);
-    const skip = (page - 1) * limit;
-    const status = String(req.query.status ?? '').trim().toLowerCase();
+    const fromDate= String(req.query.fromDate ?? '').trim();
+    const toDate= String(req.query.toDate ?? '').trim();
+        const query={};
+    const dateFilter={};
 
-    const query = {};
-    if (status && status !== 'all') query.status = status;
-
-    if (search) {
-      const regex = new RegExp(escapeRegex(search), 'i');
-      query.$or = [
-        {subscriptionCode: regex},
-        {customerName: regex},
-        {customerPhone: regex},
-      ];
+    const limit = Math.min(Math.max(Number(req.query.limit) || 2000, 1), 5000);
+       if (fromDate) {
+      const from = new Date(`${fromDate}T00:00:00.000`);
+      if (!Number.isNaN(from.getTime())) dateFilter.$gte = from;
+    }
+    if (toDate) {
+      const to = new Date(`${toDate}T23:59:59.999`);
+      if (!Number.isNaN(to.getTime())) dateFilter.$lte = to;
+    }
+    if (Object.keys(dateFilter).length) {
+      query.invoiceDate = dateFilter;
     }
 
-    const [subscriptions, total] = await Promise.all([
-      Subscription.find(query)
-        .sort({createdAt: -1})
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Subscription.countDocuments(query),
-    ]);
 
+    const subscriptions = await Subscription.find(query).lean();
     return res.status(200).json({
       success: true,
       message: 'Subscriptions fetched successfully.',
       subscriptions,
-      total,
-      page,
-      limit,
-      hasMore: skip + subscriptions.length < total,
     });
   } catch (error) {
     console.error('getSubscriptions error:', error);
@@ -677,8 +716,7 @@ export const getSubscriptions = async (req, res) => {
       message: 'Failed to fetch subscriptions.',
     });
   }
-};
-
+}
 export const getSubscriptionById = async (req, res) => {
   try {
     const {id} = req.params;

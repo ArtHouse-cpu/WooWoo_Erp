@@ -139,6 +139,7 @@ const createQuotation = async (req, res) => {
         code: coupon.code,
         orderAmount: preCouponAmount,
         customerPhone,
+        items: req.body.items || normalizedItems,
       });
       if (!couponValidation.ok) {
         return res.status(400).json({
@@ -391,6 +392,7 @@ const updateQuotation = async (req, res) => {
           orderAmount: Number(updateData.subTotal ?? existingQuotation.subTotal) - Number(updateData.discountTotal ?? existingQuotation.discountTotal ?? 0),
           customerPhone: String(updateData.customerPhone ?? existingQuotation.customerPhone ?? '').trim(),
           ignoreInvoiceId: id,
+          items: updateData.items ?? existingQuotation.items,
         });
         if (!couponValidation.ok) {
           return res.status(400).json({

@@ -3,6 +3,7 @@ import {
   MaterialReactTable,
   useMaterialReactTable,
   type MRT_ColumnDef,
+  type MRT_PaginationState,
   type MRT_Row,
 } from "material-react-table";
 import { Eye, FileSpreadsheet, SquarePen, Trash2 } from "lucide-react";
@@ -18,16 +19,15 @@ import {
   customerPayloadToFormData,
   handleCreateCustomer,
   handleDeleteCustomer,
-  handleGetAllCustomers,
-  handleGetInvoices,
-  handleGetSubscriptions,
-  handleGetWallets,
+  handleGetCustomers,
   handleImportCustomers,
   handleUpdateCustomer,
   type CustomerImportRow,
   type CustomerPayload,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
+
+const PAGE_SIZE_DEFAULT = 50;
 
 type CustomerRow = {
   _id?: string;
@@ -55,13 +55,18 @@ export default function CustomerScreen() {
   const [openImportModal, setOpenImportModal] = useState(false);
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
+  const [rowCount, setRowCount] = useState(0);
+  const [pagination, setPagination] = useState<MRT_PaginationState>({
+    pageIndex: 0,
+    pageSize: PAGE_SIZE_DEFAULT,
+  });
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [importingCustomers, setImportingCustomers] = useState(false);
   const [updatingCustomer, setUpdatingCustomer] = useState(false);
   const staff = useAppSelector((state) => state.user);
-  // console.log("staff", staff);
 
   const [editOpen, setEditOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRow | null>(
@@ -71,6 +76,64 @@ export default function CustomerScreen() {
   const [detailsCustomer, setDetailsCustomer] = useState<CustomerRow | null>(
     null,
   );
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  }, [debouncedSearch]);
+
+  const fetchCustomers = async (signal?: AbortSignal) => {
+    try {
+      setLoadingCustomers(true);
+      const page = pagination.pageIndex + 1;
+      const response = await handleGetCustomers(
+        debouncedSearch,
+        signal,
+        pagination.pageSize,
+        page,
+      );
+      const customerList: CustomerRow[] = Array.isArray(response?.customers)
+        ? response.customers
+        : [];
+
+      setCustomers(
+        customerList.map((customer) => ({
+          ...customer,
+          membershipType: customer.membershipType || "none",
+          walletAmount: Number(
+            customer?.walletAmount ?? customer?.closingBalance ?? 0,
+          ),
+          dueAmount: Number(customer?.dueAmount ?? 0),
+        })),
+      );
+      setRowCount(
+        Number.isFinite(Number(response?.total))
+          ? Number(response.total)
+          : customerList.length,
+      );
+    } catch (error) {
+      if (
+        (error as { name?: string; code?: string })?.name === "CanceledError" ||
+        (error as { name?: string; code?: string })?.code === "ERR_CANCELED"
+      ) {
+        return;
+      }
+      console.error("fetchCustomers error:", error);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchCustomers(controller.signal);
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on page/search
+  }, [debouncedSearch, pagination.pageIndex, pagination.pageSize]);
 
   const handleDelete = async (id: string) => {
     const result = await Swal.fire({
@@ -95,8 +158,8 @@ export default function CustomerScreen() {
           showConfirmButton: false,
         });
 
-        // Update UI instantly + keep it consistent with backend
         setCustomers((prev) => prev.filter((c) => c._id !== id));
+        setRowCount((prev) => Math.max(0, prev - 1));
         await fetchCustomers();
       } catch (error) {
         const err = error as { response?: { data?: { message?: string } } };
@@ -108,192 +171,6 @@ export default function CustomerScreen() {
       }
     }
   };
-
-  const fetchCustomers = async (searchText = "", signal?: AbortSignal) => {
-    try {
-      setLoadingCustomers(true);
-
-      // 1) Load customers first (paged) so empty search still returns names
-      let customerList: CustomerRow[] = [];
-      try {
-        const customerResponse = await handleGetAllCustomers(
-          searchText,
-          signal,
-          2000,
-        );
-        customerList = Array.isArray(customerResponse?.customers)
-          ? customerResponse.customers
-          : [];
-      } catch (error) {
-        console.error("Failed to fetch customers:", error);
-        return;
-      }
-
-      // Show names immediately — enrich wallet/due/membership after
-      setCustomers(
-        customerList.map((customer: CustomerRow) => ({
-          ...customer,
-          membershipType: customer.membershipType || "none",
-          walletAmount: Number(
-            customer?.walletAmount ?? customer?.closingBalance ?? 0,
-          ),
-          dueAmount: 0,
-        })),
-      );
-      setLoadingCustomers(false);
-
-      // 2) Enrich in parallel (failures must not clear the customer list)
-      const [walletResponse, invoiceResponse, subscriptionResponse] =
-        await Promise.allSettled([
-          handleGetWallets({ search: searchText, limit: 5000 }, signal),
-          handleGetInvoices(searchText, signal),
-          handleGetSubscriptions(searchText, 300, signal),
-        ]);
-
-      const walletItems =
-        walletResponse.status === "fulfilled"
-          ? Array.isArray(walletResponse.value?.wallets)
-            ? walletResponse.value.wallets
-            : Array.isArray(walletResponse.value?.data)
-              ? walletResponse.value.data
-              : Array.isArray(walletResponse.value)
-                ? walletResponse.value
-                : []
-          : [];
-
-      const nextWalletMap = walletItems.reduce(
-        (acc: Record<string, number>, wallet: any) => {
-          const amountCandidates = [
-            wallet?.walletAmount,
-            wallet?.balance,
-            wallet?.currentBalance,
-            wallet?.availableBalance,
-            wallet?.customer?.walletAmount,
-          ];
-          const amount =
-            amountCandidates.find((value) => Number.isFinite(Number(value))) ??
-            0;
-          const keys = [
-            wallet?.customerId,
-            wallet?.customer?._id,
-            wallet?.customer?.id,
-            wallet?.customerPhone,
-            wallet?.customer?.mobile,
-          ]
-            .map((value) => String(value ?? "").trim())
-            .filter(Boolean);
-
-          keys.forEach((key) => {
-            acc[key] = Number(amount);
-          });
-          return acc;
-        },
-        {},
-      );
-      const subscriptions =
-        subscriptionResponse.status === "fulfilled" &&
-        Array.isArray(subscriptionResponse.value?.subscriptions)
-          ? subscriptionResponse.value.subscriptions
-          : [];
-      const membershipLookup = subscriptions.reduce(
-        (
-          acc: Record<
-            string,
-            { type: string; startDate?: string; endDate?: string }
-          >,
-          subscription: any,
-        ) => {
-          const membershipType = String(
-            subscription?.membershipType ??
-              subscription?.membershipName ??
-              subscription?.items?.[0]?.productName ??
-              "",
-          ).trim();
-          if (!membershipType) return acc;
-          const keys = [
-            subscription?.customerId,
-            subscription?.customer?._id,
-            subscription?.customer?.id,
-            subscription?.customerPhone,
-            subscription?.customer?.mobile,
-          ]
-            .map((value) => String(value ?? "").trim())
-            .filter(Boolean);
-          keys.forEach((key) => {
-            if (!acc[key]) {
-              acc[key] = {
-                type: membershipType,
-                startDate: subscription?.startDate,
-                endDate: subscription?.endDate || subscription?.dueDate,
-              };
-            }
-          });
-          return acc;
-        },
-        {},
-      );
-
-      const invoiceItems =
-        invoiceResponse.status === "fulfilled" &&
-        Array.isArray(invoiceResponse.value?.invoices)
-          ? invoiceResponse.value.invoices
-          : [];
-      const dueLookup = invoiceItems.reduce(
-        (acc: Record<string, number>, invoice: any) => {
-          const dueAmount = Number(
-            invoice?.pendingAmount ??
-              invoice?.paymentBreakdown?.dueAmount ??
-              0,
-          );
-          if (dueAmount <= 0) return acc;
-          const keys = [invoice?.customerPhone, invoice?.customerName]
-            .map((value) => String(value ?? "").trim())
-            .filter(Boolean);
-          keys.forEach((key) => {
-            acc[key] = (acc[key] || 0) + dueAmount;
-          });
-          return acc;
-        },
-        {},
-      );
-
-      setCustomers(
-        customerList.map((customer: CustomerRow) => {
-          const membershipInfo =
-            membershipLookup[String(customer?._id ?? "").trim()] ??
-            membershipLookup[String(customer?.mobile ?? "").trim()] ??
-            {
-              type: String(customer?.membershipType || "none"),
-            };
-          const walletAmount =
-            nextWalletMap[String(customer?._id ?? "").trim()] ??
-            nextWalletMap[String(customer?.mobile ?? "").trim()] ??
-            Number(customer?.walletAmount ?? customer?.closingBalance ?? 0);
-          const dueAmount =
-            dueLookup[String(customer?.mobile ?? "").trim()] ??
-            dueLookup[String(customer?.name ?? "").trim()] ??
-            0;
-          return {
-            ...customer,
-            membershipType: membershipInfo.type,
-            membershipStartDate: membershipInfo.startDate,
-            membershipEndDate: membershipInfo.endDate,
-            walletAmount,
-            dueAmount,
-          };
-        }),
-      );
-    } catch (error) {
-      console.error("fetchCustomers error:", error);
-      // Keep current rows — do not blank the grid on refresh errors
-    } finally {
-      setLoadingCustomers(false);
-    }
-  };
-
-  useEffect(() => {
-    void fetchCustomers();
-  }, []);
 
   const handleCreateCustomerSubmit = async (args: {
     payload: CustomerPayload;
@@ -307,7 +184,6 @@ export default function CustomerScreen() {
         m_staff_email: staff?.m_staff_email,
       };
 
-      console.log("createdBy", createdBy);
       if (args.profileImageFile) {
         const fd = customerPayloadToFormData(
           {
@@ -347,15 +223,13 @@ export default function CustomerScreen() {
       Swal.fire("Update failed", "Customer id not found.", "error");
       return;
     }
-
     try {
       setUpdatingCustomer(true);
       const createdBy = {
-        m_staff_id: staff.m_staff_id,
-        m_staff_name: staff.m_staff_name,
-        m_staff_email: staff.m_staff_email,
+        m_staff_id: staff?.m_staff_id,
+        m_staff_name: staff?.m_staff_name,
+        m_staff_email: staff?.m_staff_email,
       };
-
       if (args.profileImageFile) {
         const fd = customerPayloadToFormData(
           {
@@ -413,7 +287,8 @@ export default function CustomerScreen() {
         header: "Contact Info",
         id: "contactInfo",
         accessorFn: (row: CustomerRow) =>
-          `${row.mobile || ""} ${row.whatsappNumber || ""} ${row.email || ""}`.trim() || "-",
+          `${row.mobile || ""} ${row.whatsappNumber || ""} ${row.email || ""}`.trim() ||
+          "-",
         size: 180,
       },
       {
@@ -448,26 +323,6 @@ export default function CustomerScreen() {
         },
         size: 140,
       },
-      // {
-      //   header: "Date/Time",
-      //   id: "notes",
-      //   accessorFn: (row: CustomerRow) => {
-      //     const creator = row.createdBy?.m_staff_name ?? "";
-      //     const createdAt = row.createdAt ? new Date(row.createdAt) : null;
-      //     const parts: string[] = [];
-      //     if (createdAt && !Number.isNaN(createdAt.getTime())) {
-      //       parts.push(
-      //         `Created: ${createdAt.toLocaleDateString("en-IN")} ${createdAt.toLocaleTimeString(
-      //           "en-IN",
-      //           { hour: "2-digit", minute: "2-digit" },
-      //         )}`,
-      //       );
-      //     }
-      //     if (creator) parts.push(`By ${creator}`);
-      //     return parts.join(" • ") || "-";
-      //   },
-      //   size: 320,
-      // },
       {
         header: "Ledger",
         accessorKey: "ledger",
@@ -527,11 +382,16 @@ export default function CustomerScreen() {
   const table = useMaterialReactTable<CustomerRow>({
     columns,
     data,
+    rowCount,
+    manualPagination: true,
+    manualFiltering: true,
+    onPaginationChange: setPagination,
+    onGlobalFilterChange: setSearch,
     state: {
       isLoading: loadingCustomers,
       globalFilter: search,
+      pagination,
     },
-    onGlobalFilterChange: setSearch,
     enableGlobalFilter: true,
     muiTablePaperProps: {
       elevation: 0,
@@ -563,7 +423,7 @@ export default function CustomerScreen() {
           <div className="text-sm text-slate-500">
             {loadingCustomers
               ? "Loading..."
-              : `${customers.length.toLocaleString("en-IN")} customers`}
+              : `${rowCount.toLocaleString("en-IN")} customers`}
           </div>
         </div>
 
@@ -612,11 +472,12 @@ export default function CustomerScreen() {
               : [];
             setOpenImportModal(false);
 
-            // Show created rows immediately even if list refresh is slow/fails
             if (createdRows.length) {
               setCustomers((prev) => {
                 const seen = new Set(
-                  createdRows.map((c: CustomerRow) => String(c._id || c.mobile)),
+                  createdRows.map((c: CustomerRow) =>
+                    String(c._id || c.mobile),
+                  ),
                 );
                 const rest = prev.filter(
                   (c) => !seen.has(String(c._id || c.mobile)),
@@ -625,9 +486,9 @@ export default function CustomerScreen() {
               });
             }
 
-            // Clear search so newly imported rows are not filtered out of the grid
             setSearch("");
-            await fetchCustomers("");
+            setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+            await fetchCustomers();
 
             const created = Number(summary?.created || 0);
             const failed = Number(summary?.failed || 0);
@@ -665,7 +526,14 @@ export default function CustomerScreen() {
             });
           } catch (error: unknown) {
             const err = error as {
-              response?: { data?: { message?: string; summary?: { errors?: { row?: number; message?: string }[] } } };
+              response?: {
+                data?: {
+                  message?: string;
+                  summary?: {
+                    errors?: { row?: number; message?: string }[];
+                  };
+                };
+              };
             };
             const details = Array.isArray(err?.response?.data?.summary?.errors)
               ? err.response.data.summary.errors

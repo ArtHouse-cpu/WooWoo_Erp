@@ -71,19 +71,13 @@ function toDateYmd(value: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Prefer invoiceDate only — same field as GET /subscriptions & dashboard membership. */
 function subscriptionRowDateYmd(row: SubscriptionRow): string | null {
   const raw = row.raw as Record<string, unknown> | undefined;
-  const candidates = [
-    raw?.invoiceDate,
-    raw?.startDate,
-    raw?.createdAt,
-    raw?.updatedAt,
-  ];
-  for (const value of candidates) {
-    if (!value) continue;
-    const d = value instanceof Date ? value : new Date(String(value));
-    if (!Number.isNaN(d.getTime())) return toDateYmd(d);
-  }
+  const value = raw?.invoiceDate;
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(String(value));
+  if (!Number.isNaN(d.getTime())) return toDateYmd(d);
   return null;
 }
 
@@ -404,11 +398,17 @@ export default function SubscriptionScreen() {
     return status;
   };
 
-  const fetchSubscriptions = async () => {
+  const fetchSubscriptions = async (signal?: AbortSignal) => {
     setLoading(true);
     try {
       const [response, membershipRes] = await Promise.all([
-        handleGetAllSubscriptions(search.trim()),
+        handleGetAllSubscriptions(
+          search.trim(),
+          signal,
+          2000,
+          fromDate || undefined,
+          toDate || undefined,
+        ),
         handleGetMemberships({ status: "All" }),
       ]);
 
@@ -497,15 +497,25 @@ export default function SubscriptionScreen() {
 
       setData(rows);
     } catch (error) {
+      if (
+        (error as { name?: string; code?: string })?.name === "CanceledError" ||
+        (error as { name?: string; code?: string })?.code === "ERR_CANCELED"
+      ) {
+        return;
+      }
       console.error("Error fetching subscriptions:", error);
       setData([]);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
   useEffect(() => {
-    void fetchSubscriptions();
-  }, []);
+    const controller = new AbortController();
+    void fetchSubscriptions(controller.signal);
+    return () => controller.abort();
+    // Re-fetch when date range changes so API gets fromDate/toDate
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchSubscriptions closes over search/filters
+  }, [fromDate, toDate]);
 
   const filteredData = useMemo(() => {
     const term = search.trim().toLowerCase();
