@@ -37,6 +37,8 @@ import {
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
+import Can from "@/components/rbac/Can";
+import { PERMISSIONS } from "@/constants/permissions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -563,21 +565,35 @@ const ExpenseScreen = () => {
             row.original.status === "Pending" && row.original.dueAmount > 0;
           if (isPendingDue) {
             const dueAmount = Number(row.original.dueAmount ?? 0);
-            return (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openReceivePaymentModal(row.original);
-                }}
-                className="inline-flex rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-200"
-              >
+            const dueLabel = (
+              <>
                 Due ₹{" "}
                 {dueAmount.toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
-              </button>
+              </>
+            );
+            return (
+              <Can
+                permission={PERMISSIONS.EXPENSE_UPDATE}
+                fallback={
+                  <span className="inline-flex rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                    {dueLabel}
+                  </span>
+                }
+              >
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openReceivePaymentModal(row.original);
+                  }}
+                  className="inline-flex rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-200"
+                >
+                  {dueLabel}
+                </button>
+              </Can>
             );
           }
           return (
@@ -727,15 +743,17 @@ const ExpenseScreen = () => {
             {filteredData.length}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md bg-blue-600 px-2.5 text-xs font-semibold text-white hover:bg-blue-700 sm:h-9 sm:gap-1.5 sm:px-3 sm:text-sm"
-        >
-          <Plus size={14} className="sm:size-4" />
-          <span className="sm:hidden">Add</span>
-          <span className="hidden sm:inline">Add Expense</span>
-        </button>
+        <Can permission={PERMISSIONS.EXPENSE_CREATE}>
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md bg-blue-600 px-2.5 text-xs font-semibold text-white hover:bg-blue-700 sm:h-9 sm:gap-1.5 sm:px-3 sm:text-sm"
+          >
+            <Plus size={14} className="sm:size-4" />
+            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">Add Expense</span>
+          </button>
+        </Can>
       </div>
 
       {/* ── Status tabs ── */}
@@ -897,91 +915,99 @@ const ExpenseScreen = () => {
             <div className="space-y-3 p-5">
               {selectedActionRow.status === "Pending" &&
               selectedActionRow.dueAmount > 0 ? (
+                <Can permission={PERMISSIONS.EXPENSE_UPDATE}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const row = selectedActionRow;
+                      setSelectedActionRow(null);
+                      openReceivePaymentModal(row);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-lg border border-amber-100 bg-amber-50 p-3 text-left transition-colors hover:bg-amber-100"
+                  >
+                    <div className="rounded-full bg-amber-200 p-2 text-amber-700">
+                      <IndianRupee size={18} />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-amber-800">
+                        Receive Payment
+                      </div>
+                      <div className="text-xs text-amber-700/80">
+                        Record a payment against this due
+                      </div>
+                    </div>
+                  </button>
+                </Can>
+              ) : null}
+              <Can permission={PERMISSIONS.EXPENSE_READ}>
                 <button
                   type="button"
                   onClick={() => {
                     const row = selectedActionRow;
                     setSelectedActionRow(null);
-                    openReceivePaymentModal(row);
+                    openViewModal(row);
                   }}
-                  className="flex w-full items-center gap-3 rounded-lg border border-amber-100 bg-amber-50 p-3 text-left transition-colors hover:bg-amber-100"
+                  className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
                 >
-                  <div className="rounded-full bg-amber-200 p-2 text-amber-700">
-                    <IndianRupee size={18} />
+                  <div className="rounded-full bg-violet-100 p-2 text-violet-600">
+                    <Eye size={18} />
                   </div>
                   <div>
-                    <div className="font-semibold text-amber-800">
-                      Receive Payment
+                    <div className="font-semibold text-gray-800">
+                      View Expense
                     </div>
-                    <div className="text-xs text-amber-700/80">
-                      Record a payment against this due
+                    <div className="text-xs text-gray-500">
+                      View in read-only mode
                     </div>
                   </div>
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  const row = selectedActionRow;
-                  setSelectedActionRow(null);
-                  openViewModal(row);
-                }}
-                className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
-              >
-                <div className="rounded-full bg-violet-100 p-2 text-violet-600">
-                  <Eye size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-800">
-                    View Expense
+              </Can>
+              <Can permission={PERMISSIONS.EXPENSE_UPDATE}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const row = selectedActionRow;
+                    setSelectedActionRow(null);
+                    openEditModal(row);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
+                >
+                  <div className="rounded-full bg-green-100 p-2 text-green-700">
+                    <SquarePen size={18} />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    View in read-only mode
+                  <div>
+                    <div className="font-semibold text-gray-800">
+                      Edit Expense
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Modify expense details
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const row = selectedActionRow;
-                  setSelectedActionRow(null);
-                  openEditModal(row);
-                }}
-                className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
-              >
-                <div className="rounded-full bg-green-100 p-2 text-green-700">
-                  <SquarePen size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-gray-800">
-                    Edit Expense
+                </button>
+              </Can>
+              <Can permission={PERMISSIONS.EXPENSE_DELETE}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const row = selectedActionRow;
+                    setSelectedActionRow(null);
+                    void handleDeleteExpense(row);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
+                >
+                  <div className="rounded-full bg-red-200 p-2 text-red-700">
+                    <Trash2 size={18} />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    Modify expense details
+                  <div>
+                    <div className="font-semibold text-red-700">
+                      Delete Expense
+                    </div>
+                    <div className="text-xs text-red-600/70">
+                      Permanently remove
+                    </div>
                   </div>
-                </div>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const row = selectedActionRow;
-                  setSelectedActionRow(null);
-                  void handleDeleteExpense(row);
-                }}
-                className="flex w-full items-center gap-3 rounded-lg border border-red-100 bg-red-50 p-3 text-left transition-colors hover:bg-red-100"
-              >
-                <div className="rounded-full bg-red-200 p-2 text-red-700">
-                  <Trash2 size={18} />
-                </div>
-                <div>
-                  <div className="font-semibold text-red-700">
-                    Delete Expense
-                  </div>
-                  <div className="text-xs text-red-600/70">
-                    Permanently remove
-                  </div>
-                </div>
-              </button>
+                </button>
+              </Can>
             </div>
           </div>
         </div>

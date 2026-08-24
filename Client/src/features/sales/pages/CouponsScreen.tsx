@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type InputHTMLAttributes,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   MaterialReactTable,
@@ -6,25 +13,35 @@ import {
   type MRT_ColumnDef,
 } from "material-react-table";
 import {
+  IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+} from "@mui/material";
+import {
+  ArrowLeft,
   Briefcase,
   Calendar,
+  Copy,
+  Crown,
   Filter,
   LayoutGrid,
   MapPin,
+  MoreVertical,
   Package,
   Pencil,
+  PlayCircle,
   Plus,
   Power,
   RotateCcw,
   Search,
-  ShoppingBag,
   Tag,
   TicketPercent,
   Trash2,
   Type,
-  User,
+  Users,
   Utensils,
-  Crown,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -63,38 +80,31 @@ const APPLICABLE_OPTIONS: {
   { value: "membership", label: "Membership", icon: Crown },
 ];
 
-function defaultDateRange() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
+function defaultExpiryYmd() {
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
   end.setMonth(end.getMonth() + 1);
-  const ymd = (d: Date) => {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  };
-  return { startsAt: ymd(start), expiresAt: ymd(end) };
+  const y = end.getFullYear();
+  const m = String(end.getMonth() + 1).padStart(2, "0");
+  const d = String(end.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-const initialForm = (): CouponPayload => {
-  const range = defaultDateRange();
-  return {
-    code: "",
-    title: "",
-    description: "",
-    discountType: "percentage",
-    discountValue: 10,
-    minOrderAmount: 0,
-    maxDiscountAmount: 0,
-    startsAt: range.startsAt,
-    expiresAt: range.expiresAt,
-    usageLimit: 0,
-    perCustomerLimit: 0,
-    applicableOn: ["all"],
-    isActive: true,
-  };
-};
+const initialForm = (): CouponPayload => ({
+  code: "",
+  title: "",
+  description: "",
+  discountType: "percentage",
+  discountValue: 10,
+  minOrderAmount: 0,
+  maxDiscountAmount: null,
+  startsAt: null,
+  expiresAt: defaultExpiryYmd(),
+  usageLimit: null,
+  perCustomerLimit: null,
+  applicableOn: ["all"],
+  isActive: true,
+});
 
 function toggleApplicableOn(
   current: CouponApplicableOn[],
@@ -117,7 +127,7 @@ function FieldLabel({
   required?: boolean;
 }) {
   return (
-    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+    <label className="mb-1.5 block text-sm font-semibold text-slate-800">
       {children}
       {required ? <span className="text-red-500"> *</span> : null}
     </label>
@@ -137,16 +147,16 @@ function IconInput({
     <div className="relative">
       <Icon
         size={16}
-        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-violet-600"
       />
       <input
         {...props}
-        className={`h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 ${
-          suffix ? "pr-10" : "pr-3"
+        className={`h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-2 focus:ring-violet-100 ${
+          suffix ? "pr-12" : "pr-3"
         } ${className}`}
       />
       {suffix ? (
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">
+        <span className="pointer-events-none absolute right-1.5 top-1/2 flex h-8 min-w-8 -translate-y-1/2 items-center justify-center rounded-lg bg-violet-100 px-2 text-sm font-semibold text-violet-700">
           {suffix}
         </span>
       ) : null}
@@ -180,6 +190,10 @@ export default function CouponsScreen() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [actionMenu, setActionMenu] = useState<{
+    anchorEl: HTMLElement;
+    coupon: CouponRow;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -187,6 +201,8 @@ export default function CouponsScreen() {
   const [form, setForm] = useState<CouponPayload>(() => initialForm());
   const staff = useAppSelector((state) => state.user);
   const filtersRef = useRef<HTMLDivElement>(null);
+
+  const closeActionMenu = () => setActionMenu(null);
 
   const fetchCoupons = async () => {
     try {
@@ -260,17 +276,18 @@ export default function CouponsScreen() {
       discountType: coupon.discountType,
       discountValue: coupon.discountValue,
       minOrderAmount: coupon.minOrderAmount ?? 0,
-      maxDiscountAmount: coupon.maxDiscountAmount ?? 0,
+      maxDiscountAmount: coupon.maxDiscountAmount ?? null,
       startsAt: coupon.startsAt ? String(coupon.startsAt).slice(0, 10) : null,
       expiresAt: coupon.expiresAt ? String(coupon.expiresAt).slice(0, 10) : "",
-      usageLimit: coupon.usageLimit ?? 0,
-      perCustomerLimit: coupon.perCustomerLimit ?? 0,
+      usageLimit: coupon.usageLimit ?? null,
+      perCustomerLimit: coupon.perCustomerLimit ?? null,
       applicableOn:
         Array.isArray(coupon.applicableOn) && coupon.applicableOn.length
           ? coupon.applicableOn
           : ["all"],
       isActive: Boolean(coupon.isActive),
     });
+    closeActionMenu();
     setModalOpen(true);
   };
 
@@ -306,8 +323,9 @@ export default function CouponsScreen() {
           form.perCustomerLimit && Number(form.perCustomerLimit) > 0
             ? Number(form.perCustomerLimit)
             : null,
-        applicableOn:
-          form.applicableOn?.length ? form.applicableOn : ["all"],
+        applicableOn: form.applicableOn?.length
+          ? form.applicableOn
+          : ["all"],
         createdBy: {
           m_staff_id: staff.m_staff_id,
           m_staff_name: staff.m_staff_name,
@@ -335,6 +353,7 @@ export default function CouponsScreen() {
   };
 
   const toggleActive = async (coupon: CouponRow) => {
+    closeActionMenu();
     try {
       if (coupon.isActive) await handleDeactivateCoupon(coupon._id);
       else await handleActivateCoupon(coupon._id);
@@ -349,7 +368,34 @@ export default function CouponsScreen() {
     }
   };
 
+  const duplicateCoupon = (coupon: CouponRow) => {
+    closeActionMenu();
+    setEditingId(null);
+    setForm({
+      code: `${String(coupon.code || "COUPON").slice(0, 12)}COPY`,
+      title: `${coupon.title || "Coupon"} (Copy)`,
+      description: coupon.description ?? "",
+      discountType: coupon.discountType,
+      discountValue: coupon.discountValue,
+      minOrderAmount: coupon.minOrderAmount ?? 0,
+      maxDiscountAmount: coupon.maxDiscountAmount ?? null,
+      startsAt: null,
+      expiresAt: coupon.expiresAt
+        ? String(coupon.expiresAt).slice(0, 10)
+        : defaultExpiryYmd(),
+      usageLimit: coupon.usageLimit ?? null,
+      perCustomerLimit: coupon.perCustomerLimit ?? null,
+      applicableOn:
+        Array.isArray(coupon.applicableOn) && coupon.applicableOn.length
+          ? coupon.applicableOn
+          : ["all"],
+      isActive: true,
+    });
+    setModalOpen(true);
+  };
+
   const removeCoupon = async (coupon: CouponRow) => {
+    closeActionMenu();
     const result = await Swal.fire({
       title: "Delete coupon?",
       text: `${coupon.code} will be removed permanently.`,
@@ -384,9 +430,9 @@ export default function CouponsScreen() {
       {
         accessorKey: "code",
         header: "Code",
-        size: 130,
+        size: 120,
         Cell: ({ cell }) => (
-          <span className="font-semibold uppercase tracking-wide text-slate-900">
+          <span className="font-bold uppercase tracking-wide text-slate-900">
             {String(cell.getValue() ?? "")}
           </span>
         ),
@@ -394,7 +440,7 @@ export default function CouponsScreen() {
       {
         accessorKey: "title",
         header: "Title",
-        size: 160,
+        size: 180,
         Cell: ({ cell }) => (
           <span className="text-slate-800">{String(cell.getValue() ?? "")}</span>
         ),
@@ -405,14 +451,14 @@ export default function CouponsScreen() {
         size: 110,
         accessorFn: (row) => formatDiscount(row),
         Cell: ({ row }) => (
-          <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
+          <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
             {formatDiscount(row.original)}
           </span>
         ),
       },
       {
         id: "minOrder",
-        header: "Min. Order",
+        header: "Min Order",
         size: 110,
         accessorFn: (row) => Number(row.minOrderAmount ?? 0),
         Cell: ({ cell }) => (
@@ -423,7 +469,7 @@ export default function CouponsScreen() {
       },
       {
         id: "expiry",
-        header: "Expiry",
+        header: "Expires On",
         size: 120,
         accessorFn: (row) => row.expiresAt ?? "",
         Cell: ({ row }) => (
@@ -444,98 +490,11 @@ export default function CouponsScreen() {
               className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                 active
                   ? "bg-emerald-50 text-emerald-700"
-                  : "bg-slate-100 text-slate-600"
+                  : "bg-rose-50 text-rose-600"
               }`}
             >
               {active ? "Active" : "Inactive"}
             </span>
-          );
-        },
-      },
-      {
-        id: "applicableOn",
-        header: "Applies To",
-        size: 180,
-        enableSorting: false,
-        accessorFn: (row) =>
-          Array.isArray(row.applicableOn) && row.applicableOn.length
-            ? row.applicableOn.join(", ")
-            : "all",
-        Cell: ({ row }) => {
-          const scopes =
-            Array.isArray(row.original.applicableOn) &&
-            row.original.applicableOn.length
-              ? row.original.applicableOn
-              : ["all"];
-          return (
-            <div className="flex flex-wrap gap-1">
-              {scopes.map((scope) => (
-                <span
-                  key={scope}
-                  className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600"
-                >
-                  {scope}
-                </span>
-              ))}
-            </div>
-          );
-        },
-      },
-      {
-        id: "actions",
-        header: "Actions",
-        size: 140,
-        minSize: 130,
-        enableSorting: false,
-        enableColumnFilter: false,
-        Cell: ({ row }) => {
-          const coupon = row.original;
-          return (
-            <Can
-              anyOf={[PERMISSIONS.COUPON_MANAGE, PERMISSIONS.COUPON_READ]}
-            >
-              <div className="flex items-center justify-end gap-1.5">
-                <button
-                  type="button"
-                  title="Edit"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openEdit(coupon);
-                  }}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100"
-                >
-                  <Pencil size={15} />
-                </button>
-                <Can permission={PERMISSIONS.COUPON_MANAGE}>
-                  <button
-                    type="button"
-                    title={coupon.isActive ? "Deactivate" : "Activate"}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void toggleActive(coupon);
-                    }}
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition ${
-                      coupon.isActive
-                        ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                        : "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
-                    }`}
-                  >
-                    <Power size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    title="Delete"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void removeCoupon(coupon);
-                    }}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </Can>
-              </div>
-            </Can>
           );
         },
       },
@@ -546,75 +505,73 @@ export default function CouponsScreen() {
   const table = useMaterialReactTable({
     columns,
     data: filtered,
-    state: { isLoading: loading, globalFilter: search },
-    enableGlobalFilter: false,
-    enableColumnFilters: false,
-    enableDensityToggle: false,
-    enableFullScreenToggle: false,
-    enableHiding: false,
-    enableColumnActions: false,
-    enableColumnPinning: true,
+    state: { isLoading: loading },
+    enableRowActions: true,
+    positionActionsColumn: "last",
+    displayColumnDefOptions: {
+      "mrt-row-actions": {
+        header: "Action",
+        size: 88,
+      },
+    },
     initialState: {
       pagination: { pageIndex: 0, pageSize: 10 },
-      density: "comfortable",
-      columnPinning: { right: ["actions"] },
     },
     muiTablePaperProps: {
       elevation: 0,
-      sx: {
-        borderRadius: "12px",
-        border: "1px solid #e2e8f0",
-        boxShadow: "none",
-        overflow: "hidden",
-      },
+      style: { boxShadow: "none", border: "1px solid #e5e7eb" },
     },
     muiTableContainerProps: {
       sx: {
         maxWidth: "100%",
         overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
       },
     },
-    muiTableHeadCellProps: {
+    muiTableBodyRowProps: ({ row }) => ({
       sx: {
-        fontSize: "11px",
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "#64748b",
-        backgroundColor: "#f8fafc",
-        borderBottom: "1px solid #e2e8f0",
+        backgroundColor:
+          actionMenu?.coupon._id === row.original._id
+            ? "#f5f3ff"
+            : undefined,
       },
-    },
-    muiTableBodyRowProps: {
-      sx: {
-        "&:nth-of-type(even)": { backgroundColor: "#fafafa" },
-        "&:hover": { backgroundColor: "#f1f5f9" },
-      },
-    },
-    muiTableBodyCellProps: ({ column }) =>
-      column.id === "actions"
-        ? {
-            sx: {
-              backgroundColor: "#fff",
-              boxShadow: "-4px 0 8px -4px rgba(15, 23, 42, 0.12)",
-            },
-          }
-        : {},
-    muiPaginationProps: {
-      rowsPerPageOptions: [10, 25, 50],
-      showFirstButton: false,
-      showLastButton: false,
-    },
-    paginationDisplayMode: "pages",
+    }),
+    renderRowActions: ({ row }) => (
+      <Can anyOf={[PERMISSIONS.COUPON_MANAGE, PERMISSIONS.COUPON_READ]}>
+        <IconButton
+          size="small"
+          aria-label="Coupon actions"
+          onClick={(event) => {
+            event.stopPropagation();
+            setActionMenu({
+              anchorEl: event.currentTarget,
+              coupon: row.original,
+            });
+          }}
+          sx={{
+            border: "1px solid #e2e8f0",
+            borderRadius: "10px",
+            width: 36,
+            height: 36,
+            color: "#64748b",
+            backgroundColor: "#fff",
+            "&:hover": { backgroundColor: "#f8fafc", color: "#0f172a" },
+          }}
+        >
+          <MoreVertical size={16} />
+        </IconButton>
+      </Can>
+    ),
   });
+
+  const discountSuffix = form.discountType === "percentage" ? "%" : "₹";
 
   return (
     <div className="min-w-0 space-y-4 p-1 sm:p-2">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
-            <TicketPercent size={20} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+            <TicketPercent size={18} />
           </span>
           <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
             Coupons
@@ -632,7 +589,6 @@ export default function CouponsScreen() {
         </Can>
       </div>
 
-      {/* Search + Filters */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
           <Search
@@ -658,11 +614,6 @@ export default function CouponsScreen() {
           >
             <Filter size={16} />
             Filters
-            {statusFilter !== "all" ? (
-              <span className="rounded-full bg-violet-100 px-1.5 text-[10px] font-bold text-violet-700">
-                1
-              </span>
-            ) : null}
           </button>
           {filtersOpen ? (
             <div className="absolute right-0 z-20 mt-1.5 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
@@ -696,10 +647,102 @@ export default function CouponsScreen() {
 
       <MaterialReactTable table={table} />
 
-      {/* Create / Edit modal — portaled above app header so X + actions stay visible */}
+      <Menu
+        anchorEl={actionMenu?.anchorEl ?? null}
+        open={Boolean(actionMenu)}
+        onClose={closeActionMenu}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 0.5,
+              minWidth: 180,
+              borderRadius: "12px",
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 10px 30px rgba(15, 23, 42, 0.12)",
+              py: 0.5,
+            },
+          },
+        }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (!actionMenu) return;
+            openEdit(actionMenu.coupon);
+          }}
+          sx={{ py: 1.25, px: 1.5, gap: 0.5 }}
+        >
+          <ListItemIcon sx={{ minWidth: 32 }}>
+            <Pencil size={16} color="#3b82f6" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Edit"
+            primaryTypographyProps={{ fontSize: 14, color: "#334155" }}
+          />
+        </MenuItem>
+        <Can permission={PERMISSIONS.COUPON_MANAGE}>
+          <MenuItem
+            onClick={() => {
+              if (!actionMenu) return;
+              duplicateCoupon(actionMenu.coupon);
+            }}
+            sx={{ py: 1.25, px: 1.5, gap: 0.5 }}
+          >
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              <Copy size={16} color="#64748b" />
+            </ListItemIcon>
+            <ListItemText
+              primary="Duplicate"
+              primaryTypographyProps={{ fontSize: 14, color: "#334155" }}
+            />
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              if (!actionMenu) return;
+              void toggleActive(actionMenu.coupon);
+            }}
+            sx={{ py: 1.25, px: 1.5, gap: 0.5 }}
+          >
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              {actionMenu?.coupon.isActive ? (
+                <Power size={16} color="#64748b" />
+              ) : (
+                <PlayCircle size={16} color="#64748b" />
+              )}
+            </ListItemIcon>
+            <ListItemText
+              primary={
+                actionMenu?.coupon.isActive ? "Deactivate" : "Activate"
+              }
+              primaryTypographyProps={{ fontSize: 14, color: "#334155" }}
+            />
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              if (!actionMenu) return;
+              void removeCoupon(actionMenu.coupon);
+            }}
+            sx={{ py: 1.25, px: 1.5, gap: 0.5 }}
+          >
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              <Trash2 size={16} color="#e11d48" />
+            </ListItemIcon>
+            <ListItemText
+              primary="Delete"
+              primaryTypographyProps={{
+                fontSize: 14,
+                fontWeight: 500,
+                color: "#e11d48",
+              }}
+            />
+          </MenuItem>
+        </Can>
+      </Menu>
+
       {modalOpen
         ? createPortal(
-            <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4">
+            <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/45 p-0 sm:items-center sm:p-4">
               <button
                 type="button"
                 aria-label="Close overlay"
@@ -712,14 +755,22 @@ export default function CouponsScreen() {
                 aria-labelledby="coupon-modal-title"
                 className="relative z-[1] flex max-h-[min(94vh,100dvh)] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-2xl"
               >
-                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:px-6">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
-                      <TicketPercent size={20} />
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 sm:hidden"
+                      aria-label="Back"
+                    >
+                      <ArrowLeft size={18} />
+                    </button>
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                      <TicketPercent size={18} />
                     </span>
                     <h2
                       id="coupon-modal-title"
-                      className="text-lg font-bold text-slate-900 sm:text-xl"
+                      className="text-lg font-bold text-slate-900"
                     >
                       {editingId ? "Edit Coupon" : "Create Coupon"}
                     </h2>
@@ -727,14 +778,14 @@ export default function CouponsScreen() {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     aria-label="Close"
                   >
-                    <X size={20} strokeWidth={2.25} />
+                    <X size={18} />
                   </button>
                 </div>
 
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <FieldLabel required>Coupon Code</FieldLabel>
@@ -769,7 +820,7 @@ export default function CouponsScreen() {
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <FieldLabel>Discount Type</FieldLabel>
+                      <FieldLabel required>Discount Type</FieldLabel>
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
@@ -779,13 +830,13 @@ export default function CouponsScreen() {
                               discountType: "percentage",
                             }))
                           }
-                          className={`flex h-11 items-center justify-center rounded-xl border text-lg font-semibold transition ${
+                          className={`inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border text-sm font-semibold transition ${
                             form.discountType === "percentage"
-                              ? "border-violet-300 bg-violet-50 text-violet-700"
-                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                              ? "border-violet-600 bg-violet-600 text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                           }`}
                         >
-                          %
+                          <span className="text-base">%</span> Percentage
                         </button>
                         <button
                           type="button"
@@ -795,13 +846,13 @@ export default function CouponsScreen() {
                               discountType: "flat",
                             }))
                           }
-                          className={`flex h-11 items-center justify-center rounded-xl border text-lg font-semibold transition ${
+                          className={`inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border text-sm font-semibold transition ${
                             form.discountType === "flat"
-                              ? "border-violet-300 bg-violet-50 text-violet-700"
-                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                              ? "border-violet-600 bg-violet-600 text-white"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                           }`}
                         >
-                          ₹
+                          <span className="text-base">₹</span> Fixed Amount
                         </button>
                       </div>
                     </div>
@@ -818,9 +869,7 @@ export default function CouponsScreen() {
                             discountValue: Number(e.target.value) || 0,
                           }))
                         }
-                        suffix={
-                          form.discountType === "percentage" ? "%" : "₹"
-                        }
+                        suffix={discountSuffix}
                       />
                     </div>
                   </div>
@@ -828,36 +877,39 @@ export default function CouponsScreen() {
                   <div>
                     <FieldLabel required>Applicable On</FieldLabel>
                     <div className="flex flex-wrap gap-2">
-                      {APPLICABLE_OPTIONS.map(
-                        ({ value, label, icon: Icon }) => {
-                          const selected = (
-                            form.applicableOn ?? ["all"]
-                          ).includes(value);
-                          return (
-                            <button
-                              key={value}
-                              type="button"
-                              onClick={() =>
-                                setForm((prev) => ({
-                                  ...prev,
-                                  applicableOn: toggleApplicableOn(
-                                    prev.applicableOn ?? ["all"],
-                                    value,
-                                  ),
-                                }))
+                      {APPLICABLE_OPTIONS.map(({ value, label, icon: Icon }) => {
+                        const selected = (form.applicableOn ?? ["all"]).includes(
+                          value,
+                        );
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() =>
+                              setForm((prev) => ({
+                                ...prev,
+                                applicableOn: toggleApplicableOn(
+                                  prev.applicableOn ?? ["all"],
+                                  value,
+                                ),
+                              }))
+                            }
+                            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                              selected
+                                ? "border-violet-400 bg-violet-50 text-violet-700"
+                                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            <Icon
+                              size={14}
+                              className={
+                                selected ? "text-violet-600" : "text-slate-500"
                               }
-                              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition ${
-                                selected
-                                  ? "border-violet-300 bg-violet-50 text-violet-700"
-                                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                              }`}
-                            >
-                              <Icon size={14} />
-                              {label}
-                            </button>
-                          );
-                        },
-                      )}
+                            />
+                            {label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -868,73 +920,12 @@ export default function CouponsScreen() {
                         icon={Tag}
                         type="number"
                         min={0}
-                        value={form.minOrderAmount ?? 0}
+                        placeholder="E.g. 500"
+                        value={form.minOrderAmount || ""}
                         onChange={(e) =>
                           setForm((prev) => ({
                             ...prev,
                             minOrderAmount: Number(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div>
-                      <FieldLabel>Max Discount Cap (INR)</FieldLabel>
-                      <IconInput
-                        icon={Tag}
-                        type="number"
-                        min={0}
-                        value={form.maxDiscountAmount ?? 0}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            maxDiscountAmount: Number(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div>
-                      <FieldLabel>Total Usage Limit</FieldLabel>
-                      <IconInput
-                        icon={ShoppingBag}
-                        type="number"
-                        min={0}
-                        value={form.usageLimit ?? 0}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            usageLimit: Number(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div>
-                      <FieldLabel>Per Customer Limit</FieldLabel>
-                      <IconInput
-                        icon={User}
-                        type="number"
-                        min={0}
-                        value={form.perCustomerLimit ?? 0}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            perCustomerLimit: Number(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div>
-                      <FieldLabel>Start Date</FieldLabel>
-                      <IconInput
-                        icon={Calendar}
-                        type="date"
-                        value={toDateInput(form.startsAt)}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            startsAt: e.target.value || null,
                           }))
                         }
                       />
@@ -945,7 +936,6 @@ export default function CouponsScreen() {
                         icon={Calendar}
                         type="date"
                         value={toDateInput(form.expiresAt)}
-                        min={toDateInput(form.startsAt) || undefined}
                         onChange={(e) =>
                           setForm((prev) => ({
                             ...prev,
@@ -954,23 +944,33 @@ export default function CouponsScreen() {
                         }
                       />
                     </div>
+                    <div>
+                      <FieldLabel>Max Usage</FieldLabel>
+                      <IconInput
+                        icon={Users}
+                        type="number"
+                        min={0}
+                        placeholder="E.g. 100"
+                        value={form.usageLimit ?? ""}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            usageLimit: e.target.value
+                              ? Number(e.target.value) || null
+                              : null,
+                          }))
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                  <button
-                    type="button"
-                    onClick={() => setForm(initialForm())}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    <RotateCcw size={16} />
-                    Reset
-                  </button>
+                <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
                   <button
                     type="button"
                     onClick={() => void submit()}
                     disabled={saving}
-                    className="inline-flex h-11 w-full flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60 sm:max-w-md"
+                    className="inline-flex h-11 flex-[1.4] items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:opacity-60"
                   >
                     <Tag size={16} />
                     {saving
@@ -978,6 +978,14 @@ export default function CouponsScreen() {
                       : editingId
                         ? "Update Coupon"
                         : "Create Coupon"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm(initialForm())}
+                    className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    <RotateCcw size={16} />
+                    Reset
                   </button>
                 </div>
               </div>

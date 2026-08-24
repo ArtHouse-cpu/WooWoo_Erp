@@ -50,6 +50,12 @@ export const PERMISSIONS = Object.freeze({
   DEBIT_NOTE_READ: 'debit_note.read',
   DEBIT_NOTE_CREATE: 'debit_note.create',
 
+  // Expenses
+  EXPENSE_READ: 'expense.read',
+  EXPENSE_CREATE: 'expense.create',
+  EXPENSE_UPDATE: 'expense.update',
+  EXPENSE_DELETE: 'expense.delete',
+
   // Inventory
   INVENTORY_READ: 'inventory.read',
   INVENTORY_MANAGE: 'inventory.manage',
@@ -160,6 +166,12 @@ export const PERMISSION_CATALOG = Object.freeze([
   {key: PERMISSIONS.DEBIT_NOTE_READ, module: 'purchases', label: 'View debit notes'},
   {key: PERMISSIONS.DEBIT_NOTE_CREATE, module: 'purchases', label: 'Create debit notes'},
 
+  // Expenses
+  {key: PERMISSIONS.EXPENSE_READ, module: 'expenses', label: 'View expenses'},
+  {key: PERMISSIONS.EXPENSE_CREATE, module: 'expenses', label: 'Create expenses'},
+  {key: PERMISSIONS.EXPENSE_UPDATE, module: 'expenses', label: 'Update expenses / record payments'},
+  {key: PERMISSIONS.EXPENSE_DELETE, module: 'expenses', label: 'Delete expenses'},
+
   // Inventory
   {key: PERMISSIONS.INVENTORY_READ, module: 'inventory', label: 'View inventory'},
   {key: PERMISSIONS.INVENTORY_MANAGE, module: 'inventory', label: 'Manage inventory'},
@@ -236,6 +248,7 @@ export const MENU_PERMISSION_MAP = Object.freeze({
   '/create-purchase-order': PERMISSIONS.PURCHASE_ORDER_CREATE,
   '/debit-notes': PERMISSIONS.DEBIT_NOTE_READ,
   '/create-purchase-return': PERMISSIONS.DEBIT_NOTE_CREATE,
+  '/expenses': PERMISSIONS.EXPENSE_READ,
   '/inventory': PERMISSIONS.INVENTORY_READ,
   '/inventory-timeline': PERMISSIONS.INVENTORY_TIMELINE_READ,
   '/products': PERMISSIONS.PRODUCT_READ,

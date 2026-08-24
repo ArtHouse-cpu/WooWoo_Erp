@@ -723,9 +723,9 @@ export default function PosScreen() {
   const paidAmount = filteredData
     .filter((row) => row.status === "Paid")
     .reduce((sum, row) => sum + row.amount, 0);
-  const pendingAmount = filteredData
-    .filter((row) => row.status === "Pending")
-    .reduce((sum, row) => sum + row.amount, 0);
+    const DueAmount = totalAmount - paidAmount;
+    // .filter((row) => row.status === "Pending")
+    // .reduce((sum, row) => sum + row.amount, 0);
   const returnedAmount = filteredData.reduce(
     (sum, row) => sum + Number(row.returnedAmount || 0),
     0,
@@ -925,7 +925,7 @@ export default function PosScreen() {
           </span>
           <span className="rounded-lg bg-amber-50 px-2.5 py-1.5 font-medium text-amber-700">
             Pending ₹
-            {pendingAmount.toLocaleString("en-IN", {
+            {DueAmount.toLocaleString("en-IN", {
               minimumFractionDigits: 2,
             })}
           </span>

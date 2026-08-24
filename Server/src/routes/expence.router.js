@@ -16,11 +16,11 @@ const router = express.Router();
 
 router.use(authenticateUser, attachStaffContext);
 
-router.get('/', requirePermission(PERMISSIONS.EXPENCE_READ), getAllExpences);
-router.post('/:id/payments', requirePermission(PERMISSIONS.EXPENCE_UPDATE), recordExpencePayment);
-router.get('/:id', requirePermission(PERMISSIONS.EXPENCE_READ), getExpencesById);
-router.post('/', requirePermission(PERMISSIONS.EXPENCE_CREATE), uploadExpenceReceipt.single('receipt'), addExpencesById);
-router.patch('/:id', requirePermission(PERMISSIONS.EXPENCE_UPDATE), uploadExpenceReceipt.single('receipt'), updateExpencesById);
-router.delete('/:id', requirePermission(PERMISSIONS.EXPENCE_DELETE), deleteExpencesById);
+router.get('/', requirePermission(PERMISSIONS.EXPENSE_READ), getAllExpences);
+router.post('/:id/payments', requirePermission(PERMISSIONS.EXPENSE_UPDATE), recordExpencePayment);
+router.get('/:id', requirePermission(PERMISSIONS.EXPENSE_READ), getExpencesById);
+router.post('/', requirePermission(PERMISSIONS.EXPENSE_CREATE), uploadExpenceReceipt.single('receipt'), addExpencesById);
+router.patch('/:id', requirePermission(PERMISSIONS.EXPENSE_UPDATE), uploadExpenceReceipt.single('receipt'), updateExpencesById);
+router.delete('/:id', requirePermission(PERMISSIONS.EXPENSE_DELETE), deleteExpencesById);
 
 export default router;
