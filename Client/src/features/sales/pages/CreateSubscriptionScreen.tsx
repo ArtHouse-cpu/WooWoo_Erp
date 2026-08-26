@@ -11,13 +11,16 @@ import {
   handleUpdateCustomer,
   handleUpdateSubscription,
   handleGetCustomers,
-  handleBulkCreateSubscriptions ,
+  handleBulkCreateSubscriptions,
   type CustomerPayload,
   type CreateSubscriptionPayload,
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
-import { getCustomerMembershipTypeFromPlan, buildMembershipBenefitLines } from "../utils/membershipInvoiceUtils";
+import {
+  getCustomerMembershipTypeFromPlan,
+  buildMembershipBenefitLines,
+} from "../utils/membershipInvoiceUtils";
 import { printThermalReceipt } from "@/utils/printUtils";
 import {
   Camera,
@@ -478,6 +481,57 @@ const parseDurationToDays = (periodRaw: string): number => {
   return value * 30;
 };
 
+function classToGrade(classStd: string): number | null {
+  const v = String(classStd ?? "")
+    .trim()
+    .toUpperCase();
+  if (!v) return null;
+  if (v === "NURSERY") return 0; // treat as before 1
+  if (v === "KG1" || v === "KG-1") return 0;
+  if (v === "KG2" || v === "KG-2") return 0;
+    const n = Number(v);
+  if (!Number.isNaN(n) && n >= 1 && n <= 12) return n;
+  return null;
+}
+
+function yearsUntilClass12(classStd: string): number | null {
+  const grade = classToGrade(classStd);
+  if (grade == null) return null;
+  return Math.max(0, 12 - grade);
+}
+function computeJuniorEndDateFromClass(
+  startDateValue: string,
+  classStd: string,
+): string | null {
+  if (!startDateValue) return null;
+  const yearsLeft = yearsUntilClass12(classStd);
+  if (yearsLeft == null) return null;
+  const start = new Date(startDateValue);
+  if (Number.isNaN(start.getTime())) return null;
+  const y = start.getFullYear();
+  const m = start.getMonth();
+  // Current academic session ends on 31 Mar
+  let endYear = m >= 3 ? y + 1 : y; // Apr–Dec → next Mar; Jan–Mar → this Mar
+  endYear += yearsLeft;
+  const end = new Date(Date.UTC(endYear, 2, 31)); // month 2 = March
+  return end.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+/** If multiple students: use lowest grade (longest validity). */
+function pickJuniorClassForEndDate(
+  students: Array<{ classStd?: string }>,
+): string {
+  let best: { grade: number; classStd: string } | null = null;
+  for (const s of students) {
+    const classStd = String(s.classStd ?? "").trim();
+    const grade = classToGrade(classStd);
+    if (grade == null) continue;
+    if (!best || grade < best.grade) {
+      best = { grade, classStd };
+    }
+  }
+  return best?.classStd ?? "";
+}
+
 const computeEndDateFromPeriod = (
   startDateValue: string,
   periodRaw: string,
@@ -751,7 +805,15 @@ export default function CreateSubscriptionScreen({
     () => customers.find((c) => c._id === selectedCustomerId) ?? null,
     [customers, selectedCustomerId],
   );
-  const juniorSelected = isJuniorPlan(selectedMembership);
+  /** Junior UI: plan card OR saved membershipType (edit/view when plan list miss/Inactive). */
+  const juniorSelected =
+    isJuniorPlan(selectedMembership) ||
+    String(membership ?? "")
+      .toLowerCase()
+      .includes("junior") ||
+    String(membership ?? "")
+      .toLowerCase()
+      .includes("junoir");
 
   const selectedPlanBenefits = useMemo(
     () =>
@@ -805,20 +867,40 @@ export default function CreateSubscriptionScreen({
   const discountTotal = 0;
   const grandTotal = subTotal;
 
-  useEffect(() => {
-    if (!selectedMembership || endDateManuallyEdited) return;
-    const computedEndDate = computeEndDateFromPeriod(
-      startDate,
-      selectedMembership.period,
-    );
-    setEndDate(computedEndDate);
-  }, [selectedMembership, startDate, endDateManuallyEdited]);
+useEffect(() => {
+  if (!selectedMembership || endDateManuallyEdited) return;
+
+  // Junior → end date from class (valid up to Class 12)
+  if (isJuniorPlan(selectedMembership)) {
+    const classStd = pickJuniorClassForEndDate(students);
+    if (!classStd) return; // wait until class is filled
+
+    const juniorEnd = computeJuniorEndDateFromClass(startDate, classStd);
+    if (juniorEnd) setEndDate(juniorEnd);
+    return;
+  }
+
+  // Other plans → period-based (existing behaviour)
+  const computedEndDate = computeEndDateFromPeriod(
+    startDate,
+    selectedMembership.period,
+  );
+  setEndDate(computedEndDate);
+}, [
+  selectedMembership,
+  startDate,
+  endDateManuallyEdited,
+  students, // needed so class changes recompute end date
+]);
 
   useEffect(() => {
+    // Never wipe API-loaded students while viewing/editing.
+    // On create/upgrade only: clear when leaving Junior plan.
+    if (mode === "view" || mode === "edit") return;
     if (!juniorSelected) {
       setStudents([createEmptyStudent()]);
     }
-  }, [juniorSelected]);
+  }, [juniorSelected, mode]);
 
   const buildPayload = (
     status: "draft" | "active",
@@ -847,14 +929,14 @@ export default function CreateSubscriptionScreen({
       notes: notes.trim(),
       items: selectedMembership
         ? [
-          {
-            productName: selectedMembership.displayName,
-            qty: 1,
-            unitPrice: selectedMembership.amount,
-            discount: 0,
-            category: "membership",
-          },
-        ]
+            {
+              productName: selectedMembership.displayName,
+              qty: 1,
+              unitPrice: selectedMembership.amount,
+              discount: 0,
+              category: "membership",
+            },
+          ]
         : [],
       subTotal,
       discountTotal,
@@ -867,9 +949,9 @@ export default function CreateSubscriptionScreen({
       },
       students: juniorSelected
         ? students.map((student) => ({
-          ...student,
-          dob: student.dob || null,
-        }))
+            ...student,
+            dob: student.dob || null,
+          }))
         : [],
     };
   };
@@ -936,12 +1018,12 @@ export default function CreateSubscriptionScreen({
       }
       for (let i = 0; i < students.length; i += 1) {
         const s = students[i];
-        const classNumber = Number(s.classStd);
-        if (
-          !s.studentName.trim() ||
-          !s.schoolName.trim() ||
-          !s.classStd.trim()
-        ) {
+
+        const classValue = String(s.classStd ?? "")
+          .trim()
+          .toUpperCase();
+
+        if (!s.studentName.trim() || !s.schoolName.trim() || !classValue) {
           Swal.fire(
             "Incomplete student details",
             `Please fill student name, school name and class for student ${i + 1}.`,
@@ -949,14 +1031,24 @@ export default function CreateSubscriptionScreen({
           );
           return false;
         }
-        if (!Number.isFinite(classNumber) || classNumber > 12) {
+
+        // Allowed: Nursery, KG1, KG2, and Class 1–12
+        const allowedJuniorClass =
+          ["NURSERY", "KG1", "KG2"].includes(classValue) ||
+          (!isNaN(Number(classValue)) &&
+            Number.isInteger(Number(classValue)) &&
+            Number(classValue) >= 1 &&
+            Number(classValue) <= 12);
+
+        if (!allowedJuniorClass) {
           Swal.fire(
             "Invalid class",
-            `Junior membership is only valid for class 12 and below (student ${i + 1}).`,
+            `Junior membership is only valid for Nursery, KG1, KG2 and class 1–12 (student ${i + 1}).`,
             "warning",
           );
           return false;
         }
+
         if (!s.relation.trim() || !s.parentName.trim()) {
           Swal.fire(
             "Incomplete student details",
@@ -1010,7 +1102,7 @@ export default function CreateSubscriptionScreen({
       try {
         setLoadingMemberships(true);
         const response = await handleGetMemberships(
-          { status: "Active" },
+          { status: "All" },
           controller.signal,
         );
         const list = Array.isArray(response?.memberships)
@@ -1054,6 +1146,37 @@ export default function CreateSubscriptionScreen({
     return () => controller.abort();
   }, []);
 
+  // Edit/view: if membershipId missing or not in list, resolve Junior/other plan by type.
+  useEffect(() => {
+    if (!memberships.length) return;
+    if (
+      selectedMembershipId &&
+      memberships.some((m) => m._id === selectedMembershipId)
+    ) {
+      return;
+    }
+    const type = String(membership ?? "")
+      .trim()
+      .toLowerCase();
+    if (!type || type === "-" || type === "none") return;
+
+    const match = memberships.find((m) => {
+      const planId = String(m.planId ?? "")
+        .trim()
+        .toLowerCase();
+      const name = String(m.displayName ?? "")
+        .trim()
+        .toLowerCase();
+      return (
+        planId === type ||
+        name === type ||
+        name.includes(type) ||
+        type.includes(planId)
+      );
+    });
+    if (match) setSelectedMembershipId(match._id);
+  }, [memberships, selectedMembershipId, membership]);
+
   const handleCreateCustomerSubmit = async (args: {
     payload: CustomerPayload;
     profileImageFile?: File | null;
@@ -1089,7 +1212,49 @@ export default function CreateSubscriptionScreen({
     }
   };
 
-  
+  const handleUpdateOnly = async () => {
+    if (mode !== "edit" || !subscriptionId) return;
+    if (!validateBeforeCheckout()) return;
+
+    try {
+      setSaving(true);
+      const payload: CreateSubscriptionPayload = {
+        ...buildPayload("active"),
+        subscriptionCode: subscriptionNo,
+      };
+
+      await handleUpdateSubscription(subscriptionId, payload);
+
+      if (selectedCustomerId && selectedMembership) {
+        await handleUpdateCustomer(selectedCustomerId, {
+          membershipType: getCustomerMembershipType(selectedMembership),
+          membershipPlanId: selectedMembership._id,
+          priority: Math.max(
+            0,
+            Number(selectedMembership.priority ?? 0) || 0,
+          ),
+        });
+      }
+
+      await Swal.fire(
+        "Updated",
+        "Subscription updated successfully.",
+        "success",
+      );
+      if (onSave) onSave();
+      if (onClose) onClose();
+      else navigate(-1);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      Swal.fire(
+        "Update failed",
+        err?.response?.data?.message ?? "Could not update subscription.",
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSaveSubscription = async (payment: {
     mode: string;
@@ -1139,8 +1304,7 @@ export default function CreateSubscriptionScreen({
       );
       const payload: CreateSubscriptionPayload = {
         ...buildPayload("active"),
-        salesPersonName:
-          payment.invoiceBy?.staffName?.trim() || salesPerson,
+        salesPersonName: payment.invoiceBy?.staffName?.trim() || salesPerson,
         discountTotal: appliedDiscountTotal,
         grandTotal: payableTotal,
         subscriptionCode: subscriptionNo,
@@ -1150,47 +1314,6 @@ export default function CreateSubscriptionScreen({
         coupon: payment.coupon ?? null,
         referral: payment.referral ?? null,
       };
-      if (mode === "edit" && subscriptionId) {
-        await handleUpdateSubscription(subscriptionId, payload);
-        if (selectedCustomerId && selectedMembership) {
-          await handleUpdateCustomer(selectedCustomerId, {
-            membershipType: getCustomerMembershipType(selectedMembership),
-            membershipPlanId: selectedMembership._id,
-            priority: Math.max(
-              0,
-              Number(selectedMembership.priority ?? 0) || 0,
-            ),
-          });
-        }
-        printThermalReceipt({
-          invoiceNo: subscriptionNo,
-          customerName: customer.trim(),
-          customerPhone: phone.trim(),
-          items: [
-            {
-              name: selectedMembership?.displayName ?? "Membership",
-              qty: 1,
-              price: selectedMembership?.amount ?? 0,
-              discount: appliedDiscountTotal,
-            },
-          ],
-          totalMRP: subTotal,
-          discountTotal: appliedDiscountTotal,
-          finalAmount: payableTotal,
-          totalDue: payment.paymentBreakdown.dueAmount,
-          totalQty: 1,
-        });
-        Swal.fire(
-          "Updated",
-          "Subscription updated successfully.",
-          "success",
-        ).then(() => {
-          if (onSave) onSave();
-          if (onClose) onClose();
-          else navigate(-1);
-        });
-        return;
-      }
       const response = await handleCreateSubscription(payload);
       if (selectedCustomerId && selectedMembership) {
         const nextType = getCustomerMembershipType(selectedMembership);
@@ -1256,18 +1379,24 @@ export default function CreateSubscriptionScreen({
     }
   };
 
-  const updateStudent = (
-    index: number,
-    field: keyof StudentForm,
-    value: string,
-  ) => {
-    setStudents((prev) =>
-      prev.map((student, i) =>
-        i === index ? { ...student, [field]: value } : student,
-      ),
-    );
-  };
   
+
+ const updateStudent = (
+  index: number,
+  field: keyof StudentForm,
+  value: string,
+) => {
+  setStudents((prev) => {
+    const next = [...prev];
+    next[index] = { ...next[index], [field]: value };
+    return next;
+  });
+
+  // Optional: force auto end-date again when class changes
+  if (field === "classStd") {
+    setEndDateManuallyEdited(false);
+  }
+};
 
   const addStudent = () => {
     setStudents((prev) => [...prev, createEmptyStudent()]);
@@ -1320,8 +1449,8 @@ export default function CreateSubscriptionScreen({
             </p>
             <p className="mb-2 text-xs text-slate-600">
               <span className="font-semibold text-slate-800">Optional</span>{" "}
-              (can be blank, including Junior): studentName, classStd,
-              relation, parentName, studentId, schoolName, dob, notes.
+              (can be blank, including Junior): studentName, classStd, relation,
+              parentName, studentId, schoolName, dob, notes.
             </p>
             <p className="mb-2 text-xs text-amber-700">
               Duplicates are blocked automatically: same phone + membership +
@@ -1418,11 +1547,7 @@ export default function CreateSubscriptionScreen({
                       : [];
                     setBulkUploadErrors(failedRows);
                     const icon =
-                      failed > 0
-                        ? "warning"
-                        : skipped > 0
-                          ? "info"
-                          : "success";
+                      failed > 0 ? "warning" : skipped > 0 ? "info" : "success";
                     Swal.fire(
                       failed > 0
                         ? "Partial success"
@@ -1449,7 +1574,9 @@ export default function CreateSubscriptionScreen({
                         };
                       };
                     };
-                    const failedRows = Array.isArray(err?.response?.data?.results)
+                    const failedRows = Array.isArray(
+                      err?.response?.data?.results,
+                    )
                       ? err.response!.data!.results!.filter((r) => !r.success)
                       : [];
                     setBulkUploadErrors(
@@ -1613,9 +1740,7 @@ export default function CreateSubscriptionScreen({
                                   setSelectedCustomerId(selectedCustomer._id);
                                   setCustomer(selectedCustomer.name);
                                   setPhone(selectedCustomer.mobile);
-                                  setMembership(
-                                    hasMembership ? mType : "none",
-                                  );
+                                  setMembership(hasMembership ? mType : "none");
                                   const isJuniorCust =
                                     mType.toLowerCase().includes("junior") ||
                                     mType.toLowerCase().includes("junoir");
@@ -2159,19 +2284,29 @@ export default function CreateSubscriptionScreen({
                 <X size={16} />
                 {mode === "view" ? "Close" : "Cancel"}
               </button>
-              {mode !== "view" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (validateBeforeCheckout()) setOpenCheckout(true);
-                  }}
-                  disabled={saving}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[8.5rem]"
-                >
-                  <ShoppingCart size={16} />
-                  Checkout
-                </button>
-              )}
+              {mode !== "view" &&
+                (mode === "edit" ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleUpdateOnly()}
+                    disabled={saving}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[8.5rem]"
+                  >
+                    {saving ? "Updating..." : "Update"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (validateBeforeCheckout()) setOpenCheckout(true);
+                    }}
+                    disabled={saving}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[8.5rem]"
+                  >
+                    <ShoppingCart size={16} />
+                    Checkout
+                  </button>
+                ))}
             </div>
           </>
         )}
@@ -2185,7 +2320,7 @@ export default function CreateSubscriptionScreen({
         />
       )}
 
-      {mode !== "view" && (
+      {mode !== "view" && mode !== "edit" && (
         <CheckoutModal
           open={openCheckout}
           grandTotal={grandTotal}
@@ -2193,25 +2328,23 @@ export default function CreateSubscriptionScreen({
           items={
             selectedMembership
               ? [
-                {
-                  id: 1,
-                  name: selectedMembership.displayName,
-                  qty: 1,
-                  price: selectedMembership.amount,
-                  discount: 0,
-                  category: "membership",
-                  cashback: selectedMembership.walletCashbackAmount,
-                },
-              ]
+                  {
+                    id: 1,
+                    name: selectedMembership.displayName,
+                    qty: 1,
+                    price: selectedMembership.amount,
+                    discount: 0,
+                    category: "membership",
+                    cashback: selectedMembership.walletCashbackAmount,
+                  },
+                ]
               : []
           }
           initialCustomerName={customer}
           initialCustomerPhone={phone}
           initialCustomerId={selectedCustomerId || null}
           initialMembership={selectedMembership?.displayName ?? ""}
-          initialCashbackTotal={
-            selectedMembership?.walletCashbackAmount ?? 0
-          }
+          initialCashbackTotal={selectedMembership?.walletCashbackAmount ?? 0}
           onClose={() => setOpenCheckout(false)}
           onConfirmPayment={async (payment) => {
             setOpenCheckout(false);

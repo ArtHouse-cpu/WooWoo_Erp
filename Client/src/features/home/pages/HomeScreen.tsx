@@ -74,6 +74,7 @@ type RecentBill = {
   paymentType: string;
   category: BillCategory;
   createdAt: Date | null;
+  updatedAt: Date | null;
   raw: Record<string, unknown>;
 };
 
@@ -448,10 +449,9 @@ export default function HomeScreen() {
               paymentType: formatPaymentType(invoice?.mode),
               category: billCategoryFromItems(invoice?.items),
               createdAt:
-                parseDate(invoice?.invoiceDate) ||
-                parseDate(invoice?.createdAt) ||
-                parseDate(invoice?.updatedAt),
+                parseDate(invoice?.updatedAt) ?? parseDate(invoice?.createdAt),
               raw: invoice,
+
             };
           },
         );
