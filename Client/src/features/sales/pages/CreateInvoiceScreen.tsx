@@ -1177,6 +1177,13 @@ export default function CreateInvoiceScreen({
           extraCharges={extraCharges}
           membershipPlans={membershipPlans}
           onClose={() => setOpenCheckout(false)}
+          onSavedAndNew={() => {
+            setItems([]);
+            setCustomer("");
+            setPhone("");
+            setCustomerId("");
+            setNotes("");
+          }}
           onConfirmPayment={async (payment) => {
             setOpenCheckout(false);
             await handleSave(payment);

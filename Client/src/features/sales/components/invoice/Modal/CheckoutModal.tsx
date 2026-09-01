@@ -166,6 +166,8 @@ type Props = {
     expenseTitle?: string;
     expenseCategory?: string;
   }) => Promise<void>;
+  /** After draft save from Save & New — reset parent form (e.g. clear cart). */
+  onSavedAndNew?: () => void;
 };
 
 const EXPENSE_CATEGORIES = [
@@ -376,6 +378,7 @@ export default function CheckoutModal({
   checkoutContext = "sale",
   couponApplicableContext,
   onConfirmPayment,
+  onSavedAndNew,
 }: Props) {
   const isPurchaseCheckout = checkoutContext === "purchase";
   const isExpenseCheckout = checkoutContext === "expense";
@@ -1328,6 +1331,127 @@ export default function CheckoutModal({
         `DRAFT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`,
       ),
     );
+  };
+
+  const handleSaveAndNew = async () => {
+    if (isExpenseCheckout || isPurchaseCheckout) return;
+
+    if (!items.length) {
+      Swal.fire("No items", "Please add at least one item.", "warning");
+      return;
+    }
+    if (!billedStaff?.staffId || !(billedStaff.staffName || billedStaff.name)) {
+      Swal.fire(
+        "Staff verification required",
+        "Verify Staff PIN before saving.",
+        "warning",
+      );
+      return;
+    }
+
+    const salesPersonName =
+      billedStaff.staffName ||
+      billedStaff.name ||
+      staff.m_staff_name ||
+      "POS";
+    const today = new Date().toISOString().split("T")[0];
+    const draftTotal = finalPayable;
+
+    const draftPayload = {
+      customerName: customerName.trim() || "Walk-in Customer",
+      customerPhone: customerSearch.trim(),
+      customerId: selectedCustomer?._id ?? initialCustomerId ?? undefined,
+      invoiceDate: today,
+      dueDate: today,
+      salesPersonName,
+      invoiceBy: {
+        staffId: String(billedStaff.staffId || billedStaff._id || ""),
+        staffName: salesPersonName,
+        employeeId: billedStaff.employeeId || billedStaff.m_staff_id || "",
+        email: billedStaff.email || "",
+      },
+      verifiedAt: verifiedAt || initialVerifiedAt,
+      notes: instructionNotes.trim() || "Checkout draft",
+      items: items.map((item) => ({
+        productName: item.name,
+        qty: Number(item.qty),
+        unitPrice: Number(item.price),
+        discount: Number(item.discount ?? 0),
+        category: item.category || "General",
+        image: item.image || "",
+        isCsp: Boolean(item.isCsp),
+      })),
+      subTotal: items.reduce(
+        (sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0),
+        0,
+      ),
+      discountTotal:
+        lineDiscountsTotal + couponDiscount + referralDiscount,
+      extraCharges,
+      grandTotal: draftTotal,
+      coupon: couponCode.trim()
+        ? {
+            code: couponCode.trim().toUpperCase(),
+            discountAmount: couponDiscount,
+          }
+        : null,
+      referral: referralCodeApplied
+        ? {
+            code: referralCodeApplied,
+            discountAmount: referralDiscount,
+            inviterName: referralInviterName,
+            label: referralLabel,
+          }
+        : null,
+      status: "draft" as const,
+      mode: "Draft",
+      paymentStatus: "partial" as const,
+      paymentBreakdown: {
+        cash: 0,
+        upi: 0,
+        card: 0,
+        wallet: 0,
+        paidAmount: 0,
+        dueAmount: draftTotal,
+        changeAmount: 0,
+      },
+      pendingAmount: draftTotal,
+      cashbackTotal: displayCashbackTotal,
+      membershipDiscount: displayMembershipDiscount,
+      membershipType:
+        selectedCustomer?.membershipType || membership || undefined,
+      activityType: "Invoice",
+      createdBy: {
+        m_staff_id:
+          billedStaff.m_staff_id ||
+          billedStaff.staffId ||
+          staff.m_staff_id,
+        m_staff_name: salesPersonName,
+        m_staff_email: billedStaff.email || staff.m_staff_email || null,
+      },
+    };
+
+    try {
+      setSaving(true);
+      await handleCreateInvoice(draftPayload);
+      await Swal.fire(
+        "Saved",
+        `Draft saved by ${salesPersonName}. Start a new bill.`,
+        "success",
+      );
+      onSavedAndNew?.();
+      onSaved?.();
+      onClose();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      Swal.fire(
+        "Save failed",
+        err?.response?.data?.message ?? "Could not save draft.",
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleComplete = async () => {
@@ -2336,9 +2460,13 @@ export default function CheckoutModal({
           {!isExpenseCheckout ? (
             <button
               type="button"
-              className="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors"
+              onClick={() => {
+                void handleSaveAndNew();
+              }}
+              disabled={saving || items.length === 0}
+              className="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Save & New
+              {saving ? "Saving..." : "Save & New"}
             </button>
           ) : null}
           {!isExpenseCheckout ? (

@@ -6,6 +6,57 @@ import {computeStockByProductNames, getProductStockNames} from '../utils/invento
 const escapeRegex = (value) =>
   String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** Natural sort for variant labels (10, 12X24, 12X36, …). */
+const naturalCompare = (a, b) =>
+  String(a ?? '').localeCompare(String(b ?? ''), undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+
+const sortVariantDocs = (variants = []) =>
+  [...variants].sort((a, b) =>
+    naturalCompare(String(a?.name ?? ''), String(b?.name ?? '')),
+  );
+
+const getProductGroupKey = (row) => {
+  const parent = String(row?.parentProductName ?? '').trim();
+  if (parent) return parent.toLowerCase();
+
+  const name = String(row?.productName || row?.name || '').trim();
+  const variant = String(row?.variantName ?? '').trim();
+  if (variant && name.toLowerCase().endsWith(` - ${variant.toLowerCase()}`)) {
+    return name.slice(0, -(variant.length + 3)).trim().toLowerCase();
+  }
+  return name.toLowerCase();
+};
+
+/** Group product variants under parent; sort variant rows naturally within each group. */
+const sortCatalogueItems = (rows = []) =>
+  [...rows].sort((a, b) => {
+    const aIsProduct = String(a?.sourceType || '') === 'product';
+    const bIsProduct = String(b?.sourceType || '') === 'product';
+
+    if (aIsProduct && bIsProduct) {
+      const groupCmp = naturalCompare(
+        getProductGroupKey(a),
+        getProductGroupKey(b),
+      );
+      if (groupCmp !== 0) return groupCmp;
+
+      const vA = String(a?.variantName ?? '').trim();
+      const vB = String(b?.variantName ?? '').trim();
+      if (!vA && vB) return -1;
+      if (vA && !vB) return 1;
+      if (vA && vB) return naturalCompare(vA, vB);
+      return naturalCompare(a?.name, b?.name);
+    }
+
+    return naturalCompare(
+      String(a?.productName || a?.name || ''),
+      String(b?.productName || b?.name || ''),
+    );
+  });
+
 const variantMatchesSearch = (variant, searchRegex) => {
   if (!searchRegex) return true;
   const name = String(variant?.name ?? '');
@@ -33,7 +84,9 @@ const parentMatchesSearch = (product, searchRegex) => {
 const expandProductCatalogueRows = (product, searchRegex, stockByName) => {
   const parentName = String(product.productName ?? '').trim();
   const rawVariants = Array.isArray(product.variants) ? product.variants : [];
-  const variants = rawVariants.filter((v) => String(v?.name ?? '').trim());
+  const variants = sortVariantDocs(
+    rawVariants.filter((v) => String(v?.name ?? '').trim()),
+  );
   const isCsp = Boolean(product.isCsp);
   const parentHit = parentMatchesSearch(product, searchRegex);
   const rows = [];
@@ -406,14 +459,16 @@ export const lookupCatalogueItems = async (req, res) => {
     const foods = foodDocs.map(mapFood);
 
     // Dedupe AFTER merge so same-named services/parents cannot sit beside variants
-    const items = dedupeServiceWhenProductExists(
-      dedupeParentRowsWhenVariantsExist([
-        ...products,
-        ...services,
-        ...spaces,
-        ...foods,
-      ]),
-    ).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const items = sortCatalogueItems(
+      dedupeServiceWhenProductExists(
+        dedupeParentRowsWhenVariantsExist([
+          ...products,
+          ...services,
+          ...spaces,
+          ...foods,
+        ]),
+      ),
+    );
 
     const productCount = items.filter((i) => i.sourceType === 'product').length;
     const serviceCount = items.filter((i) => i.sourceType === 'service').length;

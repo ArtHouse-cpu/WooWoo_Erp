@@ -19,6 +19,7 @@ import {
   findCartItemForCatalogueLine,
   getCatalogueLineKey,
 } from "../utils/catalogueLineKey";
+import { filterCatalogueRowsForPos } from "../utils/cataloguePosFilter";
 
 const PAGE_SIZE = 48;
 
@@ -74,6 +75,9 @@ type ProductSidebarProps = {
   title?: string;
   /** Horizontal catalogue strip for mobile POS */
   variant?: "list" | "rail";
+  /** Controlled search (mobile POS top bar drives catalogue lookup). */
+  searchTerm?: string;
+  onSearchTermChange?: (value: string) => void;
 };
 
 const SOURCE_BADGE: Record<
@@ -109,8 +113,16 @@ export default function ProductSidebar({
   onDecrementItem,
   title = "Catalogue Sidebar",
   variant = "list",
+  searchTerm: searchTermProp,
+  onSearchTermChange,
 }: ProductSidebarProps) {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [internalSearch, setInternalSearch] = useState("");
+  const isControlledSearch =
+    searchTermProp !== undefined && onSearchTermChange !== undefined;
+  const searchTerm = isControlledSearch ? searchTermProp : internalSearch;
+  const setSearchTerm = isControlledSearch
+    ? onSearchTermChange
+    : setInternalSearch;
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
   const [items, setItems] = useState<CatalogueLookupItem[]>([]);
@@ -235,22 +247,10 @@ export default function ProductSidebar({
   };
 
   /** Hide empty parent tiles when any variant of that product name is in the list. */
-  const visibleItems = useMemo(() => {
-    const parentsWithVariants = new Set<string>();
-    for (const item of items) {
-      const parts = getCatalogueNameParts(item);
-      if (parts.variantName) {
-        parentsWithVariants.add(parts.parentName.trim().toLowerCase());
-      }
-    }
-    if (!parentsWithVariants.size) return items;
-
-    return items.filter((item) => {
-      const parts = getCatalogueNameParts(item);
-      if (parts.variantName) return true;
-      return !parentsWithVariants.has(parts.parentName.trim().toLowerCase());
-    });
-  }, [items]);
+  const visibleItems = useMemo(
+    () => filterCatalogueRowsForPos(items),
+    [items],
+  );
 
   return (
     <div

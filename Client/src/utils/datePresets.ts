@@ -6,7 +6,9 @@ export type DatePreset =
   | "yesterday"
   | "week"
   | "month"
+  | "lastMonth"
   | "year"
+  | "lastYear"
   | "custom";
 
 export const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
@@ -15,7 +17,9 @@ export const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
   { value: "yesterday", label: "Yesterday" },
   { value: "week", label: "This Week" },
   { value: "month", label: "This Month" },
+  { value: "lastMonth", label: "Last Month" },
   { value: "year", label: "This Year" },
+  { value: "lastYear", label: "Last Year" },
   { value: "custom", label: "Custom Range" },
 ];
 
@@ -26,6 +30,9 @@ export const SALES_DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] =
     { value: "yesterday", label: "Yesterday" },
     { value: "week", label: "This Week" },
     { value: "month", label: "This Month" },
+    { value: "lastMonth", label: "Last Month" },
+    { value: "year", label: "This Year" },
+    { value: "lastYear", label: "Last Year" },
     { value: "custom", label: "Custom Range" },
   ];
 
@@ -65,9 +72,20 @@ export function rangeForPreset(preset: DatePreset): { from: string; to: string }
     const start = new Date(today.getFullYear(), today.getMonth(), 1);
     return { from: toDateYmd(start), to: toDateYmd(today) };
   }
+  if (preset === "lastMonth") {
+    const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const end = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { from: toDateYmd(start), to: toDateYmd(end) };
+  }
   if (preset === "year") {
     const start = new Date(today.getFullYear(), 0, 1);
     return { from: toDateYmd(start), to: toDateYmd(today) };
+  }
+  if (preset === "lastYear") {
+    const y = today.getFullYear() - 1;
+    const start = new Date(y, 0, 1);
+    const end = new Date(y, 11, 31);
+    return { from: toDateYmd(start), to: toDateYmd(end) };
   }
   // "all" | "custom" — caller keeps or clears inputs
   return { from: "", to: "" };

@@ -46,6 +46,7 @@ import {
   findCartItemForCatalogueLine,
   getCatalogueLineKey,
 } from "../utils/catalogueLineKey";
+import { filterCatalogueRowsForPos } from "../utils/cataloguePosFilter";
 import { useNavigate } from "react-router-dom";
 
 
@@ -136,8 +137,19 @@ export default function CreatePosScreen({
   const [items, setItems] = useState<PosItem[]>([]);
 
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(() =>
+    typeof window !== "undefined"
+      ? window.matchMedia("(min-width: 1024px)").matches
+      : true,
+  );
 
-
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => setIsDesktopLayout(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -774,6 +786,13 @@ export default function CreatePosScreen({
   };
 
   useEffect(() => {
+    // Mobile: top search filters POS catalogue rail only (no separate dropdown list).
+    if (!isDesktopLayout) {
+      setProducts([]);
+      setSelectedProduct(null);
+      return;
+    }
+
     const term = debouncedSearchText;
     if (!term) {
       setProducts([]);
@@ -789,7 +808,8 @@ export default function CreatePosScreen({
           page: 1,
           limit: 48,
         });
-        setProducts(Array.isArray(response?.items) ? response.items : []);
+        const raw = Array.isArray(response?.items) ? response.items : [];
+        setProducts(filterCatalogueRowsForPos(raw));
       } catch {
         setProducts([]);
       } finally {
@@ -798,7 +818,7 @@ export default function CreatePosScreen({
     })();
 
     return () => controller.abort();
-  }, [debouncedSearchText]);
+  }, [debouncedSearchText, isDesktopLayout]);
 
   const handleRequestClose = async () => {
     const result = await Swal.fire({
@@ -1122,7 +1142,7 @@ export default function CreatePosScreen({
                 + Add New Product
               </button>
 
-              {(loadingProducts || products.length > 0) && (
+              {(loadingProducts || products.length > 0) && isDesktopLayout && (
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
                   {loadingProducts ? (
                     <div className="px-3 py-2 text-sm text-slate-500">
@@ -1193,6 +1213,11 @@ export default function CreatePosScreen({
                 <ProductSidebar
                   variant="rail"
                   cartItems={items}
+                  searchTerm={searchText}
+                  onSearchTermChange={(value) => {
+                    setSearchText(value);
+                    setSelectedProduct(null);
+                  }}
                   onAddItem={addSidebarItem}
                   onRemoveItem={removeSidebarItem}
                   onIncrementItem={incrementSidebarItem}
@@ -1680,6 +1705,9 @@ export default function CreatePosScreen({
             extraCharges={extraCharges}
             membershipPlans={membershipPlans}
             onClose={() => setOpenCheckout(false)}
+            onSavedAndNew={() => {
+              setItems([]);
+            }}
             onConfirmPayment={async (payment) => {
               setOpenCheckout(false);
               await handleSave(payment);
