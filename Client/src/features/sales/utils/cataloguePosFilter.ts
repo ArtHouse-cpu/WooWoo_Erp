@@ -4,6 +4,24 @@ import { getCatalogueNameParts } from "../components/CatalogueItemLabel";
 const naturalCompare = (a: string, b: string) =>
   a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
+/** Parse size labels like "3 × 3", "12X12", "12 x 24" for ascending dimension order. */
+const parseVariantDimensions = (label: string): [number, number] | null => {
+  const s = String(label ?? "").trim();
+  const m = s.match(/(\d+(?:\.\d+)?)\s*[x×X*]\s*(\d+(?:\.\d+)?)/i);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2])];
+};
+
+const compareVariantNames = (a: string, b: string) => {
+  const da = parseVariantDimensions(a);
+  const db = parseVariantDimensions(b);
+  if (da && db) {
+    if (da[0] !== db[0]) return da[0] - db[0];
+    if (da[1] !== db[1]) return da[1] - db[1];
+  }
+  return naturalCompare(a, b);
+};
+
 const getProductGroupKey = (item: CatalogueLookupItem): string => {
   const parent = String(item.parentProductName ?? "").trim();
   if (parent) return parent.toLowerCase();
@@ -32,7 +50,7 @@ export function sortCatalogueRowsForPos(
       const vB = String(b.variantName ?? "").trim();
       if (!vA && vB) return -1;
       if (vA && !vB) return 1;
-      if (vA && vB) return naturalCompare(vA, vB);
+      if (vA && vB) return compareVariantNames(vA, vB);
       return naturalCompare(
         String(a.productName || a.name || ""),
         String(b.productName || b.name || ""),

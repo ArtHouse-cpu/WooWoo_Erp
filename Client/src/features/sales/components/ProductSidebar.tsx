@@ -173,7 +173,7 @@ export default function ProductSidebar({
         if (requestId !== requestIdRef.current) return;
 
         const nextItems = Array.isArray(response?.items) ? response.items : [];
-        setItems(nextItems);
+        setItems(filterCatalogueRowsForPos(nextItems));
         setHasMore(Boolean(response?.pagination?.hasMore));
         setTotalAvailable(Number(response?.pagination?.total ?? nextItems.length));
       } catch {
@@ -223,7 +223,7 @@ export default function ProductSidebar({
               merged.push(item);
             }
           }
-          return merged;
+          return filterCatalogueRowsForPos(merged);
         });
         setHasMore(Boolean(response?.pagination?.hasMore));
         setTotalAvailable(

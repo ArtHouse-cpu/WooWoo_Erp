@@ -13,9 +13,27 @@ const naturalCompare = (a, b) =>
     sensitivity: 'base',
   });
 
+/** Parse size labels like "3 × 3", "12X12", "12 x 24" for ascending dimension order. */
+const parseVariantDimensions = (label) => {
+  const s = String(label ?? '').trim();
+  const m = s.match(/(\d+(?:\.\d+)?)\s*[x×X*]\s*(\d+(?:\.\d+)?)/i);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2])];
+};
+
+const compareVariantNames = (a, b) => {
+  const da = parseVariantDimensions(a);
+  const db = parseVariantDimensions(b);
+  if (da && db) {
+    if (da[0] !== db[0]) return da[0] - db[0];
+    if (da[1] !== db[1]) return da[1] - db[1];
+  }
+  return naturalCompare(a, b);
+};
+
 const sortVariantDocs = (variants = []) =>
   [...variants].sort((a, b) =>
-    naturalCompare(String(a?.name ?? ''), String(b?.name ?? '')),
+    compareVariantNames(String(a?.name ?? ''), String(b?.name ?? '')),
   );
 
 const getProductGroupKey = (row) => {
@@ -47,7 +65,7 @@ const sortCatalogueItems = (rows = []) =>
       const vB = String(b?.variantName ?? '').trim();
       if (!vA && vB) return -1;
       if (vA && !vB) return 1;
-      if (vA && vB) return naturalCompare(vA, vB);
+      if (vA && vB) return compareVariantNames(vA, vB);
       return naturalCompare(a?.name, b?.name);
     }
 
@@ -303,6 +321,34 @@ const mapFood = (food) => ({
   discountValue: 0,
 });
 
+/** Expand + dedupe + sort catalogue rows from fetched entity docs. */
+const buildSortedCatalogueItems = ({
+  productDocs,
+  serviceDocs,
+  spaceDocs,
+  foodDocs,
+  searchRegex,
+  stockMap,
+}) => {
+  const products = productDocs.flatMap((product) =>
+    expandProductCatalogueRows(product, searchRegex, stockMap),
+  );
+  const services = serviceDocs.map(mapService);
+  const spaces = spaceDocs.map(mapSpace);
+  const foods = foodDocs.map(mapFood);
+
+  return sortCatalogueItems(
+    dedupeServiceWhenProductExists(
+      dedupeParentRowsWhenVariantsExist([
+        ...products,
+        ...services,
+        ...spaces,
+        ...foods,
+      ]),
+    ),
+  );
+};
+
 /**
  * Unified catalogue lookup across products, services, spaces, and foods.
  * GET /catalogue/lookup?search=&limit=&page=&sourceType=
@@ -372,8 +418,13 @@ export const lookupCatalogueItems = async (req, res) => {
     const wantSpaces = sourceType === 'all' || sourceType === 'space';
     const wantFoods = sourceType === 'all' || sourceType === 'food';
 
-    // For "all", only page products; include other types on page 1 only.
-    const includeAuxOnThisPage = sourceType !== 'all' || page === 1;
+    // Search matches are expanded to variant rows — paginate rows, not parent products.
+    const useRowPagination = Boolean(searchRegex);
+
+    // For "all", only page products when browsing; include aux types on page 1 only.
+    // When searching, merge all matching types then slice the flat sorted row list.
+    const includeAuxOnThisPage =
+      useRowPagination || sourceType !== 'all' || page === 1;
     const auxLimit = sourceType === 'all' ? Math.min(limit, 24) : limit;
     const auxSkip = sourceType === 'all' ? 0 : skip;
 
@@ -382,11 +433,13 @@ export const lookupCatalogueItems = async (req, res) => {
     if (wantProducts) {
       tasks.push(
         Product.countDocuments(productFilter),
-        Product.find(productFilter)
-          .sort({createdAt: -1})
-          .skip(skip)
-          .limit(limit)
-          .lean(),
+        useRowPagination
+          ? Product.find(productFilter).sort({productName: 1, _id: 1}).lean()
+          : Product.find(productFilter)
+              .sort({createdAt: -1})
+              .skip(skip)
+              .limit(limit)
+              .lean(),
       );
     } else {
       tasks.push(Promise.resolve(0), Promise.resolve([]));
@@ -395,11 +448,13 @@ export const lookupCatalogueItems = async (req, res) => {
     if (wantServices && includeAuxOnThisPage) {
       tasks.push(
         Product.countDocuments(serviceFilter),
-        Product.find(serviceFilter)
-          .sort({createdAt: -1})
-          .skip(auxSkip)
-          .limit(auxLimit)
-          .lean(),
+        useRowPagination
+          ? Product.find(serviceFilter).sort({productName: 1, _id: 1}).lean()
+          : Product.find(serviceFilter)
+              .sort({createdAt: -1})
+              .skip(auxSkip)
+              .limit(auxLimit)
+              .lean(),
       );
     } else {
       tasks.push(Promise.resolve(0), Promise.resolve([]));
@@ -408,11 +463,13 @@ export const lookupCatalogueItems = async (req, res) => {
     if (wantSpaces && includeAuxOnThisPage) {
       tasks.push(
         Space.countDocuments(spaceFilter),
-        Space.find(spaceFilter)
-          .sort({createdAt: -1})
-          .skip(auxSkip)
-          .limit(auxLimit)
-          .lean(),
+        useRowPagination
+          ? Space.find(spaceFilter).sort({name: 1, _id: 1}).lean()
+          : Space.find(spaceFilter)
+              .sort({createdAt: -1})
+              .skip(auxSkip)
+              .limit(auxLimit)
+              .lean(),
       );
     } else {
       tasks.push(Promise.resolve(0), Promise.resolve([]));
@@ -421,11 +478,13 @@ export const lookupCatalogueItems = async (req, res) => {
     if (wantFoods && includeAuxOnThisPage) {
       tasks.push(
         Food.countDocuments(foodFilter),
-        Food.find(foodFilter)
-          .sort({createdAt: -1})
-          .skip(auxSkip)
-          .limit(auxLimit)
-          .lean(),
+        useRowPagination
+          ? Food.find(foodFilter).sort({name: 1, _id: 1}).lean()
+          : Food.find(foodFilter)
+              .sort({createdAt: -1})
+              .skip(auxSkip)
+              .limit(auxLimit)
+              .lean(),
       );
     } else {
       tasks.push(Promise.resolve(0), Promise.resolve([]));
@@ -450,25 +509,18 @@ export const lookupCatalogueItems = async (req, res) => {
         ? await computeStockByProductNames({names: productNames})
         : new Map();
 
-    const products = productDocs.flatMap((product) =>
-      expandProductCatalogueRows(product, searchRegex, stockMap),
-    );
+    const allItems = buildSortedCatalogueItems({
+      productDocs,
+      serviceDocs,
+      spaceDocs,
+      foodDocs,
+      searchRegex,
+      stockMap,
+    });
 
-    const services = serviceDocs.map(mapService);
-    const spaces = spaceDocs.map(mapSpace);
-    const foods = foodDocs.map(mapFood);
-
-    // Dedupe AFTER merge so same-named services/parents cannot sit beside variants
-    const items = sortCatalogueItems(
-      dedupeServiceWhenProductExists(
-        dedupeParentRowsWhenVariantsExist([
-          ...products,
-          ...services,
-          ...spaces,
-          ...foods,
-        ]),
-      ),
-    );
+    const items = useRowPagination
+      ? allItems.slice(skip, skip + limit)
+      : allItems;
 
     const productCount = items.filter((i) => i.sourceType === 'product').length;
     const serviceCount = items.filter((i) => i.sourceType === 'service').length;
@@ -482,7 +534,9 @@ export const lookupCatalogueItems = async (req, res) => {
     else if (sourceType === 'food') primaryTotal = foodTotal;
     else if (sourceType === 'all') primaryTotal = productTotal;
 
-    const hasMore = skip + limit < primaryTotal;
+    const hasMore = useRowPagination
+      ? skip + limit < allItems.length
+      : skip + limit < primaryTotal;
 
     return res.status(200).json({
       success: true,
@@ -500,7 +554,7 @@ export const lookupCatalogueItems = async (req, res) => {
         limit,
         skip,
         hasMore,
-        total: primaryTotal,
+        total: useRowPagination ? allItems.length : primaryTotal,
         sourceType,
       },
     });

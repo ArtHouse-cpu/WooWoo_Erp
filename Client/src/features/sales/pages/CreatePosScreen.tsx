@@ -928,18 +928,10 @@ export default function CreatePosScreen({
               <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                 <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-12">
                   <div className="relative col-span-1 min-w-0 lg:col-span-4">
-                    <div className="mb-1.5 flex items-center justify-between gap-1">
+                    <div className="mb-1.5">
                       <label className="text-xs font-semibold text-slate-600">
                         Select Customer
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => setShowCreateCustomerModal(true)}
-                        className="inline-flex items-center gap-0.5 rounded-md bg-violet-50 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-100"
-                      >
-                        <UserPlus size={11} />
-                        Add
-                      </button>
                     </div>
                     <div className="relative">
                       <User className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -965,8 +957,16 @@ export default function CreatePosScreen({
                           )
                         }
                         placeholder="Search customer…"
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-[4.25rem] text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateCustomerModal(true)}
+                        className="absolute right-1.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-0.5 rounded-lg bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-100 transition hover:bg-violet-100"
+                      >
+                        <UserPlus size={11} />
+                        Add
+                      </button>
                     </div>
                     {customerDropdownOpen &&
                       (loadingCustomers || customers.length > 0) && (
