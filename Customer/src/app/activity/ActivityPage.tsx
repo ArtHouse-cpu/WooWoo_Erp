@@ -24,7 +24,7 @@ import { authApi } from "../../services/auth.service";
 import { getErrorMessage } from "../../services/axios";
 import type { ActivityItem } from "../../types/auth";
 import type { ThermalPrintProps } from "../../thermalPrint/ThermalPrint";
-import { ThermalPrint } from "../../thermalPrint/ThermalPrint";
+import { InvoicePreviewModal } from "../../thermalPrint/InvoicePreviewModal";
 import { useAuthStore } from "../../store/authStore";
 import { mapActivityInvoiceToThermalPrint } from "./mapActivityInvoiceToThermalPrint";
 import { downloadThermalInvoicePdf } from '../../thermalPrint/downloadThermalInvoicePdf';
@@ -946,28 +946,10 @@ const handleDownloadInvoice = async () => {
         </div>
       )}
       {invoicePreview && (
-        <div className="fixed inset-0 z-[80] bg-black/50 flex items-start justify-center overflow-auto p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-[900px] w-full relative my-4">
-            <div className="sticky top-0 z-10 flex justify-end gap-2 bg-white/95 p-3 border-b border-black/5">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="rounded-lg bg-slate-100 px-3 py-1.5 text-[12px] font-bold"
-              >
-                Print
-              </button>
-              <button
-                type="button"
-                onClick={() => setInvoicePreview(null)}
-                className="rounded-lg bg-[#111111] text-white px-3 py-1.5 text-[12px] font-bold"
-              >
-                Close
-              </button>
-            </div>
-
-            <ThermalPrint {...invoicePreview} />
-          </div>
-        </div>
+        <InvoicePreviewModal
+          invoice={invoicePreview}
+          onClose={() => setInvoicePreview(null)}
+        />
       )}
     </div>
   );

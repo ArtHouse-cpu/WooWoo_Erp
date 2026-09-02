@@ -575,8 +575,17 @@ export default function HomeScreen() {
           const list = Array.isArray(res?.subscriptions)
             ? res.subscriptions
             : [];
+          const sortedList = [...list].sort((a, b) => {
+            const ta = parseDate(a?.createdAt)?.getTime() ?? 0;
+            const tb = parseDate(b?.createdAt)?.getTime() ?? 0;
+            if (tb !== ta) return tb - ta;
+            return (
+              Number(b?.subscriptionNumber ?? 0) -
+              Number(a?.subscriptionNumber ?? 0)
+            );
+          });
           setSubscriptions(
-            list.map((s: Record<string, unknown>, i: number) => {
+            sortedList.map((s: Record<string, unknown>, i: number) => {
               const plan = String(
                 s?.membershipType ||
                   s?.membershipPlan ||
@@ -595,10 +604,11 @@ export default function HomeScreen() {
                 amount: formatMoney(
                   Number(s?.grandTotal ?? s?.amount ?? 0),
                 ),
+                // Date column + sort key: prefer createdAt
                 createdAt:
+                  parseDate(s?.createdAt) ||
                   parseDate(s?.invoiceDate) ||
-                  parseDate(s?.startDate) ||
-                  parseDate(s?.createdAt),
+                  parseDate(s?.startDate),
               };
             }),
           );
@@ -769,7 +779,7 @@ export default function HomeScreen() {
 
   const filteredGeneric = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return genericRows.filter((row) => {
+    const filtered = genericRows.filter((row) => {
       if (row.createdAt !== undefined && !inDateRange(row.createdAt ?? null, dateFilter)) {
         return false;
       }
@@ -780,7 +790,18 @@ export default function HomeScreen() {
         row.meta.toLowerCase().includes(term)
       );
     });
-  }, [genericRows, search, dateFilter]);
+
+    // Subscriptions: always newest createdAt first (matches Date column)
+    if (tab === "subscriptions") {
+      return [...filtered].sort((a, b) => {
+        const ta = a.createdAt?.getTime() ?? 0;
+        const tb = b.createdAt?.getTime() ?? 0;
+        return tb - ta;
+      });
+    }
+
+    return filtered;
+  }, [genericRows, search, dateFilter, tab]);
 
   const tableTotal =
     tab === "bills"
@@ -1337,6 +1358,9 @@ export default function HomeScreen() {
                   <th className="px-4 py-3">
                     {tab === "subscriptions" ? "Plan" : "Category"}
                   </th>
+                  {tab === "subscriptions" ? (
+                    <th className="px-4 py-3">Date</th>
+                  ) : null}
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Amount</th>
                 </tr>
@@ -1345,7 +1369,10 @@ export default function HomeScreen() {
                 {tabLoading ? (
                   Array.from({ length: 4 }).map((_, i) => (
                     <tr key={i} className="border-t border-gray-50">
-                      <td colSpan={4} className="px-4 py-3">
+                      <td
+                        colSpan={tab === "subscriptions" ? 5 : 4}
+                        className="px-4 py-3"
+                      >
                         <div className="h-10 animate-pulse rounded-lg bg-gray-100" />
                       </td>
                     </tr>
@@ -1353,31 +1380,49 @@ export default function HomeScreen() {
                 ) : pageGeneric.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={tab === "subscriptions" ? 5 : 4}
                       className="px-4 py-12 text-center text-gray-500"
                     >
                       No {tab} found.
                     </td>
                   </tr>
                 ) : (
-                  pageGeneric.map((row) => (
-                    <tr key={row.id} className="border-t border-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {row.title}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">
-                        {row.subtitle}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600">
-                          {row.meta}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900">
-                        {row.amount || "—"}
-                      </td>
-                    </tr>
-                  ))
+                  pageGeneric.map((row) => {
+                    const when =
+                      tab === "subscriptions"
+                        ? formatBillDate(row.createdAt ?? null)
+                        : null;
+                    return (
+                      <tr key={row.id} className="border-t border-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          {row.title}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {row.subtitle}
+                        </td>
+                        {tab === "subscriptions" ? (
+                          <td className="px-4 py-3 text-gray-600">
+                            <div className="flex flex-col">
+                              <span>{when?.day || "—"}</span>
+                              {when?.time ? (
+                                <span className="text-[11px] text-gray-400">
+                                  {when.time}
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+                        ) : null}
+                        <td className="px-4 py-3">
+                          <span className="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                            {row.meta}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                          {row.amount || "—"}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

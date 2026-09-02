@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   X,
   ShoppingCart,
@@ -128,7 +128,7 @@ export default function CreatePosScreen({
   const [membershipPlans, setMembershipPlans] = useState<MembershipPlanPayload[]>([]);
   const [saving, setSaving] = useState(false);
   const staff = useAppSelector((state) => state.user);
-  const [invoiceNo] = useState(getNextInvoiceNumber());
+  const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(todayStr);
   const [dueDate, setDueDate] = useState(todayStr);
   const [extraCharges, setExtraCharges] = useState<Array<{ label: string; amount: number }>>([]);
@@ -142,6 +142,41 @@ export default function CreatePosScreen({
       ? window.matchMedia("(min-width: 1024px)").matches
       : true,
   );
+  const wasOpenRef = useRef(false);
+
+  /** Fresh bill: clear previous customer + cart when POS opens. */
+  const resetPosBill = () => {
+    setCustomer("");
+    setPhone("");
+    setMembership("none");
+    setMembershipPlanId(null);
+    setCustomerId(null);
+    setCustomers([]);
+    setCustomerDropdownOpen(false);
+    setShowCreateCustomerModal(false);
+    setCreatingCustomer(false);
+    setItems([]);
+    setSearchText("");
+    setProducts([]);
+    setSelectedProduct(null);
+    setDraftQty("1");
+    setExtraCharges([]);
+    setOpenCheckout(false);
+    setOpenDraftPin(false);
+    setShowCreateModal(false);
+    setShowExitConfirm(false);
+    const today = new Date().toISOString().split("T")[0];
+    setInvoiceDate(today);
+    setDueDate(today);
+    setInvoiceNo(getNextInvoiceNumber());
+  };
+
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) {
+      resetPosBill();
+    }
+    wasOpenRef.current = Boolean(isOpen);
+  }, [isOpen]);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -1707,6 +1742,22 @@ export default function CreatePosScreen({
             onClose={() => setOpenCheckout(false)}
             onSavedAndNew={() => {
               setItems([]);
+              setCustomer("");
+              setPhone("");
+              setMembership("none");
+              setMembershipPlanId(null);
+              setCustomerId(null);
+              setCustomers([]);
+              setCustomerDropdownOpen(false);
+              setExtraCharges([]);
+              setSearchText("");
+              setProducts([]);
+              setSelectedProduct(null);
+              setDraftQty("1");
+              const today = new Date().toISOString().split("T")[0];
+              setInvoiceDate(today);
+              setDueDate(today);
+              setInvoiceNo(getNextInvoiceNumber());
             }}
             onConfirmPayment={async (payment) => {
               setOpenCheckout(false);

@@ -495,6 +495,21 @@ export default function SubscriptionScreen() {
         },
       );
 
+      // Keep newest subscriptions first by createdAt
+      rows.sort((a, b) => {
+        const ta = new Date(a.raw?.createdAt ?? 0).getTime();
+        const tb = new Date(b.raw?.createdAt ?? 0).getTime();
+        if (Number.isFinite(tb) && Number.isFinite(ta) && tb !== ta) {
+          return tb - ta;
+        }
+        const na = Number(a.raw?.subscriptionNumber ?? 0);
+        const nb = Number(b.raw?.subscriptionNumber ?? 0);
+        return nb - na;
+      });
+      rows.forEach((row, index) => {
+        row.id = index + 1;
+      });
+
       setData(rows);
     } catch (error) {
       if (

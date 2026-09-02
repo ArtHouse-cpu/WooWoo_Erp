@@ -684,13 +684,14 @@ export const createSubscription = async (req, res) => {
 export const getSubscriptions = async (req, res) => {
   try {
     const search = String(req.query.search ?? '').trim();
-    const fromDate= String(req.query.fromDate ?? '').trim();
-    const toDate= String(req.query.toDate ?? '').trim();
-        const query={};
-    const dateFilter={};
+    const fromDate = String(req.query.fromDate ?? '').trim();
+    const toDate = String(req.query.toDate ?? '').trim();
+    const query = {};
+    const dateFilter = {};
 
     const limit = Math.min(Math.max(Number(req.query.limit) || 2000, 1), 5000);
-       if (fromDate) {
+
+    if (fromDate) {
       const from = new Date(`${fromDate}T00:00:00.000`);
       if (!Number.isNaN(from.getTime())) dateFilter.$gte = from;
     }
@@ -702,8 +703,26 @@ export const getSubscriptions = async (req, res) => {
       query.invoiceDate = dateFilter;
     }
 
+    if (search) {
+      const regex = new RegExp(
+        String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        'i',
+      );
+      query.$or = [
+        {subscriptionCode: regex},
+        {customerName: regex},
+        {customerPhone: regex},
+        {membershipType: regex},
+        {status: regex},
+      ];
+    }
 
-    const subscriptions = await Subscription.find(query).lean();
+    // Newest first so dashboard / list show recent subscriptions on top
+    const subscriptions = await Subscription.find(query)
+      .sort({createdAt: -1, subscriptionNumber: -1, _id: -1})
+      .limit(limit)
+      .lean();
+
     return res.status(200).json({
       success: true,
       message: 'Subscriptions fetched successfully.',
@@ -716,7 +735,7 @@ export const getSubscriptions = async (req, res) => {
       message: 'Failed to fetch subscriptions.',
     });
   }
-}
+};
 export const getSubscriptionById = async (req, res) => {
   try {
     const {id} = req.params;
