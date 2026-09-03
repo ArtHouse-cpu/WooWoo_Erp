@@ -5,6 +5,7 @@ export type DatePreset =
   | "today"
   | "yesterday"
   | "week"
+  | "lastWeek"
   | "month"
   | "lastMonth"
   | "year"
@@ -16,6 +17,7 @@ export const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
   { value: "today", label: "Today" },
   { value: "yesterday", label: "Yesterday" },
   { value: "week", label: "This Week" },
+  { value: "lastWeek", label: "Last Week" },
   { value: "month", label: "This Month" },
   { value: "lastMonth", label: "Last Month" },
   { value: "year", label: "This Year" },
@@ -29,11 +31,10 @@ export const SALES_DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] =
     { value: "today", label: "Today" },
     { value: "yesterday", label: "Yesterday" },
     { value: "week", label: "This Week" },
+    { value: "lastWeek", label: "Last Week" },
     { value: "month", label: "This Month" },
     { value: "lastMonth", label: "Last Month" },
-    { value: "year", label: "This Year" },
-    { value: "lastYear", label: "Last Year" },
-    { value: "custom", label: "Custom Range" },
+    { value: "custom", label: "Custom Date" },
   ];
 
 export function toDateYmd(value: Date): string {
@@ -67,6 +68,14 @@ export function rangeForPreset(preset: DatePreset): { from: string; to: string }
     const day = start.getDay() || 7; // Monday start
     start.setDate(start.getDate() - (day - 1));
     return { from: toDateYmd(start), to: toDateYmd(today) };
+  }
+  if (preset === "lastWeek") {
+    const start = new Date(today);
+    const day = start.getDay() || 7; // Monday start
+    start.setDate(start.getDate() - (day - 1) - 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { from: toDateYmd(start), to: toDateYmd(end) };
   }
   if (preset === "month") {
     const start = new Date(today.getFullYear(), today.getMonth(), 1);

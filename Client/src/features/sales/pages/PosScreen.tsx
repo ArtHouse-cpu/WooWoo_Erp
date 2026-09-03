@@ -78,7 +78,7 @@ function paymentStatusForWhatsApp(
   return rowStatus;
 }
 
-const tabs: PosRow["status"][] = ["Paid", "Pending", "Cancelled", "Draft"];
+const tabs: PosRow["status"][] = ["Paid", "Pending", "Draft", "Cancelled"];
 
 export default function PosScreen() {
   const navigate = useNavigate();
@@ -735,18 +735,18 @@ export default function PosScreen() {
     "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
   return (
-    <div className="min-w-0 space-y-3 p-1 sm:space-y-4">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-w-0 space-y-2.5 p-1 sm:space-y-4">
+      {/* Header — create actions stay on desktop; mobile uses a cleaner scan layout */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="flex items-center gap-2.5">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
             Sales
           </h1>
           <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
             {statusCounts.All}
           </span>
         </div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-[22rem]">
+        <div className="hidden w-full grid-cols-2 gap-2 sm:grid sm:w-auto sm:min-w-[22rem]">
           <Can permission={PERMISSIONS.INVOICE_CREATE}>
             <button
               type="button"
@@ -768,9 +768,9 @@ export default function PosScreen() {
         </div>
       </div>
 
-      {/* Status tabs */}
+      {/* Status tabs: All → Paid → Pending → Draft → Cancelled */}
       <div className="hide-scrollbar -mx-1 overflow-x-auto px-1">
-        <div className="flex min-w-max items-stretch gap-1 border-b border-slate-200">
+        <div className="flex min-w-max items-stretch gap-0.5 border-b border-slate-200">
           {(
             [
               { key: "All" as const, label: "All" },
@@ -783,7 +783,7 @@ export default function PosScreen() {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`relative shrink-0 px-3.5 pb-2.5 pt-1 text-sm font-medium transition ${
+                className={`relative shrink-0 px-3 pb-2 pt-1 text-sm font-medium transition sm:px-3.5 sm:pb-2.5 ${
                   active
                     ? "text-blue-700"
                     : "text-slate-500 hover:text-slate-800"
@@ -804,40 +804,22 @@ export default function PosScreen() {
         </div>
       </div>
 
-      {/* Compact filters */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      {/* Compact search + date filter */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm sm:p-4">
         <div className="flex items-center gap-2">
           <div className="relative min-w-0 flex-1">
             <Search
               size={16}
-              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search invoice no., customer or mobile"
-              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-10 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              placeholder="Search invoice no., customer…"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 sm:h-11 sm:pl-10"
             />
           </div>
-          <select
-            value={activeTab}
-            onChange={(e) =>
-              setActiveTab(e.target.value as PosRow["status"] | "All")
-            }
-            className="h-11 w-[7.5rem] shrink-0 rounded-xl border border-slate-200 bg-white px-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:w-40 sm:px-3"
-            aria-label="Payment status"
-          >
-            <option value="All">All statuses</option>
-            {tabs.map((tab) => (
-              <option key={tab} value={tab}>
-                {tab}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-2">
           <select
             value={datePreset}
             onChange={(e) => {
@@ -848,7 +830,8 @@ export default function PosScreen() {
               setFromDate(range.from);
               setToDate(range.to);
             }}
-            className={`${controlClass} min-w-0 flex-1 sm:max-w-[11rem] sm:flex-none`}
+            className="h-10 w-[7.75rem] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:h-11 sm:w-40 sm:px-3"
+            aria-label="Date range"
           >
             {SALES_DATE_PRESET_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -856,57 +839,42 @@ export default function PosScreen() {
               </option>
             ))}
           </select>
-
-          <button
-            type="button"
-            onClick={() => {
-              setSearch("");
-              setActiveTab("All");
-              setDatePreset("today");
-              const range = rangeForPreset("today");
-              setFromDate(range.from);
-              setToDate(range.to);
-            }}
-            className="h-10 shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-          >
-            Clear
-          </button>
-
-          {datePreset === "custom" ? (
-            <>
-              <div className="flex w-full items-center gap-2 sm:w-auto">
-                <label className="shrink-0 text-xs font-medium text-slate-500">
-                  From
-                </label>
-                <input
-                  type="date"
-                  value={fromDate}
-                  max={toDate || undefined}
-                  onChange={(e) => {
-                    setFromDate(e.target.value);
-                    setDatePreset("custom");
-                  }}
-                  className={controlClass}
-                />
-              </div>
-              <div className="flex w-full items-center gap-2 sm:w-auto">
-                <label className="shrink-0 text-xs font-medium text-slate-500">
-                  To
-                </label>
-                <input
-                  type="date"
-                  value={toDate}
-                  min={fromDate || undefined}
-                  onChange={(e) => {
-                    setToDate(e.target.value);
-                    setDatePreset("custom");
-                  }}
-                  className={controlClass}
-                />
-              </div>
-            </>
-          ) : null}
         </div>
+
+        {datePreset === "custom" ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+              <label className="shrink-0 text-xs font-medium text-slate-500">
+                From
+              </label>
+              <input
+                type="date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => {
+                  setFromDate(e.target.value);
+                  setDatePreset("custom");
+                }}
+                className={controlClass}
+              />
+            </div>
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+              <label className="shrink-0 text-xs font-medium text-slate-500">
+                To
+              </label>
+              <input
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setDatePreset("custom");
+                }}
+                className={controlClass}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="table-scroll min-w-0 overflow-hidden rounded-2xl">
