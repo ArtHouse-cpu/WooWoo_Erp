@@ -68,6 +68,12 @@ const invoiceItemSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    /** Membership cashback ₹ for this line (stored for proportional reverse on return). */
+    cashback: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     /** Accumulated qty already returned against this line */
     returnedQty: {
       type: Number,
@@ -232,6 +238,12 @@ const invoiceSchema = new mongoose.Schema(
     },
     /** Membership cashback credited to wallet for this invoice (₹). */
     cashbackTotal: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    /** Cashback already reversed from wallet (cancel / delete / returns). */
+    cashbackReversedTotal: {
       type: Number,
       min: 0,
       default: 0,

@@ -23,6 +23,10 @@ import { creditReferralDiscountToInviter, markReferralDiscountUsed } from '../mo
 import { sendActivityUpdateWhatsApp } from '../modules/customer/services/whatsapp.service.js';
 import { normalizeMobile } from '../modules/customer/utils/normalize.js';
 import {normalizeLineType} from '../utils/itemClassification.utils.js';
+import {
+  remainingCashbackToReverse,
+  reverseMembershipCashback,
+} from '../services/membershipCashbackWallet.service.js';
 
 const roundMoney = value => {
   const n = Number(value);
@@ -554,12 +558,14 @@ const createInvoice = async (req, res) => {
       const unitPrice = Number(item.unitPrice);
       const discount = Number(item.discount ?? 0);
       const lineTotal = qty * unitPrice - discount;
+      const cashback = Math.max(0, Number(item.cashback ?? 0) || 0);
       return {
         productName: String(item.productName ?? '').trim(),
         qty,
         unitPrice,
         discount,
         lineTotal,
+        cashback,
         category: normalizeLineType(item.category || item.lineCategory || 'product'),
       };
     });
@@ -1049,19 +1055,40 @@ const deleteInvoice = async (req, res) => {
     }
 
     const walletAmount = Number(invoice.paymentBreakdown?.wallet ?? 0);
-    if (walletAmount > 0) {
-      const customer = await findCustomerForInvoice({
-        customerPhone: invoice.customerPhone,
-        customerName: invoice.customerName,
+    const customer = await findCustomerForInvoice({
+      customerId: invoice.customerId,
+      customerPhone: invoice.customerPhone,
+      customerName: invoice.customerName,
+    });
+    if (walletAmount > 0 && customer) {
+      await applyWalletDelta({
+        customer,
+        invoiceCode: invoice.invoiceCode,
+        amount: -walletAmount,
+        createdBy: buildCreatedBy(req),
+        note: `Wallet refunded for deleted invoice ${invoice.invoiceCode}`,
       });
-      if (customer) {
-        await applyWalletDelta({
+    }
+
+    const cashbackLeft = remainingCashbackToReverse(invoice);
+    if (cashbackLeft > 0 && customer) {
+      try {
+        const result = await reverseMembershipCashback({
           customer,
+          amount: cashbackLeft,
           invoiceCode: invoice.invoiceCode,
-          amount: -walletAmount,
+          referenceId: `${invoice.invoiceCode}:cashback-delete`,
+          note: `Cashback reversed — invoice ${invoice.invoiceCode} deleted`,
           createdBy: buildCreatedBy(req),
-          note: `Wallet refunded for deleted invoice ${invoice.invoiceCode}`,
         });
+        if (result.reversed > 0) {
+          invoice.cashbackReversedTotal = roundMoney(
+            Number(invoice.cashbackReversedTotal || 0) + result.reversed,
+          );
+          await invoice.save();
+        }
+      } catch (cbError) {
+        console.error('deleteInvoice cashback reverse error:', cbError);
       }
     }
 
@@ -1149,12 +1176,19 @@ const updateInvoice = async (req, res) => {
         const discount = Number(item.discount ?? 0);
         const lineTotal = qty * unitPrice - discount;
         const previous = existingItems[idx] || {};
+        const cashback = Math.max(
+          0,
+          Number(
+            item.cashback ?? previous.cashback ?? 0,
+          ) || 0,
+        );
         return {
           productName: String(item.productName ?? '').trim(),
           qty,
           unitPrice,
           discount,
           lineTotal,
+          cashback,
           category: normalizeLineType(item.category || item.lineCategory || 'product'),
           returnedQty: Math.max(0, Number(previous.returnedQty) || 0),
           isGift: Boolean(previous.isGift || item.isGift),
@@ -1391,19 +1425,39 @@ const cancelInvoice = async (req, res) => {
     }
 
     const walletAmount = Number(invoice.paymentBreakdown?.wallet ?? 0);
-    if (walletAmount > 0) {
-      const customer = await findCustomerForInvoice({
-        customerPhone: invoice.customerPhone,
-        customerName: invoice.customerName,
+    const customer = await findCustomerForInvoice({
+      customerId: invoice.customerId,
+      customerPhone: invoice.customerPhone,
+      customerName: invoice.customerName,
+    });
+    if (walletAmount > 0 && customer) {
+      await applyWalletDelta({
+        customer,
+        invoiceCode: invoice.invoiceCode,
+        amount: -walletAmount,
+        createdBy: buildCreatedBy(req),
+        note: `Wallet refunded for cancelled invoice ${invoice.invoiceCode}`,
       });
-      if (customer) {
-        await applyWalletDelta({
+    }
+
+    const cashbackLeft = remainingCashbackToReverse(invoice);
+    if (cashbackLeft > 0 && customer) {
+      try {
+        const result = await reverseMembershipCashback({
           customer,
+          amount: cashbackLeft,
           invoiceCode: invoice.invoiceCode,
-          amount: -walletAmount,
+          referenceId: `${invoice.invoiceCode}:cashback-cancel`,
+          note: `Cashback reversed — invoice ${invoice.invoiceCode} cancelled`,
           createdBy: buildCreatedBy(req),
-          note: `Wallet refunded for cancelled invoice ${invoice.invoiceCode}`,
         });
+        if (result.reversed > 0) {
+          invoice.cashbackReversedTotal = roundMoney(
+            Number(invoice.cashbackReversedTotal || 0) + result.reversed,
+          );
+        }
+      } catch (cbError) {
+        console.error('cancelInvoice cashback reverse error:', cbError);
       }
     }
 
@@ -1420,11 +1474,8 @@ const cancelInvoice = async (req, res) => {
       console.error('cancelInvoice CSP reverse error:', cspError);
     }
 
-    const updatedInvoice = await Invoice.findByIdAndUpdate(
-      id,
-      { $set: { status: 'cancelled' } },
-      { new: true }
-    );
+    invoice.status = 'cancelled';
+    const updatedInvoice = await invoice.save();
 
     return res.status(200).json({
       success: true,
@@ -1438,3 +1489,4 @@ const cancelInvoice = async (req, res) => {
 };
 
 export { createInvoice, getInvoices, getInvoice, deleteInvoice, updateInvoice, cancelInvoice };
+

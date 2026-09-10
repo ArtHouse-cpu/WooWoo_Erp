@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
 import Swal from "sweetalert2";
 
@@ -13,7 +13,7 @@ type Props = {
 
 /**
  * Full-screen overlay shell for embedding create/view document forms as modals
- * (keeps the user on the list page).
+ * (keeps the user on the list page). Mobile: edge-to-edge sheet with safe areas.
  */
 export default function DocumentFormModal({
   open = true,
@@ -22,6 +22,15 @@ export default function DocumentFormModal({
   confirmOnClose = false,
   className = "",
 }: Props) {
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const handleClose = async () => {
@@ -43,7 +52,7 @@ export default function DocumentFormModal({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-stretch justify-center overflow-y-auto bg-black/40 backdrop-blur-sm sm:items-center sm:p-4 md:p-6"
+      className="fixed inset-0 z-[70] flex items-stretch justify-center bg-black/40 backdrop-blur-sm sm:items-center sm:p-4 md:p-6"
       role="dialog"
       aria-modal="true"
     >
@@ -54,21 +63,24 @@ export default function DocumentFormModal({
         onClick={() => void handleClose()}
       />
       <div
-        className={`relative z-10 flex h-dvh max-h-dvh w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:my-4 sm:h-auto sm:max-h-[92vh] sm:rounded-2xl ${className}`}
+        className={`relative z-10 flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:my-4 sm:h-auto sm:max-h-[92vh] sm:rounded-2xl ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="safe-top flex shrink-0 items-center justify-end border-b border-gray-100 px-3 py-2">
+        <div className="safe-top flex shrink-0 items-center justify-between gap-2 border-b border-gray-100 bg-white px-3 py-2 sm:justify-end">
+          <p className="truncate text-sm font-semibold text-slate-800 sm:hidden">
+            Details
+          </p>
           <button
             type="button"
             onClick={() => void handleClose()}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+            className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
             aria-label="Close"
           >
             <X size={18} />
-            Close
+            <span className="sm:inline">Close</span>
           </button>
         </div>
-        <div className="safe-pb min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
+        <div className="safe-pb min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] p-2.5 sm:p-4">
           {children}
         </div>
       </div>

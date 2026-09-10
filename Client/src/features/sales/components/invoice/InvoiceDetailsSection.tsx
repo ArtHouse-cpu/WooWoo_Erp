@@ -126,8 +126,8 @@ export default function InvoiceDetailsSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-12 lg:gap-4">
-        <div className="relative col-span-1 min-w-0 lg:col-span-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3 lg:grid-cols-12 lg:gap-4">
+        <div className="relative min-w-0 sm:col-span-1 lg:col-span-4">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <label className="block text-xs font-semibold text-slate-600">
               {readOnly ? "Customer" : selectorLabel || "Select Customer"}
@@ -219,7 +219,7 @@ export default function InvoiceDetailsSection({
           )}
         </div>
 
-        <div className="col-span-1 min-w-0 lg:col-span-4">
+        <div className="min-w-0 sm:col-span-1 lg:col-span-4">
           <div className="mb-1.5 flex items-center justify-between gap-1">
             <label className="block text-xs font-semibold text-slate-600">
               {phoneLabel || "Phone"}
@@ -256,7 +256,7 @@ export default function InvoiceDetailsSection({
           </div>
         </div>
 
-        <div className="col-span-1 lg:col-span-2">
+        <div className="min-w-0 sm:col-span-1 lg:col-span-2">
           <label className={labelStyle}>
             {dateLabel || "Invoice Date"}
           </label>
@@ -279,7 +279,7 @@ export default function InvoiceDetailsSection({
         </div>
 
         {showDueDate ? (
-          <div className="col-span-1 lg:col-span-2">
+          <div className="min-w-0 sm:col-span-1 lg:col-span-2">
             <label className={labelStyle}>Due Date</label>
             <input
               type="date"

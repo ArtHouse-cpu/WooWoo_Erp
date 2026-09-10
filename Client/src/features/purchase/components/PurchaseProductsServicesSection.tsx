@@ -185,6 +185,11 @@ export default function ProductsServicesSection({
     [gridItems, selectedType],
   );
 
+  const totalSelectedQty = useMemo(
+    () => items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0),
+    [items],
+  );
+
   const applyItemToDraft = (item: CatalogueLookupItem) => {
     onDraftChange("name", item.productName || item.name || "");
     onDraftChange("price", String(resolvePurchaseUnitPrice(item)));
@@ -263,11 +268,14 @@ export default function ProductsServicesSection({
   };
 
   return (
-    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-800">
           {readOnly ? "Purchased Products" : "Products & Services"}
         </h2>
+        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">
+          Total Qty: {totalSelectedQty}
+        </span>
       </div>
 
       {!readOnly && (
@@ -604,7 +612,119 @@ export default function ProductsServicesSection({
       </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      {/* Mobile: stacked line cards (readable in view purchase modal) */}
+      <div className="space-y-2 sm:hidden">
+        {items.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-3 py-8 text-center text-sm text-gray-500">
+            {readOnly
+              ? "No products on this purchase."
+              : "Search or add products to start creating purchase."}
+          </div>
+        ) : (
+          items.map((item) => {
+            const lineTotal =
+              item.qty * item.unitPrice - Number(item.discount || 0);
+            const imageKey = `row-${item.id}`;
+            const hasImage = Boolean(item.image) && !imageErrors[imageKey];
+            return (
+              <div
+                key={item.id}
+                className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  {hasImage ? (
+                    <img
+                      src={item.image}
+                      alt={item.productName}
+                      onError={() => handleImageError(imageKey)}
+                      className="h-12 w-12 shrink-0 rounded-lg border border-gray-100 object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-100 bg-gradient-to-br from-blue-50 to-indigo-50 text-sm font-bold uppercase text-blue-500">
+                      {(item.productName || "P").charAt(0)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold leading-snug text-gray-900">
+                      {item.productName}
+                    </p>
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-600">
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-400">Qty</span>
+                        <span className="font-medium text-gray-800">
+                          {item.qty}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-400">Price</span>
+                        <span className="font-medium text-gray-800">
+                          ₹ {item.unitPrice.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-400">Discount</span>
+                        <span className="font-medium text-gray-800">
+                          ₹ {Number(item.discount || 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-400">Total</span>
+                        <span className="font-semibold text-gray-900">
+                          ₹ {lineTotal.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                    {!readOnly && (
+                      <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-gray-100 pt-2.5">
+                        {onUpdateItemQty ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                item.qty <= 1
+                                  ? onRemoveItem(item.id)
+                                  : onUpdateItemQty(item.id, item.qty - 1)
+                              }
+                              className="rounded-full border border-gray-200 p-1.5 text-gray-600"
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <span className="min-w-6 text-center text-sm font-semibold">
+                              {item.qty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onUpdateItemQty(item.id, item.qty + 1)
+                              }
+                              className="rounded-full border border-gray-200 p-1.5 text-gray-600"
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => onRemoveItem(item.id)}
+                          className="rounded-lg bg-red-50 p-2 text-red-600"
+                          aria-label="Remove item"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop / tablet: table */}
+      <div className="hidden overflow-x-auto rounded-lg border border-gray-200 sm:block">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
             <tr>

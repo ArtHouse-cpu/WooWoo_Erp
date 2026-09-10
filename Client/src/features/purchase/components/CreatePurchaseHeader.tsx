@@ -20,21 +20,27 @@ export default function CreatePurchaseHeader({
   mode = "create",
 }: Props) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4">
-      <div className="flex min-w-0 flex-wrap items-center gap-3">
+    <div className="flex flex-col gap-2.5 rounded-xl border border-gray-200 bg-white px-3 py-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 sm:px-4">
+      <div className="flex min-w-0 items-start gap-2.5 sm:items-center sm:gap-3">
         <button
+          type="button"
           onClick={onBack}
-          className="shrink-0 rounded-md border border-gray-200 p-2 text-gray-600 hover:bg-gray-50"
+          className="shrink-0 rounded-md border border-gray-200 p-2.5 text-gray-600 hover:bg-gray-50"
+          aria-label="Back"
         >
           <ArrowLeft size={16} />
         </button>
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold text-gray-900 sm:text-lg">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-base font-semibold leading-tight text-gray-900 sm:text-lg">
             {mode === "create" ? "Create Purchase" : mode === "edit" ? "Edit Purchase" : "View Purchase"}
           </h1>
+          <div className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs text-gray-700 sm:mt-0 sm:hidden">
+            {mode === "create" ? <span>PURCHASE-</span> : null}
+            <span className="truncate font-semibold">{purchaseNumber}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700">
-        {mode === "create" ? "PURCHASE- " : ""}
+        <div className="hidden items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 sm:flex">
+          {mode === "create" ? "PURCHASE- " : ""}
           <span className="font-semibold">{purchaseNumber}</span>
         </div>
       </div>

@@ -711,6 +711,7 @@ export default function CreateInvoiceScreen({
           qty: item.qty,
           unitPrice: item.unitPrice,
           discount,
+          cashback: item.isCsp ? 0 : Math.max(0, Number(item.cashback || 0)),
           category: item.category || "General",
         };
       });
@@ -1197,7 +1198,8 @@ export default function CreateInvoiceScreen({
           <div className="mx-auto flex max-w-lg items-center gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                Grand Total · {items.length} item{items.length === 1 ? "" : "s"}
+                Grand Total · Total Qty:{" "}
+                {items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)}
               </div>
               <div className="truncate text-lg font-bold tabular-nums text-slate-900">
                 ₹{" "}

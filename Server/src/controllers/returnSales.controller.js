@@ -6,6 +6,10 @@ import Customer from '../models/customer.model.js';
 import Wallet from '../models/wallet.model.js';
 import {appendTransaction} from './wallet.controller.js';
 import {
+  reverseMembershipCashback,
+  remainingCashbackToReverse,
+} from '../services/membershipCashbackWallet.service.js';
+import {
   validateReturnSaleCreateBody,
   validateReturnSaleUpdateBody,
 } from '../schemas/returnSale.schema.js';
@@ -81,6 +85,55 @@ const creditWalletForReturn = async ({customer, amount, returnCode, invoiceCode,
     referenceId: returnCode,
     createdBy,
   });
+};
+
+/**
+ * Cashback to claw back for this return:
+ * - Prefer line cashback × (returnQty / soldQty)
+ * - Else proportion of remaining invoice cashback by returned value / original bill value
+ */
+const computeCashbackToReverseForReturn = (invoice, normalizedReturnItems) => {
+  const remaining = remainingCashbackToReverse(invoice);
+  if (!(remaining > 0)) return 0;
+
+  let fromLines = 0;
+  let usedLineCashback = false;
+  for (const ret of normalizedReturnItems || []) {
+    const idx = Number(ret.lineIndex);
+    const source =
+      Number.isInteger(idx) && idx >= 0 ? invoice.items?.[idx] : null;
+    const lineCb = Math.max(0, Number(source?.cashback ?? 0) || 0);
+    const soldQty = Math.max(0, Number(source?.qty ?? ret.originalQty) || 0);
+    const retQty = Math.max(0, Number(ret.qty) || 0);
+    if (lineCb > 0 && soldQty > 0 && retQty > 0) {
+      usedLineCashback = true;
+      fromLines += (lineCb / soldQty) * retQty;
+    }
+  }
+  if (usedLineCashback) {
+    return Math.min(remaining, round2(fromLines));
+  }
+
+  const originalNet = round2(
+    (invoice.items || []).reduce((sum, item) => sum + originalLineNetPaid(item), 0),
+  );
+  const returnedNet = round2(
+    (normalizedReturnItems || []).reduce(
+      (sum, item) => sum + Number(item.refundAmount || item.lineTotal || 0),
+      0,
+    ),
+  );
+  if (!(originalNet > 0) || !(returnedNet > 0)) return 0;
+
+  // Full return of remaining qty → reverse all remaining cashback (avoid rounding leftover)
+  const allRemainingReturned = (invoice.items || []).every((item) => {
+    const sold = Number(item.qty) || 0;
+    const returned = Number(item.returnedQty) || 0;
+    return sold <= 0 || returned >= sold;
+  });
+  if (allRemainingReturned) return remaining;
+
+  return Math.min(remaining, round2(Number(invoice.cashbackTotal || 0) * (returnedNet / originalNet)));
 };
 
 const applyInvoiceReturnQuantities = async ({
@@ -293,12 +346,12 @@ export const createReturnSale = async (req, res) => {
       }
 
       const refundWallet = round2(parsed.data.refundBreakdown?.wallet);
+      const customer = await findCustomerForReturn({
+        customerId: invoice.customerId,
+        customerPhone: invoice.customerPhone,
+        customerName: invoice.customerName,
+      });
       if (refundWallet > 0) {
-        const customer = await findCustomerForReturn({
-          customerId: invoice.customerId,
-          customerPhone: invoice.customerPhone,
-          customerName: invoice.customerName,
-        });
         if (!customer) {
           return res.status(400).json({
             success: false,
@@ -312,6 +365,41 @@ export const createReturnSale = async (req, res) => {
           invoiceCode: originalInvoiceCode,
           createdBy,
         });
+      }
+
+      // Claw back membership cashback for returned lines (proportional / per-line)
+      const cashbackToReverse = processedReturn.shouldCancel
+        ? remainingCashbackToReverse(invoice)
+        : computeCashbackToReverseForReturn(
+            invoice,
+            processedReturn.normalizedReturnItems,
+          );
+      if (cashbackToReverse > 0 && customer) {
+        try {
+          const result = await reverseMembershipCashback({
+            customer,
+            amount: cashbackToReverse,
+            invoiceCode: originalInvoiceCode || invoice.invoiceCode,
+            referenceId: `${returnCode}:cashback-return`,
+            note: processedReturn.shouldCancel
+              ? `Cashback reversed — invoice ${originalInvoiceCode || invoice.invoiceCode} cancelled via sales return ${returnCode}`
+              : `Cashback reversed — sales return ${returnCode} against invoice ${originalInvoiceCode || invoice.invoiceCode}`,
+            createdBy,
+          });
+          if (result.reversed > 0) {
+            invoice.cashbackReversedTotal = round2(
+              Number(invoice.cashbackReversedTotal || 0) + result.reversed,
+            );
+            await invoice.save();
+          }
+        } catch (cbError) {
+          console.error('createReturnSale cashback reverse error:', cbError);
+        }
+      } else if (cashbackToReverse > 0 && !customer) {
+        console.warn(
+          '[createReturnSale] Cashback reverse skipped — customer not found',
+          originalInvoiceCode,
+        );
       }
     }
 

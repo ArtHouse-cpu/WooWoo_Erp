@@ -575,6 +575,7 @@ export default function CreatePosScreen({
           qty: item.qty,
           unitPrice: item.price,
           discount,
+          cashback: item.isCsp ? 0 : Math.max(0, Number(item.cashback || 0)),
           category: item.category || "General",
         };
       });
@@ -1263,6 +1264,15 @@ export default function CreatePosScreen({
 
               {/* Mobile cart cards */}
               <div className="space-y-2 lg:hidden">
+                <div className="flex items-center justify-between px-0.5">
+                  <h3 className="text-sm font-semibold text-slate-800">
+                    Selected Items
+                  </h3>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">
+                    Total Qty:{" "}
+                    {items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)}
+                  </span>
+                </div>
                 {items.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-8 text-center text-sm text-slate-500">
                     Search or tap Catalogue to add items.
@@ -1399,7 +1409,17 @@ export default function CreatePosScreen({
               </div>
 
               {/* Desktop table */}
-              <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 lg:block">
+              <div className="hidden space-y-2 lg:block">
+                <div className="flex items-center justify-between px-0.5">
+                  <h3 className="text-sm font-semibold text-slate-800">
+                    Selected Items
+                  </h3>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">
+                    Total Qty:{" "}
+                    {items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)}
+                  </span>
+                </div>
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                     <tr>
@@ -1536,12 +1556,19 @@ export default function CreatePosScreen({
                   </tbody>
                 </table>
               </div>
+              </div>
 
               {/* Billing Summary */}
               <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between text-slate-600">
-                    <span>Items ({items.length})</span>
+                    <span>
+                      Total Qty:{" "}
+                      {items.reduce(
+                        (sum, item) => sum + (Number(item.qty) || 0),
+                        0,
+                      )}
+                    </span>
                   </div>
                   <div className="flex justify-between text-slate-600">
                     <span>Sub Total</span>

@@ -373,14 +373,19 @@ export default function ProductsServicesSection({
     return item.sourceType === selectedType;
   });
 
+  const totalSelectedQty = items.reduce(
+    (sum, item) => sum + (Number(item.qty) || 0),
+    0,
+  );
+
   return (
     <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-800">
           {readOnly ? "Sold Products & Items" : "Products & Services"}
         </h2>
-        <span className="rounded-full bg-slate-50 px-2.5 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
-          {items.length} item{items.length === 1 ? "" : "s"}
+        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 ring-1 ring-inset ring-slate-200">
+          Total Qty: {totalSelectedQty}
         </span>
       </div>
 

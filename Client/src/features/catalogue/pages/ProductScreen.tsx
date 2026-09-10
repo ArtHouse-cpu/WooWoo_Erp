@@ -38,16 +38,7 @@ import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
 
 const PAGE_SIZE = 50;
-const SEARCH_DEBOUNCE_MS = 350;
-/**
- * MRT's useMRT_RowVirtualizer returns early BEFORE calling useVirtualizer when
- * enableRowVirtualization is false. Toggling that flag (or HMR / remount races
- * with React 19) throws "Rendered more hooks than during the previous render".
- *
- * Keep virtualization OFF here. Infinite scroll already pages data in chunks;
- * enabling virtualization later must be a permanent constant, never conditional
- * on products.length / loading.
- */
+
 const ENABLE_ROW_VIRTUALIZATION = false;
 
 type ProductRow = {
@@ -126,7 +117,7 @@ export default function ProductScreen() {
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       setDebouncedSearch(globalFilter.trim());
-    }, SEARCH_DEBOUNCE_MS);
+    }, 800);
     return () => window.clearTimeout(timeout);
   }, [globalFilter]);
 
