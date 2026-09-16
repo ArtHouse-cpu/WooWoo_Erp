@@ -118,6 +118,9 @@ export const PERMISSIONS = Object.freeze({
   AFFILIATE_MANAGE: 'affiliate.manage',
   AFFILIATE_PAYOUT: 'affiliate.payout',
 
+  // Staff commission
+  STAFF_COMMISSION_READ: 'staff.commission.read',
+
   // INVOICEDBY_READ: 'invoicedby.read',
   // INVOICEDBY_WRITE: 'invoicedby.write',
 });
@@ -223,6 +226,8 @@ export const PERMISSION_CATALOG = Object.freeze([
   {key: PERMISSIONS.AFFILIATE_READ, module: 'affiliate', label: 'View affiliate program'},
   {key: PERMISSIONS.AFFILIATE_MANAGE, module: 'affiliate', label: 'Manage affiliate settings'},
   {key: PERMISSIONS.AFFILIATE_PAYOUT, module: 'affiliate', label: 'Process affiliate payouts'},
+
+  {key: PERMISSIONS.STAFF_COMMISSION_READ, module: 'staff', label: 'View staff commission'},
 ]);
 
 /** Minimum permission required to SHOW a sidebar item / route.
@@ -271,6 +276,7 @@ export const MENU_PERMISSION_MAP = Object.freeze({
   '/coupons': PERMISSIONS.COUPON_READ,
   '/announcements': PERMISSIONS.ANNOUNCEMENT_READ,
   '/affiliate-program': PERMISSIONS.AFFILIATE_READ,
+  '/staffCommission': PERMISSIONS.STAFF_COMMISSION_READ,
   '/access': PERMISSIONS.ACCESS_READ,
 });
 

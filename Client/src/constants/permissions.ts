@@ -115,6 +115,9 @@ export const PERMISSIONS = {
   AFFILIATE_READ: "affiliate.read",
   AFFILIATE_MANAGE: "affiliate.manage",
   AFFILIATE_PAYOUT: "affiliate.payout",
+
+  // Staff commission
+  STAFF_COMMISSION_READ: "staff.commission.read",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -469,6 +472,11 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
     module: "affiliate",
     label: "Process affiliate payouts",
   },
+  {
+    key: PERMISSIONS.STAFF_COMMISSION_READ,
+    module: "staff",
+    label: "View staff commission",
+  },
 ];
 
 /** Minimum permission to show a route / sidebar item.
@@ -515,6 +523,7 @@ export const MENU_PERMISSION_MAP: Record<string, Permission | Permission[]> = {
   "/coupons": PERMISSIONS.COUPON_READ,
   "/announcements": PERMISSIONS.ANNOUNCEMENT_READ,
   "/affiliate-program": PERMISSIONS.AFFILIATE_READ,
+  "/staffCommission": PERMISSIONS.STAFF_COMMISSION_READ,
   "/access": PERMISSIONS.ACCESS_READ,
 };
 

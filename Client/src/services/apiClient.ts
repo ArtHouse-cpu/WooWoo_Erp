@@ -2562,6 +2562,121 @@ export const handleGetAffiliateOverview = async (signal?: AbortSignal) => {
   }
 };
 
+/** Staff sales commission aggregated from final invoices (invoiceBy.staffId). */
+export type StaffCommissionInvoice = {
+  id: string;
+  invoiceCode: string;
+  date: string;
+  customerName: string;
+  customerPhone?: string;
+  category: string;
+  invoiceAmount: number;
+  commissionRate: number;
+  commissionAmount: number;
+  paymentMode: string;
+  status: "Credited" | "Paid" | "Pending" | string;
+};
+
+export type StaffCommissionRow = {
+  id: string;
+  staffName: string;
+  role: string;
+  phone: string;
+  email: string;
+  totalOrders: number;
+  totalSales: number;
+  rate: number;
+  commission: number;
+  invoices: StaffCommissionInvoice[];
+};
+
+export const handleGetStaffCommission = async (
+  fromDate = "",
+  toDate = "",
+  signal?: AbortSignal,
+) => {
+  try {
+    const response = await axiosInstance.get("/api/commission/commissionList", {
+      params: {
+        ...(fromDate ? { fromDate } : {}),
+        ...(toDate ? { toDate } : {}),
+      },
+      signal,
+    });
+    return response.data as {
+      success: boolean;
+      count?: number;
+      data?: StaffCommissionRow[];
+      message?: string;
+    };
+  } catch (error) {
+    console.log("Error fetching staff commission:", error);
+    throw error;
+  }
+};
+
+/** Create membership-based staff commission rule → POST /api/commission/set */
+export const handleSetCommissionRule = async (payload: {
+  membershipType: string;
+  commissionType: "flat" | "percentage";
+  commissionValue: number;
+}) => {
+  const response = await axiosInstance.post("/api/commission/set", payload);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    commission?: CommissionRule;
+  };
+};
+
+export type CommissionRule = {
+  _id: string;
+  membershipType: string;
+  commissionType: "flat" | "percentage";
+  commissionValue: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+/** List membership commission rules → GET /api/commission/get */
+export const handleGetCommissionRules = async (signal?: AbortSignal) => {
+  const response = await axiosInstance.get("/api/commission/get", { signal });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    commission?: CommissionRule[];
+  };
+};
+
+/** Update commission rule → PATCH /api/commission/update */
+export const handleUpdateCommissionRule = async (payload: {
+  id: string;
+  membershipType: string;
+  commissionType: "flat" | "percentage";
+  commissionValue: number;
+  isActive?: boolean;
+}) => {
+  const response = await axiosInstance.patch("/api/commission/update", payload);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    commission?: CommissionRule;
+  };
+};
+
+/** Delete commission rule → DELETE /api/commission/delete */
+export const handleDeleteCommissionRule = async (id: string) => {
+  const response = await axiosInstance.delete("/api/commission/delete", {
+    data: { id },
+  });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    commission?: CommissionRule;
+  };
+};
+
 export const handleGetAffiliateLeaderboard = async (signal?: AbortSignal) => {
   try {
     const response = await axiosInstance.get("/affiliate/leaderboard", {

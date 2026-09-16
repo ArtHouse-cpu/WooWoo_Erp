@@ -85,6 +85,13 @@ const userSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    /** Staff sales commission percent (e.g. 6 = 6% of attributed invoice grandTotal) */
+    commissionRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
     gstin: { type: String, trim: true },
     companyName: { type: String, trim: true },
     address: { type: String, trim: true },
