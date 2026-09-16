@@ -202,7 +202,8 @@ export default function AccessScreen() {
         if (!/^\d{4,6}$/.test(String(value || "").trim())) {
           return "Enter a 4–6 digit PIN";
         }
-        return null;
+        return null; 
+        
       },
     });
     if (!result.isConfirmed) return;
