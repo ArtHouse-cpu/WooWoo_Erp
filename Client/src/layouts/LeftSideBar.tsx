@@ -21,7 +21,7 @@ import {
   MapPin,
   UtensilsCrossed,
   BadgeIndianRupee,
-  Utensils,
+  CircleDollarSign ,
   type LucideIcon,
   Megaphone,
 } from "lucide-react";
@@ -195,6 +195,7 @@ const MENU_GROUPS: MenuGroup[] = [
 const TOP_LINKS: TopLink[] = [
   // { key: "foodBill", label: "Food Billing", icon: Utensils, path: "/foodBill" },
   { key: "expenses", label: "Expense", icon: BadgeIndianRupee, path: "/expenses" },
+  { key: "staffCommission", label: "Staff Commission", icon: CircleDollarSign , path: "/staffCommission" },
   { key: "announcement", label: "Announcements", icon: Megaphone , path: "/announcements" },
   { key: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
   { key: "coupons", label: "Coupons", icon: Percent, path: "/coupons" },
