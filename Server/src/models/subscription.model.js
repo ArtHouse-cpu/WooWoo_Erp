@@ -198,6 +198,20 @@ const subscriptionSchema = new mongoose.Schema(
       title: {type: String, default: '', trim: true},
       discountAmount: {type: Number, default: 0, min: 0},
     },
+    mode: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    paymentStatus: {
+      type: String,
+      default: 'Paid (Full)',
+      trim: true,
+    },
+    paymentBreakdown: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
     createdBy: {
       m_staff_id: {type: String, default: null},
       m_staff_name: {type: String, default: null},

@@ -26,7 +26,7 @@ type Props = {
   extraCharges?: ExtraCharge[];
   onExtraChargesChange?: (val: ExtraCharge[]) => void;
   grandTotal: number;
-  onSave: () => void;
+  onSave?: () => void;
   isSaving?: boolean;
   /** Hide checkout CTA and extra-charge editors (view modal). */
   readOnly?: boolean;
@@ -38,6 +38,7 @@ type Props = {
   returnedTotal?: number;
   /** Override heading (default Invoice Summary). */
   title?: string;
+  className?: string;
 };
 
 function formatPaymentMode(
@@ -97,6 +98,7 @@ export default function InvoiceSummaryCard({
   paymentBreakdown = null,
   returnedTotal = 0,
   title = "Invoice Summary",
+  className,
 }: Props) {
   const isQuotationSummary = title.toLowerCase().includes("quotation");
   const billSavings =
@@ -146,7 +148,12 @@ export default function InvoiceSummaryCard({
       paymentBreakdown != null);
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 lg:col-span-4">
+    <div
+      className={
+        className ||
+        "rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 lg:col-span-4"
+      }
+    >
       <h3 className="mb-3 text-sm font-semibold text-slate-800">{title}</h3>
       <div className="space-y-2.5 text-sm">
         <div className="flex items-center justify-between text-slate-600">
@@ -350,7 +357,7 @@ export default function InvoiceSummaryCard({
       {!readOnly && (
         <button
           type="button"
-          onClick={onSave}
+          onClick={() => onSave?.()}
           disabled={isSaving}
           className="mt-4 hidden h-11 w-full rounded-xl bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60 lg:block"
         >

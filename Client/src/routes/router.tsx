@@ -56,6 +56,7 @@ import { FoodBill } from "@/features/foodbill";
 import AnnouncementScreen from "@/features/announcement/announcementScreen";
 import ExpenseScreen from "@/features/expenses/ExpenseScreen";
 import StaffCommissionScreen from "@/features/commission/StaffCommissionScreen";
+import SpaceBooking from "@/features/spacebook/SpaceBooking";
 
 export const router = createBrowserRouter([
   {
@@ -123,6 +124,7 @@ export const router = createBrowserRouter([
           { path: "announcements", element: <AnnouncementScreen /> },
           { path: "expenses", element: <ExpenseScreen /> },
           { path: "staffCommission", element: <StaffCommissionScreen /> },
+          { path: "spaceBooking", element: <SpaceBooking /> },
         ],
       },
     ],
