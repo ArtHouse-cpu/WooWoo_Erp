@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -12,11 +12,13 @@ import {
   handleUpdateSubscription,
   handleGetCustomers,
   handleBulkCreateSubscriptions,
+  handleGetSubscriptionById,
   type CustomerPayload,
   type CreateSubscriptionPayload,
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
+import InvoiceSummaryCard from "../components/invoice/InvoiceSummaryCard";
 import {
   getCustomerMembershipTypeFromPlan,
   buildMembershipBenefitLines,
@@ -685,6 +687,28 @@ export default function CreateSubscriptionScreen({
   /** Customer's current membership priority (Junior treated as 0 for upgrades) */
   const [customerPriority, setCustomerPriority] = useState(0);
 
+  // View-mode snapshots
+  const [viewSubTotal, setViewSubTotal] = useState<number | null>(null);
+  const [viewDiscountTotal, setViewDiscountTotal] = useState<number | null>(null);
+  const [viewMembershipDiscount, setViewMembershipDiscount] = useState<number | null>(null);
+  const [viewCashbackTotal, setViewCashbackTotal] = useState<number | null>(null);
+  const [viewCouponDiscount, setViewCouponDiscount] = useState<number>(0);
+  const [viewCouponCode, setViewCouponCode] = useState<string>("");
+  const [viewReferralDiscount, setViewReferralDiscount] = useState<number>(0);
+  const [viewReferralLabel, setViewReferralLabel] = useState<string>("Referral Discount");
+  const [viewGrandTotal, setViewGrandTotal] = useState<number | null>(null);
+  const [viewPaymentMode, setViewPaymentMode] = useState<string>("");
+  const [viewPaymentStatus, setViewPaymentStatus] = useState<string>("");
+  const [viewPaymentBreakdown, setViewPaymentBreakdown] = useState<{
+    cash?: number;
+    upi?: number;
+    card?: number;
+    wallet?: number;
+    paidAmount?: number;
+    dueAmount?: number;
+    changeAmount?: number;
+  } | null>(null);
+
   useEffect(() => {
     type Line = {
       productName?: string;
@@ -712,6 +736,8 @@ export default function CreateSubscriptionScreen({
       mode?: Mode;
       subscription?: Doc;
     } | null;
+
+    let cancelled = false;
 
     const applyDoc = (doc: Doc, nextMode: Mode) => {
       setMode(nextMode);
@@ -789,13 +815,142 @@ export default function CreateSubscriptionScreen({
           );
         }
       }
+
+      // Financial & payment breakdown snapshot
+      const rawSubTotal =
+        (doc as any).subTotal != null
+          ? Number((doc as any).subTotal)
+          : (doc as any).totalMRP != null
+            ? Number((doc as any).totalMRP)
+            : (doc as any).items?.[0]?.unitPrice != null
+              ? Number((doc as any).items[0].unitPrice) *
+                Number((doc as any).items[0].qty || 1)
+              : null;
+      setViewSubTotal(rawSubTotal);
+
+      const rawDiscountTotal =
+        (doc as any).discountTotal != null
+          ? Number((doc as any).discountTotal)
+          : null;
+      setViewDiscountTotal(rawDiscountTotal);
+
+      const couponObj = (doc as any).coupon;
+      const cDisc =
+        Number(
+          couponObj?.discountAmount ?? (doc as any).couponDiscount ?? 0,
+        ) || 0;
+      setViewCouponDiscount(cDisc);
+      setViewCouponCode(
+        String(couponObj?.code ?? (doc as any).couponCode ?? "").trim(),
+      );
+
+      const refObj = (doc as any).referral;
+      const rDisc =
+        Number(
+          refObj?.discountAmount ?? (doc as any).referralDiscount ?? 0,
+        ) || 0;
+      setViewReferralDiscount(rDisc);
+      setViewReferralLabel(
+        String(
+          refObj?.label ??
+            (doc as any).referralLabel ??
+            "Referral Discount",
+        ).trim() || "Referral Discount",
+      );
+
+      const mDisc =
+        (doc as any).membershipDiscount != null
+          ? Number((doc as any).membershipDiscount)
+          : rawDiscountTotal != null
+            ? Math.max(0, rawDiscountTotal - cDisc - rDisc)
+            : null;
+      setViewMembershipDiscount(mDisc);
+
+      const cb =
+        (doc as any).cashbackTotal != null
+          ? Number((doc as any).cashbackTotal)
+          : (doc as any).cashback != null
+            ? Number((doc as any).cashback)
+            : (doc as any).walletCashbackAmount != null
+              ? Number((doc as any).walletCashbackAmount)
+              : null;
+      setViewCashbackTotal(cb);
+
+      const rawGrandTotal =
+        (doc as any).grandTotal != null
+          ? Number((doc as any).grandTotal)
+          : (doc as any).amount != null
+            ? Number((doc as any).amount)
+            : null;
+      setViewGrandTotal(rawGrandTotal);
+
+      const pMode = String(
+        (doc as any).mode ?? (doc as any).paymentMode ?? "",
+      ).trim();
+      setViewPaymentMode(pMode || "UPI");
+
+      const pStatus = String((doc as any).paymentStatus ?? "").trim();
+      const docStatus = String((doc as any).status ?? "").trim().toLowerCase();
+      setViewPaymentStatus(
+        pStatus ||
+          (docStatus === "active" || docStatus === "completed"
+            ? "Paid (Full)"
+            : docStatus || "Paid (Full)"),
+      );
+
+      const rawBreakdown = (doc as any).paymentBreakdown;
+      if (rawBreakdown && typeof rawBreakdown === "object") {
+        setViewPaymentBreakdown({
+          cash: Number(rawBreakdown.cash ?? 0),
+          upi: Number(rawBreakdown.upi ?? 0),
+          card: Number(rawBreakdown.card ?? 0),
+          wallet: Number(rawBreakdown.wallet ?? 0),
+          paidAmount: Number(rawBreakdown.paidAmount ?? 0),
+          dueAmount: Number(rawBreakdown.dueAmount ?? 0),
+          changeAmount: Number(rawBreakdown.changeAmount ?? 0),
+        });
+      } else {
+        const gt = rawGrandTotal ?? 0;
+        const isPaid = docStatus === "active" || docStatus === "completed";
+        setViewPaymentBreakdown({
+          cash: 0,
+          upi: isPaid ? gt : 0,
+          card: 0,
+          wallet: 0,
+          paidAmount: isPaid ? gt : 0,
+          dueAmount: isPaid ? 0 : gt,
+          changeAmount: 0,
+        });
+      }
     };
 
     if (initialData) {
       applyDoc(initialData, initialMode ?? "edit");
+      if ((initialMode === "view" || !initialMode) && initialData._id) {
+        handleGetSubscriptionById(String(initialData._id))
+          .then((res: any) => {
+            if (!cancelled && res?.subscription) {
+              applyDoc(res.subscription, "view");
+            }
+          })
+          .catch(() => {});
+      }
     } else if (state?.subscription) {
       applyDoc(state.subscription, state.mode ?? "edit");
+      if (state.mode === "view" && state.subscription._id) {
+        handleGetSubscriptionById(String(state.subscription._id))
+          .then((res: any) => {
+            if (!cancelled && res?.subscription) {
+              applyDoc(res.subscription, "view");
+            }
+          })
+          .catch(() => {});
+      }
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [location.state, initialData, initialMode]);
   const selectedMembership = useMemo(
     () => memberships.find((m) => m._id === selectedMembershipId) ?? null,
@@ -866,6 +1021,41 @@ export default function CreateSubscriptionScreen({
   const subTotal = selectedMembership?.amount ?? 0;
   const discountTotal = 0;
   const grandTotal = subTotal;
+
+  const displaySubTotal =
+    mode === "view" && viewSubTotal != null
+      ? viewSubTotal
+      : (selectedMembership?.amount ?? 0);
+
+  const displayDiscountTotal =
+    mode === "view" && viewDiscountTotal != null
+      ? viewDiscountTotal
+      : 0;
+
+  const displayMembershipDiscount =
+    mode === "view" && viewMembershipDiscount != null
+      ? viewMembershipDiscount
+      : 0;
+
+  const displayCouponDiscount = mode === "view" ? viewCouponDiscount : 0;
+  const displayCouponCode = mode === "view" ? viewCouponCode : "";
+  const displayReferralDiscount = mode === "view" ? viewReferralDiscount : 0;
+  const displayReferralLabel =
+    mode === "view" ? viewReferralLabel : "Referral Discount";
+
+  const displayCashbackTotal =
+    mode === "view" && viewCashbackTotal != null
+      ? viewCashbackTotal
+      : (selectedMembership?.walletCashbackAmount ?? 0);
+
+  const displayGrandTotal =
+    mode === "view" && viewGrandTotal != null
+      ? viewGrandTotal
+      : Math.max(0, displaySubTotal - displayDiscountTotal);
+
+  const displayPaymentMode = mode === "view" ? viewPaymentMode : undefined;
+  const displayPaymentStatus = mode === "view" ? viewPaymentStatus : undefined;
+  const displayPaymentBreakdown = mode === "view" ? viewPaymentBreakdown : null;
 
 useEffect(() => {
   if (!selectedMembership || endDateManuallyEdited) return;
@@ -2191,49 +2381,113 @@ useEffect(() => {
                 </div>
               )}
 
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-slate-600">
-                  Notes (Optional)
-                </label>
-                <div className="relative">
-                  <FileText className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <textarea
-                    value={notes}
-                    readOnly={mode === "view"}
-                    disabled={mode === "view"}
-                    onChange={(e) => {
-                      if (mode === "view") return;
-                      setNotes(e.target.value);
-                    }}
-                    className={`min-h-[80px] w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none transition ${
-                      mode === "view"
-                        ? "cursor-not-allowed bg-slate-50 text-slate-700"
-                        : "bg-white focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
-                    }`}
-                    placeholder="Add notes for this subscription…"
-                  />
-                </div>
-              </div>
-
-              {/* Invoice summary */}
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3.5">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-violet-600 shadow-sm ring-1 ring-violet-100">
-                    <FileText size={16} />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="truncate text-xs text-violet-600">
-                      Invoice Number {subscriptionNo}
+              {mode === "view" ? (
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+                  <div className="flex flex-col justify-between gap-4 lg:col-span-7">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                        Notes (Optional)
+                      </label>
+                      <div className="relative">
+                        <FileText className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                        <textarea
+                          value={notes}
+                          readOnly
+                          disabled
+                          className="min-h-[96px] w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none cursor-not-allowed bg-slate-50 text-slate-700"
+                          placeholder="Add notes for this subscription…"
+                        />
+                      </div>
                     </div>
-                    <div className="text-base font-bold tabular-nums text-violet-950 sm:text-lg">
-                      Total Amount ₹{" "}
-                      {grandTotal.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
+
+                    {/* Total Amount card adjacent of Invoice Summary */}
+                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3.5">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-violet-600 shadow-sm ring-1 ring-violet-100">
+                          <FileText size={16} />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="truncate text-xs text-violet-600">
+                            Invoice Number {subscriptionNo}
+                          </div>
+                          <div className="text-base font-bold tabular-nums text-violet-950 sm:text-lg">
+                            Total Amount ₹{" "}
+                            {displayGrandTotal.toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
+
+                  <div className="lg:col-span-5">
+                    <InvoiceSummaryCard
+                      className="h-full rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
+                      subTotal={displaySubTotal}
+                      discountTotal={displayDiscountTotal}
+                      membershipDiscountTotal={displayMembershipDiscount}
+                      cashbackTotal={displayCashbackTotal}
+                      couponDiscount={displayCouponDiscount}
+                      couponCode={displayCouponCode}
+                      referralDiscount={displayReferralDiscount}
+                      referralLabel={displayReferralLabel}
+                      grandTotal={displayGrandTotal}
+                      readOnly={true}
+                      paymentMode={displayPaymentMode}
+                      paymentStatus={displayPaymentStatus}
+                      paymentBreakdown={displayPaymentBreakdown}
+                      onSave={() => {}}
+                    />
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+                      Notes (Optional)
+                    </label>
+                    <div className="relative">
+                      <FileText className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                      <textarea
+                        value={notes}
+                        readOnly={mode === "view"}
+                        disabled={mode === "view"}
+                        onChange={(e) => {
+                          if (mode === "view") return;
+                          setNotes(e.target.value);
+                        }}
+                        className={`min-h-[80px] w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none transition ${
+                          mode === "view"
+                            ? "cursor-not-allowed bg-slate-50 text-slate-700"
+                            : "bg-white focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                        }`}
+                        placeholder="Add notes for this subscription…"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Invoice summary */}
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3.5">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-violet-600 shadow-sm ring-1 ring-violet-100">
+                        <FileText size={16} />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="truncate text-xs text-violet-600">
+                          Invoice Number {subscriptionNo}
+                        </div>
+                        <div className="text-base font-bold tabular-nums text-violet-950 sm:text-lg">
+                          Total Amount ₹{" "}
+                          {grandTotal.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Benefits — from selected membership usageLimits / wallet / period */}
               <div>

@@ -170,6 +170,9 @@ export function validateSubscriptionCreateBody(body) {
     students,
     referral,
     coupon,
+    mode,
+    paymentStatus,
+    paymentBreakdown,
     allowPastEndDate,
     allowOptionalJuniorStudents,
   } = body ?? {};
@@ -260,6 +263,9 @@ export function validateSubscriptionCreateBody(body) {
       createdBy: createdBy ?? null,
       referral: referral ?? null,
       coupon: coupon ?? null,
+      mode: String(mode ?? '').trim(),
+      paymentStatus: String(paymentStatus ?? '').trim() || 'Paid (Full)',
+      paymentBreakdown: paymentBreakdown ?? null,
       ...repeatData,
     },
   };

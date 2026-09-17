@@ -333,6 +333,9 @@ export const createSubscription = async (req, res) => {
             discountAmount: couponDiscount,
           }
         : undefined,
+      mode: parsed.data.mode,
+      paymentStatus: parsed.data.paymentStatus,
+      paymentBreakdown: parsed.data.paymentBreakdown,
       createdBy,
       noOfInvoices: 0,
       nextInvoiceDate: parsed.data.startDate,

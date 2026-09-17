@@ -2020,7 +2020,7 @@ raf@^3.4.1:
   dependencies:
     performance-now "^2.1.0"
 
-"react-dom@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom@^17.0.0 || ^18.0.0 || ^19.0.0", react-dom@^19.2.0, react-dom@>=16.6.0, react-dom@>=16.8, react-dom@>=18, react-dom@>=18.0:
+"react-dom@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom@^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom@^18 || ^19", react-dom@^19.2.0, react-dom@>=16.6.0, react-dom@>=16.8, react-dom@>=18, react-dom@>=18.0:
   version "19.2.0"
   resolved "https://registry.npmjs.org/react-dom/-/react-dom-19.2.0.tgz"
   integrity sha512-UlbRu4cAiGaIewkPyiRGJk0imDN2T3JjieT6spoL2UeSf5od4n5LB/mQ4ejmxhCFT1tYe8IvaFulzynWovsEFQ==
@@ -2080,6 +2080,18 @@ react-router@7.9.6:
     cookie "^1.0.1"
     set-cookie-parser "^2.6.0"
 
+react-toaster@^0.0.3:
+  version "0.0.3"
+  resolved "https://registry.npmjs.org/react-toaster/-/react-toaster-0.0.3.tgz"
+  integrity sha512-PiRQkg5Vco9zrzpbqKp/iAH9aDKUbPjcTpv4iUePjsy0yzgMp/6u+iWh8Q7nyUSS6Ir6nz9qCASpR3e6Nda5Bw==
+
+react-toastify@^11.1.0:
+  version "11.1.0"
+  resolved "https://registry.npmjs.org/react-toastify/-/react-toastify-11.1.0.tgz"
+  integrity sha512-e9h23x3phN0wbFeB6yovmWp7lobzV4CaCH0LO8nVP6H7Y+3GbcLpIzMm9dJhcp1RXbpyfvjgpfXqO80QAmn7sg==
+  dependencies:
+    clsx "^2.1.1"
+
 react-transition-group@^4.4.5:
   version "4.4.5"
   resolved "https://registry.npmjs.org/react-transition-group/-/react-transition-group-4.4.5.tgz"
@@ -2090,7 +2102,7 @@ react-transition-group@^4.4.5:
     loose-envify "^1.4.0"
     prop-types "^15.6.2"
 
-"react@^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.8.0 || ^17 || ^18 || ^19", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.9.0 || ^17.0.0 || ^18 || ^19", "react@^17.0.0 || ^18.0.0 || ^19.0.0", "react@^18.0 || ^19", react@^19.2.0, react@>=16.6.0, react@>=16.8, react@>=16.8.0, react@>=18, react@>=18.0, react@>=18.0.0:
+"react@^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.8.0 || ^17 || ^18 || ^19", "react@^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react@^16.9.0 || ^17.0.0 || ^18 || ^19", "react@^17.0.0 || ^18.0.0 || ^19.0.0", "react@^18 || ^19", "react@^18.0 || ^19", react@^19.2.0, react@>=16.6.0, react@>=16.8, react@>=16.8.0, react@>=18, react@>=18.0, react@>=18.0.0:
   version "19.2.0"
   resolved "https://registry.npmjs.org/react/-/react-19.2.0.tgz"
   integrity sha512-tmbWg6W31tQLeB5cdIBOicJDJRR2KzXsV7uSK9iNfLWQ5bIZfxuPEHp7M8wiHyHnn0DD1i7w3Zmin0FtkrwoCQ==
