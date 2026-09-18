@@ -1551,6 +1551,8 @@ export type SpacePayload = {
   _id?: string;
   name: string;
   category?: string;
+  /** Weekday | Weekend — one pricing row per name + day */
+  day?: "Weekday" | "Weekend" | string;
   price?: number;
   capacity?: number;
   status?: "Available" | "Booked" | "Maintenance";
@@ -1558,10 +1560,18 @@ export type SpacePayload = {
   imageUrl?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  /** Legacy expanded list markers (from old dual-price docs) */
+  _legacyExpanded?: boolean;
+  _legacySourceId?: string;
 };
 
 export const handleGetSpaces = async (
-  params?: { search?: string; category?: string; status?: string },
+  params?: {
+    search?: string;
+    category?: string;
+    status?: string;
+    day?: string;
+  },
   signal?: AbortSignal,
 ) => {
   const response = await axiosInstance.get("/space", {
@@ -1569,6 +1579,7 @@ export const handleGetSpaces = async (
       search: params?.search?.trim() ?? "",
       category: params?.category ?? "All",
       status: params?.status ?? "All",
+      ...(params?.day ? { day: params.day } : {}),
     },
     signal,
   });
@@ -1588,6 +1599,7 @@ export const spacePayloadToFormData = (
   if (payload.name !== undefined) fd.append("name", String(payload.name));
   if (payload.category !== undefined)
     fd.append("category", String(payload.category));
+  if (payload.day !== undefined) fd.append("day", String(payload.day));
   if (payload.price !== undefined) fd.append("price", String(payload.price));
   if (payload.capacity !== undefined)
     fd.append("capacity", String(payload.capacity));
@@ -1627,6 +1639,140 @@ export const handleUpdateSpace = async (
 export const handleDeleteSpace = async (id: string) => {
   const response = await axiosInstance.delete(`/space/${id}`);
   return response.data;
+};
+
+// ── Space Bookings ───────────────────────────────────────────────────────────
+
+export type SpaceBookingStatus =
+  | "Upcoming"
+  | "Ongoing"
+  | "Expired"
+  | "Cancelled";
+
+export type SpaceBookingPayload = {
+  _id?: string;
+  id?: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  spaceId: string;
+  spaceName?: string;
+  space?: {
+    _id: string;
+    name: string;
+    category?: string;
+    day?: string;
+    price?: number;
+    capacity?: number;
+    status?: string;
+  } | null;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  bookingTime?: string;
+  status?: SpaceBookingStatus;
+  notes?: string;
+  invoiceId?: string | null;
+  invoiceCode?: string;
+  grandTotal?: number;
+  paidAmount?: number;
+  dueAmount?: number;
+  paymentStatus?: "full" | "partial" | "";
+  paymentMode?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const handleGetSpaceBookings = async (
+  params?: {
+    search?: string;
+    status?: string;
+    spaceId?: string;
+    fromDate?: string;
+    toDate?: string;
+  },
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/space-bookings", {
+    params: {
+      search: params?.search?.trim() ?? "",
+      status: params?.status ?? "All",
+      ...(params?.spaceId ? { spaceId: params.spaceId } : {}),
+      ...(params?.fromDate ? { fromDate: params.fromDate } : {}),
+      ...(params?.toDate ? { toDate: params.toDate } : {}),
+    },
+    signal,
+  });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    bookings?: SpaceBookingPayload[];
+  };
+};
+
+export const handleGetSpaceBookingById = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get(`/space-bookings/${id}`, { signal });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    booking?: SpaceBookingPayload;
+  };
+};
+
+export const handleCreateSpaceBooking = async (payload: {
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  spaceId: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  status?: SpaceBookingStatus;
+  notes?: string;
+  invoiceId?: string | null;
+  invoiceCode?: string;
+  grandTotal?: number;
+  paidAmount?: number;
+  dueAmount?: number;
+  paymentStatus?: "full" | "partial" | "";
+  paymentMode?: string;
+}) => {
+  const response = await axiosInstance.post("/space-bookings", payload);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    booking?: SpaceBookingPayload;
+  };
+};
+
+export const handleUpdateSpaceBooking = async (
+  id: string,
+  payload: Partial<{
+    customerName: string;
+    customerPhone: string;
+    customerEmail: string;
+    spaceId: string;
+    bookingDate: string;
+    startTime: string;
+    endTime: string;
+    status: SpaceBookingStatus;
+    notes: string;
+  }>,
+) => {
+  const response = await axiosInstance.patch(`/space-bookings/${id}`, payload);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    booking?: SpaceBookingPayload;
+  };
+};
+
+export const handleDeleteSpaceBooking = async (id: string) => {
+  const response = await axiosInstance.delete(`/space-bookings/${id}`);
+  return response.data as { success: boolean; message?: string };
 };
 
 export type FoodPayload = {

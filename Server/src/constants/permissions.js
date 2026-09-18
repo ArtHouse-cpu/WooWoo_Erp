@@ -80,6 +80,12 @@ export const PERMISSIONS = Object.freeze({
   SPACE_UPDATE: 'space.update',
   SPACE_DELETE: 'space.delete',
 
+  // Space bookings
+  SPACE_BOOKING_READ: 'space_booking.read',
+  SPACE_BOOKING_CREATE: 'space_booking.create',
+  SPACE_BOOKING_UPDATE: 'space_booking.update',
+  SPACE_BOOKING_DELETE: 'space_booking.delete',
+
   // Catalogue — Foods
   FOOD_READ: 'food.read',
   FOOD_CREATE: 'food.create',
@@ -194,6 +200,10 @@ export const PERMISSION_CATALOG = Object.freeze([
   {key: PERMISSIONS.SPACE_CREATE, module: 'catalogue', label: 'Create spaces'},
   {key: PERMISSIONS.SPACE_UPDATE, module: 'catalogue', label: 'Update spaces'},
   {key: PERMISSIONS.SPACE_DELETE, module: 'catalogue', label: 'Delete spaces'},
+  {key: PERMISSIONS.SPACE_BOOKING_READ, module: 'space_booking', label: 'View space bookings'},
+  {key: PERMISSIONS.SPACE_BOOKING_CREATE, module: 'space_booking', label: 'Create space bookings'},
+  {key: PERMISSIONS.SPACE_BOOKING_UPDATE, module: 'space_booking', label: 'Update space bookings'},
+  {key: PERMISSIONS.SPACE_BOOKING_DELETE, module: 'space_booking', label: 'Delete space bookings'},
   {key: PERMISSIONS.FOOD_READ, module: 'catalogue', label: 'View foods'},
   {key: PERMISSIONS.FOOD_CREATE, module: 'catalogue', label: 'Create foods'},
   {key: PERMISSIONS.FOOD_UPDATE, module: 'catalogue', label: 'Update foods'},
@@ -260,6 +270,7 @@ export const MENU_PERMISSION_MAP = Object.freeze({
   '/create-new-product': PERMISSIONS.PRODUCT_CREATE,
   '/services': PERMISSIONS.SERVICE_READ,
   '/spaces': PERMISSIONS.SPACE_READ,
+  '/spaceBooking': PERMISSIONS.SPACE_BOOKING_READ,
   '/foods': PERMISSIONS.FOOD_READ,
   '/manage-plans': PERMISSIONS.MEMBERSHIP_PLAN_READ,
   '/membership': PERMISSIONS.MEMBERSHIP_PLAN_READ,

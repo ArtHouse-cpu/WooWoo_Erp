@@ -2,9 +2,12 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import type { SpacePayload } from "@/services/apiClient";
 
+export type SpaceDay = "Weekday" | "Weekend";
+
 export type SpaceFormPayload = {
   name: string;
   category: string;
+  day: SpaceDay;
   price: number;
   capacity: number;
   status: "Available" | "Booked" | "Maintenance";
@@ -30,10 +33,16 @@ const SPACE_CATEGORIES = [
 const emptyForm: SpaceFormPayload = {
   name: "",
   category: "Studio",
+  day: "Weekday",
   price: 0,
   capacity: 1,
   status: "Available",
   description: "",
+};
+
+const normalizeDay = (value?: string | null): SpaceDay => {
+  const raw = String(value || "").trim().toLowerCase();
+  return raw === "weekend" ? "Weekend" : "Weekday";
 };
 
 export default function AddSpaceModal({
@@ -53,9 +62,11 @@ export default function AddSpaceModal({
       setForm({
         name: String(initialSpace.name || ""),
         category: String(initialSpace.category || "Studio"),
+        day: normalizeDay(initialSpace.day),
         price: Number(initialSpace.price || 0),
         capacity: Number(initialSpace.capacity || 1),
-        status: (initialSpace.status as SpaceFormPayload["status"]) || "Available",
+        status:
+          (initialSpace.status as SpaceFormPayload["status"]) || "Available",
         description: String(initialSpace.description || ""),
       });
       setPreview(initialSpace.imageUrl || null);
@@ -85,6 +96,7 @@ export default function AddSpaceModal({
       {
         ...form,
         name: form.name.trim(),
+        day: form.day,
         price: Number(form.price || 0),
         capacity: Number(form.capacity || 1),
       },
@@ -106,7 +118,7 @@ export default function AddSpaceModal({
         <p className="mb-5 text-sm text-gray-500">
           {isEdit
             ? "Edit bookable space details."
-            : "Create a new bookable space for the catalogue."}
+            : "Create a new bookable space for the catalogue. Same name can have separate Weekday and Weekend prices."}
         </p>
 
         <button
@@ -127,7 +139,9 @@ export default function AddSpaceModal({
               </label>
               <input
                 value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, name: e.target.value }))
+                }
                 placeholder="e.g. Creative Studio A"
                 required
                 className="w-full rounded-lg border border-gray-300 p-3 outline-none transition focus:ring-2 focus:ring-black"
@@ -140,7 +154,9 @@ export default function AddSpaceModal({
               </label>
               <select
                 value={form.category}
-                onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, category: e.target.value }))
+                }
                 className="w-full rounded-lg border border-gray-300 p-3 outline-none transition focus:ring-2 focus:ring-black"
               >
                 {SPACE_CATEGORIES.map((c) => (
@@ -173,7 +189,26 @@ export default function AddSpaceModal({
 
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Price / Hour (₹) <span className="text-red-500">*</span>
+                Day <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={form.day}
+                onChange={(e) =>
+                  setForm((p) => ({
+                    ...p,
+                    day: e.target.value as SpaceDay,
+                  }))
+                }
+                className="w-full rounded-lg border border-gray-300 p-3 outline-none transition focus:ring-2 focus:ring-black"
+              >
+                <option value="Weekday">Weekday</option>
+                <option value="Weekend">Weekend</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Price (₹) <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-3 text-gray-500">₹</span>
@@ -182,7 +217,10 @@ export default function AddSpaceModal({
                   min={0}
                   value={form.price}
                   onChange={(e) =>
-                    setForm((p) => ({ ...p, price: Number(e.target.value || 0) }))
+                    setForm((p) => ({
+                      ...p,
+                      price: Number(e.target.value || 0),
+                    }))
                   }
                   required
                   className="w-full rounded-lg border border-gray-300 p-3 pl-8 outline-none transition focus:ring-2 focus:ring-black"
@@ -200,7 +238,10 @@ export default function AddSpaceModal({
                 min={1}
                 value={form.capacity}
                 onChange={(e) =>
-                  setForm((p) => ({ ...p, capacity: Number(e.target.value || 1) }))
+                  setForm((p) => ({
+                    ...p,
+                    capacity: Number(e.target.value || 1),
+                  }))
                 }
                 className="w-full rounded-lg border border-gray-300 p-3 outline-none transition focus:ring-2 focus:ring-black"
                 placeholder="1"
@@ -239,7 +280,9 @@ export default function AddSpaceModal({
                 ) : (
                   <>
                     <ImagePlus size={36} className="mb-2 text-gray-500" />
-                    <p className="text-sm text-gray-500">Click to upload space image</p>
+                    <p className="text-sm text-gray-500">
+                      Click to upload space image
+                    </p>
                   </>
                 )}
                 <input

@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 
+const ALLOWED_DAYS = ['Weekday', 'Weekend'];
+
 const spaceSchema = new mongoose.Schema(
   {
     name: {
@@ -19,6 +21,18 @@ const spaceSchema = new mongoose.Schema(
       default: 'space',
       index: true,
     },
+    /**
+     * Pricing day for this record.
+     * Same space name may have one Weekday row and one Weekend row.
+     */
+    day: {
+      type: String,
+      enum: ALLOWED_DAYS,
+      required: true,
+      default: 'Weekday',
+      index: true,
+    },
+    /** Price for this specific day record only */
     price: {
       type: Number,
       required: true,
@@ -56,5 +70,8 @@ const spaceSchema = new mongoose.Schema(
 
 spaceSchema.index({name: 1});
 spaceSchema.index({category: 1});
+/** Query helper — uniqueness enforced in controller (case-insensitive name). */
+spaceSchema.index({name: 1, day: 1});
 
+export const SPACE_DAYS = ALLOWED_DAYS;
 export default mongoose.model('Space', spaceSchema);

@@ -283,24 +283,49 @@ const mapService = (service) => {
   };
 };
 
-const mapSpace = (space) => ({
-  _id: space._id,
-  sourceId: space._id,
-  sourceType: 'space',
-  name: String(space.name ?? '').trim(),
-  productName: String(space.name ?? '').trim(),
-  sellingPrice: Number(space.price ?? 0),
-  stockQty: null,
-  trackStock: false,
-  category: space.category || 'Space',
-  lineCategory: 'space',
-  imageUrl: space.imageUrl || null,
-  unit: 'Hour',
-  status: space.status,
-  capacity: space.capacity,
-  discountType: 'flat',
-  discountValue: 0,
-});
+const mapSpace = (space) => {
+  const dayRaw = String(space.day || '').trim().toLowerCase();
+  const day =
+    dayRaw === 'weekend'
+      ? 'Weekend'
+      : dayRaw === 'weekday'
+        ? 'Weekday'
+        : null;
+
+  // Legacy dual-price docs without day: keep both prices for POS day-of-week pick
+  const legacyWeekday = Number(space.weekdayPrice ?? space.price ?? 0) || 0;
+  const legacyWeekend = Number(space.weekendPrice ?? space.price ?? 0) || 0;
+  const storedPrice = Number(space.price ?? 0) || 0;
+
+  let sellingPrice = storedPrice;
+  if (!day && (space.weekdayPrice != null || space.weekendPrice != null)) {
+    const jsDay = new Date().getDay();
+    sellingPrice = jsDay === 0 || jsDay === 6 ? legacyWeekend : legacyWeekday;
+  }
+
+  return {
+    _id: space._id,
+    sourceId: space._id,
+    sourceType: 'space',
+    name: String(space.name ?? '').trim(),
+    productName: String(space.name ?? '').trim(),
+    sellingPrice,
+    price: storedPrice,
+    day: day || undefined,
+    weekdayPrice: day ? (day === 'Weekday' ? storedPrice : legacyWeekday) : legacyWeekday,
+    weekendPrice: day ? (day === 'Weekend' ? storedPrice : legacyWeekend) : legacyWeekend,
+    stockQty: null,
+    trackStock: false,
+    category: space.category || 'Space',
+    lineCategory: 'space',
+    imageUrl: space.imageUrl || null,
+    unit: 'Hour',
+    status: space.status,
+    capacity: space.capacity,
+    discountType: 'flat',
+    discountValue: 0,
+  };
+};
 
 const mapFood = (food) => ({
   _id: food._id,

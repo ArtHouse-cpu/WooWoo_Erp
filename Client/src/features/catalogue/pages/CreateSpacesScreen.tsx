@@ -72,10 +72,39 @@ export default function CreateSpacesScreen() {
       { accessorKey: "name", header: "Space Name", size: 200 },
       { accessorKey: "category", header: "Category" },
       {
+        accessorKey: "day",
+        header: "Day",
+        Cell: ({ row }: { row: { original: SpaceRow } }) => {
+          const day = String(row.original.day || "").trim();
+          const isWeekend = day.toLowerCase() === "weekend";
+          const label = isWeekend
+            ? "Weekend"
+            : day.toLowerCase() === "weekday"
+              ? "Weekday"
+              : day || "—";
+          return (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                isWeekend
+                  ? "bg-violet-100 text-violet-700"
+                  : day
+                    ? "bg-sky-100 text-sky-700"
+                    : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {label}
+            </span>
+          );
+        },
+      },
+      {
         accessorKey: "price",
-        header: "Price / Hr",
-        Cell: ({ cell }: { cell: { getValue: () => unknown } }) =>
-          `₹ ${Number(cell.getValue() || 0).toLocaleString("en-IN")}`,
+        header: "Price",
+        Cell: ({ row }: { row: { original: SpaceRow } }) => (
+          <span className="font-semibold text-gray-900">
+            ₹{Number(row.original.price || 0).toLocaleString("en-IN")}
+          </span>
+        ),
       },
       {
         accessorKey: "capacity",
