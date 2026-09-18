@@ -108,8 +108,9 @@ export const getCommissionList = async (req, res) => {
       ...dateMatch,
       status: {$in: ['active', 'completed']},
     })
+      .sort({invoiceDate: -1, createdAt: -1})
       .select(
-        'subscriptionCode invoiceDate customerName customerPhone membershipType membershipPlanId grandTotal items salesPersonName status mode paymentStatus paymentBreakdown createdBy',
+        'subscriptionCode invoiceDate createdAt customerName customerPhone membershipType membershipPlanId grandTotal items salesPersonName status mode paymentStatus paymentBreakdown createdBy',
       )
       .lean();
 
@@ -212,6 +213,7 @@ export const getCommissionList = async (req, res) => {
       grouped.get(sid).invoices.push({
         id: String(sub._id),
         invoiceCode: sub.subscriptionCode,
+        rawDate: sub.invoiceDate || sub.createdAt || null,
         date: sub.invoiceDate
           ? new Date(sub.invoiceDate).toLocaleString('en-IN', {
               day: '2-digit',
@@ -238,6 +240,12 @@ export const getCommissionList = async (req, res) => {
     const data = [...grouped.values()]
       .map(({user, invoices: invs}) => {
         if (!invs.length) return null;
+        // Sort newest commission gained first
+        invs.sort((a, b) => {
+          const timeA = a.rawDate ? new Date(a.rawDate).getTime() : 0;
+          const timeB = b.rawDate ? new Date(b.rawDate).getTime() : 0;
+          return timeB - timeA;
+        });
         const totalSales = invs.reduce((s, i) => s + i.invoiceAmount, 0);
         const commission = invs.reduce((s, i) => s + i.commissionAmount, 0);
         const rateSample = invs[0]?.commissionRate ?? 0;

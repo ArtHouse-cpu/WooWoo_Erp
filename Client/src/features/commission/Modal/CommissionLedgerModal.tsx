@@ -16,6 +16,7 @@ export type CommissionInvoice = {
   id: string;
   invoiceCode: string;
   date: string;
+  rawDate?: string;
   customerName: string;
   customerPhone?: string;
   category: string;
@@ -34,9 +35,61 @@ export type Staff = {
   email: string;
   totalOrders?: number;
   totalSales?: number;
-  rate?: number;
+ 
   commission: number;
   invoices?: CommissionInvoice[];
+};
+
+export const parseInvoiceDate = (dateStr?: string, rawDate?: string): number => {
+  if (rawDate) {
+    const t = new Date(rawDate).getTime();
+    if (!isNaN(t)) return t;
+  }
+  if (!dateStr) return 0;
+
+  // Direct Date parse attempt
+  let t = new Date(dateStr).getTime();
+  if (!isNaN(t)) return t;
+
+  // Handle "Sept" -> "Sep" and remove commas
+  const cleaned = dateStr.replace(/Sept/i, "Sep").replace(/,/g, "");
+  t = new Date(cleaned).getTime();
+  if (!isNaN(t)) return t;
+
+  // Custom regex fallback: "DD Mon YYYY hh:mm am/pm"
+  const match = dateStr.match(
+    /^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap]m)?)?/i,
+  );
+  if (match) {
+    const [, day, monthStr, year, hourStr, minStr, ampm] = match;
+    const months: Record<string, number> = {
+      jan: 0,
+      feb: 1,
+      mar: 2,
+      apr: 3,
+      may: 4,
+      jun: 5,
+      jul: 6,
+      aug: 7,
+      sep: 8,
+      sept: 8,
+      oct: 9,
+      nov: 10,
+      dec: 11,
+    };
+    const m = months[monthStr.toLowerCase().slice(0, 3)] ?? 0;
+    let h = hourStr ? parseInt(hourStr, 10) : 0;
+    const min = minStr ? parseInt(minStr, 10) : 0;
+    if (ampm) {
+      if (ampm.toLowerCase() === "pm" && h < 12) h += 12;
+      if (ampm.toLowerCase() === "am" && h === 12) h = 0;
+    }
+    const d = new Date(parseInt(year, 10), m, parseInt(day, 10), h, min);
+    const timeVal = d.getTime();
+    if (!isNaN(timeVal)) return timeVal;
+  }
+
+  return 0;
 };
 
 type CommissionLedgerModalProps = {
@@ -59,7 +112,7 @@ const CommissionLedgerModal = ({
   const invoices = useMemo(() => staff?.invoices || [], [staff]);
 
   const filteredInvoices = useMemo(() => {
-    return invoices.filter((inv) => {
+    const list = invoices.filter((inv) => {
       const matchSearch =
         inv.invoiceCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
         inv.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -70,48 +123,60 @@ const CommissionLedgerModal = ({
         statusFilter === "All" ? true : inv.status === statusFilter;
 
       let matchTime = true;
-      if (timeRange !== "lifetime" && inv.date) {
-        const invDate = new Date(inv.date);
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
+      if (timeRange !== "lifetime" && (inv.date || inv.rawDate)) {
+        const invTime = parseInvoiceDate(inv.date, inv.rawDate);
+        if (invTime > 0) {
+          const invDate = new Date(invTime);
+          const now = new Date();
+          now.setHours(0, 0, 0, 0);
 
-        if (timeRange === "today") {
-          const invDay = new Date(invDate);
-          invDay.setHours(0, 0, 0, 0);
-          matchTime = invDay.getTime() === now.getTime();
-        } else if (timeRange === "this_week") {
-          const startOfWeek = new Date(now);
-          const day = startOfWeek.getDay() || 7;
-          startOfWeek.setDate(startOfWeek.getDate() - (day - 1));
-          matchTime = invDate >= startOfWeek;
-        } else if (timeRange === "this_month") {
-          matchTime =
-            invDate.getMonth() === now.getMonth() &&
-            invDate.getFullYear() === now.getFullYear();
-        } else if (timeRange === "last_month") {
-          const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
-          const lastMonthYear =
-            now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-          matchTime =
-            invDate.getMonth() === lastMonth &&
-            invDate.getFullYear() === lastMonthYear;
-        } else if (timeRange === "this_year") {
-          matchTime = invDate.getFullYear() === now.getFullYear();
-        } else if (timeRange === "last_year") {
-          matchTime = invDate.getFullYear() === now.getFullYear() - 1;
-        } else if (timeRange === "custom") {
-          const fromTime = customFromDate
-            ? new Date(`${customFromDate}T00:00:00`).getTime()
-            : -Infinity;
-          const toTime = customToDate
-            ? new Date(`${customToDate}T23:59:59`).getTime()
-            : Infinity;
-          const t = invDate.getTime();
-          matchTime = t >= fromTime && t <= toTime;
+          if (timeRange === "today") {
+            const invDay = new Date(invDate);
+            invDay.setHours(0, 0, 0, 0);
+            matchTime = invDay.getTime() === now.getTime();
+          } else if (timeRange === "this_week") {
+            const startOfWeek = new Date(now);
+            const day = startOfWeek.getDay() || 7;
+            startOfWeek.setDate(startOfWeek.getDate() - (day - 1));
+            matchTime = invDate >= startOfWeek;
+          } else if (timeRange === "this_month") {
+            matchTime =
+              invDate.getMonth() === now.getMonth() &&
+              invDate.getFullYear() === now.getFullYear();
+          } else if (timeRange === "last_month") {
+            const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+            const lastMonthYear =
+              now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+            matchTime =
+              invDate.getMonth() === lastMonth &&
+              invDate.getFullYear() === lastMonthYear;
+          } else if (timeRange === "this_year") {
+            matchTime = invDate.getFullYear() === now.getFullYear();
+          } else if (timeRange === "last_year") {
+            matchTime = invDate.getFullYear() === now.getFullYear() - 1;
+          } else if (timeRange === "custom") {
+            const fromTime = customFromDate
+              ? new Date(`${customFromDate}T00:00:00`).getTime()
+              : -Infinity;
+            const toTime = customToDate
+              ? new Date(`${customToDate}T23:59:59`).getTime()
+              : Infinity;
+            matchTime = invTime >= fromTime && invTime <= toTime;
+          }
         }
       }
 
       return matchSearch && matchStatus && matchTime;
+    });
+
+    // Make the newest commission gained at top
+    return list.sort((a, b) => {
+      const timeA = parseInvoiceDate(a.date, a.rawDate);
+      const timeB = parseInvoiceDate(b.date, b.rawDate);
+      if (timeB !== timeA) return timeB - timeA;
+      return (b.invoiceCode || "").localeCompare(a.invoiceCode || "", undefined, {
+        numeric: true,
+      });
     });
   }, [invoices, searchQuery, statusFilter, timeRange, customFromDate, customToDate]);
 
@@ -319,7 +384,7 @@ const CommissionLedgerModal = ({
                   <th className="py-2.5 px-4">Customer</th>
                   <th className="py-2.5 px-4">Category</th>
                   <th className="py-2.5 px-4 text-right">Invoice Total</th>
-                  <th className="py-2.5 px-4 text-center">Rate</th>
+                 
                   <th className="py-2.5 px-4 text-right">Commission</th>
                   <th className="py-2.5 px-4 text-center">Status</th>
                 </tr>
@@ -356,11 +421,6 @@ const CommissionLedgerModal = ({
                       ₹{inv.invoiceAmount.toLocaleString("en-IN")}
                     </td>
 
-                    <td className="py-3 px-4 text-center">
-                      <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold text-[11px]">
-                        {inv.commissionRate}%
-                      </span>
-                    </td>
 
                     <td className="py-3 px-4 text-right font-bold text-emerald-600 text-sm">
                       +₹{inv.commissionAmount.toLocaleString("en-IN")}

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import CommissionLedgerModal, {
   type Staff,
+  parseInvoiceDate,
 } from "./Modal/CommissionLedgerModal";
 import {
   type DatePreset,
@@ -46,7 +47,18 @@ const StaffCommissionScreen = () => {
           toDate,
           controller.signal,
         );
-        setData(Array.isArray(res?.data) ? res.data : []);
+        const rawList = Array.isArray(res?.data) ? res.data : [];
+        const normalized = rawList.map((staff: any) => ({
+          ...staff,
+          invoices: Array.isArray(staff.invoices)
+            ? [...staff.invoices].sort(
+                (a, b) =>
+                  parseInvoiceDate(b.date, b.rawDate) -
+                  parseInvoiceDate(a.date, a.rawDate),
+              )
+            : [],
+        }));
+        setData(normalized);
       } catch (err: any) {
         if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
           return;

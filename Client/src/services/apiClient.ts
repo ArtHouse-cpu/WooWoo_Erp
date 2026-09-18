@@ -2567,6 +2567,7 @@ export type StaffCommissionInvoice = {
   id: string;
   invoiceCode: string;
   date: string;
+  rawDate?: string;
   customerName: string;
   customerPhone?: string;
   category: string;
