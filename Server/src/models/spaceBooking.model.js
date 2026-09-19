@@ -25,11 +25,46 @@ const spaceBookingSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    /** Snapshot of space name at booking time (list/display fallback). */
+    /** Snapshot of space details at booking time */
     spaceName: {
       type: String,
       default: '',
       trim: true,
+    },
+    spaceCode: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    spaceType: {
+      type: String,
+      enum: ['Exclusive', 'Coworking', ''],
+      default: '',
+    },
+    spaceCategory: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    spaceDay: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    unitPrice: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    durationHours: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    lineTotal: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     bookingDate: {
       type: Date,
@@ -106,5 +141,6 @@ const spaceBookingSchema = new mongoose.Schema(
 
 spaceBookingSchema.index({spaceId: 1, bookingDate: 1});
 spaceBookingSchema.index({customerPhone: 1});
+spaceBookingSchema.index({spaceType: 1});
 
 export default mongoose.model('SpaceBooking', spaceBookingSchema);

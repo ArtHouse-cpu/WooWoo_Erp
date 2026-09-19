@@ -26,8 +26,10 @@ import {
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
-import { printThermalReceipt } from "@/utils/printUtils";
-import { summarizeMembershipForCart } from "../../../utils/membershipInvoiceUtils";
+import {
+  summarizeMembershipForCart,
+  getMembershipBadgeLabel,
+} from "../../../utils/membershipInvoiceUtils";
 import { creditWalletCashback } from "../../../utils/walletCashback";
 import { roundPayable, roundToPaise } from "../../../utils/paymentRoundOff";
 import StaffVerifyModal from "./StaffVerifyModal";
@@ -532,9 +534,9 @@ export default function CheckoutModal({
       setCustomerSearch(initialCustomerPhone);
       setMembership(initialMembership);
       setSelectedCustomer(
-        initialCustomerId
+        initialCustomerId || (initialMembership && initialMembership !== "none") || initialCustomerName
           ? {
-              _id: initialCustomerId,
+              _id: initialCustomerId || "",
               name: initialCustomerName,
               mobile: initialCustomerPhone,
               membershipType: initialMembership,
@@ -544,6 +546,22 @@ export default function CheckoutModal({
       );
       // Reset until wallet fetch completes for the prefilled customer
       setWalletBalance(0);
+      if (initialCustomerId) {
+        const controller = new AbortController();
+        void (async () => {
+          try {
+            const response = await handleGetWalletById(
+              initialCustomerId,
+              controller.signal,
+            );
+            const wallet =
+              response?.wallet ?? response?.data ?? response ?? null;
+            setWalletBalance(resolveWalletBalance(wallet, 0));
+          } catch {
+            setWalletBalance(0);
+          }
+        })();
+      }
       setInstructionNotes(initialNotes);
       setExpenseTitle(itemsProp[0]?.name || "");
       {
@@ -1053,12 +1071,19 @@ export default function CheckoutModal({
     ? 0
     : rawMembershipDiscount;
 
-  // When coupon replaces membership, add membership amount back into payable base
+  // Difference between currently resolved membership discount and what was already deducted in grandTotal
+  const membershipDiscountDeductedInProp = Math.max(
+    0,
+    Number(initialMembershipDiscount || 0),
+  );
+  const netMembershipDiscountAdjustment = waiveMembershipForCoupon
+    ? -membershipDiscountDeductedInProp
+    : rawMembershipDiscount - membershipDiscountDeductedInProp;
+
   const payableBase = roundToPaise(
     Math.max(
       0,
-      Number(grandTotal || 0) +
-        (waiveMembershipForCoupon ? rawMembershipDiscount : 0),
+      Number(grandTotal || 0) - netMembershipDiscountAdjustment,
     ),
   );
 
@@ -2090,17 +2115,36 @@ export default function CheckoutModal({
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-50 pt-4">
-                  <Badge variant={membership ? "indigo" : "default"}>
-                    {membership || "General Customer"}
-                  </Badge>
+                  {(() => {
+                    const currentMType =
+                      selectedCustomer?.membershipType ||
+                      initialMembership ||
+                      membership;
+                    const currentMId =
+                      selectedCustomer?.membershipPlanId ??
+                      initialMembershipPlanId ??
+                      null;
+                    const label = getMembershipBadgeLabel(
+                      resolvedMembershipPlans,
+                      currentMType,
+                      currentMId,
+                    );
+                    const hasM =
+                      currentMType && currentMType !== "none" && label !== "NONE";
+                    return (
+                      <Badge variant={hasM ? "indigo" : "default"}>
+                        {hasM ? `${label} Member` : "General Customer"}
+                      </Badge>
+                    );
+                  })()}
                   {displayProductDiscount > 0 && (
                     <span className="text-[11px] font-medium text-sky-700">
                       Product discount applied
                     </span>
                   )}
                   {displayMembershipDiscount > 0 && (
-                    <span className="text-[11px] font-medium text-indigo-600">
-                      Membership discount applied
+                    <span className="text-[11px] font-medium text-emerald-700">
+                      Membership discount applied (−{formatInr(displayMembershipDiscount)})
                     </span>
                   )}
                   {waiveMembershipForCoupon && couponDiscount > 0 && (

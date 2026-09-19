@@ -83,7 +83,7 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Admin / existing ERP APIs (unchanged)
+// Admin / existing ERP APIs 
 app.use('/auth', authRoutes);
 app.use('/invoice', invoiceRoutes);
 app.use('/quotation', quotationRoutes);
