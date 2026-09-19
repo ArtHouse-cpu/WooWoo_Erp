@@ -150,15 +150,15 @@ const StaffCommissionScreen = () => {
           </span>
         ),
       },
-      {
-        accessorKey: "rate",
-        header: "Rate %",
-        Cell: ({ cell }) => (
-          <span className="text-sm text-indigo-700 font-semibold">
-            {cell.getValue<number>()}%
-          </span>
-        ),
-      },
+      // {
+      //   accessorKey: "rate",
+      //   header: "Rate %",
+      //   Cell: ({ cell }) => (
+      //     <span className="text-sm text-indigo-700 font-semibold">
+      //       {cell.getValue<number>()}%
+      //     </span>
+      //   ),
+      // },
       {
         accessorKey: "commission",
         header: "Commission",
@@ -209,10 +209,6 @@ const StaffCommissionScreen = () => {
             <CircleDollarSign className="text-indigo-600" size={28} />
             Staff Commission & Performance
           </h1>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Review staff commissions, performance metrics, and invoice-level
-            ledger breakdowns.
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

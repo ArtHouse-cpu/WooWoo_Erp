@@ -16,6 +16,7 @@ import {
 import Swal from "sweetalert2";
 import AddSpaceModal, {
   type SpaceFormPayload,
+  COWORKING_CATEGORIES,
 } from "@/features/catalogue/components/AddSpaceModal";
 import {
   handleCreateSpace,
@@ -69,7 +70,43 @@ export default function CreateSpacesScreen() {
         size: 50,
         Cell: ({ row }: { row: { index: number } }) => row.index + 1,
       },
+      {
+        accessorKey: "spaceCode",
+        header: "Space Code",
+        size: 110,
+        Cell: ({ row }: { row: { original: SpaceRow } }) => (
+          <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700 border border-slate-200">
+            {row.original.spaceCode ||
+              `SP-${String(row.original._id || "").slice(-5).toUpperCase()}`}
+          </span>
+        ),
+      },
       { accessorKey: "name", header: "Space Name", size: 200 },
+      {
+        accessorKey: "spaceType",
+        header: "Type",
+        size: 110,
+        Cell: ({ row }: { row: { original: SpaceRow } }) => {
+          const raw = String(row.original.spaceType || "").toLowerCase();
+          const cat = String(row.original.category || "").toLowerCase();
+          const isCoworking =
+            raw === "coworking" ||
+            (raw !== "exclusive" &&
+              (COWORKING_CATEGORIES.some((c) => c.toLowerCase() === cat) ||
+                cat.includes("cowork")));
+          return (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                isCoworking
+                  ? "bg-indigo-100 text-indigo-700"
+                  : "bg-emerald-100 text-emerald-700"
+              }`}
+            >
+              {isCoworking ? "Coworking" : "Exclusive"}
+            </span>
+          );
+        },
+      },
       { accessorKey: "category", header: "Category" },
       {
         accessorKey: "day",
@@ -252,11 +289,36 @@ export default function CreateSpacesScreen() {
           showConfirmButton: false,
         });
       } else {
-        await handleCreateSpace(formData);
+        const res = await handleCreateSpace(formData);
+
+        // Fallback assurance: If both days were requested but only 1 doc was returned
+        if (payload.createBothDays && (!res?.spaces || res.spaces.length < 2)) {
+          const createdWeekday = res?.space;
+          const weekendFormData = spacePayloadToFormData(
+            {
+              name: payload.name,
+              spaceCode: payload.spaceCode,
+              spaceType: payload.spaceType,
+              category: payload.category,
+              day: "Weekend",
+              price: payload.weekendPrice ?? 0,
+              status: payload.weekendStatus ?? "Available",
+              capacity: payload.capacity,
+              description: payload.description,
+              imageUrl: createdWeekday?.imageUrl || null,
+            },
+            null,
+          );
+          await handleCreateSpace(weekendFormData);
+        }
+
         await Swal.fire({
           icon: "success",
-          title: "Space created",
-          timer: 1400,
+          title: payload.createBothDays ? "Spaces created" : "Space created",
+          text: payload.createBothDays
+            ? "Weekday and Weekend spaces added successfully."
+            : undefined,
+          timer: 1500,
           showConfirmButton: false,
         });
       }
@@ -325,6 +387,7 @@ export default function CreateSpacesScreen() {
         onSubmit={handleSubmit}
         loading={saving}
         initialSpace={editing}
+        existingSpaces={spaces}
       />
     </div>
   );

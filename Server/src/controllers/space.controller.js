@@ -3,8 +3,41 @@ import multer from 'multer';
 import fs from 'fs';
 import path from 'path';
 import {fileURLToPath} from 'url';
-import Space, {SPACE_DAYS} from '../models/space.model.js';
+import Space, {
+  SPACE_DAYS,
+  SPACE_TYPES,
+  SPACE_STATUSES,
+  EXCLUSIVE_CATEGORIES,
+  COWORKING_CATEGORIES,
+  ALL_SPACE_CATEGORIES,
+} from '../models/space.model.js';
 import {uploadOnCloudinary} from '../utils/cloudinary.js';
+
+export const generateNextSpaceCode = async () => {
+  try {
+    const list = await Space.find({spaceCode: {$regex: /^SP-\d+$/i}})
+      .select('spaceCode')
+      .lean();
+    let maxNum = 0;
+    for (const s of list) {
+      const code = s.spaceCode || '';
+      const match = code.match(/SP-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!Number.isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+    if (maxNum > 0) {
+      return `SP-${String(maxNum + 1).padStart(3, '0')}`;
+    }
+    const count = await Space.countDocuments();
+    return `SP-${String(count + 1).padStart(3, '0')}`;
+  } catch {
+    return 'SP-001';
+  }
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -125,22 +158,62 @@ const expandLegacySpace = doc => {
   return rows;
 };
 
+export const inferSpaceType = doc => {
+  const raw = String(doc?.spaceType || '').trim().toLowerCase();
+  if (raw === 'coworking') return 'Coworking';
+  if (raw === 'exclusive') return 'Exclusive';
+
+  const cat = String(doc?.category || '').trim();
+  if (COWORKING_CATEGORIES.some(c => c.toLowerCase() === cat.toLowerCase())) {
+    return 'Coworking';
+  }
+  if (EXCLUSIVE_CATEGORIES.some(c => c.toLowerCase() === cat.toLowerCase())) {
+    return 'Exclusive';
+  }
+  if (cat.toLowerCase() === 'coworking' || cat.toLowerCase().includes('cowork')) {
+    return 'Coworking';
+  }
+
+  const name = String(doc?.name || '').trim().toLowerCase();
+  if (
+    name.includes('cowork') ||
+    name.includes('hot desk') ||
+    name.includes('desk pass') ||
+    name.includes('flexi desk') ||
+    name.includes('dedicated desk') ||
+    name.includes('meeting pod') ||
+    name.includes('open workspace')
+  ) {
+    return 'Coworking';
+  }
+  return 'Exclusive';
+};
+
 const serializeSpace = doc => {
   const plain =
     typeof doc?.toObject === 'function' ? doc.toObject() : {...doc};
   const day = normalizeDay(plain.day);
+  const spaceType = inferSpaceType(plain);
+  const spaceCode =
+    plain.spaceCode || `SP-${String(plain._id || '').slice(-5).toUpperCase()}`;
 
   // New-model docs always have day
   if (day) {
     return {
       ...plain,
+      spaceCode,
+      spaceType,
       day,
       price: toMoney(plain.price),
     };
   }
 
   // Legacy dual-price / missing day — expand for list consumers
-  return expandLegacySpace(plain);
+  return expandLegacySpace(plain).map(r => ({
+    ...r,
+    spaceCode: r.spaceCode || spaceCode,
+    spaceType: inferSpaceType(r),
+  }));
 };
 
 const buildSpacePayload = (body = {}, imageUrl, {partial = false} = {}) => {
@@ -148,8 +221,33 @@ const buildSpacePayload = (body = {}, imageUrl, {partial = false} = {}) => {
   const payload = {};
 
   if (!partial || body.name !== undefined) payload.name = name;
+  if (!partial || body.spaceCode !== undefined) {
+    payload.spaceCode = String(body.spaceCode ?? '').trim().toUpperCase();
+  }
   if (!partial || body.category !== undefined) {
     payload.category = String(body.category ?? 'Studio').trim() || 'Studio';
+  }
+  if (!partial || body.spaceType !== undefined) {
+    const rawType = String(body.spaceType ?? '').trim().toLowerCase();
+    if (rawType === 'coworking') {
+      payload.spaceType = 'Coworking';
+    } else if (rawType === 'exclusive') {
+      payload.spaceType = 'Exclusive';
+    } else if (!partial) {
+      const cat = String(payload.category ?? body.category ?? '').trim();
+      if (COWORKING_CATEGORIES.some(c => c.toLowerCase() === cat.toLowerCase())) {
+        payload.spaceType = 'Coworking';
+      } else {
+        payload.spaceType = 'Exclusive';
+      }
+    }
+  } else if (!partial) {
+    const cat = String(payload.category ?? body.category ?? '').trim();
+    if (COWORKING_CATEGORIES.some(c => c.toLowerCase() === cat.toLowerCase())) {
+      payload.spaceType = 'Coworking';
+    } else {
+      payload.spaceType = 'Exclusive';
+    }
   }
   payload.itemType = 'space';
 
@@ -227,6 +325,83 @@ export const createSpace = async (req, res) => {
       });
     }
 
+    const staffFromReq = {
+      m_staff_id: req.user?.userId ?? null,
+      m_staff_name: req.user?.name ?? null,
+      m_staff_email: req.user?.email ?? null,
+    };
+    const createdBy = payload.createdBy ?? staffFromReq;
+
+    if (!payload.spaceCode) {
+      payload.spaceCode = await generateNextSpaceCode();
+    }
+
+    const createBothDays =
+      String(req.body.createBothDays).toLowerCase() === 'true' ||
+      req.body.createBothDays === true ||
+      String(req.body.hasBothDays).toLowerCase() === 'true' ||
+      req.body.hasBothDays === true;
+
+    if (createBothDays) {
+      const weekdayPrice = toMoney(req.body.weekdayPrice ?? payload.price);
+      const weekendPrice = toMoney(req.body.weekendPrice ?? payload.price);
+      const weekdayStatus = normalizeStatus(
+        req.body.weekdayStatus ?? payload.status,
+      );
+      const weekendStatus = normalizeStatus(
+        req.body.weekendStatus ?? payload.status,
+      );
+
+      const clashWeekday = await nameDayClash(name, 'Weekday');
+      if (clashWeekday) {
+        return res.status(409).json({
+          success: false,
+          message: `A space named "${name}" already exists for Weekday.`,
+        });
+      }
+
+      const clashWeekend = await nameDayClash(name, 'Weekend');
+      if (clashWeekend) {
+        return res.status(409).json({
+          success: false,
+          message: `A space named "${name}" already exists for Weekend.`,
+        });
+      }
+
+      const baseDoc = {
+        name,
+        spaceCode: payload.spaceCode,
+        spaceType: payload.spaceType || 'Exclusive',
+        category: payload.category || 'Studio',
+        itemType: 'space',
+        capacity: payload.capacity || 1,
+        description: payload.description || '',
+        imageUrl: payload.imageUrl ?? null,
+        createdBy,
+      };
+
+      const weekdayDoc = await Space.create({
+        ...baseDoc,
+        day: 'Weekday',
+        price: weekdayPrice,
+        status: weekdayStatus,
+      });
+
+      const weekendDoc = await Space.create({
+        ...baseDoc,
+        day: 'Weekend',
+        price: weekendPrice,
+        status: weekendStatus,
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Spaces created successfully for Weekday and Weekend.',
+        space: serializeSpace(weekdayDoc),
+        spaces: [serializeSpace(weekdayDoc), serializeSpace(weekendDoc)],
+      });
+    }
+
     if (!payload.day) payload.day = 'Weekday';
     if (payload.price === undefined) payload.price = 0;
 
@@ -238,19 +413,13 @@ export const createSpace = async (req, res) => {
       });
     }
 
-    const staffFromReq = {
-      m_staff_id: req.user?.userId ?? null,
-      m_staff_name: req.user?.name ?? null,
-      m_staff_email: req.user?.email ?? null,
-    };
-
     // Strip legacy dual-price fields if somehow present
     delete payload.weekdayPrice;
     delete payload.weekendPrice;
 
     const space = await Space.create({
       ...payload,
-      createdBy: payload.createdBy ?? staffFromReq,
+      createdBy,
     });
 
     return res.status(201).json({
@@ -275,11 +444,48 @@ export const createSpace = async (req, res) => {
 
 export const getSpaces = async (req, res) => {
   try {
-    const {search = '', category, status, day} = req.query;
+    const {search = '', category, status, day, spaceType} = req.query;
     const query = {};
 
     if (category && String(category).trim() && String(category) !== 'All') {
       query.category = String(category).trim();
+    }
+    if (spaceType && String(spaceType).trim() && String(spaceType) !== 'All') {
+      const st = String(spaceType).trim().toLowerCase();
+      if (st === 'coworking') {
+        query.$or = [
+          {spaceType: 'Coworking'},
+          {
+            $and: [
+              {spaceType: {$nin: ['Exclusive', 'Coworking']}},
+              {
+                $or: [
+                  {category: {$in: COWORKING_CATEGORIES}},
+                  {category: /cowork/i},
+                  {name: /cowork|hot desk|desk pass|flexi desk|dedicated desk|meeting pod|open workspace/i},
+                ],
+              },
+            ],
+          },
+        ];
+      } else if (st === 'exclusive') {
+        query.$or = [
+          {spaceType: 'Exclusive'},
+          {
+            $and: [
+              {spaceType: {$nin: ['Exclusive', 'Coworking']}},
+              {category: {$in: EXCLUSIVE_CATEGORIES}},
+            ],
+          },
+          {
+            $and: [
+              {spaceType: {$nin: ['Exclusive', 'Coworking']}},
+              {category: {$nin: COWORKING_CATEGORIES}},
+              {name: {$not: /cowork|hot desk|desk pass|flexi desk|dedicated desk|meeting pod|open workspace/i}},
+            ],
+          },
+        ];
+      }
     }
     if (status && String(status).trim() && String(status) !== 'All') {
       query.status = normalizeStatus(status);
@@ -293,6 +499,7 @@ export const getSpaces = async (req, res) => {
     if (s) {
       query.$or = [
         {name: {$regex: s, $options: 'i'}},
+        {spaceCode: {$regex: s, $options: 'i'}},
         {category: {$regex: s, $options: 'i'}},
         {description: {$regex: s, $options: 'i'}},
       ];
@@ -481,6 +688,8 @@ export const updateSpace = async (req, res) => {
 
       const weekendPayload = {
         name: nextName,
+        spaceCode: payload.spaceCode ?? existing.spaceCode ?? '',
+        spaceType: payload.spaceType ?? existing.spaceType ?? 'Exclusive',
         category: payload.category ?? existing.category,
         itemType: 'space',
         day: 'Weekend',

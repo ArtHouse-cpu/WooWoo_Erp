@@ -157,7 +157,16 @@ const SpaceBook = () => {
   useEffect(() => {
     const controller = new AbortController();
     void fetchBookings(controller.signal);
-    return () => controller.abort();
+
+    // Periodically sync statuses with current time every 30 seconds
+    const interval = setInterval(() => {
+      void fetchBookings();
+    }, 30000);
+
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
   }, [fetchBookings]);
 
   const metrics = useMemo(() => {
@@ -307,6 +316,8 @@ const SpaceBook = () => {
     const lineTotal = Math.max(0, Number(pendingCheckout.lineTotal ?? 0));
     const couponDiscount = Number(payment.coupon?.discountAmount ?? 0);
     const referralDiscount = Number(payment.referral?.discountAmount ?? 0);
+    const membershipDiscount = Number(payment.membershipDiscount ?? 0);
+    const totalDiscount = couponDiscount + referralDiscount + membershipDiscount;
 
     try {
       setSaving(true);
@@ -318,7 +329,7 @@ const SpaceBook = () => {
           "Walk-in Customer",
         customerPhone:
           payment.customerPhone?.trim() || pendingCheckout.customerPhone || "",
-        customerId: payment.customerId || undefined,
+        customerId: payment.customerId || pendingCheckout.customerId || undefined,
         invoiceDate: today,
         dueDate: today,
         salesPersonName:
@@ -340,12 +351,12 @@ const SpaceBook = () => {
             productName: checkoutItems[0]?.name || "Space Booking",
             qty: 1,
             unitPrice: lineTotal,
-            discount: 0,
+            discount: membershipDiscount,
             category: "space",
           },
         ],
         subTotal: lineTotal,
-        discountTotal: couponDiscount + referralDiscount,
+        discountTotal: totalDiscount,
         grandTotal: payment.finalAmount,
         coupon: payment.coupon ?? null,
         referral: payment.referral ?? null,
@@ -356,6 +367,7 @@ const SpaceBook = () => {
         pendingAmount: payment.paymentBreakdown.dueAmount,
         cashbackTotal: payment.cashbackTotal,
         membershipDiscount: payment.membershipDiscount,
+        membershipType: pendingCheckout.membershipType || undefined,
         activityType: "Space Booking",
         createdBy: {
           m_staff_id: staff.m_staff_id,
@@ -372,8 +384,8 @@ const SpaceBook = () => {
       const invoiceId = invoice?._id ? String(invoice._id) : null;
 
       await handleCreateSpaceBooking({
-        customerName: pendingCheckout.customerName,
-        customerPhone: pendingCheckout.customerPhone,
+        customerName: payment.customerName?.trim() || pendingCheckout.customerName,
+        customerPhone: payment.customerPhone?.trim() || pendingCheckout.customerPhone,
         customerEmail: pendingCheckout.customerEmail,
         spaceId: pendingCheckout.spaceId,
         bookingDate: pendingCheckout.bookingDate,
@@ -401,11 +413,11 @@ const SpaceBook = () => {
             name: checkoutItems[0]?.name || "Space Booking",
             qty: 1,
             price: lineTotal,
-            discount: couponDiscount + referralDiscount,
+            discount: totalDiscount,
           },
         ],
         totalMRP: lineTotal,
-        discountTotal: couponDiscount + referralDiscount,
+        discountTotal: totalDiscount,
         finalAmount: payment.finalAmount,
         totalDue: payment.paymentBreakdown.dueAmount,
         totalQty: 1,
@@ -480,30 +492,27 @@ const SpaceBook = () => {
 
   const columns = useMemo<MRT_ColumnDef<SpaceBookingPayload>[]>(
     () => [
-      {
-        accessorKey: "id",
-        header: "Booking ID",
-        size: 110,
-        Cell: ({ row }) => {
-          const id = bookingId(row.original);
-          return (
-            <span className="inline-flex items-center justify-center rounded-md border border-slate-200/80 bg-slate-100/90 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-600 shadow-2xs">
-              #{id.slice(-6).toUpperCase() || "—"}
-            </span>
-          );
-        },
-      },
+      // {
+      //   accessorKey: "id",
+      //   header: "Booking ID",
+      //   size: 110,
+      //   Cell: ({ row }) => {
+      //     const id = bookingId(row.original);
+      //     // return (
+      //     //   // <span className="inline-flex items-center justify-center rounded-md border border-slate-200/80 bg-slate-100/90 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-600 shadow-2xs">
+      //     //   //   #{id.slice(-6).toUpperCase() || "—"}
+      //     //   // </span>
+      //     // );
+      //   },
+      // },
       {
         id: "space",
         header: "Space",
-        size: 200,
+        size: 100,
         Cell: ({ row }) => {
           const b = row.original;
           return (
             <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-200/80 bg-indigo-50 text-indigo-600">
-                <Layers size={16} />
-              </span>
               <div className="min-w-0">
                 <div className="truncate text-xs font-semibold text-slate-800 sm:text-sm">
                   {b.space?.name || b.spaceName || "—"}
@@ -523,18 +532,11 @@ const SpaceBook = () => {
       {
         accessorKey: "customerName",
         header: "Customer",
-        size: 240,
+        size: 100,
         Cell: ({ row }) => {
           const b = row.original;
           return (
             <div className="flex items-center gap-3 py-1">
-              <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-xs font-bold shadow-xs ${getAvatarColor(
-                  b.customerName || "?",
-                )}`}
-              >
-                {getInitials(b.customerName || "?")}
-              </div>
               <div className="min-w-0">
                 <div className="truncate text-sm font-bold text-slate-800">
                   {b.customerName}
@@ -551,10 +553,10 @@ const SpaceBook = () => {
       {
         accessorKey: "bookingDate",
         header: "Date",
-        size: 140,
+        size: 100,
         Cell: ({ row }) => (
           <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/80 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-2xs">
-            <Calendar size={13} className="text-indigo-600" />
+           
             <span>{formatDateDisplay(row.original.bookingDate)}</span>
           </div>
         ),
@@ -562,7 +564,7 @@ const SpaceBook = () => {
       {
         id: "time",
         header: "Time",
-        size: 180,
+        size: 100,
         Cell: ({ row }) => (
           <div className="flex items-center gap-1.5 pl-0.5 text-xs font-medium text-slate-500">
             <Clock size={12} className="shrink-0 text-slate-400" />
@@ -576,7 +578,7 @@ const SpaceBook = () => {
       {
         accessorKey: "status",
         header: "Status",
-        size: 140,
+        size: 100,
         Cell: ({ cell }) => {
           const status = cell.getValue<SpaceBookingStatus>();
           if (status === "Ongoing") {
@@ -1262,6 +1264,9 @@ const SpaceBook = () => {
         items={checkoutItems}
         initialCustomerName={pendingCheckout?.customerName || ""}
         initialCustomerPhone={pendingCheckout?.customerPhone || ""}
+        initialCustomerId={pendingCheckout?.customerId || undefined}
+        initialMembership={pendingCheckout?.membershipType || undefined}
+        initialMembershipPlanId={pendingCheckout?.membershipPlanId || undefined}
         initialNotes={
           pendingCheckout
             ? [

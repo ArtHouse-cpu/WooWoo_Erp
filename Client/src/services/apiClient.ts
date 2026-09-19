@@ -1550,7 +1550,10 @@ export const handleVerifyMembershipRazorpayPayment = async (
 export type SpacePayload = {
   _id?: string;
   name: string;
+  spaceCode?: string;
   category?: string;
+  /** Space Type: Exclusive or Coworking */
+  spaceType?: "Exclusive" | "Coworking" | string;
   /** Weekday | Weekend — one pricing row per name + day */
   day?: "Weekday" | "Weekend" | string;
   price?: number;
@@ -1571,6 +1574,7 @@ export const handleGetSpaces = async (
     category?: string;
     status?: string;
     day?: string;
+    spaceType?: string;
   },
   signal?: AbortSignal,
 ) => {
@@ -1580,6 +1584,9 @@ export const handleGetSpaces = async (
       category: params?.category ?? "All",
       status: params?.status ?? "All",
       ...(params?.day ? { day: params.day } : {}),
+      ...(params?.spaceType && params.spaceType !== "All"
+        ? { spaceType: params.spaceType }
+        : {}),
     },
     signal,
   });
@@ -1592,13 +1599,17 @@ export const handleGetSpaceById = async (id: string, signal?: AbortSignal) => {
 };
 
 export const spacePayloadToFormData = (
-  payload: SpacePayload | Partial<SpacePayload>,
+  payload: SpacePayload | Partial<SpacePayload> | Record<string, any>,
   imageFile?: File | null,
 ) => {
   const fd = new FormData();
   if (payload.name !== undefined) fd.append("name", String(payload.name));
+  if (payload.spaceCode !== undefined)
+    fd.append("spaceCode", String(payload.spaceCode));
   if (payload.category !== undefined)
     fd.append("category", String(payload.category));
+  if (payload.spaceType !== undefined)
+    fd.append("spaceType", String(payload.spaceType));
   if (payload.day !== undefined) fd.append("day", String(payload.day));
   if (payload.price !== undefined) fd.append("price", String(payload.price));
   if (payload.capacity !== undefined)
@@ -1606,6 +1617,21 @@ export const spacePayloadToFormData = (
   if (payload.status !== undefined) fd.append("status", String(payload.status));
   if (payload.description !== undefined) {
     fd.append("description", String(payload.description));
+  }
+  if ((payload as any).createBothDays !== undefined) {
+    fd.append("createBothDays", String((payload as any).createBothDays));
+  }
+  if ((payload as any).weekdayPrice !== undefined) {
+    fd.append("weekdayPrice", String((payload as any).weekdayPrice));
+  }
+  if ((payload as any).weekdayStatus !== undefined) {
+    fd.append("weekdayStatus", String((payload as any).weekdayStatus));
+  }
+  if ((payload as any).weekendPrice !== undefined) {
+    fd.append("weekendPrice", String((payload as any).weekendPrice));
+  }
+  if ((payload as any).weekendStatus !== undefined) {
+    fd.append("weekendStatus", String((payload as any).weekendStatus));
   }
   if (imageFile) fd.append("image", imageFile);
   return fd;
@@ -1657,14 +1683,24 @@ export type SpaceBookingPayload = {
   customerEmail?: string;
   spaceId: string;
   spaceName?: string;
+  spaceCode?: string;
+  spaceType?: "Exclusive" | "Coworking" | string;
+  spaceCategory?: string;
+  spaceDay?: string;
+  unitPrice?: number;
+  durationHours?: number;
+  lineTotal?: number;
   space?: {
     _id: string;
     name: string;
+    spaceCode?: string;
+    spaceType?: "Exclusive" | "Coworking" | string;
     category?: string;
     day?: string;
     price?: number;
     capacity?: number;
     status?: string;
+    imageUrl?: string | null;
   } | null;
   bookingDate: string;
   startTime: string;
@@ -1732,6 +1768,14 @@ export const handleCreateSpaceBooking = async (payload: {
   endTime: string;
   status?: SpaceBookingStatus;
   notes?: string;
+  spaceName?: string;
+  spaceCode?: string;
+  spaceType?: string;
+  spaceCategory?: string;
+  spaceDay?: string;
+  unitPrice?: number;
+  durationHours?: number;
+  lineTotal?: number;
   invoiceId?: string | null;
   invoiceCode?: string;
   grandTotal?: number;
