@@ -22,6 +22,7 @@ import {
   GuestScreen,
   PartnerScreen,
   VendorScreen,
+  LeadScreen,
 } from "@/features/network";
 import {
   CreatePurchaseReturnScreen,
@@ -78,6 +79,7 @@ export const router = createBrowserRouter([
           { path: "vendors", element: <VendorScreen /> },
           { path: "customers", element: <CustomerScreen /> },
           { path: "csp", element: <CspScreen /> },
+          { path: "leads", element: <LeadScreen /> },
           { path: "partners", element: <PartnerScreen /> },
           { path: "guests", element: <GuestScreen /> },
           { path: "purchase", element: <PurchaseScreen /> },

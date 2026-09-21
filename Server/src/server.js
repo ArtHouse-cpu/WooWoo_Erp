@@ -39,6 +39,7 @@ import expenceRoutes from './routes/expence.router.js';
 import expenceCategoryRoutes from './routes/expenceCategory.router.js';
 import dashboardRoutes from './routes/dashboard.route.js';
 import staffCommissionRoutes from './routes/staffCommission.route.js'
+import leadRouters from './routes/lead.Route.js';
 // import activityRoutes from './routes/activity.route.js';
 
 // Load environment variables
@@ -125,6 +126,7 @@ app.use('/api/expences', expenceRoutes);
 app.use('/api/expences/category', expenceCategoryRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/api/commission',staffCommissionRoutes);
+app.use('/api/lead',leadRouters)
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

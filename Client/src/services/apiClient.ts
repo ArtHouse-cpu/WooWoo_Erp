@@ -3162,3 +3162,66 @@ export const handleCreateAnnouncement = async (
   const response = await axiosInstance.post("/api/announcement", payload);
   return response.data;
 };
+
+// ==================== Leads API ====================
+
+export type LeadStatus =
+  | "New"
+  | "Contacted"
+  | "Interested"
+  | "Converted"
+  | "Lost";
+
+export type LeadItem = {
+  _id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  status: LeadStatus;
+  source?: string;
+  reasonNote?: string;
+  date?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type LeadPayload = {
+  name: string;
+  phone?: string;
+  email?: string;
+  status?: LeadStatus;
+  source?: string;
+  reasonNote?: string;
+};
+
+export const handleGetLeads = async (signal?: AbortSignal) => {
+  const response = await axiosInstance.get("/api/lead", { signal });
+  return response.data;
+};
+
+export const handleGetLeadById = async (id: string, signal?: AbortSignal) => {
+  const response = await axiosInstance.get(`/api/lead/${id}`, { signal });
+  return response.data;
+};
+
+export const handleCreateLead = async (payload: LeadPayload) => {
+  const response = await axiosInstance.post("/api/lead", payload);
+  return response.data;
+};
+
+export const handleUpdateLead = async (
+  id: string,
+  payload: Partial<LeadPayload>,
+) => {
+  const response = await axiosInstance.patch(`/api/lead/${id}`, {
+    ...payload,
+    id,
+  });
+  return response.data;
+};
+
+export const handleDeleteLead = async (id: string) => {
+  const response = await axiosInstance.delete(`/api/lead/${id}`);
+  return response.data;
+};
+

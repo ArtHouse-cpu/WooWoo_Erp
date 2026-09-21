@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+ 
   ChevronDown,
   ShoppingCart,
   Wallet,
@@ -164,12 +165,19 @@ const MENU_GROUPS: MenuGroup[] = [
     icon: Network,
     submenu: [
       { name: "vendor", label: "Vendors", icon: Users, path: "/vendors" },
+
+      {name: "lead",
+         label : "Leads",
+          icon: Users ,
+           path:"/leads" },
+     
       {
         name: "customers",
         label: "Customers",
         icon: Users,
         path: "/customers",
       },
+
       {
         name: "csp",
         label: "CSP",

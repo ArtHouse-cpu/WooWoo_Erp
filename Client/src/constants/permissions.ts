@@ -542,6 +542,7 @@ export const MENU_PERMISSION_MAP: Record<string, Permission | Permission[]> = {
   "/members-and-partners": PERMISSIONS.MEMBERSHIP_PLAN_READ,
   "/customers": PERMISSIONS.CUSTOMER_READ,
   "/csp": [PERMISSIONS.CSP_READ, PERMISSIONS.CUSTOMER_READ],
+  "/leads": PERMISSIONS.CUSTOMER_READ,
   "/vendors": PERMISSIONS.VENDOR_READ,
   "/Vendor list": PERMISSIONS.VENDOR_READ,
   "/partners": PERMISSIONS.PARTNER_READ,
