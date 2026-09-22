@@ -3,7 +3,47 @@ import Lead from '../models/lead.model.js';
 
 export const getLead = async (req, res) => {
   try {
-    const leads = await Lead.find().sort({ createdAt: -1 });
+    const { fromDate, toDate, purpose } = req.query;
+    const filter= {};
+
+    if (purpose && purpose !== 'all') {
+      filter.purpose = purpose.trim();
+    }
+
+    //fromdate
+
+       if (fromDate || toDate) {
+      filter.createdAt = {};
+
+      // From date
+      if (fromDate) {
+        const startDate = new Date(`${fromDate}T00:00:00.000Z`);
+
+        if (isNaN(startDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid fromDate",
+          });
+        }
+
+        filter.createdAt.$gte = startDate;
+      }
+
+      // To date
+      if (toDate) {
+        const endDate = new Date(`${toDate}T23:59:59.999Z`);
+
+        if (isNaN(endDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid toDate",
+          });
+        }
+
+        filter.createdAt.$lte = endDate;
+      }
+    }
+    const leads = await Lead.find(filter).sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -62,7 +102,7 @@ export const updateLead = async (req, res) => {
   try {
     const id = req.params.id || req.body.id || req.body._id;
 
-    // Check valid MongoDB ID
+    console.log(id)
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
@@ -87,16 +127,16 @@ export const updateLead = async (req, res) => {
       lead.phone = req.body.phone;
     }
 
-    if (req.body.email !== undefined) {
-      lead.email = req.body.email;
-    }
-
     if (req.body.status !== undefined) {
       lead.status = req.body.status;
     }
 
     if (req.body.source !== undefined) {
       lead.source = req.body.source;
+    }
+
+    if (req.body.purpose !== undefined) {
+      lead.purpose = req.body.purpose;
     }
 
     if (req.body.reasonNote !== undefined) {
@@ -138,10 +178,11 @@ export const createLead = async (req, res) => {
     const {
       name,
       phone,
-      email,
       status,
       source,
+      purpose,
       reasonNote,
+      createdBy,
     } = req.body;
 
     // Name validation
@@ -152,24 +193,30 @@ export const createLead = async (req, res) => {
       });
     }
 
-    // Phone OR Email validation
-    if (
-      (!phone || !phone.trim()) &&
-      (!email || !email.trim())
-    ) {
+    // Phone validation
+    const phoneTrimmed = phone?.trim() || "";
+    if (!phoneTrimmed) {
       return res.status(400).json({
         success: false,
-        message: "Either phone number or email is required",
+        message: "Phone number is required",
+      });
+    }
+
+    if (!/^\d{10}$/.test(phoneTrimmed)) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number must be a valid 10-digit number",
       });
     }
 
     const lead = await Lead.create({
       name: name.trim(),
-      phone: phone?.trim() || "",
-      email: email?.trim() || "",
+      phone: phoneTrimmed,
       status: status || "New",
       source: source?.trim() || "",
+      purpose: purpose?.trim() || "",
       reasonNote: reasonNote?.trim() || "",
+      createdBy: createdBy || undefined,
     });
 
     res.status(201).json({

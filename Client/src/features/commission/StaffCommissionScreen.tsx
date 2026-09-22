@@ -30,9 +30,13 @@ const StaffCommissionScreen = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
-  const [datePreset, setDatePreset] = useState<DatePreset>("all");
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+  const [datePreset, setDatePreset] = useState<DatePreset>("month");
+  const [fromDate, setFromDate] = useState<string>(
+    () => rangeForPreset("month").from
+  );
+  const [toDate, setToDate] = useState<string>(
+    () => rangeForPreset("month").to
+  );
   const [isCommissionModalOpen, setIsCommissionModalOpen] = useState(false);
 
   useEffect(() => {

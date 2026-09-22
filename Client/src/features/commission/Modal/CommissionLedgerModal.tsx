@@ -1,5 +1,4 @@
-
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   X,
   Search,
@@ -105,9 +104,15 @@ const CommissionLedgerModal = ({
 }: CommissionLedgerModalProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
-  const [timeRange, setTimeRange] = useState<string>("lifetime");
+  const [timeRange, setTimeRange] = useState<string>("this_month");
   const [customFromDate, setCustomFromDate] = useState<string>("");
   const [customToDate, setCustomToDate] = useState<string>("");
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeRange("this_month");
+    }
+  }, [isOpen, staff]);
 
   const invoices = useMemo(() => staff?.invoices || [], [staff]);
 

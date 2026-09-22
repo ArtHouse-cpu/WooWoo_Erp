@@ -9,19 +9,11 @@ const leadSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Phone is optional individually
     phone: {
       type: String,
       trim: true,
-      default: "",
-    },
-
-    // Email is optional individually
-    email: {
-      type: String,
-      trim: true,
-      lowercase: true,
-      default: "",
+      required: [true, "Phone number is required"],
+      match: [/^\d{10}$/, "Phone number must be a valid 10-digit number"],
     },
 
     // Status
@@ -31,8 +23,8 @@ const leadSchema = new mongoose.Schema(
         "New",
         "Contacted",
         "Interested",
-        "Converted",
-        "Lost",
+        "Not Interested",
+        "Need to message",
       ],
       default: "New",
     },
@@ -41,6 +33,35 @@ const leadSchema = new mongoose.Schema(
     source: {
       type: String,
       trim: true,
+      enum: ["Instagram",
+        "WhatsApp",
+        "Walk-in",
+        "Reference",
+        "Member",
+        "Events",
+        "Website",
+        "Other",],
+      default: "",
+    },
+
+    // Purpose
+    purpose: {
+      type: String,
+      trim: true,
+      enum: ["Events",
+        "Supplies",
+        "Space Booking (Exhibition)",
+        "Space Booking (Corporate Booking)",
+        "Framing",
+        "Private Booking",
+        "Birthday Party",
+        "Membership",
+        "Volunteering",
+        "CSP",
+        "Customer Art Work",
+        "Co-Working",
+        "Handmade Gift",
+        "Saler Program",],
       default: "",
     },
 
@@ -49,6 +70,13 @@ const leadSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
+    },
+
+    // Created By Staff
+    createdBy: {
+      m_staff_id: { type: String, default: null },
+      m_staff_name: { type: String, default: null },
+      m_staff_email: { type: String, default: null },
     },
 
     // Lead date
@@ -65,19 +93,11 @@ const leadSchema = new mongoose.Schema(
 
 leadSchema.pre("validate", function (next) {
   const phone = this.phone?.trim();
-  const email = this.email?.trim();
 
-  // Both phone and email are empty
-  if (!phone && !email) {
-    this.invalidate(
-      "phone",
-      "Either phone number or email is required."
-    );
-
-    this.invalidate(
-      "email",
-      "Either phone number or email is required."
-    );
+  if (!phone) {
+    this.invalidate("phone", "Phone number is required.");
+  } else if (!/^\d{10}$/.test(phone)) {
+    this.invalidate("phone", "Phone number must be a valid 10-digit number.");
   }
 
   next();

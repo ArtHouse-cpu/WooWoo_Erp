@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -9,14 +9,9 @@ import {
   Trash2,
   Plus,
   Eye,
-  RefreshCw,
   Phone,
   Mail,
-  Users,
-  CheckCircle2,
-  Clock,
-  HelpCircle,
-  XCircle,
+ 
 } from "lucide-react";
 import Swal from "sweetalert2";
 
@@ -30,14 +25,30 @@ import {
   type LeadItem,
   type LeadPayload,
   type LeadStatus,
+  type LeadSources,
+  type LeadPurpose,
 } from "@/services/apiClient";
+import { type DatePreset, rangeForPreset } from "@/utils/datePresets";
+
+const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
+  { value: "all", label: "All Dates" },
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "week", label: "This Week" },
+  { value: "lastWeek", label: "Last Week" },
+  { value: "month", label: "This Month" },
+  { value: "lastMonth", label: "Last Month" },
+  { value: "year", label: "This Year" },
+  { value: "lastYear", label: "Last Year" },
+  { value: "custom", label: "Custom Date" },
+];
 
 const STATUS_OPTIONS: LeadStatus[] = [
   "New",
   "Contacted",
   "Interested",
-  "Converted",
-  "Lost",
+  "Not Interested",
+  "Need to message",
 ];
 
 const getStatusBadgeStyle = (status: LeadStatus) => {
@@ -48,19 +59,128 @@ const getStatusBadgeStyle = (status: LeadStatus) => {
       return "bg-amber-50 text-amber-700 border-amber-200";
     case "Interested":
       return "bg-purple-50 text-purple-700 border-purple-200";
-    case "Converted":
+    case "Not Interested":
       return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    case "Lost":
+    case "Need to message":
       return "bg-rose-50 text-rose-700 border-rose-200";
     default:
       return "bg-gray-50 text-gray-700 border-gray-200";
   }
 };
+const SOURCE_OPTIONS: LeadSources[] = [
+  "Instagram",
+  "WhatsApp",
+  "Walk-in",
+  "Reference",
+  "Member",
+  "Events",
+];
+const getSourceBadgeStyle = (source: LeadSources) => {
+  switch (source) {
+    case "Instagram":
+      return "bg-pink-50 text-pink-700 border-pink-200";
+
+    case "WhatsApp":
+      return "bg-green-50 text-green-700 border-green-200";
+
+    case "Walk-in":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+
+    case "Reference":
+      return "bg-purple-50 text-purple-700 border-purple-200";
+
+    case "Member":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+
+    case "Events":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    default:
+      return "bg-gray-50 text-gray-700 border-gray-200";
+  }
+};
+
+const PURPOSE_OPTIONS: LeadPurpose[] = [
+  "Events",
+  "Supplies",
+  "Space Booking (Exhibition)",
+  "Space Booking (Corporate Booking)",
+  "Framing",
+  "Private Booking",
+  "Birthday Party",
+  "Membership",
+  "Volunteering",
+  "CSP",
+  "Customer Art Work",
+  "Co-Working",
+  "Handmade Gift",
+  "Saler Program",
+];
+
+
+
+ export const getPurposeBadgeStyle = (source: LeadPurpose) => {
+  switch (source) {
+    case "Events":
+      return "bg-pink-50 text-pink-700 border-pink-200";
+
+    case "Supplies":
+      return "bg-green-50 text-green-700 border-green-200";
+
+    case "Space Booking (Exhibition)":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+
+    case "Space Booking (Corporate Booking)":
+      return "bg-purple-50 text-purple-700 border-purple-200";
+
+    case "Framing":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+
+    case "Private Booking":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    case "Birthday Party":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    case "Membership":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    case "Volunteering":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    case "CSP":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    case "Customer Art Work":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    case "Co-Working":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+
+    case "Handmade Gift":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+
+    case "Saler Program":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    default:
+      return "bg-gray-50 text-gray-700 border-gray-200";
+  }
+};
+
 
 const LeadScreen = () => {
   const [leads, setLeads] = useState<LeadItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Date filter state
+  const [datePreset, setDatePreset] = useState<DatePreset>("all");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
+  const [selectedPurpose, setSelectedPurpose] = useState<string>("all");
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -71,34 +191,82 @@ const LeadScreen = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   // Fetch leads from backend API: GET /api/lead
-  const fetchLeads = useCallback(async (signal?: AbortSignal) => {
-    try {
-      setLoading(true);
-      const res = await handleGetLeads(signal);
-      const leadList: LeadItem[] = Array.isArray(res?.data)
-        ? res.data
-        : Array.isArray(res)
-        ? res
-        : [];
-      setLeads(leadList);
-    } catch (error: any) {
-      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
-        return;
+  const fetchLeads = useCallback(
+    async (
+      customFrom?: string,
+      customTo?: string,
+      customPurpose?: string,
+      signal?: AbortSignal
+    ) => {
+      try {
+        setLoading(true);
+        const fDate = customFrom !== undefined ? customFrom : fromDate;
+        const tDate = customTo !== undefined ? customTo : toDate;
+        const pPurpose =
+          customPurpose !== undefined ? customPurpose : selectedPurpose;
+        const res = await handleGetLeads(
+          {
+            fromDate: fDate || undefined,
+            toDate: tDate || undefined,
+            purpose: pPurpose && pPurpose !== "all" ? pPurpose : undefined,
+          },
+          signal
+        );
+        let leadList: LeadItem[] = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res)
+          ? res
+          : [];
+        if (pPurpose && pPurpose !== "all") {
+          leadList = leadList.filter((item) => item.purpose === pPurpose);
+        }
+        setLeads(leadList);
+      } catch (error: any) {
+        if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
+          return;
+        }
+        console.error("Failed to fetch leads:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: error?.response?.data?.message || "Failed to load leads from server.",
+        });
+      } finally {
+        setLoading(false);
       }
-      console.error("Failed to fetch leads:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: error?.response?.data?.message || "Failed to load leads from server.",
-      });
-    } finally {
-      setLoading(false);
+    },
+    [fromDate, toDate, selectedPurpose]
+  );
+
+  const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const preset = e.target.value as DatePreset;
+    setDatePreset(preset);
+
+    if (preset === "all") {
+      setFromDate("");
+      setToDate("");
+      fetchLeads("", "", selectedPurpose);
+    } else if (preset === "custom") {
+      // User can pick from/to dates
+    } else {
+      const range = rangeForPreset(preset);
+      setFromDate(range.from);
+      setToDate(range.to);
+      fetchLeads(range.from, range.to, selectedPurpose);
     }
-  }, []);
+  };
+
+  const handlePurposeFilterChange = (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const nextPurpose = e.target.value;
+    setSelectedPurpose(nextPurpose);
+    fetchLeads(fromDate, toDate, nextPurpose);
+  };
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchLeads(controller.signal);
+    fetchLeads(undefined, undefined, undefined, controller.signal);
     return () => controller.abort();
   }, [fetchLeads]);
 
@@ -180,7 +348,7 @@ const LeadScreen = () => {
   };
 
   // Inline status change: PATCH /api/lead/:id
-  const handleStatusChange = async (lead: LeadItem, newStatus: LeadStatus) => {
+   const handleStatusChange = async (lead: LeadItem, newStatus: LeadStatus) => {
     if (lead.status === newStatus) return;
 
     // Optimistic UI update
@@ -189,6 +357,7 @@ const LeadScreen = () => {
         item._id === lead._id ? { ...item, status: newStatus } : item
       )
     );
+  
 
     try {
       await handleUpdateLead(lead._id, { status: newStatus });
@@ -199,6 +368,54 @@ const LeadScreen = () => {
         icon: "error",
         title: "Error",
         text: error?.response?.data?.message || "Failed to update lead status.",
+      });
+    }
+  };
+
+  // Inline source change: PATCH /api/lead/:id
+  const handleSourcesChange = async (lead: LeadItem, newSource: LeadSources) => {
+    if (lead.source === newSource) return;
+
+    // Optimistic UI update
+    setLeads((prev) =>
+      prev.map((item) =>
+        item._id === lead._id ? { ...item, source: newSource } : item
+      )
+    );
+
+    try {
+      await handleUpdateLead(lead._id, { source: newSource });
+    } catch (error: any) {
+      console.error("Failed to update source:", error);
+      await fetchLeads();
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error?.response?.data?.message || "Failed to update lead source.",
+      });
+    }
+  };
+
+  // Inline purpose change: PATCH /api/lead/:id
+  const handlePurposeChange = async (lead: LeadItem, newPurpose: LeadPurpose) => {
+    if (lead.purpose === newPurpose) return;
+
+    // Optimistic UI update
+    setLeads((prev) =>
+      prev.map((item) =>
+        item._id === lead._id ? { ...item, purpose: newPurpose } : item
+      )
+    );
+
+    try {
+      await handleUpdateLead(lead._id, { purpose: newPurpose });
+    } catch (error: any) {
+      console.error("Failed to update purpose:", error);
+      await fetchLeads();
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error?.response?.data?.message || "Failed to update lead purpose.",
       });
     }
   };
@@ -214,17 +431,6 @@ const LeadScreen = () => {
     setSelectedLeadForDetails(lead);
     setIsDetailsModalOpen(true);
   };
-
-  // Pipeline Counts for Summary Cards
-  const stats = useMemo(() => {
-    const total = leads.length;
-    const newCount = leads.filter((l) => l.status === "New").length;
-    const contacted = leads.filter((l) => l.status === "Contacted").length;
-    const interested = leads.filter((l) => l.status === "Interested").length;
-    const converted = leads.filter((l) => l.status === "Converted").length;
-    const lost = leads.filter((l) => l.status === "Lost").length;
-    return { total, newCount, contacted, interested, converted, lost };
-  }, [leads]);
 
   const columns = useMemo<MRT_ColumnDef<LeadItem>[]>(
     () => [
@@ -335,16 +541,80 @@ const LeadScreen = () => {
       },
 
       // Source
-      {
-        accessorKey: "source",
-        header: "Source",
-        size: 120,
-        Cell: ({ cell }) => (
-          <span className="text-xs text-gray-600">
-            {cell.getValue<string>() || <span className="text-gray-400 italic">-</span>}
-          </span>
-        ),
-      },
+     {
+  accessorKey: "source",
+  header: "Source",
+  size: 150,
+  filterVariant: "select",
+  filterSelectOptions: SOURCE_OPTIONS,
+
+  Cell: ({ cell, row }) => {
+    const currentSource =
+      (cell.getValue<LeadSources>() || "Instagram") as LeadSources;
+
+    return (
+      <select
+        value={currentSource}
+        onChange={(e) =>
+          handleSourcesChange(
+            row.original,
+            e.target.value as LeadSources
+          )
+        }
+        className={`rounded-lg border px-2.5 py-1 text-xs font-semibold outline-none transition cursor-pointer ${getSourceBadgeStyle(
+          currentSource
+        )}`}
+      >
+        {SOURCE_OPTIONS.map((source) => (
+          <option
+            key={source}
+            value={source}
+            className="bg-white text-gray-800"
+          >
+            {source}
+          </option>
+        ))}
+      </select>
+    );
+  },
+},
+
+//purpose
+{
+  accessorKey: "purpose",
+  header: "Purpose",
+  size: 220,
+  filterVariant: "select",
+  filterSelectOptions: PURPOSE_OPTIONS,
+
+  Cell: ({ cell, row }) => {
+    const currentPurpose =
+      (cell.getValue<LeadPurpose>() || "Events") as LeadPurpose;
+
+    return (
+      <select
+        value={currentPurpose}
+        onChange={(e) =>
+          handlePurposeChange(
+            row.original,
+            e.target.value as LeadPurpose
+          )
+        }
+        className="rounded-lg border px-2.5 py-1 text-xs font-semibold outline-none transition cursor-pointer bg-white text-gray-700 border-gray-200"
+      >
+        {PURPOSE_OPTIONS.map((purpose) => (
+          <option
+            key={purpose}
+            value={purpose}
+            className="bg-white text-gray-800"
+          >
+            {purpose}
+          </option>
+        ))}
+      </select>
+    );
+  },
+},
 
       // Reason / Note
       {
@@ -369,20 +639,37 @@ const LeadScreen = () => {
         size: 120,
         Cell: ({ cell, row }) => {
           const rawDate = cell.getValue<string>() || row.original.date;
-          if (!rawDate) return <span className="text-gray-400 italic text-xs">-</span>;
-          try {
-            return (
-              <span className="text-xs text-gray-500 whitespace-nowrap">
-                {new Date(rawDate).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-            );
-          } catch {
-            return <span className="text-xs text-gray-500">{String(rawDate)}</span>;
+          const staffName = row.original.createdBy?.m_staff_name;
+          if (!rawDate && !staffName) return <span className="text-gray-400 italic text-xs">-</span>;
+          let dateStr = "";
+          if (rawDate) {
+            try {
+              dateStr = new Date(rawDate).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              });
+            } catch {
+              dateStr = String(rawDate);
+            }
           }
+          return (
+            <div>
+              {dateStr && (
+                <span className="text-xs text-gray-500 whitespace-nowrap block">
+                  {dateStr}
+                </span>
+              )}
+              {staffName && (
+                <span
+                  className="block text-[11px] text-gray-400 truncate max-w-[120px]"
+                  title={`Created by ${staffName}`}
+                >
+                  by {staffName}
+                </span>
+              )}
+            </div>
+          );
         },
       },
 
@@ -465,17 +752,68 @@ const LeadScreen = () => {
           </h1>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Refresh Button */}
-          <button
-            onClick={() => fetchLeads()}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition"
-            title="Refresh leads"
-          >
-            <RefreshCw size={16} className={loading ? "animate-spin text-indigo-600" : ""} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Purpose Filter Dropdown */}
+          <div className="relative inline-flex items-center">
+            <select
+              value={selectedPurpose}
+              onChange={handlePurposeFilterChange}
+              disabled={loading}
+              className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50"
+            >
+              <option value="all">All Purposes</option>
+              {PURPOSE_OPTIONS.map((purpose) => (
+                <option key={purpose} value={purpose}>
+                  {purpose}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Date Range Preset Dropdown */}
+          <div className="relative inline-flex items-center">
+            <select
+              value={datePreset}
+              onChange={handlePresetChange}
+              disabled={loading}
+              className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50"
+            >
+              {DATE_PRESET_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Custom Date Range Picker */}
+          {datePreset === "custom" && (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="h-9 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 shadow-xs focus:border-indigo-500 focus:outline-none"
+              />
+              <span className="text-xs text-gray-400">to</span>
+              <input
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => setToDate(e.target.value)}
+                className="h-9 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 shadow-xs focus:border-indigo-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => fetchLeads(fromDate, toDate, selectedPurpose)}
+                disabled={loading || (!fromDate && !toDate)}
+                className="h-9 inline-flex items-center rounded-lg bg-indigo-600 px-3.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 transition cursor-pointer"
+              >
+                Apply
+              </button>
+            </div>
+          )}
 
           {/* Create Lead Button */}
           <button
@@ -483,7 +821,7 @@ const LeadScreen = () => {
               setLeadToEdit(null);
               setIsCreateModalOpen(true);
             }}
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-700 transition"
+            className="h-9 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-700 transition cursor-pointer"
           >
             <Plus size={18} />
             <span>Create Lead</span>
