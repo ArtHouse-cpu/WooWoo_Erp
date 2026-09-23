@@ -156,6 +156,18 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
                 </div>
               </div>
             )}
+
+            {lead.assignedTo?.m_staff_name && (
+              <div className="flex items-center gap-3">
+                <UserCheck size={16} className="text-indigo-500 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs text-gray-400 block">Assigned To (Staff)</span>
+                  <span className="font-medium text-indigo-700">
+                    {lead.assignedTo.m_staff_name}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Reason / Notes */}

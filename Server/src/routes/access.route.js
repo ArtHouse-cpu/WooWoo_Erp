@@ -37,7 +37,19 @@ router.get('/roles', requirePermission(PERMISSIONS.ACCESS_READ), listRoles);
 router.get('/roles/:id', requirePermission(PERMISSIONS.ACCESS_READ), getRoleById);
 router.patch('/roles/:id', requirePermission(PERMISSIONS.ACCESS_MANAGE), updateRole);
 
-router.get('/staff', requirePermission(PERMISSIONS.ACCESS_READ), listStaff);
+router.get(
+  '/staff',
+  requireAnyPermission(
+    PERMISSIONS.ACCESS_READ,
+    PERMISSIONS.ACCESS_MANAGE,
+    PERMISSIONS.DASHBOARD_READ,
+    PERMISSIONS.INVOICE_READ,
+    PERMISSIONS.INVOICE_CREATE,
+    PERMISSIONS.EXPENSE_READ,
+    PERMISSIONS.EXPENSE_CREATE,
+  ),
+  listStaff,
+);
 router.post('/staff', requirePermission(PERMISSIONS.ACCESS_MANAGE), createStaff);
 
 /** PIN verify — available to anyone who can create invoices/bills */

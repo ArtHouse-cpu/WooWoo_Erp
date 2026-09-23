@@ -10,23 +10,26 @@ import {
   Plus,
   Eye,
   Phone,
-  Mail,
- 
+
+
 } from "lucide-react";
 import Swal from "sweetalert2";
 
 import CreateLeadModal from "../components/CreateLeadModal";
 import LeadDetailsModal from "../components/LeadDetailsModal";
+import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
 import {
   handleGetLeads,
   handleCreateLead,
   handleUpdateLead,
   handleDeleteLead,
+  handleGetAccessStaff,
   type LeadItem,
   type LeadPayload,
   type LeadStatus,
   type LeadSources,
   type LeadPurpose,
+  type VerifiedStaff,
 } from "@/services/apiClient";
 import { type DatePreset, rangeForPreset } from "@/utils/datePresets";
 
@@ -51,22 +54,7 @@ const STATUS_OPTIONS: LeadStatus[] = [
   "Need to message",
 ];
 
-const getStatusBadgeStyle = (status: LeadStatus) => {
-  switch (status) {
-    case "New":
-      return "bg-blue-50 text-blue-700 border-blue-200";
-    case "Contacted":
-      return "bg-amber-50 text-amber-700 border-amber-200";
-    case "Interested":
-      return "bg-purple-50 text-purple-700 border-purple-200";
-    case "Not Interested":
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    case "Need to message":
-      return "bg-rose-50 text-rose-700 border-rose-200";
-    default:
-      return "bg-gray-50 text-gray-700 border-gray-200";
-  }
-};
+
 const SOURCE_OPTIONS: LeadSources[] = [
   "Instagram",
   "WhatsApp",
@@ -75,30 +63,8 @@ const SOURCE_OPTIONS: LeadSources[] = [
   "Member",
   "Events",
 ];
-const getSourceBadgeStyle = (source: LeadSources) => {
-  switch (source) {
-    case "Instagram":
-      return "bg-pink-50 text-pink-700 border-pink-200";
 
-    case "WhatsApp":
-      return "bg-green-50 text-green-700 border-green-200";
 
-    case "Walk-in":
-      return "bg-blue-50 text-blue-700 border-blue-200";
-
-    case "Reference":
-      return "bg-purple-50 text-purple-700 border-purple-200";
-
-    case "Member":
-      return "bg-amber-50 text-amber-700 border-amber-200";
-
-    case "Events":
-      return "bg-indigo-50 text-indigo-700 border-indigo-200";
-
-    default:
-      return "bg-gray-50 text-gray-700 border-gray-200";
-  }
-};
 
 const PURPOSE_OPTIONS: LeadPurpose[] = [
   "Events",
@@ -119,7 +85,7 @@ const PURPOSE_OPTIONS: LeadPurpose[] = [
 
 
 
- export const getPurposeBadgeStyle = (source: LeadPurpose) => {
+export const getPurposeBadgeStyle = (source: LeadPurpose) => {
   switch (source) {
     case "Events":
       return "bg-pink-50 text-pink-700 border-pink-200";
@@ -176,19 +142,68 @@ const LeadScreen = () => {
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Date filter state
-  const [datePreset, setDatePreset] = useState<DatePreset>("all");
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
+  // Date filter state (default: this month)
+  const [datePreset, setDatePreset] = useState<DatePreset>("month");
+  const [fromDate, setFromDate] = useState<string>(
+    () => rangeForPreset("month").from
+  );
+  const [toDate, setToDate] = useState<string>(
+    () => rangeForPreset("month").to
+  );
   const [selectedPurpose, setSelectedPurpose] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedSource, setSelectedSource] = useState<string>("all");
+  const [selectedAssign, setSelectedAssign] = useState<string>("all");
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [leadToEdit, setLeadToEdit] = useState<LeadItem | null>(null);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pendingLeadPayload, setPendingLeadPayload] = useState<LeadPayload | null>(null);
 
   const [selectedLeadForDetails, setSelectedLeadForDetails] =
     useState<LeadItem | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+
+  // Staff users for Assign dropdown filter
+  const [staffUsers, setStaffUsers] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const loadStaff = async () => {
+      try {
+        const res = await handleGetAccessStaff("", controller.signal);
+        const list = Array.isArray(res?.staff) ? res.staff : [];
+        const mapped = list
+          .map((item: any) => ({
+            id: String(item?.m_staff_id ?? item?._id ?? "").trim(),
+            name: String(item?.fullName ?? item?.name ?? "").trim(),
+          }))
+          .filter((item: { id: string; name: string }) => Boolean(item.name));
+        setStaffUsers(mapped);
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          console.error("Failed to load staff users:", err);
+        }
+      }
+    };
+    loadStaff();
+    return () => controller.abort();
+  }, []);
+
+  const availableStaffNames = useMemo(() => {
+    const nameSet = new Set<string>();
+    staffUsers.forEach((s) => {
+      if (s.name) nameSet.add(s.name);
+    });
+    leads.forEach((l) => {
+      const name = l.assignedTo?.m_staff_name?.trim();
+      if (name && name !== "Assigned" && name !== "Unassigned") {
+        nameSet.add(name);
+      }
+    });
+    return Array.from(nameSet).sort((a, b) => a.localeCompare(b));
+  }, [staffUsers, leads]);
 
   // Fetch leads from backend API: GET /api/lead
   const fetchLeads = useCallback(
@@ -196,6 +211,9 @@ const LeadScreen = () => {
       customFrom?: string,
       customTo?: string,
       customPurpose?: string,
+      customStatus?: string,
+      customSource?: string,
+      customAssign?: string,
       signal?: AbortSignal
     ) => {
       try {
@@ -204,21 +222,56 @@ const LeadScreen = () => {
         const tDate = customTo !== undefined ? customTo : toDate;
         const pPurpose =
           customPurpose !== undefined ? customPurpose : selectedPurpose;
+        const pStatus =
+          customStatus !== undefined ? customStatus : selectedStatus;
+        const pSource =
+          customSource !== undefined ? customSource : selectedSource;
+        const pAssign =
+          customAssign !== undefined ? customAssign : selectedAssign;
+
         const res = await handleGetLeads(
           {
             fromDate: fDate || undefined,
             toDate: tDate || undefined,
             purpose: pPurpose && pPurpose !== "all" ? pPurpose : undefined,
+            status: pStatus && pStatus !== "all" ? pStatus : undefined,
+            source: pSource && pSource !== "all" ? pSource : undefined,
+            assignedTo: pAssign && pAssign !== "all" ? pAssign : undefined,
           },
           signal
         );
+
         let leadList: LeadItem[] = Array.isArray(res?.data)
           ? res.data
           : Array.isArray(res)
-          ? res
-          : [];
+            ? res
+            : [];
+
+        // Client-side fallback filtering
         if (pPurpose && pPurpose !== "all") {
           leadList = leadList.filter((item) => item.purpose === pPurpose);
+        }
+        if (pStatus && pStatus !== "all") {
+          leadList = leadList.filter((item) => item.status === pStatus);
+        }
+        if (pSource && pSource !== "all") {
+          leadList = leadList.filter((item) => item.source === pSource);
+        }
+        if (pAssign && pAssign !== "all") {
+          if (pAssign === "unassigned") {
+            leadList = leadList.filter(
+              (item) =>
+                !item.assignedTo ||
+                (!item.assignedTo.m_staff_name && !item.assignedTo.m_staff_id) ||
+                item.assignedTo.m_staff_name?.trim() === ""
+            );
+          } else {
+            leadList = leadList.filter(
+              (item) =>
+                item.assignedTo?.m_staff_name?.toLowerCase() === pAssign.toLowerCase() ||
+                item.assignedTo?.m_staff_id === pAssign
+            );
+          }
         }
         setLeads(leadList);
       } catch (error: any) {
@@ -235,7 +288,7 @@ const LeadScreen = () => {
         setLoading(false);
       }
     },
-    [fromDate, toDate, selectedPurpose]
+    [fromDate, toDate, selectedPurpose, selectedStatus, selectedSource, selectedAssign]
   );
 
   const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -245,15 +298,39 @@ const LeadScreen = () => {
     if (preset === "all") {
       setFromDate("");
       setToDate("");
-      fetchLeads("", "", selectedPurpose);
+      fetchLeads("", "", selectedPurpose, selectedStatus, selectedSource, selectedAssign);
     } else if (preset === "custom") {
       // User can pick from/to dates
     } else {
       const range = rangeForPreset(preset);
       setFromDate(range.from);
       setToDate(range.to);
-      fetchLeads(range.from, range.to, selectedPurpose);
+      fetchLeads(range.from, range.to, selectedPurpose, selectedStatus, selectedSource, selectedAssign);
     }
+  };
+
+  const handleAssignFilterChange = (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const nextAssign = e.target.value;
+    setSelectedAssign(nextAssign);
+    fetchLeads(fromDate, toDate, selectedPurpose, selectedStatus, selectedSource, nextAssign);
+  };
+
+  const handleStatusFilterChange = (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const nextStatus = e.target.value;
+    setSelectedStatus(nextStatus);
+    fetchLeads(fromDate, toDate, selectedPurpose, nextStatus, selectedSource, selectedAssign);
+  };
+
+  const handleSourceFilterChange = (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const nextSource = e.target.value;
+    setSelectedSource(nextSource);
+    fetchLeads(fromDate, toDate, selectedPurpose, selectedStatus, nextSource, selectedAssign);
   };
 
   const handlePurposeFilterChange = (
@@ -261,20 +338,20 @@ const LeadScreen = () => {
   ) => {
     const nextPurpose = e.target.value;
     setSelectedPurpose(nextPurpose);
-    fetchLeads(fromDate, toDate, nextPurpose);
+    fetchLeads(fromDate, toDate, nextPurpose, selectedStatus, selectedSource, selectedAssign);
   };
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchLeads(undefined, undefined, undefined, controller.signal);
+    fetchLeads(undefined, undefined, undefined, undefined, undefined, undefined, controller.signal);
     return () => controller.abort();
   }, [fetchLeads]);
 
   // Create or Update lead: POST /api/lead or PATCH /api/lead/:id
   const handleSaveLead = async (payload: LeadPayload, id?: string) => {
-    try {
-      setIsSubmitting(true);
-      if (id) {
+    if (id) {
+      try {
+        setIsSubmitting(true);
         await handleUpdateLead(id, payload);
         Swal.fire({
           icon: "success",
@@ -283,21 +360,62 @@ const LeadScreen = () => {
           timer: 1500,
           showConfirmButton: false,
         });
-      } else {
-        await handleCreateLead(payload);
+        setIsCreateModalOpen(false);
+        setLeadToEdit(null);
+        await fetchLeads();
+      } catch (error: any) {
+        console.error("Failed to save lead:", error);
         Swal.fire({
-          icon: "success",
-          title: "Lead Created",
-          text: "New lead has been created successfully.",
-          timer: 1500,
-          showConfirmButton: false,
+          icon: "error",
+          title: "Error",
+          text:
+            error?.response?.data?.message ||
+            (Array.isArray(error?.response?.data?.errors)
+              ? error.response.data.errors.join(", ")
+              : "Failed to update lead."),
         });
+      } finally {
+        setIsSubmitting(false);
       }
+    } else {
+      // For creating new lead, stash payload and open PIN verification modal
+      setPendingLeadPayload(payload);
+      setIsPinModalOpen(true);
+    }
+  };
+
+  // Called after Staff PIN is verified in StaffVerifyModal
+  const handlePinVerified = async ({ staff }: { staff: VerifiedStaff }) => {
+    if (!pendingLeadPayload) return;
+    try {
+      setIsSubmitting(true);
+      const payloadWithStaff: LeadPayload = {
+        ...pendingLeadPayload,
+        createdBy: {
+          m_staff_id: staff.staffId || staff.m_staff_id || staff._id,
+          m_staff_name: staff.staffName || staff.name,
+          m_staff_email: staff.email || "",
+        },
+      };
+
+      await handleCreateLead(payloadWithStaff);
+
+      setIsPinModalOpen(false);
       setIsCreateModalOpen(false);
+      setPendingLeadPayload(null);
       setLeadToEdit(null);
+
+      Swal.fire({
+        icon: "success",
+        title: "Lead Created",
+        text: "New lead has been created successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
       await fetchLeads();
     } catch (error: any) {
-      console.error("Failed to save lead:", error);
+      console.error("Failed to create lead:", error);
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -305,7 +423,7 @@ const LeadScreen = () => {
           error?.response?.data?.message ||
           (Array.isArray(error?.response?.data?.errors)
             ? error.response.data.errors.join(", ")
-            : "Failed to save lead."),
+            : "Failed to create lead."),
       });
     } finally {
       setIsSubmitting(false);
@@ -348,7 +466,7 @@ const LeadScreen = () => {
   };
 
   // Inline status change: PATCH /api/lead/:id
-   const handleStatusChange = async (lead: LeadItem, newStatus: LeadStatus) => {
+  const handleStatusChange = async (lead: LeadItem, newStatus: LeadStatus) => {
     if (lead.status === newStatus) return;
 
     // Optimistic UI update
@@ -357,7 +475,7 @@ const LeadScreen = () => {
         item._id === lead._id ? { ...item, status: newStatus } : item
       )
     );
-  
+
 
     try {
       await handleUpdateLead(lead._id, { status: newStatus });
@@ -451,7 +569,7 @@ const LeadScreen = () => {
       {
         accessorKey: "name",
         header: "Name",
-        size: 170,
+        size: 140,
         Cell: ({ cell, row }) => (
           <div>
             <span
@@ -489,138 +607,51 @@ const LeadScreen = () => {
         },
       },
 
-      // Email
-      {
-        accessorKey: "email",
-        header: "Email",
-        size: 180,
-        Cell: ({ cell }) => {
-          const email = cell.getValue<string>();
-          if (!email) return <span className="text-gray-400 italic text-xs">-</span>;
-          return (
-            <a
-              href={`mailto:${email}`}
-              className="inline-flex items-center gap-1.5 text-xs text-gray-700 hover:text-indigo-600 truncate max-w-[170px]"
-              title={email}
-            >
-              <Mail size={13} className="text-gray-400 shrink-0" />
-              <span className="truncate">{email}</span>
-            </a>
-          );
-        },
-      },
+
 
       // Status
       {
         accessorKey: "status",
         header: "Status",
-        size: 150,
-        filterVariant: "select",
-        filterSelectOptions: STATUS_OPTIONS,
-        Cell: ({ cell, row }) => {
-          const currentStatus = (cell.getValue<LeadStatus>() || "New") as LeadStatus;
-
-          return (
-            <select
-              value={currentStatus}
-              onChange={(e) =>
-                handleStatusChange(row.original, e.target.value as LeadStatus)
-              }
-              className={`rounded-lg border px-2.5 py-1 text-xs font-semibold outline-none transition cursor-pointer ${getStatusBadgeStyle(
-                currentStatus
-              )}`}
-            >
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status} className="bg-white text-gray-800">
-                  {status}
-                </option>
-              ))}
-            </select>
-          );
-        },
+        size: 140,
       },
 
       // Source
-     {
-  accessorKey: "source",
-  header: "Source",
-  size: 150,
-  filterVariant: "select",
-  filterSelectOptions: SOURCE_OPTIONS,
+      {
+        accessorKey: "source",
+        header: "Source",
+        size: 140,
+      },
 
-  Cell: ({ cell, row }) => {
-    const currentSource =
-      (cell.getValue<LeadSources>() || "Instagram") as LeadSources;
+      //purpose
+      {
+        accessorKey: "purpose",
+        header: "Purpose",
+        size: 140,
+      },
 
-    return (
-      <select
-        value={currentSource}
-        onChange={(e) =>
-          handleSourcesChange(
-            row.original,
-            e.target.value as LeadSources
-          )
-        }
-        className={`rounded-lg border px-2.5 py-1 text-xs font-semibold outline-none transition cursor-pointer ${getSourceBadgeStyle(
-          currentSource
-        )}`}
-      >
-        {SOURCE_OPTIONS.map((source) => (
-          <option
-            key={source}
-            value={source}
-            className="bg-white text-gray-800"
-          >
-            {source}
-          </option>
-        ))}
-      </select>
-    );
-  },
-},
-
-//purpose
-{
-  accessorKey: "purpose",
-  header: "Purpose",
-  size: 220,
-  filterVariant: "select",
-  filterSelectOptions: PURPOSE_OPTIONS,
-
-  Cell: ({ cell, row }) => {
-    const currentPurpose =
-      (cell.getValue<LeadPurpose>() || "Events") as LeadPurpose;
-
-    return (
-      <select
-        value={currentPurpose}
-        onChange={(e) =>
-          handlePurposeChange(
-            row.original,
-            e.target.value as LeadPurpose
-          )
-        }
-        className="rounded-lg border px-2.5 py-1 text-xs font-semibold outline-none transition cursor-pointer bg-white text-gray-700 border-gray-200"
-      >
-        {PURPOSE_OPTIONS.map((purpose) => (
-          <option
-            key={purpose}
-            value={purpose}
-            className="bg-white text-gray-800"
-          >
-            {purpose}
-          </option>
-        ))}
-      </select>
-    );
-  },
-},
+      // Assigned To
+      {
+        accessorKey: "assignedTo.m_staff_name",
+        header: "Assigned To",
+        size: 140,
+        Cell: ({ row }) => {
+          const assigned = row.original.assignedTo?.m_staff_name;
+          return assigned ? (
+            <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+              {assigned}
+            </span>
+          ) : (
+            <span className="text-gray-400 italic text-xs">Unassigned</span>
+          );
+        },
+      },
 
       // Reason / Note
       {
         accessorKey: "reasonNote",
         header: "Reason / Note",
-        size: 200,
+        size: 150,
         Cell: ({ cell }) => {
           const note = cell.getValue<string>();
           if (!note) return <span className="text-gray-400 italic text-xs">-</span>;
@@ -636,7 +667,7 @@ const LeadScreen = () => {
       {
         accessorKey: "createdAt",
         header: "Date",
-        size: 120,
+        size: 100,
         Cell: ({ cell, row }) => {
           const rawDate = cell.getValue<string>() || row.original.date;
           const staffName = row.original.createdBy?.m_staff_name;
@@ -677,7 +708,7 @@ const LeadScreen = () => {
       {
         id: "actions",
         header: "Actions",
-        size: 110,
+        size: 140,
         enableSorting: false,
         Cell: ({ row }) => (
           <div className="flex items-center gap-1">
@@ -746,13 +777,71 @@ const LeadScreen = () => {
     <div className="w-full space-y-5 p-4 sm:p-6">
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            Leads Management
+            Leads 
           </h1>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border-indigi-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigio-700 shadow-2xs">
+
+       Total Leads: <span className="font-bold text-indigo-900">{leads.length}</span>
+
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Assign Filter Dropdown (Staff names & Unassigned) */}
+          <div className="relative inline-flex items-center">
+            <select
+              value={selectedAssign}
+              onChange={handleAssignFilterChange}
+              disabled={loading}
+              className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50"
+            >
+              <option value="all">Assign: All</option>
+              <option value="unassigned">Unassigned</option>
+              {availableStaffNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Status Filter Dropdown */}
+          <div className="relative inline-flex items-center">
+            <select
+              value={selectedStatus}
+              onChange={handleStatusFilterChange}
+              disabled={loading}
+              className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:outline-none cursor-pointer disabled:opacity-50"
+            >
+              <option value="all">All Status</option>
+              {STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Source Filter Dropdown */}
+          <div className="relative inline-flex items-center">
+            <select
+              value={selectedSource}
+              onChange={handleSourceFilterChange}
+              disabled={loading}
+              className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50"
+            >
+              <option value="all">All Sources</option>
+
+              {SOURCE_OPTIONS.map((source) => (
+                <option key={source} value={source}>
+                  {source}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Purpose Filter Dropdown */}
           <div className="relative inline-flex items-center">
             <select
@@ -806,7 +895,16 @@ const LeadScreen = () => {
               />
               <button
                 type="button"
-                onClick={() => fetchLeads(fromDate, toDate, selectedPurpose)}
+                onClick={() =>
+                  fetchLeads(
+                    fromDate,
+                    toDate,
+                    selectedPurpose,
+                    selectedStatus,
+                    selectedSource,
+                    selectedAssign
+                  )
+                }
                 disabled={loading || (!fromDate && !toDate)}
                 className="h-9 inline-flex items-center rounded-lg bg-indigo-600 px-3.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 transition cursor-pointer"
               >
@@ -895,10 +993,18 @@ const LeadScreen = () => {
         onClose={() => {
           setIsCreateModalOpen(false);
           setLeadToEdit(null);
+          setPendingLeadPayload(null);
         }}
         leadToEdit={leadToEdit}
         onSubmit={handleSaveLead}
         isSubmitting={isSubmitting}
+      />
+
+      {/* Staff PIN Verification Modal */}
+      <StaffVerifyModal
+        open={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        onVerified={handlePinVerified}
       />
 
       {/* Lead Details Modal */}

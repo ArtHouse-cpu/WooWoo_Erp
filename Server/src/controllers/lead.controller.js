@@ -3,11 +3,38 @@ import Lead from '../models/lead.model.js';
 
 export const getLead = async (req, res) => {
   try {
-    const { fromDate, toDate, purpose } = req.query;
-    const filter= {};
+    const { fromDate, toDate, purpose, status, source, assignedTo } = req.query;
+    const filter = {};
 
     if (purpose && purpose !== 'all') {
       filter.purpose = purpose.trim();
+    }
+    if (status && status !== 'all') {
+      filter.status = status.trim();
+    }
+    if (source && source !== 'all') {
+      filter.source = source.trim();
+    }
+    if (assignedTo && assignedTo !== 'all') {
+      if (assignedTo === 'unassigned') {
+        filter.$or = [
+          { 'assignedTo.m_staff_name': null },
+          { 'assignedTo.m_staff_name': '' },
+          { assignedTo: { $exists: false } },
+          { assignedTo: null },
+        ];
+      } else if (assignedTo === 'assigned') {
+        filter.$or = [
+          { 'assignedTo.m_staff_name': { $exists: true, $nin: [null, ''] } },
+          { 'assignedTo.m_staff_id': { $exists: true, $nin: [null, ''] } },
+        ];
+      } else {
+        const rx = new RegExp(`^${assignedTo.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+        filter.$or = [
+          { 'assignedTo.m_staff_name': rx },
+          { 'assignedTo.m_staff_id': assignedTo.trim() },
+        ];
+      }
     }
 
     //fromdate
@@ -143,6 +170,10 @@ export const updateLead = async (req, res) => {
       lead.reasonNote = req.body.reasonNote;
     }
 
+    if (req.body.assignedTo !== undefined) {
+      lead.assignedTo = req.body.assignedTo;
+    }
+
     const updatedLead = await lead.save();
 
     res.status(200).json({
@@ -183,6 +214,7 @@ export const createLead = async (req, res) => {
       purpose,
       reasonNote,
       createdBy,
+      assignedTo,
     } = req.body;
 
     // Name validation
@@ -217,6 +249,7 @@ export const createLead = async (req, res) => {
       purpose: purpose?.trim() || "",
       reasonNote: reasonNote?.trim() || "",
       createdBy: createdBy || undefined,
+      assignedTo: assignedTo || undefined,
     });
 
     res.status(201).json({
