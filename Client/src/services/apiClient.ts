@@ -1,4 +1,3 @@
-import { Signal } from "lucide-react";
 import { axiosInstance } from "./axiosInstance";
 
 export const toWhatsAppNumber = (digits10: string) => `+91${digits10}`;
@@ -3170,7 +3169,32 @@ export type LeadStatus =
   | "Contacted"
   | "Interested"
   | "Converted"
-  | "Lost";
+  | "Lost"
+  | "Not Interested"
+  | "Need to message";
+
+export type LeadSources=  "Instagram"|
+  "WhatsApp"|
+  "Walk-in"|
+  "Reference"|
+  "Member"|
+  "Events";
+
+  export type LeadPurpose =   "Events"|
+  "Supplies"|
+  "Space Booking (Exhibition)"|
+  "Space Booking (Corporate Booking)"|
+  "Framing"|
+  "Private Booking"|
+  "Birthday Party"|
+  "Membership"|
+  "Volunteering"|
+  "CSP"|
+  "Customer Art Work"|
+  "Co-Working"|
+  "Handmade Gift"|
+  "Saler Program";
+  
 
 export type LeadItem = {
   _id: string;
@@ -3179,8 +3203,14 @@ export type LeadItem = {
   email?: string;
   status: LeadStatus;
   source?: string;
+  purpose?: string;
   reasonNote?: string;
   date?: string;
+  createdBy?: {
+    m_staff_id?: string;
+    m_staff_name?: string;
+    m_staff_email?: string;
+  };
   createdAt?: string;
   updatedAt?: string;
 };
@@ -3191,11 +3221,35 @@ export type LeadPayload = {
   email?: string;
   status?: LeadStatus;
   source?: string;
+  purpose?: string;
   reasonNote?: string;
+  createdBy?: {
+    m_staff_id?: string;
+    m_staff_name?: string;
+    m_staff_email?: string;
+  };
 };
 
-export const handleGetLeads = async (signal?: AbortSignal) => {
-  const response = await axiosInstance.get("/api/lead", { signal });
+export type GetLeadsParams = {
+  fromDate?: string;
+  toDate?: string;
+  purpose?: string;
+};
+
+export const handleGetLeads = async (
+  params?: GetLeadsParams,
+  signal?: AbortSignal
+) => {
+  const response = await axiosInstance.get("/api/lead", {
+    params: {
+      ...(params?.fromDate ? { fromDate: params.fromDate } : {}),
+      ...(params?.toDate ? { toDate: params.toDate } : {}),
+      ...(params?.purpose && params.purpose !== "all"
+        ? { purpose: params.purpose }
+        : {}),
+    },
+    signal,
+  });
   return response.data;
 };
 

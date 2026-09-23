@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Phone, Mail, Calendar, Tag, FileText, User } from "lucide-react";
+import { X, Phone, Mail, Calendar, Tag, FileText, User, Bookmark, UserCheck } from "lucide-react";
 import type { LeadItem } from "@/services/apiClient";
 
 type LeadDetailsModalProps = {
@@ -113,6 +113,18 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
               </div>
             </div>
 
+            {lead.purpose && (
+              <div className="flex items-center gap-3">
+                <Bookmark size={16} className="text-indigo-500 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs text-gray-400 block">Purpose</span>
+                  <span className="font-medium text-gray-800">
+                    {lead.purpose}
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <Calendar size={16} className="text-indigo-500 shrink-0" />
               <div className="min-w-0 flex-1">
@@ -132,6 +144,18 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
                 </span>
               </div>
             </div>
+
+            {lead.createdBy?.m_staff_name && (
+              <div className="flex items-center gap-3">
+                <UserCheck size={16} className="text-indigo-500 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs text-gray-400 block">Created By (Staff)</span>
+                  <span className="font-medium text-gray-800">
+                    {lead.createdBy.m_staff_name}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Reason / Notes */}
