@@ -430,7 +430,6 @@ const SetCommissionRuleModal: React.FC<SetCommissionRuleModalProps> = ({
                     }`}
                   >
                     <Percent size={14} />
-                    %
                   </button>
                   <button
                     type="button"

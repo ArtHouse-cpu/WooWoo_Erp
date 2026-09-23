@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { X, Loader2, KeyRound, CheckCircle2 } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import {
-  handleVerifyStaffPin,
   type LeadItem,
   type LeadPayload,
   type LeadStatus,
-  type VerifiedStaff,
+  handleGetAccessStaff,
 } from "@/services/apiClient";
+
+type StaffOption = {
+  _id: string;
+  m_staff_id: string;
+  fullName: string;
+  email?: string;
+};
 
 type CreateLeadModalProps = {
   isOpen: boolean;
@@ -72,15 +78,45 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   });
 
   const [customSource, setCustomSource] = useState("");
+  const [selectedStaffId, setSelectedStaffId] = useState("");
+  const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
   const [error, setError] = useState("");
 
-  // Staff PIN state (required when creating lead)
-  const [staffPin, setStaffPin] = useState("");
-  const [verifiedStaff, setVerifiedStaff] = useState<VerifiedStaff | null>(null);
-  const [isVerifyingPin, setIsVerifyingPin] = useState(false);
-  const [pinError, setPinError] = useState("");
-
   const isEditing = Boolean(leadToEdit);
+
+  // Fetch staff list from user/access API
+  useEffect(() => {
+    if (!isOpen) return;
+    const controller = new AbortController();
+    const fetchStaff = async () => {
+      try {
+        setLoadingStaff(true);
+        const res = await handleGetAccessStaff("", controller.signal);
+        const list = Array.isArray(res?.staff) ? res.staff : [];
+        const mapped: StaffOption[] = list
+          .map((item: any) => ({
+            _id: String(item?._id ?? ""),
+            m_staff_id: String(item?.m_staff_id ?? item?._id ?? "").trim(),
+            fullName: String(item?.fullName ?? item?.name ?? "").trim(),
+            email: String(item?.email ?? "").trim(),
+          }))
+          .filter((item: StaffOption) => Boolean(item.fullName));
+        setStaffOptions(mapped);
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          console.error("Failed to load staff list:", err);
+          setStaffOptions([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoadingStaff(false);
+        }
+      }
+    };
+    fetchStaff();
+    return () => controller.abort();
+  }, [isOpen]);
 
   useEffect(() => {
     if (leadToEdit) {
@@ -94,6 +130,14 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         purpose: leadToEdit.purpose || "",
         reasonNote: leadToEdit.reasonNote || "",
       });
+
+      const assigned = leadToEdit.assignedTo;
+      if (assigned?.m_staff_id || assigned?.m_staff_name) {
+        setSelectedStaffId(assigned.m_staff_id || assigned.m_staff_name || "");
+      } else {
+        setSelectedStaffId("");
+      }
+
       if (sourceVal && !isPredefined) {
         setCustomSource(sourceVal);
       } else {
@@ -108,16 +152,15 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         purpose: "",
         reasonNote: "",
       });
+      setSelectedStaffId("");
       setCustomSource("");
     }
-    setStaffPin("");
-    setVerifiedStaff(null);
-    setIsVerifyingPin(false);
-    setPinError("");
     setError("");
   }, [leadToEdit, isOpen]);
 
   if (!isOpen) return null;
+
+
 
   const handleSourceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selected = e.target.value;
@@ -133,35 +176,6 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     const value = e.target.value;
     setCustomSource(value);
     setFormData((prev) => ({ ...prev, source: value.trim() || "Other" }));
-  };
-
-  const handleStaffPinChange = async (val: string) => {
-    const cleaned = val.replace(/\D/g, "").slice(0, 6);
-    setStaffPin(cleaned);
-    setPinError("");
-    if (error) setError("");
-
-    if (cleaned.length !== 6) {
-      setVerifiedStaff(null);
-      return;
-    }
-
-    try {
-      setIsVerifyingPin(true);
-      const res = await handleVerifyStaffPin(cleaned);
-      if (res?.success && res.staff) {
-        setVerifiedStaff(res.staff);
-        setPinError("");
-      } else {
-        setVerifiedStaff(null);
-        setPinError(res?.message || "Invalid Staff PIN.");
-      }
-    } catch (err: any) {
-      setVerifiedStaff(null);
-      setPinError(err?.response?.data?.message || "Invalid Staff PIN.");
-    } finally {
-      setIsVerifyingPin(false);
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -184,47 +198,29 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
       return;
     }
 
-    let activeStaff = verifiedStaff;
-    if (!isEditing) {
-      const pinTrimmed = staffPin.trim();
-      if (!pinTrimmed) {
-        setPinError("Staff PIN is required.");
-        setError("Staff PIN is required.");
-        return;
-      }
-      if (pinTrimmed.length !== 6) {
-        setPinError("Staff PIN must be a 6-digit number.");
-        setError("Staff PIN must be a 6-digit number.");
-        return;
-      }
-
-      if (!activeStaff) {
-        try {
-          setIsVerifyingPin(true);
-          const res = await handleVerifyStaffPin(pinTrimmed);
-          if (res?.success && res.staff) {
-            activeStaff = res.staff;
-            setVerifiedStaff(res.staff);
-            setPinError("");
-          } else {
-            const msg = res?.message || "Invalid Staff PIN.";
-            setPinError(msg);
-            setError(msg);
-            return;
-          }
-        } catch (err: any) {
-          const msg = err?.response?.data?.message || "Invalid Staff PIN.";
-          setPinError(msg);
-          setError(msg);
-          return;
-        } finally {
-          setIsVerifyingPin(false);
-        }
-      }
-    }
-
     setError("");
-    setPinError("");
+
+    const chosenStaff = staffOptions.find(
+      (s) =>
+        s.m_staff_id === selectedStaffId ||
+        s._id === selectedStaffId ||
+        s.fullName === selectedStaffId
+    );
+
+    const assignedTo = chosenStaff
+      ? {
+          m_staff_id: chosenStaff.m_staff_id || chosenStaff._id,
+          m_staff_name: chosenStaff.fullName,
+          m_staff_email: chosenStaff.email || "",
+        }
+      : selectedStaffId
+      ? {
+          m_staff_id: leadToEdit?.assignedTo?.m_staff_id || selectedStaffId,
+          m_staff_name: leadToEdit?.assignedTo?.m_staff_name || selectedStaffId,
+          m_staff_email: leadToEdit?.assignedTo?.m_staff_email || "",
+        }
+      : null;
+
     const payload: LeadPayload = {
       name: formData.name.trim(),
       phone: phoneTrimmed,
@@ -232,20 +228,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
       source: formData.source?.trim() || "",
       purpose: formData.purpose?.trim() || "",
       reasonNote: formData.reasonNote?.trim() || "",
-      ...(activeStaff
-        ? {
-            createdBy: {
-              m_staff_id:
-                activeStaff.m_staff_id ||
-                activeStaff.staffId ||
-                activeStaff._id ||
-                "",
-              m_staff_name:
-                activeStaff.staffName || activeStaff.name || "",
-              m_staff_email: activeStaff.email || "",
-            },
-          }
-        : {}),
+      assignedTo,
     };
 
     await onSubmit(payload, leadToEdit?._id);
@@ -253,9 +236,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
   const handleClose = () => {
     setError("");
-    setPinError("");
-    setStaffPin("");
-    setVerifiedStaff(null);
+    setSelectedStaffId("");
     setCustomSource("");
     onClose();
   };
@@ -377,6 +358,8 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                   ))}
                 </select>
 
+
+
                 {/* Custom Source Input when "Other" is active */}
                 {isOtherSelected && (
                   <input
@@ -390,8 +373,8 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
               </div>
             </div>
 
-            {/* Purpose & Staff PIN */}
-            <div className={!isEditing ? "grid grid-cols-1 gap-4 sm:grid-cols-2" : ""}>
+            {/* Purpose & Assign To (Staff) */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {/* Purpose */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -417,54 +400,42 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                 </select>
               </div>
 
-              {/* Staff PIN (Required while creating lead) */}
-              {!isEditing && (
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Staff PIN <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                      <KeyRound size={16} />
-                    </div>
-                    <input
-                      type="password"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={staffPin}
-                      onChange={(e) => handleStaffPinChange(e.target.value)}
-                      placeholder="6-digit PIN"
-                      className={`w-full rounded-md border pl-9 pr-9 py-2 text-sm tracking-widest outline-none transition focus:border-indigo-500 ${
-                        pinError
-                          ? "border-red-300 focus:border-red-500"
-                          : verifiedStaff
-                          ? "border-emerald-300 focus:border-emerald-500"
-                          : "border-gray-300"
-                      }`}
-                      required
-                    />
-                    {isVerifyingPin ? (
-                      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-indigo-600">
-                        <Loader2 size={16} className="animate-spin" />
-                      </div>
-                    ) : verifiedStaff ? (
-                      <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-emerald-600">
-                        <CheckCircle2 size={16} />
-                      </div>
-                    ) : null}
-                  </div>
-                  {verifiedStaff && (
-                    <p className="mt-1 text-xs font-medium text-emerald-600 truncate">
-                      ✓ Verified: {verifiedStaff.staffName || verifiedStaff.name}
-                    </p>
-                  )}
-                  {pinError && (
-                    <p className="mt-1 text-xs font-medium text-red-600">
-                      {pinError}
-                    </p>
-                  )}
-                </div>
-              )}
+              {/* Assign To (Staff) */}
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Assign To
+                </label>
+                <select
+                  value={selectedStaffId}
+                  onChange={(e) => setSelectedStaffId(e.target.value)}
+                  disabled={loadingStaff}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500 disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="">
+                    {loadingStaff ? "Loading staff..." : "Unassigned"}
+                  </option>
+                  {/* Keep pre-selected staff if editing and not in list */}
+                  {selectedStaffId &&
+                    !staffOptions.some(
+                      (s) =>
+                        s.m_staff_id === selectedStaffId ||
+                        s._id === selectedStaffId ||
+                        s.fullName === selectedStaffId
+                    ) && (
+                      <option value={selectedStaffId}>
+                        {leadToEdit?.assignedTo?.m_staff_name || selectedStaffId}
+                      </option>
+                    )}
+                  {staffOptions.map((staff) => {
+                    const val = staff.m_staff_id || staff._id;
+                    return (
+                      <option key={staff._id || staff.m_staff_id} value={val}>
+                        {staff.fullName}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
             </div>
 
             {/* Reason / Note */}

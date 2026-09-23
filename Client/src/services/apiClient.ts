@@ -3211,6 +3211,11 @@ export type LeadItem = {
     m_staff_name?: string;
     m_staff_email?: string;
   };
+  assignedTo?: {
+    m_staff_id?: string;
+    m_staff_name?: string;
+    m_staff_email?: string;
+  };
   createdAt?: string;
   updatedAt?: string;
 };
@@ -3228,12 +3233,20 @@ export type LeadPayload = {
     m_staff_name?: string;
     m_staff_email?: string;
   };
+  assignedTo?: {
+    m_staff_id?: string;
+    m_staff_name?: string;
+    m_staff_email?: string;
+  } | null;
 };
 
 export type GetLeadsParams = {
   fromDate?: string;
   toDate?: string;
   purpose?: string;
+  status?: string;
+  source?: string;
+  assignedTo?: string;
 };
 
 export const handleGetLeads = async (
@@ -3246,6 +3259,15 @@ export const handleGetLeads = async (
       ...(params?.toDate ? { toDate: params.toDate } : {}),
       ...(params?.purpose && params.purpose !== "all"
         ? { purpose: params.purpose }
+        : {}),
+      ...(params?.status && params.status !== "all"
+        ? { status: params.status }
+        : {}),
+      ...(params?.source && params.source !== "all"
+        ? { source: params.source }
+        : {}),
+      ...(params?.assignedTo && params.assignedTo !== "all"
+        ? { assignedTo: params.assignedTo }
         : {}),
     },
     signal,

@@ -79,6 +79,13 @@ const leadSchema = new mongoose.Schema(
       m_staff_email: { type: String, default: null },
     },
 
+    // Assigned To Staff
+    assignedTo: {
+      m_staff_id: { type: String, default: null },
+      m_staff_name: { type: String, default: null },
+      m_staff_email: { type: String, default: null },
+    },
+
     // Lead date
     date: {
       type: Date,
