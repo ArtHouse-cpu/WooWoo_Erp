@@ -22,7 +22,7 @@ import {
   DATE_PRESET_OPTIONS,
   rangeForPreset,
 } from "../../utils/datePresets";
-import { handleGetStaffCommission } from "@/services/apiClient";
+import { handleGetStaffCommission ,handleGetSubscriptions} from "@/services/apiClient";
 import SetCommissionRuleModal from "./Modal/SetCommissionRuleModal";
 
 const StaffCommissionScreen = () => {
@@ -31,6 +31,7 @@ const StaffCommissionScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [datePreset, setDatePreset] = useState<DatePreset>("month");
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
   const [fromDate, setFromDate] = useState<string>(
     () => rangeForPreset("month").from
   );
@@ -41,43 +42,74 @@ const StaffCommissionScreen = () => {
 
   useEffect(() => {
     const controller = new AbortController();
+const load = async () => {
+  setLoading(true);
+  setError(null);
 
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await handleGetStaffCommission(
-          fromDate,
-          toDate,
-          controller.signal,
-        );
-        const rawList = Array.isArray(res?.data) ? res.data : [];
-        const normalized = rawList.map((staff: any) => ({
-          ...staff,
-          invoices: Array.isArray(staff.invoices)
-            ? [...staff.invoices].sort(
-                (a, b) =>
-                  parseInvoiceDate(b.date, b.rawDate) -
-                  parseInvoiceDate(a.date, a.rawDate),
-              )
-            : [],
-        }));
-        setData(normalized);
-      } catch (err: any) {
-        if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
-          return;
-        }
-        console.error(err);
-        setError(
-          err?.response?.data?.message ||
-            err?.message ||
-            "Failed to load staff commission",
-        );
-        setData([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+  try {
+    const [commissionRes, subscriptionRes] = await Promise.all([
+      handleGetStaffCommission(
+        fromDate,
+        toDate,
+        controller.signal
+      ),
+      handleGetSubscriptions(
+        "",
+        5000,
+        controller.signal,
+        1,
+        fromDate,
+        toDate
+      ),
+    ]);
+
+    // Staff Commission
+    const rawList = Array.isArray(commissionRes?.data)
+      ? commissionRes.data
+      : [];
+
+    const normalized = rawList.map((staff: any) => ({
+      ...staff,
+      invoices: Array.isArray(staff.invoices)
+        ? [...staff.invoices].sort(
+            (a, b) =>
+              parseInvoiceDate(b.date, b.rawDate) -
+              parseInvoiceDate(a.date, a.rawDate)
+          )
+        : [],
+    }));
+
+    setData(normalized);
+
+    // Subscriptions
+    const subscriptions = Array.isArray(subscriptionRes?.subscriptions)
+      ? subscriptionRes.subscriptions
+      : [];
+
+    setSubscriptions(subscriptions);
+
+  } catch (err: any) {
+    if (
+      err?.name === "CanceledError" ||
+      err?.code === "ERR_CANCELED"
+    ) {
+      return;
+    }
+
+    console.error(err);
+
+    setError(
+      err?.response?.data?.message ||
+        err?.message ||
+        "Failed to load data"
+    );
+
+    setData([]);
+    setSubscriptions([]);
+  } finally {
+    setLoading(false);
+  }
+};
 
     void load();
     return () => controller.abort();
@@ -104,6 +136,12 @@ const StaffCommissionScreen = () => {
   const totalOrders = useMemo(() => {
     return filteredData.reduce((sum, item) => sum + (item.totalOrders || 0), 0);
   }, [filteredData]);
+
+  const netSalesGrandTotal = useMemo(() => {
+    return subscriptions.reduce((sum, sub) => sum + ((sub.grandTotal) ||  0), 0);
+  }, [subscriptions]);
+
+  // console.log("net",netSalesGrandTotal)
 
   const columns = useMemo<MRT_ColumnDef<Staff>[]>(
     () => [
@@ -298,6 +336,9 @@ const StaffCommissionScreen = () => {
           </div>
           <p className="mt-2 text-2xl font-bold text-gray-900">
             ₹{totalSales.toLocaleString("en-IN")}
+          </p>
+          <p className="text-xs text-gray-500 mt-1 font-medium bg-gray-50 inline-block px-2 py-0.5 rounded">
+            Net Sales: <span className="text-gray-700 font-semibold">₹{netSalesGrandTotal.toLocaleString("en-IN")}</span>
           </p>
         </div>
         <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
