@@ -3205,6 +3205,8 @@ export type LeadItem = {
   source?: string;
   purpose?: string;
   reasonNote?: string;
+  url?: string;
+  attachments?: LeadAttachment[];
   date?: string;
   createdBy?: {
     m_staff_id?: string;
@@ -3220,6 +3222,13 @@ export type LeadItem = {
   updatedAt?: string;
 };
 
+export type LeadAttachment = {
+  url: string;
+  name?: string;
+  mimeType?: string;
+  size?: number;
+};
+
 export type LeadPayload = {
   name: string;
   phone?: string;
@@ -3228,6 +3237,9 @@ export type LeadPayload = {
   source?: string;
   purpose?: string;
   reasonNote?: string;
+  url?: string;
+  attachments?: LeadAttachment[];
+  attachmentFiles?: File[];
   createdBy?: {
     m_staff_id?: string;
     m_staff_name?: string;
@@ -3239,6 +3251,27 @@ export type LeadPayload = {
     m_staff_email?: string;
   } | null;
 };
+
+export function leadPayloadToFormData(
+  payload: Partial<LeadPayload>,
+  files?: File[],
+) {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(payload)) {
+    if (value === undefined || value === null || key === "attachmentFiles") continue;
+    if (key === "assignedTo" || key === "createdBy" || key === "attachments") {
+      fd.append(key, JSON.stringify(value));
+      continue;
+    }
+    fd.append(key, String(value));
+  }
+  if (files && files.length > 0) {
+    files.forEach((file) => {
+      fd.append("attachments", file);
+    });
+  }
+  return fd;
+}
 
 export type GetLeadsParams = {
   fromDate?: string;
@@ -3280,18 +3313,41 @@ export const handleGetLeadById = async (id: string, signal?: AbortSignal) => {
   return response.data;
 };
 
-export const handleCreateLead = async (payload: LeadPayload) => {
-  const response = await axiosInstance.post("/api/lead", payload);
+export const handleCreateLead = async (payload: LeadPayload | FormData) => {
+  let body: LeadPayload | FormData = payload;
+  let isFormData = payload instanceof FormData;
+
+  if (!isFormData && (payload as LeadPayload).attachmentFiles?.length) {
+    body = leadPayloadToFormData(
+      payload as LeadPayload,
+      (payload as LeadPayload).attachmentFiles,
+    );
+    isFormData = true;
+  }
+
+  const response = await axiosInstance.post("/api/lead", body, {
+    headers: isFormData ? { "Content-Type": "multipart/form-data" } : undefined,
+  });
   return response.data;
 };
 
 export const handleUpdateLead = async (
   id: string,
-  payload: Partial<LeadPayload>,
+  payload: Partial<LeadPayload> | FormData,
 ) => {
-  const response = await axiosInstance.patch(`/api/lead/${id}`, {
-    ...payload,
-    id,
+  let body: Partial<LeadPayload> | FormData = payload;
+  let isFormData = payload instanceof FormData;
+
+  if (!isFormData && (payload as LeadPayload).attachmentFiles?.length) {
+    body = leadPayloadToFormData(
+      payload as LeadPayload,
+      (payload as LeadPayload).attachmentFiles,
+    );
+    isFormData = true;
+  }
+
+  const response = await axiosInstance.patch(`/api/lead/${id}`, body, {
+    headers: isFormData ? { "Content-Type": "multipart/form-data" } : undefined,
   });
   return response.data;
 };
