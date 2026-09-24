@@ -72,6 +72,23 @@ const leadSchema = new mongoose.Schema(
       default: "",
     },
 
+    // Media / Document Attachments
+    attachments: [
+      {
+        url: { type: String, required: true },
+        name: { type: String, default: "" },
+        mimeType: { type: String, default: "" },
+        size: { type: Number, default: 0 },
+      },
+    ],
+
+    // Reference URL / Media Link
+    url: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     // Created By Staff
     createdBy: {
       m_staff_id: { type: String, default: null },

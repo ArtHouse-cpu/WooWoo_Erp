@@ -1,5 +1,112 @@
 import mongoose from 'mongoose';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import Lead from '../models/lead.model.js';
+import { uploadOnCloudinary } from '../utils/cloudinary.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const localUploadsDir = path.resolve(__dirname, '../../uploads/leads');
+const tmpUploadsDir = path.join('/tmp', 'uploads', 'leads');
+
+let uploadsDir = localUploadsDir;
+try {
+  fs.mkdirSync(localUploadsDir, { recursive: true });
+} catch (error) {
+  fs.mkdirSync(tmpUploadsDir, { recursive: true });
+  uploadsDir = tmpUploadsDir;
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueName = `${Date.now()}-${file.originalname.replace(/\s+/g, '')}`;
+    cb(null, uniqueName);
+  },
+});
+
+export const uploadLeadAttachments = multer({
+  storage,
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB max per file
+});
+
+const uploadLeadFiles = async (files) => {
+  if (!files || !files.length) return [];
+  const uploaded = [];
+  for (const file of files) {
+    try {
+      const cloudinaryUrl = await uploadOnCloudinary(file.path, {
+        folder: 'woowoo/leads',
+      });
+      uploaded.push({
+        url: cloudinaryUrl || `/uploads/leads/${file.filename}`,
+        name: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+      });
+    } catch (err) {
+      console.error('Lead attachment upload error:', err);
+      uploaded.push({
+        url: `/uploads/leads/${file.filename}`,
+        name: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+      });
+    }
+  }
+  return uploaded;
+};
+
+const normalizeAttachments = (items) => {
+  if (!items) return [];
+  if (typeof items === 'string') {
+    try {
+      items = JSON.parse(items);
+    } catch {
+      items = [items];
+    }
+  }
+  if (!Array.isArray(items)) items = [items];
+  return items
+    .map((item) => {
+      if (!item) return null;
+      if (typeof item === 'string') {
+        const parts = item.split('/');
+        return {
+          url: item,
+          name: parts[parts.length - 1] || 'attachment',
+          mimeType: '',
+          size: 0,
+        };
+      }
+      if (typeof item === 'object' && item.url) {
+        return {
+          url: item.url,
+          name: item.name || item.url.split('/').pop() || 'attachment',
+          mimeType: item.mimeType || '',
+          size: Number(item.size) || 0,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+};
+
+const parseMaybeJson = (value) => {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
 
 export const getLead = async (req, res) => {
   try {
@@ -129,7 +236,6 @@ export const updateLead = async (req, res) => {
   try {
     const id = req.params.id || req.body.id || req.body._id;
 
-    console.log(id)
     if (!id || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
@@ -170,8 +276,25 @@ export const updateLead = async (req, res) => {
       lead.reasonNote = req.body.reasonNote;
     }
 
+    if (req.body.url !== undefined) {
+      lead.url = req.body.url != null ? String(req.body.url).trim() : "";
+    }
+
     if (req.body.assignedTo !== undefined) {
-      lead.assignedTo = req.body.assignedTo;
+      lead.assignedTo = parseMaybeJson(req.body.assignedTo);
+    }
+
+    if (req.body.createdBy !== undefined) {
+      lead.createdBy = parseMaybeJson(req.body.createdBy);
+    }
+
+    // Handle attachments (existing + newly uploaded)
+    if (req.body.attachments !== undefined || (req.files && req.files.length > 0)) {
+      const existingAttachments = req.body.attachments !== undefined
+        ? normalizeAttachments(req.body.attachments)
+        : (lead.attachments || []);
+      const newAttachments = await uploadLeadFiles(req.files);
+      lead.attachments = [...existingAttachments, ...newAttachments];
     }
 
     const updatedLead = await lead.save();
@@ -213,8 +336,10 @@ export const createLead = async (req, res) => {
       source,
       purpose,
       reasonNote,
+      url,
       createdBy,
       assignedTo,
+      attachments,
     } = req.body;
 
     // Name validation
@@ -241,6 +366,13 @@ export const createLead = async (req, res) => {
       });
     }
 
+    const createdByParsed = parseMaybeJson(createdBy);
+    const assignedToParsed = parseMaybeJson(assignedTo);
+
+    const existingAttachments = normalizeAttachments(attachments);
+    const newAttachments = await uploadLeadFiles(req.files);
+    const allAttachments = [...existingAttachments, ...newAttachments];
+
     const lead = await Lead.create({
       name: name.trim(),
       phone: phoneTrimmed,
@@ -248,8 +380,10 @@ export const createLead = async (req, res) => {
       source: source?.trim() || "",
       purpose: purpose?.trim() || "",
       reasonNote: reasonNote?.trim() || "",
-      createdBy: createdBy || undefined,
-      assignedTo: assignedTo || undefined,
+      url: url?.trim() || "",
+      attachments: allAttachments,
+      createdBy: createdByParsed || undefined,
+      assignedTo: assignedToParsed || undefined,
     });
 
     res.status(201).json({

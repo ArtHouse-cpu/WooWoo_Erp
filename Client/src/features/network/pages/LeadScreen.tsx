@@ -10,8 +10,7 @@ import {
   Plus,
   Eye,
   Phone,
-
-
+  Paperclip,
 } from "lucide-react";
 import Swal from "sweetalert2";
 
@@ -572,12 +571,24 @@ const LeadScreen = () => {
         size: 140,
         Cell: ({ cell, row }) => (
           <div>
-            <span
-              onClick={() => handleViewDetails(row.original)}
-              className="cursor-pointer font-semibold text-gray-900 hover:text-indigo-600 transition"
-            >
-              {cell.getValue<string>()}
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                onClick={() => handleViewDetails(row.original)}
+                className="cursor-pointer font-semibold text-gray-900 hover:text-indigo-600 transition"
+              >
+                {cell.getValue<string>()}
+              </span>
+              {row.original.attachments && row.original.attachments.length > 0 && (
+                <span
+                  onClick={() => handleViewDetails(row.original)}
+                  className="inline-flex cursor-pointer items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 hover:bg-indigo-100 transition"
+                  title={`${row.original.attachments.length} media/document(s) attached`}
+                >
+                  <Paperclip size={10} />
+                  {row.original.attachments.length}
+                </span>
+              )}
+            </div>
             {row.original.source && (
               <span className="block text-[11px] text-gray-400">
                 via {row.original.source}

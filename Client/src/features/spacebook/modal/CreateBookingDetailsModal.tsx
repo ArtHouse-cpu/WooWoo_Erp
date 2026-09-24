@@ -3,7 +3,15 @@ import {
   X,
   User,
   Phone,
+  Minus,
+ ChevronDown,
+ Camera,
+ Megaphone,
+ Projector,
+ UserRound,
+ Volume2,
   Mail,
+  Plus,
   Calendar,
   Clock,
   Sparkles,
@@ -16,6 +24,7 @@ import {
   Laptop,
   Building2,
   Users,
+  Trash2,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
@@ -87,6 +96,27 @@ const QUICK_DURATIONS = [
   { label: "Full Day", hours: 8 },
 ];
 
+export type MultiDateSlot = {
+  id: string;
+  date: string;
+  duration: number;
+  timeSlot: string;
+  startTime: string;
+  endTime: string;
+};
+
+const TIME_SLOTS = [
+  "09:00 AM - 12:00 PM",
+  "10:00 AM - 02:00 PM",
+  "01:00 PM - 03:00 PM",
+  "12:00 PM - 03:00 PM",
+  "03:00 PM - 06:00 PM",
+  "06:00 PM - 09:00 PM",
+  "09:00 AM - 05:00 PM",
+];
+
+
+
 const toDateInput = (value?: string | Date | null) => {
   if (!value) return new Date().toISOString().split("T")[0];
   const d = new Date(value);
@@ -101,6 +131,29 @@ const toDateInput = (value?: string | Date | null) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+const formatDateDisplay = (value?: string | Date | null) => {
+  if (!value) return "—";
+  const asStr = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(asStr)) {
+    const [y, m, day] = asStr.slice(0, 10).split("-").map(Number);
+    const parsed = new Date(y, m - 1, day);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    }
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 const formatTimeDisplay = (timeStr: string) => {
   if (!timeStr) return "";
   const [h, m] = timeStr.split(":").map(Number);
@@ -109,6 +162,16 @@ const formatTimeDisplay = (timeStr: string) => {
   const displayH = h % 12 === 0 ? 12 : h % 12;
   const displayM = String(m || 0).padStart(2, "0");
   return `${displayH}:${displayM} ${period}`;
+};
+
+const formatTimeSlotDisplay = (timeStr: string) => {
+  if (!timeStr) return "";
+  const [h, m] = timeStr.split(":").map(Number);
+  if (Number.isNaN(h)) return timeStr;
+  const period = h >= 12 ? "PM" : "AM";
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  const displayM = String(m || 0).padStart(2, "0");
+  return `${String(displayH).padStart(2, "0")}:${displayM} ${period}`;
 };
 
 const timeToMinutes = (timeStr: string) => {
@@ -124,6 +187,27 @@ const calcDurationHours = (from: string, to: string) => {
   const b = timeToMinutes(to);
   if (a == null || b == null || b <= a) return 0;
   return Math.round(((b - a) / 60) * 100) / 100;
+};
+
+const parseTimeSlotRange = (slot: string) => {
+  const parts = slot.split("-").map((s) => s.trim());
+  if (parts.length !== 2) return { startTime: "09:00", endTime: "12:00", hours: 3 };
+
+  const to24H = (tStr: string) => {
+    const m = tStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return "09:00";
+    let h = parseInt(m[1], 10);
+    const min = m[2];
+    const mer = m[3].toUpperCase();
+    if (mer === "PM" && h < 12) h += 12;
+    if (mer === "AM" && h === 12) h = 0;
+    return `${String(h).padStart(2, "0")}:${min}`;
+  };
+
+  const start = to24H(parts[0]);
+  const end = to24H(parts[1]);
+  const hours = calcDurationHours(start, end) || 3;
+  return { startTime: start, endTime: end, hours };
 };
 
 const spaceLabel = (space: SpacePayload) => {
@@ -282,7 +366,30 @@ const CreateBookingDetailsModal = ({
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
+  const [dateMode, setDateMode] = useState<"single" | "multiple">("single");
+const [duration, setDuration] = useState(3);
+const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
+
+
+  const [multiDateSlots, setMultiDateSlots] = useState<MultiDateSlot[]>([
+    {
+      id: "slot-1",
+      date: new Date().toISOString().split("T")[0],
+      duration: 3,
+      timeSlot: "09:00 AM - 12:00 PM",
+      startTime: "09:00",
+      endTime: "12:00",
+    },
+  ]);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+
+  const [additionalServices, setAdditionalServices] = useState({
+  marketingSupport: 0,
+  projector: 0,
+  speakerSound: 0,
+  mediaShoot: 0,
+  eventCoordinator: 0,
+});
 
   const debouncedCustomerSearch = useDebounce(name.trim(), 250);
 
@@ -469,6 +576,9 @@ const CreateBookingDetailsModal = ({
 
   const handleSpaceTypeToggle = (type: "coworking" | "exclusive") => {
     setSpaceTypeFilter(type);
+    if (type === "exclusive") {
+      setDateMode("single");
+    }
     if (spaceId && spaces.length > 0) {
       const selected = spaces.find((s) => String(s._id) === String(spaceId));
       if (selected) {
@@ -688,6 +798,96 @@ const CreateBookingDetailsModal = ({
     }
   };
 
+  const handleSingleTimeSlotChange = (newSlot: string) => {
+    setTimeSlot(newSlot);
+    setManualStatusSelected(false);
+    const { hours, startTime, endTime } = parseTimeSlotRange(newSlot);
+    setDuration(hours);
+    setBookingFrom(startTime);
+    setBookingTo(endTime);
+  };
+
+  const handleSingleDurationChange = (delta: number) => {
+    const newDur = Math.max(1, duration + delta);
+    setDuration(newDur);
+    if (bookingFrom) {
+      const [h, m] = bookingFrom.split(":").map(Number);
+      const endH = (h + newDur) % 24;
+      const endStr = `${String(endH).padStart(2, "0")}:${String(m || 0).padStart(2, "0")}`;
+      setBookingTo(endStr);
+      setTimeSlot(`${formatTimeSlotDisplay(bookingFrom)} - ${formatTimeSlotDisplay(endStr)}`);
+    }
+  };
+
+  const handleAddSlot = () => {
+    const lastSlot = multiDateSlots[multiDateSlots.length - 1];
+    let nextDateStr = new Date().toISOString().split("T")[0];
+    if (lastSlot?.date) {
+      const d = new Date(lastSlot.date);
+      d.setDate(d.getDate() + 1);
+      if (!Number.isNaN(d.getTime())) {
+        nextDateStr = d.toISOString().split("T")[0];
+      }
+    }
+    const newSlot: MultiDateSlot = {
+      id: `slot-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      date: nextDateStr,
+      duration: 3,
+      timeSlot: "09:00 AM - 12:00 PM",
+      startTime: "09:00",
+      endTime: "12:00",
+    };
+    setMultiDateSlots((prev) => [...prev, newSlot]);
+  };
+
+  const handleRemoveSlot = (id: string) => {
+    if (multiDateSlots.length <= 1) return;
+    setMultiDateSlots((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const handleUpdateSlotDate = (id: string, newDate: string) => {
+    setMultiDateSlots((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, date: newDate } : s)),
+    );
+  };
+
+  const handleUpdateSlotDuration = (id: string, delta: number) => {
+    setMultiDateSlots((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        const newDur = Math.max(1, s.duration + delta);
+        const startTime = s.startTime || "09:00";
+        const [h, m] = startTime.split(":").map(Number);
+        const endH = (h + newDur) % 24;
+        const endTime = `${String(endH).padStart(2, "0")}:${String(m || 0).padStart(2, "0")}`;
+        const newSlotStr = `${formatTimeSlotDisplay(startTime)} - ${formatTimeSlotDisplay(endTime)}`;
+        return {
+          ...s,
+          duration: newDur,
+          endTime,
+          timeSlot: newSlotStr,
+        };
+      }),
+    );
+  };
+
+  const handleUpdateSlotTime = (id: string, newTimeSlot: string) => {
+    const { hours, startTime, endTime } = parseTimeSlotRange(newTimeSlot);
+    setMultiDateSlots((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              timeSlot: newTimeSlot,
+              duration: hours,
+              startTime,
+              endTime,
+            }
+          : s,
+      ),
+    );
+  };
+
   const handleQuickDuration = (hours: number) => {
     if (!bookingFrom) return;
     const [h, m] = bookingFrom.split(":").map(Number);
@@ -708,12 +908,26 @@ const CreateBookingDetailsModal = ({
       err.email = "Please enter a valid email address.";
     }
     if (!spaceId) err.spaceId = "Please select a space.";
-    if (!bookingDate) err.bookingDate = "Booking date is required.";
-    if (!bookingFrom) err.bookingFrom = "Start time is required.";
-    if (!bookingTo) err.bookingTo = "End time is required.";
-    if (bookingFrom && bookingTo && bookingTo <= bookingFrom) {
-      err.bookingTo = "End time must be after start time.";
+
+    if (dateMode === "multiple" && spaceTypeFilter === "exclusive") {
+      if (multiDateSlots.length === 0) {
+        err.multiDates = "Please add at least one date.";
+      }
+      for (let i = 0; i < multiDateSlots.length; i++) {
+        if (!multiDateSlots[i].date) {
+          err.multiDates = `Date for row ${i + 1} is required.`;
+          break;
+        }
+      }
+    } else {
+      if (!bookingDate) err.bookingDate = "Booking date is required.";
+      if (!bookingFrom) err.bookingFrom = "Start time is required.";
+      if (!bookingTo) err.bookingTo = "End time is required.";
+      if (bookingFrom && bookingTo && bookingTo <= bookingFrom) {
+        err.bookingTo = "End time must be after start time.";
+      }
     }
+
     setErrors(err);
     return Object.keys(err).length === 0;
   };
@@ -730,7 +944,11 @@ const CreateBookingDetailsModal = ({
       return;
     }
 
-    const durationHours = calcDurationHours(bookingFrom, bookingTo);
+    const isMultiple = dateMode === "multiple" && spaceTypeFilter === "exclusive";
+    const durationHours = isMultiple
+      ? multiDateSlots.reduce((acc, s) => acc + (s.duration || 1), 0)
+      : calcDurationHours(bookingFrom, bookingTo) || duration;
+
     const unitPrice = Math.max(0, Number(selectedSpace?.price ?? 0));
     const lineTotal =
       Math.round(unitPrice * Math.max(durationHours, 0) * 100) / 100;
@@ -748,6 +966,16 @@ const CreateBookingDetailsModal = ({
       : undefined;
     const spaceCode = selectedSpace ? getSpaceCode(selectedSpace) : undefined;
 
+    let finalNotes = notes.trim();
+    if (isMultiple && multiDateSlots.length > 0) {
+      const datesSummary = multiDateSlots
+        .map((s) => `${formatDateDisplay(s.date)} (${s.timeSlot}, ${s.duration}h)`)
+        .join(" | ");
+      finalNotes = finalNotes
+        ? `${finalNotes}\nDates: ${datesSummary}`
+        : `Multi-Date Booking: ${datesSummary}`;
+    }
+
     const payload: BookingFormPayload = {
       customerName: name.trim(),
       customerPhone: phone.trim().replace(/\D/g, ""),
@@ -756,11 +984,11 @@ const CreateBookingDetailsModal = ({
       membershipType: membershipType || undefined,
       membershipPlanId: membershipPlanId || undefined,
       spaceId,
-      bookingDate,
-      startTime: bookingFrom,
-      endTime: bookingTo,
+      bookingDate: isMultiple ? (multiDateSlots[0]?.date || bookingDate) : bookingDate,
+      startTime: isMultiple ? (multiDateSlots[0]?.startTime || bookingFrom) : bookingFrom,
+      endTime: isMultiple ? (multiDateSlots[0]?.endTime || bookingTo) : bookingTo,
       status,
-      notes: notes.trim() || undefined,
+      notes: finalNotes || undefined,
       spaceName: selectedSpace?.name || "",
       spaceCode,
       spaceType,
@@ -786,7 +1014,7 @@ const CreateBookingDetailsModal = ({
           if (e.target === e.currentTarget && !submitting) onClose();
         }}
       >
-        <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-100">
@@ -1330,92 +1558,289 @@ const CreateBookingDetailsModal = ({
             </div>
 
             <div>
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">
-                    3
-                  </span>
-                  <h3 className="font-semibold text-slate-800">
-                    Schedule & Duration
-                  </h3>
-                </div>
-              </div>
+  {/* Section Header */}
+  <div className="mb-3 flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-indigo-600">
+        3
+      </span>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-600">
-                    Date <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Calendar
-                      size={16}
-                      className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
-                    <input
-                      type="date"
-                      required
-                      value={bookingDate}
-                      onChange={(e) => {
-                        setBookingDate(e.target.value);
-                        setManualStatusSelected(false);
-                        if (errors.bookingDate) {
-                          setErrors((prev) => ({ ...prev, bookingDate: "" }));
-                        }
-                      }}
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                    />
-                  </div>
-                </div>
+      <h3 className="font-semibold text-slate-800">
+        Date & Time <span className="text-rose-500">*</span>
+      </h3>
+    </div>
 
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-600">
-                    Start Time <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Clock
-                      size={16}
-                      className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
-                    <input
-                      type="time"
-                      required
-                      value={bookingFrom}
-                      onChange={(e) => {
-                        setBookingFrom(e.target.value);
-                        setManualStatusSelected(false);
-                      }}
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                    />
-                  </div>
-                </div>
+    {/* Single / Multiple Date: ONLY for Exclusive */}
+    {spaceTypeFilter === "exclusive" && (
+      <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
+        <button
+          type="button"
+          onClick={() => setDateMode("single")}
+          className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
+            dateMode === "single"
+              ? "border border-indigo-500 bg-indigo-50/80 text-indigo-600 shadow-xs"
+              : "text-slate-500 hover:bg-slate-50"
+          }`}
+        >
+          Single Date
+        </button>
 
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-600">
-                    End Time <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Clock
-                      size={16}
-                      className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
-                    <input
-                      type="time"
-                      required
-                      value={bookingTo}
-                      onChange={(e) => {
-                        setBookingTo(e.target.value);
-                        setManualStatusSelected(false);
-                      }}
-                      className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                    />
-                  </div>
-                  {errors.bookingTo && (
-                    <p className="mt-1 text-xs text-rose-500">
-                      {errors.bookingTo}
-                    </p>
-                  )}
-                </div>
-              </div>
+        <button
+          type="button"
+          onClick={() => setDateMode("multiple")}
+          className={`rounded-lg px-4 py-1.5 text-xs font-semibold transition ${
+            dateMode === "multiple"
+              ? "border border-indigo-500 bg-indigo-50/80 text-indigo-600 shadow-xs"
+              : "text-slate-500 hover:bg-slate-50"
+          }`}
+        >
+          Multiple Dates
+        </button>
+      </div>
+    )}
+  </div>
+
+  {/* Render Single Date mode (or always single if Coworking) */}
+  {dateMode === "single" || spaceTypeFilter === "coworking" ? (
+    <div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {/* DATE */}
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-600">
+            Date <span className="text-rose-500">*</span>
+          </label>
+
+          <div className="relative">
+            <Calendar
+              size={16}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+
+            <input
+              type="date"
+              required
+              value={bookingDate}
+              onChange={(e) => {
+                setBookingDate(e.target.value);
+                setManualStatusSelected(false);
+
+                if (errors.bookingDate) {
+                  setErrors((prev) => ({
+                    ...prev,
+                    bookingDate: "",
+                  }));
+                }
+              }}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
+
+          {errors.bookingDate && (
+            <p className="mt-1 text-xs text-rose-500">
+              {errors.bookingDate}
+            </p>
+          )}
+        </div>
+
+        {/* DURATION */}
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-600">
+            Duration (Hours)
+          </label>
+
+          <div className="flex h-10 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <button
+              type="button"
+              onClick={() => handleSingleDurationChange(-1)}
+              disabled={duration <= 1}
+              className="flex w-11 items-center justify-center border-r border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+            >
+              <Minus size={16} />
+            </button>
+
+            <div className="flex flex-1 items-center justify-center text-sm font-medium text-slate-700">
+              {duration} {duration === 1 ? "Hour" : "Hours"}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleSingleDurationChange(1)}
+              className="flex w-11 items-center justify-center border-l border-slate-200 text-slate-600 transition hover:bg-slate-50"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+
+          <p className="mt-1 text-[11px] text-slate-400">
+            Minimum 1 hour
+          </p>
+        </div>
+
+        {/* TIME SLOT */}
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-600">
+            Time Slot 
+          </label>
+
+          <div className="relative">
+            <Clock
+              size={16}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+
+            <select
+              required
+              value={timeSlot}
+              onChange={(e) => handleSingleTimeSlotChange(e.target.value)}
+              className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            >
+              <option value="">Select Time Slot</option>
+              {!TIME_SLOTS.includes(timeSlot) && timeSlot && (
+                <option value={timeSlot}>{timeSlot}</option>
+              )}
+              {TIME_SLOTS.map((slot) => (
+                <option key={slot} value={slot}>
+                  {slot}
+                </option>
+              ))}
+            </select>
+
+            <ChevronDown
+              size={16}
+              className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Quick Duration */}
+      <div className="mt-2 flex items-center gap-1.5 sm:hidden">
+        <span className="text-[11px] text-slate-400">
+          Duration:
+        </span>
+
+        {QUICK_DURATIONS.map((dur) => (
+          <button
+            key={dur.label}
+            type="button"
+            onClick={() => {
+              setDuration(dur.hours);
+              handleQuickDuration(dur.hours);
+            }}
+            className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:bg-indigo-50 hover:text-indigo-700"
+          >
+            +{dur.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : (
+    /* Render Multiple Dates list (Exclusive mode) matching reference image */
+    <div className="space-y-3">
+      {/* Column Headers */}
+      <div className="hidden sm:grid sm:grid-cols-[1fr_160px_1fr_42px] gap-3 px-1 text-xs font-semibold text-slate-600">
+        <div>Date</div>
+        <div>Duration (Hours)</div>
+        <div>Time Slot</div>
+        <div></div>
+      </div>
+
+      {/* Rows */}
+      {multiDateSlots.map((slot) => (
+        <div
+          key={slot.id}
+          className="grid grid-cols-1 sm:grid-cols-[1fr_160px_1fr_42px] items-center gap-2.5 sm:gap-3"
+        >
+          {/* Date Picker */}
+          <div className="relative flex h-11 items-center justify-between rounded-xl border border-slate-200 bg-white px-3.5 shadow-2xs hover:border-slate-300 transition">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <Calendar size={16} className="text-slate-500 shrink-0 pointer-events-none" />
+              <span className="truncate text-sm font-medium text-slate-700 pointer-events-none">
+                {formatDateDisplay(slot.date)}
+              </span>
+            </div>
+            <ChevronDown size={16} className="text-slate-400 shrink-0 pointer-events-none ml-1" />
+            <input
+              type="date"
+              required
+              value={slot.date}
+              onChange={(e) => handleUpdateSlotDate(slot.id, e.target.value)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+          </div>
+
+          {/* Duration (Hours) Stepper */}
+          <div className="flex h-11 items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+            <button
+              type="button"
+              onClick={() => handleUpdateSlotDuration(slot.id, -1)}
+              disabled={slot.duration <= 1}
+              className="flex h-full w-10 items-center justify-center border-r border-slate-100 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
+            >
+              <Minus size={15} />
+            </button>
+            <div className="flex flex-1 items-center justify-center px-1 text-sm font-medium text-slate-700">
+              {slot.duration} {slot.duration === 1 ? "Hour" : "Hours"}
+            </div>
+            <button
+              type="button"
+              onClick={() => handleUpdateSlotDuration(slot.id, 1)}
+              className="flex h-full w-10 items-center justify-center border-l border-slate-100 text-slate-500 hover:bg-slate-50 transition"
+            >
+              <Plus size={15} />
+            </button>
+          </div>
+
+          {/* Time Slot Select */}
+          <div className="relative flex h-11 items-center rounded-xl border border-slate-200 bg-white px-3.5 shadow-2xs hover:border-slate-300 transition">
+            <Clock size={16} className="mr-2.5 text-slate-500 shrink-0 pointer-events-none" />
+            <select
+              value={slot.timeSlot}
+              onChange={(e) => handleUpdateSlotTime(slot.id, e.target.value)}
+              className="w-full cursor-pointer appearance-none bg-transparent pr-6 text-sm font-medium text-slate-700 outline-none"
+            >
+              {!TIME_SLOTS.includes(slot.timeSlot) && (
+                <option value={slot.timeSlot}>{slot.timeSlot}</option>
+              )}
+              {TIME_SLOTS.map((ts) => (
+                <option key={ts} value={ts}>
+                  {ts}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={16} className="pointer-events-none absolute right-3 text-slate-400" />
+          </div>
+
+          {/* Delete Row Button */}
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => handleRemoveSlot(slot.id)}
+              disabled={multiDateSlots.length <= 1}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-2xs transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30"
+              title="Remove Date"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {errors.multiDates && (
+        <p className="mt-1 text-xs text-rose-500">{errors.multiDates}</p>
+      )}
+
+      {/* Add Another Date Button */}
+      <button
+        type="button"
+        onClick={handleAddSlot}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/40 py-2.5 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50 shadow-2xs"
+      >
+        <Plus size={16} />
+        <span>Add Another Date</span>
+      </button>
+    </div>
+  )}
 
               {/* Automatic Status Preview Badge */}
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5">
@@ -1469,6 +1894,7 @@ const CreateBookingDetailsModal = ({
                   </button>
                 ))}
               </div>
+
             </div>
 
             <div>
@@ -1536,6 +1962,146 @@ const CreateBookingDetailsModal = ({
                   </div>
                 )}
 
+
+          {/* Additional Services */}
+          <div className="mt-5">
+            {/* Section Header */}
+  <div className="mb-3 flex items-center gap-2">
+    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+      <FileText size={16} />
+    </span>
+ <h3 className="font-semibold text-slate-800">
+      Additional Services{" "}
+      <span className="font-normal text-slate-400">
+        (Optional)
+      </span>
+    </h3>
+  </div>
+  {/* Services Grid */}
+  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+    {[
+      {
+        key: "marketingSupport" as const,
+        label: "Marketing Support",
+        price: "₹100/ booking",
+        icon: Megaphone,
+      },
+      {
+        key: "projector" as const,
+        label: "Projector",
+        price: "₹200 / booking",
+        icon: Projector,
+      },
+      {
+        key: "speakerSound" as const,
+        label: "Speaker / Sound System",
+        price: "₹100 / booking",
+        icon: Volume2,
+      },
+      {
+        key: "mediaShoot" as const,
+        label: "Media Shoot",
+        price: "₹500 / booking",
+        icon: Camera,
+      },
+      {
+        key: "eventCoordinator" as const,
+        label: "Event Coordinator",
+        price: "₹300/ booking",
+        icon: UserRound,
+      },
+    ].map((service) => {
+      const isSelected = additionalServices[service.key] > 0;
+      const Icon = service.icon;
+
+      return (
+        <div
+          key={service.key}
+          className={`flex h-full flex-col justify-between rounded-xl border p-3 transition ${
+            isSelected
+              ? "border-indigo-400 bg-indigo-50/20 shadow-xs"
+              : "border-slate-200 bg-white hover:border-slate-300"
+          }`}
+        >
+          {/* Top Row: Icon + Checkbox */}
+          <div className="flex items-center justify-between">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+              <Icon size={18} />
+            </div>
+
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={(e) =>
+                setAdditionalServices((prev) => ({
+                  ...prev,
+                  [service.key]: e.target.checked ? 1 : 0,
+                }))
+              }
+              className="h-4 w-4 shrink-0 cursor-pointer rounded accent-indigo-600"
+            />
+          </div>
+
+          {/* Middle: Title & Price */}
+          <div className="my-2.5 flex min-h-[38px] flex-col justify-start">
+            <p
+              className="text-xs font-semibold text-slate-700 leading-snug"
+              title={service.label}
+            >
+              {service.label}
+            </p>
+            {service.price ? (
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                {service.price}
+              </p>
+            ) : (
+              <p className="mt-0.5 text-[11px] text-transparent select-none">
+                &nbsp;
+              </p>
+            )}
+          </div>
+
+          {/* Bottom: Quantity Stepper */}
+          <div className="mt-auto flex h-8 overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <button
+              type="button"
+              onClick={() =>
+                setAdditionalServices((prev) => ({
+                  ...prev,
+                  [service.key]: Math.max(0, prev[service.key] - 1),
+                }))
+              }
+              className="flex w-9 items-center justify-center border-r border-slate-200 text-slate-500 hover:bg-slate-50 transition"
+            >
+              <Minus size={14} />
+            </button>
+
+            <div className="flex flex-1 items-center justify-center text-xs font-semibold text-slate-700">
+              {additionalServices[service.key]}
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setAdditionalServices((prev) => ({
+                  ...prev,
+                  [service.key]: prev[service.key] + 1,
+                }))
+              }
+              className="flex w-9 items-center justify-center border-l border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
+
+
+
+
                 <div>
                   <label className="mb-1 block text-xs font-semibold text-slate-600">
                     Notes / Special Requests (Optional)
@@ -1563,13 +2129,18 @@ const CreateBookingDetailsModal = ({
               {selectedSpace
                 ? `${selectedSpace.name}${selectedSpace.day ? ` · ${selectedSpace.day}` : ""}`
                 : "No space selected"}{" "}
-              • {formatTimeDisplay(bookingFrom)} - {formatTimeDisplay(bookingTo)}
+              •{" "}
+              {dateMode === "multiple" && spaceTypeFilter === "exclusive"
+                ? `${multiDateSlots.length} Dates (${multiDateSlots.reduce((sum, s) => sum + (s.duration || 1), 0)} hrs)`
+                : `${formatTimeDisplay(bookingFrom)} - ${formatTimeDisplay(bookingTo)}`}
               {!isEdit && selectedSpace && (
                 <span className="ml-1 font-semibold text-slate-700">
                   · ₹
                   {(
                     Math.max(0, Number(selectedSpace.price || 0)) *
-                    calcDurationHours(bookingFrom, bookingTo)
+                    (dateMode === "multiple" && spaceTypeFilter === "exclusive"
+                      ? multiDateSlots.reduce((sum, s) => sum + (s.duration || 1), 0)
+                      : calcDurationHours(bookingFrom, bookingTo) || duration)
                   ).toLocaleString("en-IN")}
                 </span>
               )}

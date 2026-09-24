@@ -5,6 +5,7 @@ import {
   getLeadById,
   deleteLead,
   updateLead,
+  uploadLeadAttachments,
 } from '../controllers/lead.controller.js';
 import {authenticateUser} from '../middlewares/auth.middleware.js';
 import {attachStaffContext} from '../middlewares/authorize.middleware.js';
@@ -14,10 +15,10 @@ router.use(authenticateUser, attachStaffContext);
 
 router.get('/', getLead);
 router.get('/:id', getLeadById);
-router.post('/', createLead);
+router.post('/', uploadLeadAttachments.array('attachments'), createLead);
 router.delete('/:id', deleteLead);
 router.delete('/', deleteLead);
-router.patch('/:id', updateLead);
-router.patch('/', updateLead);
+router.patch('/:id', uploadLeadAttachments.array('attachments'), updateLead);
+router.patch('/', uploadLeadAttachments.array('attachments'), updateLead);
 
 export default router;
