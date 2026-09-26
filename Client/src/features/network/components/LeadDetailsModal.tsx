@@ -83,7 +83,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl transition-all">
+      <div className="w-full max-w-6xl max-h-[80vh] overflow-y-auto rounded-2xl bg-white shadow-2xl transition-all">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 bg-gray-50/50">
           <div className="flex items-center gap-3">
@@ -113,7 +113,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="space-y-4 p-6 text-sm text-gray-600">
+        <div className="space-y-2 p-3 text-sm text-gray-600">
           {/* Contact Details */}
           <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
             <div className="flex items-center gap-3">
@@ -133,23 +133,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <Mail size={16} className="text-indigo-500 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <span className="text-xs text-gray-400 block">Email</span>
-                {lead.email ? (
-                  <a
-                    href={`mailto:${lead.email}`}
-                    className="font-medium text-gray-800 hover:text-indigo-600"
-                  >
-                    {lead.email}
-                  </a>
-                ) : (
-                  <span className="text-gray-400 italic">Not provided</span>
-                )}
-              </div>
-            </div>
-
+            
             <div className="flex items-center gap-3">
               <Tag size={16} className="text-indigo-500 shrink-0" />
               <div className="min-w-0 flex-1">

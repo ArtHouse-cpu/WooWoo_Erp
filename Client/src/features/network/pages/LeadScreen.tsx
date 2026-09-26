@@ -555,7 +555,7 @@ const LeadScreen = () => {
       {
         id: "index",
         header: "#",
-        size: 50,
+        size: 15,
         enableSorting: false,
         Cell: ({ row }) => (
           <span className="text-xs font-semibold text-gray-400">
@@ -568,7 +568,7 @@ const LeadScreen = () => {
       {
         accessorKey: "name",
         header: "Name",
-        size: 140,
+        size: 100,
         Cell: ({ cell, row }) => (
           <div>
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -645,7 +645,7 @@ const LeadScreen = () => {
       {
         accessorKey: "assignedTo.m_staff_name",
         header: "Assigned To",
-        size: 140,
+        size: 100,
         Cell: ({ row }) => {
           const assigned = row.original.assignedTo?.m_staff_name;
           return assigned ? (
@@ -662,7 +662,7 @@ const LeadScreen = () => {
       {
         accessorKey: "reasonNote",
         header: "Reason / Note",
-        size: 150,
+        size: 100,
         Cell: ({ cell }) => {
           const note = cell.getValue<string>();
           if (!note) return <span className="text-gray-400 italic text-xs">-</span>;
