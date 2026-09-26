@@ -10,7 +10,7 @@ import {
  Projector,
  UserRound,
  Volume2,
-  Mail,
+
   Plus,
   Calendar,
   Clock,
@@ -25,6 +25,7 @@ import {
   Building2,
   Users,
   Trash2,
+  Info,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
@@ -96,6 +97,26 @@ const QUICK_DURATIONS = [
   { label: "Full Day", hours: 8 },
 ];
 
+export const COWORKING_PLANS = [
+  { id: "day", label: "One Day", days: 1 },
+  { id: "week", label: "One Week", days: 7 },
+  { id: "month", label: "One Month", days: 30 },
+  { id: "year", label: "One Year", days: 365 },
+] as const;
+
+/** Calculates end date from start date and number of days (inclusive) */
+export const calculateEndDate = (startDateStr: string, days: number): string => {
+  if (!startDateStr) return "";
+  const [y, m, d] = startDateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return startDateStr;
+  date.setDate(date.getDate() + Math.max(1, days) - 1);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export type MultiDateSlot = {
   id: string;
   date: string;
@@ -115,6 +136,32 @@ const TIME_SLOTS = [
   "09:00 AM - 05:00 PM",
 ];
 
+
+export const getTimeSlotsForDuration = (
+  duration: number,
+  openingHour = 9,
+  closingHour = 21,
+): string[] => {
+  const slots: string[] = [];
+  const dur = Math.max(1, Math.min(closingHour - openingHour, Math.round(duration || 1)));
+
+  const formatTime = (hour: number) => {
+    const period = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+    return `${String(displayHour).padStart(2, "0")}:00 ${period}`;
+  };
+
+  for (
+    let startHour = openingHour;
+    startHour + dur <= closingHour;
+    startHour++
+  ) {
+    const endHour = startHour + dur;
+    slots.push(`${formatTime(startHour)} - ${formatTime(endHour)}`);
+  }
+
+  return slots;
+};
 
 
 const toDateInput = (value?: string | Date | null) => {
@@ -209,6 +256,9 @@ const parseTimeSlotRange = (slot: string) => {
   const hours = calcDurationHours(start, end) || 3;
   return { startTime: start, endTime: end, hours };
 };
+
+
+
 
 const spaceLabel = (space: SpacePayload) => {
   const day = space.day ? ` · ${space.day}` : "";
@@ -325,6 +375,8 @@ export const computeBookingStatus = (
   return "Expired";
 };
 
+
+
 const CreateBookingDetailsModal = ({
   isOpen,
   onClose,
@@ -337,10 +389,11 @@ const CreateBookingDetailsModal = ({
   const isEdit = Boolean(initialBooking?._id || initialBooking?.id);
   const staff = useAppSelector((state) => state.user);
   const customerSearchRef = useRef<HTMLDivElement>(null);
+  const coworkingDateInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+ const [isPhoneAutoFetched, setIsPhoneAutoFetched] = useState(false);
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [membershipType, setMembershipType] = useState<string>("none");
   const [membershipPlanId, setMembershipPlanId] = useState<string | null>(null);
@@ -367,9 +420,23 @@ const CreateBookingDetailsModal = ({
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [dateMode, setDateMode] = useState<"single" | "multiple">("single");
-const [duration, setDuration] = useState(3);
-const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
+  const [duration, setDuration] = useState(3);
+  const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
 
+  // Coworking Plan & Date State
+  const [coworkingPlan, setCoworkingPlan] = useState<string>("day");
+  const [coworkingDays, setCoworkingDays] = useState<number>(1);
+  const [coworkingStartDate, setCoworkingStartDate] = useState<string>(() =>
+    new Date().toISOString().split("T")[0],
+  );
+
+  const coworkingEndDate = useMemo(() => {
+    return calculateEndDate(coworkingStartDate, coworkingDays);
+  }, [coworkingStartDate, coworkingDays]);
+
+  const singleDateSlots = useMemo(() => {
+    return getTimeSlotsForDuration(duration);
+  }, [duration]);
 
   const [multiDateSlots, setMultiDateSlots] = useState<MultiDateSlot[]>([
     {
@@ -413,7 +480,7 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
     if (initialBooking) {
       setName(initialBooking.customerName || "");
       setPhone(initialBooking.customerPhone || "");
-      setEmail(initialBooking.customerEmail || "");
+     
       setSpaceId(String(initialBooking.spaceId || ""));
       setCustomerId(null);
       setMembershipType("none");
@@ -441,11 +508,18 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
         }
       }
       const bDate = toDateInput(initialBooking.bookingDate);
-      const bFrom = initialBooking.startTime || "10:00";
+      const bFrom = initialBooking.startTime || "09:00";
       const bTo = initialBooking.endTime || "12:00";
       setBookingDate(bDate);
       setBookingFrom(bFrom);
       setBookingTo(bTo);
+      setCoworkingStartDate(bDate);
+      const initialDur =
+        initialBooking.durationHours || calcDurationHours(bFrom, bTo) || 3;
+      setDuration(initialDur);
+      setTimeSlot(
+        `${formatTimeSlotDisplay(bFrom)} - ${formatTimeSlotDisplay(bTo)}`,
+      );
       if (initialBooking.status === "Cancelled") {
         setStatus("Cancelled");
         setManualStatusSelected(true);
@@ -463,17 +537,24 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
     } else if (draftValues) {
       setName(draftValues.customerName || "");
       setPhone(draftValues.customerPhone || "");
-      setEmail(draftValues.customerEmail || "");
+      
       setCustomerId(draftValues.customerId || null);
       setMembershipType(draftValues.membershipType || "none");
       setMembershipPlanId(draftValues.membershipPlanId || null);
       setSpaceId(String(draftValues.spaceId || ""));
       const bDate = toDateInput(draftValues.bookingDate);
-      const bFrom = draftValues.startTime || "10:00";
+      const bFrom = draftValues.startTime || "09:00";
       const bTo = draftValues.endTime || "12:00";
       setBookingDate(bDate);
       setBookingFrom(bFrom);
       setBookingTo(bTo);
+      setCoworkingStartDate(bDate);
+      const draftDur =
+        draftValues.durationHours || calcDurationHours(bFrom, bTo) || 3;
+      setDuration(draftDur);
+      setTimeSlot(
+        `${formatTimeSlotDisplay(bFrom)} - ${formatTimeSlotDisplay(bTo)}`,
+      );
       if (draftValues.status === "Cancelled") {
         setStatus("Cancelled");
         setManualStatusSelected(true);
@@ -490,17 +571,23 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
       setNotes(draftValues.notes || "");
     } else {
       setName("");
-      setPhone("");
-      setEmail("");
+     
+    setPhone("");
+setIsPhoneAutoFetched(false);
       setCustomerId(null);
       setMembershipType("none");
       setMembershipPlanId(null);
       setSpaceId("");
       const todayStr = new Date().toISOString().split("T")[0];
       setBookingDate(todayStr);
-      setBookingFrom("10:00");
+      setBookingFrom("09:00");
       setBookingTo("12:00");
-      const computed = computeBookingStatus(todayStr, "10:00", "12:00");
+      setCoworkingStartDate(todayStr);
+      setCoworkingDays(1);
+      setCoworkingPlan("day");
+      setDuration(3);
+      setTimeSlot("09:00 AM - 12:00 PM");
+      const computed = computeBookingStatus(todayStr, "09:00", "12:00");
       setStatus(computed);
       setManualStatusSelected(false);
       setNotes("");
@@ -693,9 +780,7 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
           ) || list[0];
         if (match?.name) {
           setName(match.name);
-          if (match.email && !email.trim()) {
-            setEmail(match.email);
-          }
+         
           setCustomerId(match._id || (match as any).id || null);
           setMembershipType(match.membershipType || "none");
           setMembershipPlanId(match.membershipPlanId || null);
@@ -712,9 +797,7 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
   const handleSelectCustomer = (c: CustomerPayload) => {
     setName(c.name || "");
     setPhone(c.mobile ? String(c.mobile).replace(/\D/g, "") : "");
-    if (c.email) {
-      setEmail(c.email);
-    }
+    
     setCustomerId(c._id || (c as any).id || null);
     setMembershipType(c.membershipType || "none");
     setMembershipPlanId(c.membershipPlanId || null);
@@ -757,7 +840,7 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
       const created = response?.customer ?? response?.data ?? response;
       const createdName = String(created?.name || args.payload.name || "").trim();
       const createdPhone = String(created?.mobile || args.payload.mobile || "").trim();
-      const createdEmail = String(created?.email || args.payload.email || "").trim();
+      
       const createdId = created?._id || (created as any)?.id || null;
       const createdMembership =
         created?.membershipType || args.payload.membershipType || "none";
@@ -766,7 +849,7 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
 
       if (createdName) setName(createdName);
       if (createdPhone) setPhone(createdPhone.replace(/\D/g, ""));
-      if (createdEmail) setEmail(createdEmail);
+     
       setCustomerId(createdId);
       setMembershipType(createdMembership);
       setMembershipPlanId(createdPlanId);
@@ -807,16 +890,40 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
     setBookingTo(endTime);
   };
 
-  const handleSingleDurationChange = (delta: number) => {
-    const newDur = Math.max(1, duration + delta);
-    setDuration(newDur);
-    if (bookingFrom) {
-      const [h, m] = bookingFrom.split(":").map(Number);
-      const endH = (h + newDur) % 24;
-      const endStr = `${String(endH).padStart(2, "0")}:${String(m || 0).padStart(2, "0")}`;
-      setBookingTo(endStr);
-      setTimeSlot(`${formatTimeSlotDisplay(bookingFrom)} - ${formatTimeSlotDisplay(endStr)}`);
+  const handleApplySingleDuration = (newDur: number) => {
+    const dur = Math.max(1, Math.min(12, newDur));
+    setDuration(dur);
+
+    let [startH] = (bookingFrom || "09:00").split(":").map(Number);
+    if (Number.isNaN(startH) || startH < 9) startH = 9;
+    if (startH + dur > 21) {
+      startH = Math.max(9, 21 - dur);
     }
+    const endH = startH + dur;
+    const startStr = `${String(startH).padStart(2, "0")}:00`;
+    const endStr = `${String(endH).padStart(2, "0")}:00`;
+    setBookingFrom(startStr);
+    setBookingTo(endStr);
+    setTimeSlot(
+      `${formatTimeSlotDisplay(startStr)} - ${formatTimeSlotDisplay(endStr)}`,
+    );
+    setManualStatusSelected(false);
+  };
+
+  const handleSingleDurationChange = (delta: number) => {
+    handleApplySingleDuration(duration + delta);
+  };
+
+  const handleSelectCoworkingPlan = (planId: string, days: number) => {
+    setCoworkingPlan(planId);
+    setCoworkingDays(days);
+  };
+
+  const handleCoworkingDaysChange = (delta: number) => {
+    const nextDays = Math.max(1, coworkingDays + delta);
+    setCoworkingDays(nextDays);
+    const matchedPlan = COWORKING_PLANS.find((p) => p.days === nextDays);
+    setCoworkingPlan(matchedPlan ? matchedPlan.id : "custom");
   };
 
   const handleAddSlot = () => {
@@ -829,13 +936,18 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
         nextDateStr = d.toISOString().split("T")[0];
       }
     }
+    const dur = lastSlot?.duration || 3;
+    const availableSlots = getTimeSlotsForDuration(dur);
+    const defaultSlot = availableSlots[0] || "09:00 AM - 12:00 PM";
+    const { startTime, endTime } = parseTimeSlotRange(defaultSlot);
+
     const newSlot: MultiDateSlot = {
       id: `slot-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       date: nextDateStr,
-      duration: 3,
-      timeSlot: "09:00 AM - 12:00 PM",
-      startTime: "09:00",
-      endTime: "12:00",
+      duration: dur,
+      timeSlot: defaultSlot,
+      startTime,
+      endTime,
     };
     setMultiDateSlots((prev) => [...prev, newSlot]);
   };
@@ -855,15 +967,20 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
     setMultiDateSlots((prev) =>
       prev.map((s) => {
         if (s.id !== id) return s;
-        const newDur = Math.max(1, s.duration + delta);
-        const startTime = s.startTime || "09:00";
-        const [h, m] = startTime.split(":").map(Number);
-        const endH = (h + newDur) % 24;
-        const endTime = `${String(endH).padStart(2, "0")}:${String(m || 0).padStart(2, "0")}`;
+        const newDur = Math.max(1, Math.min(12, s.duration + delta));
+        let [startH] = (s.startTime || "09:00").split(":").map(Number);
+        if (Number.isNaN(startH) || startH < 9) startH = 9;
+        if (startH + newDur > 21) {
+          startH = Math.max(9, 21 - newDur);
+        }
+        const endH = startH + newDur;
+        const startTime = `${String(startH).padStart(2, "0")}:00`;
+        const endTime = `${String(endH).padStart(2, "0")}:00`;
         const newSlotStr = `${formatTimeSlotDisplay(startTime)} - ${formatTimeSlotDisplay(endTime)}`;
         return {
           ...s,
           duration: newDur,
+          startTime,
           endTime,
           timeSlot: newSlotStr,
         };
@@ -889,12 +1006,7 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
   };
 
   const handleQuickDuration = (hours: number) => {
-    if (!bookingFrom) return;
-    const [h, m] = bookingFrom.split(":").map(Number);
-    const endH = (h + hours) % 24;
-    const endStr = `${String(endH).padStart(2, "0")}:${String(m || 0).padStart(2, "0")}`;
-    setBookingTo(endStr);
-    setManualStatusSelected(false);
+    handleApplySingleDuration(hours);
   };
 
   const validate = () => {
@@ -904,12 +1016,12 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
     else if (!/^\d{10}$/.test(phone.trim().replace(/\D/g, ""))) {
       err.phone = "Please enter a valid 10-digit phone number.";
     }
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      err.email = "Please enter a valid email address.";
-    }
+  
     if (!spaceId) err.spaceId = "Please select a space.";
 
-    if (dateMode === "multiple" && spaceTypeFilter === "exclusive") {
+    if (spaceTypeFilter === "coworking") {
+      if (!coworkingStartDate) err.coworkingStartDate = "Start date is required.";
+    } else if (dateMode === "multiple" && spaceTypeFilter === "exclusive") {
       if (multiDateSlots.length === 0) {
         err.multiDates = "Please add at least one date.";
       }
@@ -944,14 +1056,18 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
       return;
     }
 
-    const isMultiple = dateMode === "multiple" && spaceTypeFilter === "exclusive";
-    const durationHours = isMultiple
+    const isCoworking = spaceTypeFilter === "coworking";
+    const isMultiple = !isCoworking && dateMode === "multiple";
+    const durationHours = isCoworking
+      ? coworkingDays * 8
+      : isMultiple
       ? multiDateSlots.reduce((acc, s) => acc + (s.duration || 1), 0)
       : calcDurationHours(bookingFrom, bookingTo) || duration;
 
     const unitPrice = Math.max(0, Number(selectedSpace?.price ?? 0));
-    const lineTotal =
-      Math.round(unitPrice * Math.max(durationHours, 0) * 100) / 100;
+    const lineTotal = isCoworking
+      ? Math.round(unitPrice * Math.max(coworkingDays, 1) * 100) / 100
+      : Math.round(unitPrice * Math.max(durationHours, 0) * 100) / 100;
 
     if (!isEdit && lineTotal <= 0) {
       toast.error(
@@ -967,7 +1083,12 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
     const spaceCode = selectedSpace ? getSpaceCode(selectedSpace) : undefined;
 
     let finalNotes = notes.trim();
-    if (isMultiple && multiDateSlots.length > 0) {
+    if (isCoworking) {
+      const planObj = COWORKING_PLANS.find((p) => p.id === coworkingPlan);
+      const planName = planObj ? planObj.label : `${coworkingDays} Days`;
+      const coworkSummary = `Coworking Plan: ${planName} (${coworkingDays} ${coworkingDays === 1 ? "Day" : "Days"}: ${formatDateDisplay(coworkingStartDate)} to ${formatDateDisplay(coworkingEndDate)})`;
+      finalNotes = finalNotes ? `${finalNotes}\n${coworkSummary}` : coworkSummary;
+    } else if (isMultiple && multiDateSlots.length > 0) {
       const datesSummary = multiDateSlots
         .map((s) => `${formatDateDisplay(s.date)} (${s.timeSlot}, ${s.duration}h)`)
         .join(" | ");
@@ -979,14 +1100,14 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
     const payload: BookingFormPayload = {
       customerName: name.trim(),
       customerPhone: phone.trim().replace(/\D/g, ""),
-      customerEmail: email.trim() || undefined,
+   
       customerId: customerId || undefined,
       membershipType: membershipType || undefined,
       membershipPlanId: membershipPlanId || undefined,
       spaceId,
-      bookingDate: isMultiple ? (multiDateSlots[0]?.date || bookingDate) : bookingDate,
-      startTime: isMultiple ? (multiDateSlots[0]?.startTime || bookingFrom) : bookingFrom,
-      endTime: isMultiple ? (multiDateSlots[0]?.endTime || bookingTo) : bookingTo,
+      bookingDate: isCoworking ? coworkingStartDate : isMultiple ? (multiDateSlots[0]?.date || bookingDate) : bookingDate,
+      startTime: isCoworking ? "09:00" : isMultiple ? (multiDateSlots[0]?.startTime || bookingFrom) : bookingFrom,
+      endTime: isCoworking ? "21:00" : isMultiple ? (multiDateSlots[0]?.endTime || bookingTo) : bookingTo,
       status,
       notes: finalNotes || undefined,
       spaceName: selectedSpace?.name || "",
@@ -1230,42 +1351,43 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
                 </div>
 
                 {/* Phone Number */}
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-600">
-                    Phone Number <span className="text-rose-500">*</span>
-                  </label>
+              <div>
+  <label className="mb-1 block text-xs font-semibold text-slate-600">
+    Phone Number <span className="text-rose-500">*</span>
+  </label>
 
-                  <div className="relative">
-                    <Phone
-                      size={16}
-                      className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
+  <div className="relative">
+    <Phone
+      size={16}
+      className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+    />
 
-                    <input
-                      type="tel"
-                      required
-                      maxLength={10}
-                      value={phone}
-                      onChange={(e) => {
-                        setPhone(e.target.value.replace(/\D/g, ""));
-                        if (errors.phone)
-                          setErrors((prev) => ({ ...prev, phone: "" }));
-                      }}
-                      placeholder="9876543210"
-                      className={`h-10 w-full rounded-xl border pl-10 pr-3 text-sm outline-none transition focus:ring-2 ${
-                        errors.phone
-                          ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
-                          : "border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-100"
-                      }`}
-                    />
-                  </div>
+    <input
+      type="tel"
+      required
+      maxLength={10}
+      value={phone}
+      onChange={(e) => {
+        setPhone(e.target.value.replace(/\D/g, ""));
 
-                  {errors.phone && (
-                    <p className="mt-1 text-xs text-rose-500">{errors.phone}</p>
-                  )}
-                </div>
-              </div>
+        if (errors.phone) {
+          setErrors((prev) => ({ ...prev, phone: "" }));
+        }
+      }}
+      readOnly={isPhoneAutoFetched}
+      placeholder="9876543210"
+      className={`h-10 w-full rounded-xl border pl-10 pr-3 text-sm outline-none transition focus:ring-2 ${
+        errors.phone
+          ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
+          : isPhoneAutoFetched
+            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
+            : "border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-100"
+      }`}
+    />
+  </div>
+</div>
             </div>
+          </div>
 
             <div className="space-y-3">
               {/* Header with Title and Coworking/Exclusive Toggle */}
@@ -1278,6 +1400,32 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
                     Select Space <span className="text-rose-500">*</span>
                   </h3>
                 </div>
+                 
+                  {/* Search by space name or space code */}
+             
+              <div className="relative flex-1">
+                <Search
+                  size={17}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="text"
+                  value={spaceSearch}
+                  onChange={(e) => setSpaceSearch(e.target.value)}
+                  placeholder={`Search ${spaceTypeFilter} spaces by name or code (e.g. SP-001, Desk)...`}
+                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
+                />
+                {spaceSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setSpaceSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded"
+                    title="Clear search"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
 
                 {/* Toggle switch: Coworking vs Exclusive */}
                 <div className="inline-flex self-start sm:self-auto rounded-xl bg-slate-100 p-1 border border-slate-200/80 shadow-xs">
@@ -1327,30 +1475,7 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
                 </div>
               </div>
 
-              {/* Search by space name or space code */}
-              <div className="relative">
-                <Search
-                  size={14}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                  type="text"
-                  value={spaceSearch}
-                  onChange={(e) => setSpaceSearch(e.target.value)}
-                  placeholder={`Search ${spaceTypeFilter} spaces by name or code (e.g. SP-001, Desk)...`}
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
-                />
-                {spaceSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setSpaceSearch("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded"
-                    title="Clear search"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
+            
 
               {/* Space Options Boxes (Cards) */}
               {spacesLoading ? (
@@ -1566,7 +1691,8 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
       </span>
 
       <h3 className="font-semibold text-slate-800">
-        Date & Time <span className="text-rose-500">*</span>
+        {spaceTypeFilter === "coworking" ? "Select Plan & Date" : "Date & Time"}{" "}
+        <span className="text-rose-500">*</span>
       </h3>
     </div>
 
@@ -1600,8 +1726,142 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
     )}
   </div>
 
-  {/* Render Single Date mode (or always single if Coworking) */}
-  {dateMode === "single" || spaceTypeFilter === "coworking" ? (
+  {/* 1. COWORKING PLAN VIEW (Matches uploaded design) */}
+  {spaceTypeFilter === "coworking" ? (
+    <div className="space-y-4">
+      {/* Plan Selection Buttons */}
+      <div>
+        <label className="mb-2 block text-xs font-semibold text-slate-700">
+          Select Coworking Plan
+        </label>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {COWORKING_PLANS.map((plan) => {
+            const isSelected = coworkingPlan === plan.id;
+            return (
+              <button
+                key={plan.id}
+                type="button"
+                onClick={() => handleSelectCoworkingPlan(plan.id, plan.days)}
+                className={`rounded-xl px-5 py-2 text-xs font-semibold transition-all ${
+                  isSelected
+                    ? "border-2 border-indigo-500 bg-white text-indigo-600 shadow-xs"
+                    : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                }`}
+              >
+                {plan.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Start Date, No. of Days, End Date Row */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {/* Start Date */}
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-600">
+            Start Date <span className="text-rose-500">*</span>
+          </label>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              try {
+                (coworkingDateInputRef.current as any)?.showPicker?.();
+              } catch {
+                coworkingDateInputRef.current?.focus();
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                try {
+                  (coworkingDateInputRef.current as any)?.showPicker?.();
+                } catch {
+                  coworkingDateInputRef.current?.focus();
+                }
+              }
+            }}
+            className="relative flex h-11 items-center justify-between rounded-xl border border-slate-200 bg-white px-3.5 shadow-2xs hover:border-slate-300 transition cursor-pointer select-none"
+          >
+            <div className="flex items-center gap-2.5 pointer-events-none">
+              <Calendar size={16} className="text-slate-600 shrink-0" />
+              <span className="text-sm font-medium text-slate-700">
+                {formatDateDisplay(coworkingStartDate)}
+              </span>
+            </div>
+            <ChevronDown size={16} className="text-slate-600 shrink-0 pointer-events-none" />
+            <input
+              ref={coworkingDateInputRef}
+              type="date"
+              required
+              value={coworkingStartDate}
+              onChange={(e) => {
+                setCoworkingStartDate(e.target.value);
+                if (errors.coworkingStartDate) {
+                  setErrors((prev) => ({ ...prev, coworkingStartDate: "" }));
+                }
+              }}
+              onClick={(e) => {
+                try {
+                  (e.currentTarget as any)?.showPicker?.();
+                } catch {}
+              }}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+            />
+          </div>
+          {errors.coworkingStartDate && (
+            <p className="mt-1 text-xs text-rose-500">{errors.coworkingStartDate}</p>
+          )}
+        </div>
+
+        {/* No. of Days Stepper */}
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-600">
+            No. of Days
+          </label>
+          <div className="flex h-11 items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+            <button
+              type="button"
+              onClick={() => handleCoworkingDaysChange(-1)}
+              disabled={coworkingDays <= 1}
+              className="flex h-full w-12 items-center justify-center border-r border-slate-100 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
+            >
+              <Minus size={16} />
+            </button>
+            <div className="flex flex-1 items-center justify-center text-sm font-semibold text-slate-700">
+              {coworkingDays} {coworkingDays === 1 ? "Day" : "Days"}
+            </div>
+            <button
+              type="button"
+              onClick={() => handleCoworkingDaysChange(1)}
+              className="flex h-full w-12 items-center justify-center border-l border-slate-100 text-slate-600 hover:bg-slate-50 transition"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* End Date (Auto-calculated) */}
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-slate-600">
+            End Date
+          </label>
+          <div className="relative flex h-11 items-center gap-2.5 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 shadow-2xs text-slate-600 select-none">
+            <Clock size={16} className="text-slate-400 shrink-0" />
+            <span className="text-sm font-medium text-slate-700">
+              {formatDateDisplay(coworkingEndDate)}
+            </span>
+          </div>
+          <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
+            <Info size={12} className="shrink-0" />
+            Auto calculated based on number of days
+          </p>
+        </div>
+      </div>
+    </div>
+  ) : dateMode === "single" ? (
+    /* 2. EXCLUSIVE: Single Date mode */
     <div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {/* DATE */}
@@ -1679,7 +1939,7 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
         {/* TIME SLOT */}
         <div>
           <label className="mb-1 block text-xs font-semibold text-slate-600">
-            Time Slot 
+            Time Slot
           </label>
 
           <div className="relative">
@@ -1695,10 +1955,10 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
               className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             >
               <option value="">Select Time Slot</option>
-              {!TIME_SLOTS.includes(timeSlot) && timeSlot && (
+              {timeSlot && !singleDateSlots.includes(timeSlot) && (
                 <option value={timeSlot}>{timeSlot}</option>
               )}
-              {TIME_SLOTS.map((slot) => (
+              {singleDateSlots.map((slot) => (
                 <option key={slot} value={slot}>
                   {slot}
                 </option>
@@ -1713,23 +1973,21 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
         </div>
       </div>
 
-      {/* Mobile Quick Duration */}
-      <div className="mt-2 flex items-center gap-1.5 sm:hidden">
-        <span className="text-[11px] text-slate-400">
-          Duration:
-        </span>
-
+      {/* Quick Duration Buttons */}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] text-slate-400">Duration:</span>
         {QUICK_DURATIONS.map((dur) => (
           <button
             key={dur.label}
             type="button"
-            onClick={() => {
-              setDuration(dur.hours);
-              handleQuickDuration(dur.hours);
-            }}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:bg-indigo-50 hover:text-indigo-700"
+            onClick={() => handleQuickDuration(dur.hours)}
+            className={`rounded-lg border px-2.5 py-0.5 text-[11px] font-medium transition ${
+              duration === dur.hours
+                ? "border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold shadow-xs"
+                : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-indigo-700"
+            }`}
           >
-            +{dur.label}
+            {dur.label}
           </button>
         ))}
       </div>
@@ -1746,70 +2004,101 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
       </div>
 
       {/* Rows */}
-      {multiDateSlots.map((slot) => (
-        <div
-          key={slot.id}
-          className="grid grid-cols-1 sm:grid-cols-[1fr_160px_1fr_42px] items-center gap-2.5 sm:gap-3"
-        >
-          {/* Date Picker */}
-          <div className="relative flex h-11 items-center justify-between rounded-xl border border-slate-200 bg-white px-3.5 shadow-2xs hover:border-slate-300 transition">
-            <div className="flex items-center gap-2.5 overflow-hidden">
-              <Calendar size={16} className="text-slate-500 shrink-0 pointer-events-none" />
-              <span className="truncate text-sm font-medium text-slate-700 pointer-events-none">
-                {formatDateDisplay(slot.date)}
-              </span>
+      {multiDateSlots.map((slot) => {
+        const rowSlots = getTimeSlotsForDuration(slot.duration);
+        return (
+          <div
+            key={slot.id}
+            className="grid grid-cols-1 sm:grid-cols-[1fr_160px_1fr_42px] items-center gap-2.5 sm:gap-3"
+          >
+            {/* Date Picker */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                const inputEl = e.currentTarget.querySelector("input[type='date']") as HTMLInputElement | null;
+                try {
+                  (inputEl as any)?.showPicker?.();
+                } catch {
+                  inputEl?.focus();
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  const inputEl = e.currentTarget.querySelector("input[type='date']") as HTMLInputElement | null;
+                  try {
+                    (inputEl as any)?.showPicker?.();
+                  } catch {
+                    inputEl?.focus();
+                  }
+                }
+              }}
+              className="relative flex h-11 items-center justify-between rounded-xl border border-slate-200 bg-white px-3.5 shadow-2xs hover:border-slate-300 transition cursor-pointer select-none"
+            >
+              <div className="flex items-center gap-2.5 overflow-hidden pointer-events-none">
+                <Calendar size={16} className="text-slate-500 shrink-0" />
+                <span className="truncate text-sm font-medium text-slate-700">
+                  {formatDateDisplay(slot.date)}
+                </span>
+              </div>
+              <ChevronDown size={16} className="text-slate-400 shrink-0 pointer-events-none ml-1" />
+              <input
+                type="date"
+                required
+                value={slot.date}
+                onChange={(e) => handleUpdateSlotDate(slot.id, e.target.value)}
+                onClick={(e) => {
+                  try {
+                    (e.currentTarget as any)?.showPicker?.();
+                  } catch {}
+                }}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+              />
             </div>
-            <ChevronDown size={16} className="text-slate-400 shrink-0 pointer-events-none ml-1" />
-            <input
-              type="date"
-              required
-              value={slot.date}
-              onChange={(e) => handleUpdateSlotDate(slot.id, e.target.value)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            />
-          </div>
 
-          {/* Duration (Hours) Stepper */}
-          <div className="flex h-11 items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
-            <button
-              type="button"
-              onClick={() => handleUpdateSlotDuration(slot.id, -1)}
-              disabled={slot.duration <= 1}
-              className="flex h-full w-10 items-center justify-center border-r border-slate-100 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
-            >
-              <Minus size={15} />
-            </button>
-            <div className="flex flex-1 items-center justify-center px-1 text-sm font-medium text-slate-700">
-              {slot.duration} {slot.duration === 1 ? "Hour" : "Hours"}
+            {/* Duration (Hours) Stepper */}
+            <div className="flex h-11 items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+              <button
+                type="button"
+                onClick={() => handleUpdateSlotDuration(slot.id, -1)}
+                disabled={slot.duration <= 1}
+                className="flex h-full w-10 items-center justify-center border-r border-slate-100 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
+              >
+                <Minus size={15} />
+              </button>
+              <div className="flex flex-1 items-center justify-center px-1 text-sm font-medium text-slate-700">
+                {slot.duration} {slot.duration === 1 ? "Hour" : "Hours"}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleUpdateSlotDuration(slot.id, 1)}
+                disabled={slot.duration >= 12}
+                className="flex h-full w-10 items-center justify-center border-l border-slate-100 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
+              >
+                <Plus size={15} />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => handleUpdateSlotDuration(slot.id, 1)}
-              className="flex h-full w-10 items-center justify-center border-l border-slate-100 text-slate-500 hover:bg-slate-50 transition"
-            >
-              <Plus size={15} />
-            </button>
-          </div>
 
-          {/* Time Slot Select */}
-          <div className="relative flex h-11 items-center rounded-xl border border-slate-200 bg-white px-3.5 shadow-2xs hover:border-slate-300 transition">
-            <Clock size={16} className="mr-2.5 text-slate-500 shrink-0 pointer-events-none" />
-            <select
-              value={slot.timeSlot}
-              onChange={(e) => handleUpdateSlotTime(slot.id, e.target.value)}
-              className="w-full cursor-pointer appearance-none bg-transparent pr-6 text-sm font-medium text-slate-700 outline-none"
-            >
-              {!TIME_SLOTS.includes(slot.timeSlot) && (
-                <option value={slot.timeSlot}>{slot.timeSlot}</option>
-              )}
-              {TIME_SLOTS.map((ts) => (
-                <option key={ts} value={ts}>
-                  {ts}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={16} className="pointer-events-none absolute right-3 text-slate-400" />
-          </div>
+            {/* Time Slot Select */}
+            <div className="relative flex h-11 items-center rounded-xl border border-slate-200 bg-white px-3.5 shadow-2xs hover:border-slate-300 transition">
+              <Clock size={16} className="mr-2.5 text-slate-500 shrink-0 pointer-events-none" />
+              <select
+                value={slot.timeSlot}
+                onChange={(e) => handleUpdateSlotTime(slot.id, e.target.value)}
+                className="w-full cursor-pointer appearance-none bg-transparent pr-6 text-sm font-medium text-slate-700 outline-none"
+              >
+                {slot.timeSlot && !rowSlots.includes(slot.timeSlot) && (
+                  <option value={slot.timeSlot}>{slot.timeSlot}</option>
+                )}
+                {rowSlots.map((ts) => (
+                  <option key={ts} value={ts}>
+                    {ts}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="pointer-events-none absolute right-3 text-slate-400" />
+            </div>
 
           {/* Delete Row Button */}
           <div className="flex justify-end">
@@ -1824,7 +2113,8 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
             </button>
           </div>
         </div>
-      ))}
+      );
+      })}
 
       {errors.multiDates && (
         <p className="mt-1 text-xs text-rose-500">{errors.multiDates}</p>
@@ -1879,20 +2169,6 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
                     ? "Manual override active"
                     : "Automatically calculated from date & time"}
                 </span>
-              </div>
-
-              <div className="mt-2 flex items-center gap-1.5 sm:hidden">
-                <span className="text-[11px] text-slate-400">Duration:</span>
-                {QUICK_DURATIONS.map((dur) => (
-                  <button
-                    key={dur.label}
-                    type="button"
-                    onClick={() => handleQuickDuration(dur.hours)}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:bg-indigo-50 hover:text-indigo-700"
-                  >
-                    +{dur.label}
-                  </button>
-                ))}
               </div>
 
             </div>
@@ -2130,7 +2406,9 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
                 ? `${selectedSpace.name}${selectedSpace.day ? ` · ${selectedSpace.day}` : ""}`
                 : "No space selected"}{" "}
               •{" "}
-              {dateMode === "multiple" && spaceTypeFilter === "exclusive"
+              {spaceTypeFilter === "coworking"
+                ? `${coworkingDays} ${coworkingDays === 1 ? "Day" : "Days"} (${formatDateDisplay(coworkingStartDate)} - ${formatDateDisplay(coworkingEndDate)})`
+                : dateMode === "multiple" && spaceTypeFilter === "exclusive"
                 ? `${multiDateSlots.length} Dates (${multiDateSlots.reduce((sum, s) => sum + (s.duration || 1), 0)} hrs)`
                 : `${formatTimeDisplay(bookingFrom)} - ${formatTimeDisplay(bookingTo)}`}
               {!isEdit && selectedSpace && (
@@ -2138,7 +2416,9 @@ const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
                   · ₹
                   {(
                     Math.max(0, Number(selectedSpace.price || 0)) *
-                    (dateMode === "multiple" && spaceTypeFilter === "exclusive"
+                    (spaceTypeFilter === "coworking"
+                      ? Math.max(coworkingDays, 1)
+                      : dateMode === "multiple" && spaceTypeFilter === "exclusive"
                       ? multiDateSlots.reduce((sum, s) => sum + (s.duration || 1), 0)
                       : calcDurationHours(bookingFrom, bookingTo) || duration)
                   ).toLocaleString("en-IN")}
