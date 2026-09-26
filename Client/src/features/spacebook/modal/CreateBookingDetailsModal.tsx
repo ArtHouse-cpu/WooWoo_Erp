@@ -26,6 +26,7 @@ import {
   Users,
   Trash2,
   Info,
+  Lock,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
@@ -479,10 +480,12 @@ const CreateBookingDetailsModal = ({
 
     if (initialBooking) {
       setName(initialBooking.customerName || "");
-      setPhone(initialBooking.customerPhone || "");
+      const initPhone = initialBooking.customerPhone || "";
+      setPhone(initPhone);
+      setIsPhoneAutoFetched(Boolean(initPhone));
      
       setSpaceId(String(initialBooking.spaceId || ""));
-      setCustomerId(null);
+      setCustomerId((initialBooking as any)?.customerId || null);
       setMembershipType("none");
       setMembershipPlanId(null);
 
@@ -502,6 +505,7 @@ const CreateBookingDetailsModal = ({
                 setCustomerId(match._id || (match as any).id || null);
                 setMembershipType(match.membershipType || "none");
                 setMembershipPlanId(match.membershipPlanId || null);
+                setIsPhoneAutoFetched(true);
               }
             })
             .catch(() => undefined);
@@ -1212,6 +1216,11 @@ setIsPhoneAutoFetched(false);
                           setCustomerId(null);
                           setMembershipType("none");
                           setMembershipPlanId(null);
+                          setPhone("");
+                          setIsPhoneAutoFetched(false);
+                        } else if (customerId) {
+                          setCustomerId(null);
+                          setIsPhoneAutoFetched(false);
                         }
                         setCustomerDropdownOpen(true);
                         if (errors.name)
@@ -1223,21 +1232,42 @@ setIsPhoneAutoFetched(false);
                         }
                       }}
                       placeholder="e.g. Rahul Sharma"
-                      className={`h-10 w-full rounded-xl border pl-10 pr-12 text-sm outline-none transition focus:ring-2 ${
+                      className={`h-10 w-full rounded-xl border pl-10 pr-18 text-sm outline-none transition focus:ring-2 ${
                         errors.name
                           ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
                           : "border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-100"
                       }`}
                     />
 
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateCustomerModal(true)}
-                      title="Add New Customer"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-500 transition hover:text-indigo-700"
-                    >
-                      <UserPlus size={18} />
-                    </button>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                      {name && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setName("");
+                            setPhone("");
+                            setIsPhoneAutoFetched(false);
+                            setCustomerId(null);
+                            setMembershipType("none");
+                            setMembershipPlanId(null);
+                            setCustomerDropdownOpen(false);
+                            setCustomers([]);
+                          }}
+                          title="Clear customer"
+                          className="text-slate-400 hover:text-slate-600 transition p-0.5 rounded"
+                        >
+                          <X size={15} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateCustomerModal(true)}
+                        title="Add New Customer"
+                        className="text-indigo-500 transition hover:text-indigo-700"
+                      >
+                        <UserPlus size={18} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Membership Info Banner beneath the input */}
@@ -1351,41 +1381,65 @@ setIsPhoneAutoFetched(false);
                 </div>
 
                 {/* Phone Number */}
-              <div>
-  <label className="mb-1 block text-xs font-semibold text-slate-600">
-    Phone Number <span className="text-rose-500">*</span>
-  </label>
+                <div>
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-600">
+                      Phone Number <span className="text-rose-500">*</span>
+                    </label>
+                    {isPhoneAutoFetched && (
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                        <Lock size={11} className="text-slate-400" />
+                        Autofetched
+                      </span>
+                    )}
+                  </div>
 
-  <div className="relative">
-    <Phone
-      size={16}
-      className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-    />
+                  <div className="relative">
+                    <Phone
+                      size={16}
+                      className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
 
-    <input
-      type="tel"
-      required
-      maxLength={10}
-      value={phone}
-      onChange={(e) => {
-        setPhone(e.target.value.replace(/\D/g, ""));
+                    <input
+                      maxLength={10}
+                      value={phone}
+                      onChange={(e) => {
+                        if (isPhoneAutoFetched) return;
+                        setPhone(e.target.value.replace(/\D/g, ""));
 
-        if (errors.phone) {
-          setErrors((prev) => ({ ...prev, phone: "" }));
-        }
-      }}
-      readOnly={isPhoneAutoFetched}
-      placeholder="9876543210"
-      className={`h-10 w-full rounded-xl border pl-10 pr-3 text-sm outline-none transition focus:ring-2 ${
-        errors.phone
-          ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
-          : isPhoneAutoFetched
-            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
-            : "border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-100"
-      }`}
-    />
-  </div>
-</div>
+                        if (errors.phone) {
+                          setErrors((prev) => ({ ...prev, phone: "" }));
+                        }
+                      }}
+                      readOnly={isPhoneAutoFetched}
+                      title={
+                        isPhoneAutoFetched
+                          ? "Phone number autofetched from customer details"
+                          : undefined
+                      }
+                      placeholder="9876543210"
+                      className={`h-10 w-full rounded-xl border pl-10 pr-9 text-sm outline-none transition focus:ring-2 ${
+                        errors.phone
+                          ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
+                          : isPhoneAutoFetched
+                            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 select-none"
+                            : "border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-100"
+                      }`}
+                    />
+
+                    {isPhoneAutoFetched && (
+                      <div
+                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                        title="Autofetched from customer details"
+                      >
+                        <Lock size={15} />
+                      </div>
+                    )}
+                  </div>
+                  {errors.phone && (
+                    <p className="mt-1 text-xs text-rose-500">{errors.phone}</p>
+                  )}
+                </div>
             </div>
           </div>
 
@@ -1731,10 +1785,10 @@ setIsPhoneAutoFetched(false);
     <div className="space-y-4">
       {/* Plan Selection Buttons */}
       <div>
-        <label className="mb-2 block text-xs font-semibold text-slate-700">
+        {/* <label className="mb-2 block text-xs font-semibold text-slate-700">
           Select Coworking Plan
-        </label>
-        <div className="flex flex-wrap items-center gap-2.5">
+        </label> */}
+        {/* <div className="flex flex-wrap items-center gap-2.5">
           {COWORKING_PLANS.map((plan) => {
             const isSelected = coworkingPlan === plan.id;
             return (
@@ -1752,7 +1806,7 @@ setIsPhoneAutoFetched(false);
               </button>
             );
           })}
-        </div>
+        </div> */}
       </div>
 
       {/* Start Date, No. of Days, End Date Row */}
