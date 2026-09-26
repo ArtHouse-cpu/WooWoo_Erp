@@ -485,7 +485,7 @@ const CreateBookingDetailsModal = ({
       setIsPhoneAutoFetched(Boolean(initPhone));
      
       setSpaceId(String(initialBooking.spaceId || ""));
-      setCustomerId(initialBooking.customerId || null);
+      setCustomerId((initialBooking as any)?.customerId || null);
       setMembershipType("none");
       setMembershipPlanId(null);
 
@@ -540,9 +540,8 @@ const CreateBookingDetailsModal = ({
       setNotes(initialBooking.notes || "");
     } else if (draftValues) {
       setName(draftValues.customerName || "");
-      const draftPhone = draftValues.customerPhone || "";
-      setPhone(draftPhone);
-      setIsPhoneAutoFetched(Boolean(draftValues.customerId && draftPhone));
+      setPhone(draftValues.customerPhone || "");
+      
       setCustomerId(draftValues.customerId || null);
       setMembershipType(draftValues.membershipType || "none");
       setMembershipPlanId(draftValues.membershipPlanId || null);
@@ -789,7 +788,6 @@ setIsPhoneAutoFetched(false);
           setCustomerId(match._id || (match as any).id || null);
           setMembershipType(match.membershipType || "none");
           setMembershipPlanId(match.membershipPlanId || null);
-          setIsPhoneAutoFetched(true);
           setErrors((prev) => ({ ...prev, name: "", phone: "" }));
         }
       })
@@ -802,9 +800,7 @@ setIsPhoneAutoFetched(false);
 
   const handleSelectCustomer = (c: CustomerPayload) => {
     setName(c.name || "");
-    const custPhone = c.mobile ? String(c.mobile).replace(/\D/g, "") : "";
-    setPhone(custPhone);
-    setIsPhoneAutoFetched(Boolean(custPhone));
+    setPhone(c.mobile ? String(c.mobile).replace(/\D/g, "") : "");
     
     setCustomerId(c._id || (c as any).id || null);
     setMembershipType(c.membershipType || "none");
@@ -856,11 +852,7 @@ setIsPhoneAutoFetched(false);
         created?.membershipPlanId || args.payload.membershipPlanId || null;
 
       if (createdName) setName(createdName);
-      if (createdPhone) {
-        const cleanedPhone = createdPhone.replace(/\D/g, "");
-        setPhone(cleanedPhone);
-        setIsPhoneAutoFetched(Boolean(cleanedPhone));
-      }
+      if (createdPhone) setPhone(createdPhone.replace(/\D/g, ""));
      
       setCustomerId(createdId);
       setMembershipType(createdMembership);
@@ -1409,8 +1401,6 @@ setIsPhoneAutoFetched(false);
                     />
 
                     <input
-                      type="tel"
-                      required
                       maxLength={10}
                       value={phone}
                       onChange={(e) => {
@@ -1795,10 +1785,10 @@ setIsPhoneAutoFetched(false);
     <div className="space-y-4">
       {/* Plan Selection Buttons */}
       <div>
-        <label className="mb-2 block text-xs font-semibold text-slate-700">
+        {/* <label className="mb-2 block text-xs font-semibold text-slate-700">
           Select Coworking Plan
-        </label>
-        <div className="flex flex-wrap items-center gap-2.5">
+        </label> */}
+        {/* <div className="flex flex-wrap items-center gap-2.5">
           {COWORKING_PLANS.map((plan) => {
             const isSelected = coworkingPlan === plan.id;
             return (
@@ -1816,7 +1806,7 @@ setIsPhoneAutoFetched(false);
               </button>
             );
           })}
-        </div>
+        </div> */}
       </div>
 
       {/* Start Date, No. of Days, End Date Row */}
