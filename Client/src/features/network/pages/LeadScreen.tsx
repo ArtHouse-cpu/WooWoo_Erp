@@ -1027,12 +1027,6 @@ const LeadScreen = () => {
         }}
         lead={selectedLeadForDetails}
         onEdit={(lead) => handleEdit(lead)}
-        onLeadUpdated={(updated) => {
-          setSelectedLeadForDetails(updated);
-          setLeads((prev) =>
-            prev.map((l) => (l._id === updated._id ? updated : l))
-          );
-        }}
       />
     </div>
   );
