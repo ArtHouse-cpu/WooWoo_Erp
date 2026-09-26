@@ -3,6 +3,7 @@ import {
   X,
   User,
   Phone,
+  Lock,
   Minus,
  ChevronDown,
  Camera,
@@ -26,7 +27,6 @@ import {
   Users,
   Trash2,
   Info,
-  Lock,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
@@ -480,12 +480,10 @@ const CreateBookingDetailsModal = ({
 
     if (initialBooking) {
       setName(initialBooking.customerName || "");
-      const initPhone = initialBooking.customerPhone || "";
-      setPhone(initPhone);
-      setIsPhoneAutoFetched(Boolean(initPhone));
-     
+      setPhone(initialBooking.customerPhone || "");
+      setIsPhoneAutoFetched(Boolean(initialBooking.customerPhone));
       setSpaceId(String(initialBooking.spaceId || ""));
-      setCustomerId((initialBooking as any)?.customerId || null);
+      setCustomerId(null);
       setMembershipType("none");
       setMembershipPlanId(null);
 
@@ -505,7 +503,6 @@ const CreateBookingDetailsModal = ({
                 setCustomerId(match._id || (match as any).id || null);
                 setMembershipType(match.membershipType || "none");
                 setMembershipPlanId(match.membershipPlanId || null);
-                setIsPhoneAutoFetched(true);
               }
             })
             .catch(() => undefined);
@@ -541,7 +538,12 @@ const CreateBookingDetailsModal = ({
     } else if (draftValues) {
       setName(draftValues.customerName || "");
       setPhone(draftValues.customerPhone || "");
-      
+      setIsPhoneAutoFetched(
+        Boolean(
+          draftValues.customerPhone &&
+            (draftValues.customerId || draftValues.customerName),
+        ),
+      );
       setCustomerId(draftValues.customerId || null);
       setMembershipType(draftValues.membershipType || "none");
       setMembershipPlanId(draftValues.membershipPlanId || null);
@@ -575,9 +577,8 @@ const CreateBookingDetailsModal = ({
       setNotes(draftValues.notes || "");
     } else {
       setName("");
-     
-    setPhone("");
-setIsPhoneAutoFetched(false);
+      setPhone("");
+      setIsPhoneAutoFetched(false);
       setCustomerId(null);
       setMembershipType("none");
       setMembershipPlanId(null);
@@ -784,11 +785,11 @@ setIsPhoneAutoFetched(false);
           ) || list[0];
         if (match?.name) {
           setName(match.name);
-         
           setCustomerId(match._id || (match as any).id || null);
           setMembershipType(match.membershipType || "none");
           setMembershipPlanId(match.membershipPlanId || null);
           setErrors((prev) => ({ ...prev, name: "", phone: "" }));
+          setIsPhoneAutoFetched(true);
         }
       })
       .catch(() => undefined);
@@ -800,8 +801,9 @@ setIsPhoneAutoFetched(false);
 
   const handleSelectCustomer = (c: CustomerPayload) => {
     setName(c.name || "");
-    setPhone(c.mobile ? String(c.mobile).replace(/\D/g, "") : "");
-    
+    const cleanedMobile = c.mobile ? String(c.mobile).replace(/\D/g, "") : "";
+    setPhone(cleanedMobile);
+    setIsPhoneAutoFetched(Boolean(cleanedMobile));
     setCustomerId(c._id || (c as any).id || null);
     setMembershipType(c.membershipType || "none");
     setMembershipPlanId(c.membershipPlanId || null);
@@ -844,6 +846,7 @@ setIsPhoneAutoFetched(false);
       const created = response?.customer ?? response?.data ?? response;
       const createdName = String(created?.name || args.payload.name || "").trim();
       const createdPhone = String(created?.mobile || args.payload.mobile || "").trim();
+      const cleanedCreatedPhone = createdPhone.replace(/\D/g, "");
       
       const createdId = created?._id || (created as any)?.id || null;
       const createdMembership =
@@ -852,8 +855,10 @@ setIsPhoneAutoFetched(false);
         created?.membershipPlanId || args.payload.membershipPlanId || null;
 
       if (createdName) setName(createdName);
-      if (createdPhone) setPhone(createdPhone.replace(/\D/g, ""));
-     
+      if (cleanedCreatedPhone) {
+        setPhone(cleanedCreatedPhone);
+        setIsPhoneAutoFetched(true);
+      }
       setCustomerId(createdId);
       setMembershipType(createdMembership);
       setMembershipPlanId(createdPlanId);
@@ -1216,11 +1221,17 @@ setIsPhoneAutoFetched(false);
                           setCustomerId(null);
                           setMembershipType("none");
                           setMembershipPlanId(null);
-                          setPhone("");
-                          setIsPhoneAutoFetched(false);
+                          if (isPhoneAutoFetched) {
+                            setPhone("");
+                            setIsPhoneAutoFetched(false);
+                          }
                         } else if (customerId) {
                           setCustomerId(null);
-                          setIsPhoneAutoFetched(false);
+                          setMembershipType("none");
+                          setMembershipPlanId(null);
+                          if (isPhoneAutoFetched) {
+                            setIsPhoneAutoFetched(false);
+                          }
                         }
                         setCustomerDropdownOpen(true);
                         if (errors.name)
@@ -1232,42 +1243,21 @@ setIsPhoneAutoFetched(false);
                         }
                       }}
                       placeholder="e.g. Rahul Sharma"
-                      className={`h-10 w-full rounded-xl border pl-10 pr-18 text-sm outline-none transition focus:ring-2 ${
+                      className={`h-10 w-full rounded-xl border pl-10 pr-12 text-sm outline-none transition focus:ring-2 ${
                         errors.name
                           ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
                           : "border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-100"
                       }`}
                     />
 
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                      {name && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setName("");
-                            setPhone("");
-                            setIsPhoneAutoFetched(false);
-                            setCustomerId(null);
-                            setMembershipType("none");
-                            setMembershipPlanId(null);
-                            setCustomerDropdownOpen(false);
-                            setCustomers([]);
-                          }}
-                          title="Clear customer"
-                          className="text-slate-400 hover:text-slate-600 transition p-0.5 rounded"
-                        >
-                          <X size={15} />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setShowCreateCustomerModal(true)}
-                        title="Add New Customer"
-                        className="text-indigo-500 transition hover:text-indigo-700"
-                      >
-                        <UserPlus size={18} />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateCustomerModal(true)}
+                      title="Add New Customer"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-500 transition hover:text-indigo-700"
+                    >
+                      <UserPlus size={18} />
+                    </button>
                   </div>
 
                   {/* Membership Info Banner beneath the input */}
@@ -1386,12 +1376,7 @@ setIsPhoneAutoFetched(false);
                     <label className="block text-xs font-semibold text-slate-600">
                       Phone Number <span className="text-rose-500">*</span>
                     </label>
-                    {isPhoneAutoFetched && (
-                      <span className="flex items-center gap-1 text-[11px] font-medium text-slate-500">
-                        <Lock size={11} className="text-slate-400" />
-                        Autofetched
-                      </span>
-                    )}
+                   
                   </div>
 
                   <div className="relative">
@@ -1401,10 +1386,11 @@ setIsPhoneAutoFetched(false);
                     />
 
                     <input
+                      type="tel"
+                      required
                       maxLength={10}
                       value={phone}
                       onChange={(e) => {
-                        if (isPhoneAutoFetched) return;
                         setPhone(e.target.value.replace(/\D/g, ""));
 
                         if (errors.phone) {
@@ -1412,33 +1398,31 @@ setIsPhoneAutoFetched(false);
                         }
                       }}
                       readOnly={isPhoneAutoFetched}
+                      tabIndex={isPhoneAutoFetched ? -1 : 0}
+                      placeholder="9876543210"
                       title={
                         isPhoneAutoFetched
-                          ? "Phone number autofetched from customer details"
+                          ? "Phone number auto-fetched from customer details (not editable)"
                           : undefined
                       }
-                      placeholder="9876543210"
-                      className={`h-10 w-full rounded-xl border pl-10 pr-9 text-sm outline-none transition focus:ring-2 ${
+                      className={`h-10 w-full rounded-xl border pl-10 ${
+                        isPhoneAutoFetched
+                          ? "cursor-not-allowed border-slate-200 bg-slate-100 pr-9 text-slate-500 select-none"
+                          : "border-slate-200 bg-white pr-3 focus:border-indigo-500 focus:ring-indigo-100"
+                      } text-sm outline-none transition focus:ring-2 ${
                         errors.phone
                           ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
-                          : isPhoneAutoFetched
-                            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500 select-none"
-                            : "border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-100"
+                          : ""
                       }`}
                     />
 
-                    {isPhoneAutoFetched && (
-                      <div
+                    {/* {isPhoneAutoFetched && (
+                      <Lock
+                        size={14}
                         className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                        title="Autofetched from customer details"
-                      >
-                        <Lock size={15} />
-                      </div>
-                    )}
+                      />
+                    )} */}
                   </div>
-                  {errors.phone && (
-                    <p className="mt-1 text-xs text-rose-500">{errors.phone}</p>
-                  )}
                 </div>
             </div>
           </div>
@@ -1785,10 +1769,10 @@ setIsPhoneAutoFetched(false);
     <div className="space-y-4">
       {/* Plan Selection Buttons */}
       <div>
-        {/* <label className="mb-2 block text-xs font-semibold text-slate-700">
+        <label className="mb-2 block text-xs font-semibold text-slate-700">
           Select Coworking Plan
-        </label> */}
-        {/* <div className="flex flex-wrap items-center gap-2.5">
+        </label>
+        <div className="flex flex-wrap items-center gap-2.5">
           {COWORKING_PLANS.map((plan) => {
             const isSelected = coworkingPlan === plan.id;
             return (
@@ -1806,7 +1790,7 @@ setIsPhoneAutoFetched(false);
               </button>
             );
           })}
-        </div> */}
+        </div>
       </div>
 
       {/* Start Date, No. of Days, End Date Row */}

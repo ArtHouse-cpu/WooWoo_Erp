@@ -1677,7 +1677,6 @@ export type SpaceBookingStatus =
 export type SpaceBookingPayload = {
   _id?: string;
   id?: string;
-  customerId?: string | null;
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
