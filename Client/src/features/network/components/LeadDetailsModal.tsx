@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import {
   X,
   Phone,
-  Mail,
+ 
   Calendar,
   Tag,
   FileText,
