@@ -88,22 +88,6 @@ export default function ServiceForm() {
             />
           </div>
           <div>
-            <label className={labelClass}>Primary Unit</label>
-            <input
-              placeholder="e.g. Hour, Session, Visit"
-              {...register("primaryUnit")}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Item Code / SKU</label>
-            <input
-              placeholder="e.g. SRV-001"
-              {...register("itemCode")}
-              className={inputClass}
-            />
-          </div>
-          <div className="md:col-span-2">
             <label className={labelClass}>Barcode</label>
             <div className="flex gap-2">
               <input
@@ -123,7 +107,23 @@ export default function ServiceForm() {
               </button>
             </div>
           </div>
-          <div className="md:col-span-2">
+          <div>
+            <label className={labelClass}>Item Code / SKU</label>
+            <input
+              placeholder="e.g. SRV-001"
+              {...register("itemCode")}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Primary Unit</label>
+            <input
+              placeholder="e.g. Hour, Session, Visit"
+              {...register("primaryUnit")}
+              className={inputClass}
+            />
+          </div>
+          <div className="[&_label]:mb-1.5 [&_label]:block [&_label]:text-xs [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-slate-500 [&_button.flex]:h-10 [&_button.flex]:rounded-lg [&_button.flex]:border-slate-200 [&>div]:space-y-0">
             <CategorySelect
               categoryValue={categoryId || ""}
               categoryName={categoryName || ""}
