@@ -22,6 +22,12 @@ export type CoworkingSummaryCardProps = {
   startDate: string;
   endDate: string;
   days: number;
+  durationCount?: number;
+  durationUnit?: "day" | "week" | "month";
+  durationUnitSingular?: string;
+  durationUnitPlural?: string;
+  priceSuffix?: string;
+  packageMultiplier?: number;
   unitPrice: number;
   selectedServices: SelectedServiceItem[];
   discountAmount?: number;
@@ -35,15 +41,22 @@ export const CoworkingSummaryCard: React.FC<CoworkingSummaryCardProps> = ({
   startDate,
   endDate,
   days,
+  durationCount,
+  durationUnitSingular = "Day",
+  durationUnitPlural = "Days",
+  priceSuffix = " / day",
+  packageMultiplier,
   unitPrice,
   selectedServices,
   discountAmount = 0,
   cashbackAmount = 0,
   formatDateDisplay,
 }) => {
-  const safeDays = Math.max(1, days || 1);
+  const count = durationCount ?? days ?? 1;
+  const safeCount = Math.max(1, count);
   const safeQty = Math.max(1, spaceQty || 1);
-  const spaceCharges = unitPrice * safeDays * safeQty;
+  const multiplier = packageMultiplier ?? Math.max(1, days || 1);
+  const spaceCharges = unitPrice * multiplier * safeQty;
   const servicesTotal = selectedServices.reduce(
     (acc, s) => acc + s.price * s.qty,
     0,
@@ -94,7 +107,7 @@ export const CoworkingSummaryCard: React.FC<CoworkingSummaryCardProps> = ({
           </div>
           <div className="shrink-0 self-start">
             <span className="rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600">
-              ₹{unitPrice.toLocaleString("en-IN")} / day
+              ₹{unitPrice.toLocaleString("en-IN")}{priceSuffix}
             </span>
           </div>
         </div>
@@ -127,7 +140,7 @@ export const CoworkingSummaryCard: React.FC<CoworkingSummaryCardProps> = ({
               Duration
             </span>
             <span className="font-semibold text-slate-800">
-              {safeDays} {safeDays === 1 ? "Day" : "Days"}
+              {safeCount} {safeCount === 1 ? durationUnitSingular : durationUnitPlural}
             </span>
           </div>
         </div>
@@ -143,8 +156,8 @@ export const CoworkingSummaryCard: React.FC<CoworkingSummaryCardProps> = ({
               </span>
             </div>
             <p className="mt-0.5 text-[11px] text-slate-400">
-              ₹{unitPrice.toLocaleString("en-IN")} × {safeDays}{" "}
-              {safeDays === 1 ? "day" : "days"} × {safeQty}
+              ₹{unitPrice.toLocaleString("en-IN")} × {safeCount}{" "}
+              {safeCount === 1 ? durationUnitSingular.toLowerCase() : durationUnitPlural.toLowerCase()} × {safeQty}
             </p>
           </div>
 
