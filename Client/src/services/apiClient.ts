@@ -1560,6 +1560,7 @@ export type SpacePayload = {
   status?: "Available" | "Booked" | "Maintenance";
   description?: string;
   imageUrl?: string | null;
+  images?: string[];
   createdAt?: string;
   updatedAt?: string;
   /** Legacy expanded list markers (from old dual-price docs) */
@@ -1672,7 +1673,8 @@ export type SpaceBookingStatus =
   | "Upcoming"
   | "Ongoing"
   | "Expired"
-  | "Cancelled";
+  | "Cancelled"
+  | "Draft";
 
 export type SpaceBookingPayload = {
   _id?: string;
@@ -1689,6 +1691,30 @@ export type SpaceBookingPayload = {
   unitPrice?: number;
   durationHours?: number;
   lineTotal?: number;
+  spaceQty?: number;
+  dateMode?: "single" | "multiple";
+  multiDateSlots?: Array<{
+    id: string;
+    date: string;
+    duration: number;
+    timeSlot: string;
+    startTime: string;
+    endTime: string;
+  }>;
+  durationCount?: number;
+  durationUnit?: string;
+  packageMultiplier?: number;
+  coworkingStartDate?: string;
+  coworkingEndDate?: string;
+  subTotal?: number;
+  discountAmount?: number;
+  cashbackAmount?: number;
+  selectedServices?: Array<{
+    label: string;
+    price: number;
+    qty: number;
+  }>;
+  summarySnapshot?: any;
   space?: {
     _id: string;
     name: string;

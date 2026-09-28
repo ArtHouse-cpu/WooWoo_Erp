@@ -6,6 +6,8 @@ type Props = {
   onTypeChange: (type: DiscountType) => void;
   onValueChange: (value: number) => void;
   disabled?: boolean;
+  className?: string;
+  layout?: "stacked" | "inline";
 };
 
 export default function DiscountInput({
@@ -14,9 +16,59 @@ export default function DiscountInput({
   onTypeChange,
   onValueChange,
   disabled = false,
+  className,
+  layout = "stacked",
 }: Props) {
+  if (layout === "inline") {
+    return (
+      <div className={`flex flex-wrap items-center gap-3 ${className || ""}`}>
+        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onTypeChange("flat")}
+            className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition ${
+              valueType === "flat"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-white hover:text-slate-900"
+            }`}
+          >
+            ₹ Flat
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onTypeChange("percentage")}
+            className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition ${
+              valueType === "percentage"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-white hover:text-slate-900"
+            }`}
+          >
+            %
+          </button>
+        </div>
+        <div className="relative w-36 sm:w-44">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-400">
+            {valueType === "percentage" ? "%" : "₹"}
+          </span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            disabled={disabled}
+            value={valueAmount}
+            onChange={(e) => onValueChange(Number(e.target.value) || 0)}
+            placeholder={valueType === "flat" ? "0.00" : "0"}
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-7 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${className || ""}`}>
       <div className="inline-flex w-full rounded-lg border border-slate-200 bg-slate-50 p-1">
         <button
           type="button"

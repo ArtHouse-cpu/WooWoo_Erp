@@ -27,13 +27,14 @@ import {
   Trash2,
   Info,
   Tag,
-  HelpCircle,
   ArrowRight,
   Printer,
   Archive,
   Car,
 } from "lucide-react";
 import Swal from "sweetalert2";
+import html2canvas from "html2canvas";
+// Optional: import jsPDF from "jspdf"; // If you want PDF download
 import { toast } from "react-toastify";
 import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -66,6 +67,15 @@ import {
   type SelectedServiceItem,
 } from "./summary";
 
+export type MultiDateSlot = {
+  id: string;
+  date: string;
+  duration: number;
+  timeSlot: string;
+  startTime: string;
+  endTime: string;
+};
+
 export type BookingFormPayload = {
   customerName: string;
   customerPhone: string;
@@ -88,12 +98,26 @@ export type BookingFormPayload = {
   unitPrice?: number;
   durationHours?: number;
   lineTotal?: number;
+  spaceQty?: number;
+  dateMode?: "single" | "multiple";
+  multiDateSlots?: MultiDateSlot[];
+  durationCount?: number;
+  durationUnit?: string;
+  packageMultiplier?: number;
+  coworkingStartDate?: string;
+  coworkingEndDate?: string;
+  subTotal?: number;
+  discountAmount?: number;
+  cashbackAmount?: number;
+  selectedServices?: SelectedServiceItem[];
+  summarySnapshot?: any;
 };
 
 type CreateBookingDetailsModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (payload: BookingFormPayload) => Promise<void> | void;
+  onSaveDraft?: (payload: BookingFormPayload) => Promise<void> | void;
   /** When set, modal is in edit mode and fields are pre-filled. */
   initialBooking?: SpaceBookingPayload | null;
   /** Restore draft values after cancelling checkout (create flow). */
@@ -324,15 +348,6 @@ export const calculateEndDate = (startDateStr: string, days: number): string => 
   return calculatePlanEndDate(startDateStr, "day", days);
 };
 
-export type MultiDateSlot = {
-  id: string;
-  date: string;
-  duration: number;
-  timeSlot: string;
-  startTime: string;
-  endTime: string;
-};
-
 export const getTimeSlotsForDuration = (
   duration: number,
   openingHour = 9,
@@ -396,17 +411,6 @@ export const formatDateDisplay = (value?: string | Date | null) => {
   });
 };
 
-const formatTimeDisplay = (timeStr?: string) => {
-  if (!timeStr) return "";
-  const [hourStr, minStr] = timeStr.split(":");
-  const hour = parseInt(hourStr, 10);
-  const min = minStr ? parseInt(minStr, 10) : 0;
-  if (Number.isNaN(hour)) return timeStr;
-  const period = hour >= 12 ? "PM" : "AM";
-  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
-  return `${displayHour}:${String(min).padStart(2, "0")} ${period}`;
-};
-
 const formatTimeSlotDisplay = (time24: string) => {
   if (!time24) return "09:00 AM";
   const [h] = time24.split(":").map(Number);
@@ -455,6 +459,7 @@ const computeBookingStatus = (
   currentStatus?: SpaceBookingStatus,
 ): SpaceBookingStatus => {
   if (currentStatus === "Cancelled") return "Cancelled";
+  if (currentStatus === "Draft") return "Draft";
   if (!dateStr || !startTime || !endTime) return "Upcoming";
   const now = new Date();
   const start = new Date(`${dateStr}T${startTime}:00`);
@@ -491,12 +496,14 @@ const CreateBookingDetailsModal = ({
   isOpen,
   onClose,
   onSubmit,
+  onSaveDraft,
   initialBooking = null,
   draftValues = null,
   submitting = false,
 }: CreateBookingDetailsModalProps) => {
   const formId = useId();
   const isEdit = Boolean(initialBooking?._id || initialBooking?.id);
+  const [savingDraft, setSavingDraft] = useState(false);
   const staff = useAppSelector((state) => state.user);
   const customerSearchRef = useRef<HTMLDivElement>(null);
   const coworkingDateInputRef = useRef<HTMLInputElement>(null);
@@ -580,10 +587,11 @@ const CreateBookingDetailsModal = ({
 
   // Status & Validation
   const [status, setStatus] = useState<SpaceBookingStatus>("Upcoming");
-  const [manualStatusSelected, setManualStatusSelected] = useState(false);
+  const [, setManualStatusSelected] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const debouncedCustomerSearch = useDebounce(name.trim(), 250);
+  const summaryCardRef = useRef<HTMLDivElement>(null);
 
   // Load Memberships
   useEffect(() => {
@@ -650,6 +658,9 @@ const CreateBookingDetailsModal = ({
       if (initialBooking.status === "Cancelled") {
         setStatus("Cancelled");
         setManualStatusSelected(true);
+      } else if (initialBooking.status === "Draft") {
+        setStatus("Draft");
+        setManualStatusSelected(true);
       } else {
         const computed = computeBookingStatus(
           bDate,
@@ -661,6 +672,84 @@ const CreateBookingDetailsModal = ({
         setManualStatusSelected(false);
       }
       setNotes(initialBooking.notes || "");
+
+      const snap = (initialBooking as any)?.summarySnapshot;
+      if (snap?.spaceType) {
+        setSpaceTypeFilter(snap.spaceType as "coworking" | "exclusive");
+      } else if (initialBooking.spaceType) {
+        setSpaceTypeFilter(
+          initialBooking.spaceType.toLowerCase() === "coworking"
+            ? "coworking"
+            : "exclusive",
+        );
+      }
+      if (initialBooking.spaceQty || snap?.spaceQty) {
+        setSpaceQty(Number(initialBooking.spaceQty || snap?.spaceQty || 1));
+      }
+      if (initialBooking.durationCount || snap?.planDurationCount) {
+        setPlanDurationCount(
+          Number(initialBooking.durationCount || snap?.planDurationCount || 1),
+        );
+      }
+      if (initialBooking.dateMode || snap?.dateMode) {
+        setDateMode(
+          (initialBooking.dateMode || snap?.dateMode) as "single" | "multiple",
+        );
+      }
+      if (
+        Array.isArray(initialBooking.multiDateSlots) &&
+        initialBooking.multiDateSlots.length > 0
+      ) {
+        setMultiDateSlots(initialBooking.multiDateSlots);
+      } else if (
+        Array.isArray(snap?.multiDateSlots) &&
+        snap.multiDateSlots.length > 0
+      ) {
+        setMultiDateSlots(snap.multiDateSlots);
+      }
+      if (initialBooking.coworkingStartDate || snap?.coworkingStartDate) {
+        setCoworkingStartDate(
+          initialBooking.coworkingStartDate || snap?.coworkingStartDate || bDate,
+        );
+      }
+      if (snap?.coworkingServices) {
+        setCoworkingServices(snap.coworkingServices);
+      } else if (Array.isArray(initialBooking.selectedServices)) {
+        const cw: Record<string, number> = {};
+        initialBooking.selectedServices.forEach((s: any) => {
+          const matched = COWORKING_SERVICES.find(
+            (c) =>
+              c.label.toLowerCase() === (s.label || s.name || "").toLowerCase() ||
+              c.key.toLowerCase() === (s.key || "").toLowerCase(),
+          );
+          if (matched) cw[matched.key] = Number(s.qty) || 1;
+        });
+        if (Object.keys(cw).length > 0) {
+          setCoworkingServices((prev) => ({ ...prev, ...cw }));
+        }
+      }
+      if (snap?.exclusiveServices) {
+        setExclusiveServices(snap.exclusiveServices);
+      } else if (Array.isArray(initialBooking.selectedServices)) {
+        const ex: Record<string, number> = {};
+        initialBooking.selectedServices.forEach((s: any) => {
+          const matched = EXCLUSIVE_SERVICES.find(
+            (e) =>
+              e.label.toLowerCase() === (s.label || s.name || "").toLowerCase() ||
+              e.key.toLowerCase() === (s.key || "").toLowerCase(),
+          );
+          if (matched) ex[matched.key] = Number(s.qty) || 1;
+        });
+        if (Object.keys(ex).length > 0) {
+          setExclusiveServices((prev) => ({ ...prev, ...ex }));
+        }
+      }
+      if (snap?.purpose) {
+        setPurpose(snap.purpose);
+      } else if (initialBooking.notes?.includes("Purpose:")) {
+        const m = initialBooking.notes.match(/Purpose:\s*([^\n\r]+)/);
+        if (m) setPurpose(m[1].trim());
+      }
     } else if (draftValues) {
       setName(draftValues.customerName || "");
       setPhone(draftValues.customerPhone || "");
@@ -674,14 +763,14 @@ const CreateBookingDetailsModal = ({
       setMembershipType(draftValues.membershipType || "none");
       setMembershipPlanId(draftValues.membershipPlanId || null);
       setSpaceId(String(draftValues.spaceId || ""));
-      setSpaceQty(1);
+      setSpaceQty(draftValues.spaceQty || 1);
       const bDate = toDateInput(draftValues.bookingDate);
       const bFrom = draftValues.startTime || "09:00";
       const bTo = draftValues.endTime || "12:00";
       setBookingDate(bDate);
       setBookingFrom(bFrom);
       setBookingTo(bTo);
-      setCoworkingStartDate(bDate);
+      setCoworkingStartDate(draftValues.coworkingStartDate || bDate);
       const draftDur =
         draftValues.durationHours || calcDurationHours(bFrom, bTo) || 3;
       setDuration(draftDur);
@@ -690,6 +779,9 @@ const CreateBookingDetailsModal = ({
       );
       if (draftValues.status === "Cancelled") {
         setStatus("Cancelled");
+        setManualStatusSelected(true);
+      } else if (draftValues.status === "Draft") {
+        setStatus("Draft");
         setManualStatusSelected(true);
       } else {
         const computed = computeBookingStatus(
@@ -702,6 +794,84 @@ const CreateBookingDetailsModal = ({
         setManualStatusSelected(false);
       }
       setNotes(draftValues.notes || "");
+
+      const snapDraft = (draftValues as any)?.summarySnapshot;
+      if (snapDraft?.spaceType) {
+        setSpaceTypeFilter(snapDraft.spaceType as "coworking" | "exclusive");
+      } else if (draftValues.spaceType) {
+        setSpaceTypeFilter(
+          draftValues.spaceType.toLowerCase() === "coworking"
+            ? "coworking"
+            : "exclusive",
+        );
+      }
+      if (draftValues.spaceQty || snapDraft?.spaceQty) {
+        setSpaceQty(Number(draftValues.spaceQty || snapDraft?.spaceQty || 1));
+      }
+      if (draftValues.durationCount || snapDraft?.planDurationCount) {
+        setPlanDurationCount(
+          Number(draftValues.durationCount || snapDraft?.planDurationCount || 1),
+        );
+      }
+      if (draftValues.dateMode || snapDraft?.dateMode) {
+        setDateMode(
+          (draftValues.dateMode || snapDraft?.dateMode) as "single" | "multiple",
+        );
+      }
+      if (
+        Array.isArray(draftValues.multiDateSlots) &&
+        draftValues.multiDateSlots.length > 0
+      ) {
+        setMultiDateSlots(draftValues.multiDateSlots);
+      } else if (
+        Array.isArray(snapDraft?.multiDateSlots) &&
+        snapDraft.multiDateSlots.length > 0
+      ) {
+        setMultiDateSlots(snapDraft.multiDateSlots);
+      }
+      if (draftValues.coworkingStartDate || snapDraft?.coworkingStartDate) {
+        setCoworkingStartDate(
+          draftValues.coworkingStartDate || snapDraft?.coworkingStartDate || bDate,
+        );
+      }
+      if (snapDraft?.coworkingServices) {
+        setCoworkingServices(snapDraft.coworkingServices);
+      } else if (Array.isArray(draftValues.selectedServices)) {
+        const cw: Record<string, number> = {};
+        draftValues.selectedServices.forEach((s: any) => {
+          const matched = COWORKING_SERVICES.find(
+            (c) =>
+              c.label.toLowerCase() === (s.label || s.name || "").toLowerCase() ||
+              c.key.toLowerCase() === (s.key || "").toLowerCase(),
+          );
+          if (matched) cw[matched.key] = Number(s.qty) || 1;
+        });
+        if (Object.keys(cw).length > 0) {
+          setCoworkingServices((prev) => ({ ...prev, ...cw }));
+        }
+      }
+      if (snapDraft?.exclusiveServices) {
+        setExclusiveServices(snapDraft.exclusiveServices);
+      } else if (Array.isArray(draftValues.selectedServices)) {
+        const ex: Record<string, number> = {};
+        draftValues.selectedServices.forEach((s: any) => {
+          const matched = EXCLUSIVE_SERVICES.find(
+            (e) =>
+              e.label.toLowerCase() === (s.label || s.name || "").toLowerCase() ||
+              e.key.toLowerCase() === (s.key || "").toLowerCase(),
+          );
+          if (matched) ex[matched.key] = Number(s.qty) || 1;
+        });
+        if (Object.keys(ex).length > 0) {
+          setExclusiveServices((prev) => ({ ...prev, ...ex }));
+        }
+      }
+      if (snapDraft?.purpose) {
+        setPurpose(snapDraft.purpose);
+      } else if (draftValues.notes?.includes("Purpose:")) {
+        const m = draftValues.notes.match(/Purpose:\s*([^\n\r]+)/);
+        if (m) setPurpose(m[1].trim());
+      }
     } else {
       setName("");
       setPhone("");
@@ -763,9 +933,11 @@ const CreateBookingDetailsModal = ({
         const list = Array.isArray(res) ? res : res?.spaces;
         if (Array.isArray(list)) {
           setSpaces(list);
-          if (spaceId) {
-            const current = list.find((s) => String(s._id) === String(spaceId));
+          const targetId = spaceId || initialBooking?.spaceId || draftValues?.spaceId;
+          if (targetId) {
+            const current = list.find((s) => String(s._id) === String(targetId));
             if (current) {
+              setSpaceId(String(current._id));
               setSpaceTypeFilter(isCoworkingSpace(current) ? "coworking" : "exclusive");
             }
           } else {
@@ -881,8 +1053,6 @@ const CreateBookingDetailsModal = ({
     const diff = Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     return Math.max(1, diff);
   }, [coworkingStartDate, coworkingEndDate]);
-
-  const coworkingDays = planDurationCount;
 
   // Auto-sync plan duration count when selected space changes
   const prevSelectedSpaceIdRef = useRef<string | null>(null);
@@ -1072,10 +1242,6 @@ const CreateBookingDetailsModal = ({
   const handleDurationChange = (delta: number) => {
     const step = planDurationInfo.baseCount || 1;
     setPlanDurationCount((prev) => Math.max(step, prev + delta * step));
-  };
-
-  const handleCoworkingDaysChange = (delta: number) => {
-    handleDurationChange(delta);
   };
 
   // Exclusive Duration & Time Slot Handlers
@@ -1397,6 +1563,49 @@ const CreateBookingDetailsModal = ({
         : `Multi-Date Booking: ${datesSummary}`;
     }
 
+    const summarySnapshot = {
+      spaceType: spaceTypeFilter,
+      dateMode,
+      spaceName: selectedSpace?.name || "",
+      spaceCode,
+      spaceImageUrl: (selectedSpace as any)?.images?.[0] || selectedSpace?.imageUrl || null,
+      spaceDay: selectedSpace?.day || "",
+      spaceCategory: selectedSpace?.category || "space",
+      spaceQty,
+      unitPrice,
+      priceSuffix:
+        spaceTypeFilter === "coworking"
+          ? ` / ${planDurationInfo.unitSingular.toLowerCase()}`
+          : " / hr",
+      bookingDate: isDuration
+        ? coworkingStartDate
+        : isMultiple
+        ? multiDateSlots[0]?.date || bookingDate
+        : bookingDate,
+      coworkingStartDate,
+      coworkingEndDate,
+      duration: durationHours,
+      timeSlot,
+      multiDateSlots,
+      isDurationPlan: isDuration,
+      planDurationCount,
+      durationUnit: planDurationInfo.unit,
+      durationUnitSingular: planDurationInfo.unitSingular,
+      durationUnitPlural: planDurationInfo.unitPlural,
+      packageMultiplier,
+      selectedServices: selectedServicesList,
+      coworkingServices,
+      exclusiveServices,
+      spaceCharges,
+      servicesTotal,
+      subTotal: spaceCharges + servicesTotal,
+      discountAmount,
+      cashbackAmount,
+      grandTotal: lineTotal,
+      purpose,
+      notes: finalNotes,
+    };
+
     const payload: BookingFormPayload = {
       customerName: name.trim(),
       customerPhone: phone.trim().replace(/\D/g, ""),
@@ -1429,12 +1638,195 @@ const CreateBookingDetailsModal = ({
       unitPrice,
       durationHours,
       lineTotal,
+      spaceQty,
+      dateMode,
+      multiDateSlots,
+      durationCount: planDurationCount,
+      durationUnit: planDurationInfo.unit,
+      packageMultiplier,
+      coworkingStartDate,
+      coworkingEndDate,
+      subTotal: spaceCharges + servicesTotal,
+      discountAmount,
+      cashbackAmount,
+      selectedServices: selectedServicesList,
+      summarySnapshot,
     };
 
     try {
       await onSubmit(payload);
     } catch {
       // Parent handles toast
+    }
+  };
+
+  const handleSaveDraftClick = async () => {
+    const err: Record<string, string> = {};
+    if (!name.trim()) err.name = "Customer name is required.";
+    if (!phone.trim()) err.phone = "Phone number is required.";
+    if (!spaceId) err.spaceId = "Please select a space.";
+
+    if (Object.keys(err).length > 0) {
+      setErrors((prev) => ({ ...prev, ...err }));
+      toast.warning("Please provide customer name, phone, and space to save draft.");
+      return;
+    }
+
+    const isDuration = isDurationPlan;
+    const isMultiple = !isDuration && dateMode === "multiple";
+    const durationHours = isDuration
+      ? totalDaysForHours * 8
+      : isMultiple
+      ? multiDateSlots.reduce((acc, s) => acc + (s.duration || 1), 0)
+      : calcDurationHours(bookingFrom, bookingTo) || duration;
+
+    const unitPrice = Math.max(
+      0,
+      Number(
+        selectedSpace?.price ?? (spaceTypeFilter === "coworking" ? 400 : 800),
+      ),
+    );
+    const servicesTotal = selectedServicesList.reduce(
+      (acc, s) => acc + s.price * s.qty,
+      0,
+    );
+    const spaceCharges = isDuration
+      ? unitPrice * packageMultiplier * spaceQty
+      : isMultiple
+      ? multiDateSlots.reduce(
+          (acc, s) => acc + unitPrice * (s.duration || 1) * spaceQty,
+          0,
+        )
+      : unitPrice * (calcDurationHours(bookingFrom, bookingTo) || duration) * spaceQty;
+
+    const lineTotal = Math.max(0, spaceCharges + servicesTotal - discountAmount);
+
+    const spaceType = selectedSpace
+      ? selectedSpace.spaceType ||
+        (isCoworkingSpace(selectedSpace) ? "Coworking" : "Exclusive")
+      : undefined;
+    const spaceCode = selectedSpace ? getSpaceCode(selectedSpace) : undefined;
+
+    let finalNotes = notes.trim();
+    if (purpose) {
+      finalNotes = finalNotes ? `Purpose: ${purpose}\n${finalNotes}` : `Purpose: ${purpose}`;
+    }
+    if (isDuration) {
+      const durationText = `${planDurationCount} ${
+        planDurationCount === 1 ? planDurationInfo.unitSingular : planDurationInfo.unitPlural
+      }`;
+      const coworkSummary = `${spaceType || (spaceTypeFilter === "coworking" ? "Coworking" : "Exclusive")} Booking (${durationText}: ${formatDateDisplay(coworkingStartDate)} to ${formatDateDisplay(coworkingEndDate)})`;
+      finalNotes = finalNotes ? `${finalNotes}\n${coworkSummary}` : coworkSummary;
+    } else if (isMultiple && multiDateSlots.length > 0) {
+      const datesSummary = multiDateSlots
+        .map((s) => `${formatDateDisplay(s.date)} (${s.timeSlot}, ${s.duration}h)`)
+        .join(" | ");
+      finalNotes = finalNotes
+        ? `${finalNotes}\nDates: ${datesSummary}`
+        : `Multi-Date Booking: ${datesSummary}`;
+    }
+
+    const summarySnapshot = {
+      spaceType: spaceTypeFilter,
+      dateMode,
+      spaceName: selectedSpace?.name || "",
+      spaceCode,
+      spaceImageUrl: (selectedSpace as any)?.images?.[0] || selectedSpace?.imageUrl || null,
+      spaceDay: selectedSpace?.day || "",
+      spaceCategory: selectedSpace?.category || "space",
+      spaceQty,
+      unitPrice,
+      priceSuffix:
+        spaceTypeFilter === "coworking"
+          ? ` / ${planDurationInfo.unitSingular.toLowerCase()}`
+          : " / hr",
+      bookingDate: isDuration
+        ? coworkingStartDate
+        : isMultiple
+        ? multiDateSlots[0]?.date || bookingDate
+        : bookingDate,
+      coworkingStartDate,
+      coworkingEndDate,
+      duration: durationHours,
+      timeSlot,
+      multiDateSlots,
+      isDurationPlan: isDuration,
+      planDurationCount,
+      durationUnit: planDurationInfo.unit,
+      durationUnitSingular: planDurationInfo.unitSingular,
+      durationUnitPlural: planDurationInfo.unitPlural,
+      packageMultiplier,
+      selectedServices: selectedServicesList,
+      coworkingServices,
+      exclusiveServices,
+      spaceCharges,
+      servicesTotal,
+      subTotal: spaceCharges + servicesTotal,
+      discountAmount,
+      cashbackAmount,
+      grandTotal: lineTotal,
+      purpose,
+      notes: finalNotes,
+    };
+
+    const draftPayload: BookingFormPayload = {
+      customerName: name.trim(),
+      customerPhone: phone.trim().replace(/\D/g, ""),
+      customerId: customerId || undefined,
+      membershipType: membershipType || undefined,
+      membershipPlanId: membershipPlanId || undefined,
+      spaceId: selectedSpace?._id ? String(selectedSpace._id) : spaceId,
+      bookingDate: isDuration
+        ? coworkingStartDate
+        : isMultiple
+        ? multiDateSlots[0]?.date || bookingDate
+        : bookingDate,
+      startTime: isDuration
+        ? "09:00"
+        : isMultiple
+        ? multiDateSlots[0]?.startTime || bookingFrom
+        : bookingFrom,
+      endTime: isDuration
+        ? "21:00"
+        : isMultiple
+        ? multiDateSlots[0]?.endTime || bookingTo
+        : bookingTo,
+      status: "Draft",
+      notes: finalNotes || undefined,
+      spaceName: selectedSpace?.name || "",
+      spaceCode,
+      spaceType,
+      spaceDay: selectedSpace?.day || "",
+      spaceCategory: selectedSpace?.category || "space",
+      unitPrice,
+      durationHours,
+      lineTotal,
+      spaceQty,
+      dateMode,
+      multiDateSlots,
+      durationCount: planDurationCount,
+      durationUnit: planDurationInfo.unit,
+      packageMultiplier,
+      coworkingStartDate,
+      coworkingEndDate,
+      subTotal: spaceCharges + servicesTotal,
+      discountAmount,
+      cashbackAmount,
+      selectedServices: selectedServicesList,
+      summarySnapshot,
+    };
+
+    try {
+      setSavingDraft(true);
+      if (onSaveDraft) {
+        await onSaveDraft(draftPayload);
+      } else {
+        await onSubmit(draftPayload);
+      }
+    } catch {
+      // Caller handles error reporting
+    } finally {
+      setSavingDraft(false);
     }
   };
 
@@ -1670,11 +2062,11 @@ const CreateBookingDetailsModal = ({
                           <label className="block text-xs font-semibold text-slate-600">
                             Phone Number <span className="text-rose-500">*</span>
                           </label>
-                          {isPhoneAutoFetched && (
+                          {/* {isPhoneAutoFetched && (
                             <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
                               <Lock size={10} /> Auto-filled
                             </span>
-                          )}
+                          )} */}
                         </div>
 
                         <div className="relative">
@@ -1713,12 +2105,12 @@ const CreateBookingDetailsModal = ({
                             }`}
                           />
 
-                          {isPhoneAutoFetched && (
+                          {/* {isPhoneAutoFetched && (
                             <Lock
                               size={14}
                               className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
                             />
-                          )}
+                          )} */}
                         </div>
                         {errors.phone && (
                           <p className="mt-1 text-xs text-rose-500">{errors.phone}</p>
@@ -1728,9 +2120,9 @@ const CreateBookingDetailsModal = ({
                   </div>
 
                   {/* 2. Select Space * */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                  
+                    <div className="flex items-center  gap-2">
+                      <span className="flex h-6 w-6  items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
                         <Building2 size={14} />
                       </span>
                       <h3 className="font-bold text-slate-800 text-sm">
@@ -1821,11 +2213,13 @@ const CreateBookingDetailsModal = ({
                     )}
 
                     {/* Space Cards Grid */}
+                    <div className="max-h-40 overflow-y-auto pr-2">   
                     {spacesLoading ? (
                       <div className="flex h-36 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-white text-slate-500">
                         <Loader2 size={20} className="animate-spin text-indigo-500" />
                         <span className="text-xs">Loading spaces…</span>
                       </div>
+                       
                     ) : spacesError && !spaces.length ? (
                       <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
                         <AlertCircle size={14} className="mt-0.5 shrink-0" />
@@ -1841,6 +2235,7 @@ const CreateBookingDetailsModal = ({
                             : `No ${spaceTypeFilter} spaces are currently available.`}
                         </p>
                       </div>
+                     
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                         {filteredSpaces.map((space) => {
@@ -2592,6 +2987,7 @@ const CreateBookingDetailsModal = ({
                             [
                               "Upcoming",
                               "Ongoing",
+                              "Draft",
                               "Expired",
                               "Cancelled",
                             ] as SpaceBookingStatus[]
@@ -2678,8 +3074,8 @@ const CreateBookingDetailsModal = ({
           </div>
 
           {/* Modal Footer */}
-          <div className="flex items-center justify-between border-t border-slate-100 bg-white px-6 py-3.5">
-            <a
+          <div className="flex justify-end border-t border-slate-100 bg-white px-6 py-3.5">
+            {/* <a
               href="mailto:support@woowoo.in"
               target="_blank"
               rel="noreferrer"
@@ -2689,9 +3085,9 @@ const CreateBookingDetailsModal = ({
               <span>
                 Need help? <span className="underline">Contact us</span>
               </span>
-            </a>
+            </a> */}
 
-            <div className="flex items-center gap-3">
+            <div className="flex justify-end gap-3">
               <button
                 type="button"
                 onClick={onClose}
@@ -2701,10 +3097,25 @@ const CreateBookingDetailsModal = ({
                 Cancel
               </button>
 
+
+              <button
+                type="button"
+                onClick={handleSaveDraftClick}
+                disabled={submitting || savingDraft || spacesLoading || !spaces.length}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-800 disabled:opacity-50 sm:text-sm"
+              >
+                {savingDraft ? (
+                  <Loader2 size={15} className="animate-spin text-amber-600" />
+                ) : (
+                  <FileText size={15} className="text-amber-600" />
+                )}
+                <span>Save Draft</span>
+              </button>
+
               <button
                 type="submit"
                 form={formId}
-                disabled={submitting || spacesLoading || !spaces.length}
+                disabled={submitting || savingDraft || spacesLoading || !spaces.length}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2 text-xs font-semibold text-white shadow-md shadow-violet-200 transition hover:from-violet-700 hover:to-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
               >
                 {submitting ? (
@@ -2712,7 +3123,13 @@ const CreateBookingDetailsModal = ({
                 ) : (
                   <Sparkles size={16} />
                 )}
-                <span>{isEdit ? "Save Changes" : "Proceed to Checkout"}</span>
+                <span>
+                  {isEdit
+                    ? initialBooking?.status === "Draft"
+                      ? "Proceed to Checkout"
+                      : "Save Changes"
+                    : "Proceed to Checkout"}
+                </span>
                 <ArrowRight size={16} />
               </button>
             </div>
