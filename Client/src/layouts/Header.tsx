@@ -1,6 +1,7 @@
-import { Bell, User, Shuffle, ChevronDown, Menu, FilePlus2, Crown } from "lucide-react";
+import { Bell, User, Shuffle, ChevronDown, Menu, FilePlus2, Crown, CalendarPlus } from "lucide-react";
 import logo from "../assets/images/logo/woo_woo_art_house_logo.png";
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import { usePermission } from "@/hooks/usePermission";
 import { UserModal } from "./UserModal";
@@ -17,16 +18,25 @@ export default function Header({
   onMenuClick,
   showMenuButton = false,
 }: HeaderProps) {
-
-    const [isPosOpen, setIsPosOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isPosOpen, setIsPosOpen] = useState(false);
   const { canPath } = usePermission();
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const { companyName, m_staff_branch, companies, activeCompanyId } =
     useAppSelector((state) => state.user);
 
-     const [openCreateSubscriptionModal, setOpenCreateSubscriptionModal] =
-       useState(false);
+  const [openCreateSubscriptionModal, setOpenCreateSubscriptionModal] =
+    useState(false);
+
+  const handleOpenAddBooking = () => {
+    if (location.pathname.toLowerCase().includes("spacebooking")) {
+      window.dispatchEvent(new CustomEvent("open-add-space-booking"));
+    } else {
+      navigate("/spaceBooking?create=true");
+    }
+  };
 
                                                                                                                                                                                               
 
@@ -113,6 +123,16 @@ export default function Header({
             <span className="hidden md:inline">POS BILL</span>
           </button>
         )}
+        <button
+          type="button"
+          onClick={handleOpenAddBooking}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 md:px-4 md:py-2 md:text-sm"
+          aria-label="+ Add Booking"
+          title="+ Add Booking"
+        >
+          <CalendarPlus size={16} />
+          <span className="hidden md:inline">+ Add Booking</span>
+        </button>
         <button
           type="button"
           onClick={() => setOpenCreateSubscriptionModal(true)}

@@ -102,6 +102,8 @@ type Props = {
   initialCashbackTotal?: number;
   /** When true, do not auto-credit cashback from checkout (server credits it). Still shows initialCashbackTotal. */
   disableCashback?: boolean;
+  /** When true, lock membership discount and cashback as given from parent without recalculating. */
+  lockMembershipDiscount?: boolean;
   extraCharges?: Array<{ label: string; amount: number }>;
   membershipPlans?: MembershipPlanPayload[];
   /**
@@ -375,6 +377,7 @@ export default function CheckoutModal({
   initialProductDiscount = 0,
   initialCashbackTotal = 0,
   disableCashback = false,
+  lockMembershipDiscount = false,
   extraCharges = [],
   membershipPlans = DEFAULT_MEMBERSHIP_PLANS,
   checkoutContext = "sale",
@@ -1058,8 +1061,9 @@ export default function CheckoutModal({
               ? lineDiscountsTotal
               : 0;
 
-  const rawMembershipDiscount =
-    lineMembershipDiscountTotal > 0
+  const rawMembershipDiscount = lockMembershipDiscount
+    ? Math.max(0, Number(initialMembershipDiscount || 0))
+    : lineMembershipDiscountTotal > 0
       ? lineMembershipDiscountTotal
       : initialMembershipDiscount > 0
         ? initialMembershipDiscount
@@ -1078,7 +1082,9 @@ export default function CheckoutModal({
   );
   const netMembershipDiscountAdjustment = waiveMembershipForCoupon
     ? -membershipDiscountDeductedInProp
-    : rawMembershipDiscount - membershipDiscountDeductedInProp;
+    : lockMembershipDiscount
+      ? 0
+      : rawMembershipDiscount - membershipDiscountDeductedInProp;
 
   const payableBase = roundToPaise(
     Math.max(
@@ -1087,7 +1093,7 @@ export default function CheckoutModal({
     ),
   );
 
-  const displayCashbackTotal = disableCashback
+  const displayCashbackTotal = lockMembershipDiscount || disableCashback
     ? Math.max(0, Number(initialCashbackTotal) || 0)
     : cartHasCsp
       ? lineCashbackTotal > 0

@@ -7,6 +7,7 @@ const ALLOWED_STATUS = new Set([
   'Ongoing',
   'Expired',
   'Cancelled',
+  'Draft',
 ]);
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -25,6 +26,9 @@ export const computeBookingStatus = (
 ) => {
   if (currentStatus === 'Cancelled') {
     return 'Cancelled';
+  }
+  if (currentStatus === 'Draft') {
+    return 'Draft';
   }
 
   if (!bookingDate || !startTime || !endTime) {
@@ -296,6 +300,55 @@ const buildPayload = (body = {}, {partial = false} = {}) => {
     const n = Number(body.lineTotal);
     if (!Number.isNaN(n) && n >= 0) payload.lineTotal = n;
   }
+  if (!partial || body.spaceQty !== undefined) {
+    const n = Number(body.spaceQty);
+    if (!Number.isNaN(n) && n >= 1) payload.spaceQty = n;
+  }
+  if (!partial || body.dateMode !== undefined) {
+    payload.dateMode = String(body.dateMode || 'single');
+  }
+  if (!partial || body.multiDateSlots !== undefined) {
+    payload.multiDateSlots = Array.isArray(body.multiDateSlots)
+      ? body.multiDateSlots
+      : [];
+  }
+  if (!partial || body.durationCount !== undefined) {
+    const n = Number(body.durationCount);
+    if (!Number.isNaN(n) && n >= 1) payload.durationCount = n;
+  }
+  if (!partial || body.durationUnit !== undefined) {
+    payload.durationUnit = String(body.durationUnit || 'day');
+  }
+  if (!partial || body.packageMultiplier !== undefined) {
+    const n = Number(body.packageMultiplier);
+    if (!Number.isNaN(n) && n >= 1) payload.packageMultiplier = n;
+  }
+  if (!partial || body.coworkingStartDate !== undefined) {
+    payload.coworkingStartDate = String(body.coworkingStartDate || '');
+  }
+  if (!partial || body.coworkingEndDate !== undefined) {
+    payload.coworkingEndDate = String(body.coworkingEndDate || '');
+  }
+  if (!partial || body.subTotal !== undefined) {
+    const n = Number(body.subTotal);
+    if (!Number.isNaN(n) && n >= 0) payload.subTotal = n;
+  }
+  if (!partial || body.discountAmount !== undefined) {
+    const n = Number(body.discountAmount);
+    if (!Number.isNaN(n) && n >= 0) payload.discountAmount = n;
+  }
+  if (!partial || body.cashbackAmount !== undefined) {
+    const n = Number(body.cashbackAmount);
+    if (!Number.isNaN(n) && n >= 0) payload.cashbackAmount = n;
+  }
+  if (!partial || body.selectedServices !== undefined) {
+    payload.selectedServices = Array.isArray(body.selectedServices)
+      ? body.selectedServices
+      : [];
+  }
+  if (!partial || body.summarySnapshot !== undefined) {
+    payload.summarySnapshot = body.summarySnapshot || null;
+  }
 
   return {payload, errors};
 };
@@ -322,8 +375,8 @@ export const createSpaceBooking = async (req, res) => {
       });
     }
 
-    // Automatically compute status from date & time unless explicitly Cancelled
-    if (payload.status !== 'Cancelled') {
+    // Automatically compute status from date & time unless explicitly Cancelled or Draft
+    if (payload.status !== 'Cancelled' && payload.status !== 'Draft') {
       payload.status = computeBookingStatus(
         payload.bookingDate,
         payload.startTime,
@@ -521,14 +574,15 @@ export const updateSpaceBooking = async (req, res) => {
       payload.spaceName = space.name;
     }
 
-    // Automatically recalculate status from updated date & time unless explicitly Cancelled
-    if (payload.status !== 'Cancelled') {
+    // Automatically recalculate status from updated date & time unless explicitly Cancelled or Draft
+    const targetStatus = payload.status !== undefined ? payload.status : existing.status;
+    if (targetStatus !== 'Cancelled' && targetStatus !== 'Draft') {
       const nextDate = payload.bookingDate ?? existing.bookingDate;
       payload.status = computeBookingStatus(
         nextDate,
         nextStart,
         nextEnd,
-        payload.status ?? existing.status,
+        targetStatus,
       );
     }
 

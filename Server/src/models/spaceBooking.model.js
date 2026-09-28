@@ -85,9 +85,68 @@ const spaceBookingSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Upcoming', 'Ongoing', 'Expired', 'Cancelled'],
+      enum: ['Upcoming', 'Ongoing', 'Expired', 'Cancelled', 'Draft'],
       default: 'Upcoming',
       index: true,
+    },
+    spaceQty: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+    dateMode: {
+      type: String,
+      enum: ['single', 'multiple', ''],
+      default: 'single',
+    },
+    multiDateSlots: [
+      {
+        type: mongoose.Schema.Types.Mixed,
+      },
+    ],
+    durationCount: {
+      type: Number,
+      default: 1,
+    },
+    durationUnit: {
+      type: String,
+      default: 'day',
+    },
+    packageMultiplier: {
+      type: Number,
+      default: 1,
+    },
+    coworkingStartDate: {
+      type: String,
+      default: '',
+    },
+    coworkingEndDate: {
+      type: String,
+      default: '',
+    },
+    subTotal: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    cashbackAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    selectedServices: [
+      {
+        type: mongoose.Schema.Types.Mixed,
+      },
+    ],
+    summarySnapshot: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
     notes: {
       type: String,

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -22,12 +23,21 @@ import {
   PhoneCall,
   MailCheck,
   Loader2,
+  FileText,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import CreateBookingDetailsModal, {
   type BookingFormPayload,
+  type MultiDateSlot,
 } from "./modal/CreateBookingDetailsModal";
+import {
+  CoworkingSummaryCard,
+  ExclusiveMultipleDatesSummaryCard,
+  ExclusiveSingleDateSummaryCard,
+  type SelectedServiceItem,
+} from "./modal/summary";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
 import {
   handleCreateInvoice,
@@ -108,6 +118,158 @@ const apiErrorMessage = (err: unknown, fallback: string) => {
   return fallback;
 };
 
+const toDateInput = (value?: string | Date | null) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().split("T")[0];
+};
+
+const BookingSummaryRenderer = ({
+  booking,
+}: {
+  booking: SpaceBookingPayload;
+}) => {
+  const snap = (booking as any)?.summarySnapshot;
+  const isCoworking =
+    (booking.spaceType || booking.space?.spaceType || "").toLowerCase() ===
+      "coworking" ||
+    snap?.spaceType === "coworking" ||
+    Boolean(snap?.isDurationPlan);
+  const isMultiple = (booking.dateMode || snap?.dateMode) === "multiple";
+
+  const resolvedSpace =
+    booking.space ||
+    (snap
+      ? {
+          name: snap.spaceName || booking.spaceName || "Space",
+          spaceCode: snap.spaceCode || booking.spaceCode || "",
+          imageUrl: snap.spaceImageUrl || (booking.space as any)?.imageUrl || null,
+          price: snap.unitPrice || booking.unitPrice || 0,
+          spaceType: snap.spaceType || booking.spaceType || "",
+          category: snap.spaceCategory || booking.spaceCategory || "",
+          day: snap.spaceDay || booking.spaceDay || "",
+        }
+      : {
+          name: booking.spaceName || "Space",
+          spaceCode: booking.spaceCode || "",
+          imageUrl: null,
+          price: booking.unitPrice || 0,
+          spaceType: booking.spaceType || "",
+          category: booking.spaceCategory || "",
+          day: booking.spaceDay || "",
+        });
+
+  const spaceQty = booking.spaceQty || snap?.spaceQty || 1;
+  const selectedServices = (snap?.selectedServices ||
+    booking.selectedServices ||
+    []) as SelectedServiceItem[];
+  const discountAmount = snap?.discountAmount ?? booking.discountAmount ?? 0;
+  const cashbackAmount = snap?.cashbackAmount ?? booking.cashbackAmount ?? 0;
+
+  if (isCoworking) {
+    const startDate =
+      booking.coworkingStartDate ||
+      snap?.coworkingStartDate ||
+      toDateInput(booking.bookingDate);
+    const endDate =
+      booking.coworkingEndDate || snap?.coworkingEndDate || startDate;
+    const durationCount = snap?.planDurationCount || booking.durationCount || 1;
+    const durationUnit = snap?.durationUnit || booking.durationUnit || "day";
+    const durationUnitSingular =
+      snap?.durationUnitSingular || "Day";
+    const durationUnitPlural =
+      snap?.durationUnitPlural || "Days";
+    const priceSuffix = snap?.priceSuffix || " / day";
+    const packageMultiplier =
+      snap?.packageMultiplier || booking.packageMultiplier || 1;
+    const unitPrice =
+      snap?.unitPrice ?? booking.unitPrice ?? Number(booking.space?.price || 0);
+
+    return (
+      <div className="w-full max-w-sm mx-auto text-left">
+        <CoworkingSummaryCard
+          space={resolvedSpace}
+          spaceQty={spaceQty}
+          startDate={startDate}
+          endDate={endDate}
+          days={durationCount}
+          durationCount={durationCount}
+          durationUnit={durationUnit}
+          durationUnitSingular={durationUnitSingular}
+          durationUnitPlural={durationUnitPlural}
+          priceSuffix={priceSuffix}
+          packageMultiplier={packageMultiplier}
+          unitPrice={unitPrice}
+          selectedServices={selectedServices}
+          discountAmount={discountAmount}
+          cashbackAmount={cashbackAmount}
+          formatDateDisplay={formatDateDisplay}
+        />
+      </div>
+    );
+  }
+
+  if (isMultiple) {
+    const slots = (snap?.multiDateSlots ||
+      booking.multiDateSlots || [
+        {
+          id: "slot-1",
+          date: toDateInput(booking.bookingDate),
+          duration: booking.durationHours || 3,
+          timeSlot:
+            booking.bookingTime ||
+            `${booking.startTime} - ${booking.endTime}`,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+        },
+      ]) as MultiDateSlot[];
+    const hourlyRate =
+      snap?.unitPrice ?? booking.unitPrice ?? Number(booking.space?.price || 800);
+
+    return (
+      <div className="w-full max-w-sm mx-auto text-left">
+        <ExclusiveMultipleDatesSummaryCard
+          space={resolvedSpace}
+          spaceQty={spaceQty}
+          slots={slots}
+          hourlyRate={hourlyRate}
+          selectedServices={selectedServices}
+          discountAmount={discountAmount}
+          cashbackAmount={cashbackAmount}
+          formatDateDisplay={formatDateDisplay}
+        />
+      </div>
+    );
+  }
+
+  const bookingDate = snap?.bookingDate || toDateInput(booking.bookingDate);
+  const timeSlot =
+    snap?.timeSlot ||
+    booking.bookingTime ||
+    `${booking.startTime} - ${booking.endTime}`;
+  const duration = snap?.duration || booking.durationHours || 1;
+  const hourlyRate =
+    snap?.unitPrice ?? booking.unitPrice ?? Number(booking.space?.price || 800);
+
+  return (
+    <div className="w-full max-w-sm mx-auto text-left">
+      <ExclusiveSingleDateSummaryCard
+        space={resolvedSpace}
+        spaceQty={spaceQty}
+        bookingDate={bookingDate}
+        timeSlot={timeSlot}
+        duration={duration}
+        hourlyRate={hourlyRate}
+        selectedServices={selectedServices}
+        discountAmount={discountAmount}
+        cashbackAmount={cashbackAmount}
+        formatDateDisplay={formatDateDisplay}
+      />
+    </div>
+  );
+};
+
 const SpaceBook = () => {
   const staff = useAppSelector((state) => state.user);
   const [data, setData] = useState<SpaceBookingPayload[]>([]);
@@ -127,6 +289,38 @@ const SpaceBook = () => {
   const [deleteBooking, setDeleteBooking] =
     useState<SpaceBookingPayload | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Listen for event from Header "+ Add Booking" button when already on /spaceBooking
+  useEffect(() => {
+    const handleOpen = () => {
+      setEditingBooking(null);
+      setPendingCheckout(null);
+      setIsCreateModalOpen(true);
+    };
+    window.addEventListener("open-add-space-booking", handleOpen);
+    return () => {
+      window.removeEventListener("open-add-space-booking", handleOpen);
+    };
+  }, []);
+
+  // Open modal if navigated from Header with ?create=true
+  useEffect(() => {
+    if (searchParams.get("create") === "true") {
+      setEditingBooking(null);
+      setPendingCheckout(null);
+      setIsCreateModalOpen(true);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete("create");
+          return next;
+        },
+        { replace: true }
+      );
+    }
+  }, [searchParams, setSearchParams]);
 
   /** Pending booking details waiting for CheckoutModal payment. */
   const [pendingCheckout, setPendingCheckout] =
@@ -173,9 +367,10 @@ const SpaceBook = () => {
     const total = data.length;
     const ongoing = data.filter((b) => b.status === "Ongoing").length;
     const upcoming = data.filter((b) => b.status === "Upcoming").length;
+    const draft = data.filter((b) => b.status === "Draft").length;
     const expired = data.filter((b) => b.status === "Expired").length;
     const cancelled = data.filter((b) => b.status === "Cancelled").length;
-    return { total, ongoing, upcoming, expired, cancelled };
+    return { total, ongoing, upcoming, draft, expired, cancelled };
   }, [data]);
 
   const uniqueSpaces = useMemo(() => {
@@ -239,25 +434,75 @@ const SpaceBook = () => {
     if (!pendingCheckout) return [];
     const hours = Math.max(0, Number(pendingCheckout.durationHours ?? 0));
     const unit = Math.max(0, Number(pendingCheckout.unitPrice ?? 0));
+    const spaceQty = Math.max(1, Number(pendingCheckout.spaceQty || 1));
+
+    const services = Array.isArray(pendingCheckout.selectedServices)
+      ? pendingCheckout.selectedServices
+      : [];
+    const servicesTotal = services.reduce(
+      (sum: number, s: any) =>
+        sum + (Number(s.price) || 0) * (Number(s.qty) || 1),
+      0,
+    );
+
+    const spaceCharges = Math.max(
+      0,
+      Number(
+        pendingCheckout.summarySnapshot?.spaceCharges ??
+          (pendingCheckout.subTotal != null
+            ? Number(pendingCheckout.subTotal) - servicesTotal
+            : unit * hours * spaceQty),
+      ),
+    );
+
     const nameParts = [
       pendingCheckout.spaceName || "Space Booking",
       pendingCheckout.spaceDay ? `(${pendingCheckout.spaceDay})` : "",
       hours > 0 ? `· ${hours}h` : "",
+      spaceQty > 1 ? `· ${spaceQty} spaces` : "",
     ]
       .filter(Boolean)
       .join(" ");
-    return [
+
+    const items: Array<{
+      id?: number;
+      name: string;
+      qty: number;
+      price: number;
+      discount?: number;
+      category?: string;
+      lineCategory?: string;
+      sourceType?: string;
+    }> = [
       {
         id: 1,
         name: nameParts,
         qty: 1,
-        price: Math.max(0, Number(pendingCheckout.lineTotal ?? unit * hours)),
+        price: spaceCharges,
         discount: 0,
         category: "space",
         lineCategory: "space",
         sourceType: "space",
       },
     ];
+
+    services.forEach((s: any, idx: number) => {
+      const sQty = Math.max(1, Number(s.qty) || 1);
+      const sPrice = Math.max(0, Number(s.price) || 0);
+      const sName = s.label || s.name || `Service ${idx + 1}`;
+      items.push({
+        id: idx + 2,
+        name: sName,
+        qty: sQty,
+        price: sPrice,
+        discount: 0,
+        category: "service",
+        lineCategory: "service",
+        sourceType: "service",
+      });
+    });
+
+    return items;
   }, [pendingCheckout]);
 
   const handleConfirmCheckoutPayment = async (payment: {
@@ -346,16 +591,17 @@ const SpaceBook = () => {
           : null,
         verifiedAt: payment.verifiedAt || null,
         notes: bookingNotes || "Space Booking",
-        items: [
-          {
-            productName: checkoutItems[0]?.name || "Space Booking",
-            qty: 1,
-            unitPrice: lineTotal,
-            discount: membershipDiscount,
-            category: "space",
-          },
-        ],
-        subTotal: lineTotal,
+        items: checkoutItems.map((item) => ({
+          productName: item.name,
+          qty: item.qty,
+          unitPrice: item.price,
+          discount: 0,
+          category: item.category || "space",
+        })),
+        subTotal:
+          pendingCheckout.subTotal != null
+            ? Number(pendingCheckout.subTotal)
+            : checkoutItems.reduce((acc, it) => acc + it.price * it.qty, 0),
         discountTotal: totalDiscount,
         grandTotal: payment.finalAmount,
         coupon: payment.coupon ?? null,
@@ -383,7 +629,8 @@ const SpaceBook = () => {
         String(invoice?._id || "");
       const invoiceId = invoice?._id ? String(invoice._id) : null;
 
-      await handleCreateSpaceBooking({
+      const existingDraftId = (pendingCheckout as any)?._originalBookingId;
+      const bookingData: SpaceBookingPayload = {
         customerName: payment.customerName?.trim() || pendingCheckout.customerName,
         customerPhone: payment.customerPhone?.trim() || pendingCheckout.customerPhone,
         customerEmail: pendingCheckout.customerEmail,
@@ -391,7 +638,7 @@ const SpaceBook = () => {
         bookingDate: pendingCheckout.bookingDate,
         startTime: pendingCheckout.startTime,
         endTime: pendingCheckout.endTime,
-        status: pendingCheckout.status,
+        status: (pendingCheckout.status === "Draft" ? "Upcoming" : pendingCheckout.status) as SpaceBookingStatus,
         notes: pendingCheckout.notes,
         invoiceId,
         invoiceCode,
@@ -400,7 +647,34 @@ const SpaceBook = () => {
         dueAmount: payment.paymentBreakdown.dueAmount,
         paymentStatus: payment.paymentStatus,
         paymentMode: payment.mode,
-      });
+        spaceQty: pendingCheckout.spaceQty,
+        dateMode: pendingCheckout.dateMode,
+        multiDateSlots: pendingCheckout.multiDateSlots,
+        durationCount: pendingCheckout.durationCount,
+        durationUnit: pendingCheckout.durationUnit,
+        packageMultiplier: pendingCheckout.packageMultiplier,
+        coworkingStartDate: pendingCheckout.coworkingStartDate,
+        coworkingEndDate: pendingCheckout.coworkingEndDate,
+        subTotal:
+          pendingCheckout.subTotal != null
+            ? Number(pendingCheckout.subTotal)
+            : checkoutItems.reduce((acc, it) => acc + it.price * it.qty, 0),
+        discountAmount: totalDiscount,
+        cashbackAmount: payment.cashbackTotal,
+        selectedServices: pendingCheckout.selectedServices,
+        summarySnapshot: pendingCheckout.summarySnapshot,
+      };
+
+      if (existingDraftId) {
+        await handleUpdateSpaceBooking(existingDraftId, bookingData);
+      } else {
+        await handleCreateSpaceBooking(bookingData);
+      }
+
+      const printableSubtotal =
+        pendingCheckout.subTotal != null
+          ? Number(pendingCheckout.subTotal)
+          : checkoutItems.reduce((acc, it) => acc + it.price * it.qty, 0);
 
       printThermalReceipt({
         invoiceNo: invoiceCode || "SPACE",
@@ -408,19 +682,20 @@ const SpaceBook = () => {
           payment.customerName?.trim() || pendingCheckout.customerName,
         customerPhone:
           payment.customerPhone?.trim() || pendingCheckout.customerPhone,
-        items: [
-          {
-            name: checkoutItems[0]?.name || "Space Booking",
-            qty: 1,
-            price: lineTotal,
-            discount: totalDiscount,
-          },
-        ],
-        totalMRP: lineTotal,
+        items: checkoutItems.map((item) => ({
+          name: item.name,
+          qty: item.qty,
+          price: item.price,
+          discount: 0,
+        })),
+        totalMRP: printableSubtotal,
         discountTotal: totalDiscount,
         finalAmount: payment.finalAmount,
         totalDue: payment.paymentBreakdown.dueAmount,
-        totalQty: 1,
+        totalQty: checkoutItems.reduce(
+          (sum, item) => sum + (Number(item.qty) || 0),
+          0,
+        ),
       });
 
       setOpenCheckout(false);
@@ -450,6 +725,13 @@ const SpaceBook = () => {
       toast.error("Invalid booking id.");
       return;
     }
+    // If editing a draft and user proceeds to checkout
+    if (editingBooking.status === "Draft") {
+      setPendingCheckout({ ...payload, _originalBookingId: id } as any);
+      setEditingBooking(null);
+      setOpenCheckout(true);
+      return;
+    }
     try {
       setSaving(true);
       await handleUpdateSpaceBooking(id, payload);
@@ -460,6 +742,125 @@ const SpaceBook = () => {
     } catch (err: unknown) {
       toast.error(apiErrorMessage(err, "Failed to update space booking."));
       throw err;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveDraft = async (payload: BookingFormPayload) => {
+    try {
+      setSaving(true);
+      const isEditingExisting = editingBooking && bookingId(editingBooking);
+      const existingId = isEditingExisting ? bookingId(editingBooking) : null;
+
+      let invoiceId: string | null = null;
+      let invoiceCode = "";
+
+      const today = new Date().toISOString().split("T")[0];
+      const lineTotal = Math.max(0, Number(payload.lineTotal ?? 0));
+      const hours = Math.max(0, Number(payload.durationHours ?? 0));
+      const nameParts = [
+        payload.spaceName || "Space Booking",
+        payload.spaceDay ? `(${payload.spaceDay})` : "",
+        hours > 0 ? `· ${hours}h` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      try {
+        const invoiceRes = await handleCreateInvoice({
+          customerName: payload.customerName || "Walk-in Customer",
+          customerPhone: payload.customerPhone || "",
+          customerId: payload.customerId || undefined,
+          invoiceDate: today,
+          dueDate: today,
+          salesPersonName: staff.m_staff_name || "Space Booking",
+          notes: payload.notes || "Space Booking Draft",
+          items: [
+            {
+              productName: nameParts,
+              qty: 1,
+              unitPrice: lineTotal,
+              discount: payload.discountAmount || 0,
+              category: "space",
+            },
+          ],
+          subTotal: payload.subTotal || lineTotal,
+          discountTotal: payload.discountAmount || 0,
+          grandTotal: lineTotal,
+          status: "draft",
+          mode: "Draft",
+          paymentStatus: "due",
+          paymentBreakdown: {
+            cash: 0,
+            upi: 0,
+            card: 0,
+            wallet: 0,
+            paidAmount: 0,
+            dueAmount: lineTotal,
+            changeAmount: 0,
+          },
+          pendingAmount: lineTotal,
+          activityType: "Space Booking",
+          createdBy: {
+            m_staff_id: staff.m_staff_id,
+            m_staff_name: staff.m_staff_name,
+            m_staff_email: staff.m_staff_email,
+          },
+        } as Parameters<typeof handleCreateInvoice>[0]);
+
+        const inv = invoiceRes?.invoice;
+        invoiceId = inv?._id ? String(inv._id) : null;
+        invoiceCode =
+          inv?.invoiceCode ||
+          inv?.invoiceNumber ||
+          (invoiceId ? `DRAFT-${invoiceId.slice(-6)}` : "");
+      } catch (invErr) {
+        console.warn(
+          "Could not create linked draft invoice; continuing with space booking draft.",
+          invErr,
+        );
+        invoiceCode = `DRAFT-${Date.now().toString().slice(-6)}`;
+      }
+
+      const bookingData: SpaceBookingPayload = {
+        ...payload,
+        status: "Draft",
+        invoiceId,
+        invoiceCode,
+        grandTotal: lineTotal,
+        paidAmount: 0,
+        dueAmount: lineTotal,
+        paymentStatus: "" as const,
+        paymentMode: "Draft",
+      };
+
+      if (isEditingExisting && existingId) {
+        await handleUpdateSpaceBooking(existingId, bookingData);
+        toast.success(`Booking draft for ${payload.customerName} updated!`);
+      } else {
+        await handleCreateSpaceBooking(bookingData);
+        toast.success(`Booking draft for ${payload.customerName} saved!`);
+      }
+
+      setIsCreateModalOpen(false);
+      setEditingBooking(null);
+      setPendingCheckout(null);
+      await fetchBookings();
+
+      await Swal.fire(
+        "Draft Saved",
+        `Space booking has been saved as draft${
+          invoiceCode ? ` (${invoiceCode})` : ""
+        }. You can review or complete it from the Draft tab anytime.`,
+        "success",
+      );
+    } catch (err: unknown) {
+      Swal.fire(
+        "Save Draft Failed",
+        apiErrorMessage(err, "Could not save space booking draft."),
+        "error",
+      );
     } finally {
       setSaving(false);
     }
@@ -576,6 +977,40 @@ const SpaceBook = () => {
         ),
       },
       {
+        id: "amount",
+        header: "Amount",
+        size: 110,
+        Cell: ({ row }) => {
+          const b = row.original;
+          const amount = Number(b.grandTotal ?? b.paidAmount ?? 0);
+          const isDraft = b.status === "Draft";
+          return (
+            <div className="flex flex-col">
+              <span className="font-semibold text-slate-800 tabular-nums">
+                ₹{amount.toLocaleString("en-IN")}
+              </span>
+              {isDraft ? (
+                <span className="inline-flex items-center text-[10px] font-semibold text-amber-600">
+                  Draft Bill
+                </span>
+              ) : b.paymentStatus ? (
+                <span
+                  className={`text-[10px] font-semibold uppercase tracking-wider ${
+                    b.paymentStatus === "full"
+                      ? "text-emerald-600"
+                      : b.paymentStatus === "partial"
+                        ? "text-blue-600"
+                        : "text-amber-600"
+                  }`}
+                >
+                  {b.paymentStatus}
+                </span>
+              ) : null}
+            </div>
+          );
+        },
+      },
+      {
         accessorKey: "status",
         header: "Status",
         size: 100,
@@ -594,6 +1029,14 @@ const SpaceBook = () => {
               <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-300/80 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800 shadow-2xs">
                 <span className="h-2 w-2 rounded-full bg-blue-500 ring-2 ring-blue-300/50" />
                 Upcoming
+              </span>
+            );
+          }
+          if (status === "Draft") {
+            return (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/80 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 shadow-2xs">
+                <span className="h-2 w-2 rounded-full bg-amber-500 ring-2 ring-amber-300/50" />
+                Draft
               </span>
             );
           }
@@ -635,14 +1078,36 @@ const SpaceBook = () => {
     displayColumnDefOptions: {
       "mrt-row-actions": {
         header: "Actions",
-        size: 130,
-        minSize: 120,
+        size: 160,
+        minSize: 140,
         muiTableHeadCellProps: { align: "center" },
         muiTableBodyCellProps: { align: "center" },
       },
     },
+    renderDetailPanel: ({ row }) => (
+      <div className="bg-slate-50/80 p-4 border-y border-slate-200 flex flex-col items-center">
+        <div className="mb-2 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+          Booking Summary Card
+        </div>
+        <BookingSummaryRenderer booking={row.original} />
+      </div>
+    ),
     renderRowActions: ({ row }) => (
       <div className="flex min-w-max items-center justify-center gap-1.5">
+        {row.original.status === "Draft" && (
+          <Can permission={PERMISSIONS.SPACE_BOOKING_UPDATE}>
+            <button
+              type="button"
+              className="flex h-8 items-center gap-1 px-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 shadow-2xs transition-all hover:bg-amber-100 hover:text-amber-800 active:scale-95 text-xs font-semibold"
+              title="Pay / Checkout Draft"
+              onClick={() => setEditingBooking(row.original)}
+            >
+              <CreditCard size={13} />
+              <span>Pay</span>
+            </button>
+          </Can>
+        )}
+
         <button
           type="button"
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-600 shadow-2xs transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 active:scale-95"
@@ -810,7 +1275,7 @@ const SpaceBook = () => {
         </Can>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
         <button
           type="button"
           onClick={() => setStatusFilter("All")}
@@ -878,6 +1343,26 @@ const SpaceBook = () => {
 
         <button
           type="button"
+          onClick={() => setStatusFilter("Draft")}
+          className={`flex items-start justify-between rounded-2xl border p-4 text-left transition ${
+            statusFilter === "Draft"
+              ? "border-amber-400 bg-amber-50/50 shadow-sm ring-2 ring-amber-500/20"
+              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50"
+          }`}
+        >
+          <div>
+            <span className="text-xs font-medium text-slate-500">Drafts</span>
+            <div className="mt-1 text-2xl font-bold tabular-nums text-amber-700">
+              {metrics.draft}
+            </div>
+          </div>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+            <FileText size={20} />
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setStatusFilter("Expired")}
           className={`flex items-start justify-between rounded-2xl border p-4 text-left transition ${
             statusFilter === "Expired"
@@ -902,7 +1387,7 @@ const SpaceBook = () => {
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
           {(
-            ["All", "Ongoing", "Upcoming", "Expired", "Cancelled"] as const
+            ["All", "Ongoing", "Upcoming", "Draft", "Expired", "Cancelled"] as const
           ).map((tab) => {
             const isSelected = statusFilter === tab;
             const count =
@@ -912,9 +1397,11 @@ const SpaceBook = () => {
                   ? metrics.ongoing
                   : tab === "Upcoming"
                     ? metrics.upcoming
-                    : tab === "Expired"
-                      ? metrics.expired
-                      : metrics.cancelled;
+                    : tab === "Draft"
+                      ? metrics.draft
+                      : tab === "Expired"
+                        ? metrics.expired
+                        : metrics.cancelled;
 
             return (
               <button
@@ -1016,8 +1503,8 @@ const SpaceBook = () => {
             if (e.target === e.currentTarget) setSelectedBooking(null);
           }}
         >
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-4">
+          <div className="w-full max-w-lg max-h-[88vh] flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600">
                   <Building2 size={20} />
@@ -1046,7 +1533,7 @@ const SpaceBook = () => {
               </button>
             </div>
 
-            <div className="space-y-4 p-6 text-sm">
+            <div className="space-y-4 overflow-y-auto p-6 text-sm">
               <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 p-4">
                 <div className="flex items-center gap-3">
                   <div
@@ -1135,22 +1622,44 @@ const SpaceBook = () => {
                   </p>
                 </div>
               )}
+
+              <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 flex flex-col items-center">
+                <div className="mb-2 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Booking Summary Card
+                </div>
+                <BookingSummaryRenderer booking={selectedBooking} />
+              </div>
             </div>
 
-            <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">
-              <Can permission={PERMISSIONS.SPACE_BOOKING_UPDATE}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingBooking(selectedBooking);
-                    setSelectedBooking(null);
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
-                >
-                  <Pencil size={14} />
-                  <span>Edit Booking</span>
-                </button>
-              </Can>
+            <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+              <div className="flex items-center gap-2">
+                <Can permission={PERMISSIONS.SPACE_BOOKING_UPDATE}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingBooking(selectedBooking);
+                      setSelectedBooking(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50"
+                  >
+                    <Pencil size={14} />
+                    <span>Edit Booking</span>
+                  </button>
+                </Can>
+                {selectedBooking.status === "Draft" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingBooking(selectedBooking);
+                      setSelectedBooking(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-amber-700 active:scale-95"
+                  >
+                    <CreditCard size={14} />
+                    <span>Proceed to Checkout</span>
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedBooking(null)}
@@ -1238,6 +1747,7 @@ const SpaceBook = () => {
           setPendingCheckout(null);
         }}
         onSubmit={handleCreate}
+        onSaveDraft={handleSaveDraft}
         draftValues={pendingCheckout}
         submitting={saving}
       />
@@ -1246,6 +1756,7 @@ const SpaceBook = () => {
         isOpen={Boolean(editingBooking)}
         onClose={() => setEditingBooking(null)}
         onSubmit={handleUpdate}
+        onSaveDraft={handleSaveDraft}
         initialBooking={editingBooking}
         submitting={saving}
       />
@@ -1257,6 +1768,16 @@ const SpaceBook = () => {
           setOpenCheckout(false);
           // Return user to booking details if they cancel checkout
           if (pendingCheckout) {
+            const originalDraftId = (pendingCheckout as any)?._originalBookingId;
+            if (originalDraftId) {
+              const orig = bookings.find((b) => bookingId(b) === originalDraftId);
+              setEditingBooking({
+                ...(orig || {}),
+                ...pendingCheckout,
+                _id: originalDraftId,
+              } as any);
+              return;
+            }
             setIsCreateModalOpen(true);
           }
         }}
@@ -1267,6 +1788,10 @@ const SpaceBook = () => {
         initialCustomerId={pendingCheckout?.customerId || undefined}
         initialMembership={pendingCheckout?.membershipType || undefined}
         initialMembershipPlanId={pendingCheckout?.membershipPlanId || undefined}
+        initialMembershipDiscount={pendingCheckout?.discountAmount || 0}
+        initialCashbackTotal={pendingCheckout?.cashbackAmount || 0}
+        lockMembershipDiscount={true}
+        disableCashback={true}
         initialNotes={
           pendingCheckout
             ? [
@@ -1279,7 +1804,6 @@ const SpaceBook = () => {
             : ""
         }
         couponApplicableContext="space"
-        disableCashback
         onConfirmPayment={async (payment) => {
           await handleConfirmCheckoutPayment(payment);
         }}
