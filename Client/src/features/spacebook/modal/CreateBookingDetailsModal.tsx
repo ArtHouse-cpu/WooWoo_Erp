@@ -196,17 +196,132 @@ export const PURPOSE_OPTIONS = [
   "Other",
 ];
 
-/** Calculates end date from start date and number of days (inclusive) */
-export const calculateEndDate = (startDateStr: string, days: number): string => {
+export type PlanDurationUnit = "day" | "week" | "month";
+
+export interface PlanDurationInfo {
+  unit: PlanDurationUnit;
+  baseCount: number;
+  label: string;
+  unitSingular: string;
+  unitPlural: string;
+  priceSuffix: string;
+  isDurationPlan: boolean;
+}
+
+export const parsePlanDuration = (
+  name = "",
+  spaceType: "coworking" | "exclusive" | string = "coworking",
+): PlanDurationInfo => {
+  const cleanName = (name || "")
+    .replace(/\bweekdays?\b/gi, "")
+    .replace(/\bweekends?\b/gi, "");
+
+  // Check Months (e.g. "3 Months", "6 Months", "Monthly", "1 Month")
+  const monthMatch = cleanName.match(/(\d+)?\s*(?:months?|monthly|mo)\b/i);
+  if (monthMatch) {
+    const num = monthMatch[1] ? parseInt(monthMatch[1], 10) : 1;
+    const baseCount = Number.isFinite(num) && num > 0 ? num : 1;
+    return {
+      unit: "month",
+      baseCount,
+      label: "No. of Months",
+      unitSingular: "Month",
+      unitPlural: "Months",
+      priceSuffix: baseCount > 1 ? ` / ${baseCount} months` : " / month",
+      isDurationPlan: true,
+    };
+  }
+
+  // Check Weeks (e.g. "Weekly", "1 Week", "2 Weeks")
+  const weekMatch = cleanName.match(/(\d+)?\s*(?:weeks?|weekly|wk)\b/i);
+  if (weekMatch) {
+    const num = weekMatch[1] ? parseInt(weekMatch[1], 10) : 1;
+    const baseCount = Number.isFinite(num) && num > 0 ? num : 1;
+    return {
+      unit: "week",
+      baseCount,
+      label: "No. of Weeks",
+      unitSingular: "Week",
+      unitPlural: "Weeks",
+      priceSuffix: baseCount > 1 ? ` / ${baseCount} weeks` : " / week",
+      isDurationPlan: true,
+    };
+  }
+
+  // Check Days (e.g. "1 day", "5 days", "Daily", "Day Pass")
+  const dayMatch = cleanName.match(/(\d+)?\s*(?:days?|daily|daypass|day\s*pass)\b/i);
+  if (dayMatch) {
+    const num = dayMatch[1] ? parseInt(dayMatch[1], 10) : 1;
+    const baseCount = Number.isFinite(num) && num > 0 ? num : 1;
+    return {
+      unit: "day",
+      baseCount,
+      label: "No. of Days",
+      unitSingular: "Day",
+      unitPlural: "Days",
+      priceSuffix: baseCount > 1 ? ` / ${baseCount} days` : " / day",
+      isDurationPlan: true,
+    };
+  }
+
+  const isCowork = String(spaceType).toLowerCase() === "coworking";
+  if (isCowork) {
+    return {
+      unit: "day",
+      baseCount: 1,
+      label: "No. of Days",
+      unitSingular: "Day",
+      unitPlural: "Days",
+      priceSuffix: " / day",
+      isDurationPlan: true,
+    };
+  }
+
+  return {
+    unit: "day",
+    baseCount: 1,
+    label: "No. of Days",
+    unitSingular: "Day",
+    unitPlural: "Days",
+    priceSuffix: " / hr",
+    isDurationPlan: false,
+  };
+};
+
+/** Calculates end date based on start date, duration unit, and count (inclusive) */
+export const calculatePlanEndDate = (
+  startDateStr: string,
+  unit: PlanDurationUnit,
+  count: number,
+): string => {
   if (!startDateStr) return "";
   const [y, m, d] = startDateStr.split("-").map(Number);
   const date = new Date(y, m - 1, d);
   if (Number.isNaN(date.getTime())) return startDateStr;
-  date.setDate(date.getDate() + Math.max(1, days) - 1);
+  const safeCount = Math.max(1, count || 1);
+
+  if (unit === "week") {
+    date.setDate(date.getDate() + safeCount * 7 - 1);
+  } else if (unit === "month") {
+    const targetMonth = date.getMonth() + safeCount;
+    date.setMonth(targetMonth);
+    if (date.getMonth() !== ((targetMonth % 12) + 12) % 12) {
+      date.setDate(0);
+    }
+    date.setDate(date.getDate() - 1);
+  } else {
+    date.setDate(date.getDate() + safeCount - 1);
+  }
+
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+};
+
+/** Calculates end date from start date and number of days (inclusive) */
+export const calculateEndDate = (startDateStr: string, days: number): string => {
+  return calculatePlanEndDate(startDateStr, "day", days);
 };
 
 export type MultiDateSlot = {
@@ -432,15 +547,11 @@ const CreateBookingDetailsModal = ({
     },
   ]);
 
-  // Coworking Plans
-  const [coworkingDays, setCoworkingDays] = useState<number>(1);
+  // Coworking / Duration Plans State
+  const [planDurationCount, setPlanDurationCount] = useState<number>(1);
   const [coworkingStartDate, setCoworkingStartDate] = useState<string>(() =>
     new Date().toISOString().split("T")[0],
   );
-
-  const coworkingEndDate = useMemo(() => {
-    return calculateEndDate(coworkingStartDate, coworkingDays);
-  }, [coworkingStartDate, coworkingDays]);
 
   const singleDateSlots = useMemo(() => {
     return getTimeSlotsForDuration(duration);
@@ -607,7 +718,7 @@ const CreateBookingDetailsModal = ({
       setBookingFrom("09:00");
       setBookingTo("12:00");
       setCoworkingStartDate(todayStr);
-      setCoworkingDays(1);
+      setPlanDurationCount(1);
       setDateMode("single");
       setDuration(3);
       setTimeSlot("09:00 AM - 12:00 PM");
@@ -695,8 +806,11 @@ const CreateBookingDetailsModal = ({
     if (matching.length > 0) {
       const alreadyMatches = matching.some((s) => String(s._id) === String(spaceId));
       if (!alreadyMatches) {
-        setSpaceId(String(matching[0]._id));
+        const nextSpace = matching[0];
+        setSpaceId(String(nextSpace._id));
         setSpaceQty(1);
+        const info = parsePlanDuration(nextSpace.name, nextSpace.spaceType || type);
+        setPlanDurationCount(info.baseCount);
       }
     }
   };
@@ -734,6 +848,56 @@ const CreateBookingDetailsModal = ({
   const selectedSpace = useMemo(() => {
     return spaces.find((s) => String(s._id) === String(spaceId)) || filteredSpaces[0] || null;
   }, [spaces, spaceId, filteredSpaces]);
+
+  const planDurationInfo = useMemo(() => {
+    return parsePlanDuration(
+      selectedSpace?.name || "",
+      selectedSpace?.spaceType || spaceTypeFilter,
+    );
+  }, [selectedSpace, spaceTypeFilter]);
+
+  const isDurationPlan =
+    spaceTypeFilter === "coworking" || planDurationInfo.isDurationPlan;
+
+  const packageMultiplier = useMemo(() => {
+    const base = planDurationInfo.baseCount || 1;
+    return Math.max(1, Math.round(planDurationCount / base));
+  }, [planDurationCount, planDurationInfo.baseCount]);
+
+  const coworkingEndDate = useMemo(() => {
+    return calculatePlanEndDate(
+      coworkingStartDate,
+      planDurationInfo.unit,
+      planDurationCount,
+    );
+  }, [coworkingStartDate, planDurationInfo.unit, planDurationCount]);
+
+  const totalDaysForHours = useMemo(() => {
+    if (!coworkingStartDate || !coworkingEndDate) return 1;
+    const [sy, sm, sd] = coworkingStartDate.split("-").map(Number);
+    const [ey, em, ed] = coworkingEndDate.split("-").map(Number);
+    const sDate = new Date(sy, sm - 1, sd);
+    const eDate = new Date(ey, em - 1, ed);
+    const diff = Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return Math.max(1, diff);
+  }, [coworkingStartDate, coworkingEndDate]);
+
+  const coworkingDays = planDurationCount;
+
+  // Auto-sync plan duration count when selected space changes
+  const prevSelectedSpaceIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!selectedSpace) return;
+    const sId = String(selectedSpace._id);
+    if (prevSelectedSpaceIdRef.current && prevSelectedSpaceIdRef.current !== sId) {
+      const info = parsePlanDuration(
+        selectedSpace.name || "",
+        selectedSpace.spaceType || spaceTypeFilter,
+      );
+      setPlanDurationCount(info.baseCount);
+    }
+    prevSelectedSpaceIdRef.current = sId;
+  }, [selectedSpace, spaceTypeFilter]);
 
   // Customer Search & Dropdown
   useEffect(() => {
@@ -904,9 +1068,14 @@ const CreateBookingDetailsModal = ({
     }
   };
 
-  // Coworking Handlers
+  // Coworking / Duration Plan Handlers
+  const handleDurationChange = (delta: number) => {
+    const step = planDurationInfo.baseCount || 1;
+    setPlanDurationCount((prev) => Math.max(step, prev + delta * step));
+  };
+
   const handleCoworkingDaysChange = (delta: number) => {
-    setCoworkingDays((prev) => Math.max(1, prev + delta));
+    handleDurationChange(delta);
   };
 
   // Exclusive Duration & Time Slot Handlers
@@ -1073,8 +1242,8 @@ const CreateBookingDetailsModal = ({
       Number(selectedSpace?.price ?? (spaceTypeFilter === "coworking" ? 400 : 800)),
     );
     const baseSpaceTotal =
-      spaceTypeFilter === "coworking"
-        ? unitRate * Math.max(coworkingDays, 1) * spaceQty
+      isDurationPlan
+        ? unitRate * packageMultiplier * spaceQty
         : dateMode === "multiple"
         ? multiDateSlots.reduce(
             (acc, s) => acc + unitRate * (s.duration || 1) * spaceQty,
@@ -1110,7 +1279,9 @@ const CreateBookingDetailsModal = ({
     membershipType,
     selectedSpace,
     spaceTypeFilter,
-    coworkingDays,
+    isDurationPlan,
+    packageMultiplier,
+    planDurationCount,
     spaceQty,
     dateMode,
     multiDateSlots,
@@ -1130,7 +1301,7 @@ const CreateBookingDetailsModal = ({
 
     if (!spaceId) err.spaceId = "Please select a space.";
 
-    if (spaceTypeFilter === "coworking") {
+    if (isDurationPlan) {
       if (!coworkingStartDate) err.coworkingStartDate = "Start date is required.";
     } else if (dateMode === "multiple" && spaceTypeFilter === "exclusive") {
       if (multiDateSlots.length === 0) {
@@ -1167,21 +1338,26 @@ const CreateBookingDetailsModal = ({
       return;
     }
 
-    const isCoworking = spaceTypeFilter === "coworking";
-    const isMultiple = !isCoworking && dateMode === "multiple";
-    const durationHours = isCoworking
-      ? coworkingDays * 8
+    const isDuration = isDurationPlan;
+    const isMultiple = !isDuration && dateMode === "multiple";
+    const durationHours = isDuration
+      ? totalDaysForHours * 8
       : isMultiple
       ? multiDateSlots.reduce((acc, s) => acc + (s.duration || 1), 0)
       : calcDurationHours(bookingFrom, bookingTo) || duration;
 
-    const unitPrice = Math.max(0, Number(selectedSpace?.price ?? (isCoworking ? 400 : 800)));
+    const unitPrice = Math.max(
+      0,
+      Number(
+        selectedSpace?.price ?? (spaceTypeFilter === "coworking" ? 400 : 800),
+      ),
+    );
     const servicesTotal = selectedServicesList.reduce(
       (acc, s) => acc + s.price * s.qty,
       0,
     );
-    const spaceCharges = isCoworking
-      ? unitPrice * Math.max(coworkingDays, 1) * spaceQty
+    const spaceCharges = isDuration
+      ? unitPrice * packageMultiplier * spaceQty
       : isMultiple
       ? multiDateSlots.reduce(
           (acc, s) => acc + unitPrice * (s.duration || 1) * spaceQty,
@@ -1206,8 +1382,11 @@ const CreateBookingDetailsModal = ({
     if (purpose) {
       finalNotes = finalNotes ? `Purpose: ${purpose}\n${finalNotes}` : `Purpose: ${purpose}`;
     }
-    if (isCoworking) {
-      const coworkSummary = `Coworking Booking (${coworkingDays} ${coworkingDays === 1 ? "Day" : "Days"}: ${formatDateDisplay(coworkingStartDate)} to ${formatDateDisplay(coworkingEndDate)})`;
+    if (isDuration) {
+      const durationText = `${planDurationCount} ${
+        planDurationCount === 1 ? planDurationInfo.unitSingular : planDurationInfo.unitPlural
+      }`;
+      const coworkSummary = `${spaceType || (spaceTypeFilter === "coworking" ? "Coworking" : "Exclusive")} Booking (${durationText}: ${formatDateDisplay(coworkingStartDate)} to ${formatDateDisplay(coworkingEndDate)})`;
       finalNotes = finalNotes ? `${finalNotes}\n${coworkSummary}` : coworkSummary;
     } else if (isMultiple && multiDateSlots.length > 0) {
       const datesSummary = multiDateSlots
@@ -1225,17 +1404,17 @@ const CreateBookingDetailsModal = ({
       membershipType: membershipType || undefined,
       membershipPlanId: membershipPlanId || undefined,
       spaceId: selectedSpace?._id ? String(selectedSpace._id) : spaceId,
-      bookingDate: isCoworking
+      bookingDate: isDuration
         ? coworkingStartDate
         : isMultiple
         ? multiDateSlots[0]?.date || bookingDate
         : bookingDate,
-      startTime: isCoworking
+      startTime: isDuration
         ? "09:00"
         : isMultiple
         ? multiDateSlots[0]?.startTime || bookingFrom
         : bookingFrom,
-      endTime: isCoworking
+      endTime: isDuration
         ? "21:00"
         : isMultiple
         ? multiDateSlots[0]?.endTime || bookingTo
@@ -1678,9 +1857,15 @@ const CreateBookingDetailsModal = ({
                             <div
                               key={String(space._id)}
                               onClick={() => {
+                                const isNew = spaceId !== String(space._id);
                                 setSpaceId(String(space._id));
-                                if (spaceId !== String(space._id)) {
+                                if (isNew) {
                                   setSpaceQty(1);
+                                  const info = parsePlanDuration(
+                                    space.name,
+                                    space.spaceType || spaceTypeFilter,
+                                  );
+                                  setPlanDurationCount(info.baseCount);
                                 }
                                 if (errors.spaceId) {
                                   setErrors((prev) => ({ ...prev, spaceId: "" }));
@@ -1755,9 +1940,12 @@ const CreateBookingDetailsModal = ({
                                         (spaceTypeFilter === "coworking" ? 400 : 800),
                                     ).toLocaleString("en-IN")}
                                     <span className="text-[11px] font-normal text-slate-400">
-                                      {spaceTypeFilter === "coworking"
-                                        ? " / day"
-                                        : " / hr"}
+                                      {
+                                        parsePlanDuration(
+                                          space.name,
+                                          space.spaceType || spaceTypeFilter,
+                                        ).priceSuffix
+                                      }
                                     </span>
                                   </span>
 
@@ -1787,6 +1975,11 @@ const CreateBookingDetailsModal = ({
                                         if (!isSelected) {
                                           setSpaceId(String(space._id));
                                           setSpaceQty(1);
+                                          const info = parsePlanDuration(
+                                            space.name,
+                                            space.spaceType || spaceTypeFilter,
+                                          );
+                                          setPlanDurationCount(info.baseCount);
                                         } else {
                                           setSpaceQty((prev) => Math.min(10, prev + 1));
                                         }
@@ -1805,27 +1998,27 @@ const CreateBookingDetailsModal = ({
                     )}
                   </div>
 
-                  {/* 3. Date & Duration * (Coworking) OR Date & Time * (Exclusive) */}
+                  {/* 3. Date & Duration * (Coworking or Duration Plan) OR Date & Time * (Hourly Exclusive) */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                          {spaceTypeFilter === "coworking" ? (
+                          {isDurationPlan ? (
                             <Calendar size={14} />
                           ) : (
                             <Clock size={14} />
                           )}
                         </span>
                         <h3 className="font-bold text-slate-800 text-sm">
-                          {spaceTypeFilter === "coworking"
+                          {isDurationPlan
                             ? "Date & Duration"
                             : "Date & Time"}{" "}
                           <span className="text-rose-500">*</span>
                         </h3>
                       </div>
 
-                      {/* Exclusive Mode: Single vs Multiple Toggle */}
-                      {spaceTypeFilter === "exclusive" && (
+                      {/* Exclusive Mode: Single vs Multiple Toggle (only for hourly exclusive spaces) */}
+                      {!isDurationPlan && spaceTypeFilter === "exclusive" && (
                         <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200/80">
                           <button
                             type="button"
@@ -1853,10 +2046,10 @@ const CreateBookingDetailsModal = ({
                       )}
                     </div>
 
-                    {/* Mode 1: Coworking View */}
-                    {spaceTypeFilter === "coworking" && (
+                    {/* Mode 1: Duration Plan View (Coworking or Exclusive with Day/Week/Month Plan) */}
+                    {isDurationPlan && (
                       <div className="space-y-3">
-                        {/* Start Date, Days Stepper, End Date Row */}
+                        {/* Start Date, Duration Stepper, End Date Row */}
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                           {/* Start Date */}
                           <div>
@@ -1898,27 +2091,29 @@ const CreateBookingDetailsModal = ({
                             )}
                           </div>
 
-                          {/* No. of Days Stepper */}
+                          {/* Stepper: No. of Months / No. of Weeks / No. of Days */}
                           <div>
                             <label className="mb-1 block text-xs font-semibold text-slate-600">
-                              No. of Days
+                              {planDurationInfo.label}
                             </label>
                             <div className="flex h-10 items-center overflow-hidden rounded-xl border border-slate-200 bg-white">
                               <button
                                 type="button"
-                                onClick={() => handleCoworkingDaysChange(-1)}
-                                disabled={coworkingDays <= 1}
+                                onClick={() => handleDurationChange(-1)}
+                                disabled={planDurationCount <= (planDurationInfo.baseCount || 1)}
                                 className="flex h-full w-10 items-center justify-center border-r border-slate-100 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
                               >
                                 <Minus size={14} />
                               </button>
                               <div className="flex flex-1 items-center justify-center text-xs font-bold text-slate-700">
-                                {coworkingDays}{" "}
-                                {coworkingDays === 1 ? "Day" : "Days"}
+                                {planDurationCount}{" "}
+                                {planDurationCount === 1
+                                  ? planDurationInfo.unitSingular
+                                  : planDurationInfo.unitPlural}
                               </div>
                               <button
                                 type="button"
-                                onClick={() => handleCoworkingDaysChange(1)}
+                                onClick={() => handleDurationChange(1)}
                                 className="flex h-full w-10 items-center justify-center border-l border-slate-100 text-slate-600 hover:bg-slate-50 transition"
                               >
                                 <Plus size={14} />
@@ -1939,7 +2134,7 @@ const CreateBookingDetailsModal = ({
                             </div>
                             <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
                               <Info size={11} className="shrink-0" />
-                              Auto calculated based on number of days
+                              Auto calculated based on number of {planDurationInfo.unitPlural.toLowerCase()}
                             </p>
                           </div>
                         </div>
@@ -1947,7 +2142,7 @@ const CreateBookingDetailsModal = ({
                     )}
 
                     {/* Mode 2: Exclusive Single Date View */}
-                    {spaceTypeFilter === "exclusive" && dateMode === "single" && (
+                    {!isDurationPlan && spaceTypeFilter === "exclusive" && dateMode === "single" && (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         {/* Date */}
                         <div>
@@ -2058,7 +2253,7 @@ const CreateBookingDetailsModal = ({
                     )}
 
                     {/* Mode 3: Exclusive Multiple Dates View */}
-                    {spaceTypeFilter === "exclusive" && dateMode === "multiple" && (
+                    {!isDurationPlan && spaceTypeFilter === "exclusive" && dateMode === "multiple" && (
                       <div className="space-y-2.5">
                         {/* Column Labels */}
                         <div className="hidden sm:grid sm:grid-cols-[1fr_140px_1fr_40px] gap-2 px-1 text-xs font-semibold text-slate-500">
@@ -2427,14 +2622,26 @@ const CreateBookingDetailsModal = ({
               {/* Right Column: Refactored Booking Summary Card (4 cols) */}
               <div className="lg:col-span-4">
                 <div className="sticky top-4">
-                  {spaceTypeFilter === "coworking" ? (
+                  {isDurationPlan ? (
                     <CoworkingSummaryCard
                       space={selectedSpace || null}
                       spaceQty={spaceQty}
                       startDate={coworkingStartDate}
                       endDate={coworkingEndDate}
-                      days={coworkingDays}
-                      unitPrice={Number(selectedSpace?.price || 400)}
+                      days={totalDaysForHours}
+                      durationCount={planDurationCount}
+                      durationUnit={planDurationInfo.unit}
+                      durationUnitSingular={planDurationInfo.unitSingular}
+                      durationUnitPlural={planDurationInfo.unitPlural}
+                      priceSuffix={planDurationInfo.priceSuffix}
+                      packageMultiplier={packageMultiplier}
+                      unitPrice={
+                        selectedSpace?.price
+                          ? Number(selectedSpace.price)
+                          : spaceTypeFilter === "coworking"
+                          ? 400
+                          : 800
+                      }
                       selectedServices={selectedServicesList}
                       discountAmount={discountAmount}
                       cashbackAmount={cashbackAmount}
