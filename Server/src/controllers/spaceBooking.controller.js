@@ -1,6 +1,17 @@
 import mongoose from 'mongoose';
 import SpaceBooking from '../models/spaceBooking.model.js';
 import Space from '../models/space.model.js';
+import {
+  BOOKING_TIMEZONE,
+  BookingValidationError,
+  buildBookingIntervals,
+  findBusyIntervals,
+  getAvailabilityRangeError,
+  intervalKey,
+  nowInBusinessTz,
+  resolveSpaceGroup,
+  validateAndPersistSchedule,
+} from '../services/spaceBookingAvailability.service.js';
 
 const ALLOWED_STATUS = new Set([
   'Upcoming',
@@ -360,6 +371,70 @@ const resolveSpaceSnapshot = async spaceId => {
   return space;
 };
 
+const isReservingStatus = status => status !== 'Cancelled' && status !== 'Draft';
+
+const sendBookingValidationError = (res, error) =>
+  res.status(error.status).json({
+    success: false,
+    code: error.code,
+    message: error.message,
+    ...error.details,
+  });
+
+export const getSpaceBookingAvailability = async (req, res) => {
+  try {
+    const {spaceId, from, excludeId} = req.query;
+    const fromKey = String(from || '').trim();
+    const toKey = String(req.query.to || from || '').trim();
+
+    const rangeError = getAvailabilityRangeError(fromKey, toKey);
+    if (rangeError) {
+      return res.status(400).json({success: false, message: rangeError});
+    }
+
+    const group = await resolveSpaceGroup(spaceId);
+    if (!group) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected space was not found.',
+      });
+    }
+
+    const now = nowInBusinessTz();
+    const busy = group.conflictScoped
+      ? await findBusyIntervals({
+          spaceIds: group.spaceIds,
+          fromKey,
+          toKey,
+          excludeId: excludeId ? String(excludeId) : null,
+        })
+      : [];
+
+    return res.status(200).json({
+      success: true,
+      timezone: BOOKING_TIMEZONE,
+      today: now.dateKey,
+      nowMinutes: now.minutes,
+      conflictScoped: group.conflictScoped,
+      from: fromKey,
+      to: toKey,
+      busy: busy.map(({date, startTime, endTime, bookingId, status}) => ({
+        date,
+        startTime,
+        endTime,
+        bookingId,
+        status,
+      })),
+    });
+  } catch (error) {
+    console.error('getSpaceBookingAvailability error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to check space availability.',
+    });
+  }
+};
+
 export const createSpaceBooking = async (req, res) => {
   try {
     const {payload, errors} = buildPayload(req.body);
@@ -391,16 +466,33 @@ export const createSpaceBooking = async (req, res) => {
       m_staff_email: req.user?.email ?? null,
     };
 
-    const booking = await SpaceBooking.create({
-      ...payload,
-      spaceName: space.name,
-      spaceType: payload.spaceType || space.spaceType || '',
-      spaceCode: payload.spaceCode || space.spaceCode || '',
-      spaceCategory: payload.spaceCategory || space.category || '',
-      spaceDay: payload.spaceDay || space.day || '',
-      unitPrice: payload.unitPrice !== undefined ? payload.unitPrice : space.price,
-      createdBy: staffFromReq,
-    });
+    const persist = () =>
+      SpaceBooking.create({
+        ...payload,
+        spaceName: space.name,
+        spaceType: payload.spaceType || space.spaceType || '',
+        spaceCode: payload.spaceCode || space.spaceCode || '',
+        spaceCategory: payload.spaceCategory || space.category || '',
+        spaceDay: payload.spaceDay || space.day || '',
+        unitPrice: payload.unitPrice !== undefined ? payload.unitPrice : space.price,
+        createdBy: staffFromReq,
+      });
+
+    let booking;
+    if (isReservingStatus(payload.status)) {
+      const {intervals, errors: scheduleErrors} = buildBookingIntervals(payload);
+      if (scheduleErrors.length || intervals.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: scheduleErrors[0] || 'A valid booking date and time are required.',
+          errors: scheduleErrors,
+        });
+      }
+      const group = await resolveSpaceGroup(payload.spaceId);
+      booking = await validateAndPersistSchedule({group, intervals, persist});
+    } else {
+      booking = await persist();
+    }
 
     const populated = await SpaceBooking.findById(booking._id).populate(
       'spaceId',
@@ -413,6 +505,9 @@ export const createSpaceBooking = async (req, res) => {
       booking: serializeBooking(populated),
     });
   } catch (error) {
+    if (error instanceof BookingValidationError) {
+      return sendBookingValidationError(res, error);
+    }
     console.error('createSpaceBooking error:', error);
     return res.status(500).json({
       success: false,
@@ -586,8 +681,55 @@ export const updateSpaceBooking = async (req, res) => {
       );
     }
 
-    Object.assign(existing, payload);
-    await existing.save();
+    const persist = async () => {
+      Object.assign(existing, payload);
+      await existing.save();
+    };
+
+    if (isReservingStatus(targetStatus)) {
+      const previous = existing.toObject();
+      const next = {...previous, ...payload};
+      const {intervals, errors: scheduleErrors} = buildBookingIntervals(next);
+      if (scheduleErrors.length || intervals.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: scheduleErrors[0] || 'A valid booking date and time are required.',
+          errors: scheduleErrors,
+        });
+      }
+
+      const group = await resolveSpaceGroup(next.spaceId);
+      if (!group) {
+        return res.status(400).json({
+          success: false,
+          message: 'Selected space was not found.',
+        });
+      }
+      const previousGroup =
+        String(previous.spaceId) === String(next.spaceId)
+          ? group
+          : await resolveSpaceGroup(previous.spaceId);
+
+      const wasReserving = isReservingStatus(existing.status);
+      const sameGroup = previousGroup?.lockKey === group.lockKey;
+      const previousKeys = new Set(
+        buildBookingIntervals(previous).intervals.map(intervalKey),
+      );
+      const checkIntervals =
+        wasReserving && sameGroup
+          ? intervals.filter(iv => !previousKeys.has(intervalKey(iv)))
+          : intervals;
+
+      await validateAndPersistSchedule({
+        group,
+        intervals,
+        checkIntervals,
+        excludeId: existing._id,
+        persist,
+      });
+    } else {
+      await persist();
+    }
 
     const populated = await SpaceBooking.findById(existing._id)
       .populate(
@@ -602,6 +744,9 @@ export const updateSpaceBooking = async (req, res) => {
       booking: serializeBooking(populated),
     });
   } catch (error) {
+    if (error instanceof BookingValidationError) {
+      return sendBookingValidationError(res, error);
+    }
     console.error('updateSpaceBooking error:', error);
     return res.status(500).json({
       success: false,

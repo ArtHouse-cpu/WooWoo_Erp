@@ -38,6 +38,10 @@ import {
   ExclusiveSingleDateSummaryCard,
   type SelectedServiceItem,
 } from "./modal/summary";
+import {
+  getBookingConflictMessage,
+  getBusinessToday,
+} from "./utils/bookingAvailability";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
 import {
   handleCreateInvoice,
@@ -351,16 +355,7 @@ const SpaceBook = () => {
   useEffect(() => {
     const controller = new AbortController();
     void fetchBookings(controller.signal);
-
-    // Periodically sync statuses with current time every 30 seconds
-    const interval = setInterval(() => {
-      void fetchBookings();
-    }, 30000);
-
-    return () => {
-      controller.abort();
-      clearInterval(interval);
-    };
+    return () => controller.abort();
   }, [fetchBookings]);
 
   const metrics = useMemo(() => {
@@ -547,7 +542,7 @@ const SpaceBook = () => {
       return;
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = getBusinessToday();
     const bookingNotes = [
       pendingCheckout.notes,
       `Space booking · ${pendingCheckout.spaceName || "Space"}`,
@@ -564,8 +559,59 @@ const SpaceBook = () => {
     const membershipDiscount = Number(payment.membershipDiscount ?? 0);
     const totalDiscount = couponDiscount + referralDiscount + membershipDiscount;
 
+    const existingDraftId = (pendingCheckout as any)?._originalBookingId as
+      | string
+      | undefined;
+    const bookingData: SpaceBookingPayload = {
+      customerName: payment.customerName?.trim() || pendingCheckout.customerName,
+      customerPhone: payment.customerPhone?.trim() || pendingCheckout.customerPhone,
+      customerEmail: pendingCheckout.customerEmail,
+      spaceId: pendingCheckout.spaceId,
+      bookingDate: pendingCheckout.bookingDate,
+      startTime: pendingCheckout.startTime,
+      endTime: pendingCheckout.endTime,
+      status: (pendingCheckout.status === "Draft" ? "Upcoming" : pendingCheckout.status) as SpaceBookingStatus,
+      notes: pendingCheckout.notes,
+      spaceQty: pendingCheckout.spaceQty,
+      dateMode: pendingCheckout.dateMode,
+      multiDateSlots: pendingCheckout.multiDateSlots,
+      durationCount: pendingCheckout.durationCount,
+      durationUnit: pendingCheckout.durationUnit,
+      packageMultiplier: pendingCheckout.packageMultiplier,
+      coworkingStartDate: pendingCheckout.coworkingStartDate,
+      coworkingEndDate: pendingCheckout.coworkingEndDate,
+      subTotal:
+        pendingCheckout.subTotal != null
+          ? Number(pendingCheckout.subTotal)
+          : checkoutItems.reduce((acc, it) => acc + it.price * it.qty, 0),
+      discountAmount: totalDiscount,
+      cashbackAmount: payment.cashbackTotal,
+      selectedServices: pendingCheckout.selectedServices,
+      summarySnapshot: pendingCheckout.summarySnapshot,
+    };
+
+    let reservedBookingId = existingDraftId || "";
+    const releaseReservation = async () => {
+      if (existingDraftId) {
+        await handleUpdateSpaceBooking(existingDraftId, { status: "Draft" }).catch(
+          () => undefined,
+        );
+      } else if (reservedBookingId) {
+        await handleDeleteSpaceBooking(reservedBookingId).catch(() => undefined);
+      }
+    };
+
     try {
       setSaving(true);
+
+      // The booking is saved before the invoice so the server can reject a
+      // taken slot before any payment is recorded.
+      if (existingDraftId) {
+        await handleUpdateSpaceBooking(existingDraftId, bookingData);
+      } else {
+        const created = await handleCreateSpaceBooking(bookingData);
+        reservedBookingId = created?.booking ? bookingId(created.booking) : "";
+      }
 
       const invoiceRes = await handleCreateInvoice({
         customerName:
@@ -620,7 +666,10 @@ const SpaceBook = () => {
           m_staff_name: staff.m_staff_name,
           m_staff_email: staff.m_staff_email,
         },
-      } as Parameters<typeof handleCreateInvoice>[0]);
+      } as Parameters<typeof handleCreateInvoice>[0]).catch(async (invoiceErr: unknown) => {
+        await releaseReservation();
+        throw invoiceErr;
+      });
 
       const invoice = invoiceRes?.invoice;
       const invoiceCode =
@@ -629,46 +678,22 @@ const SpaceBook = () => {
         String(invoice?._id || "");
       const invoiceId = invoice?._id ? String(invoice._id) : null;
 
-      const existingDraftId = (pendingCheckout as any)?._originalBookingId;
-      const bookingData: SpaceBookingPayload = {
-        customerName: payment.customerName?.trim() || pendingCheckout.customerName,
-        customerPhone: payment.customerPhone?.trim() || pendingCheckout.customerPhone,
-        customerEmail: pendingCheckout.customerEmail,
-        spaceId: pendingCheckout.spaceId,
-        bookingDate: pendingCheckout.bookingDate,
-        startTime: pendingCheckout.startTime,
-        endTime: pendingCheckout.endTime,
-        status: (pendingCheckout.status === "Draft" ? "Upcoming" : pendingCheckout.status) as SpaceBookingStatus,
-        notes: pendingCheckout.notes,
-        invoiceId,
-        invoiceCode,
-        grandTotal: payment.finalAmount,
-        paidAmount: payment.paymentBreakdown.paidAmount,
-        dueAmount: payment.paymentBreakdown.dueAmount,
-        paymentStatus: payment.paymentStatus,
-        paymentMode: payment.mode,
-        spaceQty: pendingCheckout.spaceQty,
-        dateMode: pendingCheckout.dateMode,
-        multiDateSlots: pendingCheckout.multiDateSlots,
-        durationCount: pendingCheckout.durationCount,
-        durationUnit: pendingCheckout.durationUnit,
-        packageMultiplier: pendingCheckout.packageMultiplier,
-        coworkingStartDate: pendingCheckout.coworkingStartDate,
-        coworkingEndDate: pendingCheckout.coworkingEndDate,
-        subTotal:
-          pendingCheckout.subTotal != null
-            ? Number(pendingCheckout.subTotal)
-            : checkoutItems.reduce((acc, it) => acc + it.price * it.qty, 0),
-        discountAmount: totalDiscount,
-        cashbackAmount: payment.cashbackTotal,
-        selectedServices: pendingCheckout.selectedServices,
-        summarySnapshot: pendingCheckout.summarySnapshot,
-      };
-
-      if (existingDraftId) {
-        await handleUpdateSpaceBooking(existingDraftId, bookingData);
-      } else {
-        await handleCreateSpaceBooking(bookingData);
+      if (reservedBookingId) {
+        try {
+          await handleUpdateSpaceBooking(reservedBookingId, {
+            invoiceId,
+            invoiceCode,
+            grandTotal: payment.finalAmount,
+            paidAmount: payment.paymentBreakdown.paidAmount,
+            dueAmount: payment.paymentBreakdown.dueAmount,
+            paymentStatus: payment.paymentStatus,
+            paymentMode: payment.mode,
+          });
+        } catch {
+          toast.warning(
+            `Booking confirmed, but linking invoice ${invoiceCode} to it failed. Please update the booking manually.`,
+          );
+        }
       }
 
       const printableSubtotal =
@@ -707,11 +732,8 @@ const SpaceBook = () => {
         "success",
       );
     } catch (err: unknown) {
-      Swal.fire(
-        "Checkout failed",
-        apiErrorMessage(err, "Could not complete space booking checkout."),
-        "error",
-      );
+      // CheckoutModal shows the error dialog using response.data.message.
+      if (getBookingConflictMessage(err)) void fetchBookings();
       throw err;
     } finally {
       setSaving(false);
@@ -756,7 +778,7 @@ const SpaceBook = () => {
       let invoiceId: string | null = null;
       let invoiceCode = "";
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = getBusinessToday();
       const lineTotal = Math.max(0, Number(payload.lineTotal ?? 0));
       const hours = Math.max(0, Number(payload.durationHours ?? 0));
       const nameParts = [
@@ -1084,14 +1106,6 @@ const SpaceBook = () => {
         muiTableBodyCellProps: { align: "center" },
       },
     },
-    renderDetailPanel: ({ row }) => (
-      <div className="bg-slate-50/80 p-4 border-y border-slate-200 flex flex-col items-center">
-        <div className="mb-2 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-          Booking Summary Card
-        </div>
-        <BookingSummaryRenderer booking={row.original} />
-      </div>
-    ),
     renderRowActions: ({ row }) => (
       <div className="flex min-w-max items-center justify-center gap-1.5">
         {row.original.status === "Draft" && (
@@ -1770,7 +1784,7 @@ const SpaceBook = () => {
           if (pendingCheckout) {
             const originalDraftId = (pendingCheckout as any)?._originalBookingId;
             if (originalDraftId) {
-              const orig = bookings.find((b) => bookingId(b) === originalDraftId);
+              const orig = data.find((b) => bookingId(b) === originalDraftId);
               setEditingBooking({
                 ...(orig || {}),
                 ...pendingCheckout,

@@ -1771,6 +1771,42 @@ export const handleGetSpaceBookings = async (
   };
 };
 
+export type SpaceBookingBusySlot = {
+  date: string;
+  startTime: string;
+  endTime: string;
+  bookingId: string;
+  status: SpaceBookingStatus;
+};
+
+export type SpaceBookingAvailabilityResponse = {
+  success: boolean;
+  message?: string;
+  timezone: string;
+  today: string;
+  nowMinutes: number;
+  conflictScoped: boolean;
+  from: string;
+  to: string;
+  busy: SpaceBookingBusySlot[];
+};
+
+export const handleGetSpaceBookingAvailability = async (
+  params: { spaceId: string; from: string; to?: string; excludeId?: string },
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/space-bookings/availability", {
+    params: {
+      spaceId: params.spaceId,
+      from: params.from,
+      to: params.to || params.from,
+      ...(params.excludeId ? { excludeId: params.excludeId } : {}),
+    },
+    signal,
+  });
+  return response.data as SpaceBookingAvailabilityResponse;
+};
+
 export const handleGetSpaceBookingById = async (
   id: string,
   signal?: AbortSignal,
@@ -1819,17 +1855,7 @@ export const handleCreateSpaceBooking = async (payload: {
 
 export const handleUpdateSpaceBooking = async (
   id: string,
-  payload: Partial<{
-    customerName: string;
-    customerPhone: string;
-    customerEmail: string;
-    spaceId: string;
-    bookingDate: string;
-    startTime: string;
-    endTime: string;
-    status: SpaceBookingStatus;
-    notes: string;
-  }>,
+  payload: Partial<SpaceBookingPayload>,
 ) => {
   const response = await axiosInstance.patch(`/space-bookings/${id}`, payload);
   return response.data as {

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   X,
   User,
@@ -66,6 +66,21 @@ import {
   ExclusiveMultipleDatesSummaryCard,
   type SelectedServiceItem,
 } from "./summary";
+import {
+  useBusinessNow,
+  useSpaceAvailability,
+} from "../hooks/useSpaceAvailability";
+import {
+  BOOKING_MESSAGES,
+  SLOT_OPTION_SUFFIX,
+  addDaysToKey,
+  findBusyOverlaps,
+  getBusinessNow,
+  getBusinessToday,
+  getSlotAvailability,
+  timeToMinutes,
+  type SlotAvailability,
+} from "../utils/bookingAvailability";
 
 export type MultiDateSlot = {
   id: string;
@@ -374,18 +389,63 @@ export const getTimeSlotsForDuration = (
   return slots;
 };
 
+/** Calendar date of a stored booking date; date-only values are stored at UTC midnight. */
 const toDateInput = (value?: string | Date | null) => {
-  if (!value) return new Date().toISOString().split("T")[0];
-  const d = new Date(value);
+  if (!value) return getBusinessToday();
+  const asStr = typeof value === "string" ? value.trim() : "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(asStr)) return asStr;
+  const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) {
-    const asStr = String(value);
     if (/^\d{4}-\d{2}-\d{2}/.test(asStr)) return asStr.slice(0, 10);
-    return new Date().toISOString().split("T")[0];
+    return getBusinessToday();
   }
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  if (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0
+  ) {
+    return d.toISOString().slice(0, 10);
+  }
+  return getBusinessNow(d).dateKey;
+};
+
+const AVAILABILITY_BADGE: Record<
+  SlotAvailability | "checking",
+  { label: string; className: string }
+> = {
+  available: {
+    label: "Available",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  },
+  booked: {
+    label: "Booked",
+    className: "border-rose-200 bg-rose-50 text-rose-700",
+  },
+  unavailable: {
+    label: "Unavailable",
+    className: "border-slate-200 bg-slate-100 text-slate-500",
+  },
+  checking: {
+    label: "Checking…",
+    className: "border-indigo-200 bg-indigo-50 text-indigo-600",
+  },
+};
+
+const AvailabilityBadge = ({
+  status,
+}: {
+  status: SlotAvailability | "checking";
+}) => {
+  const badge = AVAILABILITY_BADGE[status];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badge.className}`}
+    >
+      {status === "checking" && <Loader2 size={10} className="animate-spin" />}
+      {badge.label}
+    </span>
+  );
 };
 
 export const formatDateDisplay = (value?: string | Date | null) => {
@@ -535,9 +595,7 @@ const CreateBookingDetailsModal = ({
 
   // Exclusive Dates Mode
   const [dateMode, setDateMode] = useState<"single" | "multiple">("single");
-  const [bookingDate, setBookingDate] = useState(() =>
-    new Date().toISOString().split("T")[0],
-  );
+  const [bookingDate, setBookingDate] = useState(() => getBusinessToday());
   const [bookingFrom, setBookingFrom] = useState("09:00");
   const [bookingTo, setBookingTo] = useState("12:00");
   const [duration, setDuration] = useState(3);
@@ -546,7 +604,7 @@ const CreateBookingDetailsModal = ({
   const [multiDateSlots, setMultiDateSlots] = useState<MultiDateSlot[]>([
     {
       id: "slot-1",
-      date: new Date().toISOString().split("T")[0],
+      date: getBusinessToday(),
       duration: 3,
       timeSlot: "09:00 AM - 12:00 PM",
       startTime: "09:00",
@@ -557,7 +615,7 @@ const CreateBookingDetailsModal = ({
   // Coworking / Duration Plans State
   const [planDurationCount, setPlanDurationCount] = useState<number>(1);
   const [coworkingStartDate, setCoworkingStartDate] = useState<string>(() =>
-    new Date().toISOString().split("T")[0],
+    getBusinessToday(),
   );
 
   const singleDateSlots = useMemo(() => {
@@ -883,7 +941,7 @@ const CreateBookingDetailsModal = ({
       setSpaceQty(1);
       setPurpose("");
       setNotes("");
-      const todayStr = new Date().toISOString().split("T")[0];
+      const todayStr = getBusinessToday();
       setBookingDate(todayStr);
       setBookingFrom("09:00");
       setBookingTo("12:00");
@@ -1053,6 +1111,164 @@ const CreateBookingDetailsModal = ({
     const diff = Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     return Math.max(1, diff);
   }, [coworkingStartDate, coworkingEndDate]);
+
+  // Availability & date-time validation
+  const businessNow = useBusinessNow(isOpen);
+  const todayKey = businessNow.dateKey;
+  const editingBookingId = isEdit
+    ? String(initialBooking?._id || initialBooking?.id || "")
+    : "";
+  const availabilitySpaceId = selectedSpace?._id ? String(selectedSpace._id) : spaceId;
+  const needsConflictCheck = selectedSpace ? !isCoworkingSpace(selectedSpace) : false;
+  const isMultipleMode = !isDurationPlan && dateMode === "multiple";
+
+  const availabilityRange = useMemo(() => {
+    if (isDurationPlan) {
+      return { from: coworkingStartDate, to: coworkingEndDate || coworkingStartDate };
+    }
+    if (isMultipleMode) {
+      const dates = multiDateSlots.map((s) => s.date).filter(Boolean).sort();
+      return { from: dates[0] || "", to: dates[dates.length - 1] || "" };
+    }
+    return { from: bookingDate, to: bookingDate };
+  }, [
+    isDurationPlan,
+    isMultipleMode,
+    coworkingStartDate,
+    coworkingEndDate,
+    multiDateSlots,
+    bookingDate,
+  ]);
+
+  const availability = useSpaceAvailability({
+    spaceId: availabilitySpaceId,
+    from: availabilityRange.from,
+    to: availabilityRange.to,
+    excludeId: editingBookingId || undefined,
+    enabled: isOpen && needsConflictCheck,
+  });
+
+  const busySlots = useMemo(
+    () =>
+      needsConflictCheck && availability.data?.conflictScoped !== false
+        ? availability.data?.busy ?? []
+        : [],
+    [needsConflictCheck, availability.data],
+  );
+
+  /** Slots the edited booking already holds; they stay valid even if now in the past. */
+  const originalSlotKeys = useMemo(() => {
+    const keys = new Set<string>();
+    const src = initialBooking;
+    if (!src || src.status === "Draft" || src.status === "Cancelled") return keys;
+    if (src.summarySnapshot?.isDurationPlan) {
+      const start = toDateInput(src.coworkingStartDate || src.bookingDate);
+      const end = src.coworkingEndDate ? toDateInput(src.coworkingEndDate) : start;
+      for (let d = start, i = 0; d <= end && i <= 400; d = addDaysToKey(d, 1), i++) {
+        keys.add(`${d}|full`);
+      }
+    } else if (
+      src.dateMode === "multiple" &&
+      Array.isArray(src.multiDateSlots) &&
+      src.multiDateSlots.length > 0
+    ) {
+      src.multiDateSlots.forEach((s) =>
+        keys.add(`${toDateInput(s.date)}|${s.startTime}|${s.endTime}`),
+      );
+    } else {
+      keys.add(`${toDateInput(src.bookingDate)}|${src.startTime}|${src.endTime}`);
+    }
+    return keys;
+  }, [initialBooking]);
+
+  const getSlotStatus = useCallback(
+    (date: string, startTime: string, endTime: string): SlotAvailability => {
+      if (originalSlotKeys.has(`${date}|${startTime}|${endTime}`)) return "available";
+      return getSlotAvailability(date, startTime, endTime, busySlots, businessNow);
+    },
+    [originalSlotKeys, busySlots, businessNow],
+  );
+
+  const toBadgeStatus = (status: SlotAvailability): SlotAvailability | "checking" =>
+    status !== "unavailable" && needsConflictCheck && availability.loading
+      ? "checking"
+      : status;
+
+  const singleSlotStatus = getSlotStatus(bookingDate, bookingFrom, bookingTo);
+
+  const multiSlotStatuses = useMemo(
+    () => multiDateSlots.map((s) => getSlotStatus(s.date, s.startTime, s.endTime)),
+    [multiDateSlots, getSlotStatus],
+  );
+
+  const multiSlotOverlap = useMemo(() => {
+    for (let i = 0; i < multiDateSlots.length; i++) {
+      for (let j = i + 1; j < multiDateSlots.length; j++) {
+        const a = multiDateSlots[i];
+        const b = multiDateSlots[j];
+        if (!a.date || a.date !== b.date) continue;
+        const as = timeToMinutes(a.startTime);
+        const ae = timeToMinutes(a.endTime);
+        const bs = timeToMinutes(b.startTime);
+        const be = timeToMinutes(b.endTime);
+        if (as != null && ae != null && bs != null && be != null && as < be && bs < ae) {
+          return { first: i + 1, second: j + 1, date: a.date };
+        }
+      }
+    }
+    return null;
+  }, [multiDateSlots]);
+
+  const durationPlanPast =
+    isDurationPlan &&
+    Boolean(coworkingStartDate) &&
+    coworkingStartDate < todayKey &&
+    !originalSlotKeys.has(`${coworkingStartDate}|full`);
+
+  const durationPlanBookedDates = useMemo(() => {
+    if (!isDurationPlan || !coworkingStartDate) return [];
+    const end = coworkingEndDate || coworkingStartDate;
+    const dates = new Set<string>();
+    for (const b of busySlots) {
+      if (b.date < coworkingStartDate || b.date > end) continue;
+      if (originalSlotKeys.has(`${b.date}|full`)) continue;
+      if (findBusyOverlaps(b.date, "09:00", "21:00", [b]).length > 0) dates.add(b.date);
+    }
+    return [...dates].sort();
+  }, [isDurationPlan, coworkingStartDate, coworkingEndDate, busySlots, originalSlotKeys]);
+
+  const durationPlanStatus: SlotAvailability = durationPlanPast
+    ? "unavailable"
+    : durationPlanBookedDates.length > 0
+    ? "booked"
+    : "available";
+
+  const dateInputMin = (value: string) =>
+    isEdit && value && value < todayKey ? undefined : todayKey;
+
+  const renderSlotOptions = (
+    slots: string[],
+    date: string,
+    currentValue: string,
+  ) => {
+    const list =
+      currentValue && !slots.includes(currentValue) ? [currentValue, ...slots] : slots;
+    return list.map((slot) => {
+      const { startTime, endTime } = parseTimeSlotRange(slot);
+      const status = getSlotStatus(date, startTime, endTime);
+      return (
+        <option
+          key={slot}
+          value={slot}
+          disabled={status !== "available" && slot !== currentValue}
+          className={status === "available" ? "" : "text-slate-400"}
+        >
+          {slot}
+          {SLOT_OPTION_SUFFIX[status]}
+        </option>
+      );
+    });
+  };
 
   // Auto-sync plan duration count when selected space changes
   const prevSelectedSpaceIdRef = useRef<string | null>(null);
@@ -1271,10 +1487,9 @@ const CreateBookingDetailsModal = ({
 
   // Multi-Date Slots Handlers
   const handleAddSlot = () => {
-    const lastDate = multiDateSlots[multiDateSlots.length - 1]?.date || bookingDate;
-    const nextDate = new Date(lastDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-    const nextDateStr = nextDate.toISOString().split("T")[0];
+    const lastDate =
+      multiDateSlots[multiDateSlots.length - 1]?.date || bookingDate || getBusinessToday();
+    const nextDateStr = addDaysToKey(lastDate, 1);
     const newSlot: MultiDateSlot = {
       id: `slot-${Date.now()}`,
       date: nextDateStr,
@@ -1469,6 +1684,12 @@ const CreateBookingDetailsModal = ({
 
     if (isDurationPlan) {
       if (!coworkingStartDate) err.coworkingStartDate = "Start date is required.";
+      else if (durationPlanPast) err.coworkingStartDate = BOOKING_MESSAGES.PAST;
+      else if (durationPlanBookedDates.length > 0) {
+        err.coworkingStartDate = `${BOOKING_MESSAGES.ALREADY_BOOKED} (${durationPlanBookedDates
+          .map((d) => formatDateDisplay(d))
+          .join(", ")})`;
+      }
     } else if (dateMode === "multiple" && spaceTypeFilter === "exclusive") {
       if (multiDateSlots.length === 0) {
         err.multiDates = "Please add at least one date.";
@@ -1479,12 +1700,29 @@ const CreateBookingDetailsModal = ({
           break;
         }
       }
+      if (!err.multiDates) {
+        const pastIdx = multiSlotStatuses.indexOf("unavailable");
+        const bookedIdx = multiSlotStatuses.indexOf("booked");
+        if (pastIdx >= 0) {
+          err.multiDates = `Row ${pastIdx + 1}: ${BOOKING_MESSAGES.PAST}`;
+        } else if (bookedIdx >= 0) {
+          err.multiDates = `Row ${bookedIdx + 1}: ${BOOKING_MESSAGES.ALREADY_BOOKED}`;
+        } else if (multiSlotOverlap) {
+          err.multiDates = `Rows ${multiSlotOverlap.first} and ${multiSlotOverlap.second} overlap on ${formatDateDisplay(multiSlotOverlap.date)}.`;
+        }
+      }
     } else {
       if (!bookingDate) err.bookingDate = "Booking date is required.";
       if (!bookingFrom) err.bookingFrom = "Start time is required.";
       if (!bookingTo) err.bookingTo = "End time is required.";
       if (bookingFrom && bookingTo && bookingTo <= bookingFrom) {
         err.bookingTo = "End time must be after start time.";
+      }
+      if (!err.bookingDate && !err.bookingFrom && !err.bookingTo) {
+        if (singleSlotStatus === "unavailable") err.timeSlot = BOOKING_MESSAGES.PAST;
+        else if (singleSlotStatus === "booked") {
+          err.timeSlot = BOOKING_MESSAGES.ALREADY_BOOKED;
+        }
       }
     }
 
@@ -1498,6 +1736,10 @@ const CreateBookingDetailsModal = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (needsConflictCheck && availability.loading) {
+      toast.info("Checking availability… please try again in a moment.");
+      return;
+    }
     if (!validate()) return;
     if (spacesLoading) {
       toast.error("Please wait for spaces to finish loading.");
@@ -1656,7 +1898,8 @@ const CreateBookingDetailsModal = ({
     try {
       await onSubmit(payload);
     } catch {
-      // Parent handles toast
+      // Parent handles toast; refresh in case the slot was taken meanwhile
+      availability.reload();
     }
   };
 
@@ -1873,7 +2116,7 @@ const CreateBookingDetailsModal = ({
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
               {/* Left Column: Form (8 cols) */}
               <div className="lg:col-span-8">
-                <form id={formId} onSubmit={handleSubmit} className="space-y-6">
+                <form id={formId} onSubmit={handleSubmit} noValidate className="space-y-6">
                   {/* 1. Customer Information */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
@@ -2448,8 +2691,13 @@ const CreateBookingDetailsModal = ({
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                           {/* Start Date */}
                           <div>
-                            <label className="mb-1 block text-xs font-semibold text-slate-600">
-                              Start Date <span className="text-rose-500">*</span>
+                            <label className="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-slate-600">
+                              <span>
+                                Start Date <span className="text-rose-500">*</span>
+                              </span>
+                              {coworkingStartDate && (
+                                <AvailabilityBadge status={toBadgeStatus(durationPlanStatus)} />
+                              )}
                             </label>
                             <div
                               role="button"
@@ -2474,16 +2722,27 @@ const CreateBookingDetailsModal = ({
                                 ref={coworkingDateInputRef}
                                 type="date"
                                 required
+                                min={dateInputMin(coworkingStartDate)}
                                 value={coworkingStartDate}
-                                onChange={(e) => setCoworkingStartDate(e.target.value)}
+                                onChange={(e) => {
+                                  setCoworkingStartDate(e.target.value);
+                                  setErrors((prev) => ({ ...prev, coworkingStartDate: "" }));
+                                }}
                                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                               />
                             </div>
-                            {errors.coworkingStartDate && (
+                            {errors.coworkingStartDate ? (
                               <p className="mt-1 text-xs text-rose-500">
                                 {errors.coworkingStartDate}
                               </p>
-                            )}
+                            ) : durationPlanPast ? (
+                              <p className="mt-1 text-xs text-rose-500">{BOOKING_MESSAGES.PAST}</p>
+                            ) : durationPlanBookedDates.length > 0 && !availability.loading ? (
+                              <p className="mt-1 text-xs text-rose-500">
+                                {BOOKING_MESSAGES.ALREADY_BOOKED} (
+                                {durationPlanBookedDates.map((d) => formatDateDisplay(d)).join(", ")})
+                              </p>
+                            ) : null}
                           </div>
 
                           {/* Stepper: No. of Months / No. of Weeks / No. of Days */}
@@ -2572,8 +2831,12 @@ const CreateBookingDetailsModal = ({
                             <input
                               type="date"
                               required
+                              min={dateInputMin(bookingDate)}
                               value={bookingDate}
-                              onChange={(e) => setBookingDate(e.target.value)}
+                              onChange={(e) => {
+                                setBookingDate(e.target.value);
+                                setErrors((prev) => ({ ...prev, bookingDate: "", timeSlot: "" }));
+                              }}
                               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                             />
                           </div>
@@ -2616,8 +2879,11 @@ const CreateBookingDetailsModal = ({
 
                         {/* Time Slot Select */}
                         <div>
-                          <label className="mb-1 block text-xs font-semibold text-slate-600">
-                            Time Slot
+                          <label className="mb-1 flex items-center justify-between gap-2 text-xs font-semibold text-slate-600">
+                            <span>Time Slot</span>
+                            {bookingDate && (
+                              <AvailabilityBadge status={toBadgeStatus(singleSlotStatus)} />
+                            )}
                           </label>
                           <div className="relative">
                             <Clock
@@ -2626,23 +2892,30 @@ const CreateBookingDetailsModal = ({
                             />
                             <select
                               value={timeSlot}
-                              onChange={(e) => handleSingleTimeSlotChange(e.target.value)}
-                              className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs font-medium outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                              onChange={(e) => {
+                                handleSingleTimeSlotChange(e.target.value);
+                                setErrors((prev) => ({ ...prev, timeSlot: "" }));
+                              }}
+                              className={`h-10 w-full appearance-none rounded-xl border bg-white pl-9 pr-8 text-xs font-medium outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${
+                                singleSlotStatus === "available" ? "border-slate-200" : "border-rose-300"
+                              }`}
                             >
-                              {timeSlot && !singleDateSlots.includes(timeSlot) && (
-                                <option value={timeSlot}>{timeSlot}</option>
-                              )}
-                              {singleDateSlots.map((slot) => (
-                                <option key={slot} value={slot}>
-                                  {slot}
-                                </option>
-                              ))}
+                              {renderSlotOptions(singleDateSlots, bookingDate, timeSlot)}
                             </select>
                             <ChevronDown
                               size={15}
                               className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
                             />
                           </div>
+                          {errors.timeSlot ? (
+                            <p className="mt-1 text-xs text-rose-500">{errors.timeSlot}</p>
+                          ) : singleSlotStatus === "unavailable" ? (
+                            <p className="mt-1 text-xs text-rose-500">{BOOKING_MESSAGES.PAST}</p>
+                          ) : singleSlotStatus === "booked" && !availability.loading ? (
+                            <p className="mt-1 text-xs text-rose-500">
+                              {BOOKING_MESSAGES.ALREADY_BOOKED}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                     )}
@@ -2659,8 +2932,9 @@ const CreateBookingDetailsModal = ({
                         </div>
 
                         {/* Slots Rows */}
-                        {multiDateSlots.map((slot) => {
+                        {multiDateSlots.map((slot, rowIdx) => {
                           const rowSlots = getTimeSlotsForDuration(slot.duration);
+                          const rowStatus = multiSlotStatuses[rowIdx] ?? "available";
                           return (
                             <div
                               key={slot.id}
@@ -2692,10 +2966,12 @@ const CreateBookingDetailsModal = ({
                                 />
                                 <input
                                   type="date"
+                                  min={dateInputMin(slot.date)}
                                   value={slot.date}
-                                  onChange={(e) =>
-                                    handleUpdateSlotDate(slot.id, e.target.value)
-                                  }
+                                  onChange={(e) => {
+                                    handleUpdateSlotDate(slot.id, e.target.value);
+                                    setErrors((prev) => ({ ...prev, multiDates: "" }));
+                                  }}
                                   className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                                 />
                               </div>
@@ -2730,24 +3006,25 @@ const CreateBookingDetailsModal = ({
                                 />
                                 <select
                                   value={slot.timeSlot}
-                                  onChange={(e) =>
-                                    handleUpdateSlotTime(slot.id, e.target.value)
-                                  }
-                                  className="h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs font-medium outline-none"
+                                  onChange={(e) => {
+                                    handleUpdateSlotTime(slot.id, e.target.value);
+                                    setErrors((prev) => ({ ...prev, multiDates: "" }));
+                                  }}
+                                  className={`h-10 w-full appearance-none rounded-xl border bg-white pl-9 pr-8 text-xs font-medium outline-none ${
+                                    rowStatus === "available" ? "border-slate-200" : "border-rose-300"
+                                  }`}
                                 >
-                                  {slot.timeSlot && !rowSlots.includes(slot.timeSlot) && (
-                                    <option value={slot.timeSlot}>{slot.timeSlot}</option>
-                                  )}
-                                  {rowSlots.map((ts) => (
-                                    <option key={ts} value={ts}>
-                                      {ts}
-                                    </option>
-                                  ))}
+                                  {renderSlotOptions(rowSlots, slot.date, slot.timeSlot)}
                                 </select>
                                 <ChevronDown
                                   size={15}
                                   className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
                                 />
+                                {slot.date && (
+                                  <span className="pointer-events-none absolute -top-2 right-2 z-10">
+                                    <AvailabilityBadge status={toBadgeStatus(rowStatus)} />
+                                  </span>
+                                )}
                               </div>
 
                               {/* Delete Row Button */}
@@ -2781,6 +3058,40 @@ const CreateBookingDetailsModal = ({
                           <Plus size={15} />
                           <span>Add Another Date</span>
                         </button>
+                      </div>
+                    )}
+
+                    {needsConflictCheck && availabilityRange.from && (
+                      <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                        {availability.loading ? (
+                          <span className="flex items-center gap-1.5 text-slate-500">
+                            <Loader2 size={12} className="animate-spin" />
+                            Checking availability…
+                          </span>
+                        ) : availability.error ? (
+                          <>
+                            <span className="flex items-center gap-1.5 text-amber-600">
+                              <AlertCircle size={12} />
+                              {availability.error} Slots will be verified when you save.
+                            </span>
+                            <button
+                              type="button"
+                              onClick={availability.reload}
+                              className="font-semibold text-indigo-600 hover:underline"
+                            >
+                              Retry
+                            </button>
+                          </>
+                        ) : availability.data ? (
+                          <span className="flex items-center gap-1.5 text-slate-500">
+                            <Info size={12} />
+                            {busySlots.length === 0
+                              ? "No existing bookings for the selected date(s)."
+                              : `${busySlots.length} existing booking slot${
+                                  busySlots.length === 1 ? "" : "s"
+                                } for the selected date(s). Booked slots are disabled.`}
+                          </span>
+                        ) : null}
                       </div>
                     )}
                   </div>

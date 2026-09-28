@@ -2,12 +2,14 @@ import express from 'express';
 import {authenticateUser} from '../middlewares/auth.middleware.js';
 import {
   attachStaffContext,
+  requireAnyPermission,
   requirePermission,
 } from '../middlewares/authorize.middleware.js';
 import {PERMISSIONS} from '../constants/permissions.js';
 import {
   createSpaceBooking,
   getSpaceBookings,
+  getSpaceBookingAvailability,
   getSpaceBookingById,
   updateSpaceBooking,
   deleteSpaceBooking,
@@ -21,6 +23,15 @@ router.get(
   '/',
   requirePermission(PERMISSIONS.SPACE_BOOKING_READ),
   getSpaceBookings,
+);
+router.get(
+  '/availability',
+  requireAnyPermission(
+    PERMISSIONS.SPACE_BOOKING_READ,
+    PERMISSIONS.SPACE_BOOKING_CREATE,
+    PERMISSIONS.SPACE_BOOKING_UPDATE,
+  ),
+  getSpaceBookingAvailability,
 );
 router.get(
   '/:id',
