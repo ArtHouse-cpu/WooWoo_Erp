@@ -40,6 +40,7 @@ import expenceCategoryRoutes from './routes/expenceCategory.router.js';
 import dashboardRoutes from './routes/dashboard.route.js';
 import staffCommissionRoutes from './routes/staffCommission.route.js'
 import leadRouters from './routes/lead.Route.js';
+import additionalServiceRoutes from './routes/additionalService.route.js';
 // import activityRoutes from './routes/activity.route.js';
 
 // Load environment variables
@@ -91,6 +92,8 @@ app.use('/quotation', quotationRoutes);
 app.use('/customer', customerRoutes);
 app.use('/product', productRoutes);
 app.use('/services', serviceRoutes);
+app.use('/additional-services', additionalServiceRoutes);
+app.use('/api/additional-services', additionalServiceRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/subCategories', subCategoryRoutes);
 app.use('/returnsales', returnsalesRoutes);

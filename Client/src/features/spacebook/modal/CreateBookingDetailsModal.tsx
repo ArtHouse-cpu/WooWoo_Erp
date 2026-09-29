@@ -3,7 +3,7 @@ import {
   X,
   User,
   Phone,
-  Lock,
+
   Minus,
   ChevronDown,
   Camera,
@@ -33,7 +33,6 @@ import {
   Car,
 } from "lucide-react";
 import Swal from "sweetalert2";
-import html2canvas from "html2canvas";
 // Optional: import jsPDF from "jspdf"; // If you want PDF download
 import { toast } from "react-toastify";
 import { useAppSelector } from "@/store/hooks";
@@ -43,6 +42,8 @@ import {
   handleGetCustomers,
   handleCreateCustomer,
   handleGetMemberships,
+  handleGetAdditionalServices,
+  type AdditionalServiceItem,
   customerPayloadToFormData,
   type CustomerPayload,
   type SpaceBookingPayload,
@@ -50,6 +51,7 @@ import {
   type SpacePayload,
   type MembershipPlanPayload,
 } from "@/services/apiClient";
+import { getIconComponent } from "@/features/catalogue/components/AddAdditionalServiceModal";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import MembershipBadge from "@/features/sales/components/invoice/MembershipBadge";
 import {
@@ -148,13 +150,13 @@ export const QUICK_DURATIONS = [
 ];
 
 export const COWORKING_SERVICES = [
-  {
-    key: "locker",
-    label: "Locker",
-    price: 500,
-    priceLabel: "₹500 / month",
-    icon: Lock,
-  },
+  // {
+  //   key: "locker",
+  //   label: "Locker",
+  //   price: 500,
+  //   priceLabel: "₹500 / month",
+  //   icon: Lock,
+  // },
   {
     key: "printing",
     label: "Printing",
@@ -639,6 +641,58 @@ const CreateBookingDetailsModal = ({
     eventCoordinator: 0,
   });
 
+  // Dynamic Additional Services from API / Local Store
+  const [dynamicAdditionalServices, setDynamicAdditionalServices] = useState<
+    AdditionalServiceItem[]
+  >([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const controller = new AbortController();
+    handleGetAdditionalServices(controller.signal)
+      .then((items) => {
+        if (Array.isArray(items) && items.length > 0) {
+          setDynamicAdditionalServices(items);
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [isOpen]);
+
+  const activeCoworkingServices = useMemo(() => {
+    if (dynamicAdditionalServices.length === 0) return COWORKING_SERVICES;
+    const filtered = dynamicAdditionalServices.filter(
+      (s) => s.spaceType === "all" || s.spaceType === "coworking",
+    );
+    if (filtered.length === 0) return COWORKING_SERVICES;
+    return filtered.map((s) => ({
+      key: s.key || (s.title || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
+      label: s.title || s.name || "Service",
+      price: Number(s.amount ?? s.price ?? 0),
+      priceLabel:
+        s.priceLabel ||
+        `₹${Number(s.amount ?? s.price ?? 0).toLocaleString("en-IN")} / ${s.unit || "month"}`,
+      icon: getIconComponent(s.icon),
+    }));
+  }, [dynamicAdditionalServices]);
+
+  const activeExclusiveServices = useMemo(() => {
+    if (dynamicAdditionalServices.length === 0) return EXCLUSIVE_SERVICES;
+    const filtered = dynamicAdditionalServices.filter(
+      (s) => s.spaceType === "all" || s.spaceType === "exclusive",
+    );
+    if (filtered.length === 0) return EXCLUSIVE_SERVICES;
+    return filtered.map((s) => ({
+      key: s.key || (s.title || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
+      label: s.title || s.name || "Service",
+      price: Number(s.amount ?? s.price ?? 0),
+      priceLabel:
+        s.priceLabel ||
+        `₹${Number(s.amount ?? s.price ?? 0).toLocaleString("en-IN")} / ${s.unit || "booking"}`,
+      icon: getIconComponent(s.icon),
+    }));
+  }, [dynamicAdditionalServices]);
+
   // Purpose & Notes (COMMON FOR ALL)
   const [purpose, setPurpose] = useState("");
   const [notes, setNotes] = useState("");
@@ -649,7 +703,6 @@ const CreateBookingDetailsModal = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const debouncedCustomerSearch = useDebounce(name.trim(), 250);
-  const summaryCardRef = useRef<HTMLDivElement>(null);
 
   // Load Memberships
   useEffect(() => {
@@ -775,7 +828,7 @@ const CreateBookingDetailsModal = ({
       } else if (Array.isArray(initialBooking.selectedServices)) {
         const cw: Record<string, number> = {};
         initialBooking.selectedServices.forEach((s: any) => {
-          const matched = COWORKING_SERVICES.find(
+          const matched = [...activeCoworkingServices, ...COWORKING_SERVICES].find(
             (c) =>
               c.label.toLowerCase() === (s.label || s.name || "").toLowerCase() ||
               c.key.toLowerCase() === (s.key || "").toLowerCase(),
@@ -791,7 +844,7 @@ const CreateBookingDetailsModal = ({
       } else if (Array.isArray(initialBooking.selectedServices)) {
         const ex: Record<string, number> = {};
         initialBooking.selectedServices.forEach((s: any) => {
-          const matched = EXCLUSIVE_SERVICES.find(
+          const matched = [...activeExclusiveServices, ...EXCLUSIVE_SERVICES].find(
             (e) =>
               e.label.toLowerCase() === (s.label || s.name || "").toLowerCase() ||
               e.key.toLowerCase() === (s.key || "").toLowerCase(),
@@ -897,7 +950,7 @@ const CreateBookingDetailsModal = ({
       } else if (Array.isArray(draftValues.selectedServices)) {
         const cw: Record<string, number> = {};
         draftValues.selectedServices.forEach((s: any) => {
-          const matched = COWORKING_SERVICES.find(
+          const matched = [...activeCoworkingServices, ...COWORKING_SERVICES].find(
             (c) =>
               c.label.toLowerCase() === (s.label || s.name || "").toLowerCase() ||
               c.key.toLowerCase() === (s.key || "").toLowerCase(),
@@ -913,7 +966,7 @@ const CreateBookingDetailsModal = ({
       } else if (Array.isArray(draftValues.selectedServices)) {
         const ex: Record<string, number> = {};
         draftValues.selectedServices.forEach((s: any) => {
-          const matched = EXCLUSIVE_SERVICES.find(
+          const matched = [...activeExclusiveServices, ...EXCLUSIVE_SERVICES].find(
             (e) =>
               e.label.toLowerCase() === (s.label || s.name || "").toLowerCase() ||
               e.key.toLowerCase() === (s.key || "").toLowerCase(),
@@ -1594,22 +1647,28 @@ const CreateBookingDetailsModal = ({
   // Selected Services List for Summary
   const selectedServicesList = useMemo<SelectedServiceItem[]>(() => {
     if (spaceTypeFilter === "coworking") {
-      return COWORKING_SERVICES.filter((s) => (coworkingServices[s.key] || 0) > 0).map(
-        (s) => ({
+      return activeCoworkingServices
+        .filter((s) => (coworkingServices[s.key] || 0) > 0)
+        .map((s) => ({
           label: s.label,
           price: s.price,
           qty: coworkingServices[s.key] || 0,
-        }),
-      );
+        }));
     }
-    return EXCLUSIVE_SERVICES.filter((s) => (exclusiveServices[s.key] || 0) > 0).map(
-      (s) => ({
+    return activeExclusiveServices
+      .filter((s) => (exclusiveServices[s.key] || 0) > 0)
+      .map((s) => ({
         label: s.label,
         price: s.price,
         qty: exclusiveServices[s.key] || 0,
-      }),
-    );
-  }, [spaceTypeFilter, coworkingServices, exclusiveServices]);
+      }));
+  }, [
+    spaceTypeFilter,
+    coworkingServices,
+    exclusiveServices,
+    activeCoworkingServices,
+    activeExclusiveServices,
+  ]);
 
   // Discount & Cashback Calculation
   const activeMembershipPlan = useMemo(() => {
@@ -3112,8 +3171,8 @@ const CreateBookingDetailsModal = ({
 
                     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
                       {(spaceTypeFilter === "coworking"
-                        ? COWORKING_SERVICES
-                        : EXCLUSIVE_SERVICES
+                        ? activeCoworkingServices
+                        : activeExclusiveServices
                       ).map((service) => {
                         const qty =
                           spaceTypeFilter === "coworking"

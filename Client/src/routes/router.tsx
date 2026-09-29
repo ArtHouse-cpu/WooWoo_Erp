@@ -58,6 +58,7 @@ import AnnouncementScreen from "@/features/announcement/announcementScreen";
 import ExpenseScreen from "@/features/expenses/ExpenseScreen";
 import StaffCommissionScreen from "@/features/commission/StaffCommissionScreen";
 import SpaceBooking from "@/features/spacebook/SpaceBooking";
+import GiftCard from "@/features/GiftCard/Pages/GiftCard";
 
 export const router = createBrowserRouter([
   {
@@ -101,6 +102,7 @@ export const router = createBrowserRouter([
           { path: "invoices", element: <InvoiceScreen /> },
           { path: "payments", element: <PaymentScreen /> },
           { path: "wallet", element: <WalletScreen /> },
+          { path: "giftcard", element: <GiftCard /> },
           { path: "quotations", element: <QuotationScreen /> },
           { path: "create-quotation", element: <CreateQuotationScreen /> },
           { path: "creditnotes", element: <CreditNoteScreen /> },
