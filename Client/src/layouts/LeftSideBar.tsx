@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
- 
+ Gift,
   ChevronDown,
   ShoppingCart,
   Wallet,
@@ -208,6 +208,7 @@ const TOP_LINKS: TopLink[] = [
   { key: "spaceBooking", label: "Space Booking", icon: CalendarCheck  , path: "/spaceBooking" },
   { key: "announcement", label: "Announcements", icon: Megaphone , path: "/announcements" },
   { key: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
+  { key: "giftcard", label: "Gift Card", icon: Gift , path: "/giftcard" },
   { key: "coupons", label: "Coupons", icon: Percent, path: "/coupons" },
   { key: "access", label: "Access", icon: ShieldUser, path: "/access" },
 

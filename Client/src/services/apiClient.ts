@@ -2491,6 +2491,135 @@ export const handleDeleteService = async (id: string) => {
   }
 };
 
+export type AdditionalServiceItem = {
+  _id?: string;
+  title: string;
+  name?: string;
+  amount: number;
+  price?: number;
+  unit: string;
+  priceLabel?: string;
+  icon?: string;
+  spaceType?: "all" | "coworking" | "exclusive";
+  key?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+const LOCAL_ADDITIONAL_SERVICES_KEY = "woowoo_additional_services";
+
+export const getLocalAdditionalServices = (): AdditionalServiceItem[] => {
+  try {
+    const raw = localStorage.getItem(LOCAL_ADDITIONAL_SERVICES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+};
+
+export const setLocalAdditionalServices = (items: AdditionalServiceItem[]) => {
+  try {
+    localStorage.setItem(LOCAL_ADDITIONAL_SERVICES_KEY, JSON.stringify(items));
+  } catch {
+    // ignore
+  }
+};
+
+export const handleGetAdditionalServices = async (signal?: AbortSignal): Promise<AdditionalServiceItem[]> => {
+  try {
+    const response = await axiosInstance.get("/additional-services", { signal });
+    const list = Array.isArray(response?.data?.services) ? response.data.services : [];
+    if (list.length > 0) {
+      setLocalAdditionalServices(list);
+      return list;
+    }
+    const local = getLocalAdditionalServices();
+    return local.length > 0 ? local : list;
+  } catch (error) {
+    console.log("Error fetching additional services from backend, using local store:", error);
+    return getLocalAdditionalServices();
+  }
+};
+
+export const handleCreateAdditionalService = async (payload: Partial<AdditionalServiceItem>) => {
+  try {
+    const response = await axiosInstance.post("/additional-services", payload);
+    const created = response?.data?.service;
+    if (created) {
+      const current = getLocalAdditionalServices();
+      setLocalAdditionalServices([...current, created]);
+    }
+    return response.data;
+  } catch (error) {
+    console.log("Error creating additional service via API, saving locally:", error);
+    const localItem: AdditionalServiceItem = {
+      _id: "local_" + Date.now(),
+      title: payload.title || payload.name || "Untitled Service",
+      amount: Number(payload.amount ?? payload.price ?? 0),
+      unit: payload.unit || "per month",
+      priceLabel:
+        payload.priceLabel ||
+        `₹${Number(payload.amount ?? payload.price ?? 0).toLocaleString("en-IN")} / ${payload.unit || "per month"}`,
+      icon: payload.icon || "Car",
+      spaceType: payload.spaceType || "all",
+      key:
+        payload.key ||
+        (payload.title || "service").toLowerCase().replace(/[^a-z0-9]/g, "") +
+          "_" +
+          Date.now().toString().slice(-4),
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+    const current = getLocalAdditionalServices();
+    const updated = [...current, localItem];
+    setLocalAdditionalServices(updated);
+    return { success: true, service: localItem };
+  }
+};
+
+export const handleUpdateAdditionalService = async (
+  id: string,
+  payload: Partial<AdditionalServiceItem>,
+) => {
+  try {
+    const response = await axiosInstance.put(`/additional-services/${id}`, payload);
+    const updated = response?.data?.service;
+    if (updated) {
+      const current = getLocalAdditionalServices();
+      setLocalAdditionalServices(
+        current.map((item) => (item._id === id ? { ...item, ...updated } : item)),
+      );
+    }
+    return response.data;
+  } catch (error) {
+    console.log("Error updating additional service via API, saving locally:", error);
+    const current = getLocalAdditionalServices();
+    setLocalAdditionalServices(
+      current.map((item) => (item._id === id ? { ...item, ...payload } : item)),
+    );
+    return { success: true };
+  }
+};
+
+export const handleDeleteAdditionalService = async (id: string) => {
+  try {
+    const response = await axiosInstance.delete(`/additional-services/${id}`);
+    const current = getLocalAdditionalServices();
+    setLocalAdditionalServices(current.filter((item) => item._id !== id));
+    return response.data;
+  } catch (error) {
+    console.log("Error deleting additional service via API, removing locally:", error);
+    const current = getLocalAdditionalServices();
+    setLocalAdditionalServices(current.filter((item) => item._id !== id));
+    return { success: true };
+  }
+};
+
 export type CatalogueLookupItem = {
   _id: string;
   sourceId: string;
