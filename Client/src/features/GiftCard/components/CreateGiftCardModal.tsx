@@ -1,6 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Wand2, X } from "lucide-react";
 import type { GiftCardData } from "../Pages/GiftCard";
+import { useAuthStore } from "@/store/authStore";
+import { useAppSelector } from "@/store/hooks";
 
 export type GiftCardFormData = Omit<GiftCardData, "_id"> & {
   _id?: string;
@@ -13,6 +15,44 @@ type Props = {
   initialData?: GiftCardData | null;
   existingCards?: GiftCardData[];
   defaultCreatedBy?: string;
+};
+
+export const resolveStaffName = (
+  reduxName?: string | null,
+  authUserName?: string | null,
+  fallback?: string,
+): string => {
+  const fromRedux = reduxName?.trim();
+  if (fromRedux) return fromRedux;
+
+  const fromAuth = authUserName?.trim();
+  if (fromAuth) return fromAuth;
+
+  try {
+    const authRaw = localStorage.getItem("auth-storage");
+    if (authRaw) {
+      const parsed = JSON.parse(authRaw);
+      const u = parsed?.state?.user;
+      const name =
+        u?.fullName?.trim() || u?.name?.trim() || u?.m_staff_name?.trim();
+      if (name) return name;
+    }
+  } catch {
+    // ignore
+  }
+
+  try {
+    const reduxRaw = localStorage.getItem("wooerp-redux-user");
+    if (reduxRaw) {
+      const parsed = JSON.parse(reduxRaw);
+      const name = parsed?.m_staff_name?.trim();
+      if (name) return name;
+    }
+  } catch {
+    // ignore
+  }
+
+  return fallback?.trim() || "Staff";
 };
 
 export const generateGiftCardCode = (existingCards: GiftCardData[] = []): string => {
@@ -41,8 +81,20 @@ export default function CreateGiftCardModal({
   onSubmit,
   initialData = null,
   existingCards = [],
-  defaultCreatedBy = "Admin",
+  defaultCreatedBy = "",
 }: Props) {
+  const authUser = useAuthStore((state) => state.user);
+  const reduxStaffName = useAppSelector((state) => state.user.m_staff_name);
+
+  const resolvedStaffName = useMemo(() => {
+    const authName =
+      authUser?.fullName ||
+      (authUser as any)?.name ||
+      (authUser as any)?.m_staff_name ||
+      null;
+    return resolveStaffName(reduxStaffName, authName, defaultCreatedBy || "Admin");
+  }, [reduxStaffName, authUser, defaultCreatedBy]);
+
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [initialAmount, setInitialAmount] = useState<number | "">("");
@@ -59,7 +111,7 @@ export default function CreateGiftCardModal({
       setName(initialData.name || "");
       setInitialAmount(initialData.initialAmount ?? 0);
       setCurrentBalance(initialData.currentBalance ?? 0);
-      setCreatedBy(initialData.createdBy || defaultCreatedBy);
+      setCreatedBy(initialData.createdBy || resolvedStaffName);
       setExpiryDate(
         initialData.expiryDate
           ? new Date(initialData.expiryDate).toISOString().split("T")[0]
@@ -72,12 +124,12 @@ export default function CreateGiftCardModal({
       setName("");
       setInitialAmount("");
       setCurrentBalance("");
-      setCreatedBy(defaultCreatedBy);
+      setCreatedBy(resolvedStaffName);
       setExpiryDate(getDefaultExpiryDate());
       setStatus("Active");
       setBalanceTouched(false);
     }
-  }, [open, initialData, existingCards, defaultCreatedBy]);
+  }, [open, initialData, existingCards, resolvedStaffName]);
 
   if (!open) return null;
 
@@ -102,7 +154,7 @@ export default function CreateGiftCardModal({
       initialAmount: Number(initialAmount || 0),
       currentBalance:
         currentBalance === "" ? Number(initialAmount || 0) : Number(currentBalance || 0),
-      createdBy: createdBy.trim() || defaultCreatedBy,
+      createdBy: createdBy.trim() || resolvedStaffName,
       expiryDate: expiryDate || getDefaultExpiryDate(),
       status,
     });
@@ -240,9 +292,16 @@ export default function CreateGiftCardModal({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* 5. Created By */}
             <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-700">
-                Created By <span className="text-red-500">*</span>
-              </label>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700">
+                  Created By <span className="text-red-500">*</span>
+                </label>
+                {resolvedStaffName && (
+                  <span className="text-[11px] font-medium text-emerald-600">
+                    Logged in: {resolvedStaffName}
+                  </span>
+                )}
+              </div>
               <input
                 value={createdBy}
                 onChange={(e) => setCreatedBy(e.target.value)}

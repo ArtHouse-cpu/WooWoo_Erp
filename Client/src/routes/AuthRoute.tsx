@@ -21,12 +21,13 @@ export default function AuthRoute() {
   const user = useAuthStore((state) => state.user);
   const dispatch = useAppDispatch();
   const reduxStaffId = useAppSelector((s) => s.user.m_staff_id);
+  const reduxStaffName = useAppSelector((s) => s.user.m_staff_name);
 
   useEffect(() => {
     if (!token || !user) return;
-    if (reduxStaffId) return;
+    if (reduxStaffId && reduxStaffName) return;
     dispatch(loginSuccess(mapAuthUserToReduxPayload(user)));
-  }, [token, user, reduxStaffId, dispatch]);
+  }, [token, user, reduxStaffId, reduxStaffName, dispatch]);
 
   useEffect(() => {
     if (!token) return;
