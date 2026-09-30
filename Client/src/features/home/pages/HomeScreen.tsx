@@ -937,40 +937,40 @@ export default function HomeScreen() {
             ) : null}
           </div>
         </div>
-        <div className="hidden flex-wrap items-center gap-2 sm:flex">
-          <button
+        {/* <div className="hidden flex-wrap items-center gap-2 sm:flex"> */}
+          {/* <button
             type="button"
             onClick={() => setOpenPos(true)}
             className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-600 shadow-sm transition hover:bg-blue-50"
           >
             <Monitor size={16} />
             POS
-          </button>
-          <button
+          </button> */}
+          {/* <button
             type="button"
             onClick={() => navigate("/foodBill")}
             className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm font-semibold text-orange-600 shadow-sm transition hover:bg-orange-50"
           >
             <Utensils size={16} />
             Food Bill
-          </button>
-          <button
+          </button> */}
+          {/* <button
             type="button"
             onClick={() => setOpenCreateCustomerModal(true)}
             className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-600 shadow-sm transition hover:bg-emerald-50"
           >
             <UserPlus size={16} />
             Add Customer
-          </button>
-          <button
+          </button> */}
+          {/* <button
             type="button"
             onClick={() => setOpenCreateSubscriptionModal(true)}
             className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700"
           >
             <Crown size={16} />
             Activate Membership
-          </button>
-        </div>
+          </button> */}
+        {/* </div> */}
       </section>
 
       <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">

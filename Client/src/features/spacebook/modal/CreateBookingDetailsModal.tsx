@@ -2174,6 +2174,7 @@ const CreateBookingDetailsModal = ({
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/40">
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
               {/* Left Column: Form (8 cols) */}
+             
               <div className="lg:col-span-8">
                 <form id={formId} onSubmit={handleSubmit} noValidate className="space-y-6">
                   {/* 1. Customer Information */}
@@ -2187,235 +2188,272 @@ const CreateBookingDetailsModal = ({
                       </h3>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {/* Full Name */}
-                      <div className="relative" ref={customerSearchRef}>
-                        <div className="mb-1 flex items-center justify-between">
-                          <label className="block text-xs font-semibold text-slate-600">
-                            Full Name <span className="text-rose-500">*</span>
-                          </label>
-                          {membershipType && membershipType !== "none" && (
-                            <MembershipBadge
-                              membershipType={membershipType}
-                              membershipPlanId={membershipPlanId}
-                              membershipPlans={membershipPlans}
-                              showNone={false}
-                              className="shadow-xs"
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 items-start">
+                      {/* Left Column: Full Name & Phone Number */}
+                      <div className="space-y-3">
+                        {/* Full Name */}
+                        <div className="relative" ref={customerSearchRef}>
+                          <div className="mb-1 flex items-center justify-between">
+                            <label className="block text-xs font-semibold text-slate-600">
+                              Full Name <span className="text-rose-500">*</span>
+                            </label>
+                            {membershipType && membershipType !== "none" && (
+                              <MembershipBadge
+                                membershipType={membershipType}
+                                membershipPlanId={membershipPlanId}
+                                membershipPlans={membershipPlans}
+                                showNone={false}
+                                className="shadow-xs"
+                              />
+                            )}
+                          </div>
+
+                          <div className="relative">
+                            <User
+                              size={16}
+                              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                             />
-                          )}
-                        </div>
 
-                        <div className="relative">
-                          <User
-                            size={16}
-                            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                          />
-
-                          <input
-                            type="text"
-                            required
-                            value={name}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setName(val);
-                              if (!val.trim()) {
-                                setCustomerId(null);
-                                setMembershipType("none");
-                                setMembershipPlanId(null);
-                                if (isPhoneAutoFetched) {
-                                  setPhone("");
-                                  setIsPhoneAutoFetched(false);
-                                }
-                              } else if (customerId) {
-                                setCustomerId(null);
-                                setMembershipType("none");
-                                setMembershipPlanId(null);
-                                if (isPhoneAutoFetched) {
-                                  setIsPhoneAutoFetched(false);
-                                }
-                              }
-                              setCustomerDropdownOpen(true);
-                              if (errors.name)
-                                setErrors((prev) => ({ ...prev, name: "" }));
-                            }}
-                            onFocus={() => {
-                              if (name.trim().length >= 2) {
-                                setCustomerDropdownOpen(true);
-                              }
-                            }}
-                            placeholder="e.g. Rahul Sharma"
-                            className={`h-10 w-full rounded-xl border pl-10 pr-16 text-sm outline-none transition focus:ring-2 ${
-                              errors.name
-                                ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
-                                : "border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-100"
-                            }`}
-                          />
-
-                          <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
-                            {name && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setName("");
-                                  setPhone("");
-                                  setIsPhoneAutoFetched(false);
+                            <input
+                              type="text"
+                              required
+                              value={name}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setName(val);
+                                if (!val.trim()) {
                                   setCustomerId(null);
                                   setMembershipType("none");
                                   setMembershipPlanId(null);
-                                  setCustomerDropdownOpen(false);
-                                  setCustomers([]);
-                                }}
-                                title="Clear customer"
-                                className="rounded p-0.5 text-slate-400 transition hover:text-slate-600"
-                              >
-                                <X size={15} />
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => setShowCreateCustomerModal(true)}
-                              title="Add New Customer"
-                              className="text-indigo-500 transition hover:text-indigo-700"
-                            >
-                              <UserPlus size={18} />
-                            </button>
-                          </div>
-                        </div>
+                                  if (isPhoneAutoFetched) {
+                                    setPhone("");
+                                    setIsPhoneAutoFetched(false);
+                                  }
+                                } else if (customerId) {
+                                  setCustomerId(null);
+                                  setMembershipType("none");
+                                  setMembershipPlanId(null);
+                                  if (isPhoneAutoFetched) {
+                                    setIsPhoneAutoFetched(false);
+                                  }
+                                }
+                                setCustomerDropdownOpen(true);
+                                if (errors.name)
+                                  setErrors((prev) => ({ ...prev, name: "" }));
+                              }}
+                              onFocus={() => {
+                                if (name.trim().length >= 2) {
+                                  setCustomerDropdownOpen(true);
+                                }
+                              }}
+                              placeholder="e.g. Khushi Sahu"
+                              className={`h-10 w-full rounded-xl border pl-10 pr-16 text-sm outline-none transition focus:ring-2 ${
+                                errors.name
+                                  ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
+                                  : "border-slate-200 bg-white focus:border-indigo-500 focus:ring-indigo-100"
+                              }`}
+                            />
 
-                        {/* Customer Search Dropdown */}
-                        {customerDropdownOpen &&
-                          (loadingCustomers || customers.length > 0) && (
-                            <div className="absolute left-0 right-0 z-50 mt-1 max-h-52 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-                              {loadingCustomers ? (
-                                <div className="flex items-center gap-2 px-3.5 py-2.5 text-xs text-slate-500">
-                                  <Loader2
-                                    size={13}
-                                    className="animate-spin text-indigo-500"
-                                  />
-                                  <span>Searching customers…</span>
-                                </div>
-                              ) : (
-                                customers.map((c) => (
-                                  <button
-                                    key={c._id || `${c.name}-${c.mobile}`}
-                                    type="button"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      handleSelectCustomer(c);
-                                    }}
-                                    className="flex w-full items-center justify-between border-b border-slate-100 px-3.5 py-2.5 text-left transition hover:bg-indigo-50/50 last:border-0"
-                                  >
-                                    <div className="min-w-0 pr-2">
-                                      <p className="truncate text-xs font-semibold text-slate-800">
-                                        {c.name}
-                                      </p>
-                                      <p className="text-[11px] text-slate-500">
-                                        {c.mobile ? `+91 ${c.mobile}` : "No phone"}
-                                        {c.email ? ` · ${c.email}` : ""}
-                                      </p>
-                                    </div>
-                                    {c.membershipType &&
-                                      c.membershipType !== "none" && (
-                                        <MembershipBadge
-                                          membershipType={c.membershipType}
-                                          membershipPlanId={c.membershipPlanId}
-                                          membershipPlans={membershipPlans}
-                                          showNone={false}
-                                          className="shrink-0"
-                                        />
-                                      )}
-                                  </button>
-                                ))
+                            <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
+                              {name && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setName("");
+                                    setPhone("");
+                                    setIsPhoneAutoFetched(false);
+                                    setCustomerId(null);
+                                    setMembershipType("none");
+                                    setMembershipPlanId(null);
+                                    setCustomerDropdownOpen(false);
+                                    setCustomers([]);
+                                  }}
+                                  title="Clear customer"
+                                  className="rounded p-0.5 text-slate-400 transition hover:text-slate-600"
+                                >
+                                  <X size={15} />
+                                </button>
                               )}
-                            </div>
-                          )}
-
-                        {customerDropdownOpen &&
-                          debouncedCustomerSearch.trim().length >= 2 &&
-                          !loadingCustomers &&
-                          customers.length === 0 && (
-                            <div className="absolute left-0 right-0 z-50 mt-1 rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xl">
-                              <p className="text-xs text-slate-500">
-                                No customer found
-                              </p>
                               <button
                                 type="button"
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  setCustomerDropdownOpen(false);
-                                  setShowCreateCustomerModal(true);
-                                }}
-                                className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100"
+                                onClick={() => setShowCreateCustomerModal(true)}
+                                title="Add New Customer"
+                                className="text-indigo-500 transition hover:text-indigo-700"
                               >
-                                <UserPlus size={13} />
-                                Create customer
+                                <UserPlus size={18} />
                               </button>
                             </div>
-                          )}
+                          </div>
 
-                        {errors.name && (
-                          <p className="mt-1 text-xs text-rose-500">{errors.name}</p>
-                        )}
+                          {/* Customer Search Dropdown */}
+                          {customerDropdownOpen &&
+                            (loadingCustomers || customers.length > 0) && (
+                              <div className="absolute left-0 right-0 z-50 mt-1 max-h-52 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                                {loadingCustomers ? (
+                                  <div className="flex items-center gap-2 px-3.5 py-2.5 text-xs text-slate-500">
+                                    <Loader2
+                                      size={13}
+                                      className="animate-spin text-indigo-500"
+                                    />
+                                    <span>Searching customers…</span>
+                                  </div>
+                                ) : (
+                                  customers.map((c) => (
+                                    <button
+                                      key={c._id || `${c.name}-${c.mobile}`}
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleSelectCustomer(c);
+                                      }}
+                                      className="flex w-full items-center justify-between border-b border-slate-100 px-3.5 py-2.5 text-left transition hover:bg-indigo-50/50 last:border-0"
+                                    >
+                                      <div className="min-w-0 pr-2">
+                                        <p className="truncate text-xs font-semibold text-slate-800">
+                                          {c.name}
+                                        </p>
+                                        <p className="text-[11px] text-slate-500">
+                                          {c.mobile ? `+91 ${c.mobile}` : "No phone"}
+                                          {c.email ? ` · ${c.email}` : ""}
+                                        </p>
+                                      </div>
+                                      {c.membershipType &&
+                                        c.membershipType !== "none" && (
+                                          <MembershipBadge
+                                            membershipType={c.membershipType}
+                                            membershipPlanId={c.membershipPlanId}
+                                            membershipPlans={membershipPlans}
+                                            showNone={false}
+                                            className="shrink-0"
+                                          />
+                                        )}
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            )}
+
+                          {customerDropdownOpen &&
+                            debouncedCustomerSearch.trim().length >= 2 &&
+                            !loadingCustomers &&
+                            customers.length === 0 && (
+                              <div className="absolute left-0 right-0 z-50 mt-1 rounded-xl border border-slate-200 bg-white p-3 text-center shadow-xl">
+                                <p className="text-xs text-slate-500">
+                                  No customer found
+                                </p>
+                                <button
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setCustomerDropdownOpen(false);
+                                    setShowCreateCustomerModal(true);
+                                  }}
+                                  className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:bg-indigo-100"
+                                >
+                                  <UserPlus size={13} />
+                                  Create customer
+                                </button>
+                              </div>
+                            )}
+
+                          {errors.name && (
+                            <p className="mt-1 text-xs text-rose-500">{errors.name}</p>
+                          )}
+                        </div>
+
+                        {/* Phone Number */}
+                        <div>
+                          <div className="mb-1 flex items-center justify-between">
+                            <label className="block text-xs font-semibold text-slate-600">
+                              Phone Number <span className="text-rose-500">*</span>
+                            </label>
+                          </div>
+
+                          <div className="relative">
+                            <Phone
+                              size={16}
+                              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                            />
+
+                            <input
+                              type="tel"
+                              required
+                              maxLength={10}
+                              value={phone}
+                              onChange={(e) => {
+                                setPhone(e.target.value.replace(/\D/g, ""));
+                                if (errors.phone) {
+                                  setErrors((prev) => ({ ...prev, phone: "" }));
+                                }
+                              }}
+                              readOnly={isPhoneAutoFetched}
+                              tabIndex={isPhoneAutoFetched ? -1 : 0}
+                              placeholder="9876543210"
+                              title={
+                                isPhoneAutoFetched
+                                  ? "Phone number auto-fetched from customer details (not editable)"
+                                  : undefined
+                              }
+                              className={`h-10 w-full rounded-xl border pl-10 ${
+                                isPhoneAutoFetched
+                                  ? "cursor-not-allowed border-slate-200 bg-slate-100 pr-9 text-slate-500 select-none"
+                                  : "border-slate-200 bg-white pr-3 focus:border-indigo-500 focus:ring-indigo-100"
+                              } text-sm outline-none transition focus:ring-2 ${
+                                errors.phone
+                                  ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
+                                  : ""
+                              }`}
+                            />
+                          </div>
+                          {errors.phone && (
+                            <p className="mt-1 text-xs text-rose-500">{errors.phone}</p>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Phone Number */}
+                      {/* Right Column: Purpose */}
                       <div>
                         <div className="mb-1 flex items-center justify-between">
                           <label className="block text-xs font-semibold text-slate-600">
-                            Phone Number <span className="text-rose-500">*</span>
+                            Purpose of Booking <span className="text-rose-500">*</span>
                           </label>
-                          {/* {isPhoneAutoFetched && (
-                            <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
-                              <Lock size={10} /> Auto-filled
-                            </span>
-                          )} */}
                         </div>
 
                         <div className="relative">
-                          <Phone
-                            size={16}
-                            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                          <Tag
+                            size={15}
+                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                           />
-
-                          <input
-                            type="tel"
-                            required
-                            maxLength={10}
-                            value={phone}
+                          <select
+                            value={purpose}
                             onChange={(e) => {
-                              setPhone(e.target.value.replace(/\D/g, ""));
-                              if (errors.phone) {
-                                setErrors((prev) => ({ ...prev, phone: "" }));
+                              setPurpose(e.target.value);
+                              if (errors.purpose) {
+                                setErrors((prev) => ({ ...prev, purpose: "" }));
                               }
                             }}
-                            readOnly={isPhoneAutoFetched}
-                            tabIndex={isPhoneAutoFetched ? -1 : 0}
-                            placeholder="9876543210"
-                            title={
-                              isPhoneAutoFetched
-                                ? "Phone number auto-fetched from customer details (not editable)"
-                                : undefined
-                            }
-                            className={`h-10 w-full rounded-xl border pl-10 ${
-                              isPhoneAutoFetched
-                                ? "cursor-not-allowed border-slate-200 bg-slate-100 pr-9 text-slate-500 select-none"
-                                : "border-slate-200 bg-white pr-3 focus:border-indigo-500 focus:ring-indigo-100"
-                            } text-sm outline-none transition focus:ring-2 ${
-                              errors.phone
-                                ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
-                                : ""
+                            className={`h-10 w-full appearance-none rounded-xl border bg-white pl-9 pr-8 text-xs font-medium outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${
+                              errors.purpose
+                                ? "border-rose-300 bg-rose-50/30"
+                                : "border-slate-200 text-slate-700"
                             }`}
+                          >
+                            <option value="">Select purpose</option>
+                            {PURPOSE_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown
+                            size={15}
+                            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
                           />
-
-                          {/* {isPhoneAutoFetched && (
-                            <Lock
-                              size={14}
-                              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                            />
-                          )} */}
                         </div>
-                        {errors.phone && (
-                          <p className="mt-1 text-xs text-rose-500">{errors.phone}</p>
+                        {errors.purpose && (
+                          <p className="mt-1 text-xs text-rose-500">
+                            {errors.purpose}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -3261,88 +3299,42 @@ const CreateBookingDetailsModal = ({
                     </div>
                   </div>
 
-                  {/* 5. Purpose & Notes (COMMON FOR ALL) */}
+                  {/* 5. Additional Notes (COMMON FOR ALL) */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                        <Tag size={14} />
+                        <FileText size={14} />
                       </span>
                       <h3 className="font-bold text-slate-800 text-sm">
-                        Purpose & Notes
+                        Additional Notes
                       </h3>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                      {/* Purpose of Booking */}
-                      <div>
-                        <label className="mb-1 block text-xs font-semibold text-slate-600">
-                          Purpose of Booking <span className="text-rose-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <Tag
-                            size={15}
-                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                          />
-                          <select
-                            value={purpose}
-                            onChange={(e) => {
-                              setPurpose(e.target.value);
-                              if (errors.purpose) {
-                                setErrors((prev) => ({ ...prev, purpose: "" }));
-                              }
-                            }}
-                            className={`h-10 w-full appearance-none rounded-xl border bg-white pl-9 pr-8 text-xs font-medium outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${
-                              errors.purpose
-                                ? "border-rose-300 bg-rose-50/30"
-                                : "border-slate-200 text-slate-700"
-                            }`}
-                          >
-                            <option value="">Select purpose</option>
-                            {PURPOSE_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown
-                            size={15}
-                            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-                          />
-                        </div>
-                        {errors.purpose && (
-                          <p className="mt-1 text-xs text-rose-500">
-                            {errors.purpose}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Additional Notes (Optional) */}
-                      <div>
-                        <div className="mb-1 flex items-center justify-between">
-                          <label className="block text-xs font-semibold text-slate-600">
-                            Additional Notes{" "}
-                            <span className="font-normal text-slate-400">
-                              (Optional)
-                            </span>
-                          </label>
-                        </div>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            maxLength={200}
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder={
-                              spaceTypeFilter === "coworking"
-                                ? "Tell us more about your booking..."
-                                : "Tell us more about your event..."
-                            }
-                            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 pr-14 text-xs outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
-                          />
-                          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">
-                            {notes.length}/200
+                    <div>
+                      <div className="mb-1 flex items-center justify-between">
+                        <label className="block text-xs font-semibold text-slate-600">
+                          Additional Notes{" "}
+                          <span className="font-normal text-slate-400">
+                            (Optional)
                           </span>
-                        </div>
+                        </label>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          maxLength={200}
+                          value={notes}
+                          onChange={(e) => setNotes(e.target.value)}
+                          placeholder={
+                            spaceTypeFilter === "coworking"
+                              ? "Tell us more about your booking..."
+                              : "Tell us more about your event..."
+                          }
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 pr-14 text-xs outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
+                        />
+                        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono">
+                          {notes.length}/200
+                        </span>
                       </div>
                     </div>
 
