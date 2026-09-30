@@ -46,6 +46,8 @@ export const DEFAULT_ROLES = Object.freeze([
       P.SPACE_READ,
       P.FOOD_READ,
       P.MEMBERSHIP_PLAN_READ,
+      P.GIFT_CARD_READ,
+      P.GIFT_CARD_CREATE,
     ],
   },
   {
@@ -132,6 +134,7 @@ export const DEFAULT_ROLES = Object.freeze([
       P.CSP_READ,
       P.WALLET_READ,
       P.COUPON_READ,
+      P.GIFT_CARD_READ,
       P.AFFILIATE_READ,
     ],
   },

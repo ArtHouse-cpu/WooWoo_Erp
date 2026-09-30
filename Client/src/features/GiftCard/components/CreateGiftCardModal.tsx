@@ -3,6 +3,7 @@ import { Wand2, X } from "lucide-react";
 import type { GiftCardData } from "../Pages/GiftCard";
 import { useAuthStore } from "@/store/authStore";
 import { useAppSelector } from "@/store/hooks";
+import { toast } from "react-toastify";
 
 export type GiftCardFormData = Omit<GiftCardData, "_id"> & {
   _id?: string;
@@ -11,7 +12,8 @@ export type GiftCardFormData = Omit<GiftCardData, "_id"> & {
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSubmit: (card: GiftCardFormData) => void;
+  /** Return false (or reject) to keep the modal open, e.g. on a server error. */
+  onSubmit: (card: GiftCardFormData) => Promise<boolean | void> | boolean | void;
   initialData?: GiftCardData | null;
   existingCards?: GiftCardData[];
   defaultCreatedBy?: string;
@@ -103,6 +105,7 @@ export default function CreateGiftCardModal({
   const [expiryDate, setExpiryDate] = useState("");
   const [status, setStatus] = useState<GiftCardData["status"]>("Active");
   const [balanceTouched, setBalanceTouched] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -143,23 +146,43 @@ export default function CreateGiftCardModal({
     }
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     if (!code.trim() || !name.trim() || initialAmount === "") return;
 
-    onSubmit({
-      _id: initialData?._id,
-      code: code.trim(),
-      name: name.trim(),
-      initialAmount: Number(initialAmount || 0),
-      currentBalance:
-        currentBalance === "" ? Number(initialAmount || 0) : Number(currentBalance || 0),
-      createdBy: createdBy.trim() || resolvedStaffName,
-      expiryDate: expiryDate || getDefaultExpiryDate(),
-      status,
-    });
+    const amount = Number(initialAmount || 0);
+    const balance =
+      currentBalance === "" ? amount : Number(currentBalance || 0);
+    if (amount <= 0) {
+      toast.error("Amount must be greater than 0.");
+      return;
+    }
+    if (balance > amount) {
+      toast.error("Balance cannot be greater than the amount.");
+      return;
+    }
 
-    onClose();
+    setSubmitting(true);
+    let saved: boolean | void = false;
+    try {
+      saved = await onSubmit({
+        _id: initialData?._id,
+        code: code.trim(),
+        name: name.trim(),
+        initialAmount: amount,
+        currentBalance: balance,
+        createdBy: createdBy.trim() || resolvedStaffName,
+        expiryDate: expiryDate || getDefaultExpiryDate(),
+        status,
+      });
+    } catch {
+      saved = false;
+    } finally {
+      setSubmitting(false);
+    }
+
+    if (saved !== false) onClose();
   };
 
   return (
@@ -356,9 +379,16 @@ export default function CreateGiftCardModal({
             </button>
             <button
               type="submit"
-              className="cursor-pointer rounded-xl bg-black px-6 py-2 text-sm font-semibold text-white transition hover:bg-gray-800"
+              disabled={submitting}
+              className="cursor-pointer rounded-xl bg-black px-6 py-2 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isEdit ? "Update Gift Card" : "Create Gift Card"}
+              {submitting
+                ? isEdit
+                  ? "Updating..."
+                  : "Creating..."
+                : isEdit
+                  ? "Update Gift Card"
+                  : "Create Gift Card"}
             </button>
           </div>
         </form>

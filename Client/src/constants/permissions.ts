@@ -115,6 +115,12 @@ export const PERMISSIONS = {
   COUPON_READ: "coupon.read",
   COUPON_MANAGE: "coupon.manage",
 
+  // Gift cards
+  GIFT_CARD_READ: "gift_card.read",
+  GIFT_CARD_CREATE: "gift_card.create",
+  GIFT_CARD_UPDATE: "gift_card.update",
+  GIFT_CARD_DELETE: "gift_card.delete",
+
   // Announcements (WhatsApp blasts)
   ANNOUNCEMENT_READ: "announcement.read",
   ANNOUNCEMENT_CREATE: "announcement.create",
@@ -482,6 +488,26 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
     key: PERMISSIONS.COUPON_MANAGE,
     module: "coupons",
     label: "Manage coupons",
+  },
+  {
+    key: PERMISSIONS.GIFT_CARD_READ,
+    module: "gift_cards",
+    label: "View gift cards",
+  },
+  {
+    key: PERMISSIONS.GIFT_CARD_CREATE,
+    module: "gift_cards",
+    label: "Create gift cards",
+  },
+  {
+    key: PERMISSIONS.GIFT_CARD_UPDATE,
+    module: "gift_cards",
+    label: "Update gift cards",
+  },
+  {
+    key: PERMISSIONS.GIFT_CARD_DELETE,
+    module: "gift_cards",
+    label: "Delete gift cards",
   },
   {
     key: PERMISSIONS.AFFILIATE_READ,

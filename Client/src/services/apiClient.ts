@@ -736,6 +736,128 @@ export const handleValidateCoupon = async (payload: {
   return response.data;
 };
 
+export type GiftCardStatus = "Active" | "Used" | "Expired" | "Cancelled";
+
+export type GiftCardTransaction = {
+  _id: string;
+  type: "issue" | "redeem" | "refund" | "adjust";
+  amount: number;
+  balanceAfter: number;
+  reference?: string;
+  note?: string;
+  by?: { m_staff_id?: string | null; m_staff_name?: string | null };
+  at: string;
+};
+
+export type GiftCardRecord = {
+  _id: string;
+  id: string;
+  code: string;
+  name: string;
+  initialAmount: number;
+  currentBalance: number;
+  amountUsed: number;
+  /** YYYY-MM-DD */
+  expiryDate: string;
+  status: GiftCardStatus;
+  createdBy: string;
+  createdAt?: string;
+  updatedAt?: string;
+  transactions?: GiftCardTransaction[];
+};
+
+export type GiftCardPayload = {
+  code?: string;
+  name: string;
+  initialAmount: number;
+  currentBalance?: number;
+  expiryDate: string;
+  status?: GiftCardStatus;
+  createdBy?: string;
+  adjustmentNote?: string;
+};
+
+export const handleGetGiftCards = async (
+  params?: { search?: string; status?: GiftCardStatus | "All" },
+  signal?: AbortSignal,
+): Promise<{ success: boolean; giftCards: GiftCardRecord[] }> => {
+  const response = await axiosInstance.get("/gift-cards", {
+    params: {
+      search: params?.search?.trim() ?? "",
+      status: params?.status ?? "All",
+    },
+    signal,
+  });
+  return response.data;
+};
+
+export const handleGetGiftCardById = async (
+  id: string,
+): Promise<{ success: boolean; giftCard: GiftCardRecord }> => {
+  const response = await axiosInstance.get(`/gift-cards/${id}`);
+  return response.data;
+};
+
+export const handleCreateGiftCard = async (
+  payload: GiftCardPayload,
+): Promise<{ success: boolean; message: string; giftCard: GiftCardRecord }> => {
+  const response = await axiosInstance.post("/gift-cards", payload);
+  return response.data;
+};
+
+export const handleUpdateGiftCard = async (
+  id: string,
+  payload: Partial<GiftCardPayload>,
+): Promise<{ success: boolean; message: string; giftCard: GiftCardRecord }> => {
+  const response = await axiosInstance.patch(`/gift-cards/${id}`, payload);
+  return response.data;
+};
+
+export const handleDeleteGiftCard = async (
+  id: string,
+): Promise<{ success: boolean; message: string }> => {
+  const response = await axiosInstance.delete(`/gift-cards/${id}`);
+  return response.data;
+};
+
+export const handleLookupGiftCard = async (
+  code: string,
+): Promise<{
+  success: boolean;
+  redeemable: boolean;
+  reason: string;
+  giftCard: GiftCardRecord;
+}> => {
+  const response = await axiosInstance.get(
+    `/gift-cards/code/${encodeURIComponent(code.trim())}`,
+  );
+  return response.data;
+};
+
+export const handleRedeemGiftCard = async (payload: {
+  code: string;
+  amount: number;
+  reference?: string;
+  note?: string;
+}): Promise<{
+  success: boolean;
+  message: string;
+  redeemedAmount: number;
+  giftCard: GiftCardRecord;
+}> => {
+  const response = await axiosInstance.post("/gift-cards/redeem", payload);
+  return response.data;
+};
+
+export const handleRefundGiftCard = async (payload: {
+  code: string;
+  reference: string;
+  note?: string;
+}): Promise<{ success: boolean; message: string; giftCard: GiftCardRecord }> => {
+  const response = await axiosInstance.post("/gift-cards/refund", payload);
+  return response.data;
+};
+
 export const handleValidateReferralDiscount = async (payload: {
   customerId?: string;
   customerPhone?: string;

@@ -23,6 +23,10 @@ import {
   handleGetMemberships,
   handleValidateCoupon,
   handleValidateReferralDiscount,
+  handleLookupGiftCard,
+  handleRedeemGiftCard,
+  handleRefundGiftCard,
+  type GiftCardRecord,
   type MembershipPlanPayload,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
@@ -747,40 +751,31 @@ export default function CheckoutModal({
         return;
       }
 
-      const saved = localStorage.getItem("woowoo_gift_cards");
-      const defaultCards = [
-        { code: "GC-2026-001", name: "Birthday Gift Card", currentBalance: 1200, status: "Active" },
-        { code: "GC-2026-002", name: "Festival Gift Card", currentBalance: 0, status: "Used" },
-        { code: "GC-2026-003", name: "Welcome Gift Card", currentBalance: 500, status: "Active" },
-      ];
-      let cards = defaultCards;
+      setLoadingPromo(true);
+      let card: GiftCardRecord;
       try {
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            cards = parsed;
-          }
+        const lookup = await handleLookupGiftCard(code);
+        if (!lookup.redeemable) {
+          Swal.fire(
+            "Cannot Apply",
+            lookup.reason || "This gift card cannot be used.",
+            "warning",
+          );
+          return;
         }
-      } catch (e) {
-        console.error("Failed to read gift cards", e);
-      }
-
-      const card = cards.find(
-        (c: any) => c.code?.trim().toUpperCase() === code,
-      );
-
-      if (!card) {
-        Swal.fire("Invalid Card", `Gift card "${code}" not found.`, "error");
-        return;
-      }
-
-      if (card.status !== "Active" || Number(card.currentBalance) <= 0) {
+        card = lookup.giftCard;
+      } catch (error: unknown) {
+        const err = error as {
+          response?: { status?: number; data?: { message?: string } };
+        };
         Swal.fire(
-          "Cannot Apply",
-          `This gift card is ${String(card.status).toLowerCase()} with ₹0 balance.`,
-          "warning",
+          err?.response?.status === 404 ? "Invalid Card" : "Lookup failed",
+          err?.response?.data?.message ?? "Could not verify the gift card. Try again.",
+          "error",
         );
         return;
+      } finally {
+        setLoadingPromo(false);
       }
 
       const availableBal = Number(card.currentBalance || 0);
@@ -1872,31 +1867,46 @@ export default function CheckoutModal({
     try {
       setSaving(true);
 
-      const processGiftCardSettlement = async (refId: string) => {
-        if (!giftCardCode || giftCardDiscount <= 0) return;
+      const usesGiftCard = Boolean(giftCardCode.trim()) && giftCardDiscount > 0;
+      const giftCardCodeUpper = giftCardCode.trim().toUpperCase();
+      const giftCardRef = `CHK-${Date.now().toString(36).toUpperCase()}-${Math.random()
+        .toString(36)
+        .slice(2, 6)
+        .toUpperCase()}`;
+      let giftCardRedeemed = false;
 
-        // 1. Update card in storage (status: Used, balance: 0) since remaining was converted to wallet
+      // The whole card balance is consumed: the bill takes giftCardDiscount and
+      // the leftover moves to the customer's wallet after the sale succeeds.
+      const redeemGiftCardForCheckout = async () => {
+        if (!usesGiftCard) return;
+        await handleRedeemGiftCard({
+          code: giftCardCodeUpper,
+          amount: roundToPaise(giftCardBalance),
+          reference: giftCardRef,
+          note:
+            leftoverGiftCardAmount > 0
+              ? `Checkout: ₹${roundToPaise(giftCardDiscount)} on bill, ₹${roundToPaise(leftoverGiftCardAmount)} to wallet`
+              : "Redeemed at checkout",
+        });
+        giftCardRedeemed = true;
+      };
+
+      const reverseGiftCardRedemption = async () => {
+        if (!giftCardRedeemed) return;
         try {
-          const saved = localStorage.getItem("woowoo_gift_cards");
-          if (saved) {
-            const cards = JSON.parse(saved);
-            const updatedCards = cards.map((c: any) => {
-              if (c.code?.trim().toUpperCase() === giftCardCode.trim().toUpperCase()) {
-                return {
-                  ...c,
-                  currentBalance: 0,
-                  status: "Used",
-                };
-              }
-              return c;
-            });
-            localStorage.setItem("woowoo_gift_cards", JSON.stringify(updatedCards));
-          }
+          await handleRefundGiftCard({
+            code: giftCardCodeUpper,
+            reference: giftCardRef,
+            note: "Checkout failed — redemption reversed",
+          });
+          giftCardRedeemed = false;
         } catch (e) {
-          console.error("Failed to update gift card storage", e);
+          console.error("Failed to reverse gift card redemption", e);
         }
+      };
 
-        // 2. If money left in gift card, automatically credit to customer wallet
+      const creditGiftCardLeftover = async (refId: string) => {
+        if (!usesGiftCard) return;
         if (leftoverGiftCardAmount > 0 && (targetCustomerPhone || targetCustomerId)) {
           try {
             await creditWalletCashback({
@@ -1918,16 +1928,39 @@ export default function CheckoutModal({
         }
       };
 
-      if (onConfirmPayment) {
-        await processGiftCardSettlement("CHECKOUT");
-        await onConfirmPayment(paymentPayload);
+      try {
+        await redeemGiftCardForCheckout();
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { message?: string } } };
+        Swal.fire(
+          "Gift card error",
+          `${err?.response?.data?.message ?? "Could not redeem the gift card."} Remove it and re-apply to continue.`,
+          "error",
+        );
         return;
       }
 
-      const response = await handleCreateInvoice(payload);
+      if (onConfirmPayment) {
+        try {
+          await onConfirmPayment(paymentPayload);
+        } catch (error) {
+          await reverseGiftCardRedemption();
+          throw error;
+        }
+        await creditGiftCardLeftover(giftCardRef);
+        return;
+      }
+
+      let response: Awaited<ReturnType<typeof handleCreateInvoice>>;
+      try {
+        response = await handleCreateInvoice(payload);
+      } catch (error) {
+        await reverseGiftCardRedemption();
+        throw error;
+      }
       const invoiceCode = response?.invoice?.invoiceCode ?? "N/A";
 
-      await processGiftCardSettlement(invoiceCode);
+      await creditGiftCardLeftover(invoiceCode);
 
       if (!disableCashback && displayCashbackTotal > 0) {
         try {
