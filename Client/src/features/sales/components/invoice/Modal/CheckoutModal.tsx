@@ -10,6 +10,7 @@ import {
   FileText,
   Loader2,
   Tag,
+  Gift,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import Swal from "sweetalert2";
@@ -454,10 +455,14 @@ export default function CheckoutModal({
   /** When true, membership line discount is removed so coupon can apply instead */
   const [waiveMembershipForCoupon, setWaiveMembershipForCoupon] =
     useState(false);
-  const [promoType, setPromoType] = useState<"coupon" | "referral">("coupon");
+  const [promoType, setPromoType] = useState<"coupon" | "referral" | "giftCard">("coupon");
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [loadingPromo, setLoadingPromo] = useState(false);
-  const [referralCodeInput, setReferralCodeInput] = useState("");
+  const [giftCardCode, setGiftCardCode] = useState("");
+  const [giftCardDiscount, setGiftCardDiscount] = useState(0);
+  const [giftCardBalance, setGiftCardBalance] = useState(0);
+  const [giftCardLabel, setGiftCardLabel] = useState("Gift Card");
+ const [referralCodeInput, setReferralCodeInput] = useState("");
   const [referralDiscount, setReferralDiscount] = useState(0);
   const [referralLabel, setReferralLabel] = useState("Referral Discount");
   const [referralCodeApplied, setReferralCodeApplied] = useState("");
@@ -600,6 +605,10 @@ export default function CheckoutModal({
       setPromoType("coupon");
       setPromoCodeInput("");
       setLoadingPromo(false);
+      setGiftCardCode("");
+      setGiftCardDiscount(0);
+      setGiftCardBalance(0);
+      setGiftCardLabel("Gift Card");
       setReferralCodeInput("");
       setReferralDiscount(0);
       setReferralLabel("Referral Discount");
@@ -702,10 +711,18 @@ export default function CheckoutModal({
     if (promoType === "coupon") setPromoCodeInput("");
   };
 
+  const clearGiftCardDiscount = () => {
+    setGiftCardCode("");
+    setGiftCardDiscount(0);
+    setGiftCardBalance(0);
+    setGiftCardLabel("Gift Card");
+    if (promoType === "giftCard") setPromoCodeInput("");
+  };
+
   const handleApplyPromoCode = async () => {
     const code = promoCodeInput.trim().toUpperCase();
     if (!code) {
-      Swal.fire("Code required", "Enter a coupon or referral code.", "warning");
+      Swal.fire("Code required", "Enter a coupon, referral, or gift card code.", "warning");
       return;
     }
     if (!items.length) {
@@ -717,6 +734,72 @@ export default function CheckoutModal({
       return;
     }
 
+    if (promoType === "giftCard") {
+      const currentNetPayable = Math.max(
+        0,
+        payableBase -
+          roundToPaise(couponDiscount) -
+          roundToPaise(referralDiscount),
+      );
+
+      if (currentNetPayable <= 0) {
+        Swal.fire("Fully Paid", "The bill is already fully covered by discounts.", "info");
+        return;
+      }
+
+      const saved = localStorage.getItem("woowoo_gift_cards");
+      const defaultCards = [
+        { code: "GC-2026-001", name: "Birthday Gift Card", currentBalance: 1200, status: "Active" },
+        { code: "GC-2026-002", name: "Festival Gift Card", currentBalance: 0, status: "Used" },
+        { code: "GC-2026-003", name: "Welcome Gift Card", currentBalance: 500, status: "Active" },
+      ];
+      let cards = defaultCards;
+      try {
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cards = parsed;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to read gift cards", e);
+      }
+
+      const card = cards.find(
+        (c: any) => c.code?.trim().toUpperCase() === code,
+      );
+
+      if (!card) {
+        Swal.fire("Invalid Card", `Gift card "${code}" not found.`, "error");
+        return;
+      }
+
+      if (card.status !== "Active" || Number(card.currentBalance) <= 0) {
+        Swal.fire(
+          "Cannot Apply",
+          `This gift card is ${String(card.status).toLowerCase()} with ₹0 balance.`,
+          "warning",
+        );
+        return;
+      }
+
+      const availableBal = Number(card.currentBalance || 0);
+      const applicableAmount = Math.min(availableBal, currentNetPayable);
+
+      setGiftCardCode(card.code);
+      setGiftCardDiscount(applicableAmount);
+      setGiftCardBalance(availableBal);
+      setGiftCardLabel(card.name || "Gift Card");
+
+      await Swal.fire({
+        icon: "success",
+        title: "Gift Card Applied",
+        text: `${card.code}: -₹${applicableAmount.toFixed(2)} applied (Card balance: ₹${availableBal})`,
+        timer: 2000,
+        showConfirmButton: false,
+      });
+      return;
+    }
     setLoadingPromo(true);
     try {
       if (promoType === "coupon") {
@@ -1125,7 +1208,8 @@ export default function CheckoutModal({
     const { payable } = roundPayable(
       payableBase -
         roundToPaise(couponDiscount) -
-        roundToPaise(referralDiscount),
+        roundToPaise(referralDiscount) -
+        roundToPaise(giftCardDiscount),
     );
 
     if (paymentStatus === "due") {
@@ -1148,6 +1232,7 @@ export default function CheckoutModal({
     payableBase,
     couponDiscount,
     referralDiscount,
+    giftCardDiscount,
   ]);
 
   useEffect(() => {
@@ -1296,7 +1381,8 @@ export default function CheckoutModal({
   } = roundPayable(
     payableBase -
       roundToPaise(couponDiscount) -
-      roundToPaise(referralDiscount),
+      roundToPaise(referralDiscount) -
+      roundToPaise(giftCardDiscount),
   );
   const isPartialPayment = paymentStatus === "partial";
   const totalPaid = isDuePayment
@@ -1344,7 +1430,7 @@ export default function CheckoutModal({
       (sum, it) => sum + Number(it.qty) * Number(it.price),
       0,
     ),
-    discountTotal: lineDiscountsTotal + couponDiscount + referralDiscount,
+    discountTotal: lineDiscountsTotal + couponDiscount + referralDiscount + giftCardDiscount,
     cashbackAmount: displayCashbackTotal,
     finalAmount: finalPayable,
     totalDue: dueAmount,
@@ -1417,7 +1503,7 @@ export default function CheckoutModal({
         0,
       ),
       discountTotal:
-        lineDiscountsTotal + couponDiscount + referralDiscount,
+        lineDiscountsTotal + couponDiscount + referralDiscount + giftCardDiscount,
       extraCharges,
       grandTotal: draftTotal,
       coupon: couponCode.trim()
@@ -1434,6 +1520,14 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
+      giftCard:
+        giftCardCode.trim() && giftCardDiscount > 0
+          ? {
+              code: giftCardCode.trim().toUpperCase(),
+              discountAmount: giftCardDiscount,
+              label: giftCardLabel,
+            }
+          : null,
       status: "draft" as const,
       mode: "Draft",
       paymentStatus: "partial" as const,
@@ -1720,7 +1814,8 @@ export default function CheckoutModal({
           0,
         ) +
         couponDiscount +
-        referralDiscount,
+        referralDiscount +
+        giftCardDiscount,
       extraCharges: extraCharges,
       grandTotal: finalPayable,
       coupon: couponCode.trim()
@@ -1737,6 +1832,14 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
+      giftCard:
+        giftCardCode.trim() && giftCardDiscount > 0
+          ? {
+              code: giftCardCode.trim().toUpperCase(),
+              discountAmount: giftCardDiscount,
+              label: giftCardLabel,
+            }
+          : null,
       status: "final" as const,
       mode: paymentPayload.mode,
       paymentStatus: paymentPayload.paymentStatus,
@@ -1753,14 +1856,78 @@ export default function CheckoutModal({
       },
     };
 
+    const leftoverGiftCardAmount = Math.max(0, giftCardBalance - giftCardDiscount);
+    const targetCustomerPhone = customerSearch.trim() || initialCustomerPhone || (selectedCustomer as any)?.mobile || "";
+    const targetCustomerId = selectedCustomer?._id ?? initialCustomerId ?? null;
+
+    if (giftCardCode && leftoverGiftCardAmount > 0 && !targetCustomerPhone && !targetCustomerId) {
+      Swal.fire(
+        "Customer Required",
+        `There is ₹${leftoverGiftCardAmount.toFixed(2)} remaining on this gift card. Please enter the customer's mobile number or select a customer so the remaining balance can be added to their wallet.`,
+        "warning",
+      );
+      return;
+    }
+
     try {
       setSaving(true);
+
+      const processGiftCardSettlement = async (refId: string) => {
+        if (!giftCardCode || giftCardDiscount <= 0) return;
+
+        // 1. Update card in storage (status: Used, balance: 0) since remaining was converted to wallet
+        try {
+          const saved = localStorage.getItem("woowoo_gift_cards");
+          if (saved) {
+            const cards = JSON.parse(saved);
+            const updatedCards = cards.map((c: any) => {
+              if (c.code?.trim().toUpperCase() === giftCardCode.trim().toUpperCase()) {
+                return {
+                  ...c,
+                  currentBalance: 0,
+                  status: "Used",
+                };
+              }
+              return c;
+            });
+            localStorage.setItem("woowoo_gift_cards", JSON.stringify(updatedCards));
+          }
+        } catch (e) {
+          console.error("Failed to update gift card storage", e);
+        }
+
+        // 2. If money left in gift card, automatically credit to customer wallet
+        if (leftoverGiftCardAmount > 0 && (targetCustomerPhone || targetCustomerId)) {
+          try {
+            await creditWalletCashback({
+              customerId: targetCustomerId,
+              customerPhone: targetCustomerPhone,
+              customerName: customerName.trim() || "Customer",
+              amount: leftoverGiftCardAmount,
+              note: `Remaining balance from Gift Card (${giftCardCode}) transferred to wallet for Invoice #${refId}`,
+              referenceId: refId,
+              createdBy: {
+                m_staff_id: staff.m_staff_id,
+                m_staff_name: staff.m_staff_name,
+                m_staff_email: staff.m_staff_email,
+              },
+            });
+          } catch (e) {
+            console.error("Failed to credit remaining gift card balance to wallet", e);
+          }
+        }
+      };
+
       if (onConfirmPayment) {
+        await processGiftCardSettlement("CHECKOUT");
         await onConfirmPayment(paymentPayload);
         return;
       }
+
       const response = await handleCreateInvoice(payload);
       const invoiceCode = response?.invoice?.invoiceCode ?? "N/A";
+
+      await processGiftCardSettlement(invoiceCode);
 
       if (!disableCashback && displayCashbackTotal > 0) {
         try {
@@ -1783,9 +1950,14 @@ export default function CheckoutModal({
         }
       }
 
+      let successMsg = `Invoice ${invoiceCode} saved successfully.`;
+      if (leftoverGiftCardAmount > 0) {
+        successMsg += ` ₹${leftoverGiftCardAmount.toFixed(2)} remaining from Gift Card (${giftCardCode}) was automatically added to the customer's wallet.`;
+      }
+
       await Swal.fire(
         "Saved",
-        `Invoice ${invoiceCode} saved successfully.`,
+        successMsg,
         "success",
       );
       onSaved?.();
@@ -1970,6 +2142,13 @@ export default function CheckoutModal({
                   <SummaryLine
                     label={`${referralLabel}${referralCodeApplied ? ` (${referralCodeApplied})` : ""}`}
                     value={`− ${formatInr(referralDiscount)}`}
+                    tone="discount"
+                  />
+                )}
+                {giftCardDiscount > 0 && (
+                  <SummaryLine
+                    label={`Gift Card (${giftCardCode})`}
+                    value={`− ${formatInr(giftCardDiscount)}`}
                     tone="discount"
                   />
                 )}
@@ -2173,7 +2352,7 @@ export default function CheckoutModal({
                 <div className="flex items-center gap-2">
                   <Tag className="h-4 w-4 text-violet-600" />
                   <h3 className="text-xs font-bold uppercase tracking-wider text-violet-600">
-                    Coupon / Referral
+                    Coupon / Referral / Gift Card
                   </h3>
                 </div>
 
@@ -2208,6 +2387,20 @@ export default function CheckoutModal({
                   >
                     Referral
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromoType("giftCard");
+                      setPromoCodeInput(giftCardCode || "");
+                    }}
+                    className={`flex-1 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition ${
+                      promoType === "giftCard"
+                        ? "bg-violet-600 text-white shadow-sm"
+                        : "text-violet-600 hover:bg-violet-50"
+                    }`}
+                  >
+                    Gift Card
+                  </button>
                 </div>
 
                 <div className="flex gap-2">
@@ -2219,7 +2412,9 @@ export default function CheckoutModal({
                     placeholder={
                       promoType === "coupon"
                         ? "ENTER COUPON CODE"
-                        : "ENTER REFERRAL CODE"
+                        : promoType === "referral"
+                          ? "ENTER REFERRAL CODE"
+                          : "ENTER GIFT CARD CODE"
                     }
                     className="min-w-0 flex-1 rounded-lg border border-violet-200 bg-white px-3 py-2.5 text-sm font-semibold uppercase text-slate-800 outline-none placeholder:font-medium placeholder:tracking-wide placeholder:text-slate-400 focus:border-violet-500"
                   />
@@ -2232,6 +2427,41 @@ export default function CheckoutModal({
                     {loadingPromo || loadingReferral ? "…" : "Apply"}
                   </button>
                 </div>
+
+                {giftCardDiscount > 0 && (
+                  <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Gift size={14} className="text-emerald-600" />
+                        <span>{giftCardLabel} ({giftCardCode})</span>
+                        <span className="text-[11px] font-normal text-emerald-600">
+                          Balance: {formatInr(giftCardBalance)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-emerald-700">
+                          −{formatInr(giftCardDiscount)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={clearGiftCardDiscount}
+                          title="Remove Gift Card"
+                          className="rounded p-0.5 text-emerald-600 hover:text-emerald-800 transition"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {giftCardBalance > giftCardDiscount && (
+                      <div className="flex items-center gap-1.5 border-t border-emerald-200/70 pt-1.5 text-[11px] font-medium text-emerald-700">
+                        <WalletIcon className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span>
+                          Remaining <strong>{formatInr(giftCardBalance - giftCardDiscount)}</strong> will automatically be credited to the customer's wallet upon checkout.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {couponDiscount > 0 ? (
                   <div className="flex items-center justify-between gap-2 text-xs text-indigo-700">

@@ -5,7 +5,7 @@
 export function mapAuthUserToReduxPayload(user: any) {
   return {
     m_staff_id: user?.m_staff_id ?? null,
-    m_staff_name: user?.fullName ?? null,
+    m_staff_name: user?.fullName ?? user?.name ?? user?.m_staff_name ?? null,
     m_staff_mobile: user?.phoneNumber ?? null,
     m_staff_email: user?.email ?? null,
     m_staff_role: user?.rbacRole?.slug || user?.role || null,

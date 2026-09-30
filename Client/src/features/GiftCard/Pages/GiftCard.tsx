@@ -8,8 +8,10 @@ import {
 
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import Swal from "sweetalert2";
+import { useAuthStore } from "@/store/authStore";
 import { useAppSelector } from "@/store/hooks";
 import CreateGiftCardModal, {
+  resolveStaffName,
   type GiftCardFormData,
 } from "../components/CreateGiftCardModal";
 
@@ -23,6 +25,7 @@ export type GiftCardData = {
   createdBy: string;
   expiryDate: string;
   status: "Active" | "Used" | "Expired" | "Cancelled";
+  createdAt?: string;
 };
 
 // Initial Sample Data
@@ -81,8 +84,17 @@ const GiftCard = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedCard, setSelectedCard] = useState<GiftCardData | null>(null);
 
-  const staffName =
-    useAppSelector((state) => state.user.m_staff_name) || "Admin";
+  const authUser = useAuthStore((state) => state.user);
+  const reduxStaffName = useAppSelector((state) => state.user.m_staff_name);
+
+  const staffName = useMemo(() => {
+    const authName =
+      authUser?.fullName ||
+      (authUser as any)?.name ||
+      (authUser as any)?.m_staff_name ||
+      null;
+    return resolveStaffName(reduxStaffName, authName, "Staff");
+  }, [reduxStaffName, authUser]);
 
   const saveCards = (updated: GiftCardData[]) => {
     setCards(updated);
@@ -97,7 +109,9 @@ const GiftCard = () => {
     if (formData._id) {
       // Update existing
       const updated = cards.map((c) =>
-        c._id === formData._id ? ({ ...formData, _id: formData._id } as GiftCardData) : c,
+        c._id === formData._id
+          ? ({ ...c, ...formData, _id: formData._id } as GiftCardData)
+          : c,
       );
       saveCards(updated);
       Swal.fire({
@@ -128,9 +142,10 @@ const GiftCard = () => {
         name: formData.name,
         initialAmount: formData.initialAmount,
         currentBalance: formData.currentBalance,
-        createdBy: formData.createdBy,
+        createdBy: formData.createdBy || staffName,
         expiryDate: formData.expiryDate,
         status: formData.status,
+        createdAt: new Date().toISOString(),
       };
       const updated = [newCard, ...cards];
       saveCards(updated);
@@ -178,6 +193,11 @@ const GiftCard = () => {
           <p><strong>Initial Amount:</strong> ₹${card.initialAmount.toLocaleString("en-IN")}</p>
           <p><strong>Current Balance:</strong> ₹${card.currentBalance.toLocaleString("en-IN")}</p>
           <p><strong>Created By:</strong> ${card.createdBy}</p>
+          ${
+            card.createdAt
+              ? `<p><strong>Created At:</strong> ${new Date(card.createdAt).toLocaleDateString("en-IN")}</p>`
+              : ""
+          }
           <p><strong>Expiry Date:</strong> ${new Date(card.expiryDate).toLocaleDateString("en-IN")}</p>
           <p><strong>Status:</strong> ${card.status}</p>
         </div>
