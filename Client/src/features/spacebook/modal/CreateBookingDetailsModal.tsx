@@ -2142,9 +2142,9 @@ const CreateBookingDetailsModal = ({
           if (e.target === e.currentTarget && !submitting) onClose();
         }}
       >
-        <div className="flex max-h-[94vh] w-full max-w-[1240px] flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="flex h-[92vh] max-h-[94vh] w-full max-w-[1240px] flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
           {/* Modal Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4">
+          <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm">
                 <Sparkles size={18} />
@@ -2170,12 +2170,12 @@ const CreateBookingDetailsModal = ({
             </button>
           </div>
 
-          {/* Modal Body - 2 Columns Scrollable */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/40">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
-              {/* Left Column: Form (8 cols) */}
+          {/* Modal Body - 2 Columns */}
+          <div className="flex-1 min-h-0 overflow-hidden p-4 sm:p-6 bg-slate-50/40">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 h-full min-h-0">
+              {/* Left Column: Form (8 cols) - Scrollable Overall Information */}
              
-              <div className="lg:col-span-8">
+              <div className="lg:col-span-8 h-full min-h-0 overflow-y-auto pr-3 custom-scrollbar">
                 <form id={formId} onSubmit={handleSubmit} noValidate className="space-y-6">
                   {/* 1. Customer Information */}
                   <div className="space-y-3">
@@ -2553,7 +2553,7 @@ const CreateBookingDetailsModal = ({
                     )}
 
                     {/* Space Cards Grid */}
-                    <div className="max-h-40 overflow-y-auto pr-2">   
+                    <div>   
                     {spacesLoading ? (
                       <div className="flex h-36 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-white text-slate-500">
                         <Loader2 size={20} className="animate-spin text-indigo-500" />
@@ -3378,8 +3378,8 @@ const CreateBookingDetailsModal = ({
               </div>
 
               {/* Right Column: Refactored Booking Summary Card (4 cols) */}
-              <div className="lg:col-span-4">
-                <div className="sticky top-4">
+              <div className="lg:col-span-4 lg:h-full lg:min-h-0 lg:overflow-y-auto custom-scrollbar">
+                <div>
                   {isDurationPlan ? (
                     <CoworkingSummaryCard
                       space={selectedSpace || null}
@@ -3436,7 +3436,7 @@ const CreateBookingDetailsModal = ({
           </div>
 
           {/* Modal Footer */}
-          <div className="flex justify-end border-t border-slate-100 bg-white px-6 py-3.5">
+          <div className="flex shrink-0 justify-end border-t border-slate-100 bg-white px-6 py-3.5">
             {/* <a
               href="mailto:support@woowoo.in"
               target="_blank"
