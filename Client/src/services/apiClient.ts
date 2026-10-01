@@ -1,5 +1,5 @@
 import { axiosInstance } from "./axiosInstance";
-
+import axios from "axios";
 export const toWhatsAppNumber = (digits10: string) => `+91${digits10}`;
 
 export const handleLogin = async (payload: {
@@ -763,6 +763,9 @@ export type GiftCardRecord = {
   createdBy: string;
   createdAt?: string;
   updatedAt?: string;
+  isShared?: boolean;
+  sharedAt?: string | null;
+  shareToken?: string | null;
   transactions?: GiftCardTransaction[];
 };
 
@@ -855,6 +858,62 @@ export const handleRefundGiftCard = async (payload: {
   note?: string;
 }): Promise<{ success: boolean; message: string; giftCard: GiftCardRecord }> => {
   const response = await axiosInstance.post("/gift-cards/refund", payload);
+  return response.data;
+};
+
+export type PublicGiftCard = {
+  name: string;
+  /** Masked when the card is not usable. */
+  code: string;
+  initialAmount: number;
+  currentBalance: number;
+  expiryDate: string;
+  status: GiftCardStatus;
+  usable: boolean;
+};
+
+/** Public share page URL for a token, on whatever host the app is served from. */
+export const buildGiftCardShareUrl = (token: string) =>
+  `${window.location.origin}/g/${encodeURIComponent(token)}`;
+
+export const handleShareGiftCard = async (
+  id: string,
+  options?: { regenerate?: boolean },
+): Promise<{
+  success: boolean;
+  message: string;
+  shareToken: string;
+  sharedAt: string;
+  giftCard: GiftCardRecord;
+}> => {
+  const response = await axiosInstance.post(`/gift-cards/${id}/share`, {
+    regenerate: Boolean(options?.regenerate),
+  });
+  return response.data;
+};
+
+export const handleRevokeGiftCardShare = async (
+  id: string,
+): Promise<{ success: boolean; message: string; giftCard: GiftCardRecord }> => {
+  const response = await axiosInstance.delete(`/gift-cards/${id}/share`);
+  return response.data;
+};
+
+// Share-link recipients aren't logged in: skip the auth interceptors so an
+// expired staff session in the same browser can't trigger a forced logout.
+const publicAxios = axios.create({
+  baseURL: axiosInstance.defaults.baseURL,
+  headers: { "Content-Type": "application/json" },
+});
+
+export const handleGetPublicGiftCard = async (
+  token: string,
+  signal?: AbortSignal,
+): Promise<{ success: boolean; giftCard: PublicGiftCard }> => {
+  const response = await publicAxios.get(
+    `/public/gift-cards/${encodeURIComponent(token)}`,
+    { signal },
+  );
   return response.data;
 };
 

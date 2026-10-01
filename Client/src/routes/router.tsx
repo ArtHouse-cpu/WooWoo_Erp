@@ -5,6 +5,7 @@ import PermissionRoute from "@/routes/PermissionRoute";
 import { LoginScreen, OtpScreen, SignUpScreen } from "@/features/auth";
 import { HomeScreen } from "@/features/home";
 import { NotfoundScreen } from "@/features/common";
+import PublicGiftCard from "@/features/GiftCard/Pages/PublicGiftCard";
 import {
   CreateNewMembershipScreen,
   CreateNewProductScreen,
@@ -154,4 +155,5 @@ export const router = createBrowserRouter([
     element: <OtpScreen />,
   },
   { path: "*", element: <NotfoundScreen /> },
+  { path: "/g/:token", element: <PublicGiftCard /> },
 ]);

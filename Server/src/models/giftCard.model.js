@@ -70,6 +70,10 @@ const giftCardSchema = new mongoose.Schema(
     },
     createdBy: {type: staffSchema, default: () => ({})},
     updatedBy: {type: staffSchema, default: () => ({})},
+    /** Random, unguessable token for the public share link; absent when not shared. */
+    shareToken: {type: String, default: undefined},
+    sharedAt: {type: Date, default: null},
+    sharedBy: {type: staffSchema, default: undefined},
     transactions: {type: [transactionSchema], default: []},
   },
   {timestamps: true},
@@ -77,5 +81,10 @@ const giftCardSchema = new mongoose.Schema(
 
 giftCardSchema.index({createdAt: -1});
 giftCardSchema.index({name: 1});
+giftCardSchema.index(
+  {shareToken: 1},
+  {unique: true, partialFilterExpression: {shareToken: {$type: 'string'}}},
+);
+
 
 export default mongoose.model('GiftCard', giftCardSchema);

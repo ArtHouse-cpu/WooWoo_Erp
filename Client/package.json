@@ -21,6 +21,7 @@
     "axios": "^1.13.2",
     "dotenv": "^17.2.3",
     "html2canvas": "^1.4.1",
+    "html2canvas-pro": "^2.5.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.554.0",
     "material-react-table": "^3.2.1",

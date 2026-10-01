@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ShareGiftCardModal from "../components/ShareGiftCardModal";
 
 import {
   MaterialReactTable,
@@ -40,6 +41,7 @@ export type GiftCardData = {
   status: "Active" | "Used" | "Expired" | "Cancelled";
   createdAt?: string;
   transactions?: GiftCardTransaction[];
+  isShared?: boolean;
 };
 
 const toGiftCardData = (record: GiftCardRecord): GiftCardData => ({
@@ -53,6 +55,7 @@ const toGiftCardData = (record: GiftCardRecord): GiftCardData => ({
   status: record.status,
   createdAt: record.createdAt,
   transactions: record.transactions,
+  isShared: Boolean(record.isShared),
 });
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -67,7 +70,7 @@ const GiftCard = () => {
   const [selectedCard, setSelectedCard] = useState<GiftCardData | null>(null);
   const [viewCard, setViewCard] = useState<GiftCardData | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
-
+  const [shareCard, setShareCard] = useState<GiftCardData | null>(null);
   const { can } = usePermission();
   const canCreate = can(PERMISSIONS.GIFT_CARD_CREATE);
   const canUpdate = can(PERMISSIONS.GIFT_CARD_UPDATE);
@@ -77,9 +80,11 @@ const GiftCard = () => {
   const reduxStaffName = useAppSelector((state) => state.user.m_staff_name);
 
   const staffName = useMemo(() => {
-    const authUserRecord = authUser as
-      | { fullName?: string; name?: string; m_staff_name?: string }
-      | null;
+    const authUserRecord = authUser as {
+      fullName?: string;
+      name?: string;
+      m_staff_name?: string;
+    } | null;
     const authName =
       authUserRecord?.fullName ||
       authUserRecord?.name ||
@@ -146,14 +151,19 @@ const GiftCard = () => {
         showConfirmButton: false,
       });
       if (saved.status !== formData.status) {
-        toast.info(`Status set to "${saved.status}" based on balance and expiry.`);
+        toast.info(
+          `Status set to "${saved.status}" based on balance and expiry.`,
+        );
       }
       return true;
     } catch (error) {
       Swal.fire({
         icon: "error",
         title: formData._id ? "Update failed" : "Create failed",
-        text: getErrorMessage(error, "Could not save the gift card. Try again."),
+        text: getErrorMessage(
+          error,
+          "Could not save the gift card. Try again.",
+        ),
       });
       return false;
     }
@@ -217,6 +227,16 @@ const GiftCard = () => {
   const handleEditFromView = (card: GiftCardData) => {
     setViewCard(null);
     openEdit(card);
+  };
+
+  const handleShareChange = useCallback((cardId: string, isShared: boolean) => {
+    setCards((prev) =>
+      prev.map((c) => (c._id === cardId ? { ...c, isShared } : c)),
+    );
+  }, []);
+
+  const handleShareFromView = (card: GiftCardData) => {
+    setShareCard(card);
   };
 
   // Table Columns
@@ -435,6 +455,13 @@ const GiftCard = () => {
         loadingHistory={viewLoading}
         onClose={() => setViewCard(null)}
         onEdit={canUpdate ? handleEditFromView : undefined}
+        onShare={canUpdate ? handleShareFromView : undefined}
+      />
+      <ShareGiftCardModal
+        open={Boolean(shareCard)}
+        card={shareCard}
+        onClose={() => setShareCard(null)}
+        onShareChange={handleShareChange}
       />
     </div>
   );

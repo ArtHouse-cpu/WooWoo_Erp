@@ -42,6 +42,7 @@ import dashboardRoutes from './routes/dashboard.route.js';
 import staffCommissionRoutes from './routes/staffCommission.route.js'
 import leadRouters from './routes/lead.Route.js';
 import additionalServiceRoutes from './routes/additionalService.route.js';
+import publicGiftCardRoutes from './routes/publicGiftCard.route.js';
 // import activityRoutes from './routes/activity.route.js';
 
 // Load environment variables
@@ -116,7 +117,7 @@ app.use('/gift-cards', giftCardRoutes);
 app.use('/company', companyRoutes);
 app.use('/affiliate', affiliateRoutes);
 app.use('/access', accessRoutes);
-
+app.use('/public/gift-cards', publicGiftCardRoutes);
 
 //CSP APIs
 app.use('/csp', cspRouters);

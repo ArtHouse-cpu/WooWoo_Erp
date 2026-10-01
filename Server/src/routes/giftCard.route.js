@@ -14,6 +14,8 @@ import {
   getGiftCards,
   redeemGiftCard,
   refundGiftCard,
+  revokeGiftCardShare,
+  shareGiftCard,
   updateGiftCard,
 } from '../controllers/giftCard.controller.js';
 
@@ -57,5 +59,6 @@ router.get('/:id', requirePermission(PERMISSIONS.GIFT_CARD_READ), getGiftCardByI
 router.patch('/:id', requirePermission(PERMISSIONS.GIFT_CARD_UPDATE), updateGiftCard);
 router.put('/:id', requirePermission(PERMISSIONS.GIFT_CARD_UPDATE), updateGiftCard);
 router.delete('/:id', requirePermission(PERMISSIONS.GIFT_CARD_DELETE), deleteGiftCard);
-
+router.post('/:id/share', requirePermission(PERMISSIONS.GIFT_CARD_UPDATE), shareGiftCard);
+router.delete('/:id/share', requirePermission(PERMISSIONS.GIFT_CARD_UPDATE), revokeGiftCardShare);
 export default router;

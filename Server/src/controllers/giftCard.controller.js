@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import GiftCard, {GIFT_CARD_STATUSES} from '../models/giftCard.model.js';
+const SHARE_TOKEN_RE = /^[A-Za-z0-9_-]{20,64}$/;
+const newShareToken = () => crypto.randomBytes(24).toString('base64url');
 import {
   nowInBusinessTz,
   toDateKey,
@@ -49,6 +52,8 @@ const serializeGiftCard = (doc, {withTransactions = false} = {}) => {
     createdBy: plain.createdByName || plain.createdBy?.m_staff_name || '',
     createdByStaff: plain.createdBy || null,
     updatedByStaff: plain.updatedBy || null,
+    isShared: Boolean(plain.shareToken),
+    sharedAt: plain.shareToken ? plain.sharedAt || null : null,
     createdAt: plain.createdAt,
     updatedAt: plain.updatedAt,
   };
@@ -627,6 +632,134 @@ export const refundGiftCard = async (req, res) => {
       success: false,
       message: 'Failed to reverse gift card redemption.',
     });
+  }
+};   
+export const shareGiftCard = async (req, res) => {
+  try {
+    const {id} = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({success: false, message: 'Invalid gift card id.'});
+    }
+
+    await syncGiftCardStatuses();
+    const card = await GiftCard.findById(id).select('-transactions');
+    if (!card) {
+      return res.status(404).json({success: false, message: 'Gift card not found.'});
+    }
+    if (card.status !== 'Active') {
+      return res.status(400).json({
+        success: false,
+        message: `Only active gift cards can be shared. This card is ${card.status.toLowerCase()}.`,
+      });
+    }
+
+    const regenerate = req.body?.regenerate === true;
+    if (card.shareToken && !regenerate) {
+      return res.status(200).json({
+        success: true,
+        message: 'Share link ready.',
+        shareToken: card.shareToken,
+        sharedAt: card.sharedAt,
+        giftCard: serializeGiftCard(card),
+      });
+    }
+
+    const staff = staffFromReq(req);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      card.shareToken = newShareToken();
+      card.sharedAt = new Date();
+      card.sharedBy = staff;
+      try {
+        await card.save();
+        return res.status(200).json({
+          success: true,
+          message: regenerate
+            ? 'New share link created. The old link no longer works.'
+            : 'Share link created.',
+          shareToken: card.shareToken,
+          sharedAt: card.sharedAt,
+          giftCard: serializeGiftCard(card),
+        });
+      } catch (err) {
+        if (err?.code !== 11000) throw err;
+      }
+    }
+    return res.status(500).json({success: false, message: 'Could not create a share link.'});
+  } catch (error) {
+    console.error('shareGiftCard error:', error);
+    return res.status(500).json({success: false, message: 'Failed to share gift card.'});
+  }
+};
+
+export const revokeGiftCardShare = async (req, res) => {
+  try {
+    const {id} = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({success: false, message: 'Invalid gift card id.'});
+    }
+
+    const card = await GiftCard.findByIdAndUpdate(
+      id,
+      {$unset: {shareToken: 1, sharedBy: 1}, $set: {sharedAt: null}},
+      {new: true},
+    ).select('-transactions');
+    if (!card) {
+      return res.status(404).json({success: false, message: 'Gift card not found.'});
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Share link disabled. Anyone with the old link can no longer open it.',
+      giftCard: serializeGiftCard(card),
+    });
+  } catch (error) {
+    console.error('revokeGiftCardShare error:', error);
+    return res.status(500).json({success: false, message: 'Failed to disable share link.'});
+  }
+};
+
+/** Unauthenticated view for share links. Exposes only what the recipient needs. */
+export const getPublicGiftCard = async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  const notFound = () =>
+    res.status(404).json({
+      success: false,
+      message: 'This gift card link is invalid or has been disabled.',
+    });
+
+  try {
+    const token = String(req.params.token ?? '');
+    if (!SHARE_TOKEN_RE.test(token)) return notFound();
+
+    const card = await GiftCard.findOne({shareToken: token})
+      .select('code name initialAmount currentBalance expiryDate status')
+      .lean();
+    if (!card) return notFound();
+
+    const expiryKey = toDateKey(card.expiryDate) || '';
+    const status = resolveStatus({
+      requested: card.status,
+      balance: Number(card.currentBalance || 0),
+      expiryKey,
+    });
+    const usable = status === 'Active';
+
+    return res.status(200).json({
+      success: true,
+      giftCard: {
+        name: card.name,
+        code: usable ? card.code : `${card.code.slice(0, 3)}••••••`,
+        initialAmount: Number(card.initialAmount || 0),
+        currentBalance: usable ? Number(card.currentBalance || 0) : 0,
+        expiryDate: expiryKey,
+        status,
+        usable,
+      },
+    });
+  } catch (error) {
+    console.error('getPublicGiftCard error:', error);
+    return res.status(500).json({success: false, message: 'Failed to load gift card.'});
   }
 };
 
