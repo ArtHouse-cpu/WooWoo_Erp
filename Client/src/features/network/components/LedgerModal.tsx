@@ -218,7 +218,6 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
     const run = async () => {
       try {
         setLoadingInvoices(true);
-        // We fetch using customerPhone as search query
         const res = await handleGetInvoices(customerPhone || customerName, controller.signal);
         const r = res as any;
         const invoices = Array.isArray(r?.invoices) ? r.invoices : Array.isArray(r) ? r : [];
@@ -292,7 +291,30 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
   }, [customer?.mobile, customer?.name]);
 
   const transactions = useMemo(() => {
-    return Array.isArray(walletRecord?.transactions) ? walletRecord.transactions : [];
+    const raw = Array.isArray(walletRecord?.transactions) ? walletRecord.transactions : [];
+    const indexed = raw.map((entry: any, index: number) => ({ entry, origIndex: index }));
+
+    indexed.sort((a:any, b:any) => {
+      const getTime = (item: any) => {
+        const rawDate = item?.createdAt || item?.date || item?.timestamp || item?.updatedAt;
+        if (rawDate) {
+          const t = new Date(rawDate).getTime();
+          if (!Number.isNaN(t) && t > 0) return t;
+        }
+        if (typeof item?._id === "string" && item._id.length === 24) {
+          const timestamp = parseInt(item._id.substring(0, 8), 16) * 1000;
+          if (!Number.isNaN(timestamp) && timestamp > 0) return timestamp;
+        }
+        return 0;
+      };
+
+      const da = getTime(a.entry);
+      const db = getTime(b.entry);
+      if (db !== da) return db - da;
+      return b.origIndex - a.origIndex;
+    });
+
+    return indexed.map((x:any) => x.entry);
   }, [walletRecord]);
 
   const closingBalance = toAmount(

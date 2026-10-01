@@ -5,10 +5,12 @@ import {
   CalendarPlus,
   Check,
   Copy,
+  Download,
   Gift,
   History,
   Loader2,
   Pencil,
+  Share2,
   ShoppingBag,
   SlidersHorizontal,
   Sparkles,
@@ -19,6 +21,8 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import type { GiftCardData } from "../Pages/GiftCard";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 type Props = {
   open: boolean;
@@ -44,12 +48,12 @@ const formatDateTime = (value?: string) => {
   return Number.isNaN(d.getTime())
     ? "—"
     : d.toLocaleString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 };
 
 const STATUS_STYLES: Record<
@@ -95,10 +99,10 @@ const formatDate = (value?: string) => {
   const d = parseDate(value);
   return d
     ? d.toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })
     : "—";
 };
 
@@ -111,6 +115,8 @@ const daysUntil = (value?: string) => {
   target.setHours(0, 0, 0, 0);
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 };
+
+// const handleDownload=
 
 const ViewGiftCardModal = ({
   open,
@@ -159,6 +165,62 @@ const ViewGiftCardModal = ({
       toast.error("Could not copy the code");
     }
   };
+  const handleDownload = async () => {
+    const element = document.getElementById("gift-card-download");
+    if(!element){
+      toast.error("Could not generate gift card");
+      return;
+    }
+
+    try{
+      const canvas = await html2canvas(element, {
+        scale : 2,
+        useCORS : true,
+        backgroundColor : "ffffff"
+      });
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF ({
+        orientation : "portrait",
+        unit : "mm" ,
+        format :"a4",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight ();
+
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+
+      const ratio = Math.min(
+          pdfWidth / imgWidth,
+          pdfHeight / imgHeight
+
+      ); 
+      const imgPdfWidth = imgWidth * ratio;
+      const imgPdfHeight = imgHeight * ratio;
+
+      const x= (pdfWidth - imgPdfWidth)/2;
+      const y= (pdfHeight - imgPdfHeight)/2;
+
+      pdf.addImage(
+        imgData,
+        "PNG",
+        x,
+        y,
+        imgPdfWidth,
+        imgPdfHeight
+      );
+
+      pdf.save("gift-card.pdf");
+
+      toast.success("Gift card downloaded successfully!");
+    }
+    catch(error){
+      console.error("Gift card download error:",error);
+      toast.error("Failed to download gift card");
+    }
+  };
 
   const details = [
     {
@@ -186,6 +248,8 @@ const ViewGiftCardModal = ({
       tone: "bg-emerald-50 text-emerald-600",
     },
   ];
+
+
 
   return (
     <div
@@ -301,13 +365,12 @@ const ViewGiftCardModal = ({
             aria-label="Balance remaining"
           >
             <div
-              className={`h-full rounded-full transition-all ${
-                remainingPct > 50
+              className={`h-full rounded-full transition-all ${remainingPct > 50
                   ? "bg-emerald-500"
                   : remainingPct > 20
                     ? "bg-amber-500"
                     : "bg-rose-500"
-              }`}
+                }`}
               style={{ width: `${remainingPct}%` }}
             />
           </div>
@@ -344,18 +407,16 @@ const ViewGiftCardModal = ({
         {/* Expiry */}
         <div className="px-6 pt-3">
           <div
-            className={`flex items-center gap-3 rounded-2xl border p-3 ${
-              pastExpiry
+            className={`flex items-center gap-3 rounded-2xl border p-3 ${pastExpiry
                 ? "border-rose-200 bg-rose-50"
                 : days != null && days <= 30
                   ? "border-amber-200 bg-amber-50"
                   : "border-gray-100 bg-gray-50/60"
-            }`}
+              }`}
           >
             <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                pastExpiry ? "bg-rose-100 text-rose-600" : "bg-violet-50 text-violet-600"
-              }`}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${pastExpiry ? "bg-rose-100 text-rose-600" : "bg-violet-50 text-violet-600"
+                }`}
             >
               <CalendarClock size={17} />
             </span>
@@ -369,13 +430,12 @@ const ViewGiftCardModal = ({
             </div>
             {expiryNote && (
               <span
-                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                  pastExpiry
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${pastExpiry
                     ? "bg-rose-100 text-rose-700"
                     : days != null && days <= 30
                       ? "bg-amber-100 text-amber-700"
                       : "bg-emerald-100 text-emerald-700"
-                }`}
+                  }`}
               >
                 {expiryNote}
               </span>
@@ -433,13 +493,12 @@ const ViewGiftCardModal = ({
                     </div>
                     <div className="shrink-0 text-right">
                       <p
-                        className={`text-sm font-bold ${
-                          txn.type === "issue"
+                        className={`text-sm font-bold ${txn.type === "issue"
                             ? "text-gray-900"
                             : positive
                               ? "text-emerald-600"
                               : "text-rose-600"
-                        }`}
+                          }`}
                       >
                         {txn.type === "issue" ? "" : positive ? "+" : "−"}
                         {formatINR(Math.abs(txn.amount))}
@@ -460,7 +519,30 @@ const ViewGiftCardModal = ({
         </div>
 
         {/* Footer */}
+
+
         <div className="mt-5 flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+          <div className="flex items-center gap-2">
+            {/* Share Button */}
+            <button
+              type="button"
+              // onClick={}
+              title="Share"
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-green-200 bg-white text-green-600 shadow-sm transition-all duration-200 hover:border-green-300 hover:bg-green-50 hover:shadow-md"
+            >
+              <Share2 size={18} strokeWidth={2} />
+            </button>
+
+            {/* Download Button */}
+            <button
+              type="button"
+              onClick={handleDownload}
+              title="Download"
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-blue-200 bg-white text-blue-600 shadow-sm transition-all duration-200 hover:border-blue-300 hover:bg-blue-50 hover:shadow-md"
+            >
+              <Download size={18} strokeWidth={2} />
+            </button>
+          </div>
           <button
             type="button"
             onClick={onClose}
