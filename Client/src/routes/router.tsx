@@ -31,6 +31,7 @@ import {
   DebitNoteScreen,
   InventoryScreen,
   InventoryTimelineScreen,
+
   PurchaseOrderScreen,
 } from "@/features/purchase";
 import {
@@ -60,6 +61,7 @@ import ExpenseScreen from "@/features/expenses/ExpenseScreen";
 import StaffCommissionScreen from "@/features/commission/StaffCommissionScreen";
 import SpaceBooking from "@/features/spacebook/SpaceBooking";
 import GiftCard from "@/features/GiftCard/Pages/GiftCard";
+import InventorypaymentsScreen from "@/features/purchase/pages/InventorypaymentsScreen";
 
 export const router = createBrowserRouter([
   {
@@ -97,7 +99,9 @@ export const router = createBrowserRouter([
           },
           { path: "inventory", element: <InventoryScreen /> },
           { path: "inventory-timeline", element: <InventoryTimelineScreen /> },
-          { path: "debit-notes", element: <DebitNoteScreen /> },
+          { path: "inventory-payments", element: <InventorypaymentsScreen /> },
+
+          { path: "debit-notes", element: <DebitNoteScreen/> },
           { path: "pos", element: <PosScreen /> },
           { path: "subscriptions", element: <SubscriptionScreen /> },
           { path: "invoices", element: <InvoiceScreen /> },

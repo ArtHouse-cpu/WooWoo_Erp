@@ -109,8 +109,8 @@ const MENU_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    key: "Inventory",
-    label: "Inventory",
+    key: "Timeline",
+    label: "Timeline",
     icon: Package,
     submenu: [
       {
@@ -121,9 +121,15 @@ const MENU_GROUPS: MenuGroup[] = [
       },
       {
         name: "Inventory Timeline",
-        label: "Timeline",
+        label: "Inventory-Timeline",
         icon: FileSpreadsheet,
         path: "/inventory-timeline",
+      },
+      {
+        name: "Payments Timeline",
+        label: "Payments-Timeline",
+        icon: FileSpreadsheet,
+        path: "/inventory-payments",
       },
     ],
   },
