@@ -30,6 +30,7 @@ import {
   History,
 } from "lucide-react";
 import Swal from "sweetalert2";
+import PaymentModal from "../components/paymentmodal";
 
 export type PaymentEntry = {
   id: string;
@@ -55,6 +56,50 @@ export type PaymentEntry = {
     dueAmount?: number;
   };
 };
+
+const toYmd = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const getPeriodRange = (period: string): { start: string; end: string } => {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (period === "today") {
+    const ymd = toYmd(today);
+    return { start: ymd, end: ymd };
+  }
+  if (period === "yesterday") {
+    const y = new Date(today);
+    y.setDate(today.getDate() - 1);
+    const ymd = toYmd(y);
+    return { start: ymd, end: ymd };
+  }
+  if (period === "this_week") {
+    const start = new Date(today);
+    const day = start.getDay() || 7;
+    start.setDate(start.getDate() - (day - 1));
+    return { start: toYmd(start), end: toYmd(today) };
+  }
+  if (period === "this_month") {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { start: toYmd(start), end: toYmd(today) };
+  }
+  if (period === "last_month") {
+    const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const end = new Date(today.getFullYear(), today.getMonth(), 0);
+    return { start: toYmd(start), end: toYmd(end) };
+  }
+  if (period === "this_year") {
+    const start = new Date(today.getFullYear(), 0, 1);
+    return { start: toYmd(start), end: toYmd(today) };
+  }
+  return { start: "", end: "" };
+};
+
 const InventorypaymentsScreen = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -66,11 +111,19 @@ const InventorypaymentsScreen = () => {
   const [statusFilter, setStatusFilter] = useState<
     "ALL" | "Paid" | "Partial" | "Pending" | "Cancelled"
   >("ALL");
+  const [timeRange, setTimeRange] = useState("lifetime");
   const [dateRange, setDateRange] = useState({
     start: "",
     end: "",
   });
   const [selectedPayment, setSelectedPayment] = useState<PaymentEntry | null>(null);
+
+  const handleTimeRangeChange = (period: string) => {
+    setTimeRange(period);
+    if (period === "custom") return;
+    const range = getPeriodRange(period);
+    setDateRange(range);
+  };
 
   useEffect(() => {
     fetchData();
@@ -237,12 +290,14 @@ const InventorypaymentsScreen = () => {
 
       const itemDate = item.date.toISOString().split("T")[0];
       const matchesDate =
-        (!dateRange.start || itemDate >= dateRange.start) &&
-        (!dateRange.end || itemDate <= dateRange.end);
+        timeRange === "lifetime"
+          ? true
+          : (!dateRange.start || itemDate >= dateRange.start) &&
+            (!dateRange.end || itemDate <= dateRange.end);
 
       return matchesSearch && matchesFlow && matchesStatus && matchesDate;
     });
-  }, [paymentData, searchTerm, flowFilter, statusFilter, dateRange]);
+  }, [paymentData, searchTerm, flowFilter, statusFilter, dateRange, timeRange]);
 
   const stats = useMemo(() => {
     return filteredData.reduce(
@@ -340,29 +395,33 @@ const InventorypaymentsScreen = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* <button
-            onClick={() => navigate("/inventory-timeline")}
-            className="px-3.5 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm flex items-center gap-2"
-          >
-            <History size={15} className="text-blue-600" />
-            Stock Timeline
-          </button>
-          <button
-            onClick={exportCSV}
-            className="px-3.5 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm flex items-center gap-2"
-            title="Export CSV"
-          >
-            <Download size={15} />
-            Export
-          </button>
+          {/* Right Top: Lifetime Filter Dropdown */}
+          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
+            <Calendar size={14} className="text-blue-600 shrink-0" />
+            <select
+              value={timeRange}
+              onChange={(e) => handleTimeRangeChange(e.target.value)}
+              className="text-xs font-semibold text-gray-800 bg-transparent outline-none cursor-pointer pr-1"
+            >
+              <option value="lifetime">Lifetime</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="this_week">This Week</option>
+              <option value="this_month">This Month</option>
+              <option value="last_month">Last Month</option>
+              <option value="this_year">This Year</option>
+            </select>
+          </div>
+
           <button
             onClick={fetchData}
             disabled={refreshing}
-            className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm flex items-center gap-2"
+            className="px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Refresh Data"
           >
-            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-            Refresh Data
-          </button> */}
+            <RefreshCw size={13} className={refreshing ? "animate-spin text-blue-600" : "text-gray-500"} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
         </div>
       </div>
 
@@ -403,7 +462,7 @@ const InventorypaymentsScreen = () => {
       {/* Filters Bar */}
       <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          <div className="md:col-span-5 relative">
+          <div className="md:col-span-8 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
             <input
               type="text"
@@ -414,7 +473,7 @@ const InventorypaymentsScreen = () => {
             />
           </div>
 
-          <div className="md:col-span-3">
+          <div className="md:col-span-4">
             <div className="flex p-1 bg-gray-100 rounded-lg">
               <button
                 onClick={() => setFlowFilter("ALL")}
@@ -448,33 +507,6 @@ const InventorypaymentsScreen = () => {
               </button>
             </div>
           </div>
-
-          <div className="md:col-span-4 flex gap-2">
-            <div className="flex-1 relative">
-              <Calendar
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                size={14}
-              />
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(e) => setDateRange((prev) => ({ ...prev, start: e.target.value }))}
-                className="w-full pl-9 pr-2 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="flex-1 relative">
-              <Calendar
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                size={14}
-              />
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(e) => setDateRange((prev) => ({ ...prev, end: e.target.value }))}
-                className="w-full pl-9 pr-2 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
         </div>
 
         {/* Secondary Filter: Status Pills */}
@@ -495,12 +527,13 @@ const InventorypaymentsScreen = () => {
               {status === "ALL" ? "All Statuses" : status}
             </button>
           ))}
-          {(searchTerm || flowFilter !== "ALL" || statusFilter !== "ALL" || dateRange.start || dateRange.end) && (
+          {(searchTerm || flowFilter !== "ALL" || statusFilter !== "ALL" || timeRange !== "lifetime") && (
             <button
               onClick={() => {
                 setSearchTerm("");
                 setFlowFilter("ALL");
                 setStatusFilter("ALL");
+                setTimeRange("lifetime");
                 setDateRange({ start: "", end: "" });
               }}
               className="ml-auto text-xs text-blue-600 hover:underline font-semibold"
@@ -551,8 +584,7 @@ const InventorypaymentsScreen = () => {
                 filteredData.map((item) => (
                   <tr
                     key={item.id}
-                    className="hover:bg-gray-50/60 transition group cursor-pointer"
-                    onClick={() => setSelectedPayment(item)}
+                    className="hover:bg-gray-50/60 transition group"
                   >
                     {/* Date & Time */}
                     <td className="px-6 py-4">
@@ -593,20 +625,12 @@ const InventorypaymentsScreen = () => {
                     </td>
 
                     {/* Payment Info */}
-                    <td className="px-6 py-0">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5">
-                          <Hash size={12} className="text-gray-400" />
-                          <span className="text-sm font-bold text-gray-800">
-                            {item.paymentNo}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <FileText size={12} className="text-gray-400" />
-                          <span className="text-[11px] font-semibold text-blue-600 hover:underline">
-                            {item.invoiceNo}
-                          </span>
-                        </div>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5">
+                        <Hash size={12} className="text-gray-400" />
+                        <span className="text-sm font-bold text-gray-800">
+                          {item.paymentNo}
+                        </span>
                       </div>
                     </td>
 
@@ -699,10 +723,11 @@ const InventorypaymentsScreen = () => {
                     </td>
 
                     {/* Action */}
-                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-6 py-4 text-right">
                       <button
+                        type="button"
                         onClick={() => setSelectedPayment(item)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition inline-flex items-center"
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition inline-flex items-center cursor-pointer"
                         title="View Details"
                       >
                         <Eye size={16} />
@@ -740,12 +765,12 @@ const InventorypaymentsScreen = () => {
         </div>
       </div>
 
-      {/* Payment Details Drawer / Modal */}
-      {selectedPayment && (
-       <div>
-        Modal Open
-       </div>
-      )}
+      {/* Payment Details Modal */}
+      <PaymentModal
+        open={Boolean(selectedPayment)}
+        onClose={() => setSelectedPayment(null)}
+        payment={selectedPayment}
+      />
     </div>
   );
 };

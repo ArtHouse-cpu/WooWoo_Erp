@@ -121,13 +121,13 @@ const MENU_GROUPS: MenuGroup[] = [
       },
       {
         name: "Inventory Timeline",
-        label: "Inventory-Timeline",
+        label: "Timeline",
         icon: FileSpreadsheet,
         path: "/inventory-timeline",
       },
       {
         name: "Payments Timeline",
-        label: "Payments-Timeline",
+        label: "Payments",
         icon: FileSpreadsheet,
         path: "/inventory-payments",
       },
