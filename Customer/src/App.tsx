@@ -34,6 +34,7 @@ import {useAuthStore} from './store/authStore';
 import {getPostAuthPath} from './utils/onboarding';
 import ActivityPage from './app/activity/ActivityPage';
 import HelpScreen from './app/help/HelpScreen'
+import ExhibitionPage from './app/exhibition/ExhibitionPage';
 
 
 const queryClient = new QueryClient({
@@ -104,6 +105,7 @@ export default function App() {
             <Route path="/communityguidelines" element={<CommunityGuidelinesPage />} />
             <Route path="/refundterms" element={<RefundTermsPage />} />
             <Route path="/help" element={< HelpScreen/>} />
+            <Route path="/exhibition" element={<ExhibitionPage />} />
             <Route path="*" element={<RootRedirect />} />
             
 
