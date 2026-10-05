@@ -22,12 +22,12 @@ import {
   Coins,
   RefreshCw,
   Eye,
-  X,
-  FileText,
+ 
+ 
   Filter,
   Receipt,
-  Download,
-  History,
+ 
+ 
 } from "lucide-react";
 import Swal from "sweetalert2";
 import PaymentModal from "../components/paymentmodal";
