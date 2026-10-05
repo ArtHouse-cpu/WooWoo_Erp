@@ -31,7 +31,6 @@ import {
   DebitNoteScreen,
   InventoryScreen,
   InventoryTimelineScreen,
-
   PurchaseOrderScreen,
 } from "@/features/purchase";
 import {
@@ -62,6 +61,7 @@ import StaffCommissionScreen from "@/features/commission/StaffCommissionScreen";
 import SpaceBooking from "@/features/spacebook/SpaceBooking";
 import GiftCard from "@/features/GiftCard/Pages/GiftCard";
 import InventorypaymentsScreen from "@/features/purchase/pages/InventorypaymentsScreen";
+import Exhibition from "@/features/auth/pages/Exhibition";
 
 export const router = createBrowserRouter([
   {
@@ -101,7 +101,7 @@ export const router = createBrowserRouter([
           { path: "inventory-timeline", element: <InventoryTimelineScreen /> },
           { path: "inventory-payments", element: <InventorypaymentsScreen /> },
 
-          { path: "debit-notes", element: <DebitNoteScreen/> },
+          { path: "debit-notes", element: <DebitNoteScreen /> },
           { path: "pos", element: <PosScreen /> },
           { path: "subscriptions", element: <SubscriptionScreen /> },
           { path: "invoices", element: <InvoiceScreen /> },
@@ -153,6 +153,10 @@ export const router = createBrowserRouter([
         <SignUpScreen />
       </GuestRoute>
     ),
+  },
+  {
+    path: "/exhibition",
+    element: <Exhibition/>,
   },
   {
     path: "/otp",

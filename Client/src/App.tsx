@@ -15,19 +15,23 @@ export default function App() {
 
     return () => clearTimeout(timer);
   }, []);
-    <ToastContainer
-      position="top-right"
-      autoClose={3000}
-      hideProgressBar={false}
-      newestOnTop
-      closeOnClick
-      pauseOnHover
-      theme="light"
-    />
-
 
   if (loading) {
     return <FullPageLoader />;
   }
-  return <RouterProvider router={router} />;
+
+  return (
+    <>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        theme="light"
+      />
+      <RouterProvider router={router} />
+    </>
+  );
 }
