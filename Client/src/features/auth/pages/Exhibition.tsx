@@ -1,7 +1,7 @@
 import {
-  ArrowRight,
   ArrowUpRight,
   CalendarDays,
+  ChevronRight,
   Coffee,
   Menu,
   Music2,
@@ -491,42 +491,40 @@ const Exhibition = () => {
 
 
       {/* =====================================================
-          REGISTER SECTION
+          REGISTER / ENTRY PASS BUTTON
       ====================================================== */}
 
       <section
         id="register"
-        className="mx-4 mb-5 flex items-center justify-between gap-3 rounded-2xl bg-orange-500 p-5 text-white shadow-xl shadow-orange-200"
+        className="px-5 pb-8 pt-1 md:px-12"
       >
-
-        <div>
-
-          <span className="text-[7px] font-black tracking-wider opacity-80">
-            READY TO CREATE?
-          </span>
-
-          <h2 className="mt-1 font-serif text-[22px] font-bold leading-none">
-            Get your free
-            <br />
-            entry pass.
-          </h2>
-
-          <p className="mt-2 max-w-[190px] text-[8px] leading-relaxed opacity-90">
-            Register now and enjoy the entire creative weekend.
-          </p>
-
-        </div>
-
-
         <button
           type="button"
           onClick={() => alert("Registration form coming next!")}
-          className="flex items-center gap-1 rounded-full bg-white px-3 py-3 text-[8px] font-bold text-orange-500"
+          className="group flex w-full items-center justify-between gap-3 rounded-2xl bg-orange-500 px-4 py-3.5 text-white shadow-lg shadow-orange-500/25 transition-all hover:bg-orange-600 active:scale-[0.99] sm:px-6 sm:py-4"
         >
-          Register
-          <ArrowRight size={17} />
-        </button>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-6 w-6 shrink-0 sm:h-7 sm:w-7"
+            >
+              <path d="M5 8 C5 5.5 5.5 5 8 5 H9 C9.5 7.5 14.5 7.5 15 5 H16 C18.5 5 19 5.5 19 8 V9 C16.5 9.5 16.5 14.5 19 15 V16 C19 18.5 18.5 19 16 19 H15 C14.5 16.5 9.5 16.5 9 19 H8 C5.5 19 5 18.5 5 16 V15 C7.5 14.5 7.5 9.5 5 9 Z" />
+            </svg>
 
+            <span className="text-[15px] font-bold tracking-normal text-white sm:text-lg md:text-xl">
+              Get Your Free Entry Pass
+            </span>
+          </div>
+
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-orange-500 shadow-sm transition-transform group-hover:translate-x-0.5 sm:h-9 sm:w-9">
+            <ChevronRight className="h-5 w-5 stroke-[2.5]" />
+          </div>
+        </button>
       </section>
 
 
@@ -534,9 +532,9 @@ const Exhibition = () => {
           FOOTER
       ====================================================== */}
 
-      <footer className="flex items-center justify-between px-5 pb-10 pt-4 md:px-12">
+      {/*<footer className="flex items-center justify-between px-5 pb-10 pt-4 md:px-12">
 
-        <a href="#top" className="flex items-center">
+         <a href="#top" className="flex items-center">
           <img
             src={logo}
             alt="Woo Woo Art House Logo"
@@ -549,9 +547,9 @@ const Exhibition = () => {
           Art • Fashion • Craft
           <br />
           Community
-        </p>
+        </p> 
 
-      </footer>
+      </footer>*/}
 
     </div>
   );
