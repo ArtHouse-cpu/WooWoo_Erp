@@ -532,9 +532,9 @@ const Exhibition = () => {
           FOOTER
       ====================================================== */}
 
-      <footer className="flex items-center justify-between px-5 pb-10 pt-4 md:px-12">
+      {/*<footer className="flex items-center justify-between px-5 pb-10 pt-4 md:px-12">
 
-        {/* <a href="#top" className="flex items-center">
+         <a href="#top" className="flex items-center">
           <img
             src={logo}
             alt="Woo Woo Art House Logo"
@@ -547,9 +547,9 @@ const Exhibition = () => {
           Art • Fashion • Craft
           <br />
           Community
-        </p> */}
+        </p> 
 
-      </footer>
+      </footer>*/}
 
     </div>
   );
