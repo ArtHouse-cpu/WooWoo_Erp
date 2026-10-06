@@ -61,7 +61,8 @@ import StaffCommissionScreen from "@/features/commission/StaffCommissionScreen";
 import SpaceBooking from "@/features/spacebook/SpaceBooking";
 import GiftCard from "@/features/GiftCard/Pages/GiftCard";
 import InventorypaymentsScreen from "@/features/purchase/pages/InventorypaymentsScreen";
-import Exhibition from "@/features/auth/pages/Exhibition";
+import ExhibitionTable from "@/features/exhibition-table/ExhibitionTable";
+
 
 export const router = createBrowserRouter([
   {
@@ -107,6 +108,7 @@ export const router = createBrowserRouter([
           { path: "invoices", element: <InvoiceScreen /> },
           { path: "payments", element: <PaymentScreen /> },
           { path: "wallet", element: <WalletScreen /> },
+          { path: "exhibitiontable", element: <ExhibitionTable/> },
           { path: "giftcard", element: <GiftCard /> },
           { path: "quotations", element: <QuotationScreen /> },
           { path: "create-quotation", element: <CreateQuotationScreen /> },
@@ -156,7 +158,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/exhibition",
-    element: <Exhibition/>,
+    element: <ExhibitionTable/>,
   },
   {
     path: "/otp",
