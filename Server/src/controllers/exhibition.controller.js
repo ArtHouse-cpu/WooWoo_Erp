@@ -5,6 +5,7 @@ import Exhibition, {
   EXHIBITION_GENDERS,
   EXHIBITION_INTERESTS,
 } from '../models/exhibition.model.js';
+const PASS_CODE_RE = /WWX-[A-Z0-9]{4}-[A-Z0-9]{4}/;
 
 const MAX_PEOPLE_PER_REQUEST = 10;
 const PHONE_RE = /^[6-9]\d{9}$/;
@@ -212,6 +213,61 @@ export const createExhibition = async (req, res) => {
   }
 };
 
+/** Admin: mark a visitor present (checked in at the gate) or revert to absent. */
+export const markExhibitionAttendance = async (req, res) => {
+  try {
+    const {id} = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({success: false, message: 'Invalid id'});
+    }
+    if (typeof req.body?.present !== 'boolean') {
+      return res.status(400).json({success: false, message: '`present` must be true or false.'});
+    }
+
+    const staff = staffFromReq(req);
+    let exhibition;
+
+    if (req.body.present) {
+      // Only stamp the first check-in so a double click doesn't move the time.
+      exhibition = await Exhibition.findOneAndUpdate(
+        {_id: id, checkedInAt: null, status: {$ne: 'Cancelled'}},
+        {$set: {checkedInAt: new Date(), checkedInBy: staff, updatedBy: staff}},
+        {new: true},
+      ).lean();
+
+      if (!exhibition) {
+        const existing = await Exhibition.findById(id).lean();
+        if (!existing) {
+          return res.status(404).json({success: false, message: 'Pass not found'});
+        }
+        if (existing.status === 'Cancelled') {
+          return res
+            .status(409)
+            .json({success: false, message: 'Cancelled passes cannot be marked present.'});
+        }
+        exhibition = existing;
+      }
+    } else {
+      exhibition = await Exhibition.findByIdAndUpdate(
+        id,
+        {$set: {checkedInAt: null, updatedBy: staff}, $unset: {checkedInBy: 1}},
+        {new: true},
+      ).lean();
+      if (!exhibition) {
+        return res.status(404).json({success: false, message: 'Pass not found'});
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: exhibition.checkedInAt ? 'Marked present' : 'Marked absent',
+      exhibition,
+    });
+  } catch (error) {
+    return res.status(500).json({success: false, message: error.message});
+  }
+};
+
 export const getExhibitionById = async (req, res) => {
   try {
     const {id} = req.params;
@@ -277,5 +333,53 @@ export const deleteExhibition = async (req, res) => {
       });
   } catch (error) {
     res.status(500).json({success: false, message: error.message});
+  }
+};
+
+
+
+
+export const checkInExhibitionPass = async (req, res) => {
+  try {
+    const match = String(req.body?.code ?? '').toUpperCase().match(PASS_CODE_RE);
+    if (!match) {
+      return res.status(400).json({success: false, message: 'This is not a valid exhibition pass.'});
+    }
+    const passcode = match[0];
+    const staff = staffFromReq(req);
+
+    // Atomic: only the first scan stamps the time, even if two gates scan at once.
+    const updated = await Exhibition.findOneAndUpdate(
+      {passcode, checkedInAt: null, status: 'Active'},
+      {$set: {checkedInAt: new Date(), checkedInBy: staff, updatedBy: staff}},
+      {new: true},
+    ).lean();
+
+    if (updated) {
+      return res.status(200).json({
+        success: true,
+        result: 'checked_in',
+        message: `${updated.fullName} marked present`,
+        exhibition: updated,
+      });
+    }
+
+    const existing = await Exhibition.findOne({passcode}).lean();
+    if (!existing) {
+      return res.status(404).json({success: false, message: `Pass ${passcode} not found.`});
+    }
+    if (existing.status !== 'Active') {
+      return res
+        .status(409)
+        .json({success: false, message: `This pass is ${existing.status.toLowerCase()}.`});
+    }
+    return res.status(200).json({
+      success: true,
+      result: 'already_present',
+      message: `${existing.fullName} is already marked present`,
+      exhibition: existing,
+    });
+  } catch (error) {
+    return res.status(500).json({success: false, message: error.message});
   }
 };

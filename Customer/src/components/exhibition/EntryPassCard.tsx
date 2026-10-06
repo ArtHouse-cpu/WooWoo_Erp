@@ -3,6 +3,7 @@ import JsBarcode from 'jsbarcode';
 import {QRCodeCanvas} from 'qrcode.react';
 import {CalendarDays, Clock3, MapPin, Sparkles, Ticket, Users} from 'lucide-react';
 import logo from '../../assets/woo_woo_art_house_logo.png';
+import mapsIcon from '../../assets/google_maps_icon.png';
 import {EXHIBITION_EVENT, passInterests, passQrValue, type EntryPass} from './entryPass';
 
 /** Must match the surface behind the card so the perforation notches read as cut-outs. */
@@ -26,6 +27,14 @@ const Barcode = ({value}: {value: string}) => {
 
   return <canvas ref={ref} className="block h-11 w-full" aria-label={`Barcode ${value}`} />;
 };
+
+const InstagramIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <rect x="3.5" y="3.5" width="17" height="17" rx="5" stroke="currentColor" strokeWidth="2" />
+    <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
+    <circle cx="17.2" cy="6.8" r="1.2" fill="currentColor" />
+  </svg>
+);
 
 const Detail = ({
   icon,
@@ -133,6 +142,32 @@ export default function EntryPassCard({pass, ref}: Props) {
           <MapPin size={12} className="mt-px shrink-0 text-[#f97316]" />
           {EXHIBITION_EVENT.venue}
         </p>
+
+        <div className="mt-2.5 flex items-center gap-2">
+          <a
+            href={EXHIBITION_EVENT.mapUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#1c1917] px-3 py-2 text-[12px] font-bold text-white transition hover:bg-[#292524]"
+          >
+            <img src={mapsIcon} alt="" aria-hidden="true" className="h-4 w-4 object-contain" />
+            Get Directions
+          </a>
+          <a
+            href={EXHIBITION_EVENT.instagramUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Instagram ${EXHIBITION_EVENT.instagramHandle}`}
+            title={EXHIBITION_EVENT.instagramHandle}
+            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-bold text-white transition hover:opacity-90"
+            style={{
+              background: 'linear-gradient(45deg, #f58529 0%, #dd2a7b 50%, #8134af 100%)',
+            }}
+          >
+            <InstagramIcon />
+            Instagram
+          </a>
+        </div>
       </div>
 
       {/* Perforation */}

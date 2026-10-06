@@ -3,8 +3,10 @@ import {
   CalendarDays,
   ChevronRight,
   Coffee,
-  Menu,
+  MessageCircle,
+  MoreVertical,
   Music2,
+  QrCode,
   Palette,
   ShoppingBag,
   Sparkles,
@@ -12,10 +14,10 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
-import logo from "@/assets/woo_woo_art_house_logo.png";
+import logo from "@/assets/woo_woo_art_house_logo_full.png";
 import EntryPassFormModal from "../../components/exhibition/EntryPassFormModal";
 import EntryPassPreviewModal from "../../components/exhibition/EntryPassPreviewModal";
 import {
@@ -27,6 +29,10 @@ import {
 import { registerExhibitionPasses } from "../../services/exhibition.service";
 import { getErrorMessage } from "../../services/axios";
 
+
+const HELP_WHATSAPP_URL = `https://wa.me/918073988123?text=${encodeURIComponent(
+  "Hi, I need help with the free entry pass for the Creative Exhibition.",
+)}`;
 
 // ================= TYPES =================
 
@@ -45,6 +51,23 @@ const Exhibition = () => {
   const [passFormOpen, setPassFormOpen] = useState(false);
   const [previewPasses, setPreviewPasses] = useState<EntryPass[]>([]);
   const [savedPasses, setSavedPasses] = useState<EntryPass[]>(loadSavedPasses);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
 
   const openPassForm = () => {
     setMenuOpen(false);
@@ -135,7 +158,7 @@ const Exhibition = () => {
 
   return (
     <>
-    <div id="top" className="min-h-screen bg-[#f8f3ec] text-[#181818] print:hidden">
+    <div id="top" className="min-h-screen bg-[#f8f3ec] pb-24 text-[#181818] md:pb-0 print:hidden">
 
       {/* =====================================================
           HEADER
@@ -148,60 +171,76 @@ const Exhibition = () => {
           <img
             src={logo}
             alt="Woo Woo Art House Logo"
-            className="h-10 w-auto object-contain sm:h-12"
+            className="h-11 w-auto object-contain sm:h-14"
           />
         </a>
 
-        {/* Menu Button */}
-        <button
-          type="button"
-          onClick={() => setMenuOpen((prev) => !prev)}
-          className="rounded-lg p-2 hover:bg-white"
-        >
-          <Menu size={22} />
-        </button>
+        {/* More (three-dot) menu */}
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((prev) => !prev)}
+            aria-label="More options"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            className="rounded-full p-2 text-[#44403c] transition hover:bg-white"
+          >
+            <MoreVertical size={22} />
+          </button>
 
-        {/* Mobile Menu */}
-        {menuOpen && (
-          <div className="absolute right-5 top-16 w-48 rounded-2xl bg-white p-3 shadow-xl">
-
-            <a
-              href="#about"
-              onClick={() => setMenuOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm hover:bg-orange-50"
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full mt-2 w-60 overflow-hidden rounded-2xl border border-[#eee5db] bg-white p-1.5 shadow-xl"
             >
-              About
-            </a>
+              <a
+                role="menuitem"
+                href={HELP_WHATSAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[#1c1917] hover:bg-green-50"
+              >
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-[#25D366] text-white">
+                  <MessageCircle size={16} />
+                </span>
+                Help on WhatsApp
+              </a>
 
-            <a
-              href="#explore"
-              onClick={() => setMenuOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm hover:bg-orange-50"
-            >
-              Explore
-            </a>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={openPassForm}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-[#1c1917] hover:bg-orange-50"
+              >
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 text-white">
+                  <TicketIcon className="h-4 w-4" />
+                </span>
+                Get Free Pass
+              </button>
 
-            <a
-              href="#vibes"
-              onClick={() => setMenuOpen(false)}
-              className="block rounded-lg px-3 py-5 text-sm hover:bg-orange-50"
-            >
-              Event Vibes
-            </a>
-
-            <a
-              href="#register"
-              onClick={(e) => {
-                e.preventDefault();
-                openPassForm();
-              }}
-              className="mt-2 block rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold text-white"
-            >
-              Get Entry Pass
-            </a>
-
-          </div>
-        )}
+              {savedPasses.length > 0 && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setPreviewPasses(savedPasses);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-[#1c1917] hover:bg-orange-50"
+                >
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-[#1c1917] text-white">
+                    <QrCode size={16} />
+                  </span>
+                  View your passes
+                  <span className="ml-auto rounded-full bg-orange-100 px-2 py-0.5 text-xs font-bold text-orange-700">
+                    {savedPasses.length}
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
       </header>
 
@@ -537,33 +576,8 @@ const Exhibition = () => {
         id="register"
         className="px-5 pb-8 pt-1 md:px-12"
       >
-        <button
-          type="button"
-          onClick={openPassForm}
-          className="group flex w-full items-center justify-between gap-3 rounded-2xl bg-orange-500 px-4 py-3.5 text-white shadow-lg shadow-orange-500/25 transition-all hover:bg-orange-600 active:scale-[0.99] sm:px-6 sm:py-4"
-        >
-          <div className="flex items-center gap-3 sm:gap-4">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-6 w-6 shrink-0 sm:h-7 sm:w-7"
-            >
-              <path d="M5 8 C5 5.5 5.5 5 8 5 H9 C9.5 7.5 14.5 7.5 15 5 H16 C18.5 5 19 5.5 19 8 V9 C16.5 9.5 16.5 14.5 19 15 V16 C19 18.5 18.5 19 16 19 H15 C14.5 16.5 9.5 16.5 9 19 H8 C5.5 19 5 18.5 5 16 V15 C7.5 14.5 7.5 9.5 5 9 Z" />
-            </svg>
-
-            <span className="text-[15px] font-bold tracking-normal text-white sm:text-lg md:text-xl">
-              Get Your Free Entry Pass
-            </span>
-          </div>
-
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-orange-500 shadow-sm transition-transform group-hover:translate-x-0.5 sm:h-9 sm:w-9">
-            <ChevronRight className="h-5 w-5 stroke-[2.5]" />
-          </div>
-        </button>
+        {/* Desktop: inline button. Mobile uses the floating bar below. */}
+        <EntryPassButton onClick={openPassForm} className="hidden md:flex" />
 
         {savedPasses.length > 0 && (
           <button
@@ -575,6 +589,11 @@ const Exhibition = () => {
           </button>
         )}
       </section>
+
+      {/* Mobile floating entry pass button (always visible) */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 bg-gradient-to-t from-[#f8f3ec] via-[#f8f3ec]/90 to-transparent px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-6 md:hidden">
+        <EntryPassButton onClick={openPassForm} className="pointer-events-auto flex shadow-xl shadow-orange-500/30" />
+      </div>
 
 
       {/* =====================================================
@@ -617,6 +636,50 @@ const Exhibition = () => {
     </>
   );
 };
+
+
+// ==========================================================
+// ENTRY PASS BUTTON
+// ==========================================================
+
+const TicketIcon = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M5 8 C5 5.5 5.5 5 8 5 H9 C9.5 7.5 14.5 7.5 15 5 H16 C18.5 5 19 5.5 19 8 V9 C16.5 9.5 16.5 14.5 19 15 V16 C19 18.5 18.5 19 16 19 H15 C14.5 16.5 9.5 16.5 9 19 H8 C5.5 19 5 18.5 5 16 V15 C7.5 14.5 7.5 9.5 5 9 Z" />
+  </svg>
+);
+
+const EntryPassButton = ({
+  onClick,
+  className = "",
+}: {
+  onClick: () => void;
+  className?: string;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`group w-full items-center justify-between gap-3 rounded-2xl bg-orange-500 px-4 py-3.5 text-white shadow-lg shadow-orange-500/25 transition-all hover:bg-orange-600 active:scale-[0.99] sm:px-6 sm:py-4 ${className}`}
+  >
+    <div className="flex items-center gap-3 sm:gap-4">
+      <TicketIcon className="h-6 w-6 shrink-0 sm:h-7 sm:w-7" />
+      <span className="text-[15px] font-bold tracking-normal text-white sm:text-lg md:text-xl">
+        Get Your Free Entry Pass
+      </span>
+    </div>
+
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-orange-500 shadow-sm transition-transform group-hover:translate-x-0.5 sm:h-9 sm:w-9">
+      <ChevronRight className="h-5 w-5 stroke-[2.5]" />
+    </div>
+  </button>
+);
 
 
 // ==========================================================

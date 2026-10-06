@@ -6,6 +6,9 @@ export const EXHIBITION_EVENT = {
   dateLabel: '10 & 11 Oct 2026',
   timeLabel: '10:00 AM – 9:00 PM',
   passType: 'Free Entry',
+  mapUrl: 'https://maps.app.goo.gl/NmQYkYtfFn8boMEi7',
+  instagramUrl: 'https://www.instagram.com/woowoo_art_house/',
+  instagramHandle: '@woowoo_art_house',
 } as const;
 
 export const GENDER_OPTIONS = ['Male', 'Female', 'Other', 'Prefer not to say'] as const;

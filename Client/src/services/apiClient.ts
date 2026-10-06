@@ -934,14 +934,61 @@ export type ExhibitionPassRecord = {
   position: number;
   groupSize?: number;
   status: ExhibitionPassStatus;
+  /** Set when the visitor is marked present at the gate; null means absent. */
+  checkedInAt?: string | null;
+  checkedInBy?: {
+    m_staff_id?: string | null;
+    m_staff_name?: string | null;
+    m_staff_email?: string | null;
+  } | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ExhibitionPassPersonPayload = {
+  fullName: string;
+  phone: string;
+  age: number;
+  gender: string;
+  interests: string[];
 };
 
 export const handleGetExhibitionPasses = async (
   signal?: AbortSignal,
 ): Promise<{ success: boolean; exhibitions: ExhibitionPassRecord[] }> => {
   const response = await axiosInstance.get("/api/exhibition", { signal });
+  return response.data;
+};
+
+export const handleCreateExhibitionPasses = async (
+  people: ExhibitionPassPersonPayload[],
+): Promise<{
+  success: boolean;
+  message: string;
+  data: { _id: string; code: string; fullName: string }[];
+}> => {
+  const response = await axiosInstance.post("/api/exhibition", { people });
+  return response.data;
+};
+
+export const handleMarkExhibitionAttendance = async (
+  id: string,
+  present: boolean,
+): Promise<{ success: boolean; message: string; exhibition: ExhibitionPassRecord }> => {
+  const response = await axiosInstance.patch(`/api/exhibition/${id}/attendance`, { present });
+  return response.data;
+};
+export type ExhibitionCheckInResult = "checked_in" | "already_present";
+
+export const handleCheckInExhibitionPass = async (
+  code: string,
+): Promise<{
+  success: boolean;
+  result: ExhibitionCheckInResult;
+  message: string;
+  exhibition: ExhibitionPassRecord;
+}> => {
+  const response = await axiosInstance.post("/api/exhibition/check-in", { code });
   return response.data;
 };
 
