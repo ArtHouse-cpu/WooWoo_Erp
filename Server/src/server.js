@@ -43,6 +43,7 @@ import staffCommissionRoutes from './routes/staffCommission.route.js'
 import leadRouters from './routes/lead.Route.js';
 import additionalServiceRoutes from './routes/additionalService.route.js';
 import publicGiftCardRoutes from './routes/publicGiftCard.route.js';
+import exhibitionRoutes from './routes/exhibition.routes.js';
 // import activityRoutes from './routes/activity.route.js';
 
 // Load environment variables
@@ -135,6 +136,9 @@ app.use('/api/commission',staffCommissionRoutes);
 app.use('/api/lead',leadRouters)
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+//Exhibition module
+app.use('/api/exhibition',exhibitionRoutes);
 
 connectDB();
 
