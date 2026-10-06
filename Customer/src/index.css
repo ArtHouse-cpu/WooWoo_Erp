@@ -66,3 +66,11 @@
     box-shadow: var(--shadow-card);
   }
 }
+
+@media print {
+  body {
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

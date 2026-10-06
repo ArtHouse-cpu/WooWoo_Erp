@@ -14,7 +14,17 @@ import {
 
 import { useState } from "react";
 import type { ReactNode } from "react";
+import { toast } from "sonner";
 import logo from "@/assets/woo_woo_art_house_logo.png";
+import EntryPassFormModal from "../../components/exhibition/EntryPassFormModal";
+import EntryPassPreviewModal from "../../components/exhibition/EntryPassPreviewModal";
+import {
+  createPasses,
+  loadSavedPasses,
+  savePasses,
+  type EntryPass,
+  type PassPerson,
+} from "../../components/exhibition/entryPass";
 
 
 // ================= TYPES =================
@@ -31,6 +41,25 @@ type ExploreItem = {
 
 const Exhibition = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [passFormOpen, setPassFormOpen] = useState(false);
+  const [previewPasses, setPreviewPasses] = useState<EntryPass[]>([]);
+  const [savedPasses, setSavedPasses] = useState<EntryPass[]>(loadSavedPasses);
+
+  const openPassForm = () => {
+    setMenuOpen(false);
+    setPreviewPasses([]);
+    setPassFormOpen(true);
+  };
+
+  const handleGeneratePasses = (people: PassPerson[]) => {
+    const passes = createPasses(people);
+    const allPasses = [...passes, ...savedPasses];
+    savePasses(allPasses);
+    setSavedPasses(allPasses);
+    setPassFormOpen(false);
+    setPreviewPasses(passes);
+    toast.success(passes.length > 1 ? `${passes.length} entry passes generated` : "Entry pass generated");
+  };
 
   // ================= EXPLORE DATA =================
 
@@ -99,7 +128,8 @@ const Exhibition = () => {
   // ================= JSX =================
 
   return (
-    <div id="top" className="min-h-screen bg-[#f8f3ec] text-[#181818]">
+    <>
+    <div id="top" className="min-h-screen bg-[#f8f3ec] text-[#181818] print:hidden">
 
       {/* =====================================================
           HEADER
@@ -155,7 +185,10 @@ const Exhibition = () => {
 
             <a
               href="#register"
-              onClick={() => setMenuOpen(false)}
+              onClick={(e) => {
+                e.preventDefault();
+                openPassForm();
+              }}
               className="mt-2 block rounded-lg bg-orange-500 px-3 py-2 text-center text-sm font-semibold text-white"
             >
               Get Entry Pass
@@ -500,7 +533,7 @@ const Exhibition = () => {
       >
         <button
           type="button"
-          onClick={() => alert("Registration form coming next!")}
+          onClick={openPassForm}
           className="group flex w-full items-center justify-between gap-3 rounded-2xl bg-orange-500 px-4 py-3.5 text-white shadow-lg shadow-orange-500/25 transition-all hover:bg-orange-600 active:scale-[0.99] sm:px-6 sm:py-4"
         >
           <div className="flex items-center gap-3 sm:gap-4">
@@ -525,6 +558,16 @@ const Exhibition = () => {
             <ChevronRight className="h-5 w-5 stroke-[2.5]" />
           </div>
         </button>
+
+        {savedPasses.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setPreviewPasses(savedPasses)}
+            className="mt-3 w-full text-center text-sm font-semibold text-orange-600 underline-offset-4 hover:underline"
+          >
+            View your passes ({savedPasses.length})
+          </button>
+        )}
       </section>
 
 
@@ -552,6 +595,20 @@ const Exhibition = () => {
       </footer>*/}
 
     </div>
+
+    <EntryPassFormModal
+      open={passFormOpen}
+      onClose={() => setPassFormOpen(false)}
+      onGenerate={handleGeneratePasses}
+    />
+
+    <EntryPassPreviewModal
+      open={previewPasses.length > 0}
+      passes={previewPasses}
+      onClose={() => setPreviewPasses([])}
+      onNewRequest={openPassForm}
+    />
+    </>
   );
 };
 
