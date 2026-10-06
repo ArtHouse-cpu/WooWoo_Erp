@@ -247,64 +247,68 @@ const load = async () => {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2.5">
-            <CircleDollarSign className="text-indigo-600" size={28} />
-            Staff Commission & Performance
+          <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2 sm:gap-2.5">
+            <CircleDollarSign className="w-5 h-5 sm:w-7 sm:h-7 text-indigo-600 shrink-0" size={28} />
+            <span>Staff Commission &amp; Performance</span>
           </h1>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-2 bg-white hover:bg-blue-50 px-4 py-2.5 rounded-lg border border-gray-200 hover:border-blue-300 text-sm text-gray-700 hover:text-blue-600 font-medium cursor-pointer transition-all duration-200 shadow-sm" 
-            onClick={() => setIsCommissionModalOpen(true)}>
-      
-            <Calendar size={15} className="text-blue-500 shrink-0" />
-            <span>Set Commission</span>
-          </div>
-          <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-200/80 text-xs">
-            <Calendar size={14} className="text-gray-400 shrink-0" />
-            <span className="text-gray-500 font-medium">Period:</span>
-            <select
-              value={datePreset}
-              onChange={(e) => {
-                const preset = e.target.value as DatePreset;
-                setDatePreset(preset);
-                if (preset === "all") {
-                  setFromDate("");
-                  setToDate("");
-                } else if (preset === "custom") {
-                  // keep current custom dates
-                } else {
-                  const range = rangeForPreset(preset);
-                  setFromDate(range.from);
-                  setToDate(range.to);
-                }
-              }}
-              className="text-xs font-semibold text-gray-800 bg-transparent outline-none cursor-pointer pr-1"
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 bg-white hover:bg-blue-50 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-gray-200 hover:border-blue-300 text-xs sm:text-sm text-gray-700 hover:text-blue-600 font-medium cursor-pointer transition-all duration-200 shadow-sm"
+              onClick={() => setIsCommissionModalOpen(true)}
             >
-              {DATE_PRESET_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              <Calendar size={14} className="text-blue-500 shrink-0" />
+              <span className="whitespace-nowrap">Set Commission</span>
+            </div>
+
+            <div className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 sm:gap-2 bg-white px-2.5 sm:px-3 py-2 sm:py-2 rounded-lg border border-gray-200/80 text-xs shadow-sm">
+              <Calendar size={14} className="text-gray-400 shrink-0" />
+              <span className="text-gray-500 font-medium whitespace-nowrap">Period:</span>
+              <select
+                value={datePreset}
+                onChange={(e) => {
+                  const preset = e.target.value as DatePreset;
+                  setDatePreset(preset);
+                  if (preset === "all") {
+                    setFromDate("");
+                    setToDate("");
+                  } else if (preset === "custom") {
+                    // keep current custom dates
+                  } else {
+                    const range = rangeForPreset(preset);
+                    setFromDate(range.from);
+                    setToDate(range.to);
+                  }
+                }}
+                className="text-xs font-semibold text-gray-800 bg-transparent outline-none cursor-pointer pr-1 truncate max-w-[85px] sm:max-w-none"
+              >
+                {DATE_PRESET_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {datePreset === "custom" && (
-            <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-gray-200/80 text-xs">
+            <div className="flex items-center justify-between sm:justify-start gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-gray-200/80 text-xs shadow-sm w-full sm:w-auto">
               <input
                 type="date"
                 value={fromDate}
                 max={toDate || undefined}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="bg-transparent text-gray-700 outline-none text-xs"
+                className="bg-transparent text-gray-700 outline-none text-xs flex-1 sm:flex-none"
               />
-              <span className="text-gray-400 font-medium">to</span>
+              <span className="text-gray-400 font-medium shrink-0">to</span>
               <input
                 type="date"
                 value={toDate}
                 min={fromDate || undefined}
                 onChange={(e) => setToDate(e.target.value)}
-                className="bg-transparent text-gray-700 outline-none text-xs"
+                className="bg-transparent text-gray-700 outline-none text-xs flex-1 sm:flex-none"
               />
             </div>
           )}
@@ -317,47 +321,47 @@ const load = async () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-4">
+        <div className="bg-white rounded-xl border border-gray-100 p-2.5 sm:p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-gray-500">
+            <p className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">
               Total Commission
             </p>
-            <Award className="text-amber-500" size={18} />
+            <Award className="text-amber-500 shrink-0" size={15} />
           </div>
-          <p className="mt-2 text-2xl font-bold text-gray-900">
+          <p className="mt-1 text-sm sm:text-xl font-bold text-gray-900 truncate">
             ₹{totalCommission.toLocaleString("en-IN")}
           </p>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <div className="bg-white rounded-xl border border-gray-100 p-2.5 sm:p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-gray-500">Total Sales</p>
-            <TrendingUp className="text-emerald-500" size={18} />
+            <p className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">Total Sales</p>
+            <TrendingUp className="text-emerald-500 shrink-0" size={15} />
           </div>
-          <p className="mt-2 text-2xl font-bold text-gray-900">
+          <p className="mt-1 text-sm sm:text-xl font-bold text-gray-900 truncate">
             ₹{totalSales.toLocaleString("en-IN")}
           </p>
-          <p className="text-xs text-gray-500 mt-1 font-medium bg-gray-50 inline-block px-2 py-0.5 rounded">
+          <p className="text-[9px] sm:text-xs text-gray-500 mt-1 font-medium bg-gray-50 inline-block px-1.5 py-0.5 rounded truncate max-w-full">
             Net Sales: <span className="text-gray-700 font-semibold">₹{netSalesGrandTotal.toLocaleString("en-IN")}</span>
           </p>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <div className="bg-white rounded-xl border border-gray-100 p-2.5 sm:p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-gray-500">Total Orders</p>
-            <Receipt className="text-indigo-500" size={18} />
+            <p className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">Total Orders</p>
+            <Receipt className="text-indigo-500 shrink-0" size={15} />
           </div>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{totalOrders}</p>
+          <p className="mt-1 text-sm sm:text-xl font-bold text-gray-900">{totalOrders}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+        <div className="bg-white rounded-xl border border-gray-100 p-2.5 sm:p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-gray-500">Top Earner</p>
-            <Sparkles className="text-purple-500" size={18} />
+            <p className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">Top Earner</p>
+            <Sparkles className="text-purple-500 shrink-0" size={15} />
           </div>
-          <p className="mt-2 text-lg font-bold text-gray-900 truncate">
+          <p className="mt-1 text-xs sm:text-base font-bold text-gray-900 truncate">
             {topEarner?.staffName || "—"}
           </p>
           {topEarner && (
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 truncate">
               ₹{topEarner.commission.toLocaleString("en-IN")}
             </p>
           )}
