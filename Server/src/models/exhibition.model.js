@@ -15,6 +15,7 @@ export const EXHIBITION_INTERESTS = [
 ];
 
 export const EXHIBITION_PASS_STATUSES = ['Active', 'Expired', 'Cancelled'];
+export const EXHIBITION_DEFAULT_EVENT = 'creative-exhibition-2026';
 const staffSchema = new mongoose.Schema(
   {
     m_staff_id: {type: String, default: null},
@@ -37,7 +38,7 @@ const exhibitionPassSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      default: 'creative-exhibition-2026',
+      default: EXHIBITION_DEFAULT_EVENT,
       index: true,
     },
     fullName: {
@@ -52,13 +53,16 @@ const exhibitionPassSchema = new mongoose.Schema(
       required: true,
       trim: true,
       match: [/^[6-9]\d{9}$/, 'Invalid Indian mobile number'],
-      index: true,
     },
     age: {type: Number, required: true, min: 1, max: 110},
     gender: {type: String, enum: EXHIBITION_GENDERS, required: true},
-    interest: {type: String, enum: EXHIBITION_INTERESTS, required: true},
+    interests: {
+      type: [{type: String, enum: EXHIBITION_INTERESTS}],
+      validate: {validator: list => list.length > 0, message: 'Select at least one interest'},
+    },
     groupId: {type: String, required: true, index: true},
     position: {type: Number, required: true, min: 1},
+    groupSize: {type: Number, required: true, min: 1, max: 10},
     status: {
       type: String,
       enum: EXHIBITION_PASS_STATUSES,
@@ -77,4 +81,6 @@ const exhibitionPassSchema = new mongoose.Schema(
 exhibitionPassSchema.index({createdAt: -1});
 exhibitionPassSchema.index({event: 1, status: 1});
 exhibitionPassSchema.index({fullName: 1});
+// One pass per phone number per exhibition; also blocks concurrent duplicate registrations.
+exhibitionPassSchema.index({event: 1, phone: 1}, {unique: true});
 export default mongoose.model('ExhibitionPass', exhibitionPassSchema);

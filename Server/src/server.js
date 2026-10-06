@@ -44,6 +44,7 @@ import leadRouters from './routes/lead.Route.js';
 import additionalServiceRoutes from './routes/additionalService.route.js';
 import publicGiftCardRoutes from './routes/publicGiftCard.route.js';
 import exhibitionRoutes from './routes/exhibition.routes.js';
+import publicExhibitionRoutes from './routes/publicExhibition.route.js';
 // import activityRoutes from './routes/activity.route.js';
 
 // Load environment variables
@@ -53,6 +54,9 @@ dotenv.config({path: path.join(__dirname, '.env')});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Behind Vercel's proxy: use X-Forwarded-For so rate limits apply per visitor, not globally.
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(
@@ -119,6 +123,7 @@ app.use('/company', companyRoutes);
 app.use('/affiliate', affiliateRoutes);
 app.use('/access', accessRoutes);
 app.use('/public/gift-cards', publicGiftCardRoutes);
+app.use('/public/exhibition', publicExhibitionRoutes);
 
 //CSP APIs
 app.use('/csp', cspRouters);

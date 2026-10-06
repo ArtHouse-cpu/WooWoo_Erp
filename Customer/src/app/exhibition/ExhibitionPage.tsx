@@ -19,12 +19,13 @@ import logo from "@/assets/woo_woo_art_house_logo.png";
 import EntryPassFormModal from "../../components/exhibition/EntryPassFormModal";
 import EntryPassPreviewModal from "../../components/exhibition/EntryPassPreviewModal";
 import {
-  createPasses,
   loadSavedPasses,
   savePasses,
   type EntryPass,
   type PassPerson,
 } from "../../components/exhibition/entryPass";
+import { registerExhibitionPasses } from "../../services/exhibition.service";
+import { getErrorMessage } from "../../services/axios";
 
 
 // ================= TYPES =================
@@ -51,14 +52,19 @@ const Exhibition = () => {
     setPassFormOpen(true);
   };
 
-  const handleGeneratePasses = (people: PassPerson[]) => {
-    const passes = createPasses(people);
-    const allPasses = [...passes, ...savedPasses];
-    savePasses(allPasses);
-    setSavedPasses(allPasses);
-    setPassFormOpen(false);
-    setPreviewPasses(passes);
-    toast.success(passes.length > 1 ? `${passes.length} entry passes generated` : "Entry pass generated");
+  const handleGeneratePasses = async (people: PassPerson[]) => {
+    try {
+      const passes = await registerExhibitionPasses(people);
+      const allPasses = [...passes, ...savedPasses];
+      savePasses(allPasses);
+      setSavedPasses(allPasses);
+      setPassFormOpen(false);
+      setPreviewPasses(passes);
+      toast.success(passes.length > 1 ? `${passes.length} entry passes generated` : "Entry pass generated");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Could not generate your pass. Please try again."));
+      throw error;
+    }
   };
 
   // ================= EXPLORE DATA =================

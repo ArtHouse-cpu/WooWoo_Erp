@@ -121,6 +121,12 @@ export const PERMISSIONS = {
   GIFT_CARD_UPDATE: "gift_card.update",
   GIFT_CARD_DELETE: "gift_card.delete",
 
+  // Exhibition entry passes
+  EXHIBITION_READ: "exhibition.read",
+  EXHIBITION_CREATE: "exhibition.create",
+  EXHIBITION_UPDATE: "exhibition.update",
+  EXHIBITION_DELETE: "exhibition.delete",
+
   // Announcements (WhatsApp blasts)
   ANNOUNCEMENT_READ: "announcement.read",
   ANNOUNCEMENT_CREATE: "announcement.create",
@@ -510,6 +516,26 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
     label: "Delete gift cards",
   },
   {
+    key: PERMISSIONS.EXHIBITION_READ,
+    module: "exhibition",
+    label: "View exhibition passes",
+  },
+  {
+    key: PERMISSIONS.EXHIBITION_CREATE,
+    module: "exhibition",
+    label: "Create exhibition passes",
+  },
+  {
+    key: PERMISSIONS.EXHIBITION_UPDATE,
+    module: "exhibition",
+    label: "Update exhibition passes",
+  },
+  {
+    key: PERMISSIONS.EXHIBITION_DELETE,
+    module: "exhibition",
+    label: "Delete exhibition passes",
+  },
+  {
     key: PERMISSIONS.AFFILIATE_READ,
     module: "affiliate",
     label: "View affiliate program",
@@ -578,6 +604,7 @@ export const MENU_PERMISSION_MAP: Record<string, Permission | Permission[]> = {
   "/announcements": PERMISSIONS.ANNOUNCEMENT_READ,
   "/affiliate-program": PERMISSIONS.AFFILIATE_READ,
   "/staffCommission": PERMISSIONS.STAFF_COMMISSION_READ,
+  "/exhibitiontable": PERMISSIONS.EXHIBITION_READ,
   "/access": PERMISSIONS.ACCESS_READ,
 };
 

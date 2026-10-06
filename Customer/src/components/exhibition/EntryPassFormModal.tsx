@@ -3,7 +3,7 @@ import {createPortal} from 'react-dom';
 import {useFieldArray, useForm} from 'react-hook-form';
 import {z} from 'zod';
 import {zodResolver} from '@hookform/resolvers/zod';
-import {Loader2, Phone, Ticket, Trash2, UserPlus, X} from 'lucide-react';
+import {Check, ChevronDown, Loader2, Phone, Ticket, Trash2, UserPlus, X} from 'lucide-react';
 import {
   EXHIBITION_EVENT,
   GENDER_OPTIONS,
@@ -11,6 +11,7 @@ import {
   MAX_PEOPLE_PER_REQUEST,
   type PassPerson,
 } from './entryPass';
+import {getDuplicatePhones} from '../../services/exhibition.service';
 
 const personSchema = z.object({
   fullName: z.string().trim().min(2, 'Enter full name').max(60, 'Name is too long'),
@@ -26,23 +27,39 @@ const personSchema = z.object({
   gender: z
     .string()
     .refine(v => (GENDER_OPTIONS as readonly string[]).includes(v), 'Select gender'),
-  interest: z
-    .string()
-    .refine(v => (INTEREST_OPTIONS as readonly string[]).includes(v), 'Select an interest'),
+  interests: z.array(z.enum(INTEREST_OPTIONS)).min(1, 'Select at least one interest'),
 });
 
 const schema = z.object({
-  people: z.array(personSchema).min(1).max(MAX_PEOPLE_PER_REQUEST),
+  people: z
+    .array(personSchema)
+    .min(1)
+    .max(MAX_PEOPLE_PER_REQUEST)
+    .superRefine((people, ctx) => {
+      const firstIndexByPhone = new Map<string, number>();
+      people.forEach((person, index) => {
+        const first = firstIndexByPhone.get(person.phone);
+        if (first === undefined) {
+          firstIndexByPhone.set(person.phone, index);
+          return;
+        }
+        ctx.addIssue({
+          code: 'custom',
+          path: [index, 'phone'],
+          message: `Already used for person ${first + 1}. Each person needs their own number.`,
+        });
+      });
+    }),
 });
 
 type FormValues = z.infer<typeof schema>;
 
-const emptyPerson = (phone = ''): FormValues['people'][number] => ({
+const emptyPerson = (): FormValues['people'][number] => ({
   fullName: '',
-  phone,
+  phone: '',
   age: '',
   gender: '',
-  interest: '',
+  interests: [],
 });
 
 const inputClass =
@@ -67,7 +84,7 @@ export default function EntryPassFormModal({open, onClose, onGenerate}: Props) {
     register,
     control,
     handleSubmit,
-    getValues,
+    setError,
     reset,
     formState: {errors},
   } = useForm<FormValues>({
@@ -98,7 +115,7 @@ export default function EntryPassFormModal({open, onClose, onGenerate}: Props) {
 
   const handleAddPerson = () => {
     if (!canAddMore) return;
-    append(emptyPerson(getValues('people.0.phone') || ''));
+    append(emptyPerson());
   };
 
   const submit = handleSubmit(async values => {
@@ -110,10 +127,22 @@ export default function EntryPassFormModal({open, onClose, onGenerate}: Props) {
           phone: p.phone.trim(),
           age: Number(p.age),
           gender: p.gender as PassPerson['gender'],
-          interest: p.interest as PassPerson['interest'],
+          interests: p.interests,
         })),
       );
       reset({people: [emptyPerson()]});
+    } catch (error) {
+      // The caller reports the error; keep the entered details so the user can retry.
+      const duplicates = getDuplicatePhones(error);
+      values.people.forEach((person, index) => {
+        if (duplicates.includes(person.phone.trim())) {
+          setError(
+            `people.${index}.phone`,
+            {type: 'server', message: 'This number is already registered for the exhibition.'},
+            {shouldFocus: true},
+          );
+        }
+      });
     } finally {
       setSubmitting(false);
     }
@@ -226,58 +255,81 @@ export default function EntryPassFormModal({open, onClose, onGenerate}: Props) {
                     <FieldError message={err?.phone?.message} />
                   </div>
 
+                  <div className="grid grid-cols-[6rem_minmax(0,1fr)] gap-3">
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-[#44403c]">
+                    <label
+                      htmlFor={`people-${index}-age`}
+                      className="mb-1 block text-xs font-semibold text-[#44403c]"
+                    >
                       Age <span className="text-[#dc2626]">*</span>
                     </label>
                     <input
+                      id={`people-${index}-age`}
                       {...register(`people.${index}.age`)}
                       inputMode="numeric"
                       maxLength={3}
                       placeholder="e.g. 24"
-                      className={`${inputClass} max-w-[8rem] ${err?.age ? 'border-[#fca5a5]' : 'border-[#e7e5e4]'}`}
+                      className={`${inputClass} ${err?.age ? 'border-[#fca5a5]' : 'border-[#e7e5e4]'}`}
                     />
                     <FieldError message={err?.age?.message} />
                   </div>
 
                   <div>
-                    <p className="mb-1.5 text-xs font-semibold text-[#44403c]">
+                    <label
+                      htmlFor={`people-${index}-gender`}
+                      className="mb-1 block text-xs font-semibold text-[#44403c]"
+                    >
                       Gender <span className="text-[#dc2626]">*</span>
-                    </p>
-                    <div className="flex flex-wrap gap-2" role="radiogroup">
-                      {GENDER_OPTIONS.map(option => (
-                        <label key={option}>
-                          <input
-                            type="radio"
-                            value={option}
-                            {...register(`people.${index}.gender`)}
-                            className="peer sr-only"
-                          />
-                          <span className={chipClass}>{option}</span>
-                        </label>
-                      ))}
+                    </label>
+                    <div className="relative">
+                      <select
+                        id={`people-${index}-gender`}
+                        {...register(`people.${index}.gender`)}
+                        className={`${inputClass} cursor-pointer appearance-none pr-9 invalid:text-[#a8a29e] ${err?.gender ? 'border-[#fca5a5]' : 'border-[#e7e5e4]'}`}
+                        required
+                      >
+                        <option value="" disabled hidden>
+                          Select gender
+                        </option>
+                        {GENDER_OPTIONS.map(option => (
+                          <option key={option} value={option} className="text-[#1c1917]">
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        size={16}
+                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#78716c]"
+                      />
                     </div>
                     <FieldError message={err?.gender?.message} />
+                  </div>
                   </div>
 
                   <div>
                     <p className="mb-1.5 text-xs font-semibold text-[#44403c]">
-                      Interest <span className="text-[#dc2626]">*</span>
+                      Interests <span className="text-[#dc2626]">*</span>
+                      <span className="ml-1 font-normal text-[#a8a29e]">Select all that apply</span>
                     </p>
-                    <div className="flex flex-wrap gap-2" role="radiogroup">
+                    <div className="flex flex-wrap gap-2" role="group" aria-label="Interests">
                       {INTEREST_OPTIONS.map(option => (
                         <label key={option}>
                           <input
-                            type="radio"
+                            type="checkbox"
                             value={option}
-                            {...register(`people.${index}.interest`)}
+                            {...register(`people.${index}.interests`)}
                             className="peer sr-only"
                           />
-                          <span className={chipClass}>{option}</span>
+                          <span
+                            className={`${chipClass} inline-flex items-center gap-1 [&>svg]:hidden peer-checked:[&>svg]:block`}
+                          >
+                            <Check size={12} strokeWidth={3} />
+                            {option}
+                          </span>
                         </label>
                       ))}
                     </div>
-                    <FieldError message={err?.interest?.message} />
+                    <FieldError message={err?.interests?.message} />
                   </div>
                 </div>
               </fieldset>

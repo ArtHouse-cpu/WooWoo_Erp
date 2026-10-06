@@ -917,6 +917,34 @@ export const handleGetPublicGiftCard = async (
   return response.data;
 };
 
+export type ExhibitionPassStatus = "Active" | "Expired" | "Cancelled";
+
+export type ExhibitionPassRecord = {
+  _id: string;
+  passcode: string;
+  event: string;
+  fullName: string;
+  phone: string;
+  age: number;
+  gender: string;
+  interests?: string[];
+  /** Single interest stored by passes issued before multi-select. */
+  interest?: string;
+  groupId: string;
+  position: number;
+  groupSize?: number;
+  status: ExhibitionPassStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const handleGetExhibitionPasses = async (
+  signal?: AbortSignal,
+): Promise<{ success: boolean; exhibitions: ExhibitionPassRecord[] }> => {
+  const response = await axiosInstance.get("/api/exhibition", { signal });
+  return response.data;
+};
+
 export const handleValidateReferralDiscount = async (payload: {
   customerId?: string;
   customerPhone?: string;

@@ -3,7 +3,7 @@ import JsBarcode from 'jsbarcode';
 import {QRCodeCanvas} from 'qrcode.react';
 import {CalendarDays, Clock3, MapPin, Sparkles, Ticket, Users} from 'lucide-react';
 import logo from '../../assets/woo_woo_art_house_logo.png';
-import {EXHIBITION_EVENT, passQrValue, type EntryPass} from './entryPass';
+import {EXHIBITION_EVENT, passInterests, passQrValue, type EntryPass} from './entryPass';
 
 /** Must match the surface behind the card so the perforation notches read as cut-outs. */
 export const PASS_NOTCH_COLOR = '#f3ece2';
@@ -89,20 +89,44 @@ export default function EntryPassCard({pass, ref}: Props) {
 
       {/* Attendee */}
       <div className="px-5 pt-4">
-        <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a8a29e]">Attendee</p>
-        <p className="mt-0.5 break-words font-serif text-[22px] font-bold leading-tight text-[#1c1917]">
-          {pass.fullName}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a8a29e]">Attendee</p>
+            <p className="mt-0.5 break-words font-serif text-[22px] font-bold leading-tight text-[#1c1917]">
+              {pass.fullName}
+            </p>
+          </div>
+          <div className="shrink-0 text-right [&_p]:justify-end">
+            <Detail
+              icon={<Users size={10} />}
+              label="Guest"
+              value={pass.groupSize > 1 ? `${pass.position} of ${pass.groupSize}` : 'Individual'}
+            />
+          </div>
+        </div>
 
         <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
           <Detail icon={<CalendarDays size={10} />} label="Date" value={EXHIBITION_EVENT.dateLabel} />
           <Detail icon={<Clock3 size={10} />} label="Time" value={EXHIBITION_EVENT.timeLabel} />
-          <Detail icon={<Sparkles size={10} />} label="Interest" value={pass.interest} />
-          <Detail
-            icon={<Users size={10} />}
-            label="Guest"
-            value={pass.groupSize > 1 ? `${pass.position} of ${pass.groupSize}` : 'Individual'}
-          />
+        </div>
+
+        <div className="mt-3">
+          <p className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-[0.14em] text-[#a8a29e]">
+            <span className="text-[#f97316]">
+              <Sparkles size={10} />
+            </span>
+            Interests
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {passInterests(pass).map(interest => (
+              <span
+                key={interest}
+                className="rounded-full border border-[#fed7aa] bg-[#fff7ed] px-2 py-0.5 text-[11px] font-semibold text-[#9a3412]"
+              >
+                {interest}
+              </span>
+            ))}
+          </div>
         </div>
 
         <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-snug text-[#78716c]">
