@@ -98,9 +98,9 @@ const ScanPassModal = ({ onClose, onCheckedIn }: Props) => {
   const style = result ? RESULT_STYLES[result.kind] : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 sm:p-4">
+      <div className="flex h-full w-full flex-col overflow-hidden bg-white shadow-xl sm:h-auto sm:max-h-[95vh] sm:max-w-md sm:rounded-xl">
+        <div className="safe-top flex items-center justify-between border-b border-gray-200 px-5 py-3">
           <h2 className="text-lg font-semibold text-gray-800">Scan Entry Pass</h2>
           <button
             type="button"
@@ -111,7 +111,7 @@ const ScanPassModal = ({ onClose, onCheckedIn }: Props) => {
           </button>
         </div>
 
-        <div className="space-y-4 p-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-5">
           <div className="relative aspect-square overflow-hidden rounded-lg bg-black">
             {cameraError ? (
               <div className="flex h-full items-center justify-center p-6 text-center text-sm text-white">

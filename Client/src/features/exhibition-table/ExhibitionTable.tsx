@@ -4,7 +4,11 @@ import {
   MaterialReactTable,
   useMaterialReactTable,
   type MRT_ColumnDef,
+  type MRT_VisibilityState,
 } from "material-react-table";
+import { useMediaQuery } from "@mui/material";
+import ExhibitionCharts from "./ExhibitionCharts";
+import { mrtMobileContainerProps, mrtMobilePaperProps } from "@/utils/mrtMobileDefaults";
 
 import {
   CheckCircle2,
@@ -40,6 +44,20 @@ const STATUS_STYLES: Record<string, string> = {
 
 type AttendanceTab = "all" | "present" | "absent";
 
+/** On phones only Name (with phone + code inside) and Attendance fit; the rest is hidden. */
+const MOBILE_COLUMN_VISIBILITY: MRT_VisibilityState = {
+  passcode: false,
+  phone: false,
+  age: false,
+  gender: false,
+  interests: false,
+  group: false,
+  status: false,
+  createdAt: false,
+  actions: false,
+};
+const DESKTOP_COLUMN_VISIBILITY: MRT_VisibilityState = {};
+
 const isPresent = (row: ExhibitionPassRecord) => Boolean(row.checkedInAt);
 
 const formatTime = (value: string) =>
@@ -56,6 +74,7 @@ const ExhibitionTable = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
 
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const { can } = usePermission();
   const canCreate = can(PERMISSIONS.EXHIBITION_CREATE);
   const canUpdate = can(PERMISSIONS.EXHIBITION_UPDATE);
@@ -153,8 +172,22 @@ const ExhibitionTable = () => {
       },
       {
         accessorKey: "fullName",
-        header: "Full Name",
-        size: 180,
+        header: isMobile ? "Visitor" : "Full Name",
+        size: isMobile ? 130 : 180,
+        Cell: ({ row }) =>
+          isMobile ? (
+            <div className="min-w-0">
+              <p className="font-medium leading-tight text-gray-800">
+                {row.original.fullName}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-500">+91 {row.original.phone}</p>
+              <p className="font-mono text-[11px] tracking-wider text-gray-400">
+                {row.original.passcode}
+              </p>
+            </div>
+          ) : (
+            row.original.fullName
+          ),
       },
       {
         accessorKey: "phone",
@@ -165,7 +198,7 @@ const ExhibitionTable = () => {
       {
         id: "attendance",
         header: "Attendance",
-        size: 190,
+        size: isMobile ? 150 : 190,
         enableColumnFilter: false,
         accessorFn: (row) => (isPresent(row) ? "Present" : "Absent"),
         Cell: ({ row }) => {
@@ -176,7 +209,7 @@ const ExhibitionTable = () => {
             return (
               <div className="flex items-center gap-2">
                 <span
-                  className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-1 text-xs font-semibold text-green-700"
+                  className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-green-200 bg-green-50 px-2 py-1 text-xs font-semibold text-green-700"
                   title={
                     pass.checkedInBy?.m_staff_name
                       ? `Checked in by ${pass.checkedInBy.m_staff_name}`
@@ -184,7 +217,8 @@ const ExhibitionTable = () => {
                   }
                 >
                   <CheckCircle2 size={13} />
-                  Present · {formatTime(pass.checkedInAt as string)}
+                  <span className="hidden sm:inline">Present ·</span>
+                  {formatTime(pass.checkedInAt as string)}
                 </span>
                 {canUpdate && (
                   <button
@@ -328,7 +362,7 @@ const ExhibitionTable = () => {
         ),
       },
     ],
-    [pendingIds, canUpdate, markAttendance],
+    [pendingIds, canUpdate, markAttendance, isMobile],
   );
 
   const tabs: { id: AttendanceTab; label: string; count: number }[] = [
@@ -348,23 +382,71 @@ const ExhibitionTable = () => {
     enablePagination: true,
     autoResetPageIndex: false,
 
+    enableHiding: !isMobile,
+
     state: {
       isLoading: loading && data.length === 0,
       showProgressBars: loading && data.length > 0,
+      ...(isMobile ? { columnVisibility: MOBILE_COLUMN_VISIBILITY } : {}),
     },
 
     initialState: {
+      columnVisibility: DESKTOP_COLUMN_VISIBILITY,
       pagination: {
         pageIndex: 0,
         pageSize: 10,
       },
     },
 
-    renderTopToolbarCustomActions: ({ table }) => (
-      <div className="flex flex-wrap items-center gap-3">
+    muiTablePaperProps: mrtMobilePaperProps,
+    muiTableContainerProps: mrtMobileContainerProps,
+
+    muiTopToolbarProps: {
+      sx: { flexWrap: "wrap" },
+    },
+
+    muiTableHeadCellProps: {
+      sx: {
+        fontWeight: 700,
+        fontSize: { xs: "13px", md: "14px" },
+        px: { xs: 1.25, md: 2 },
+      },
+    },
+
+    muiTableBodyCellProps: {
+      sx: {
+        fontSize: { xs: "13px", md: "14px" },
+        px: { xs: 1.25, md: 2 },
+        py: { xs: 1.25, md: 1.5 },
+      },
+    },
+
+    muiPaginationProps: {
+      rowsPerPageOptions: [10, 25, 50, 100],
+      showFirstButton: !isMobile,
+      showLastButton: !isMobile,
+    },
+  });
+
+  const selectTab = (id: AttendanceTab) => {
+    setTab(id);
+    table.setPageIndex(0);
+  };
+
+  // Marking a row present in the Absent tab removes it; step back if the page empties.
+  const { pageIndex, pageSize } = table.getState().pagination;
+  useEffect(() => {
+    const lastPage = Math.max(0, Math.ceil(visibleData.length / pageSize) - 1);
+    if (pageIndex > lastPage) table.setPageIndex(lastPage);
+  }, [visibleData.length, pageIndex, pageSize, table]);
+
+  return (
+    <div className={`w-full ${canUpdate ? "pb-24 md:pb-0" : ""}`}>
+      {/* Tabs + actions */}
+      <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div
-          className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5"
           role="tablist"
+          className="grid grid-cols-3 rounded-lg border border-gray-200 bg-gray-50 p-0.5 md:inline-flex"
         >
           {tabs.map((t) => {
             const active = tab === t.id;
@@ -374,14 +456,9 @@ const ExhibitionTable = () => {
                 type="button"
                 role="tab"
                 aria-selected={active}
-                onClick={() => {
-                  setTab(t.id);
-                  table.setPageIndex(0);
-                }}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                  active
-                    ? "bg-white text-orange-600 shadow-sm"
-                    : "text-gray-600 hover:text-gray-900"
+                onClick={() => selectTab(t.id)}
+                className={`flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition md:py-1.5 ${
+                  active ? "bg-white text-orange-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
                 }`}
               >
                 {t.label}
@@ -401,64 +478,60 @@ const ExhibitionTable = () => {
           })}
         </div>
 
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => loadPasses()}
+            disabled={loading}
+            className="flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:text-orange-600 disabled:opacity-50 md:py-1.5"
+            title="Refresh"
+            aria-label="Refresh"
+          >
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+
+          {canCreate && (
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600 md:flex-none md:py-1.5"
+            >
+              <Plus size={16} />
+              Create Pass
+            </button>
+          )}
+
+          {canUpdate && (
+            <button
+              type="button"
+              onClick={() => setScanOpen(true)}
+              className="hidden items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700 md:flex"
+            >
+              <ScanLine size={16} />
+              Scan Pass
+            </button>
+          )}
+        </div>
+      </div>
+
+      {data.length > 0 && <ExhibitionCharts passes={visibleData} />}
+
+      <MaterialReactTable table={table} />
+
+      {/* Mobile: floating scan button, always within thumb reach at the gate */}
+      {canUpdate && !scanOpen && !createOpen && (
         <button
           type="button"
-          onClick={() => loadPasses()}
-          disabled={loading}
-          className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-sm text-gray-600 hover:text-orange-600 disabled:opacity-50"
-          title="Refresh"
+          onClick={() => setScanOpen(true)}
+          aria-label="Scan pass"
+          className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex items-center gap-2 rounded-full bg-green-600 py-3.5 pl-4 pr-5 text-sm font-bold text-white shadow-lg shadow-green-600/40 transition active:scale-95 md:hidden"
         >
-          <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-          Refresh
+          <ScanLine size={22} />
+          Scan Pass
         </button>
+      )}
 
-        {canCreate && (
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            className="flex items-center gap-1.5 rounded-md bg-orange-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-orange-600"
-          >
-            <Plus size={16} />
-            Create Pass
-          </button>
-        )}
-        {canUpdate && (
-          <button
-            type="button"
-            onClick={() => setScanOpen(true)}
-            className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
-          >
-            <ScanLine size={16} />
-            Scan Pass
-          </button>
-        )}
-      </div>
-    ),
-
-    muiTableHeadCellProps: {
-      sx: {
-        fontWeight: 700,
-        fontSize: "14px",
-      },
-    },
-
-    muiTableBodyCellProps: {
-      sx: {
-        fontSize: "14px",
-      },
-    },
-  });
-
-  // Marking a row present in the Absent tab removes it; step back if the page empties.
-  const { pageIndex, pageSize } = table.getState().pagination;
-  useEffect(() => {
-    const lastPage = Math.max(0, Math.ceil(visibleData.length / pageSize) - 1);
-    if (pageIndex > lastPage) table.setPageIndex(lastPage);
-  }, [visibleData.length, pageIndex, pageSize, table]);
-
-  return (
-    <div className="w-full">
-      <MaterialReactTable table={table} />
       <CreateExhibitionPassModal
         isOpen={createOpen}
         onClose={() => setCreateOpen(false)}

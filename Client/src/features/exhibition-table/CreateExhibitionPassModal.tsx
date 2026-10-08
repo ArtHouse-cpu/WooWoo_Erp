@@ -162,9 +162,9 @@ const CreateExhibitionPassModal = ({ isOpen, onClose, onCreated }: Props) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 sm:p-4">
+      <div className="flex h-full w-full flex-col overflow-hidden bg-white shadow-xl sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-xl">
+        <div className="safe-top flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-800">Create Entry Pass</h2>
             <p className="text-xs text-gray-500">
@@ -181,8 +181,8 @@ const CreateExhibitionPassModal = ({ isOpen, onClose, onCreated }: Props) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col overflow-hidden">
-          <div className="space-y-4 overflow-y-auto p-6">
+        <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
             {people.map((person, index) => {
               const err = errors[index] ?? {};
               return (
@@ -322,7 +322,7 @@ const CreateExhibitionPassModal = ({ isOpen, onClose, onCreated }: Props) => {
             )}
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
+          <div className="flex justify-end gap-3 border-t border-gray-200 bg-gray-50 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
             <button
               type="button"
               onClick={handleClose}

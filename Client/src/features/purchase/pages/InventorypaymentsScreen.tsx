@@ -22,8 +22,6 @@ import {
   Coins,
   RefreshCw,
   Eye,
- 
- 
   Filter,
   Receipt,
  
@@ -389,9 +387,6 @@ const InventorypaymentsScreen = () => {
             <CreditCard className="text-blue-600" />
             Inventory Payments Timeline
           </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Track all payment collections, supplier outflows, and outstanding balances
-          </p>
         </div>
 
         <div className="flex items-center gap-3">
