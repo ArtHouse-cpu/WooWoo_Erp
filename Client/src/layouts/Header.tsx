@@ -12,17 +12,24 @@ import CreatePosScreen from "@/features/sales/pages/CreatePosScreen";
 type HeaderProps = {
   onMenuClick?: () => void;
   showMenuButton?: boolean;
+  /** Controlled profile modal state (lets the mobile sidebar open it too). */
+  isProfileOpen?: boolean;
+  onProfileOpenChange?: (open: boolean) => void;
 };
 
 export default function Header({
   onMenuClick,
   showMenuButton = false,
+  isProfileOpen,
+  onProfileOpenChange,
 }: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isPosOpen, setIsPosOpen] = useState(false);
   const { canPath } = usePermission();
-  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [localProfileOpen, setLocalProfileOpen] = useState(false);
+  const isUserModalOpen = isProfileOpen ?? localProfileOpen;
+  const setIsUserModalOpen = onProfileOpenChange ?? setLocalProfileOpen;
   const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
   const { companyName, m_staff_branch, companies, activeCompanyId } =
     useAppSelector((state) => state.user);
@@ -193,18 +200,7 @@ export default function Header({
             <Menu size={22} />
             <span className="text-[11px] font-medium">Menu</span>
           </button>
-        ) : (
-          <span />
-        )}
-        <button
-          type="button"
-          onClick={handleOpenUser}
-          className="flex min-w-16 flex-col items-center justify-center gap-0.5 text-gray-700 transition active:scale-95"
-          aria-label="Account"
-        >
-          <User size={22} />
-          <span className="text-[11px] font-medium">Profile</span>
-        </button>
+        ) : null}
       </div>
     </nav>
     </>

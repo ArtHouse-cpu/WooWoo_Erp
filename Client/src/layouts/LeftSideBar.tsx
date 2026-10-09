@@ -11,6 +11,7 @@ Sparkles ,
   Network,
   FileSpreadsheet,
   LogOut,
+  UserRound,
   Receipt,
   FileText,
   Percent,
@@ -32,7 +33,7 @@ import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { useAuthStore } from "@/store/authStore";
 import { handleLogout } from "@/services/apiClient";
-import { useAppDispatch } from "@/store/hooks";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { logout as logoutUser } from "@/store/slices/userSlice";
 import { usePermission } from "@/hooks/usePermission";
 
@@ -58,6 +59,14 @@ type TopLink = {
 };
 
 const MENU_GROUPS: MenuGroup[] = [
+  {
+    key: "bookingAndOrders",
+    label: "Booking",
+    icon: BookOpenText,
+    submenu: [
+      { name: "spaceBooking", label: "Space Booking", icon: CalendarCheck  , path: "/spaceBooking" }
+    ],
+  },
   {
     key: "sales",
     label: "Sales",
@@ -206,19 +215,68 @@ const MENU_GROUPS: MenuGroup[] = [
       },
     ],
   },
+  {
+    key: "marketing",
+    label: "Marketing",
+    icon: Network,
+    submenu: [
+      {
+        name: "Coupons",
+        label: "Coupons",
+        icon: Percent,
+        path: "/coupons",
+      },
+      {
+        name: "giftcard",
+        label: "Gift Card",
+        icon: Gift,
+        path: "/giftcard",
+      },
+      {
+        name: "Announcements",
+        label: "Megaphone",
+        icon: Megaphone,
+        path: "/announcements",
+      },
+    ],
+  },
+  {
+    key: "Company",
+    label: "Company",
+    icon: Network,
+    submenu: [
+      {
+        name: "Access Control",
+        label: "Access Control",
+        icon: ShieldUser,
+        path: "/access",
+      },
+      { name: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
+  { name: "staffCommission", label: "Staff Commission", icon: CircleDollarSign , path: "/staffCommission" },
+  { name: "expenses", label: "Expense", icon: BadgeIndianRupee, path: "/expenses" },
+
+
+      {
+        name: "Announcements",
+        label: "Megaphone",
+        icon: Megaphone,
+        path: "/announcements",
+      },
+    ],
+  },
 ];
 
 const TOP_LINKS: TopLink[] = [
   // { key: "foodBill", label: "Food Billing", icon: Utensils, path: "/foodBill" },
-  { key: "expenses", label: "Expense", icon: BadgeIndianRupee, path: "/expenses" },
-  { key: "staffCommission", label: "Staff Commission", icon: CircleDollarSign , path: "/staffCommission" },
-  { key: "spaceBooking", label: "Space Booking", icon: CalendarCheck  , path: "/spaceBooking" },
-  { key: "announcement", label: "Announcements", icon: Megaphone , path: "/announcements" },
-  { key: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
-  { key: "giftcard", label: "Gift Card", icon: Gift , path: "/giftcard" },
-  { key: "coupons", label: "Coupons", icon: Percent, path: "/coupons" },
+  // { key: "expenses", label: "Expense", icon: BadgeIndianRupee, path: "/expenses" },
+  // { key: "staffCommission", label: "Staff Commission", icon: CircleDollarSign , path: "/staffCommission" },
+  // { key: "spaceBooking", label: "Space Booking", icon: CalendarCheck  , path: "/spaceBooking" },
+  // { key: "announcement", label: "Announcements", icon: Megaphone , path: "/announcements" },
+  // { key: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
+  // { key: "giftcard", label: "Gift Card", icon: Gift , path: "/giftcard" },
+  // { key: "coupons", label: "Coupons", icon: Percent, path: "/coupons" },
   { key: "exhibition", label: "Exhibition", icon: Sparkles, path: "/exhibitiontable" },
-  { key: "access", label: "Access", icon: ShieldUser, path: "/access" },
+  // { key: "access", label: "Access", icon: ShieldUser, path: "/access" },
 
 ];
 
@@ -229,12 +287,15 @@ const TOP_LINKS: TopLink[] = [
 type LeftSideBarProps = {
   mobile?: boolean;
   onNavigate?: () => void;
+  onOpenProfile?: () => void;
 };
 
 export default function LeftSideBar({
   mobile = false,
   onNavigate,
+  onOpenProfile,
 }: LeftSideBarProps) {
+  const staffName = useAppSelector((state) => state.user.m_staff_name);
   const [collapsed, setCollapsed] = useState(false);
   const [openMenu, setOpenMenu] = useState("");
   const [activeMenu, setActiveMenu] = useState("home");
@@ -422,7 +483,22 @@ export default function LeftSideBar({
           );
         })}
       </div>
-      <div className="border-t border-gray-100 bg-white/50 p-3 backdrop-blur-sm">
+      <div className="space-y-1 border-t border-gray-100 bg-white/50 p-3 backdrop-blur-sm">
+        {mobile && onOpenProfile ? (
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-gray-700 transition-colors hover:bg-gray-50 hover:text-black md:hidden"
+            onClick={onOpenProfile}
+          >
+            <UserRound size={20} className="text-gray-500" />
+            <span className="min-w-0 text-left leading-tight">
+              <span className="block text-[15px] font-semibold">Profile</span>
+              {staffName ? (
+                <span className="block truncate text-xs text-gray-500">{staffName}</span>
+              ) : null}
+            </span>
+          </button>
+        ) : null}
         <button
           className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-red-500 transition-colors hover:bg-red-50"
           onClick={onLogout}

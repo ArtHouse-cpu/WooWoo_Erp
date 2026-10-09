@@ -5,6 +5,7 @@ import LeftSideBar from "./LeftSideBar";
 
 export default function DashboardLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const onResize = () => {
@@ -28,6 +29,8 @@ export default function DashboardLayout() {
         <Header
           onMenuClick={() => setMobileNavOpen(true)}
           showMenuButton
+          isProfileOpen={profileOpen}
+          onProfileOpenChange={setProfileOpen}
         />
       </div>
 
@@ -59,6 +62,10 @@ export default function DashboardLayout() {
             <LeftSideBar
               mobile
               onNavigate={() => setMobileNavOpen(false)}
+              onOpenProfile={() => {
+                setMobileNavOpen(false);
+                setProfileOpen(true);
+              }}
             />
           </div>
         </div>
