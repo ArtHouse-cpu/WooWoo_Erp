@@ -1,5 +1,7 @@
+import mongoose from 'mongoose';
 import Announcement from '../models/announcement.model.js';
 import Customer from '../models/customer.model.js';
+import ExhibitionPass from '../models/exhibition.model.js';
 import { enqueueAnnouncementRecipient } from '../queue/announcement.queue.js';
 import {
   announcementRequiresImageHeader,
@@ -13,6 +15,7 @@ export const createAnnouncement = async (req, res) => {
       templateName,
       audienceType = 'All',
       selectedCustomerIds = [],
+      selectedExhibitionPassIds = [],
       whatsappTemplateName,
       languageCode = 'en',
       templateParams = [],
@@ -68,35 +71,71 @@ export const createAnnouncement = async (req, res) => {
       });
     }
 
-    const normalizedAudience =
-      String(audienceType).toLowerCase() === 'selected' ? 'selected' : 'all';
+    const requestedAudience = String(audienceType).toLowerCase();
+    const normalizedAudience = ['selected', 'exhibition'].includes(requestedAudience)
+      ? requestedAudience
+      : 'all';
 
-    let customers = [];
-    if (normalizedAudience === 'selected') {
-      customers = await Customer.find({
-        _id: { $in: selectedCustomerIds },
-        isDeleted: { $ne: true },
+    const exhibitionPassIds =
+      normalizedAudience === 'exhibition' && Array.isArray(selectedExhibitionPassIds)
+        ? [...new Set(selectedExhibitionPassIds.map(String))].filter((id) =>
+            mongoose.Types.ObjectId.isValid(id),
+          )
+        : [];
+
+    let recipients = [];
+    if (normalizedAudience === 'exhibition') {
+      if (!exhibitionPassIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: 'Select at least one exhibition lead',
+        });
+      }
+      const passes = await ExhibitionPass.find({
+        _id: { $in: exhibitionPassIds },
+        status: { $ne: 'Cancelled' },
       })
-        .select('_id name mobile whatsappNumber')
+        .select('_id fullName phone')
         .lean();
-    } else {
-      customers = await Customer.find({ isDeleted: { $ne: true } })
-        .select('_id name mobile whatsappNumber')
-        .lean();
-    }
 
-    const recipients = customers
-      .map((c) => ({
-        customerId: String(c._id),
-        name: c.name,
-        phone: String(c.whatsappNumber || c.mobile || '').trim(),
-      }))
-      .filter((r) => r.phone);
+      // A visitor can hold passes for several events — message each phone once.
+      const byPhone = new Map();
+      for (const pass of passes) {
+        const phone = String(pass.phone || '').trim();
+        if (phone && !byPhone.has(phone)) {
+          byPhone.set(phone, {
+            customerId: String(pass._id),
+            name: pass.fullName,
+            phone,
+          });
+        }
+      }
+      recipients = [...byPhone.values()];
+    } else {
+      const customers = await Customer.find(
+        normalizedAudience === 'selected'
+          ? { _id: { $in: selectedCustomerIds }, isDeleted: { $ne: true } }
+          : { isDeleted: { $ne: true } },
+      )
+        .select('_id name mobile whatsappNumber')
+        .lean();
+
+      recipients = customers
+        .map((c) => ({
+          customerId: String(c._id),
+          name: c.name,
+          phone: String(c.whatsappNumber || c.mobile || '').trim(),
+        }))
+        .filter((r) => r.phone);
+    }
 
     if (!recipients.length) {
       return res.status(400).json({
         success: false,
-        message: 'No customers with phone number  found!',
+        message:
+          normalizedAudience === 'exhibition'
+            ? 'No active exhibition leads with phone number found!'
+            : 'No customers with phone number  found!',
       });
     }
 
@@ -105,6 +144,7 @@ export const createAnnouncement = async (req, res) => {
       audienceType: normalizedAudience,
       selectedCustomerIds:
         normalizedAudience === 'selected' ? selectedCustomerIds : [],
+      selectedExhibitionPassIds: exhibitionPassIds,
       whatsappMetaTemplateName: metaTemplate,
       languageCode: lang,
       templateParams,
@@ -148,6 +188,22 @@ export const createAnnouncement = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to create announcement',
+    });
+  }
+};
+
+/** Exhibition pass holders (non-cancelled) as an announcement audience. */
+export const listExhibitionLeads = async (req, res) => {
+  try {
+    const leads = await ExhibitionPass.find({ status: { $ne: 'Cancelled' } })
+      .select('_id fullName phone event status checkedInAt createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+    return res.status(200).json({ success: true, leads });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to load exhibition leads',
     });
   }
 };

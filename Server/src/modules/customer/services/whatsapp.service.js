@@ -156,6 +156,39 @@ const getActivityUpdateTemplateConfig = () => {
   };
 };
 
+/** Meta template `cspsaleupdate` — sent to the CSP owner when their product sells. */
+const getCspSaleUpdateTemplateConfig = () => {
+  const {phoneNumberId, accessToken, language} = getConfig();
+  const templateName = (
+    process.env.WHATSAPP_CSP_SALE_TEMPLATE ||
+    'cspsaleupdate'
+  ).trim();
+  const cspLanguage = (
+    process.env.WHATSAPP_CSP_SALE_TEMPLATE_LANGUAGE ||
+    language ||
+    'en_US'
+  ).trim();
+  const urlButtonParam = (process.env.WHATSAPP_CSP_SALE_URL_PARAM || '').trim();
+  const paramOrder = String(process.env.WHATSAPP_CSP_SALE_PARAM_ORDER || '')
+    .split(',')
+    .map(key => key.trim())
+    .filter(Boolean);
+  const paramCount = Number.parseInt(
+    String(process.env.WHATSAPP_CSP_SALE_PARAM_COUNT || ''),
+    10,
+  );
+
+  return {
+    phoneNumberId,
+    accessToken,
+    templateName,
+    language: cspLanguage,
+    urlButtonParam,
+    paramOrder,
+    paramCount: Number.isInteger(paramCount) && paramCount >= 0 ? paramCount : null,
+  };
+};
+
 const toWhatsAppRecipient = mobile => {
   const e164 = toE164(mobile);
   if (!e164) return null;
@@ -1293,6 +1326,211 @@ export const sendActivityUpdateWhatsApp = async ({
   };
 };
 
+
+const CSP_SALE_PARAM_KEYS = [
+  'name',
+  'products',
+  'earning',
+  'saleAmount',
+  'invoice',
+  'walletBalance',
+];
+const CSP_SALE_FALLBACK_COUNTS = [3, 4, 2, 5, 6, 1, 0];
+let learnedCspSaleParamCount = null;
+
+/** Meta rejects template params containing newlines, tabs or 4+ consecutive spaces. */
+const toTemplateText = (value, fallback, maxLength = 120) => {
+  const text = String(value ?? '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  if (!text) return fallback;
+  return text.length > maxLength
+    ? `${text.slice(0, maxLength - 1).trimEnd()}…`
+    : text;
+};
+
+const formatCspProductList = productNames => {
+  const names = [
+    ...new Set(
+      (Array.isArray(productNames) ? productNames : [])
+        .map(name => toTemplateText(name, '', 60))
+        .filter(Boolean),
+    ),
+  ];
+  if (!names.length) return 'your product';
+  const shown = names.slice(0, 3).join(', ');
+  return names.length > 3 ? `${shown} +${names.length - 3} more` : shown;
+};
+
+const parseExpectedParamCount = error => {
+  const text = `${error?.error_data?.details || ''} ${error?.message || ''}`;
+  const match = text.match(/expected number of params \((\d+)\)/i);
+  return match ? Number(match[1]) : null;
+};
+
+/**
+ * Send `cspsaleupdate` to a CSP owner after their product sells (payment complete).
+ *
+ * Body params follow WHATSAPP_CSP_SALE_PARAM_ORDER (comma-separated keys), default:
+ *  {{1}} name, {{2}} products, {{3}} earning, {{4}} saleAmount, {{5}} invoice, {{6}} walletBalance
+ * Amounts are digits only — the Meta template text carries the ₹ symbol.
+ * If Meta reports a different param count, the matching prefix is resent and remembered.
+ */
+export const sendCspSaleUpdateWhatsApp = async ({
+  to,
+  ownerName,
+  productNames,
+  earningAmount,
+  saleAmount,
+  invoiceLabel,
+  walletBalance,
+}) => {
+  const config = getCspSaleUpdateTemplateConfig();
+  const {phoneNumberId, accessToken, templateName, language} = config;
+
+  const valuesByKey = {
+    name: toTemplateText(ownerName, 'Partner', 60),
+    products: formatCspProductList(productNames),
+    earning: formatAmountPlain(earningAmount),
+    saleAmount: formatAmountPlain(saleAmount),
+    invoice: toTemplateText(invoiceLabel, 'Invoice', 40),
+    walletBalance: formatAmountPlain(walletBalance),
+  };
+  const configuredKeys = config.paramOrder.filter(key => key in valuesByKey);
+  const keys = configuredKeys.length ? configuredKeys : CSP_SALE_PARAM_KEYS;
+  const allValues = keys.map(key => valuesByKey[key]);
+  const initialCount = Math.min(
+    config.paramCount ?? learnedCspSaleParamCount ?? allValues.length,
+    allValues.length,
+  );
+
+  if (!phoneNumberId || !accessToken) {
+    console.log(
+      `[CspSaleUpdate][WhatsApp stub] to=${to} template=${templateName} params=${JSON.stringify(allValues.slice(0, initialCount))}`,
+    );
+    return {channel: 'whatsapp-stub', delivered: false};
+  }
+
+  const recipient = toWhatsAppRecipient(to);
+  if (!recipient) {
+    return {
+      channel: 'whatsapp',
+      delivered: false,
+      error: 'Invalid mobile number for WhatsApp CSP sale update',
+    };
+  }
+
+  const buttonParam = config.urlButtonParam || 'wallet';
+  let lastError = null;
+  let authFailed = false;
+
+  for (const lang of languageCandidates(language)) {
+    let count = initialCount;
+    let withButton = false;
+    const tried = new Set();
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const attemptKey = `${count}:${withButton}`;
+      if (tried.has(attemptKey)) break;
+      tried.add(attemptKey);
+
+      const bodyValues = allValues.slice(0, count);
+      const components = [];
+      if (bodyValues.length) {
+        components.push({
+          type: 'body',
+          parameters: bodyValues.map(text => ({type: 'text', text})),
+        });
+      }
+      if (withButton) {
+        components.push({
+          type: 'button',
+          sub_type: 'url',
+          index: '0',
+          parameters: [{type: 'text', text: buttonParam}],
+        });
+      }
+
+      const result = await postTemplateMessage({
+        phoneNumberId,
+        accessToken,
+        payload: {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: recipient,
+          type: 'template',
+          template: {
+            name: templateName,
+            language: {code: lang},
+            ...(components.length ? {components} : {}),
+          },
+        },
+      });
+
+      if (result.ok) {
+        learnedCspSaleParamCount = count;
+        const messageId = result.json?.messages?.[0]?.id || null;
+        console.log(
+          `[CspSaleUpdate][WhatsApp] delivered to=${recipient} template=${templateName} lang=${lang} body=${JSON.stringify(bodyValues)} button=${withButton} id=${messageId}`,
+        );
+        return {
+          channel: 'whatsapp',
+          delivered: true,
+          messageId,
+          templateName,
+          language: lang,
+          bodyValues,
+        };
+      }
+
+      lastError = result.json?.error || {message: result.raw, status: result.status};
+      const errorText = `${lastError.message || ''} ${lastError.error_data?.details || ''}`;
+
+      if (lastError.code === 190 || /oauth|access token|authenticat/i.test(errorText)) {
+        authFailed = true;
+        break;
+      }
+      if (isMissingTemplateError(lastError)) break;
+      if (!/param|button|component/i.test(errorText)) break;
+
+      if (/button/i.test(errorText) && !/body/i.test(errorText)) {
+        withButton = !withButton;
+        continue;
+      }
+
+      const expected = parseExpectedParamCount(lastError);
+      if (expected !== null && expected !== count && expected <= allValues.length) {
+        count = expected;
+        continue;
+      }
+
+      const nextCount = CSP_SALE_FALLBACK_COUNTS.find(
+        n => n <= allValues.length && !tried.has(`${n}:${withButton}`),
+      );
+      if (nextCount === undefined) break;
+      count = nextCount;
+    }
+
+    if (authFailed) break;
+  }
+
+  const metaMessage =
+    lastError?.error_user_msg || lastError?.message || 'Unknown WhatsApp API error';
+
+  console.error('[CspSaleUpdate][WhatsApp] failed:', lastError, {
+    to: recipient,
+    templateName,
+    values: allValues,
+  });
+
+  return {
+    channel: 'whatsapp',
+    delivered: false,
+    error: metaMessage,
+    meta: lastError,
+  };
+};
 
 /**
  * Meta template names are lowercase [a-z0-9_]+ only.

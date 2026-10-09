@@ -50,8 +50,9 @@ export default function Header({
   };
 
   return (
-    <header className="flex w-full max-w-[100vw] items-center justify-between gap-2 border-b border-gray-200 bg-white px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5 md:px-6">
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3 md:gap-4">
+    <>
+    <header className="flex w-full max-w-[100vw] items-center justify-end gap-2 border-b border-gray-200 bg-white px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5 md:justify-between md:px-6">
+      <div className="hidden min-w-0 flex-1 items-center gap-1.5 sm:gap-3 md:flex md:gap-4">
         {showMenuButton ? (
           <button
             type="button"
@@ -155,18 +156,10 @@ export default function Header({
           <Icon
             key={i}
             size={20}
-            className="hidden cursor-pointer text-gray-700 transition hover:text-black sm:block"
+            className="hidden cursor-pointer text-gray-700 transition hover:text-black md:block"
             onClick={Icon === User ? handleOpenUser : undefined}
           />
         ))}
-        <button
-          type="button"
-          onClick={handleOpenUser}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-700 sm:hidden"
-          aria-label="Account"
-        >
-          <User size={18} />
-        </button>
         <UserModal
           open={isUserModalOpen}
           onClose={() => setIsUserModalOpen(false)}
@@ -184,5 +177,36 @@ export default function Header({
 
       </div>
     </header>
+
+    <nav
+      aria-label="Mobile navigation"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white/95 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-4px_20px_rgba(15,23,42,0.06)] backdrop-blur-md md:hidden"
+    >
+      <div className="flex h-14 items-stretch justify-between px-6">
+        {showMenuButton ? (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="flex min-w-16 flex-col items-center justify-center gap-0.5 text-gray-700 transition active:scale-95"
+            aria-label="Open navigation menu"
+          >
+            <Menu size={22} />
+            <span className="text-[11px] font-medium">Menu</span>
+          </button>
+        ) : (
+          <span />
+        )}
+        <button
+          type="button"
+          onClick={handleOpenUser}
+          className="flex min-w-16 flex-col items-center justify-center gap-0.5 text-gray-700 transition active:scale-95"
+          aria-label="Account"
+        >
+          <User size={22} />
+          <span className="text-[11px] font-medium">Profile</span>
+        </button>
+      </div>
+    </nav>
+    </>
   );
 }

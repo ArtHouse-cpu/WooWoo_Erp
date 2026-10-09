@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Eye,
   Loader2,
+  PieChart as PieChartIcon,
   Plus,
   RefreshCw,
   ScanLine,
@@ -73,6 +74,7 @@ const ExhibitionTable = () => {
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
   const [createOpen, setCreateOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [showChartsMobile, setShowChartsMobile] = useState(false);
 
   const isMobile = useMediaQuery("(max-width: 767px)");
   const { can } = usePermission();
@@ -398,8 +400,59 @@ const ExhibitionTable = () => {
       },
     },
 
-    muiTablePaperProps: mrtMobilePaperProps,
-    muiTableContainerProps: mrtMobileContainerProps,
+    enableStickyHeader: true,
+
+    // Paper fills the remaining section height; only the rows container scrolls.
+    muiTablePaperProps: {
+      ...mrtMobilePaperProps,
+      sx: {
+        ...mrtMobilePaperProps.sx,
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: { xs: 0, md: 280 },
+      },
+    },
+    muiTableContainerProps: {
+      ...mrtMobileContainerProps,
+      sx: {
+        ...mrtMobileContainerProps.sx,
+        flex: 1,
+        minHeight: 0,
+        maxHeight: "none",
+        overflowY: "auto",
+      },
+    },
+
+    renderTopToolbarCustomActions: () =>
+      isMobile ? (
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => loadPasses()}
+            disabled={loading}
+            className="flex items-center justify-center rounded-md p-2 text-gray-600 hover:text-orange-600 disabled:opacity-50"
+            title="Refresh"
+            aria-label="Refresh"
+          >
+            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+          </button>
+          {data.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowChartsMobile((v) => !v)}
+              className={`flex items-center justify-center rounded-md p-2 ${
+                showChartsMobile ? "bg-orange-50 text-orange-600" : "text-gray-600"
+              }`}
+              title={showChartsMobile ? "Hide charts" : "Show charts"}
+              aria-label={showChartsMobile ? "Hide charts" : "Show charts"}
+              aria-pressed={showChartsMobile}
+            >
+              <PieChartIcon size={18} />
+            </button>
+          )}
+        </div>
+      ) : null,
 
     muiTopToolbarProps: {
       sx: { flexWrap: "wrap" },
@@ -423,6 +476,7 @@ const ExhibitionTable = () => {
 
     muiPaginationProps: {
       rowsPerPageOptions: [10, 25, 50, 100],
+      showRowsPerPage: !isMobile,
       showFirstButton: !isMobile,
       showLastButton: !isMobile,
     },
@@ -441,12 +495,19 @@ const ExhibitionTable = () => {
   }, [visibleData.length, pageIndex, pageSize, table]);
 
   return (
-    <div className={`w-full ${canUpdate ? "pb-24 md:pb-0" : ""}`}>
-      {/* Tabs + actions */}
-      <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    // md+: section height = viewport minus the shell's top bar and main padding, so only
+    // the table rows scroll. Phones: the table box alone is one screen tall (see below).
+    <div
+      className={`w-full md:flex md:h-[calc(100dvh-5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] md:flex-col md:pb-0 lg:h-[calc(100dvh-5.25rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] ${
+        canUpdate ? "pb-16" : ""
+      }`}
+    >
+      {/* Tabs + actions — pinned while charts scroll away on phones */}
+      <div className="sticky -top-3 z-20 -mx-3 -mt-3 flex h-[4.25rem] shrink-0 items-center justify-between gap-2 bg-[#F7F8FA] px-3 py-3 sm:-mx-4 sm:px-4 md:static md:mx-0 md:mt-0 md:mb-3 md:h-auto md:bg-transparent md:px-0 md:py-0">
+        <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-none">
         <div
           role="tablist"
-          className="grid grid-cols-3 rounded-lg border border-gray-200 bg-gray-50 p-0.5 md:inline-flex"
+          className="grid min-w-0 flex-1 grid-cols-3 rounded-lg border border-gray-200 bg-gray-50 p-0.5 md:inline-flex md:flex-none"
         >
           {tabs.map((t) => {
             const active = tab === t.id;
@@ -457,7 +518,7 @@ const ExhibitionTable = () => {
                 role="tab"
                 aria-selected={active}
                 onClick={() => selectTab(t.id)}
-                className={`flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition md:py-1.5 ${
+                className={`flex items-center justify-center gap-1 rounded-md px-1.5 py-2 text-[13px] font-medium transition sm:gap-1.5 sm:px-3 sm:text-sm md:py-1.5 ${
                   active ? "bg-white text-orange-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
                 }`}
               >
@@ -478,35 +539,36 @@ const ExhibitionTable = () => {
           })}
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => loadPasses()}
-            disabled={loading}
-            className="flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:text-orange-600 disabled:opacity-50 md:py-1.5"
-            title="Refresh"
-            aria-label="Refresh"
-          >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-
           {canCreate && (
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-orange-500 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-600 md:flex-none md:py-1.5"
+              className="flex shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-orange-500 px-2.5 py-2 text-sm font-semibold text-white hover:bg-orange-600 sm:gap-1.5 sm:px-3 md:py-1.5"
             >
               <Plus size={16} />
-              Create Pass
+              <span className="hidden min-[400px]:inline">Create</span> Pass
             </button>
           )}
+        </div>
+
+        <div className="hidden items-center gap-2 md:flex">
+          <button
+            type="button"
+            onClick={() => loadPasses()}
+            disabled={loading}
+            className="flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:text-orange-600 disabled:opacity-50"
+            title="Refresh"
+            aria-label="Refresh"
+          >
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </button>
 
           {canUpdate && (
             <button
               type="button"
               onClick={() => setScanOpen(true)}
-              className="hidden items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700 md:flex"
+              className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-green-700"
             >
               <ScanLine size={16} />
               Scan Pass
@@ -515,9 +577,23 @@ const ExhibitionTable = () => {
         </div>
       </div>
 
-      {data.length > 0 && <ExhibitionCharts passes={visibleData} />}
+      {data.length > 0 && (!isMobile || showChartsMobile) && (
+        <div className="shrink-0">
+          <ExhibitionCharts passes={visibleData} />
+        </div>
+      )}
 
-      <MaterialReactTable table={table} />
+      {/* Phones: screen height minus top bar, main padding, bottom nav, the 3.5rem tabs row
+          and (when scanning is allowed) the 4rem bottom padding kept clear for the Scan button. */}
+      <div
+        className={`flex flex-col md:h-auto md:min-h-0 md:flex-1 ${
+          canUpdate
+            ? "h-[calc(100dvh-16.25rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]"
+            : "h-[calc(100dvh-12.25rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]"
+        }`}
+      >
+        <MaterialReactTable table={table} />
+      </div>
 
       {/* Mobile: floating scan button, always within thumb reach at the gate */}
       {canUpdate && !scanOpen && !createOpen && (
@@ -525,7 +601,7 @@ const ExhibitionTable = () => {
           type="button"
           onClick={() => setScanOpen(true)}
           aria-label="Scan pass"
-          className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex items-center gap-2 rounded-full bg-green-600 py-3.5 pl-4 pr-5 text-sm font-bold text-white shadow-lg shadow-green-600/40 transition active:scale-95 md:hidden"
+          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-white py-3.5 pl-4 pr-5 text-sm font-bold text-green-600 shadow-lg shadow-slate-900/15 ring-2 ring-green-600 transition active:scale-95 md:hidden"
         >
           <ScanLine size={22} />
           Scan Pass

@@ -3,11 +3,12 @@ const announcementSchema = new mongoose.Schema({
     templateName:{type:String,required:true,trim:true},
     audienceType:{
         type:String,
-        enum:["all","selected"],
+        enum:["all","selected","exhibition"],
         required:true,
     },
   
     selectedCustomerIds:[{type:mongoose.Schema.Types.ObjectId,ref:"Customer"}],
+    selectedExhibitionPassIds:[{type:mongoose.Schema.Types.ObjectId,ref:"ExhibitionPass"}],
     whatsappMetaTemplateName:{type:String,required:true,trim:true},
     languageCode:{type:String},
     templateParams:{type:[String],default:[]},

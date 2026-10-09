@@ -6,7 +6,9 @@ import {
   handleCreateAnnouncement,
   handleGetAllCustomers,
   handleGetCustomers,
+  handleGetExhibitionLeads,
   type CreateAnnouncementPayload,
+  type ExhibitionLead,
 } from "@/services/apiClient";
 
 type CustomerOption = {
@@ -15,6 +17,14 @@ type CustomerOption = {
   mobile?: string;
   whatsappNumber?: string;
 };
+
+type AudienceType = CreateAnnouncementPayload["audienceType"];
+
+const AUDIENCE_OPTIONS: { value: AudienceType; label: string }[] = [
+  { value: "all", label: "All customers" },
+  { value: "selected", label: "Selected customers" },
+  { value: "exhibition", label: "Exhibition leads" },
+];
 
 type Props = {
   open: boolean;
@@ -33,8 +43,15 @@ export default function SendAnnouncementModal({
   const [languageCode, setLanguageCode] = useState("en");
   const [templateParamsRaw, setTemplateParamsRaw] = useState("");
   const [headerImageLink, setHeaderImageLink] = useState("");
-  const [audienceType, setAudienceType] = useState<"all" | "selected">("selected");
+  const [audienceType, setAudienceType] = useState<AudienceType>("selected");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const [leads, setLeads] = useState<ExhibitionLead[]>([]);
+  const [leadsLoaded, setLeadsLoaded] = useState(false);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [leadsError, setLeadsError] = useState("");
+  const [leadSearch, setLeadSearch] = useState("");
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
 
   const [customerSearch, setCustomerSearch] = useState("");
   const debouncedSearch = useDebounce(customerSearch.trim(), 300);
@@ -81,6 +98,55 @@ export default function SendAnnouncementModal({
     void load();
     return () => controller.abort();
   }, [open, debouncedSearch]);
+
+  useEffect(() => {
+    if (!open || audienceType !== "exhibition" || leadsLoaded) return;
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        setLoadingLeads(true);
+        setLeadsError("");
+        const res = await handleGetExhibitionLeads(controller.signal);
+        setLeads(Array.isArray(res?.leads) ? res.leads : []);
+        setLeadsLoaded(true);
+      } catch {
+        if (!controller.signal.aborted) {
+          setLeadsError("Could not load exhibition leads.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoadingLeads(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [open, audienceType, leadsLoaded]);
+
+  const filteredLeads = useMemo(() => {
+    const query = leadSearch.trim().toLowerCase();
+    if (!query) return leads;
+    const digits = query.replace(/\D/g, "");
+    return leads.filter(
+      (lead) =>
+        lead.fullName?.toLowerCase().includes(query) ||
+        (digits && lead.phone?.includes(digits)),
+    );
+  }, [leads, leadSearch]);
+
+  const selectedLeadSet = useMemo(
+    () => new Set(selectedLeadIds),
+    [selectedLeadIds],
+  );
+
+  const toggleLead = (id: string) => {
+    setSelectedLeadIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const selectAllLeads = () => {
+    const ids = filteredLeads.map((lead) => lead._id);
+    setSelectedLeadIds((prev) => [...new Set([...prev, ...ids])]);
+  };
 
   const selectedCustomers = useMemo(() => {
     return selectedIds.map(
@@ -144,6 +210,11 @@ export default function SendAnnouncementModal({
     setSelectedIds([]);
     setCustomerSearch("");
     setCustomerDirectory({});
+    setLeads([]);
+    setLeadsLoaded(false);
+    setLeadsError("");
+    setLeadSearch("");
+    setSelectedLeadIds([]);
   };
 
   const handleClose = () => {
@@ -187,6 +258,15 @@ export default function SendAnnouncementModal({
       return;
     }
 
+    if (audienceType === "exhibition" && selectedLeadIds.length === 0) {
+      Swal.fire(
+        "No recipients",
+        "Select at least one exhibition lead.",
+        "warning",
+      );
+      return;
+    }
+
     const templateParams = templateParamsRaw
       .split(",")
       .map((s) => s.trim())
@@ -197,6 +277,8 @@ export default function SendAnnouncementModal({
       audienceType,
       selectedCustomerIds:
         audienceType === "selected" ? selectedIds : [],
+      selectedExhibitionPassIds:
+        audienceType === "exhibition" ? selectedLeadIds : [],
       whatsappTemplateName: metaName,
       languageCode: languageCode.trim() || "en",
       templateParams,
@@ -242,7 +324,7 @@ export default function SendAnnouncementModal({
               Send Announcement
             </h2>
             <p className="text-xs text-slate-500">
-              Queue WhatsApp template to all customers or selected ones.
+              Queue WhatsApp template to customers or exhibition leads.
             </p>
           </div>
           <button
@@ -332,32 +414,117 @@ export default function SendAnnouncementModal({
               Audience
             </label>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setAudienceType("all")}
-                className={`rounded-full px-4 py-1.5 text-xs font-semibold ${
-                  audienceType === "all"
-                    ? "bg-slate-900 text-white"
-                    : "bg-white text-slate-600 ring-1 ring-slate-200"
-                }`}
-              >
-                All customers
-              </button>
-              <button
-                type="button"
-                onClick={() => setAudienceType("selected")}
-                className={`rounded-full px-4 py-1.5 text-xs font-semibold ${
-                  audienceType === "selected"
-                    ? "bg-slate-900 text-white"
-                    : "bg-white text-slate-600 ring-1 ring-slate-200"
-                }`}
-              >
-                Selected customers
-              </button>
+              {AUDIENCE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setAudienceType(option.value)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold ${
+                    audienceType === option.value
+                      ? "bg-slate-900 text-white"
+                      : "bg-white text-slate-600 ring-1 ring-slate-200"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {audienceType === "selected" ? (
+          {audienceType === "exhibition" ? (
+            <div className="rounded-xl border border-slate-200 p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-800">
+                  Exhibition leads{" "}
+                  <span className="font-normal text-slate-500">
+                    ({selectedLeadIds.length} of {leads.length} selected)
+                  </span>
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={selectAllLeads}
+                    disabled={!leadsLoaded || filteredLeads.length === 0}
+                    className="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-50"
+                  >
+                    {leadSearch.trim() ? "Select all matching" : "Select all"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLeadIds([])}
+                    disabled={selectedLeadIds.length === 0}
+                    className="text-xs font-semibold text-slate-500 hover:underline disabled:opacity-50"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <div className="relative mb-3">
+                <Search
+                  size={14}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  value={leadSearch}
+                  onChange={(e) => setLeadSearch(e.target.value)}
+                  placeholder="Search leads by name or mobile..."
+                  className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400"
+                />
+              </div>
+
+              <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-100">
+                {loadingLeads || (!leadsLoaded && !leadsError) ? (
+                  <p className="p-3 text-sm text-slate-500">
+                    Loading exhibition leads...
+                  </p>
+                ) : leadsError ? (
+                  <div className="flex items-center justify-between gap-2 p-3 text-sm text-rose-600">
+                    <span>{leadsError}</span>
+                    <button
+                      type="button"
+                      onClick={() => setLeadsLoaded(false)}
+                      className="text-xs font-semibold text-blue-600 hover:underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : filteredLeads.length === 0 ? (
+                  <p className="p-3 text-sm text-slate-500">
+                    {leads.length ? "No leads match your search." : "No exhibition leads yet."}
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {filteredLeads.map((lead) => (
+                      <li key={lead._id}>
+                        <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-slate-50">
+                          <input
+                            type="checkbox"
+                            checked={selectedLeadSet.has(lead._id)}
+                            onChange={() => toggleLead(lead._id)}
+                            className="h-4 w-4 rounded border-slate-300"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-slate-900">
+                              {lead.fullName || "Unnamed"}
+                            </p>
+                            <p className="truncate text-xs text-slate-500">
+                              +91 {lead.phone}
+                            </p>
+                          </div>
+                          {lead.checkedInAt ? (
+                            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                              Visited
+                            </span>
+                          ) : null}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          ) : audienceType === "selected" ? (
             <div className="rounded-xl border border-slate-200 p-3">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-slate-800">

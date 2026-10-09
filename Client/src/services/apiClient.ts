@@ -3578,8 +3578,9 @@ export const handleBulkCreateSubscriptions = async (payload: {
 
 export type CreateAnnouncementPayload = {
   templateName: string;
-  audienceType: "all" | "selected";
+  audienceType: "all" | "selected" | "exhibition";
   selectedCustomerIds?: string[];
+  selectedExhibitionPassIds?: string[];
   whatsappTemplateName: string;
   languageCode?: string;
   templateParams?: string[];
@@ -3596,6 +3597,26 @@ export const handleCreateAnnouncement = async (
   payload: CreateAnnouncementPayload,
 ) => {
   const response = await axiosInstance.post("/api/announcement", payload);
+  return response.data;
+};
+
+export type ExhibitionLead = {
+  _id: string;
+  fullName: string;
+  phone: string;
+  event?: string;
+  status?: string;
+  checkedInAt?: string | null;
+  createdAt?: string;
+};
+
+export const handleGetExhibitionLeads = async (
+  signal?: AbortSignal,
+): Promise<{ success: boolean; leads: ExhibitionLead[] }> => {
+  const response = await axiosInstance.get(
+    "/api/announcement/exhibition-leads",
+    { signal },
+  );
   return response.data;
 };
 

@@ -63,7 +63,7 @@ export default function DashboardLayout() {
           </div>
         </div>
 
-        <main className="safe-pb min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-6 pt-3 sm:px-4 md:px-5 lg:pt-4">
+        <main className="safe-pb min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-6 pt-3 max-md:pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))]! sm:px-4 md:px-5 lg:pt-4">
           <div className="mx-auto w-full max-w-full min-w-0">
             <Outlet />
           </div>

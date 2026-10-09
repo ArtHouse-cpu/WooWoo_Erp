@@ -6,6 +6,7 @@ import Invoice from '../models/invoice.model.js';
 import CustomerSailorProgram from '../models/customerSellerProgram.model.js';
 import CspSettlement from '../models/cspSettlement.model.js';
 import {appendTransaction} from '../controllers/wallet.controller.js';
+import {sendCspSaleUpdateWhatsApp} from '../modules/customer/services/whatsapp.service.js';
 
 export const getCspsailorSharePercent = () => {
   const n = Number(process.env.CSP_sailor_SHARE_PERCENT ?? 70);
@@ -65,13 +66,16 @@ const isCspSaleCredit = (tx, invoiceCode) =>
   String(tx.type || '').toLowerCase() === 'credit' &&
   String(tx.referenceType || '') === 'CspSale';
 
-const buildCspEarningNote = ({invoice, productNames = []}) => {
+const formatInvoiceLabel = invoice => {
   const code = String(invoice?.invoiceCode || '').trim();
   const number = invoice?.invoiceNumber;
-  const invoiceLabel =
-    Number.isFinite(Number(number)) && Number(number) > 0
-      ? `Invoice #${Number(number)}`
-      : code || 'Invoice';
+  return Number.isFinite(Number(number)) && Number(number) > 0
+    ? `Invoice #${Number(number)}`
+    : code || 'Invoice';
+};
+
+const buildCspEarningNote = ({invoice, productNames = []}) => {
+  const invoiceLabel = formatInvoiceLabel(invoice);
   const productLabel = productNames.filter(Boolean).slice(0, 3).join(', ');
   return productLabel
     ? `CSP Product Earning · ${invoiceLabel} · ${productLabel}`
@@ -298,13 +302,61 @@ const groupSailorCreditsByCustomer = lines => {
     const prev = byCustomer.get(key) || {
       customerId: line.cspCustomerId,
       amount: 0,
+      saleAmount: 0,
       productNames: [],
     };
     prev.amount = roundMoney(prev.amount + Number(line.sailorAmount));
+    prev.saleAmount = roundMoney(
+      prev.saleAmount + Number(line.lineBaseAmount || 0),
+    );
     prev.productNames.push(line.productName || 'item');
     byCustomer.set(key, prev);
   }
   return byCustomer;
+};
+
+/** WhatsApp `cspsaleupdate` to each CSP owner; failures are logged, never thrown. */
+const notifyCspOwnersOfSale = async ({invoice, byCustomer}) => {
+  const invoiceLabel = formatInvoiceLabel(invoice);
+
+  for (const group of byCustomer.values()) {
+    try {
+      const owner = await Customer.findById(group.customerId)
+        .select('name mobile whatsappNumber')
+        .lean();
+      const to = String(owner?.whatsappNumber || owner?.mobile || '').trim();
+      if (!to) {
+        console.warn(
+          `[CspSaleUpdate] skipped invoice=${invoice?.invoiceCode} owner=${group.customerId}: no mobile`,
+        );
+        continue;
+      }
+
+      const wallet = await Wallet.findOne({customerId: owner._id})
+        .select('walletAmount')
+        .lean();
+
+      const result = await sendCspSaleUpdateWhatsApp({
+        to,
+        ownerName: owner.name,
+        productNames: group.productNames,
+        earningAmount: group.amount,
+        saleAmount: group.saleAmount,
+        invoiceLabel,
+        walletBalance: Number(wallet?.walletAmount || 0),
+      });
+      if (!result?.delivered && result?.channel !== 'whatsapp-stub') {
+        console.warn(
+          `[CspSaleUpdate] not delivered invoice=${invoice?.invoiceCode} owner=${group.customerId}: ${result?.error || 'unknown error'}`,
+        );
+      }
+    } catch (err) {
+      console.error(
+        `[CspSaleUpdate] failed invoice=${invoice?.invoiceCode} owner=${group.customerId}:`,
+        err?.message || err,
+      );
+    }
+  }
 };
 
 const buildSettlementLines = cspItems =>
@@ -348,6 +400,7 @@ export const settleCspPaymentSplit = async ({
   invoice,
   items,
   createdBy,
+  notifyOwners = true,
 }) => {
   const ref = String(invoice?.invoiceCode || '').trim();
   const invoiceId = invoice?._id;
@@ -457,6 +510,12 @@ export const settleCspPaymentSplit = async ({
     },
   );
 
+  if (notifyOwners) {
+    notifyCspOwnersOfSale({invoice, byCustomer}).catch(err =>
+      console.error('[CspSaleUpdate] notify failed:', err?.message || err),
+    );
+  }
+
   return settlement;
 };
 
@@ -547,6 +606,7 @@ export const backfillMissedCspSettlements = async ({
       invoice,
       items: enrichedItems,
       createdBy,
+      notifyOwners: false,
     });
     results.settled += 1;
   }

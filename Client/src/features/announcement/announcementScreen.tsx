@@ -19,7 +19,7 @@ import { handleGetAnnouncements } from "@/services/apiClient";
 import SendAnnouncementModal from "./components/SendAnnouncementModal";
 
 type AnnouncementStatus = "completed" | "pending" | "failed" | "sending";
-type AnnouncementType = "Selected" | "All";
+type AnnouncementType = "Selected" | "All" | "Exhibition";
 
 type AnnouncementRow = {
   id: string;
@@ -43,7 +43,10 @@ const STATUS_FILTERS = [
 ] as const;
 
 function mapAudienceType(value: unknown): AnnouncementType {
-  return String(value ?? "").toLowerCase() === "selected" ? "Selected" : "All";
+  const type = String(value ?? "").toLowerCase();
+  if (type === "selected") return "Selected";
+  if (type === "exhibition") return "Exhibition";
+  return "All";
 }
 
 function mapStatus(value: unknown): AnnouncementStatus {
@@ -125,6 +128,7 @@ function TypePill({ type }: { type: AnnouncementType }) {
   const map: Record<AnnouncementType, string> = {
     All: "bg-green-50 text-green-700 ring-green-100",
     Selected: "bg-indigo-50 text-indigo-700 ring-indigo-100",
+    Exhibition: "bg-amber-50 text-amber-700 ring-amber-100",
   };
   return (
     <span
