@@ -58,11 +58,17 @@ const leadSchema = new mongoose.Schema(
         "Membership",
         "Volunteering",
         "CSP",
+        "Hiring",
         "Customer Art Work",
         "Co-Working",
         "Handmade Gift",
         "Saler Program",],
       default: "",
+    },
+
+    deadline:{
+      type:Date,
+      default: null,
     },
 
     // Reason / Note

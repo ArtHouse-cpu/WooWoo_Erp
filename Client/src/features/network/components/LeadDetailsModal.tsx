@@ -198,6 +198,26 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
               </div>
             </div>
 
+            {lead.deadline && (
+              <div className="flex items-center gap-3">
+                <Calendar size={16} className="text-amber-500 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <span className="text-xs text-gray-400 block">Deadline</span>
+                  <span className="font-medium text-gray-800">
+                    {new Date(
+                      (typeof lead.deadline === "string" && lead.deadline.includes("T")
+                        ? lead.deadline.split("T")[0]
+                        : String(lead.deadline).slice(0, 10)) + "T00:00:00"
+                    ).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {lead.createdBy?.m_staff_name && (
               <div className="flex items-center gap-3">
                 <UserCheck size={16} className="text-indigo-500 shrink-0" />

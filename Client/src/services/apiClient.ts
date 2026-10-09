@@ -3651,6 +3651,7 @@ export type LeadSources=  "Instagram"|
   "Customer Art Work"|
   "Co-Working"|
   "Handmade Gift"|
+  "Hiring"|
   "Saler Program";
   
 
@@ -3662,6 +3663,7 @@ export type LeadItem = {
   status: LeadStatus;
   source?: string;
   purpose?: string;
+  deadline?: string;
   reasonNote?: string;
   url?: string;
   attachments?: LeadAttachment[];
@@ -3696,6 +3698,7 @@ export type LeadPayload = {
   purpose?: string;
   reasonNote?: string;
   url?: string;
+  deadline?: string;
   attachments?: LeadAttachment[];
   attachmentFiles?: File[];
   createdBy?: {
