@@ -110,7 +110,7 @@ const parseMaybeJson = (value) => {
 
 export const getLead = async (req, res) => {
   try {
-    const { fromDate, toDate, purpose, status, source, assignedTo } = req.query;
+    const { fromDate, toDate, purpose, status, source, assignedTo, deadline, deadlineFrom, deadlineTo } = req.query;
     const filter = {};
 
     if (purpose && purpose !== 'all') {
@@ -141,6 +141,31 @@ export const getLead = async (req, res) => {
           { 'assignedTo.m_staff_name': rx },
           { 'assignedTo.m_staff_id': assignedTo.trim() },
         ];
+      }
+    }
+
+    if (deadline && deadline !== 'all') {
+      const d = new Date(deadline);
+      if (!isNaN(d.getTime())) {
+        const start = new Date(d);
+        start.setUTCHours(0, 0, 0, 0);
+        const end = new Date(d);
+        end.setUTCHours(23, 59, 59, 999);
+        filter.deadline = { $gte: start, $lte: end };
+      }
+    } else if (deadlineFrom || deadlineTo) {
+      filter.deadline = {};
+      if (deadlineFrom) {
+        const start = new Date(`${deadlineFrom}T00:00:00.000Z`);
+        if (!isNaN(start.getTime())) {
+          filter.deadline.$gte = start;
+        }
+      }
+      if (deadlineTo) {
+        const end = new Date(`${deadlineTo}T23:59:59.999Z`);
+        if (!isNaN(end.getTime())) {
+          filter.deadline.$lte = end;
+        }
       }
     }
 
@@ -272,6 +297,17 @@ export const updateLead = async (req, res) => {
       lead.purpose = req.body.purpose;
     }
 
+    if (req.body.deadline !== undefined) {
+      if (req.body.deadline && typeof req.body.deadline === 'string' && req.body.deadline.trim()) {
+        const d = new Date(req.body.deadline);
+        lead.deadline = !isNaN(d.getTime()) ? d : null;
+      } else if (req.body.deadline instanceof Date && !isNaN(req.body.deadline.getTime())) {
+        lead.deadline = req.body.deadline;
+      } else {
+        lead.deadline = null;
+      }
+    }
+
     if (req.body.reasonNote !== undefined) {
       lead.reasonNote = req.body.reasonNote;
     }
@@ -335,6 +371,7 @@ export const createLead = async (req, res) => {
       status,
       source,
       purpose,
+      deadline,
       reasonNote,
       url,
       createdBy,
@@ -366,6 +403,16 @@ export const createLead = async (req, res) => {
       });
     }
 
+    let parsedDeadline = null;
+    if (deadline && typeof deadline === 'string' && deadline.trim()) {
+      const d = new Date(deadline);
+      if (!isNaN(d.getTime())) {
+        parsedDeadline = d;
+      }
+    } else if (deadline instanceof Date && !isNaN(deadline.getTime())) {
+      parsedDeadline = deadline;
+    }
+
     const createdByParsed = parseMaybeJson(createdBy);
     const assignedToParsed = parseMaybeJson(assignedTo);
 
@@ -379,6 +426,7 @@ export const createLead = async (req, res) => {
       status: status || "New",
       source: source?.trim() || "",
       purpose: purpose?.trim() || "",
+      deadline: parsedDeadline,
       reasonNote: reasonNote?.trim() || "",
       url: url?.trim() || "",
       attachments: allAttachments,
