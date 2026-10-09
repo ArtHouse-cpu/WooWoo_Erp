@@ -31,6 +31,7 @@ import {
   type VerifiedStaff,
 } from "@/services/apiClient";
 import { type DatePreset, rangeForPreset } from "@/utils/datePresets";
+import { UNSAFE_RSCDefaultRootErrorBoundary } from "react-router-dom";
 
 const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
   { value: "all", label: "All Dates" },
@@ -75,6 +76,7 @@ const PURPOSE_OPTIONS: LeadPurpose[] = [
   "Birthday Party",
   "Membership",
   "Volunteering",
+  "Hiring",
   "CSP",
   "Customer Art Work",
   "Co-Working",
@@ -115,6 +117,9 @@ export const getPurposeBadgeStyle = (source: LeadPurpose) => {
 
     case "CSP":
       return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    case "Hiring":
+      return "bg-green-50 text-green-700 border-green-200";
 
     case "Customer Art Work":
       return "bg-indigo-50 text-indigo-700 border-indigo-200";
@@ -246,6 +251,8 @@ const LeadScreen = () => {
             ? res
             : [];
 
+
+            
         // Client-side fallback filtering
         if (pPurpose && pPurpose !== "all") {
           leadList = leadList.filter((item) => item.purpose === pPurpose);
@@ -344,6 +351,17 @@ const LeadScreen = () => {
     const controller = new AbortController();
     fetchLeads(undefined, undefined, undefined, undefined, undefined, undefined, controller.signal);
     return () => controller.abort();
+  }, [fetchLeads]);
+
+  // Refresh leads if created from global Header
+  useEffect(() => {
+    const handleLeadCreated = () => {
+      fetchLeads();
+    };
+    window.addEventListener("lead-created", handleLeadCreated);
+    return () => {
+      window.removeEventListener("lead-created", handleLeadCreated);
+    };
   }, [fetchLeads]);
 
   // Create or Update lead: POST /api/lead or PATCH /api/lead/:id
@@ -640,6 +658,57 @@ const LeadScreen = () => {
         header: "Purpose",
         size: 140,
       },
+      
+      //deadline
+      
+      {
+        accessorKey: "deadline",
+        header: "Deadline",
+        size: 130,
+        Cell: ({ row }) => {
+          const deadline = row.original.deadline;
+
+          if (!deadline) {
+            return (
+              <span className="text-gray-400 italic text-xs">
+                No deadline
+              </span>
+            );
+          }
+          const deadlineStr =
+            typeof deadline === "string" && deadline.includes("T")
+              ? deadline.split("T")[0]
+              : String(deadline).slice(0, 10);
+          const deadlineDate = new Date(`${deadlineStr}T23:59:59`);
+          const today = new Date();
+
+          const isOverdue = !isNaN(deadlineDate.getTime()) && deadlineDate < today;
+
+          return (
+            <div className="flex flex-col gap-0.5">
+              <span
+                className={`inline-flex w-fit items-center rounded-md px-2 py-0.5 text-xs font-medium ${
+                  isOverdue
+                    ? "bg-red-50 text-red-700"
+                    : "bg-amber-50 text-amber-700"
+                }`}
+              >
+                {new Date(`${deadlineStr}T00:00:00`).toLocaleDateString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+
+              {isOverdue && (
+                <span className="text-[10px] font-medium text-red-500">
+                  Overdue
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
 
       // Assigned To
       {
@@ -788,25 +857,38 @@ const LeadScreen = () => {
     <div className="w-full space-y-5 p-4 sm:p-6">
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-            Leads 
-          </h1>
-          <span className="inline-flex items-center gap-1.5 rounded-lg border-indigi-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigio-700 shadow-2xs">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
+              Leads
+            </h1>
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 sm:px-3 py-1 text-xs font-semibold text-indigo-700 shadow-2xs whitespace-nowrap">
+              Total Leads: <span className="font-bold text-indigo-900">{leads.length}</span>
+            </span>
+          </div>
 
-       Total Leads: <span className="font-bold text-indigo-900">{leads.length}</span>
-
-          </span>
+          {/* Create Lead Button on mobile parallel to Lead text */}
+          <button
+            type="button"
+            onClick={() => {
+              setLeadToEdit(null);
+              setIsCreateModalOpen(true);
+            }}
+            className="sm:hidden inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 active:scale-[0.98] transition cursor-pointer shrink-0"
+          >
+            <Plus size={16} className="shrink-0" />
+            <span>Create Lead</span>
+          </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2.5">
           {/* Assign Filter Dropdown (Staff names & Unassigned) */}
-          <div className="relative inline-flex items-center">
+          <div className="relative w-full sm:w-auto">
             <select
               value={selectedAssign}
               onChange={handleAssignFilterChange}
               disabled={loading}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50"
+              className="h-9 w-full sm:w-auto rounded-lg border border-gray-200 bg-white px-2.5 sm:px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50 truncate"
             >
               <option value="all">Assign: All</option>
               <option value="unassigned">Unassigned</option>
@@ -819,12 +901,12 @@ const LeadScreen = () => {
           </div>
 
           {/* Status Filter Dropdown */}
-          <div className="relative inline-flex items-center">
+          <div className="relative w-full sm:w-auto">
             <select
               value={selectedStatus}
               onChange={handleStatusFilterChange}
               disabled={loading}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:outline-none cursor-pointer disabled:opacity-50"
+              className="h-9 w-full sm:w-auto rounded-lg border border-gray-200 bg-white px-2.5 sm:px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:outline-none cursor-pointer disabled:opacity-50 truncate"
             >
               <option value="all">All Status</option>
               {STATUS_OPTIONS.map((status) => (
@@ -836,12 +918,12 @@ const LeadScreen = () => {
           </div>
 
           {/* Source Filter Dropdown */}
-          <div className="relative inline-flex items-center">
+          <div className="relative w-full sm:w-auto">
             <select
               value={selectedSource}
               onChange={handleSourceFilterChange}
               disabled={loading}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50"
+              className="h-9 w-full sm:w-auto rounded-lg border border-gray-200 bg-white px-2.5 sm:px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50 truncate"
             >
               <option value="all">All Sources</option>
 
@@ -854,12 +936,12 @@ const LeadScreen = () => {
           </div>
 
           {/* Purpose Filter Dropdown */}
-          <div className="relative inline-flex items-center">
+          <div className="relative w-full sm:w-auto">
             <select
               value={selectedPurpose}
               onChange={handlePurposeFilterChange}
               disabled={loading}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50"
+              className="h-9 w-full sm:w-auto rounded-lg border border-gray-200 bg-white px-2.5 sm:px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50 truncate"
             >
               <option value="all">All Purposes</option>
               {PURPOSE_OPTIONS.map((purpose) => (
@@ -871,12 +953,12 @@ const LeadScreen = () => {
           </div>
 
           {/* Date Range Preset Dropdown */}
-          <div className="relative inline-flex items-center">
+          <div className="relative col-span-2 sm:col-span-1 w-full sm:w-auto">
             <select
               value={datePreset}
               onChange={handlePresetChange}
               disabled={loading}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50"
+              className="h-9 w-full sm:w-auto rounded-lg border border-gray-200 bg-white px-2.5 sm:px-3 py-1.5 text-xs font-medium text-gray-700 shadow-xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50 truncate"
             >
               {DATE_PRESET_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -888,21 +970,21 @@ const LeadScreen = () => {
 
           {/* Custom Date Range Picker */}
           {datePreset === "custom" && (
-            <div className="flex items-center gap-1.5">
+            <div className="col-span-2 flex items-center gap-1.5 w-full sm:w-auto">
               <input
                 type="date"
                 value={fromDate}
                 max={toDate || undefined}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="h-9 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 shadow-xs focus:border-indigo-500 focus:outline-none"
+                className="h-9 flex-1 sm:w-auto rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 shadow-xs focus:border-indigo-500 focus:outline-none"
               />
-              <span className="text-xs text-gray-400">to</span>
+              <span className="text-xs text-gray-400 shrink-0">to</span>
               <input
                 type="date"
                 value={toDate}
                 min={fromDate || undefined}
                 onChange={(e) => setToDate(e.target.value)}
-                className="h-9 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 shadow-xs focus:border-indigo-500 focus:outline-none"
+                className="h-9 flex-1 sm:w-auto rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 shadow-xs focus:border-indigo-500 focus:outline-none"
               />
               <button
                 type="button"
@@ -917,20 +999,21 @@ const LeadScreen = () => {
                   )
                 }
                 disabled={loading || (!fromDate && !toDate)}
-                className="h-9 inline-flex items-center rounded-lg bg-indigo-600 px-3.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 transition cursor-pointer"
+                className="h-9 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50 transition cursor-pointer shrink-0"
               >
                 Apply
               </button>
             </div>
           )}
 
-          {/* Create Lead Button */}
+          {/* Create Lead Button (Desktop only) */}
           <button
+            type="button"
             onClick={() => {
               setLeadToEdit(null);
               setIsCreateModalOpen(true);
             }}
-            className="h-9 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-700 transition cursor-pointer"
+            className="hidden sm:inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-700 transition cursor-pointer"
           >
             <Plus size={18} />
             <span>Create Lead</span>

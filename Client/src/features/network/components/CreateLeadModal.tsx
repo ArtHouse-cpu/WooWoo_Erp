@@ -68,6 +68,7 @@ const PURPOSE_OPTIONS = [
   "Membership",
   "Volunteering",
   "CSP",
+  "Hiring",
   "Customer Art Work",
   "Co-Working",
   "Handmade Gift",
@@ -89,6 +90,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     purpose: "",
     reasonNote: "",
     url: "",
+    deadline:"",
   });
 
   const [customSource, setCustomSource] = useState("");
@@ -175,6 +177,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         purpose: leadToEdit.purpose || "",
         reasonNote: leadToEdit.reasonNote || "",
         url: leadToEdit.url || "",
+        deadline: leadToEdit.deadline 
+         ? new Date(leadToEdit.deadline).toISOString().split("T")[0]
+         : "",
       });
 
       setExistingAttachments(
@@ -202,6 +207,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         purpose: "",
         reasonNote: "",
         url: "",
+        deadline: "",
       });
       setExistingAttachments([]);
       setSelectedStaffId("");
@@ -343,6 +349,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
       purpose: formData.purpose?.trim() || "",
       reasonNote: formData.reasonNote?.trim() || "",
       url: formData.url?.trim() || "",
+      deadline: formData.deadline || "",
       assignedTo,
       attachments: existingAttachments,
       attachmentFiles: newFiles.map((f) => f.file),
@@ -562,6 +569,47 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                 </select>
               </div>
             </div>
+
+
+             {/*Deadline */}
+             <div>
+             <label className="mb-1 block text-sm font-medium text-gray-700">
+              Deadline
+             </label>
+
+             <input 
+             type="date"
+             value={formData.deadline|| ""}
+             min={new Date().toISOString().split("T")[0]}
+             onChange={(e) =>
+              setFormData({
+                ...formData,
+                deadline: e.target.value,
+              })
+             }
+             className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+             
+             />
+
+             {formData.deadline && (
+              <p className="mt-1 text-xs text-gray-500">
+                Selected deadline:{" "}
+                {new Date(`${formData.deadline}T00:00:00`).toLocaleDateString(
+                  "en-IN",
+                  {
+                    day:"2-digit",
+                    month:"short",
+                    year:"numeric",
+                  }
+                )}
+
+
+              </p>
+             )}
+
+             </div>
+
+
 
             {/* Media / Document Uploadation - just above Reason / Note */}
             <div className="space-y-2">

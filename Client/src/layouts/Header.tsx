@@ -1,7 +1,8 @@
-import { Bell, User, Shuffle, ChevronDown, Menu, FilePlus2, Crown, CalendarPlus } from "lucide-react";
+import { Bell, User, Shuffle, ChevronDown, Menu, FilePlus2, Crown, CalendarPlus, UserPlus } from "lucide-react";
 import logo from "../assets/images/logo/woo_woo_art_house_logo.png";
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import Swal from "sweetalert2";
 
 import { usePermission } from "@/hooks/usePermission";
 import { UserModal } from "./UserModal";
@@ -9,6 +10,13 @@ import { CompanySelectorModal } from "./CompanySelectorModal";
 import { useAppSelector } from "@/store/hooks";
 import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
 import CreatePosScreen from "@/features/sales/pages/CreatePosScreen";
+import CreateLeadModal from "@/features/network/components/CreateLeadModal";
+import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
+import {
+  handleCreateLead,
+  type LeadPayload,
+  type VerifiedStaff,
+} from "@/services/apiClient";
 type HeaderProps = {
   onMenuClick?: () => void;
   showMenuButton?: boolean;
@@ -30,11 +38,65 @@ export default function Header({
   const [openCreateSubscriptionModal, setOpenCreateSubscriptionModal] =
     useState(false);
 
+  const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
+  const [isLeadPinOpen, setIsLeadPinOpen] = useState(false);
+  const [pendingLeadPayload, setPendingLeadPayload] = useState<LeadPayload | null>(null);
+  const [isSubmittingLead, setIsSubmittingLead] = useState(false);
+
   const handleOpenAddBooking = () => {
     if (location.pathname.toLowerCase().includes("spacebooking")) {
       window.dispatchEvent(new CustomEvent("open-add-space-booking"));
     } else {
       navigate("/spaceBooking?create=true");
+    }
+  };
+
+  const handleLeadSubmit = (payload: LeadPayload) => {
+    setPendingLeadPayload(payload);
+    setIsLeadPinOpen(true);
+  };
+
+  const handleLeadPinVerified = async ({ staff }: { staff: VerifiedStaff }) => {
+    if (!pendingLeadPayload) return;
+    try {
+      setIsSubmittingLead(true);
+      const payloadWithStaff: LeadPayload = {
+        ...pendingLeadPayload,
+        createdBy: {
+          m_staff_id: staff.staffId || staff.m_staff_id || staff._id,
+          m_staff_name: staff.staffName || staff.name,
+          m_staff_email: staff.email || "",
+        },
+      };
+
+      await handleCreateLead(payloadWithStaff);
+
+      setIsLeadPinOpen(false);
+      setIsCreateLeadOpen(false);
+      setPendingLeadPayload(null);
+
+      Swal.fire({
+        icon: "success",
+        title: "Lead Created",
+        text: "New lead has been created successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
+      window.dispatchEvent(new CustomEvent("lead-created"));
+    } catch (error: any) {
+      console.error("Failed to create lead:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error?.response?.data?.message ||
+          (Array.isArray(error?.response?.data?.errors)
+            ? error.response.data.errors.join(", ")
+            : "Failed to create lead."),
+      });
+    } finally {
+      setIsSubmittingLead(false);
     }
   };
 
@@ -109,6 +171,7 @@ export default function Header({
           </span>
         </div>
       </div> */}
+      
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 md:gap-5">
         {hasQuickBillAccess && (
@@ -123,6 +186,16 @@ export default function Header({
             <span className="hidden md:inline">POS BILL</span>
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setIsCreateLeadOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 md:px-4 md:py-2 md:text-sm"
+          aria-label="Create Lead"
+          title="Create Lead"
+        >
+          <UserPlus size={16} />
+          <span className="hidden md:inline">Create Lead</span>
+        </button>
         <button
           type="button"
           onClick={handleOpenAddBooking}
@@ -179,6 +252,22 @@ export default function Header({
         <CreatePosScreen
           open={isPosOpen}
           onClose={() => setIsPosOpen(false)}
+        />
+
+        {/* Render Create Lead Modal and Staff PIN Verification */}
+        <CreateLeadModal
+          isOpen={isCreateLeadOpen}
+          onClose={() => {
+            setIsCreateLeadOpen(false);
+            setPendingLeadPayload(null);
+          }}
+          onSubmit={handleLeadSubmit}
+          isSubmitting={isSubmittingLead}
+        />
+        <StaffVerifyModal
+          open={isLeadPinOpen}
+          onClose={() => setIsLeadPinOpen(false)}
+          onVerified={handleLeadPinVerified}
         />
       
 
