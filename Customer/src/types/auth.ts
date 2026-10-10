@@ -149,6 +149,9 @@ export interface ActivityItem {
   status: 'Paid' | 'Pending' | 'Cancelled' | string;
   category?: string;
   subTotal?: number;
+  grandTotal?: number;
+  amountPaid?: number;
+  pendingAmount?: number;
 }
 
 export interface ActivityDashboard {

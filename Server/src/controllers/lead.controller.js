@@ -4,6 +4,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Lead from '../models/lead.model.js';
+import Customer from '../models/customer.model.js';
+import Membership from '../models/membership.model.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -108,6 +110,67 @@ const parseMaybeJson = (value) => {
   }
 };
 
+const NO_MEMBERSHIP = new Set(['', 'none', 'null', 'undefined']);
+
+/**
+ * Leads may repeat a number; when a customer with that mobile holds a membership,
+ * return { phone -> { label, planId, customerId, customerName } }.
+ */
+const getMembershipsByPhone = async (phones) => {
+  const unique = [...new Set(phones.map((p) => String(p || '').trim()).filter((p) => /^\d{10}$/.test(p)))];
+  if (!unique.length) return new Map();
+
+  const customers = await Customer.find({ mobile: { $in: unique }, isDeleted: { $ne: true } })
+    .select('_id name mobile membershipType membershipPlanId')
+    .lean();
+  const members = customers.filter(
+    (c) => !NO_MEMBERSHIP.has(String(c.membershipType ?? '').trim().toLowerCase()),
+  );
+  if (!members.length) return new Map();
+
+  const planIds = [...new Set(members.map((c) => String(c.membershipType).trim().toLowerCase()))];
+  const planObjectIds = members.map((c) => c.membershipPlanId).filter(Boolean);
+  const plans = await Membership.find({
+    $or: [{ planId: { $in: planIds } }, { _id: { $in: planObjectIds } }],
+  })
+    .select('_id planId displayName')
+    .lean();
+  const byObjectId = new Map(plans.map((p) => [String(p._id), p]));
+  const byPlanId = new Map(plans.map((p) => [String(p.planId).toLowerCase(), p]));
+
+  const result = new Map();
+  for (const c of members) {
+    const key = String(c.membershipType).trim().toLowerCase();
+    const plan = (c.membershipPlanId && byObjectId.get(String(c.membershipPlanId))) || byPlanId.get(key);
+    result.set(c.mobile, {
+      label: plan?.displayName || key.charAt(0).toUpperCase() + key.slice(1),
+      planId: plan?.planId || key,
+      customerId: c._id,
+      customerName: c.name,
+    });
+  }
+  return result;
+};
+
+const withMembership = (lead, memberships) => {
+  const obj = typeof lead?.toObject === 'function' ? lead.toObject() : lead;
+  return { ...obj, membership: memberships.get(String(obj?.phone || '').trim()) || null };
+};
+
+export const getLeadMembership = async (req, res) => {
+  try {
+    const phone = String(req.query.phone || '').replace(/\D/g, '').slice(-10);
+    if (!/^\d{10}$/.test(phone)) {
+      return res.status(400).json({ success: false, message: 'Valid 10-digit phone is required' });
+    }
+    const memberships = await getMembershipsByPhone([phone]);
+    res.status(200).json({ success: true, data: memberships.get(phone) || null });
+  } catch (error) {
+    console.error('Get Lead Membership Error:', error);
+    res.status(500).json({ success: false, message: 'Failed to check membership', error: error.message });
+  }
+};
+
 export const getLead = async (req, res) => {
   try {
     const { fromDate, toDate, purpose, status, source, assignedTo, deadline, deadlineFrom, deadlineTo } = req.query;
@@ -202,12 +265,13 @@ export const getLead = async (req, res) => {
         filter.createdAt.$lte = endDate;
       }
     }
-    const leads = await Lead.find(filter).sort({ createdAt: -1 });
+    const leads = await Lead.find(filter).sort({ createdAt: -1 }).lean();
+    const memberships = await getMembershipsByPhone(leads.map((l) => l.phone));
 
     res.status(200).json({
       success: true,
       message: "Leads fetched successfully",
-      data: leads,
+      data: leads.map((lead) => withMembership(lead, memberships)),
     });
   } catch (error) {
     console.error("Get Leads Error:", error);
@@ -241,10 +305,12 @@ export const getLeadById = async (req, res) => {
       });
     }
 
+    const memberships = await getMembershipsByPhone([lead.phone]);
+
     res.status(200).json({
       success: true,
       message: "Lead fetched successfully",
-      data: lead,
+      data: withMembership(lead, memberships),
     });
   } catch (error) {
     console.error("Get Lead By ID Error:", error);

@@ -1194,7 +1194,7 @@ export default function CreateInvoiceScreen({
 
       {/* Mobile sticky checkout bar */}
       {mode !== "view" && (
-        <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] z-40 border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-md md:bottom-0 lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 max-md:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-md lg:hidden">
           <div className="mx-auto flex max-w-lg items-center gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">

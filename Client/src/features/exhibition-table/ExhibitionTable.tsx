@@ -499,7 +499,7 @@ const ExhibitionTable = () => {
     // the table rows scroll. Phones: the table box alone is one screen tall (see below).
     <div
       className={`w-full md:flex md:h-[calc(100dvh-5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] md:flex-col md:pb-0 lg:h-[calc(100dvh-5.25rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] ${
-        canUpdate ? "pb-16" : ""
+        canUpdate ? "pb-14" : "pb-3"
       }`}
     >
       {/* Tabs + actions — pinned while charts scroll away on phones */}
@@ -583,13 +583,13 @@ const ExhibitionTable = () => {
         </div>
       )}
 
-      {/* Phones: screen height minus top bar, main padding, bottom nav, the 3.5rem tabs row
-          and (when scanning is allowed) the 4rem bottom padding kept clear for the Scan button. */}
+      {/* Phones: screen height minus top bar, main top padding, the 3.5rem tabs row and the
+          section's bottom padding (5rem clear for the floating Scan button, else 0.75rem). */}
       <div
         className={`flex flex-col md:h-auto md:min-h-0 md:flex-1 ${
           canUpdate
             ? "h-[calc(100dvh-16.25rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]"
-            : "h-[calc(100dvh-12.25rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]"
+            : "h-[calc(100dvh-13.5rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))]"
         }`}
       >
         <MaterialReactTable table={table} />
@@ -601,7 +601,7 @@ const ExhibitionTable = () => {
           type="button"
           onClick={() => setScanOpen(true)}
           aria-label="Scan pass"
-          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-white py-3.5 pl-4 pr-5 text-sm font-bold text-green-600 shadow-lg shadow-slate-900/15 ring-2 ring-green-600 transition active:scale-95 md:hidden"
+          className="fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-white py-3.5 pl-4 pr-5 text-sm font-bold text-green-600 shadow-lg shadow-slate-900/15 ring-2 ring-green-600 transition active:scale-95 md:hidden"
         >
           <ScanLine size={22} />
           Scan Pass

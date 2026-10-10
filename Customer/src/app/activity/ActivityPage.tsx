@@ -40,6 +40,9 @@ export interface Transaction {
   dateTime: string;
   amount: number;
   totalPaid: number;
+  /** Collected so far; equals totalPaid when fully settled. */
+  amountPaid: number;
+  pendingAmount: number;
   discount: number;
   cashback: number;
   status: "Paid" | "Pending";
@@ -76,8 +79,15 @@ const mapActivityToTransaction = (a: ActivityItem): Transaction => {
   const discount = Number(a.discountAmount ?? 0) || 0;
   const cashback = Number(a.cashbackAmount ?? 0) || 0;
   const totalPaid = Number(a.totalPaid ?? Math.max(0, amount - discount)) || 0;
+  const pendingAmount = Math.max(0, Number(a.pendingAmount ?? 0) || 0);
+  const amountPaid = Math.max(
+    0,
+    Number(a.amountPaid ?? totalPaid - pendingAmount) || 0,
+  );
 
   return {
+    amountPaid,
+    pendingAmount,
     invoiceId: a.invoiceId,
     invoiceNo: a.invoiceNumber || "—",
     items: `${Number(a.itemCount ?? 0) || 0} Items`,
@@ -905,12 +915,35 @@ const handleDownloadInvoice = async () => {
                     </span>
                   </div>
                 )}
-                <div className="border-t border-dashed border-slate-200 pt-2 flex justify-between text-[14px] font-extrabold text-[#111111]">
-                  <span>Total Paid</span>
-                  <span>
-                    ₹{selectedTransaction.totalPaid.toLocaleString("en-IN")}
-                  </span>
-                </div>
+                {selectedTransaction.pendingAmount > 0 ? (
+                  <>
+                    <div className="border-t border-dashed border-slate-200 pt-2 flex justify-between text-[13px] font-bold text-[#374151]">
+                      <span>Bill Total</span>
+                      <span>
+                        ₹{selectedTransaction.totalPaid.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[14px] font-extrabold text-[#111111]">
+                      <span>Total Paid</span>
+                      <span>
+                        ₹{selectedTransaction.amountPaid.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl bg-[#FFF7ED] px-3 py-2 text-[13px] font-extrabold text-[#EA580C] ring-1 ring-inset ring-[#FED7AA]">
+                      <span>Pending Amount</span>
+                      <span>
+                        ₹{selectedTransaction.pendingAmount.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="border-t border-dashed border-slate-200 pt-2 flex justify-between text-[14px] font-extrabold text-[#111111]">
+                    <span>Total Paid</span>
+                    <span>
+                      ₹{selectedTransaction.totalPaid.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                )}
                 <div className="border-t border-dashed border-slate-200/50 pt-2 flex justify-between text-[13px] font-bold text-[#10B981]">
                   <span>Total Benefit</span>
                   <span>

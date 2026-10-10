@@ -17,8 +17,11 @@ import {
   type LeadPayload,
   type LeadStatus,
   type LeadAttachment,
+  type LeadMembership,
   handleGetAccessStaff,
+  handleGetLeadMembership,
 } from "@/services/apiClient";
+import LeadMembershipBadge from "./LeadMembershipBadge";
 
 type StaffOption = {
   _id: string;
@@ -121,6 +124,29 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = Boolean(leadToEdit);
+
+  const [phoneMembership, setPhoneMembership] = useState<LeadMembership | null>(null);
+  const [checkingMembership, setCheckingMembership] = useState(false);
+  const phoneForLookup = isOpen && /^\d{10}$/.test(formData.phone || "") ? formData.phone! : "";
+
+  useEffect(() => {
+    if (!phoneForLookup) {
+      setPhoneMembership(null);
+      setCheckingMembership(false);
+      return;
+    }
+    const controller = new AbortController();
+    setCheckingMembership(true);
+    handleGetLeadMembership(phoneForLookup, controller.signal)
+      .then((m) => setPhoneMembership(m))
+      .catch((err) => {
+        if (err?.name !== "CanceledError") setPhoneMembership(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCheckingMembership(false);
+      });
+    return () => controller.abort();
+  }, [phoneForLookup]);
 
   // Fetch staff list from user/access API
   useEffect(() => {
@@ -398,9 +424,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col overflow-hidden">
-          <div className="space-y-4 overflow-y-auto p-6">
+          <div className="flex flex-col gap-4 overflow-y-auto p-4 sm:p-6">
             {/* Name + Phone Number */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {/* Name */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -438,11 +464,21 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
                   required
                 />
+                {checkingMembership ? (
+                  <p className="mt-1 flex items-center gap-1 text-[11px] text-gray-400">
+                    <Loader2 size={11} className="animate-spin" /> Checking membership…
+                  </p>
+                ) : phoneMembership ? (
+                  <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
+                    Existing member{phoneMembership.customerName ? ` (${phoneMembership.customerName})` : ""}:
+                    <LeadMembershipBadge membership={phoneMembership} />
+                  </p>
+                ) : null}
               </div>
             </div>
 
             {/* Status + Source */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {/* Status */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -506,7 +542,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
             </div>
 
             {/* Purpose & Assign To (Staff) */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {/* Purpose */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -571,8 +607,10 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
             </div>
 
 
+            {/* sm+: wrapper is display:contents; the sm:order-* classes keep Media URL below the uploads */}
+            <div className="grid grid-cols-2 gap-3 sm:contents">
              {/*Deadline */}
-             <div>
+             <div className="min-w-0">
              <label className="mb-1 block text-sm font-medium text-gray-700">
               Deadline
              </label>
@@ -609,10 +647,51 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
              </div>
 
-
+            {/* Media URL / Reference Link (Below Media Uploadation) */}
+            <div className="min-w-0 sm:order-2">
+              <div className="flex items-center justify-between mb-1">
+                <label className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-gray-700">
+                  <Globe size={15} className="shrink-0 text-indigo-600" />
+                  <span className="truncate">
+                    Media URL<span className="hidden sm:inline"> / Reference Link</span>
+                  </span>
+                </label>
+                <span className="hidden text-[11px] text-gray-400 sm:inline">
+                  (Optional - Drive, Portfolio, Social)
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  type="url"
+                  value={formData.url || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, url: e.target.value })
+                  }
+                  placeholder="https://drive.google.com/... or portfolio / website link"
+                  className="w-full rounded-md border border-gray-300 py-2 pl-3 pr-8 text-sm outline-none transition focus:border-indigo-500"
+                />
+                {formData.url && (
+                  <a
+                    href={
+                      formData.url.startsWith("http://") ||
+                      formData.url.startsWith("https://")
+                        ? formData.url
+                        : `https://${formData.url}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition"
+                    title="Open link in new tab"
+                  >
+                    <ExternalLink size={15} />
+                  </a>
+                )}
+              </div>
+            </div>
+            </div>
 
             {/* Media / Document Uploadation - just above Reason / Note */}
-            <div className="space-y-2">
+            <div className="space-y-2 sm:order-1">
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
                   <Paperclip size={15} className="text-indigo-600" />
@@ -824,48 +903,8 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
               )}
             </div>
 
-            {/* Media URL / Reference Link (Below Media Uploadation) */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
-                  <Globe size={15} className="text-indigo-600" />
-                  <span>Media URL / Reference Link</span>
-                </label>
-                <span className="text-[11px] text-gray-400">
-                  (Optional - Drive, Portfolio, Social)
-                </span>
-              </div>
-              <div className="relative">
-                <input
-                  type="url"
-                  value={formData.url || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, url: e.target.value })
-                  }
-                  placeholder="https://drive.google.com/... or portfolio / website link"
-                  className="w-full rounded-md border border-gray-300 py-2 pl-3 pr-8 text-sm outline-none transition focus:border-indigo-500"
-                />
-                {formData.url && (
-                  <a
-                    href={
-                      formData.url.startsWith("http://") ||
-                      formData.url.startsWith("https://")
-                        ? formData.url
-                        : `https://${formData.url}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 transition"
-                    title="Open link in new tab"
-                  >
-                    <ExternalLink size={15} />
-                  </a>
-                )}
-              </div>
-            </div>
-
             {/* Reason / Note */}
-            <div>
+            <div className="sm:order-3">
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Reason / Note
               </label>
@@ -882,7 +921,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
             {/* Validation message */}
             {error && (
-              <div className="rounded-md bg-red-50 p-2.5 text-sm text-red-600">
+              <div className="rounded-md bg-red-50 p-2.5 text-sm text-red-600 sm:order-4">
                 {error}
               </div>
             )}

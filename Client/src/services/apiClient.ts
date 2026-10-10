@@ -3680,6 +3680,8 @@ export type LeadItem = {
   };
   createdAt?: string;
   updatedAt?: string;
+  /** Present when a customer with this phone holds a membership. */
+  membership?: LeadMembership | null;
 };
 
 export type LeadAttachment = {
@@ -3767,6 +3769,24 @@ export const handleGetLeads = async (
     signal,
   });
   return response.data;
+};
+
+export type LeadMembership = {
+  label: string;
+  planId: string;
+  customerId: string;
+  customerName?: string;
+};
+
+export const handleGetLeadMembership = async (
+  phone: string,
+  signal?: AbortSignal
+): Promise<LeadMembership | null> => {
+  const response = await axiosInstance.get("/api/lead/membership", {
+    params: { phone },
+    signal,
+  });
+  return response.data?.data ?? null;
 };
 
 export const handleGetLeadById = async (id: string, signal?: AbortSignal) => {

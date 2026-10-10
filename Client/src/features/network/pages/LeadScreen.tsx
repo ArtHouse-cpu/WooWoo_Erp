@@ -16,6 +16,7 @@ import Swal from "sweetalert2";
 
 import CreateLeadModal from "../components/CreateLeadModal";
 import LeadDetailsModal from "../components/LeadDetailsModal";
+import LeadMembershipBadge from "../components/LeadMembershipBadge";
 import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
 import {
   handleGetLeads,
@@ -621,17 +622,20 @@ const LeadScreen = () => {
         accessorKey: "phone",
         header: "Phone Number",
         size: 140,
-        Cell: ({ cell }) => {
+        Cell: ({ cell, row }) => {
           const phone = cell.getValue<string>();
           if (!phone) return <span className="text-gray-400 italic text-xs">-</span>;
           return (
-            <a
-              href={`tel:${phone}`}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 hover:text-indigo-600"
-            >
-              <Phone size={13} className="text-gray-400" />
-              <span>{phone}</span>
-            </a>
+            <div className="flex flex-col items-start gap-1">
+              <a
+                href={`tel:${phone}`}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 hover:text-indigo-600"
+              >
+                <Phone size={13} className="text-gray-400" />
+                <span>{phone}</span>
+              </a>
+              <LeadMembershipBadge membership={row.original.membership} />
+            </div>
           );
         },
       },

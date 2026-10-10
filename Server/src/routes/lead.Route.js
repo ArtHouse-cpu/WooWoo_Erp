@@ -3,6 +3,7 @@ import {
   createLead,
   getLead,
   getLeadById,
+  getLeadMembership,
   deleteLead,
   updateLead,
   uploadLeadAttachments,
@@ -14,6 +15,7 @@ const router = express.Router();
 router.use(authenticateUser, attachStaffContext);
 
 router.get('/', getLead);
+router.get('/membership', getLeadMembership);
 router.get('/:id', getLeadById);
 router.post('/', uploadLeadAttachments.array('attachments'), createLead);
 router.delete('/:id', deleteLead);

@@ -17,6 +17,7 @@ import {
   Globe,
 } from "lucide-react";
 import type { LeadItem } from "@/services/apiClient";
+import LeadMembershipBadge from "./LeadMembershipBadge";
 
 type LeadDetailsModalProps = {
   isOpen: boolean;
@@ -121,12 +122,15 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
               <div className="min-w-0 flex-1">
                 <span className="text-xs text-gray-400 block">Phone</span>
                 {lead.phone ? (
-                  <a
-                    href={`tel:${lead.phone}`}
-                    className="font-medium text-gray-800 hover:text-indigo-600"
-                  >
-                    {lead.phone}
-                  </a>
+                  <>
+                    <a
+                      href={`tel:${lead.phone}`}
+                      className="font-medium text-gray-800 hover:text-indigo-600"
+                    >
+                      {lead.phone}
+                    </a>
+                    <LeadMembershipBadge membership={lead.membership} className="ml-2 align-middle" />
+                  </>
                 ) : (
                   <span className="text-gray-400 italic">Not provided</span>
                 )}

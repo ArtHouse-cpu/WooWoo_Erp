@@ -1557,137 +1557,140 @@ export default function CreatePosScreen({
                 </table>
               </div>
               </div>
-
-              {/* Billing Summary */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-slate-600">
-                    <span>
-                      Total Qty:{" "}
-                      {items.reduce(
-                        (sum, item) => sum + (Number(item.qty) || 0),
-                        0,
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-slate-600">
-                    <span>Sub Total</span>
-                    <span className="tabular-nums">
-                      ₹
-                      {subTotal.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                  {discountTotal > 0 && (
-                    <div className="flex justify-between font-medium text-rose-600">
-                      <span>Discount</span>
+              <div className="sticky -bottom-3 z-10 -mb-3 bg-white pt-2 pb-3 sm:-bottom-6 sm:-mb-6 sm:pb-6">
+                {/* Billing Summary */}
+                <div className="mr-auto w-full rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm sm:max-w-xs">
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between text-slate-600">
+                      <span>
+                        Sub Total
+                        <span className="ml-1 text-slate-400">
+                          (Qty{" "}
+                          {items.reduce(
+                            (sum, item) => sum + (Number(item.qty) || 0),
+                            0,
+                          )}
+                          )
+                        </span>
+                      </span>
                       <span className="tabular-nums">
-                        − ₹
-                        {discountTotal.toLocaleString("en-IN", {
+                        ₹
+                        {subTotal.toLocaleString("en-IN", {
                           minimumFractionDigits: 2,
                         })}
                       </span>
                     </div>
-                  )}
-                  <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
-                    <span className="text-base font-semibold text-slate-900">
-                      Grand Total
-                    </span>
-                    <span className="text-xl font-bold tabular-nums text-slate-900">
-                      ₹{" "}
-                      {grandTotal.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </span>
-                  </div>
-                  {Math.abs(roundOff) >= 0.005 && (
-                    <div className="text-[11px] text-slate-500">
-                      Bill ₹
-                      {billTotalBeforeRoundOff.toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
-                      {" · "}
-                      Round off {roundOff >= 0 ? "+" : "−"}₹
-                      {Math.abs(roundOff).toFixed(2)}
-                    </div>
-                  )}
-                  {cashbackTotal > 0 && (
-                    <div className="flex items-center justify-between rounded-xl bg-emerald-50 px-3 py-2 text-emerald-700 ring-1 ring-inset ring-emerald-100">
-                      <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
-                        <Tag size={14} />
-                        Cashback
+                    {discountTotal > 0 && (
+                      <div className="flex justify-between font-medium text-rose-600">
+                        <span>Discount</span>
+                        <span className="tabular-nums">
+                          − ₹
+                          {discountTotal.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-inset ring-slate-200">
+                      <span className="text-sm font-semibold text-slate-900">
+                        Grand Total
                       </span>
-                      <span className="font-bold tabular-nums">
-                        + ₹
-                        {cashbackTotal.toLocaleString("en-IN", {
+                      <span className="text-base font-bold tabular-nums text-slate-900">
+                        ₹{" "}
+                        {grandTotal.toLocaleString("en-IN", {
                           minimumFractionDigits: 2,
                         })}
                       </span>
                     </div>
-                  )}
-                </div>
-
-                <div className="mt-3 border-t border-slate-100 pt-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      <Tag size={12} /> Extra Charges
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExtraCharges([
-                          ...extraCharges,
-                          { label: "New Charge", amount: 0 },
-                        ])
-                      }
-                      className="text-[11px] font-bold text-violet-600 hover:underline"
-                    >
-                      + Add
-                    </button>
+                    {Math.abs(roundOff) >= 0.005 && (
+                      <div className="text-[11px] text-slate-500">
+                        Bill ₹
+                        {billTotalBeforeRoundOff.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                        {" · "}
+                        Round off {roundOff >= 0 ? "+" : "−"}₹
+                        {Math.abs(roundOff).toFixed(2)}
+                      </div>
+                    )}
+                    {cashbackTotal > 0 && (
+                      <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-700 ring-1 ring-inset ring-emerald-100">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold">
+                          <Tag size={12} />
+                          Cashback
+                        </span>
+                        <span className="font-bold tabular-nums">
+                          + ₹
+                          {cashbackTotal.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  {extraCharges.map((charge, idx) => (
-                    <div
-                      key={idx}
-                      className="mb-1.5 flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5"
-                    >
-                      <input
-                        type="text"
-                        value={charge.label}
-                        onChange={(e) => {
-                          const next = [...extraCharges];
-                          next[idx].label = e.target.value;
-                          setExtraCharges(next);
-                        }}
-                        className="flex-1 bg-transparent text-xs font-medium text-slate-600 outline-none"
-                      />
-                      <span className="text-xs text-slate-400">₹</span>
-                      <input
-                        type="number"
-                        value={charge.amount || ""}
-                        placeholder="0"
-                        onChange={(e) => {
-                          const next = [...extraCharges];
-                          next[idx].amount = Number(e.target.value);
-                          setExtraCharges(next);
-                        }}
-                        className="w-16 border-b border-slate-200 bg-transparent text-right text-xs font-bold outline-none focus:border-violet-600"
-                      />
+  
+                  <div className="mt-1.5 border-t border-slate-100 pt-1.5">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        <Tag size={12} /> Extra Charges
+                      </span>
                       <button
                         type="button"
-                        onClick={() => {
-                          const next = [...extraCharges];
-                          next.splice(idx, 1);
-                          setExtraCharges(next);
-                        }}
-                        className="text-slate-300 hover:text-red-500"
+                        onClick={() =>
+                          setExtraCharges([
+                            ...extraCharges,
+                            { label: "New Charge", amount: 0 },
+                          ])
+                        }
+                        className="text-[11px] font-bold text-violet-600 hover:underline"
                       >
-                        ×
+                        + Add
                       </button>
                     </div>
-                  ))}
+                    {extraCharges.map((charge, idx) => (
+                      <div
+                        key={idx}
+                        className="mb-1 flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1"
+                      >
+                        <input
+                          type="text"
+                          value={charge.label}
+                          onChange={(e) => {
+                            const next = [...extraCharges];
+                            next[idx].label = e.target.value;
+                            setExtraCharges(next);
+                          }}
+                          className="flex-1 bg-transparent text-xs font-medium text-slate-600 outline-none"
+                        />
+                        <span className="text-xs text-slate-400">₹</span>
+                        <input
+                          type="number"
+                          value={charge.amount || ""}
+                          placeholder="0"
+                          onChange={(e) => {
+                            const next = [...extraCharges];
+                            next[idx].amount = Number(e.target.value);
+                            setExtraCharges(next);
+                          }}
+                          className="w-16 border-b border-slate-200 bg-transparent text-right text-xs font-bold outline-none focus:border-violet-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = [...extraCharges];
+                            next.splice(idx, 1);
+                            setExtraCharges(next);
+                          }}
+                          className="text-slate-300 hover:text-red-500"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
+
             </div>
 
             <aside className="hidden h-[min(52dvh,440px)] min-h-[260px] overflow-hidden lg:sticky lg:top-0 lg:block lg:h-[70vh]">

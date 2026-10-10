@@ -81,6 +81,17 @@ function resolvePaidAmount(inv) {
   );
 }
 
+/** Bill total vs. what has actually been collected so far (partial / due invoices). */
+function resolveSettlement(inv) {
+  const grandTotal = toNum(inv.grandTotal) || resolvePaidAmount(inv);
+  const pendingAmount = Math.max(
+    0,
+    Math.round(toNum(inv.pendingAmount ?? inv.paymentBreakdown?.dueAmount) * 100) / 100,
+  );
+  const amountPaid = Math.max(0, Math.round((grandTotal - pendingAmount) * 100) / 100);
+  return {grandTotal, pendingAmount, amountPaid};
+}
+
 function resolveBenefitBreakdown(inv) {
   const discountAmount = toNum(inv.discountTotal);
   const cashbackAmount = toNum(inv.cashbackTotal);
@@ -136,11 +147,15 @@ const mapActivityListItem = inv => {
   const {discountAmount, cashbackAmount, totalBenefit} =
     resolveBenefitBreakdown(inv);
   const category = resolveCategory(items);
+  const {grandTotal, pendingAmount, amountPaid} = resolveSettlement(inv);
 
   return {
     invoiceId: String(inv._id),
     invoiceNumber: inv.invoiceCode || '',
     createdAt: inv.createdAt,
+    grandTotal,
+    amountPaid,
+    pendingAmount,
     billedBy: resolveBilledBy(inv),
     /** Bill value before benefits (shown as PAID column in design) */
     subTotal,
@@ -168,10 +183,13 @@ const mapActivityDetail = inv => {
   const totalPaid = toNum(inv.grandTotal) || resolvePaidAmount(inv);
   const {discountAmount, cashbackAmount, totalBenefit} =
     resolveBenefitBreakdown(inv);
+  const {grandTotal, amountPaid} = resolveSettlement(inv);
 
   return {
     invoiceId: String(inv._id),
     invoiceNumber: inv.invoiceCode || '',
+    grandTotal,
+    amountPaid,
     itemCount,
     category: resolveCategory(items),
     dateTime: inv.createdAt,

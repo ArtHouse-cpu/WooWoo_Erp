@@ -9,8 +9,13 @@ import {
   Loader2,
 } from "lucide-react";
 import Swal from "sweetalert2";
-import { handleUpdateInvoice } from "@/services/apiClient";
+import {
+  handleGetWalletById,
+  handleGetWallets,
+  handleUpdateInvoice,
+} from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
+import { resolveWalletBalance } from "@/utils/resolveWalletBalance";
 import { nearestRupee, roundPayable } from "@/features/sales/utils/paymentRoundOff";
 
 type SplitKey = "cash" | "upi" | "card" | "wallet";
@@ -64,6 +69,62 @@ export default function DuePaymentModal({
     setSplitPayments(EMPTY_SPLIT);
     setLoading(false);
   }, [open, invoice]);
+
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [loadingWallet, setLoadingWallet] = useState(false);
+  const rawCustomerId = invoice?.raw?.customerId;
+  const walletCustomerId = String(
+    (typeof rawCustomerId === "object" ? rawCustomerId?._id : rawCustomerId) ?? "",
+  ).trim();
+  const walletPhone = String(
+    invoice?.raw?.customerPhone ?? invoice?.customerPhone ?? "",
+  ).trim();
+
+  useEffect(() => {
+    if (!open || (!walletCustomerId && !walletPhone)) {
+      setWalletBalance(null);
+      return;
+    }
+    const controller = new AbortController();
+    setLoadingWallet(true);
+    void (async () => {
+      let amount: number | null = null;
+      try {
+        if (walletCustomerId) {
+          try {
+            const res = await handleGetWalletById(walletCustomerId, controller.signal);
+            const wallet = res?.wallet ?? res?.data ?? res ?? null;
+            if (wallet && typeof wallet === "object") amount = resolveWalletBalance(wallet, 0);
+          } catch {
+            // fall back to phone search
+          }
+        }
+        if ((amount === null || amount <= 0) && walletPhone) {
+          const res = await handleGetWallets({ search: walletPhone, limit: 5 }, controller.signal);
+          const items: Array<
+            Record<string, unknown> & { customer?: { mobile?: string } }
+          > = Array.isArray(res?.wallets)
+            ? res.wallets
+            : Array.isArray(res?.data)
+              ? res.data
+              : [];
+          const match = items.find(
+            (w) =>
+              (walletCustomerId && String(w?.customerId ?? "") === walletCustomerId) ||
+              String(w?.customerPhone ?? "").trim() === walletPhone ||
+              String(w?.customer?.mobile ?? "").trim() === walletPhone,
+          );
+          if (match) amount = resolveWalletBalance(match, 0);
+        }
+        if (!controller.signal.aborted) setWalletBalance(amount ?? 0);
+      } catch {
+        if (!controller.signal.aborted) setWalletBalance(null);
+      } finally {
+        if (!controller.signal.aborted) setLoadingWallet(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [open, walletCustomerId, walletPhone]);
 
   const splitTotal = useMemo(
     () =>
@@ -262,6 +323,19 @@ export default function DuePaymentModal({
                 Bill: {invoice.bill}
                 {invoice.customer ? ` · ${invoice.customer}` : ""}
               </p>
+              {(walletCustomerId || walletPhone) && (
+                <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                  <Wallet size={13} className="shrink-0" />
+                  Wallet Balance:
+                  {loadingWallet ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : walletBalance === null ? (
+                    <span className="font-medium text-amber-600/70">Unavailable</span>
+                  ) : (
+                    <span className="tabular-nums">{formatInr(walletBalance)}</span>
+                  )}
+                </span>
+              )}
             </div>
             <button
               type="button"
@@ -456,6 +530,11 @@ export default function DuePaymentModal({
                               >
                                 {mode.id}
                               </span>
+                              {mode.id === "Wallet" && walletBalance !== null && !loadingWallet && (
+                                <span className="text-[10px] font-semibold tabular-nums text-amber-600">
+                                  {formatInr(walletBalance)}
+                                </span>
+                              )}
                             </button>
                           );
                         })}
@@ -474,8 +553,13 @@ export default function DuePaymentModal({
                         ] as const
                       ).map(([key, label]) => (
                         <div key={key}>
-                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          <label className="mb-1 flex items-center justify-between gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                             {label}
+                            {key === "wallet" && walletBalance !== null && !loadingWallet && (
+                              <span className="normal-case tracking-normal text-amber-600 tabular-nums">
+                                Bal {formatInr(walletBalance)}
+                              </span>
+                            )}
                           </label>
                           <div className="relative">
                             <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">

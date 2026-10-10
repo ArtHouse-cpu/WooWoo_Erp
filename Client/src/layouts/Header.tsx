@@ -120,8 +120,8 @@ export default function Header({
 
   return (
     <>
-    <header className="flex w-full max-w-[100vw] items-center justify-end gap-2 border-b border-gray-200 bg-white px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5 md:justify-between md:px-6">
-      <div className="hidden min-w-0 flex-1 items-center gap-1.5 sm:gap-3 md:flex md:gap-4">
+    <header className="flex w-full max-w-[100vw] items-center justify-between gap-2 border-b border-gray-200 bg-white px-2.5 py-2 sm:gap-3 sm:px-4 sm:py-2.5 md:px-6">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3 md:gap-4">
         {showMenuButton ? (
           <button
             type="button"
@@ -136,11 +136,11 @@ export default function Header({
         <img
           src={activeLogo}
           alt="logo"
-          className="h-8 w-8 shrink-0 rounded-full border border-gray-100 object-cover shadow-sm sm:h-10 sm:w-10"
+          className="hidden h-10 w-10 shrink-0 rounded-full border border-gray-100 object-cover shadow-sm md:block"
         />
 
         <div
-          className="group flex min-w-0 cursor-pointer flex-col leading-tight"
+          className="group hidden min-w-0 cursor-pointer flex-col leading-tight md:flex"
           onClick={() => setIsCompanyModalOpen(true)}
         >
           <div className="flex min-w-0 items-center gap-1 sm:gap-2">
@@ -186,42 +186,42 @@ export default function Header({
           <button
             type="button"
             onClick={() => setIsPosOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 md:px-4 md:py-2 md:text-sm"
+            className="hidden items-center gap-2 rounded-xl bg-blue-50 p-2.5 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3.5 sm:py-2 md:inline-flex md:px-5 md:py-2.5 md:text-[13px]"
             aria-label="POS Bill"
             title="POS Bill"
           >
-            <FilePlus2 size={16} />
+            <FilePlus2 size={19} />
             <span className="hidden md:inline">POS BILL</span>
           </button>
         )}
         <button
           type="button"
           onClick={() => setIsCreateLeadOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 md:px-4 md:py-2 md:text-sm"
+          className="hidden items-center gap-2 rounded-xl bg-blue-50 p-2.5 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3.5 sm:py-2 md:inline-flex md:px-5 md:py-2.5 md:text-[13px]"
           aria-label="Create Lead"
           title="Create Lead"
         >
-          <UserPlus size={16} />
+          <UserPlus size={19} />
           <span className="hidden md:inline">Create Lead</span>
         </button>
         <button
           type="button"
           onClick={handleOpenAddBooking}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 md:px-4 md:py-2 md:text-sm"
+          className="hidden items-center gap-2 rounded-xl bg-blue-50 p-2.5 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3.5 sm:py-2 md:inline-flex md:px-5 md:py-2.5 md:text-[13px]"
           aria-label="+ Add Booking"
           title="+ Add Booking"
         >
-          <CalendarPlus size={16} />
+          <CalendarPlus size={19} />
           <span className="hidden md:inline">+ Add Booking</span>
         </button>
         <button
           type="button"
           onClick={() => setOpenCreateSubscriptionModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 p-2 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3 sm:py-1.5 md:px-4 md:py-2 md:text-sm"
+          className="hidden items-center gap-2 rounded-xl bg-blue-50 p-2.5 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3.5 sm:py-2 md:inline-flex md:px-5 md:py-2.5 md:text-[13px]"
           aria-label="Membership"
           title="Activate Membership"
         >
-          <Crown size={16} />
+          <Crown size={19} />
           <span className="hidden lg:inline">Activate Membership</span>
         </button>
 
@@ -275,22 +275,47 @@ export default function Header({
     </header>
 
     <nav
-      aria-label="Mobile navigation"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white/95 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-4px_20px_rgba(15,23,42,0.06)] backdrop-blur-md md:hidden"
+      aria-label="Quick actions"
+      className="fixed inset-x-0 bottom-0 z-50 flex gap-2 border-t border-gray-200 bg-white px-2 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(15,23,42,0.06)] md:hidden"
     >
-      <div className="flex h-14 items-stretch justify-between px-6">
-        {showMenuButton ? (
+      {[
+        hasQuickBillAccess && {
+          label: "POS Bill",
+          Icon: FilePlus2,
+          onClick: () => setIsPosOpen(true),
+          tone: "from-blue-500 to-indigo-600 shadow-blue-500/30",
+        },
+        {
+          label: "Create Lead",
+          Icon: UserPlus,
+          onClick: () => setIsCreateLeadOpen(true),
+          tone: "from-emerald-500 to-teal-600 shadow-emerald-500/30",
+        },
+        {
+          label: "Add Booking",
+          Icon: CalendarPlus,
+          onClick: handleOpenAddBooking,
+          tone: "from-violet-500 to-fuchsia-600 shadow-violet-500/30",
+        },
+        {
+          label: "Membership",
+          Icon: Crown,
+          onClick: () => setOpenCreateSubscriptionModal(true),
+          tone: "from-amber-400 to-orange-500 shadow-amber-500/30",
+        },
+      ]
+        .filter((item): item is Exclude<typeof item, false> => Boolean(item))
+        .map(({ label, Icon, onClick, tone }) => (
           <button
+            key={label}
             type="button"
-            onClick={onMenuClick}
-            className="flex min-w-16 flex-col items-center justify-center gap-0.5 text-gray-700 transition active:scale-95"
-            aria-label="Open navigation menu"
+            onClick={onClick}
+            className={`flex h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl bg-linear-to-br px-1 text-[10px] font-semibold text-white shadow-md transition active:scale-95 active:brightness-95 ${tone}`}
           >
-            <Menu size={22} />
-            <span className="text-[11px] font-medium">Menu</span>
+            <Icon size={18} />
+            <span className="max-w-full truncate">{label}</span>
           </button>
-        ) : null}
-      </div>
+        ))}
     </nav>
     </>
   );
