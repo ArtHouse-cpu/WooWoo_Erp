@@ -577,6 +577,9 @@ export default function CreatePosScreen({
           discount,
           cashback: item.isCsp ? 0 : Math.max(0, Number(item.cashback || 0)),
           category: item.category || "General",
+          isCsp: Boolean(item.isCsp),
+          productDiscountAmount: productOnly,
+          membershipDiscountAmount: waiveMembership ? 0 : membershipOnly,
         };
       });
       const lineDiscountTotal = lineItems.reduce(

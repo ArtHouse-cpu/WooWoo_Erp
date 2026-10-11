@@ -124,6 +124,11 @@ export type CreateInvoiceItemPayload = {
   unitPrice: number;
   discount: number;
   category?: string;
+  cashback?: number;
+  isCsp?: boolean;
+  productDiscountAmount?: number;
+  /** Already applied on this line. Edit must not add it again. */
+  membershipDiscountAmount?: number;
 };
 
 export type CreateInvoicePayload = {

@@ -31,8 +31,10 @@ import {
 } from "../utils/resolveBilledBy";
 import {
   calcStackedLineBenefits,
+  distributeSavedMembershipDiscount,
   membershipBenefitsForLine,
   resolveMembershipPlan,
+  scaleLineDiscount,
   toMembershipPlanId,
 } from "../utils/membershipInvoiceUtils";
 import { creditWalletCashback } from "../utils/walletCashback";
@@ -167,28 +169,34 @@ export default function CreateInvoiceScreen({
         resolveBilledBy(inv) || String(inv.salesPersonName ?? "").trim(),
       );
       if (Array.isArray(inv.items)) {
+        const loadedItems = inv.items.map((item: any, idx: number) => ({
+          id: idx + 1,
+          productName: item.productName || "",
+          qty: item.qty || 1,
+          unitPrice: item.unitPrice || 0,
+          discount: item.discount || 0,
+          cashback: item.isCsp ? 0 : item.cashback || 0,
+          image: item.image || item.imageUrl || "",
+          category: item.category || "General",
+          isCsp: Boolean(item.isCsp),
+          cspLabel: item.cspLabel || (item.isCsp ? "CSP" : null),
+          productDiscountType: item.productDiscountType,
+          productDiscountValue: item.productDiscountValue,
+          productDiscountAmount: Number(item.productDiscountAmount ?? 0),
+          membershipDiscountAmount: Number(
+            item.membershipDiscountAmount ?? 0,
+          ),
+          returnedQty: Number(item.returnedQty ?? 0) || 0,
+          lineTotal: Number(item.lineTotal ?? 0) || 0,
+          isGift: Boolean(item.isGift),
+        }));
+        // Membership is already inside each line discount. Record that split
+        // so checkout does not subtract the same membership discount again.
         setItems(
-          inv.items.map((item: any, idx: number) => ({
-            id: idx + 1,
-            productName: item.productName || "",
-            qty: item.qty || 1,
-            unitPrice: item.unitPrice || 0,
-            discount: item.discount || 0,
-            cashback: item.isCsp ? 0 : item.cashback || 0,
-            image: item.image || item.imageUrl || "",
-            category: item.category || "General",
-            isCsp: Boolean(item.isCsp),
-            cspLabel: item.cspLabel || (item.isCsp ? "CSP" : null),
-            productDiscountType: item.productDiscountType,
-            productDiscountValue: item.productDiscountValue,
-            productDiscountAmount: Number(item.productDiscountAmount ?? 0),
-            membershipDiscountAmount: Number(
-              item.membershipDiscountAmount ?? 0,
-            ),
-            returnedQty: Number(item.returnedQty ?? 0) || 0,
-            lineTotal: Number(item.lineTotal ?? 0) || 0,
-            isGift: Boolean(item.isGift),
-          })),
+          distributeSavedMembershipDiscount(
+            loadedItems,
+            Number(inv.membershipDiscount) || 0,
+          ),
         );
       }
       if (inv.extraCharges) setExtraCharges(inv.extraCharges);
@@ -403,6 +411,29 @@ export default function CreateInvoiceScreen({
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
+        // Edit keeps the discount already on the bill. Do not re-price membership.
+        if (mode === "edit") {
+          return {
+            ...item,
+            qty: newQty,
+            discount: scaleLineDiscount(item.discount, item.qty, newQty),
+            cashback: item.isCsp
+              ? 0
+              : scaleLineDiscount(item.cashback || 0, item.qty, newQty),
+            productDiscountAmount: scaleLineDiscount(
+              Number(item.productDiscountAmount ?? 0),
+              item.qty,
+              newQty,
+            ),
+            membershipDiscountAmount: item.isCsp
+              ? 0
+              : scaleLineDiscount(
+                  Number(item.membershipDiscountAmount ?? 0),
+                  item.qty,
+                  newQty,
+                ),
+          };
+        }
         const plan = resolveMembershipPlan(
           membershipPlans,
           membership,
@@ -713,6 +744,9 @@ export default function CreateInvoiceScreen({
           discount,
           cashback: item.isCsp ? 0 : Math.max(0, Number(item.cashback || 0)),
           category: item.category || "General",
+          isCsp: Boolean(item.isCsp),
+          productDiscountAmount: productOnly,
+          membershipDiscountAmount: waiveMembership ? 0 : membershipOnly,
         };
       });
       const lineDiscountTotal = lineItems.reduce(
@@ -753,6 +787,11 @@ export default function CreateInvoiceScreen({
           paymentStatus: payment.paymentStatus,
           paymentBreakdown: payment.paymentBreakdown,
           pendingAmount: payment.paymentBreakdown.dueAmount,
+          cashbackTotal: payment.cashbackTotal,
+          membershipDiscount: waiveMembership
+            ? 0
+            : Math.max(0, Number(payment.membershipDiscount) || 0),
+          membershipType: membership || undefined,
         });
 
         await creditCashbackForInvoice(
@@ -967,6 +1006,9 @@ export default function CreateInvoiceScreen({
               setCustomers([]);
               setCustomerDropdownOpen(false);
 
+              // Existing bill already has membership inside line discounts.
+              if (mode === "edit") return;
+
               // Stack product catalogue discount + membership category discount
               setItems((prev) =>
                 prev.map((item) => {
@@ -1172,7 +1214,14 @@ export default function CreateInvoiceScreen({
           initialCustomerId={customerId}
           initialMembership={membership}
           initialMembershipPlanId={membershipPlanId}
-          initialMembershipDiscount={membershipDiscountTotal}
+          initialMembershipDiscount={
+            mode === "edit"
+              ? membershipDiscountTotal > 0
+                ? membershipDiscountTotal
+                : Math.max(0, viewMembershipDiscount ?? 0)
+              : membershipDiscountTotal
+          }
+          lockMembershipDiscount={mode === "edit"}
           initialProductDiscount={productDiscountTotal}
           initialCashbackTotal={cashbackTotal}
           extraCharges={extraCharges}

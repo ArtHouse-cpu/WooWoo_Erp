@@ -334,6 +334,99 @@ export function calcStackedLineBenefits(params: {
   };
 }
 
+function roundMoney(value: number): number {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+/**
+ * Saved invoices store membership inside line `discount` and on
+ * `membershipDiscount`. Line split fields are often missing, so checkout
+ * would calculate the plan discount again and subtract it a second time.
+ * Copy the already-applied header amount onto lines without changing `discount`.
+ */
+export function distributeSavedMembershipDiscount<
+  T extends {
+    qty: number;
+    unitPrice: number;
+    discount: number;
+    isCsp?: boolean;
+    isGift?: boolean;
+    membershipDiscountAmount?: number;
+    productDiscountAmount?: number;
+  },
+>(items: T[], headerMembershipDiscount: number): T[] {
+  const existing = items.reduce(
+    (sum, item) =>
+      sum +
+      (item.isCsp
+        ? 0
+        : Math.max(0, Number(item.membershipDiscountAmount ?? 0))),
+    0,
+  );
+  if (existing > 0.009) return items;
+
+  const header = roundMoney(Math.max(0, Number(headerMembershipDiscount) || 0));
+  if (header <= 0) return items;
+
+  const eligible = items
+    .map((item, index) => ({ item, index }))
+    .filter(
+      ({ item }) =>
+        !item.isCsp &&
+        !item.isGift &&
+        Number(item.discount) > 0 &&
+        Number(item.qty) * Number(item.unitPrice) > 0,
+    );
+  const weightSum = eligible.reduce(
+    (sum, { item }) => sum + Number(item.qty) * Number(item.unitPrice),
+    0,
+  );
+  if (weightSum <= 0 || eligible.length === 0) return items;
+
+  let remaining = header;
+  const shares = new Map<number, number>();
+  eligible.forEach(({ item, index }, slot) => {
+    const isLast = slot === eligible.length - 1;
+    const raw = isLast
+      ? remaining
+      : roundMoney(
+          (header * Number(item.qty) * Number(item.unitPrice)) / weightSum,
+        );
+    const share = Math.min(
+      Math.max(0, Number(item.discount) || 0),
+      Math.max(0, raw),
+    );
+    shares.set(index, share);
+    remaining = roundMoney(remaining - share);
+  });
+
+  return items.map((item, index) => {
+    if (!shares.has(index)) return item;
+    const membershipDiscountAmount = shares.get(index) ?? 0;
+    const productFromDiscount = roundMoney(
+      Math.max(0, Number(item.discount) - membershipDiscountAmount),
+    );
+    const storedProduct = Math.max(0, Number(item.productDiscountAmount ?? 0));
+    return {
+      ...item,
+      membershipDiscountAmount,
+      productDiscountAmount: storedProduct > 0 ? storedProduct : productFromDiscount,
+    };
+  });
+}
+
+/** Keep an already-applied line discount when quantity changes (do not re-price membership). */
+export function scaleLineDiscount(
+  amount: number,
+  fromQty: number,
+  toQty: number,
+): number {
+  const from = Number(fromQty) || 0;
+  const to = Number(toQty) || 0;
+  if (from <= 0 || to <= 0) return 0;
+  return roundMoney((Math.max(0, Number(amount) || 0) * to) / from);
+}
+
 export function summarizeMembershipForCart(
   plans: MembershipPlanPayload[],
   membershipType: string,

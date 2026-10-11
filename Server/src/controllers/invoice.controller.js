@@ -485,6 +485,43 @@ const applyCouponUsageDelta = async ({ code, delta }) => {
   );
 };
 
+/** Keep product vs membership split on the line. Membership is already inside `discount`. */
+const normalizeInvoiceItem = (item, previous = {}) => {
+  const qty = Number(item.qty);
+  const unitPrice = Number(item.unitPrice);
+  const discount = Math.max(0, Number(item.discount ?? 0) || 0);
+  const lineTotal = qty * unitPrice - discount;
+  const isCsp = Boolean(item.isCsp || previous.isCsp);
+  const cashback = isCsp
+    ? 0
+    : Math.max(0, Number(item.cashback ?? previous.cashback ?? 0) || 0);
+  const membershipDiscountAmount = isCsp
+    ? 0
+    : Math.max(
+        0,
+        Number(
+          item.membershipDiscountAmount ?? previous.membershipDiscountAmount ?? 0,
+        ) || 0,
+      );
+  const productDiscountAmount = Math.max(
+    0,
+    Number(item.productDiscountAmount ?? previous.productDiscountAmount ?? 0) || 0,
+  );
+  return {
+    productName: String(item.productName ?? '').trim(),
+    qty,
+    unitPrice,
+    discount,
+    lineTotal,
+    cashback,
+    productDiscountAmount,
+    membershipDiscountAmount,
+    category: normalizeLineType(item.category || item.lineCategory || 'product'),
+    returnedQty: Math.max(0, Number(previous.returnedQty) || 0),
+    isGift: Boolean(previous.isGift || item.isGift),
+  };
+};
+
 const createInvoice = async (req, res) => {
   try {
     const {
@@ -553,22 +590,9 @@ const createInvoice = async (req, res) => {
       });
     }
 
-    const normalizedItems = items.map(item => {
-      const qty = Number(item.qty);
-      const unitPrice = Number(item.unitPrice);
-      const discount = Number(item.discount ?? 0);
-      const lineTotal = qty * unitPrice - discount;
-      const cashback = Math.max(0, Number(item.cashback ?? 0) || 0);
-      return {
-        productName: String(item.productName ?? '').trim(),
-        qty,
-        unitPrice,
-        discount,
-        lineTotal,
-        cashback,
-        category: normalizeLineType(item.category || item.lineCategory || 'product'),
-      };
-    });
+    const normalizedItems = items.map(item =>
+      normalizeInvoiceItem(item),
+    );
 
     if (normalizedItems.some(item => !item.productName || item.qty <= 0 || item.unitPrice < 0 || item.discount < 0 || item.lineTotal < 0)) {
       return res.status(400).json({
@@ -1171,28 +1195,8 @@ const updateInvoice = async (req, res) => {
     if (items && Array.isArray(items)) {
       const existingItems = Array.isArray(existingInvoice.items) ? existingInvoice.items : [];
       normalizedItems = items.map((item, idx) => {
-        const qty = Number(item.qty);
-        const unitPrice = Number(item.unitPrice);
-        const discount = Number(item.discount ?? 0);
-        const lineTotal = qty * unitPrice - discount;
         const previous = existingItems[idx] || {};
-        const cashback = Math.max(
-          0,
-          Number(
-            item.cashback ?? previous.cashback ?? 0,
-          ) || 0,
-        );
-        return {
-          productName: String(item.productName ?? '').trim(),
-          qty,
-          unitPrice,
-          discount,
-          lineTotal,
-          cashback,
-          category: normalizeLineType(item.category || item.lineCategory || 'product'),
-          returnedQty: Math.max(0, Number(previous.returnedQty) || 0),
-          isGift: Boolean(previous.isGift || item.isGift),
-        };
+        return normalizeInvoiceItem(item, previous);
       });
     }
 

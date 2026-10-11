@@ -1524,7 +1524,11 @@ export default function FoodBill() {
           // Cap so line discount never exceeds line gross
           last.discount = Math.min(last.discount, last.lineGross);
         }
-        return lines.map(({ lineGross: _g, ...item }) => item);
+        return lines.map(({ lineGross: _g, ...item }) => ({
+          ...item,
+          productDiscountAmount: 0,
+          membershipDiscountAmount: item.discount,
+        }));
       })();
 
       const mode = isMultiMode ? "MULTI" : toInvoicePaymentMode(paymentMethod);

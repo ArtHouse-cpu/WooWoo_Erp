@@ -74,6 +74,18 @@ const invoiceItemSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    /** Catalogue product discount ₹ already inside `discount`. */
+    productDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    /** Membership discount ₹ already inside `discount` (do not apply again on edit). */
+    membershipDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     /** Accumulated qty already returned against this line */
     returnedQty: {
       type: Number,
