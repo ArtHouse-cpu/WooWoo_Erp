@@ -326,6 +326,8 @@ const SpaceBook = () => {
     }
   }, [searchParams, setSearchParams]);
 
+  const [bookingsLoaded, setBookingsLoaded] = useState(false);
+
   /** Pending booking details waiting for CheckoutModal payment. */
   const [pendingCheckout, setPendingCheckout] =
     useState<BookingFormPayload | null>(null);
@@ -348,6 +350,7 @@ const SpaceBook = () => {
       setData([]);
       toast.error(apiErrorMessage(err, "Failed to load space bookings."));
     } finally {
+      if (!signal?.aborted) setBookingsLoaded(true);
       setLoading(false);
     }
   }, []);
@@ -357,6 +360,26 @@ const SpaceBook = () => {
     void fetchBookings(controller.signal);
     return () => controller.abort();
   }, [fetchBookings]);
+
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || !bookingsLoaded || loading) return;
+    const found = data.find((booking) => bookingId(booking) === editId);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("edit");
+        return next;
+      },
+      { replace: true },
+    );
+    if (found) {
+      setIsCreateModalOpen(false);
+      setEditingBooking(found);
+      return;
+    }
+    toast.error("That space booking could not be opened for editing.");
+  }, [searchParams, bookingsLoaded, loading, data, setSearchParams]);
 
   const metrics = useMemo(() => {
     const total = data.length;

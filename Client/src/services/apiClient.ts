@@ -2005,6 +2005,127 @@ export type SpaceBookingPayload = {
   updatedAt?: string;
 };
 
+export type AllBookingLine = {
+  refId?: string;
+  label: string;
+  price: number;
+  qty: number;
+  unit?: string;
+  category?: string;
+};
+
+export type AllBookingRow = {
+  id: string;
+  sourceId: string;
+  bookingCode: string;
+  customerId?: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  customer?: {
+    id?: string;
+    name?: string;
+    phone?: string;
+    email?: string;
+    membershipType?: string;
+  } | null;
+  spaceId?: string;
+  spaceDetails?: string;
+  spaceName?: string;
+  spaceType?: string;
+  spaceDay?: string;
+  unitPrice?: number;
+  spaceQty?: number;
+  durationHours?: number;
+  bookingDate?: string | null;
+  startTime?: string;
+  endTime?: string;
+  timeLabel?: string;
+  services?: AllBookingLine[];
+  foods?: AllBookingLine[];
+  serviceDetails?: string;
+  foodDetails?: string;
+  membershipType?: string;
+  membershipDiscount?: number;
+  cashbackTotal?: number;
+  subTotal?: number;
+  grandTotal?: number;
+  status?: string;
+  notes?: string;
+  paymentStatus?: string;
+  createdAt?: string | null;
+};
+
+export type AllBookingWritePayload = {
+  customerName: string;
+  customerPhone: string;
+  customerId?: string | null;
+  spaceId?: string | null;
+  bookingDate?: string;
+  startTime?: string;
+  endTime?: string;
+  spaceQty?: number;
+  services?: Array<{ refId?: string; label?: string; qty: number }>;
+  foods?: Array<{ foodId?: string; refId?: string; qty: number }>;
+  status?: string;
+  notes?: string;
+};
+
+export const handleGetAllBookings = async (
+  params?: {
+    search?: string;
+    includes?: "All" | "Space" | "Services" | "Food";
+    status?: string;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  },
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/all-booking", {
+    params: {
+      search: params?.search?.trim() ?? "",
+      includes: params?.includes ?? "All",
+      status: params?.status ?? "All",
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 20,
+      ...(params?.fromDate ? { fromDate: params.fromDate } : {}),
+      ...(params?.toDate ? { toDate: params.toDate } : {}),
+    },
+    signal,
+  });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    bookings?: AllBookingRow[];
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
+  };
+};
+
+export const handleCreateAllBooking = async (payload: AllBookingWritePayload) => {
+  const response = await axiosInstance.post("/all-booking", payload);
+  return response.data as { success: boolean; message?: string; booking?: AllBookingRow };
+};
+
+export const handleUpdateAllBooking = async (
+  id: string,
+  payload: AllBookingWritePayload,
+) => {
+  const response = await axiosInstance.patch(`/all-booking/${id}`, payload);
+  return response.data as { success: boolean; message?: string; booking?: AllBookingRow };
+};
+
+export const handleDeleteAllBooking = async (id: string) => {
+  const response = await axiosInstance.delete(`/all-booking/${id}`);
+  return response.data as { success: boolean; message?: string };
+};
+
 export const handleGetSpaceBookings = async (
   params?: {
     search?: string;

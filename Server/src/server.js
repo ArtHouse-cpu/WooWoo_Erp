@@ -45,6 +45,7 @@ import additionalServiceRoutes from './routes/additionalService.route.js';
 import publicGiftCardRoutes from './routes/publicGiftCard.route.js';
 import exhibitionRoutes from './routes/exhibition.routes.js';
 import publicExhibitionRoutes from './routes/publicExhibition.route.js';
+import allBookingRoutes from './routes/allBooking.route.js';
 // import activityRoutes from './routes/activity.route.js';
 
 // Load environment variables
@@ -108,6 +109,7 @@ app.use('/subscriptions', subscriptionRoutes);
 app.use('/membership', membershipRoutes);
 app.use('/space', spaceRoutes);
 app.use('/space-bookings', spaceBookingRoutes);
+app.use('/all-booking',allBookingRoutes);
 app.use('/food', foodRoutes);
 app.use('/catalogue', catalogueRoutes);
 app.use('/purchase', purchaseRoutes);
@@ -138,7 +140,7 @@ app.use('/api/expences', expenceRoutes);
 app.use('/api/expences/category', expenceCategoryRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/api/commission',staffCommissionRoutes);
-app.use('/api/lead',leadRouters)
+app.use('/api/lead',leadRouters);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

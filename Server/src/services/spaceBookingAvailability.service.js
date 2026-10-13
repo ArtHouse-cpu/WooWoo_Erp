@@ -1,6 +1,7 @@
 import {randomUUID} from 'crypto';
 import mongoose from 'mongoose';
 import SpaceBooking from '../models/spaceBooking.model.js';
+import AllBooking from '../models/allBooking.model.js';
 import Space, {COWORKING_CATEGORIES} from '../models/space.model.js';
 import SpaceBookingLock from '../models/spaceBookingLock.model.js';
 
@@ -269,8 +270,23 @@ export const findBusyIntervals = async ({spaceIds, fromKey, toKey, excludeId = n
     )
     .lean();
 
+  const combinedQuery = {
+    spaceId: {$in: spaceIds},
+    status: {$in: BLOCKING_STATUSES},
+    bookingDate: {
+      $gte: new Date(`${addDaysToKey(fromKey, -1)}T00:00:00Z`),
+      $lt: new Date(`${addDaysToKey(toKey, 2)}T00:00:00Z`),
+    },
+  };
+  if (excludeId && mongoose.Types.ObjectId.isValid(String(excludeId))) {
+    combinedQuery._id = {$ne: new mongoose.Types.ObjectId(String(excludeId))};
+  }
+  const combinedDocs = await AllBooking.find(combinedQuery)
+    .select('_id status bookingDate startTime endTime')
+    .lean();
+
   const busy = [];
-  for (const doc of docs) {
+  for (const doc of [...docs, ...combinedDocs]) {
     const {intervals} = buildBookingIntervals(doc);
     for (const iv of intervals) {
       if (iv.date < fromKey || iv.date > toKey) continue;

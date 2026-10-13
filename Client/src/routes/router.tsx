@@ -59,6 +59,7 @@ import AnnouncementScreen from "@/features/announcement/announcementScreen";
 import ExpenseScreen from "@/features/expenses/ExpenseScreen";
 import StaffCommissionScreen from "@/features/commission/StaffCommissionScreen";
 import SpaceBooking from "@/features/spacebook/SpaceBooking";
+import AllBookings from "@/features/allbookings/AllBookings";
 import GiftCard from "@/features/GiftCard/Pages/GiftCard";
 import InventorypaymentsScreen from "@/features/purchase/pages/InventorypaymentsScreen";
 import ExhibitionTable from "@/features/exhibition-table/ExhibitionTable";
@@ -136,6 +137,7 @@ export const router = createBrowserRouter([
           { path: "expenses", element: <ExpenseScreen /> },
           { path: "staffCommission", element: <StaffCommissionScreen /> },
           { path: "spaceBooking", element: <SpaceBooking /> },
+          { path: "allBookings", element: <AllBookings /> },
         ],
       },
     ],

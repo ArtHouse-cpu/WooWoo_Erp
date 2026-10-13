@@ -587,6 +587,7 @@ export const MENU_PERMISSION_MAP: Record<string, Permission | Permission[]> = {
   "/services": PERMISSIONS.SERVICE_READ,
   "/spaces": PERMISSIONS.SPACE_READ,
   "/spaceBooking": PERMISSIONS.SPACE_BOOKING_READ,
+  "/allBookings": [PERMISSIONS.SPACE_BOOKING_READ, PERMISSIONS.INVOICE_READ],
   "/foods": PERMISSIONS.FOOD_READ,
   "/manage-plans": PERMISSIONS.MEMBERSHIP_PLAN_READ,
   "/membership": PERMISSIONS.MEMBERSHIP_PLAN_READ,

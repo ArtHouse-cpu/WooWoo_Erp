@@ -31,10 +31,13 @@ import {
   Printer,
   Archive,
   Car,
+  UtensilsCrossed,
+  Download,
 } from "lucide-react";
 import Swal from "sweetalert2";
 // Optional: import jsPDF from "jspdf"; // If you want PDF download
 import { toast } from "react-toastify";
+import { downloadInvoicePdf } from "@/utils/pdfGenerator";
 import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
@@ -43,7 +46,9 @@ import {
   handleCreateCustomer,
   handleGetMemberships,
   handleGetAdditionalServices,
+  handleGetFoods,
   type AdditionalServiceItem,
+  type FoodPayload,
   customerPayloadToFormData,
   type CustomerPayload,
   type SpaceBookingPayload,
@@ -127,7 +132,16 @@ export type BookingFormPayload = {
   discountAmount?: number;
   cashbackAmount?: number;
   selectedServices?: SelectedServiceItem[];
+  foods?: SelectedFoodItem[];
   summarySnapshot?: any;
+};
+
+export type SelectedFoodItem = {
+  foodId: string;
+  label: string;
+  price: number;
+  qty: number;
+  unit?: string;
 };
 
 type CreateBookingDetailsModalProps = {
@@ -641,6 +655,10 @@ const CreateBookingDetailsModal = ({
     eventCoordinator: 0,
   });
 
+  const [foodCatalog, setFoodCatalog] = useState<FoodPayload[]>([]);
+  const [foodQty, setFoodQty] = useState<Record<string, number>>({});
+  const [foodSearch, setFoodSearch] = useState("");
+
   // Dynamic Additional Services from API / Local Store
   const [dynamicAdditionalServices, setDynamicAdditionalServices] = useState<
     AdditionalServiceItem[]
@@ -656,6 +674,17 @@ const CreateBookingDetailsModal = ({
         }
       })
       .catch(() => {});
+    return () => controller.abort();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const controller = new AbortController();
+    handleGetFoods({ status: "Active" }, controller.signal)
+      .then((res) => {
+        setFoodCatalog(Array.isArray(res?.foods) ? res.foods : []);
+      })
+      .catch(() => undefined);
     return () => controller.abort();
   }, [isOpen]);
 
@@ -855,6 +884,16 @@ const CreateBookingDetailsModal = ({
           setExclusiveServices((prev) => ({ ...prev, ...ex }));
         }
       }
+      const savedFoods = Array.isArray(snap?.foods)
+        ? snap.foods
+        : Array.isArray((initialBooking as { foods?: SelectedFoodItem[] }).foods)
+          ? (initialBooking as { foods?: SelectedFoodItem[] }).foods
+          : [];
+      const nextFoodQty: Record<string, number> = {};
+      savedFoods.forEach((food: SelectedFoodItem) => {
+        if (food?.foodId) nextFoodQty[String(food.foodId)] = Number(food.qty) || 0;
+      });
+      setFoodQty(nextFoodQty);
       if (snap?.purpose) {
         setPurpose(snap.purpose);
       } else if (initialBooking.notes?.includes("Purpose:")) {
@@ -994,6 +1033,8 @@ const CreateBookingDetailsModal = ({
       setSpaceQty(1);
       setPurpose("");
       setNotes("");
+      setFoodQty({});
+      setFoodSearch("");
       const todayStr = getBusinessToday();
       setBookingDate(todayStr);
       setBookingFrom("09:00");
@@ -1670,12 +1711,26 @@ const CreateBookingDetailsModal = ({
     activeExclusiveServices,
   ]);
 
+  const selectedFoodsList = useMemo<SelectedFoodItem[]>(() => {
+    return foodCatalog
+      .map((food) => ({
+        foodId: String(food._id || ""),
+        label: food.name,
+        price: Math.max(0, Number(food.price) || 0),
+        qty: foodQty[String(food._id || "")] || 0,
+        unit: food.unit || "",
+      }))
+      .filter((food) => food.foodId && food.qty > 0);
+  }, [foodCatalog, foodQty]);
+
+  const foodCharges = selectedFoodsList.reduce((sum, food) => sum + food.price * food.qty, 0);
+
   // Discount & Cashback Calculation
   const activeMembershipPlan = useMemo(() => {
     return resolveMembershipPlan(membershipPlans, membershipType, membershipPlanId);
   }, [membershipPlans, membershipType, membershipPlanId]);
 
-  const { discountAmount, cashbackAmount } = useMemo(() => {
+  const { discountAmount, cashbackAmount, pricedSubTotal } = useMemo(() => {
     const benefit = resolveBenefitPercents("space", activeMembershipPlan);
     const unitRate = Math.max(
       0,
@@ -1695,7 +1750,9 @@ const CreateBookingDetailsModal = ({
       (acc, s) => acc + s.price * s.qty,
       0,
     );
+    const foodTotal = selectedFoodsList.reduce((acc, food) => acc + food.price * food.qty, 0);
     const subTotal = baseSpaceTotal + servicesTotal;
+    const foodBenefit = resolveBenefitPercents("food", activeMembershipPlan);
 
     const discPct =
       benefit.discountPercent > 0
@@ -1710,10 +1767,10 @@ const CreateBookingDetailsModal = ({
         ? 5
         : 0;
 
-    const discount = Math.round(subTotal * (discPct / 100));
-    const cashback = Math.round(subTotal * (cashPct / 100));
+    const discount = Math.round(subTotal * (discPct / 100)) + Math.round(foodTotal * ((foodBenefit.discountPercent || 0) / 100));
+    const cashback = Math.round(subTotal * (cashPct / 100)) + Math.round(foodTotal * ((foodBenefit.cashbackPercent || 0) / 100));
 
-    return { discountAmount: discount, cashbackAmount: cashback };
+    return { discountAmount: discount, cashbackAmount: cashback, pricedSubTotal: subTotal + foodTotal };
   }, [
     activeMembershipPlan,
     membershipType,
@@ -1729,6 +1786,7 @@ const CreateBookingDetailsModal = ({
     bookingTo,
     duration,
     selectedServicesList,
+    selectedFoodsList,
   ]);
 
   const validate = () => {
@@ -1832,7 +1890,7 @@ const CreateBookingDetailsModal = ({
         )
       : unitPrice * (calcDurationHours(bookingFrom, bookingTo) || duration) * spaceQty;
 
-    const lineTotal = Math.max(0, spaceCharges + servicesTotal - discountAmount);
+    const lineTotal = Math.max(0, spaceCharges + servicesTotal + foodCharges - discountAmount);
 
     if (!isEdit && lineTotal <= 0) {
       toast.error("Booking total is ₹0. Check space price and booking duration.");
@@ -1895,11 +1953,13 @@ const CreateBookingDetailsModal = ({
       durationUnitPlural: planDurationInfo.unitPlural,
       packageMultiplier,
       selectedServices: selectedServicesList,
+      foods: selectedFoodsList,
+      foodCharges,
       coworkingServices,
       exclusiveServices,
       spaceCharges,
       servicesTotal,
-      subTotal: spaceCharges + servicesTotal,
+      subTotal: spaceCharges + servicesTotal + foodCharges,
       discountAmount,
       cashbackAmount,
       grandTotal: lineTotal,
@@ -1951,6 +2011,7 @@ const CreateBookingDetailsModal = ({
       discountAmount,
       cashbackAmount,
       selectedServices: selectedServicesList,
+      foods: selectedFoodsList,
       summarySnapshot,
     };
 
@@ -2001,7 +2062,7 @@ const CreateBookingDetailsModal = ({
         )
       : unitPrice * (calcDurationHours(bookingFrom, bookingTo) || duration) * spaceQty;
 
-    const lineTotal = Math.max(0, spaceCharges + servicesTotal - discountAmount);
+    const lineTotal = Math.max(0, spaceCharges + servicesTotal + foodCharges - discountAmount);
 
     const spaceType = selectedSpace
       ? selectedSpace.spaceType ||
@@ -2059,11 +2120,13 @@ const CreateBookingDetailsModal = ({
       durationUnitPlural: planDurationInfo.unitPlural,
       packageMultiplier,
       selectedServices: selectedServicesList,
+      foods: selectedFoodsList,
+      foodCharges,
       coworkingServices,
       exclusiveServices,
       spaceCharges,
       servicesTotal,
-      subTotal: spaceCharges + servicesTotal,
+      subTotal: spaceCharges + servicesTotal + foodCharges,
       discountAmount,
       cashbackAmount,
       grandTotal: lineTotal,
@@ -2115,6 +2178,7 @@ const CreateBookingDetailsModal = ({
       discountAmount,
       cashbackAmount,
       selectedServices: selectedServicesList,
+      foods: selectedFoodsList,
       summarySnapshot,
     };
 
@@ -3299,6 +3363,106 @@ const CreateBookingDetailsModal = ({
                     </div>
                   </div>
 
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
+                        <UtensilsCrossed size={14} />
+                      </span>
+                      <h3 className="font-bold text-slate-800 text-sm">
+                        Food{" "}
+                        <span className="font-normal text-slate-400 text-xs">
+                          (Optional)
+                        </span>
+                      </h3>
+                    </div>
+                    <input
+                      type="text"
+                      value={foodSearch}
+                      onChange={(event) => setFoodSearch(event.target.value)}
+                      placeholder="Search food"
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                    />
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+                      {foodCatalog
+                        .filter((food) => {
+                          const query = foodSearch.trim().toLowerCase();
+                          const selected = (foodQty[String(food._id || "")] || 0) > 0;
+                          if (!query) return selected || foodCatalog.indexOf(food) < 10;
+                          return String(food.name || "").toLowerCase().includes(query);
+                        })
+                        .map((food) => {
+                          const id = String(food._id || "");
+                          const qty = foodQty[id] || 0;
+                          return (
+                            <div
+                              key={id}
+                              className={`flex flex-col justify-between rounded-2xl border p-3 transition ${
+                                qty > 0
+                                  ? "border-orange-400 bg-orange-50/40 shadow-xs"
+                                  : "border-slate-200/90 bg-white hover:border-slate-300"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
+                                  <UtensilsCrossed size={16} />
+                                </div>
+                                <input
+                                  type="checkbox"
+                                  checked={qty > 0}
+                                  onChange={(event) =>
+                                    setFoodQty((prev) => ({
+                                      ...prev,
+                                      [id]: event.target.checked ? Math.max(1, prev[id] || 1) : 0,
+                                    }))
+                                  }
+                                  className="h-4 w-4 rounded accent-orange-500 cursor-pointer"
+                                />
+                              </div>
+                              <div className="my-2 min-h-[36px]">
+                                <p className="text-xs font-bold text-slate-800 leading-tight truncate" title={food.name}>
+                                  {food.name}
+                                </p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                  ₹{Number(food.price || 0).toLocaleString("en-IN")}
+                                  {food.unit ? ` / ${food.unit}` : ""}
+                                </p>
+                              </div>
+                              <div className="flex h-7 items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setFoodQty((prev) => ({
+                                      ...prev,
+                                      [id]: Math.max(0, (prev[id] || 0) - 1),
+                                    }))
+                                  }
+                                  disabled={qty <= 0}
+                                  className="flex h-full w-7 items-center justify-center border-r border-slate-100 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <div className="flex flex-1 items-center justify-center text-xs font-semibold text-slate-700">
+                                  {qty}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setFoodQty((prev) => ({
+                                      ...prev,
+                                      [id]: (prev[id] || 0) + 1,
+                                    }))
+                                  }
+                                  className="flex h-full w-7 items-center justify-center border-l border-slate-100 text-slate-600 hover:bg-slate-50 transition"
+                                >
+                                  <Plus size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+
                   {/* 5. Additional Notes (COMMON FOR ALL) */}
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
@@ -3459,6 +3623,67 @@ const CreateBookingDetailsModal = ({
                 Cancel
               </button>
 
+
+              <button
+                type="button"
+                onClick={() => {
+                  const code = `QT-${phone.replace(/\D/g, "").slice(-4) || "BOOK"}`;
+                  const items = [
+                    ...(selectedSpace
+                      ? [{
+                          productName: selectedSpace.name || "Space",
+                          qty: spaceQty,
+                          unitPrice: Number(selectedSpace.price) || 0,
+                          discount: 0,
+                          category: "space",
+                        }]
+                      : []),
+                    ...selectedServicesList.map((service) => ({
+                      productName: service.label,
+                      qty: service.qty,
+                      unitPrice: service.price,
+                      discount: 0,
+                      category: "service",
+                    })),
+                    ...selectedFoodsList.map((food) => ({
+                      productName: food.label,
+                      qty: food.qty,
+                      unitPrice: food.price,
+                      discount: 0,
+                      category: "food",
+                    })),
+                  ];
+                  if (!name.trim() || items.length === 0) {
+                    toast.warning("Add a customer and at least one space, service, or food item.");
+                    return;
+                  }
+                  void downloadInvoicePdf(
+                    {
+                      invoiceCode: code,
+                      quotationCode: code,
+                      quotationDate: bookingDate,
+                      invoiceDate: bookingDate,
+                      customerName: name.trim(),
+                      customerPhone: phone.replace(/\D/g, ""),
+                      membershipType: membershipType !== "none" ? membershipType : "",
+                      membershipDiscount: discountAmount,
+                      cashbackTotal: cashbackAmount,
+                      subTotal: pricedSubTotal,
+                      discountTotal: discountAmount,
+                      grandTotal: Math.max(0, pricedSubTotal - discountAmount),
+                      items,
+                      notes,
+                    },
+                    "QUOTATION",
+                  ).catch((err: unknown) => {
+                    toast.error(err instanceof Error ? err.message : "Could not download the quotation.");
+                  });
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:border-indigo-300 hover:bg-indigo-50 disabled:opacity-50 sm:text-sm"
+              >
+                <Download size={15} className="text-indigo-600" />
+                <span>Download Quotation</span>
+              </button>
 
               <button
                 type="button"

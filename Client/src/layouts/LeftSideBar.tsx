@@ -26,6 +26,7 @@ Sparkles ,
   BadgeIndianRupee,
   CircleDollarSign ,
   CalendarCheck,
+  ClipboardList,
   type LucideIcon,
   Megaphone,
 } from "lucide-react";
@@ -64,7 +65,8 @@ const MENU_GROUPS: MenuGroup[] = [
     label: "Booking",
     icon: BookOpenText,
     submenu: [
-      { name: "spaceBooking", label: "Space Booking", icon: CalendarCheck  , path: "/spaceBooking" }
+      { name: "spaceBooking", label: "Space Booking", icon: CalendarCheck  , path: "/spaceBooking" },
+      { name: "allBookings", label: "All Bookings", icon: ClipboardList, path: "/allBookings" },
     ],
   },
   {

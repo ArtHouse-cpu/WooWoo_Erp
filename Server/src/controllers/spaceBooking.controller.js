@@ -89,7 +89,7 @@ export const computeBookingStatus = (
   return 'Expired';
 };
 
-const syncBookingStatuses = async () => {
+export const syncBookingStatuses = async () => {
   try {
     const now = new Date();
     const activeBookings = await SpaceBooking.find({
