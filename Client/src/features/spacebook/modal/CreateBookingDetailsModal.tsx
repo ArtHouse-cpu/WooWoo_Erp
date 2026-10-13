@@ -96,6 +96,7 @@ export type MultiDateSlot = {
   timeSlot: string;
   startTime: string;
   endTime: string;
+  isCustom?: boolean;
 };
 
 export type BookingFormPayload = {
@@ -489,10 +490,13 @@ export const formatDateDisplay = (value?: string | Date | null) => {
 
 const formatTimeSlotDisplay = (time24: string) => {
   if (!time24) return "09:00 AM";
-  const [h] = time24.split(":").map(Number);
+  const [hStr, mStr] = time24.split(":");
+  let h = Number(hStr);
+  const m = Number(mStr) || 0;
+  if (Number.isNaN(h)) h = 9;
   const period = h >= 12 ? "PM" : "AM";
   const displayH = h % 12 === 0 ? 12 : h % 12;
-  return `${String(displayH).padStart(2, "0")}:00 ${period}`;
+  return `${String(displayH).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
 };
 
 const parseTimeSlotRange = (
@@ -506,26 +510,50 @@ const parseTimeSlotRange = (
     const isPM = p.toUpperCase().includes("PM");
     const isAM = p.toUpperCase().includes("AM");
     const clean = p.replace(/(AM|PM)/gi, "").trim();
-    let [h] = clean.split(":").map(Number);
+    let [h, m = 0] = clean.split(":").map(Number);
     if (Number.isNaN(h)) h = 9;
+    if (Number.isNaN(m)) m = 0;
     if (isPM && h !== 12) h += 12;
     if (isAM && h === 12) h = 0;
-    return h;
+    return { h, m, totalM: h * 60 + m };
   };
 
-  const startH = parsePart(startPart);
-  const endH = parsePart(endPart);
-  const hours = Math.max(1, endH - startH);
-  const startTime = `${String(startH).padStart(2, "0")}:00`;
-  const endTime = `${String(endH).padStart(2, "0")}:00`;
+  const start = parsePart(startPart);
+  const end = parsePart(endPart);
+  const diffMinutes = Math.max(0, end.totalM - start.totalM);
+  const hours = Math.round((diffMinutes / 60) * 100) / 100;
+  const startTime = `${String(start.h).padStart(2, "0")}:${String(start.m).padStart(2, "0")}`;
+  const endTime = `${String(end.h).padStart(2, "0")}:${String(end.m).padStart(2, "0")}`;
   return { hours, startTime, endTime };
 };
 
 const calcDurationHours = (from: string, to: string) => {
   if (!from || !to) return 0;
-  const [fh, fm] = from.split(":").map(Number);
-  const [th, tm] = to.split(":").map(Number);
-  return Math.max(0, (th * 60 + tm - (fh * 60 + fm)) / 60);
+  const [fh, fm = 0] = from.split(":").map(Number);
+  const [th, tm = 0] = to.split(":").map(Number);
+  return Math.max(0, Math.round(((th * 60 + tm - (fh * 60 + fm)) / 60) * 100) / 100);
+};
+
+const normalizeSlot = (s: MultiDateSlot): MultiDateSlot => {
+  const isCustom = Boolean(
+    s.isCustom ||
+      (s.startTime && !s.startTime.endsWith(":00")) ||
+      (s.endTime && !s.endTime.endsWith(":00")),
+  );
+  const startTime = s.startTime || "09:00";
+  const endTime = s.endTime || "12:00";
+  const dur = s.duration || calcDurationHours(startTime, endTime) || 3;
+  const timeSlot =
+    s.timeSlot ||
+    `${formatTimeSlotDisplay(startTime)} - ${formatTimeSlotDisplay(endTime)}`;
+  return {
+    ...s,
+    startTime,
+    endTime,
+    duration: dur,
+    timeSlot,
+    isCustom,
+  };
 };
 
 const computeBookingStatus = (
@@ -840,12 +868,12 @@ const CreateBookingDetailsModal = ({
         Array.isArray(initialBooking.multiDateSlots) &&
         initialBooking.multiDateSlots.length > 0
       ) {
-        setMultiDateSlots(initialBooking.multiDateSlots);
+        setMultiDateSlots(initialBooking.multiDateSlots.map(normalizeSlot));
       } else if (
         Array.isArray(snap?.multiDateSlots) &&
         snap.multiDateSlots.length > 0
       ) {
-        setMultiDateSlots(snap.multiDateSlots);
+        setMultiDateSlots(snap.multiDateSlots.map(normalizeSlot));
       }
       if (initialBooking.coworkingStartDate || snap?.coworkingStartDate) {
         setCoworkingStartDate(
@@ -972,12 +1000,12 @@ const CreateBookingDetailsModal = ({
         Array.isArray(draftValues.multiDateSlots) &&
         draftValues.multiDateSlots.length > 0
       ) {
-        setMultiDateSlots(draftValues.multiDateSlots);
+        setMultiDateSlots(draftValues.multiDateSlots.map(normalizeSlot));
       } else if (
         Array.isArray(snapDraft?.multiDateSlots) &&
         snapDraft.multiDateSlots.length > 0
       ) {
-        setMultiDateSlots(snapDraft.multiDateSlots);
+        setMultiDateSlots(snapDraft.multiDateSlots.map(normalizeSlot));
       }
       if (draftValues.coworkingStartDate || snapDraft?.coworkingStartDate) {
         setCoworkingStartDate(
@@ -1277,6 +1305,10 @@ const CreateBookingDetailsModal = ({
 
   const getSlotStatus = useCallback(
     (date: string, startTime: string, endTime: string): SlotAvailability => {
+      if (!date || !startTime || !endTime) return "available";
+      const sMin = timeToMinutes(startTime);
+      const eMin = timeToMinutes(endTime);
+      if (sMin == null || eMin == null || eMin <= sMin) return "unavailable";
       if (originalSlotKeys.has(`${date}|${startTime}|${endTime}`)) return "available";
       return getSlotAvailability(date, startTime, endTime, busySlots, businessNow);
     },
@@ -1580,17 +1612,20 @@ const CreateBookingDetailsModal = ({
   };
 
   // Multi-Date Slots Handlers
-  const handleAddSlot = () => {
-    const lastDate =
-      multiDateSlots[multiDateSlots.length - 1]?.date || bookingDate || getBusinessToday();
+  const handleAddSlot = (isCustom = false) => {
+    const lastSlot = multiDateSlots[multiDateSlots.length - 1];
+    const lastDate = lastSlot?.date || bookingDate || getBusinessToday();
     const nextDateStr = addDaysToKey(lastDate, 1);
+    const startTime = "09:00";
+    const endTime = "12:00";
     const newSlot: MultiDateSlot = {
-      id: `slot-${Date.now()}`,
+      id: `slot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       date: nextDateStr,
       duration: 3,
       timeSlot: "09:00 AM - 12:00 PM",
-      startTime: "09:00",
-      endTime: "12:00",
+      startTime,
+      endTime,
+      isCustom,
     };
     setMultiDateSlots((prev) => [...prev, newSlot]);
   };
@@ -1606,10 +1641,91 @@ const CreateBookingDetailsModal = ({
     );
   };
 
+  const handleToggleSlotCustom = (id: string, forceCustom?: boolean) => {
+    setMultiDateSlots((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        const nextCustom = forceCustom !== undefined ? forceCustom : !s.isCustom;
+        if (nextCustom) {
+          const startTime = s.startTime || "09:00";
+          const endTime = s.endTime || "12:00";
+          const dur = calcDurationHours(startTime, endTime) || s.duration || 3;
+          const timeSlot = `${formatTimeSlotDisplay(startTime)} - ${formatTimeSlotDisplay(endTime)}`;
+          return {
+            ...s,
+            isCustom: true,
+            startTime,
+            endTime,
+            duration: dur,
+            timeSlot,
+          };
+        } else {
+          const safeDur = Math.max(1, Math.min(12, Math.round(s.duration || 3)));
+          let [sh] = (s.startTime || "09:00").split(":").map(Number);
+          if (Number.isNaN(sh) || sh < 9) sh = 9;
+          if (sh + safeDur > 21) sh = Math.max(9, 21 - safeDur);
+          const startTime = `${String(sh).padStart(2, "0")}:00`;
+          const endTime = `${String(sh + safeDur).padStart(2, "0")}:00`;
+          const timeSlot = `${formatTimeSlotDisplay(startTime)} - ${formatTimeSlotDisplay(endTime)}`;
+          return {
+            ...s,
+            isCustom: false,
+            duration: safeDur,
+            startTime,
+            endTime,
+            timeSlot,
+          };
+        }
+      }),
+    );
+  };
+
+  const handleUpdateSlotCustomTimes = (
+    id: string,
+    startTime: string,
+    endTime: string,
+  ) => {
+    setMultiDateSlots((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        const sValid = startTime ?? s.startTime ?? "09:00";
+        const eValid = endTime ?? s.endTime ?? "12:00";
+        const dur = calcDurationHours(sValid, eValid);
+        const timeSlot = `${formatTimeSlotDisplay(sValid)} - ${formatTimeSlotDisplay(eValid)}`;
+        return {
+          ...s,
+          isCustom: true,
+          startTime: sValid,
+          endTime: eValid,
+          duration: dur,
+          timeSlot,
+        };
+      }),
+    );
+  };
+
   const handleUpdateSlotDuration = (id: string, delta: number) => {
     setMultiDateSlots((prev) =>
       prev.map((s) => {
         if (s.id !== id) return s;
+        if (s.isCustom) {
+          const [sh = 9, sm = 0] = (s.startTime || "09:00").split(":").map(Number);
+          const currentDur = calcDurationHours(s.startTime, s.endTime) || s.duration || 1;
+          const newDur = Math.max(0.5, Math.min(14, Math.round((currentDur + delta) * 10) / 10));
+          const totalEndMinutes = sh * 60 + sm + Math.round(newDur * 60);
+          const clampedEndMinutes = Math.min(23 * 60 + 59, totalEndMinutes);
+          const endH = Math.floor(clampedEndMinutes / 60);
+          const endM = clampedEndMinutes % 60;
+          const endTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
+          const actualDur = calcDurationHours(s.startTime, endTime);
+          const timeSlot = `${formatTimeSlotDisplay(s.startTime)} - ${formatTimeSlotDisplay(endTime)}`;
+          return {
+            ...s,
+            duration: actualDur,
+            endTime,
+            timeSlot,
+          };
+        }
         const newDur = Math.max(1, Math.min(12, s.duration + delta));
         let [startH] = (s.startTime || "09:00").split(":").map(Number);
         if (Number.isNaN(startH) || startH < 9) startH = 9;
@@ -1632,6 +1748,10 @@ const CreateBookingDetailsModal = ({
   };
 
   const handleUpdateSlotTime = (id: string, newTimeSlot: string) => {
+    if (newTimeSlot === "__custom__") {
+      handleToggleSlotCustom(id, true);
+      return;
+    }
     const { hours, startTime, endTime } = parseTimeSlotRange(newTimeSlot);
     setMultiDateSlots((prev) =>
       prev.map((s) =>
@@ -1642,6 +1762,7 @@ const CreateBookingDetailsModal = ({
               duration: hours,
               startTime,
               endTime,
+              isCustom: false,
             }
           : s,
       ),
@@ -1812,8 +1933,19 @@ const CreateBookingDetailsModal = ({
         err.multiDates = "Please add at least one date.";
       }
       for (let i = 0; i < multiDateSlots.length; i++) {
-        if (!multiDateSlots[i].date) {
+        const s = multiDateSlots[i];
+        if (!s.date) {
           err.multiDates = `Date for row ${i + 1} is required.`;
+          break;
+        }
+        if (!s.startTime || !s.endTime) {
+          err.multiDates = `Row ${i + 1}: Start and end times are required.`;
+          break;
+        }
+        const sMin = timeToMinutes(s.startTime);
+        const eMin = timeToMinutes(s.endTime);
+        if (sMin == null || eMin == null || eMin <= sMin) {
+          err.multiDates = `Row ${i + 1}: End time must be after start time.`;
           break;
         }
       }
@@ -3085,10 +3217,10 @@ const CreateBookingDetailsModal = ({
                     {!isDurationPlan && spaceTypeFilter === "exclusive" && dateMode === "multiple" && (
                       <div className="space-y-2.5">
                         {/* Column Labels */}
-                        <div className="hidden sm:grid sm:grid-cols-[1fr_140px_1fr_40px] gap-2 px-1 text-xs font-semibold text-slate-500">
+                        <div className="hidden sm:grid sm:grid-cols-[1.1fr_130px_1.5fr_40px] gap-2 px-1 text-xs font-semibold text-slate-500">
                           <div>Date</div>
                           <div>Duration (Hours)</div>
-                          <div>Time Slot</div>
+                          <div>Time Slot / Custom Timing</div>
                           <div></div>
                         </div>
 
@@ -3096,11 +3228,42 @@ const CreateBookingDetailsModal = ({
                         {multiDateSlots.map((slot, rowIdx) => {
                           const rowSlots = getTimeSlotsForDuration(slot.duration);
                           const rowStatus = multiSlotStatuses[rowIdx] ?? "available";
+                          const isValidTimeRange =
+                            slot.startTime &&
+                            slot.endTime &&
+                            (timeToMinutes(slot.endTime) ?? 0) > (timeToMinutes(slot.startTime) ?? 0);
+
                           return (
                             <div
                               key={slot.id}
-                              className="grid grid-cols-1 sm:grid-cols-[1fr_140px_1fr_40px] items-center gap-2"
+                              className="rounded-2xl border border-slate-100 bg-slate-50/40 p-2.5 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:grid sm:grid-cols-[1.1fr_130px_1.5fr_40px] sm:items-center sm:gap-2 space-y-2 sm:space-y-0"
                             >
+                              {/* Mobile Card Header */}
+                              <div className="flex sm:hidden items-center justify-between pb-1.5 border-b border-slate-200/60">
+                                <span className="text-xs font-bold text-slate-700">
+                                  Slot #{rowIdx + 1}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleSlotCustom(slot.id)}
+                                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 transition"
+                                  >
+                                    {slot.isCustom ? "Use Presets" : "Custom Time"}
+                                  </button>
+                                  {multiDateSlots.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveSlot(slot.id)}
+                                      className="text-rose-500 hover:text-rose-600 transition p-1"
+                                      title="Remove Slot"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
                               {/* Date */}
                               <div
                                 onClick={(e) => {
@@ -3142,54 +3305,133 @@ const CreateBookingDetailsModal = ({
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateSlotDuration(slot.id, -1)}
-                                  disabled={slot.duration <= 1}
-                                  className="flex h-full w-9 items-center justify-center border-r border-slate-100 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
+                                  disabled={slot.isCustom ? slot.duration <= 0.5 : slot.duration <= 1}
+                                  className="flex h-full w-9 items-center justify-center border-r border-slate-100 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition shrink-0"
+                                  title="Decrease duration by 1 hour"
                                 >
                                   <Minus size={13} />
                                 </button>
-                                <div className="flex flex-1 items-center justify-center text-xs font-bold text-slate-700">
-                                  {slot.duration} {slot.duration === 1 ? "Hour" : "Hours"}
+                                <div className="flex flex-1 items-center justify-center text-xs font-bold text-slate-700 px-1 truncate">
+                                  {!isValidTimeRange && slot.isCustom ? (
+                                    <span className="text-[11px] font-semibold text-rose-500">Invalid</span>
+                                  ) : (
+                                    `${slot.duration} ${slot.duration === 1 ? "Hour" : "Hours"}`
+                                  )}
                                 </div>
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateSlotDuration(slot.id, 1)}
-                                  className="flex h-full w-9 items-center justify-center border-l border-slate-100 text-slate-600 hover:bg-slate-50 transition"
+                                  className="flex h-full w-9 items-center justify-center border-l border-slate-100 text-slate-600 hover:bg-slate-50 transition shrink-0"
+                                  title="Increase duration by 1 hour"
                                 >
                                   <Plus size={13} />
                                 </button>
                               </div>
 
-                              {/* Time Slot */}
-                              <div className="relative">
-                                <Clock
-                                  size={15}
-                                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                                />
-                                <select
-                                  value={slot.timeSlot}
-                                  onChange={(e) => {
-                                    handleUpdateSlotTime(slot.id, e.target.value);
-                                    setErrors((prev) => ({ ...prev, multiDates: "" }));
-                                  }}
-                                  className={`h-10 w-full appearance-none rounded-xl border bg-white pl-9 pr-8 text-xs font-medium outline-none ${
-                                    rowStatus === "available" ? "border-slate-200" : "border-rose-300"
-                                  }`}
-                                >
-                                  {renderSlotOptions(rowSlots, slot.date, slot.timeSlot)}
-                                </select>
-                                <ChevronDown
-                                  size={15}
-                                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
-                                />
-                                {slot.date && (
-                                  <span className="pointer-events-none absolute -top-2 right-2 z-10">
-                                    <AvailabilityBadge status={toBadgeStatus(rowStatus)} />
-                                  </span>
-                                )}
-                              </div>
+                              {/* Time Slot (Preset or Custom) */}
+                              {slot.isCustom ? (
+                                /* Custom Timings Mode */
+                                <div className="relative">
+                                  <div
+                                    className={`flex h-10 items-center gap-1.5 rounded-xl border bg-white p-1 transition ${
+                                      rowStatus === "available" && isValidTimeRange
+                                        ? "border-indigo-300 ring-1 ring-indigo-100"
+                                        : "border-rose-300"
+                                    }`}
+                                  >
+                                    {/* Start Time Input */}
+                                    <div className="relative flex-1 min-w-0">
+                                      <input
+                                        type="time"
+                                        value={slot.startTime || "09:00"}
+                                        onChange={(e) => {
+                                          handleUpdateSlotCustomTimes(slot.id, e.target.value, slot.endTime);
+                                          setErrors((prev) => ({ ...prev, multiDates: "" }));
+                                        }}
+                                        className="h-8 w-full rounded-lg bg-slate-50 px-2 text-xs font-semibold text-slate-700 outline-none hover:bg-slate-100 focus:bg-white focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                                        title="Start Time"
+                                      />
+                                    </div>
 
-                              {/* Delete Row Button */}
-                              <div className="flex justify-end">
+                                    <span className="text-[11px] font-bold text-slate-400 shrink-0">to</span>
+
+                                    {/* End Time Input */}
+                                    <div className="relative flex-1 min-w-0">
+                                      <input
+                                        type="time"
+                                        value={slot.endTime || "12:00"}
+                                        onChange={(e) => {
+                                          handleUpdateSlotCustomTimes(slot.id, slot.startTime, e.target.value);
+                                          setErrors((prev) => ({ ...prev, multiDates: "" }));
+                                        }}
+                                        className="h-8 w-full rounded-lg bg-slate-50 px-2 text-xs font-semibold text-slate-700 outline-none hover:bg-slate-100 focus:bg-white focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                                        title="End Time"
+                                      />
+                                    </div>
+
+                                    {/* Switch back to Presets button */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleSlotCustom(slot.id, false)}
+                                      className="flex h-8 items-center gap-1 rounded-lg px-2 text-[10px] font-bold text-indigo-600 hover:bg-indigo-50 transition shrink-0"
+                                      title="Switch back to preset slots"
+                                    >
+                                      <Clock size={11} />
+                                      <span className="hidden sm:inline">Presets</span>
+                                    </button>
+                                  </div>
+
+                                  {slot.date && (
+                                    <span className="pointer-events-none absolute -top-2 right-2 z-10">
+                                      <AvailabilityBadge status={toBadgeStatus(rowStatus)} />
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                /* Preset Slots Mode */
+                                <div className="relative">
+                                  <Clock
+                                    size={15}
+                                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                                  />
+                                  <select
+                                    value={slot.timeSlot}
+                                    onChange={(e) => {
+                                      handleUpdateSlotTime(slot.id, e.target.value);
+                                      setErrors((prev) => ({ ...prev, multiDates: "" }));
+                                    }}
+                                    className={`h-10 w-full appearance-none rounded-xl border bg-white pl-9 pr-16 text-xs font-medium outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 ${
+                                      rowStatus === "available" ? "border-slate-200" : "border-rose-300"
+                                    }`}
+                                  >
+                                    {renderSlotOptions(rowSlots, slot.date, slot.timeSlot)}
+                                    <option value="__custom__">⚙ Custom Timing...</option>
+                                  </select>
+
+                                  {/* Quick Custom Switch button inside the select */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleSlotCustom(slot.id, true)}
+                                    className="absolute right-7 top-1/2 -translate-y-1/2 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 transition"
+                                    title="Switch to custom timings"
+                                  >
+                                    Custom
+                                  </button>
+
+                                  <ChevronDown
+                                    size={15}
+                                    className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
+                                  />
+                                  {slot.date && (
+                                    <span className="pointer-events-none absolute -top-2 right-2 z-10">
+                                      <AvailabilityBadge status={toBadgeStatus(rowStatus)} />
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Delete Row Button (Desktop) */}
+                              <div className="hidden sm:flex justify-end">
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveSlot(slot.id)}
@@ -3210,15 +3452,25 @@ const CreateBookingDetailsModal = ({
                           </p>
                         )}
 
-                        {/* Add Another Date Button */}
-                        <button
-                          type="button"
-                          onClick={handleAddSlot}
-                          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/40 py-2.5 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50"
-                        >
-                          <Plus size={15} />
-                          <span>Add Another Date</span>
-                        </button>
+                        {/* Add Buttons */}
+                        <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAddSlot(false)}
+                            className="flex flex-1 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/40 py-2.5 text-xs font-bold text-indigo-600 transition hover:bg-indigo-50"
+                          >
+                            <Plus size={14} />
+                            <span>Add Another Date</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAddSlot(true)}
+                            className="flex flex-1 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-violet-300 bg-violet-50/40 py-2.5 text-xs font-bold text-violet-700 transition hover:bg-violet-50"
+                          >
+                            <Clock size={14} />
+                            <span>Add Custom Timing</span>
+                          </button>
+                        </div>
                       </div>
                     )}
 

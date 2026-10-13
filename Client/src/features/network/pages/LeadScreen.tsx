@@ -51,6 +51,7 @@ const STATUS_OPTIONS: LeadStatus[] = [
   "New",
   "Contacted",
   "Interested",
+  "Converted",
   "Not Interested",
   "Need to message",
 ];
@@ -647,6 +648,29 @@ const LeadScreen = () => {
         accessorKey: "status",
         header: "Status",
         size: 140,
+        Cell: ({ cell }) => {
+          const status = cell.getValue<LeadStatus>();
+          const badgeStyle =
+            status === "Converted"
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : status === "Interested"
+              ? "bg-purple-50 text-purple-700 border-purple-200"
+              : status === "Contacted"
+              ? "bg-amber-50 text-amber-700 border-amber-200"
+              : status === "New"
+              ? "bg-blue-50 text-blue-700 border-blue-200"
+              : status === "Not Interested"
+              ? "bg-rose-50 text-rose-700 border-rose-200"
+              : "bg-gray-50 text-gray-700 border-gray-200";
+
+          return (
+            <span
+              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold ${badgeStyle}`}
+            >
+              {status}
+            </span>
+          );
+        },
       },
 
       // Source
