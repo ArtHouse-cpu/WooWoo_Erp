@@ -1204,6 +1204,83 @@ export const getProducts = async (req, res) => {
     });
   }
 };
+/** Public catalogue for the customer supplies modal. No cost price or staff fields. */
+export const getCustomerProducts = async (req, res) => {
+  try {
+    const limit = Math.min(
+      Math.max(Number(req.query.limit) || 100, 1),
+      100,
+    );
+    const search = String(req.query.search || '').trim();
+    const category = String(req.query.category || '').trim();
+    const filter = {
+      type: {$ne: 'service'},
+      itemType: {$ne: 'service'},
+    };
+    if (category && category.toLowerCase() !== 'all') {
+      filter.category = category;
+    }
+    if (search) {
+      const searchRegex = new RegExp(escapeRegex(search), 'i');
+      filter.$or = [
+        {productName: searchRegex},
+        {brandName: searchRegex},
+        {category: searchRegex},
+        {subCategory: searchRegex},
+      ];
+    }
+
+    const [products, categoryNames] = await Promise.all([
+      Product.find(filter)
+        .select(
+          'productName brandName sellingPrice category subCategory description discountType discountValue images imageUrl createdAt',
+        )
+        .sort({createdAt: -1})
+        .limit(limit)
+        .lean(),
+      Product.distinct('category', {
+        type: {$ne: 'service'},
+        itemType: {$ne: 'service'},
+      }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      categories: categoryNames
+        .map(name => String(name || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+      products: products.map(product => {
+        const images = Array.isArray(product.images)
+          ? product.images.map(url => String(url || '').trim()).filter(Boolean)
+          : [];
+        const imageUrl =
+          String(product.imageUrl || '').trim() || images[0] || null;
+        return {
+          _id: product._id,
+          name: String(product.productName || '').trim(),
+          brandName: String(product.brandName || '').trim(),
+          price: Math.max(0, Number(product.sellingPrice) || 0),
+          category: String(product.category || '').trim(),
+          subCategory: String(product.subCategory || '').trim(),
+          description: String(product.description || '').trim(),
+          discountType: product.discountType || 'flat',
+          discountValue: Math.max(0, Number(product.discountValue) || 0),
+          imageUrl,
+          images,
+          createdAt: product.createdAt,
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('getCustomerProducts error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch products',
+    });
+  }
+};
+
 export const getProductsById = async (req, res) => {
   try {
     const { id } = req.params;

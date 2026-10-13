@@ -435,6 +435,55 @@ export const getSpaceBookingAvailability = async (req, res) => {
   }
 };
 
+/** Public catalogue view: occupied times only, no booking ids or customer data. */
+export const getCustomerSpaceAvailability = async (req, res) => {
+  try {
+    const {spaceId, from} = req.query;
+    const fromKey = String(from || '').trim();
+    const toKey = String(req.query.to || from || '').trim();
+
+    const rangeError = getAvailabilityRangeError(fromKey, toKey);
+    if (rangeError) {
+      return res.status(400).json({success: false, message: rangeError});
+    }
+
+    const group = await resolveSpaceGroup(spaceId);
+    if (!group) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected space was not found.',
+      });
+    }
+
+    const now = nowInBusinessTz();
+    const busy = await findBusyIntervals({
+      spaceIds: group.spaceIds,
+      fromKey,
+      toKey,
+    });
+
+    return res.status(200).json({
+      success: true,
+      timezone: BOOKING_TIMEZONE,
+      today: now.dateKey,
+      nowMinutes: now.minutes,
+      from: fromKey,
+      to: toKey,
+      busy: busy.map(({date, startTime, endTime}) => ({
+        date,
+        startTime,
+        endTime,
+      })),
+    });
+  } catch (error) {
+    console.error('getCustomerSpaceAvailability error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to check space availability.',
+    });
+  }
+};
+
 export const createSpaceBooking = async (req, res) => {
   try {
     const {payload, errors} = buildPayload(req.body);

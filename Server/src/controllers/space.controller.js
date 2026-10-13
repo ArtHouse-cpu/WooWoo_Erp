@@ -197,10 +197,12 @@ const serializeSpace = doc => {
   const spaceCode =
     plain.spaceCode || `SP-${String(plain._id || '').slice(-5).toUpperCase()}`;
 
+  const {createdBy: _createdBy, ...safe} = plain;
+
   // New-model docs always have day
   if (day) {
     return {
-      ...plain,
+      ...safe,
       spaceCode,
       spaceType,
       day,
@@ -209,11 +211,14 @@ const serializeSpace = doc => {
   }
 
   // Legacy dual-price / missing day — expand for list consumers
-  return expandLegacySpace(plain).map(r => ({
-    ...r,
-    spaceCode: r.spaceCode || spaceCode,
-    spaceType: inferSpaceType(r),
-  }));
+  return expandLegacySpace(safe).map(r => {
+    const {createdBy: _staff, ...row} = r;
+    return {
+      ...row,
+      spaceCode: r.spaceCode || spaceCode,
+      spaceType: inferSpaceType(r),
+    };
+  });
 };
 
 const buildSpacePayload = (body = {}, imageUrl, {partial = false} = {}) => {

@@ -1,12 +1,13 @@
-import {useState} from 'react';
+import {useEffect, useState, type ReactNode} from 'react';
+import axios from 'axios';
 import {
   X,
   MapPin,
   Building,
-  Building2,
   Laptop,
   Ticket,
   Calendar,
+  Clock,
   Paintbrush,
   GraduationCap,
   Users,
@@ -14,14 +15,401 @@ import {
   Ellipsis,
   Star,
   Shield,
-  Briefcase,
   Wifi,
-  VolumeX,
   Sofa,
   MessageCircle,
   Book,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
+import {
+  fetchSpaceAvailability,
+  fetchSpacesByType,
+  groupSpacesByName,
+  type BusyInterval,
+  type SpaceCard,
+} from '../../services/space.service';
+
+const SPACE_WHATSAPP = '918073988123';
+
+function spaceQueryUrl(section: 'Exclusive Space' | 'Coworking') {
+  const text = `Hi, I have a query about ${section} at WooWoo Art House.`;
+  return `https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent(text)}`;
+}
+
+function formatInr(value: number) {
+  return Math.max(0, Number(value) || 0).toLocaleString('en-IN', {
+    maximumFractionDigits: 0,
+  });
+}
+
+function dayPriceLine(card: SpaceCard) {
+  const parts: string[] = [];
+  if (card.weekdayPrice != null) parts.push(`Weekday ₹${formatInr(card.weekdayPrice)}`);
+  if (card.weekendPrice != null) parts.push(`Weekend ₹${formatInr(card.weekendPrice)}`);
+  return parts.join(' · ');
+}
+
+function SpacePhoto({
+  src,
+  alt,
+  className,
+  fallback,
+}: {
+  src: string | null;
+  alt: string;
+  className?: string;
+  fallback: ReactNode;
+}) {
+  const [broken, setBroken] = useState(false);
+
+  if (!src || broken) {
+    return (
+      <div className={`flex h-full w-full items-center justify-center bg-[#E2E8F0] text-slate-500 ${className || ''}`}>
+        {fallback}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`h-full w-full object-cover ${className || ''}`}
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
+const OPEN_HOUR = 9;
+const SLOT_HOURS: Array<[number, number]> = [
+  [9, 12],
+  [12, 15],
+  [15, 18],
+  [18, 21],
+];
+const LOOKAHEAD_DAYS = 14;
+
+function businessDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+function addDateDays(key: string, days: number) {
+  const [year, month, day] = key.split('-').map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + days));
+  return next.toISOString().slice(0, 10);
+}
+
+function isWeekendDate(key: string) {
+  const [year, month, day] = key.split('-').map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return weekday === 0 || weekday === 6;
+}
+
+function formatDayChip(key: string) {
+  const [year, month, day] = key.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return {
+    weekday: new Intl.DateTimeFormat('en-IN', {weekday: 'short', timeZone: 'UTC'}).format(date),
+    label: new Intl.DateTimeFormat('en-IN', {day: 'numeric', month: 'short', timeZone: 'UTC'}).format(date),
+  };
+}
+
+function formatClock(hour: number) {
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const display = hour % 12 === 0 ? 12 : hour % 12;
+  return `${String(display).padStart(2, '0')}:00 ${period}`;
+}
+
+function clockToMinutes(value: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+type SlotState = 'available' | 'booked' | 'past';
+
+function slotState(
+  dateKey: string,
+  startHour: number,
+  endHour: number,
+  today: string,
+  nowMinutes: number,
+  busy: BusyInterval[],
+): SlotState {
+  const start = startHour * 60;
+  const end = endHour * 60;
+  if (dateKey < today || (dateKey === today && start <= nowMinutes)) return 'past';
+  const taken = busy.some(interval => {
+    if (interval.date !== dateKey) return false;
+    const busyStart = clockToMinutes(interval.startTime);
+    const busyEnd = clockToMinutes(interval.endTime);
+    if (busyStart == null || busyEnd == null) return false;
+    return start < busyEnd && busyStart < end;
+  });
+  return taken ? 'booked' : 'available';
+}
+
+function SpaceDetailsModal({
+  space,
+  onClose,
+}: {
+  space: SpaceCard;
+  onClose: () => void;
+}) {
+  const today = businessDateKey();
+  const dates = Array.from({length: LOOKAHEAD_DAYS}, (_, index) => addDateDays(today, index));
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [busy, setBusy] = useState<BusyInterval[]>([]);
+  const [serverToday, setServerToday] = useState(today);
+  const [nowMinutes, setNowMinutes] = useState(OPEN_HOUR * 60);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError('');
+    fetchSpaceAvailability(space.id, dates[0], dates[dates.length - 1], controller.signal)
+      .then(result => {
+        setBusy(result.busy);
+        setServerToday(result.today || today);
+        setNowMinutes(result.nowMinutes);
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted || axios.isCancel(err)) return;
+        if (axios.isAxiosError(err) && err.code === 'ERR_CANCELED') return;
+        setBusy([]);
+        setError('Could not check availability.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [space.id]);
+
+  const weekend = isWeekendDate(selectedDate);
+  const dayPrice = weekend ? space.weekendPrice : space.weekdayPrice;
+  const slots = SLOT_HOURS.map(([startHour, endHour]) => ({
+    startHour,
+    endHour,
+    label: `${formatClock(startHour)} - ${formatClock(endHour)}`,
+    state: slotState(selectedDate, startHour, endHour, serverToday, nowMinutes, busy),
+  }));
+  const openCount = slots.filter(slot => slot.state === 'available').length;
+  const chip = formatDayChip(selectedDate);
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center">
+      <button
+        type="button"
+        aria-label="Close space details"
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+      />
+      <div className="relative z-10 flex max-h-[88dvh] w-full max-w-lg flex-col rounded-t-[28px] bg-white shadow-2xl">
+        <div className="flex shrink-0 justify-center pt-3">
+          <div className="h-1.5 w-12 rounded-full bg-[#E5E7EB]" />
+        </div>
+        <div className="flex items-start gap-3 px-5 pb-3 pt-3">
+          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[14px]">
+            <SpacePhoto
+              src={space.imageUrl}
+              alt={space.name}
+              fallback={<Building className="h-5 w-5" />}
+            />
+          </div>
+          <div className="min-w-0 flex-1 text-left">
+            <h3 className="text-[16px] font-black leading-tight text-[#111111]">{space.name}</h3>
+            <p className="mt-0.5 text-[11px] font-bold text-[#6B7280]">
+              {space.category || 'Space'}
+              {space.capacity > 0 ? ` · Upto ${space.capacity} people` : ''}
+            </p>
+            <p className="mt-1 text-[12px] font-black text-[#EA580C]">
+              {dayPrice != null
+                ? `₹${formatInr(dayPrice)} / ${weekend ? 'weekend' : 'weekday'}`
+                : `From ₹${formatInr(space.fromPrice)}`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563]"
+            aria-label="Close details"
+          >
+            <X className="h-4 w-4" strokeWidth={2.5} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 pb-5">
+          <p className="mb-2 text-left text-[12px] font-black text-[#111111]">Date</p>
+          <div className="mb-4 flex gap-2 overflow-x-auto scrollbar-none pb-1">
+            {dates.map(dateKey => {
+              const item = formatDayChip(dateKey);
+              const selected = dateKey === selectedDate;
+              return (
+                <button
+                  key={dateKey}
+                  type="button"
+                  onClick={() => setSelectedDate(dateKey)}
+                  className={`shrink-0 rounded-[14px] border px-3 py-2 text-center ${
+                    selected
+                      ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C]'
+                      : 'border-slate-200 bg-white text-[#111111]'
+                  }`}
+                >
+                  <span className="block text-[10px] font-bold">{item.weekday}</span>
+                  <span className="block text-[12px] font-black">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mb-3 flex items-center justify-between text-left">
+            <p className="text-[12px] font-black text-[#111111]">
+              Time · {chip.weekday}, {chip.label}
+            </p>
+            {loading ? (
+              <span className="text-[11px] font-bold text-[#9CA3AF]">Checking…</span>
+            ) : error ? (
+              <span className="text-[11px] font-bold text-red-500">Unavailable</span>
+            ) : openCount > 0 ? (
+              <span className="rounded-full bg-[#E8F8EF] px-2 py-0.5 text-[10px] font-black text-[#15803D]">
+                Available
+              </span>
+            ) : (
+              <span className="rounded-full bg-[#FEE2E2] px-2 py-0.5 text-[10px] font-black text-[#B91C1C]">
+                Not available
+              </span>
+            )}
+          </div>
+
+          {error ? (
+            <p className="mb-3 text-left text-[12px] font-bold text-red-500">{error}</p>
+          ) : null}
+
+          <div className="grid grid-cols-1 gap-2">
+            {slots.map(slot => (
+              <div
+                key={slot.label}
+                className={`flex items-center justify-between rounded-[14px] border px-3 py-3 ${
+                  slot.state === 'available'
+                    ? 'border-[#BBF7D0] bg-[#F0FDF4]'
+                    : slot.state === 'booked'
+                      ? 'border-[#FECACA] bg-[#FEF2F2]'
+                      : 'border-slate-200 bg-[#F8FAFC]'
+                }`}
+              >
+                <span className="flex items-center gap-2 text-[13px] font-black text-[#111111]">
+                  <Clock className="h-4 w-4 text-[#6B7280]" strokeWidth={2.25} />
+                  {slot.label}
+                </span>
+                <span
+                  className={`text-[11px] font-black ${
+                    slot.state === 'available'
+                      ? 'text-[#15803D]'
+                      : slot.state === 'booked'
+                        ? 'text-[#B91C1C]'
+                        : 'text-[#9CA3AF]'
+                  }`}
+                >
+                  {slot.state === 'available' ? 'Available' : slot.state === 'booked' ? 'Booked' : 'Passed'}
+                </span>
+              </div>
+            ))}
+          </div>
+          {space.description ? (
+            <p className="mt-4 text-left text-[12px] font-semibold leading-snug text-[#6B7280]">
+              {space.description}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SpaceGallery({
+  spaces,
+  activeDot,
+  onSelect,
+  onOpen,
+}: {
+  spaces: SpaceCard[];
+  activeDot: number;
+  onSelect: (index: number) => void;
+  onOpen: (space: SpaceCard) => void;
+}) {
+  const slides = spaces.some(space => space.imageUrl)
+    ? spaces.filter(space => space.imageUrl)
+    : spaces;
+  if (!slides.length) return null;
+
+  const index = ((activeDot % slides.length) + slides.length) % slides.length;
+  const main = slides[index];
+  const extras = slides.filter((_, slideIndex) => slideIndex !== index).slice(0, 2);
+
+  return (
+    <div className="px-5 mb-5 grid grid-cols-5 gap-2.5">
+      <div
+        className={`relative h-[200px] overflow-hidden rounded-[20px] border border-black/[0.05] ${
+          extras.length ? 'col-span-3' : 'col-span-5'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => onOpen(main)}
+          className="absolute inset-0 text-left"
+          aria-label={`View ${main.name} availability`}
+        >
+          <SpacePhoto src={main.imageUrl} alt={main.name} fallback={<Building className="h-8 w-8" />} />
+        </button>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
+        <div className="absolute left-2.5 bottom-8 max-w-[80%] rounded-[6px] bg-black/60 px-2 py-0.75 text-left text-[8.5px] font-black text-white">
+          <span className="line-clamp-1">{main.name}</span>
+        </div>
+        {slides.length > 1 ? (
+          <div className="absolute bottom-2.5 inset-x-0 flex justify-center gap-1">
+            {slides.map((space, slideIndex) => (
+              <button
+                key={space.id}
+                type="button"
+                onClick={() => onSelect(slideIndex)}
+                className={`h-1.25 rounded-full transition-all duration-200 ${
+                  index === slideIndex ? 'w-2.5 bg-white' : 'w-1.25 bg-white/40'
+                }`}
+                aria-label={`Show ${space.name}`}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {extras.length > 0 ? (
+        <div className="col-span-2 flex flex-col gap-2.5">
+          {extras.map(space => (
+            <button
+              key={space.id}
+              type="button"
+              onClick={() => onOpen(space)}
+              className="relative h-[95px] overflow-hidden rounded-[16px] border border-black/[0.05] text-left"
+            >
+              <SpacePhoto src={space.imageUrl} alt={space.name} fallback={<Building className="h-5 w-5" />} />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+              <div className="absolute left-2 bottom-2 max-w-[90%] rounded-[6px] bg-black/60 px-2 py-0.5 text-[8px] font-black text-white">
+                <span className="line-clamp-1">{space.name}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 type SpaceBottomSheetProps = {
   isOpen: boolean;
@@ -38,6 +426,43 @@ type PillItem = {
 export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
   const [activeTab, setActiveTab] = useState<TabId>('exclusive-space');
   const [activeDot, setActiveDot] = useState(0);
+  const [exclusiveSpaces, setExclusiveSpaces] = useState<SpaceCard[]>([]);
+  const [coworkingSpaces, setCoworkingSpaces] = useState<SpaceCard[]>([]);
+  const [spacesLoading, setSpacesLoading] = useState(false);
+  const [spacesError, setSpacesError] = useState('');
+  const [detailSpace, setDetailSpace] = useState<SpaceCard | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const controller = new AbortController();
+    setSpacesLoading(true);
+    setSpacesError('');
+
+    Promise.all([
+      fetchSpacesByType('Exclusive', controller.signal),
+      fetchSpacesByType('Coworking', controller.signal),
+    ])
+      .then(([exclusive, coworking]) => {
+        setExclusiveSpaces(groupSpacesByName(exclusive));
+        setCoworkingSpaces(groupSpacesByName(coworking));
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || axios.isCancel(error)) return;
+        if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') return;
+        setExclusiveSpaces([]);
+        setCoworkingSpaces([]);
+        setSpacesError('Could not load spaces.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSpacesLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) setDetailSpace(null);
+  }, [isOpen]);
 
   const pills: PillItem[] = [
     {label: 'Shows', icon: Ticket},
@@ -108,7 +533,10 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
               {/* Exclusive Space Tab */}
               <button
                 type="button"
-                onClick={() => setActiveTab('exclusive-space')}
+                onClick={() => {
+                  setActiveTab('exclusive-space');
+                  setActiveDot(0);
+                }}
                 className={`flex-1 py-3 px-4 rounded-[16px] border text-[13px] font-extrabold flex items-center justify-center gap-2 transition-all duration-200 relative overflow-hidden cursor-pointer ${
                   activeTab === 'exclusive-space'
                     ? 'border-[#EA580C] bg-[#FFF0EB]/50 text-[#EA580C]'
@@ -125,7 +553,10 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
               {/* Coworking Tab */}
               <button
                 type="button"
-                onClick={() => setActiveTab('coworking')}
+                onClick={() => {
+                  setActiveTab('coworking');
+                  setActiveDot(0);
+                }}
                 className={`flex-1 py-3 px-4 rounded-[16px] border text-[13px] font-extrabold flex items-center justify-center gap-2 transition-all duration-200 relative overflow-hidden cursor-pointer ${
                   activeTab === 'coworking'
                     ? 'border-[#EA580C] bg-[#FFF0EB]/50 text-[#EA580C]'
@@ -142,6 +573,11 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
 
             {/* Scrollable Contents */}
             <div className="flex-1 overflow-y-auto pb-6">
+              {spacesError ? (
+                <p className="px-5 mb-3 text-left text-[12px] font-bold text-red-500">
+                  {spacesError}
+                </p>
+              ) : null}
               {activeTab === 'exclusive-space' ? (
                 <>
                   {/* Create. Host. Inspire. subtitle */}
@@ -167,121 +603,68 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     })}
                   </div>
 
-                  {/* Featured Gallery */}
-                  <div className="px-5 mb-5 grid grid-cols-5 gap-2.5">
-                    {/* Left Large Image */}
-                    <div className="col-span-3 relative h-[200px] overflow-hidden rounded-[20px] border border-black/[0.05]">
-                      <img
-                        src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=600&q=80"
-                        alt="Events and Shows"
-                        className="h-full w-full object-cover"
-                      />
-                      {/* Top Left Label */}
-                      <div className="absolute left-2.5 top-2.5 flex items-center gap-1 rounded-[6px] bg-black/60 px-2 py-0.75 text-[8.5px] font-black text-white">
-                        <Calendar className="h-2.5 w-2.5" />
-                        <span>Events & Shows</span>
-                      </div>
-                      {/* Gradient overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                      {/* Carousel Dots */}
-                      <div className="absolute bottom-2.5 inset-x-0 flex justify-center gap-1">
-                        {[0, 1, 2, 3].map(idx => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setActiveDot(idx)}
-                            className={`h-1.25 w-1.25 rounded-full transition-all duration-200 ${
-                              activeDot === idx ? 'bg-white w-2.5' : 'bg-white/40'
-                            }`}
-                            aria-label={`Go to slide ${idx + 1}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Right Stacked Column */}
-                    <div className="col-span-2 flex flex-col gap-2.5">
-                      {/* Top Stacked */}
-                      <div className="relative h-[95px] overflow-hidden rounded-[16px] border border-black/[0.05]">
-                        <img
-                          src="https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=400&q=80"
-                          alt="Workshops and Classes"
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="absolute left-2 top-2 flex items-center gap-1 rounded-[6px] bg-black/60 px-2 py-0.5 text-[8px] font-black text-white">
-                          <Briefcase className="h-2.2 w-2.2" />
-                          <span>Workshops & Classes</span>
-                        </div>
-                      </div>
-
-                      {/* Bottom Stacked */}
-                      <div className="relative h-[95px] overflow-hidden rounded-[16px] border border-black/[0.05]">
-                        <img
-                          src="https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=400&q=80"
-                          alt="Meetups and Seminars"
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="absolute left-2 top-2 flex items-center gap-1 rounded-[6px] bg-black/60 px-2 py-0.5 text-[8px] font-black text-white">
-                          <Users className="h-2.2 w-2.2" />
-                          <span>Meetups & Seminars</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <SpaceGallery
+                    spaces={exclusiveSpaces}
+                    activeDot={activeDot}
+                    onSelect={setActiveDot}
+                    onOpen={setDetailSpace}
+                  />
 
                   {/* Available Spaces Section */}
                   <div className="mb-5">
                     <h4 className="text-[15px] font-black text-[#111111] px-5 mb-3 text-left">
                       Available Spaces
                     </h4>
-                    <div className="px-5 grid grid-cols-4 gap-2">
-                      {/* Mini */}
-                      <div className="rounded-[16px] border border-transparent p-2.5 text-center flex flex-col items-center justify-between min-h-[120px] bg-[#F8FAFC] shadow-2xs">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E2E8F0]/60 text-slate-600">
-                          <Building className="h-4 w-4" strokeWidth={2} />
+                    {spacesLoading ? (
+                      <p className="px-5 text-[12px] font-bold text-[#9CA3AF]">Loading spaces…</p>
+                    ) : exclusiveSpaces.length === 0 ? (
+                      <p className="px-5 text-[12px] font-bold text-[#9CA3AF]">No exclusive spaces yet.</p>
+                    ) : (
+                      <div className="px-5 flex gap-2 overflow-x-auto scrollbar-none">
+                        {exclusiveSpaces.map(space => (
+                          <button
+                            type="button"
+                            key={space.id}
+                            onClick={() => setDetailSpace(space)}
+                            className="w-[132px] shrink-0 overflow-hidden rounded-[16px] border border-transparent text-center flex flex-col bg-[#F8FAFC] shadow-2xs"
+                          >
+                            <div className="h-[84px] w-full overflow-hidden">
+                              <SpacePhoto
+                                src={space.imageUrl}
+                                alt={space.name}
+                                fallback={<Building className="h-5 w-5" />}
+                              />
+                            </div>
+                            <div className="flex flex-1 flex-col items-center justify-between p-2.5">
+                            <div className="my-1.5 w-full">
+                              <p className="text-[11px] font-black text-[#111111] leading-tight line-clamp-2">
+                                {space.name}
+                              </p>
+                              <p className="text-[8.5px] font-bold text-[#4B5563] leading-none mt-0.5">
+                                {space.capacity > 0
+                                  ? `Upto ${space.capacity} People`
+                                  : space.category || 'Exclusive'}
+                              </p>
+                            </div>
+                            <p className="text-[7.5px] text-[#9CA3AF] font-bold leading-tight line-clamp-2">
+                              {space.description || dayPriceLine(space) || 'Available to book'}
+                            </p>
+                            </div>
+                          </button>
+                        ))}
+                        <div className="w-[108px] shrink-0 rounded-[16px] p-2.5 text-center flex flex-col justify-between min-h-[120px] bg-[#FFF0EB] border border-[#FFEDD5] shadow-2xs">
+                          <p className="text-[9.5px] font-black text-[#EA580C] leading-none mt-0.5">Pricing</p>
+                          <div>
+                            <p className="text-[7px] font-bold text-[#9CA3AF] leading-none">Starts at</p>
+                            <p className="text-[16px] font-black text-[#111111] my-0.5 leading-none">
+                              ₹{formatInr(Math.min(...exclusiveSpaces.map(space => space.fromPrice)))}
+                            </p>
+                            <p className="text-[7.5px] font-bold text-[#9CA3AF] leading-none">/day</p>
+                          </div>
+                          <div />
                         </div>
-                        <div className="my-1.5">
-                          <p className="text-[11px] font-black text-[#111111] leading-tight">Mini</p>
-                          <p className="text-[8.5px] font-bold text-[#4B5563] leading-none mt-0.5">Upto 20 People</p>
-                        </div>
-                        <p className="text-[7.5px] text-[#9CA3AF] font-bold leading-tight">Perfect for small sessions</p>
                       </div>
-
-                      {/* Mega */}
-                      <div className="rounded-[16px] border border-transparent p-2.5 text-center flex flex-col items-center justify-between min-h-[120px] bg-[#F8FAFC] shadow-2xs">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E2E8F0]/60 text-slate-600">
-                          <Users className="h-4 w-4" strokeWidth={2} />
-                        </div>
-                        <div className="my-1.5">
-                          <p className="text-[11px] font-black text-[#111111] leading-tight">Mega</p>
-                          <p className="text-[8.5px] font-bold text-[#4B5563] leading-none mt-0.5">Upto 80 People</p>
-                        </div>
-                        <p className="text-[7.5px] text-[#9CA3AF] font-bold leading-tight">Ideal for events & workshops</p>
-                      </div>
-
-                      {/* Full Space */}
-                      <div className="rounded-[16px] border border-transparent p-2.5 text-center flex flex-col items-center justify-between min-h-[120px] bg-[#F8FAFC] shadow-2xs">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E2E8F0]/60 text-slate-600">
-                          <Building2 className="h-4 w-4" strokeWidth={2} />
-                        </div>
-                        <div className="my-1.5">
-                          <p className="text-[11px] font-black text-[#111111] leading-tight">Full Space</p>
-                          <p className="text-[8.5px] font-bold text-[#4B5563] leading-none mt-0.5">Upto 200 People</p>
-                        </div>
-                        <p className="text-[7.5px] text-[#9CA3AF] font-bold leading-tight">For large shows & exhibitions</p>
-                      </div>
-
-                      {/* Pricing Card */}
-                      <div className="rounded-[16px] p-2.5 text-center flex flex-col justify-between min-h-[120px] bg-[#FFF0EB] border border-[#FFEDD5] shadow-2xs">
-                        <p className="text-[9.5px] font-black text-[#EA580C] leading-none mt-0.5">Pricing</p>
-                        <div>
-                          <p className="text-[7px] font-bold text-[#9CA3AF] leading-none">Starts at</p>
-                          <p className="text-[16px] font-black text-[#111111] my-0.5 leading-none">₹299</p>
-                          <p className="text-[7.5px] font-bold text-[#9CA3AF] leading-none">/hour</p>
-                        </div>
-                        <div />
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </>
               ) : (
@@ -315,127 +698,66 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     })}
                   </div>
 
-                  {/* Coworking Featured Gallery */}
-                  <div className="px-5 mb-5 grid grid-cols-5 gap-2.5">
-                    {/* Left Large Image */}
-                    <div className="col-span-3 relative h-[200px] overflow-hidden rounded-[20px] border border-black/[0.05]">
-                      <img
-                        src="https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2?auto=format&fit=crop&w=600&q=80"
-                        alt="Quiet Zones"
-                        className="h-full w-full object-cover"
-                      />
-                      {/* Gradient overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                      
-                      {/* Capsule Label at bottom-left */}
-                      <div className="absolute left-2.5 bottom-2.5 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 text-white text-left">
-                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/40 text-white bg-black/10">
-                          <VolumeX className="h-2.5 w-2.5" />
-                        </div>
-                        <div className="leading-tight">
-                          <div className="text-[9.5px] font-black">Quiet Zones</div>
-                          <div className="text-[7.5px] text-white/80 font-bold">Focus in peace</div>
-                        </div>
-                      </div>
-
-                      {/* Carousel Dots */}
-                      <div className="absolute bottom-2.5 right-4 flex gap-1">
-                        {[0, 1, 2, 3, 4].map(idx => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setActiveDot(idx)}
-                            className={`h-1.25 w-1.25 rounded-full transition-all duration-200 ${
-                              activeDot === idx ? 'bg-white w-2.5' : 'bg-white/40'
-                            }`}
-                            aria-label={`Go to slide ${idx + 1}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Right Stacked Column */}
-                    <div className="col-span-2 flex flex-col gap-2.5">
-                      {/* Top Stacked */}
-                      <div className="relative h-[95px] overflow-hidden rounded-[16px] border border-black/[0.05]">
-                        <img
-                          src="https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=400&q=80"
-                          alt="Open Seating"
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                        <div className="absolute left-2 bottom-2 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-1 text-white text-left">
-                          <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-white/30 text-white">
-                            <Users className="h-2 w-2" />
-                          </div>
-                          <div className="leading-none">
-                            <div className="text-[7.5px] font-black">Open Seating</div>
-                            <div className="text-[5.5px] text-white/80 font-bold">Collaborate & connect</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Bottom Stacked */}
-                      <div className="relative h-[95px] overflow-hidden rounded-[16px] border border-black/[0.05]">
-                        <img
-                          src="https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=400&q=80"
-                          alt="Comfort Lounge"
-                          className="h-full w-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                        <div className="absolute left-2 bottom-2 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-1 text-white text-left">
-                          <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-white/30 text-white">
-                            <Sofa className="h-2 w-2" />
-                          </div>
-                          <div className="leading-none">
-                            <div className="text-[7.5px] font-black">Comfort Lounge</div>
-                            <div className="text-[5.5px] text-white/80 font-bold">Relax & recharge</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <SpaceGallery
+                    spaces={coworkingSpaces}
+                    activeDot={activeDot}
+                    onSelect={setActiveDot}
+                    onOpen={setDetailSpace}
+                  />
 
                   {/* Coworking Pass Section */}
                   <div className="mb-5">
                     <h4 className="text-[15px] font-black text-[#111111] px-5 mb-3 text-left">
-                      Coworking Pass
+                      Coworking
                     </h4>
-                    <div className="px-5 grid grid-cols-3 gap-2">
-                      {/* Day Pass */}
-                      <div className="relative rounded-[16px] border border-[#EA580C] p-2.5 text-center flex flex-col items-center justify-between min-h-[120px] bg-[#FFF0EB] shadow-2xs">
-                        {/* Most Popular Badge */}
-                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#EA580C] text-white text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap">
-                          Most Popular
-                        </div>
-                        <Calendar className="h-4.5 w-4.5 text-[#EA580C] mt-1.5" strokeWidth={2.5} />
-                        <div className="my-1.5">
-                          <p className="text-[11px] font-black text-[#111111] leading-tight">Day Pass</p>
-                          <p className="text-[13px] font-black text-[#EA580C] my-0.5 leading-none">₹299 <span className="text-[7.5px] text-[#9CA3AF] font-bold">/day</span></p>
-                        </div>
-                        <p className="text-[7.5px] text-[#9CA3AF] font-bold leading-tight">Access for 1 day</p>
+                    {spacesLoading ? (
+                      <p className="px-5 text-[12px] font-bold text-[#9CA3AF]">Loading spaces…</p>
+                    ) : coworkingSpaces.length === 0 ? (
+                      <p className="px-5 text-[12px] font-bold text-[#9CA3AF]">No coworking spaces yet.</p>
+                    ) : (
+                      <div className="px-5 flex gap-2 overflow-x-auto scrollbar-none pb-1">
+                        {coworkingSpaces.map(space => {
+                          const lowest = Math.min(...coworkingSpaces.map(item => item.fromPrice));
+                          const featured = space.fromPrice === lowest;
+                          return (
+                            <button
+                              type="button"
+                              key={space.id}
+                              onClick={() => setDetailSpace(space)}
+                              className={`relative w-[140px] shrink-0 overflow-hidden rounded-[16px] text-center flex flex-col shadow-2xs ${
+                                featured
+                                  ? 'border border-[#EA580C] bg-[#FFF0EB]'
+                                  : 'border border-slate-100 bg-[#F8FAFC]'
+                              }`}
+                            >
+                              <div className="relative h-[84px] w-full overflow-hidden">
+                                <SpacePhoto
+                                  src={space.imageUrl}
+                                  alt={space.name}
+                                  fallback={<Laptop className="h-5 w-5" />}
+                                />
+                              </div>
+                              {featured ? (
+                                <div className="absolute left-2 top-2 bg-[#EA580C] text-white text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap">
+                                  Starts at
+                                </div>
+                              ) : null}
+                              <div className="my-1.5 w-full px-2">
+                                <p className="text-[11px] font-black text-[#111111] leading-tight line-clamp-2">
+                                  {space.name}
+                                </p>
+                                <p className={`text-[13px] font-black my-0.5 leading-none ${featured ? 'text-[#EA580C]' : 'text-[#111111]'}`}>
+                                  ₹{formatInr(space.fromPrice)}
+                                </p>
+                              </div>
+                              <p className="text-[7.5px] text-[#9CA3AF] font-bold leading-tight line-clamp-2">
+                                {dayPriceLine(space) || space.category || 'Coworking'}
+                              </p>
+                            </button>
+                          );
+                        })}
                       </div>
-
-                      {/* Week Pass */}
-                      <div className="rounded-[16px] border border-slate-100 p-2.5 text-center flex flex-col items-center justify-between min-h-[120px] bg-[#F8FAFC] shadow-2xs">
-                        <Calendar className="h-4.5 w-4.5 text-[#6B7280] mt-1.5" strokeWidth={2} />
-                        <div className="my-1.5">
-                          <p className="text-[11px] font-black text-[#111111] leading-tight">Week Pass</p>
-                          <p className="text-[13px] font-black text-[#111111] my-0.5 leading-none">₹1,499 <span className="text-[7.5px] text-[#9CA3AF] font-bold">/week</span></p>
-                        </div>
-                        <p className="text-[7.5px] text-[#9CA3AF] font-bold leading-tight">Access for 7 days</p>
-                      </div>
-
-                      {/* Monthly Pass */}
-                      <div className="rounded-[16px] border border-slate-100 p-2.5 text-center flex flex-col items-center justify-between min-h-[120px] bg-[#F8FAFC] shadow-2xs">
-                        <Calendar className="h-4.5 w-4.5 text-[#6B7280] mt-1.5" strokeWidth={2} />
-                        <div className="my-1.5">
-                          <p className="text-[11px] font-black text-[#111111] leading-tight">Monthly Pass</p>
-                          <p className="text-[13px] font-black text-[#111111] my-0.5 leading-none">₹4,999 <span className="text-[7.5px] text-[#9CA3AF] font-bold">/month</span></p>
-                        </div>
-                        <p className="text-[7.5px] text-[#9CA3AF] font-bold leading-tight">Access for 30 days</p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </>
               )}
@@ -540,14 +862,15 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <span>Book Online</span>
                   </button>
 
-                  {/* Visit Today Button */}
-                  <button
-                    type="button"
+                  <a
+                    href={spaceQueryUrl('Exclusive Space')}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
                   >
-                    <Calendar className="h-4.5 w-4.5" strokeWidth={2.5} />
-                    <span>Visit Today</span>
-                  </button>
+                    <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
+                    <span>Query Now</span>
+                  </a>
                 </>
               ) : (
                 <>
@@ -560,18 +883,22 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <span>Explore More</span>
                   </button>
 
-                  {/* Query Now Button */}
-                  <button
-                    type="button"
+                  <a
+                    href={spaceQueryUrl('Coworking')}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
                   >
                     <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
                     <span>Query Now</span>
-                  </button>
+                  </a>
                 </>
               )}
             </div>
           </motion.div>
+          {detailSpace ? (
+            <SpaceDetailsModal space={detailSpace} onClose={() => setDetailSpace(null)} />
+          ) : null}
         </div>
       )}
     </AnimatePresence>

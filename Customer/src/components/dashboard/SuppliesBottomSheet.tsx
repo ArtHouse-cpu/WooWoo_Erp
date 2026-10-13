@@ -1,9 +1,8 @@
-import {useState} from 'react';
+import {useEffect, useState, type ReactNode} from 'react';
+import axios from 'axios';
 import {
   X,
   ShoppingBag,
-  Play,
-  Heart,
   Tag,
   Grid,
   ShieldCheck,
@@ -11,9 +10,58 @@ import {
   RotateCcw,
   Lock,
   ShoppingCart,
-  Store,
+  MessageCircle,
+  Search,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
+import {
+  fetchCustomerProducts,
+  type CustomerProduct,
+} from '../../services/product.service';
+
+const SUPPLIES_WHATSAPP = '918073988123';
+
+function suppliesQueryUrl(product: {name: string; price: number}) {
+  const text = [
+    'Hi, I have a query about this product at WooWoo Art House.',
+    `Name: ${product.name}`,
+    `Price: ₹${formatInr(product.price)}`,
+  ].join('\n');
+  return `https://wa.me/${SUPPLIES_WHATSAPP}?text=${encodeURIComponent(text)}`;
+}
+
+function formatInr(value: number) {
+  return Math.max(0, Number(value) || 0).toLocaleString('en-IN', {
+    maximumFractionDigits: 0,
+  });
+}
+
+function ProductPhoto({
+  src,
+  alt,
+  fallback,
+}: {
+  src: string | null;
+  alt: string;
+  fallback?: ReactNode;
+}) {
+  const [broken, setBroken] = useState(false);
+  if (!src || broken) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-[#F3E8FF] text-[#7C3AED]">
+        {fallback || <ShoppingBag className="h-6 w-6" />}
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="h-full w-full object-cover"
+      onError={() => setBroken(true)}
+    />
+  );
+}
 
 type SuppliesBottomSheetProps = {
   isOpen: boolean;
@@ -25,6 +73,95 @@ type TabId = 'most-loved' | 'reviews' | 'new-arrivals';
 export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps) {
   const [activeTab, setActiveTab] = useState<TabId>('most-loved');
   const [activeDot, setActiveDot] = useState(0);
+  const [products, setProducts] = useState<CustomerProduct[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productsError, setProductsError] = useState('');
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<CustomerProduct | null>(null);
+
+  useEffect(() => {
+    if (isOpen) return;
+    setSearch('');
+    setCategory('');
+    setSearchOpen(false);
+    setSelectedProduct(null);
+    setActiveDot(0);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setProductsLoading(true);
+      setProductsError('');
+      fetchCustomerProducts(
+        {search, category, limit: 100},
+        controller.signal,
+      )
+        .then(result => {
+          setProducts(result.products);
+          if (result.categories.length) setCategories(result.categories);
+          setActiveDot(0);
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted || axios.isCancel(error)) return;
+          if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') return;
+          setProducts([]);
+          setProductsError('Could not load products.');
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setProductsLoading(false);
+        });
+    }, search.trim() ? 250 : 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [isOpen, search, category]);
+
+  const visibleProducts = products;
+
+  const toggleProduct = (product: CustomerProduct) => {
+    setSearchOpen(false);
+    setActiveDot(0);
+    if (selectedProduct?._id === product._id) {
+      setSelectedProduct(null);
+      if (search === selectedProduct.name) setSearch('');
+      return;
+    }
+    setSelectedProduct(product);
+  };
+  const queryText = search.trim().toLowerCase();
+  const suggestions = queryText
+    ? products
+        .filter(product => {
+          if (selectedProduct && product._id === selectedProduct._id && search === selectedProduct.name) {
+            return false;
+          }
+          return (
+            product.name.toLowerCase().includes(queryText) ||
+            product.brandName.toLowerCase().includes(queryText) ||
+            product.category.toLowerCase().includes(queryText)
+          );
+        })
+        .slice(0, 8)
+    : [];
+
+  const slides = (visibleProducts.some(product => product.imageUrl)
+    ? visibleProducts.filter(product => product.imageUrl)
+    : visibleProducts
+  ).slice(0, 8);
+  const slideIndex = slides.length
+    ? ((activeDot % slides.length) + slides.length) % slides.length
+    : 0;
+  const featured = selectedProduct ?? slides[slideIndex];
+  const sideProducts = slides
+    .filter(product => product._id !== featured?._id)
+    .slice(0, 4);
 
   const tabs = [
     {id: 'most-loved' as TabId, label: 'Most Loved'},
@@ -86,6 +223,82 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
               </button>
             </div>
 
+            <div className="shrink-0 px-5 mb-3">
+              <div className="flex gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
+                  <input
+                    value={search}
+                    onChange={event => {
+                      setSearch(event.target.value);
+                      setSelectedProduct(null);
+                      setSearchOpen(true);
+                    }}
+                    onFocus={() => setSearchOpen(true)}
+                    placeholder="Search product"
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold text-[#111111] outline-none focus:border-[#EA580C]"
+                  />
+                </div>
+                <select
+                  value={category}
+                  onChange={event => {
+                    setCategory(event.target.value);
+                    setSelectedProduct(null);
+                    setSearch('');
+                    setSearchOpen(false);
+                  }}
+                  aria-label="Category"
+                  className="h-11 max-w-[42%] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-[#111111] outline-none focus:border-[#EA580C]"
+                >
+                  <option value="">All categories</option>
+                  {categories.map(name => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {searchOpen && search.trim() && suggestions.length > 0 ? (
+                <ul className="mt-1 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                  {suggestions.map(product => (
+                    <li key={product._id}>
+                      <button
+                        type="button"
+                        onMouseDown={event => event.preventDefault()}
+                        onClick={() => {
+                          if (selectedProduct?._id === product._id) {
+                            setSelectedProduct(null);
+                            setSearch('');
+                          } else {
+                            setSelectedProduct(product);
+                            setSearch(product.name);
+                          }
+                          setSearchOpen(false);
+                          setActiveDot(0);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[#FFF8F2]"
+                      >
+                        <span className="h-9 w-9 shrink-0 overflow-hidden rounded-lg">
+                          <ProductPhoto src={product.imageUrl} alt="" fallback={<ShoppingBag className="h-4 w-4" />} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] font-extrabold text-[#111111]">
+                            {product.name}
+                          </span>
+                          <span className="block truncate text-[11px] font-bold text-[#6B7280]">
+                            {product.category || 'Supplies'} · ₹{formatInr(product.price)}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {searchOpen && search.trim() && !productsLoading && suggestions.length === 0 && !selectedProduct ? (
+                <p className="mt-1 px-1 text-[12px] font-bold text-[#9CA3AF]">No matching product.</p>
+              ) : null}
+            </div>
+
             {/* Interactive Category Tabs */}
             <div className="shrink-0 px-5 mb-4 flex gap-2.5 overflow-x-auto scrollbar-none">
               {tabs.map(tab => {
@@ -109,130 +322,122 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
 
             {/* Scrollable Contents */}
             <div className="flex-1 overflow-y-auto pb-6">
-              {activeTab === 'most-loved' ? (
+              {productsError ? (
+                <p className="px-5 mb-3 text-left text-[12px] font-bold text-red-500">
+                  {productsError}
+                </p>
+              ) : null}
+              {productsLoading && visibleProducts.length === 0 ? (
+                <p className="px-5 mb-4 text-[12px] font-bold text-[#9CA3AF]">Loading products…</p>
+              ) : visibleProducts.length === 0 ? (
+                <p className="px-5 mb-4 text-[12px] font-bold text-[#9CA3AF]">No products yet.</p>
+              ) : activeTab === 'reviews' ? (
+                <div className="flex flex-col items-center justify-center py-12 px-5 text-center text-[#6B7280]">
+                  <ShoppingBag className="h-12 w-12 text-slate-300 mb-3" />
+                  <p className="text-[14px] font-extrabold text-[#111111]">Supplies Reviews</p>
+                  <p className="mt-1 text-[12px]">Reviews will show here when customers leave them.</p>
+                </div>
+              ) : (
                 <>
-                  {/* Modern Masonry-style Grid */}
-                  <div className="px-5 mb-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* Left Large Card */}
-                      <div className="relative h-[255px] overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs">
-                        <img
-                          src="https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80"
-                          alt="Creative supplies"
-                          className="h-full w-full object-cover"
-                        />
-                        {/* Watch Video Tag */}
-                        <div className="absolute left-3 top-3 flex items-center gap-1 rounded-[6px] bg-black/60 px-2 py-0.75 text-[9px] font-extrabold text-white">
-                          <Play className="h-2 w-2 fill-white text-white" />
-                          <span>Watch Video</span>
-                        </div>
-                        {/* Overlay text */}
-                        <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/35 to-transparent p-3.5 text-left">
-                          <h4 className="text-[13px] font-black text-white leading-tight tracking-wide">
-                            Everything for your
-                          </h4>
-                          <h4 className="text-[13px] font-black text-white leading-tight tracking-wide">
-                            Creative Journey
-                          </h4>
-                          <p className="mt-1 text-[9.5px] font-semibold text-white/80 leading-none">
-                            Quality supplies for every artist
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Right 2x2 Grid Column */}
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {/* Top Left Card - Wide Range */}
-                        <div className="relative h-[122px] overflow-hidden rounded-[16px] border border-black/[0.05]">
-                          <img
-                            src="https://images.unsplash.com/photo-1580136579312-94651dfd596d?auto=format&fit=crop&w=400&q=80"
-                            alt="Wide range"
-                            className="h-full w-full object-cover"
-                          />
-                          <div className="absolute left-2 top-2 rounded-[6px] bg-black/60 px-2 py-0.5 text-[8px] font-black text-white tracking-wide">
-                            Wide Range
-                          </div>
-                        </div>
-
-                        {/* Top Right Card - New Arrivals */}
-                        <div className="relative h-[122px] overflow-hidden rounded-[16px] border border-black/[0.05]">
-                          <img
-                            src="https://images.unsplash.com/photo-1605721911519-3dfeb3be25e7?auto=format&fit=crop&w=400&q=80"
-                            alt="New Arrivals"
-                            className="h-full w-full object-cover"
-                          />
-                          <div className="absolute left-2 top-2 rounded-[6px] bg-black/60 px-2 py-0.5 text-[8px] font-black text-white tracking-wide">
-                            New Arrivals
-                          </div>
-                        </div>
-
-                        {/* Bottom Left Card - Sketchbook & Hearts */}
-                        <div className="relative h-[122px] overflow-hidden rounded-[16px] border border-black/[0.05]">
-                          <img
-                            src="https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80"
-                            alt="Sketchbook"
-                            className="h-full w-full object-cover"
-                          />
-                          {/* Sketch for big ideas text overlay */}
-                          <div className="absolute inset-0 flex flex-col justify-between p-2 bg-black/10">
-                            <div />
-                            <div className="text-left">
-                              <p className="text-[10px] font-black text-white leading-tight drop-shadow-md">
-                                Sketch
-                              </p>
-                              <p className="text-[8px] font-medium text-white/90 leading-none drop-shadow-md">
-                                for big ideas
-                              </p>
-                            </div>
-                          </div>
-                          {/* Likes Tag */}
-                          <div className="absolute bottom-2 left-2 flex items-center gap-0.5 rounded-full bg-black/45 px-1.5 py-0.5 text-[7.5px] font-black text-white backdrop-blur-xs">
-                            <Heart className="h-2 w-2 fill-white text-white" />
-                            <span>1.2K</span>
-                          </div>
-                        </div>
-
-                        {/* Bottom Right Card - Play Video */}
-                        <div className="relative h-[122px] overflow-hidden rounded-[16px] border border-black/[0.05]">
-                          <img
-                            src="https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=400&q=80"
-                            alt="Painting"
-                            className="h-full w-full object-cover"
-                          />
-                          {/* Centered Play Button Overlay */}
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/30 text-white border border-white/40 shadow-sm backdrop-blur-xs">
-                              <Play className="h-3 w-3 fill-white text-white ml-0.5" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Pagination Dots */}
-                    <div className="flex justify-center gap-1.5 mt-3.5 mb-2">
-                      {[0, 1, 2, 3, 4].map(idx => (
+                  {activeTab === 'most-loved' && featured ? (
+                    <div className="px-5 mb-4">
+                      <div className="grid grid-cols-2 gap-3">
                         <button
-                          key={idx}
                           type="button"
-                          onClick={() => setActiveDot(idx)}
-                          className={`h-1.5 w-1.5 rounded-full transition-all duration-200 ${
-                            activeDot === idx ? 'bg-[#EA580C] w-3' : 'bg-[#E5E7EB]'
+                          onClick={() => featured && toggleProduct(featured)}
+                          className={`relative h-[255px] overflow-hidden rounded-[20px] border text-left shadow-xs ${
+                            sideProducts.length ? '' : 'col-span-2'
+                          } ${
+                            selectedProduct?._id === featured?._id
+                              ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
+                              : 'border-black/[0.05]'
                           }`}
-                          aria-label={`Go to slide ${idx + 1}`}
-                        />
+                        >
+                          <ProductPhoto src={featured.imageUrl} alt={featured.name} />
+                          <div className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/35 to-transparent p-3.5 text-left">
+                            <h4 className="text-[13px] font-black text-white leading-tight line-clamp-2">
+                              {featured.name}
+                            </h4>
+                            <p className="mt-1 text-[9.5px] font-semibold text-white/80 leading-none">
+                              {featured.category || featured.brandName || 'Art supplies'} · ₹{formatInr(featured.price)}
+                            </p>
+                          </div>
+                        </button>
+                        {sideProducts.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {sideProducts.map(product => (
+                            <button
+                              key={product._id}
+                              type="button"
+                              onClick={() => toggleProduct(product)}
+                              className={`relative h-[122px] overflow-hidden rounded-[16px] border text-left ${
+                                selectedProduct?._id === product._id
+                                  ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
+                                  : 'border-black/[0.05]'
+                              }`}
+                            >
+                              <ProductPhoto src={product.imageUrl} alt={product.name} />
+                              <div className="absolute left-2 bottom-2 max-w-[90%] rounded-[6px] bg-black/60 px-2 py-0.5 text-[8px] font-black text-white">
+                                <span className="line-clamp-1">{product.name}</span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        ) : null}
+                      </div>
+                      {slides.length > 1 ? (
+                        <div className="flex justify-center gap-1.5 mt-3.5 mb-2">
+                          {slides.map((product, index) => (
+                            <button
+                              key={product._id}
+                              type="button"
+                              onClick={() => setActiveDot(index)}
+                              className={`h-1.5 rounded-full transition-all duration-200 ${
+                                slideIndex === index ? 'bg-[#EA580C] w-3' : 'w-1.5 bg-[#E5E7EB]'
+                              }`}
+                              aria-label={`Show ${product.name}`}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <div className="px-5 mb-4">
+                    <h4 className="text-[15px] font-black text-[#111111] mb-3 text-left">
+                      {activeTab === 'new-arrivals' ? 'New Arrivals' : 'Products'}
+                    </h4>
+                    <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+                      {visibleProducts.map(product => (
+                        <button
+                          key={product._id}
+                          type="button"
+                          onClick={() => toggleProduct(product)}
+                          className={`w-[132px] shrink-0 overflow-hidden rounded-[16px] bg-[#F8FAFC] text-center ${
+                            selectedProduct?._id === product._id
+                              ? 'ring-2 ring-[#EA580C]'
+                              : ''
+                          }`}
+                        >
+                          <div className="h-[84px] w-full overflow-hidden">
+                            <ProductPhoto src={product.imageUrl} alt={product.name} />
+                          </div>
+                          <div className="p-2.5">
+                            <p className="text-[11px] font-black text-[#111111] leading-tight line-clamp-2">
+                              {product.name}
+                            </p>
+                            <p className="mt-1 text-[12px] font-black text-[#7C3AED] leading-none">
+                              ₹{formatInr(product.price)}
+                            </p>
+                            <p className="mt-1 text-[8px] font-bold text-[#9CA3AF] line-clamp-1">
+                              {product.category || product.brandName || 'Supplies'}
+                            </p>
+                          </div>
+                        </button>
                       ))}
                     </div>
                   </div>
                 </>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 px-5 text-center text-[#6B7280]">
-                  <ShoppingBag className="h-12 w-12 text-slate-300 mb-3" />
-                  <p className="text-[14px] font-extrabold text-[#111111]">
-                    {activeTab === 'reviews' ? 'Supplies Reviews' : 'New Arrivals'}
-                  </p>
-                  <p className="mt-1 text-[12px]">Explore our catalog for the latest updates.</p>
-                </div>
               )}
 
               {/* Benefits Section */}
@@ -256,7 +461,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                     <ShoppingBag className="h-5 w-5" strokeWidth={2} />
                   </div>
                   <h5 className="text-[12px] font-black text-[#111111] mt-2 leading-none">
-                    1000+ Products
+                    {visibleProducts.length > 0 ? `${visibleProducts.length} Products` : 'Products'}
                   </h5>
                   <p className="mt-1 text-[9px] text-[#9CA3AF] font-bold leading-tight">
                     Everything you need in one place
@@ -337,14 +542,26 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                 <span>Order Online</span>
               </button>
 
-              {/* Visit Today Button */}
-              <button
-                type="button"
-                className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
-              >
-                <Store className="h-4.5 w-4.5" strokeWidth={2.5} />
-                <span>Visit Today</span>
-              </button>
+              {selectedProduct ? (
+                <a
+                  href={suppliesQueryUrl(selectedProduct)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
+                >
+                  <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
+                  <span>Query Now</span>
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C]/40 text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 cursor-not-allowed"
+                >
+                  <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
+                  <span>Query Now</span>
+                </button>
+              )}
             </div>
           </motion.div>
         </div>

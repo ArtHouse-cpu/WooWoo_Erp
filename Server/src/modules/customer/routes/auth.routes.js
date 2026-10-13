@@ -23,6 +23,9 @@ import {
 import {getReferralDashboard} from '../controllers/referral.controller.js';
 import {getWalletDashboard} from '../controllers/wallet.controller.js';
 import {getCustomerMembershipPlans} from '../controllers/membership.controller.js';
+import {getSpaces} from '../../../controllers/space.controller.js';
+import {getCustomerSpaceAvailability} from '../../../controllers/spaceBooking.controller.js';
+import {getCustomerProducts} from '../../../controllers/product.controller.js';
 import {
   getMyActivity,
   getMyActivityDetail,
@@ -94,6 +97,9 @@ router.post('/refresh-token', refreshToken);
 router.post('/logout', logout);
 
 router.get('/membership/plans', getCustomerMembershipPlans);
+router.get('/space', getSpaces);
+router.get('/space/availability', getCustomerSpaceAvailability);
+router.get('/product', getCustomerProducts);
 
 router.get('/me', authenticateCustomer, authorizeCustomer('active'), me);
 router.get(

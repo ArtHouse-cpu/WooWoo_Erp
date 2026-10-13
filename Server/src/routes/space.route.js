@@ -13,9 +13,11 @@ import {
 
 const router = express.Router();
 
+// Catalogue read. Customer app lists Exclusive / Coworking without a staff session.
+router.get('/', getSpaces);
+
 router.use(authenticateUser, attachStaffContext);
 
-router.get('/', requirePermission(PERMISSIONS.SPACE_READ), getSpaces);
 router.get('/:id', requirePermission(PERMISSIONS.SPACE_READ), getSpaceById);
 router.post(
   '/',
