@@ -300,6 +300,9 @@ const buildRecord = async body => {
     spaceBenefit.cashback + serviceBenefit.cashback + foodBenefit.cashback,
   );
   const grandTotal = roundMoney(Math.max(0, subTotal - membershipDiscount));
+  const paymentStatus = ['full', 'partial', 'due'].includes(String(body.paymentStatus || '').trim())
+    ? String(body.paymentStatus).trim()
+    : '';
   const resolvedStatus =
     status === 'Draft' || status === 'Cancelled'
       ? status
@@ -333,6 +336,7 @@ const buildRecord = async body => {
       grandTotal,
       status: resolvedStatus,
       notes: String(body.notes || '').trim().slice(0, 200),
+      ...(paymentStatus ? {paymentStatus} : {}),
     },
     customer,
     blocksSpace: Boolean(space) && resolvedStatus !== 'Draft' && resolvedStatus !== 'Cancelled',

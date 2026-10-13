@@ -1,5 +1,6 @@
 import { KeyRound, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Swal from "sweetalert2";
 import {
   handleVerifyStaffPin,
@@ -73,8 +74,11 @@ export default function StaffVerifyModal({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+  return createPortal(
+    <div
+      className="fixed inset-0 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+      style={{ zIndex: 10000 }}
+    >
       <div className="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5">
         <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div className="flex items-center gap-3">
@@ -108,9 +112,16 @@ export default function StaffVerifyModal({
           <div className="relative">
             <input
               ref={inputRef}
-              type="password"
+              type="text"
               inputMode="numeric"
-              autoComplete="one-time-code"
+              name="woowoo-staff-pin"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              data-1p-ignore="true"
+              data-lpignore="true"
+              data-form-type="other"
               maxLength={PIN_AUTO_LENGTH}
               value={pin}
               disabled={verifying}
@@ -123,7 +134,7 @@ export default function StaffVerifyModal({
                 }
               }}
               placeholder="••••••"
-              className="w-full rounded-lg border border-slate-300 px-3 py-3 text-center text-lg tracking-[0.35em] outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50 disabled:opacity-70"
+              className="w-full rounded-lg border border-slate-300 px-3 py-3 text-center text-lg tracking-[0.35em] outline-none [-webkit-text-security:disc] focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50 disabled:opacity-70"
             />
             {verifying ? (
               <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-indigo-600">
@@ -153,7 +164,8 @@ export default function StaffVerifyModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

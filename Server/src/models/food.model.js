@@ -35,6 +35,11 @@ const foodSchema = new mongoose.Schema(
       default: 'Plate',
       trim: true,
     },
+    /** Off = normal food. On = packaged food. */
+    isPackaged: {
+      type: Boolean,
+      default: false,
+    },
     description: {
       type: String,
       default: '',

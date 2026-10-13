@@ -2069,6 +2069,7 @@ export type AllBookingWritePayload = {
   foods?: Array<{ foodId?: string; refId?: string; qty: number }>;
   status?: string;
   notes?: string;
+  paymentStatus?: "full" | "partial" | "due" | string;
 };
 
 export const handleGetAllBookings = async (
@@ -2259,6 +2260,7 @@ export type FoodPayload = {
   price?: number;
   stock?: number;
   unit?: string;
+  isPackaged?: boolean;
   description?: string;
   isVeg?: boolean;
   status?: "Active" | "Inactive";
@@ -2293,6 +2295,9 @@ export const foodPayloadToFormData = (
   if (payload.price !== undefined) fd.append("price", String(payload.price));
   if (payload.stock !== undefined) fd.append("stock", String(payload.stock));
   if (payload.unit !== undefined) fd.append("unit", String(payload.unit));
+  if (payload.isPackaged !== undefined) {
+    fd.append("isPackaged", String(Boolean(payload.isPackaged)));
+  }
   if (payload.description !== undefined) {
     fd.append("description", String(payload.description));
   }

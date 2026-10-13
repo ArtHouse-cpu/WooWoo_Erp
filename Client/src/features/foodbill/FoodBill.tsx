@@ -95,6 +95,7 @@ interface FoodItem {
   isVeg: boolean;
   category: string;
   unit?: string;
+  isPackaged?: boolean;
   description?: string;
   /** Cloudinary secure_url (or placeholder) */
   image: string;
@@ -134,6 +135,7 @@ function mapApiFood(raw: any): FoodItem | null {
     isVeg: raw?.isVeg !== false && raw?.isVeg !== "false",
     category,
     unit: String(raw?.unit || "Plate").trim() || "Plate",
+    isPackaged: raw?.isPackaged === true || raw?.isPackaged === "true",
     description: String(raw?.description || "").trim(),
     image: imageUrl || PLACEHOLDER_FOOD_IMAGE,
     imageUrl: imageUrl || null,
@@ -148,6 +150,7 @@ function foodItemToPayload(food: FoodItem): FoodPayload {
     category: food.category,
     price: food.price,
     unit: food.unit || "Plate",
+    isPackaged: food.isPackaged === true,
     description: food.description || "",
     isVeg: food.isVeg,
     status: food.status === "Inactive" ? "Inactive" : "Active",

@@ -155,6 +155,8 @@ type CreateBookingDetailsModalProps = {
   /** Restore draft values after cancelling checkout (create flow). */
   draftValues?: BookingFormPayload | null;
   submitting?: boolean;
+  /** Food catalogue is only used by All Bookings. */
+  showFood?: boolean;
 };
 
 export const QUICK_DURATIONS = [
@@ -604,6 +606,7 @@ const CreateBookingDetailsModal = ({
   initialBooking = null,
   draftValues = null,
   submitting = false,
+  showFood = false,
 }: CreateBookingDetailsModalProps) => {
   const formId = useId();
   const isEdit = Boolean(initialBooking?._id || initialBooking?.id);
@@ -706,7 +709,7 @@ const CreateBookingDetailsModal = ({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !showFood) return;
     const controller = new AbortController();
     handleGetFoods({ status: "Active" }, controller.signal)
       .then((res) => {
@@ -714,7 +717,7 @@ const CreateBookingDetailsModal = ({
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [isOpen]);
+  }, [isOpen, showFood]);
 
   const activeCoworkingServices = useMemo(() => {
     if (dynamicAdditionalServices.length === 0) return COWORKING_SERVICES;
@@ -1044,6 +1047,16 @@ const CreateBookingDetailsModal = ({
           setExclusiveServices((prev) => ({ ...prev, ...ex }));
         }
       }
+      const draftFoods = Array.isArray(draftValues.foods)
+        ? draftValues.foods
+        : Array.isArray(snapDraft?.foods)
+          ? snapDraft.foods
+          : [];
+      const nextFoodQty: Record<string, number> = {};
+      draftFoods.forEach((food: SelectedFoodItem) => {
+        if (food?.foodId) nextFoodQty[String(food.foodId)] = Number(food.qty) || 0;
+      });
+      setFoodQty(nextFoodQty);
       if (snapDraft?.purpose) {
         setPurpose(snapDraft.purpose);
       } else if (draftValues.notes?.includes("Purpose:")) {
@@ -1833,6 +1846,7 @@ const CreateBookingDetailsModal = ({
   ]);
 
   const selectedFoodsList = useMemo<SelectedFoodItem[]>(() => {
+    if (!showFood) return [];
     return foodCatalog
       .map((food) => ({
         foodId: String(food._id || ""),
@@ -1842,7 +1856,7 @@ const CreateBookingDetailsModal = ({
         unit: food.unit || "",
       }))
       .filter((food) => food.foodId && food.qty > 0);
-  }, [foodCatalog, foodQty]);
+  }, [foodCatalog, foodQty, showFood]);
 
   const foodCharges = selectedFoodsList.reduce((sum, food) => sum + food.price * food.qty, 0);
 
@@ -1983,13 +1997,16 @@ const CreateBookingDetailsModal = ({
     return Object.keys(err).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     if (needsConflictCheck && availability.loading) {
       toast.info("Checking availability… please try again in a moment.");
       return;
     }
-    if (!validate()) return;
+    if (!validate()) {
+      toast.warning("Complete the required booking fields before checkout.");
+      return;
+    }
     if (spacesLoading) {
       toast.error("Please wait for spaces to finish loading.");
       return;
@@ -3615,6 +3632,7 @@ const CreateBookingDetailsModal = ({
                     </div>
                   </div>
 
+                  {showFood ? (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
@@ -3678,6 +3696,11 @@ const CreateBookingDetailsModal = ({
                                   ₹{Number(food.price || 0).toLocaleString("en-IN")}
                                   {food.unit ? ` / ${food.unit}` : ""}
                                 </p>
+                                {food.isPackaged ? (
+                                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-orange-600">
+                                    Packaged Food
+                                  </p>
+                                ) : null}
                               </div>
                               <div className="flex h-7 items-center overflow-hidden rounded-lg border border-slate-200 bg-white">
                                 <button
@@ -3714,6 +3737,7 @@ const CreateBookingDetailsModal = ({
                         })}
                     </div>
                   </div>
+                  ) : null}
 
                   {/* 5. Additional Notes (COMMON FOR ALL) */}
                   <div className="space-y-3">
@@ -3817,6 +3841,7 @@ const CreateBookingDetailsModal = ({
                           : 800
                       }
                       selectedServices={selectedServicesList}
+                      foods={selectedFoodsList}
                       discountAmount={discountAmount}
                       cashbackAmount={cashbackAmount}
                       formatDateDisplay={formatDateDisplay}
@@ -3828,6 +3853,7 @@ const CreateBookingDetailsModal = ({
                       slots={multiDateSlots}
                       hourlyRate={Number(selectedSpace?.price || 800)}
                       selectedServices={selectedServicesList}
+                      foods={selectedFoodsList}
                       discountAmount={discountAmount}
                       cashbackAmount={cashbackAmount}
                       formatDateDisplay={formatDateDisplay}
@@ -3841,6 +3867,7 @@ const CreateBookingDetailsModal = ({
                       duration={duration}
                       hourlyRate={Number(selectedSpace?.price || 800)}
                       selectedServices={selectedServicesList}
+                      foods={selectedFoodsList}
                       discountAmount={discountAmount}
                       cashbackAmount={cashbackAmount}
                       formatDateDisplay={formatDateDisplay}
@@ -3952,8 +3979,10 @@ const CreateBookingDetailsModal = ({
               </button>
 
               <button
-                type="submit"
-                form={formId}
+                type="button"
+                onClick={(event) => {
+                  void handleSubmit(event);
+                }}
                 disabled={submitting || savingDraft || spacesLoading || !spaces.length}
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2 text-xs font-semibold text-white shadow-md shadow-violet-200 transition hover:from-violet-700 hover:to-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
               >

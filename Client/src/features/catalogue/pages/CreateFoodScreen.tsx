@@ -73,6 +73,24 @@ export default function CreateFoodScreen() {
       },
      
       { accessorKey: "unit", header: "Unit" },
+      {
+        accessorKey: "isPackaged",
+        header: "Label",
+        Cell: ({ cell }: { cell: { getValue: () => unknown } }) => {
+          const packaged = cell.getValue() === true;
+          return (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                packaged
+                  ? "bg-orange-100 text-orange-700"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {packaged ? "Packaged Food" : "Food"}
+            </span>
+          );
+        },
+      },
        {
         accessorKey: "status",
         header: "Availability",

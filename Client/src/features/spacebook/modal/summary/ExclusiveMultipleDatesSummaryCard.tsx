@@ -12,7 +12,7 @@ import {
 
 import type { SpacePayload } from "@/services/apiClient";
 import type { MultiDateSlot } from "../CreateBookingDetailsModal";
-import type { SelectedServiceItem } from "./CoworkingSummaryCard";
+import type { SelectedServiceItem, SummaryFoodItem } from "./CoworkingSummaryCard";
 
 /* =========================================
    Constants
@@ -31,6 +31,7 @@ export type ExclusiveMultipleDatesSummaryCardProps = {
   slots: MultiDateSlot[];
   hourlyRate: number;
   selectedServices: SelectedServiceItem[];
+  foods?: SummaryFoodItem[];
   discountAmount?: number;
   cashbackAmount?: number;
   formatDateDisplay: (
@@ -50,6 +51,7 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
   slots,
   hourlyRate,
   selectedServices,
+  foods = [],
   discountAmount = 0,
   cashbackAmount = 0,
   formatDateDisplay,
@@ -144,12 +146,20 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
     );
   }, [selectedServices]);
 
+  const foodTotal = useMemo(() => {
+    return foods.reduce((total, food) => {
+      const price = Number(food.price) || 0;
+      const quantity = Number(food.qty) || 0;
+      return total + price * quantity;
+    }, 0);
+  }, [foods]);
+
   /* =========================================
      Final Amounts
   ========================================= */
 
   const subTotal =
-    spaceCharges + servicesTotal;
+    spaceCharges + servicesTotal + foodTotal;
 
   const grandTotal = Math.max(
     0,
@@ -482,6 +492,34 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
             )}
 
           </div>
+
+          {foods.length > 0 ? (
+            <div>
+              <div className="flex items-center justify-between text-xs font-medium text-slate-700">
+                <span>Food</span>
+                <span className="font-bold text-slate-900">
+                  ₹{foodTotal.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="mt-1 space-y-0.5">
+                {foods.map((food) => {
+                  const price = Number(food.price) || 0;
+                  const quantity = Number(food.qty) || 0;
+                  return (
+                    <div
+                      key={food.label}
+                      className="flex items-center justify-between text-[11px] text-slate-500"
+                    >
+                      <span>
+                        {food.label} × {quantity}
+                      </span>
+                      <span>₹{(price * quantity).toLocaleString("en-IN")}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {/* =================================
               Quantity + Subtotal

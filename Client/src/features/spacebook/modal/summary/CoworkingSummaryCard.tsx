@@ -21,6 +21,12 @@ export type SelectedServiceItem = {
   qty: number;
 };
 
+export type SummaryFoodItem = {
+  label: string;
+  price: number;
+  qty: number;
+};
+
 export type CoworkingSummaryCardProps = {
   space: SpacePayload | null;
   spaceQty: number;
@@ -35,6 +41,7 @@ export type CoworkingSummaryCardProps = {
   packageMultiplier?: number;
   unitPrice: number;
   selectedServices: SelectedServiceItem[];
+  foods?: SummaryFoodItem[];
   discountAmount?: number;
   cashbackAmount?: number;
   formatDateDisplay: (val?: string | Date | null) => string;
@@ -67,6 +74,7 @@ export const CoworkingSummaryCard: React.FC<
   packageMultiplier,
   unitPrice,
   selectedServices,
+  foods = [],
   discountAmount = 0,
   cashbackAmount = 0,
   formatDateDisplay,
@@ -138,7 +146,17 @@ export const CoworkingSummaryCard: React.FC<
     [selectedServices],
   );
 
-  const subTotal = spaceCharges + servicesTotal;
+  const foodTotal = useMemo(
+    () =>
+      foods.reduce((total, food) => {
+        const price = Number(food.price) || 0;
+        const qty = Number(food.qty) || 0;
+        return total + price * qty;
+      }, 0),
+    [foods],
+  );
+
+  const subTotal = spaceCharges + servicesTotal + foodTotal;
 
   const grandTotal = Math.max(
     0,
@@ -396,6 +414,34 @@ export const CoworkingSummaryCard: React.FC<
             )}
 
           </div>
+
+          {foods.length > 0 ? (
+            <div>
+              <div className="flex items-center justify-between text-xs font-medium text-slate-700">
+                <span>Food</span>
+                <span className="font-bold text-slate-900">
+                  ₹{foodTotal.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div className="mt-1 space-y-0.5">
+                {foods.map((food) => {
+                  const price = Number(food.price) || 0;
+                  const qty = Number(food.qty) || 0;
+                  return (
+                    <div
+                      key={food.label}
+                      className="flex items-center justify-between text-[11px] text-slate-500"
+                    >
+                      <span>
+                        {food.label} × {qty}
+                      </span>
+                      <span>₹{(price * qty).toLocaleString("en-IN")}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {/* Quantity + Subtotal */}
 

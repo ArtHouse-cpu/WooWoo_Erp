@@ -49,6 +49,8 @@ const buildFoodPayload = (body = {}, imageUrl) => {
     // Stock is optional for restaurant made-to-order; availability uses status
     stock: Math.max(0, Number(body.stock ?? 0) || 0),
     unit: String(body.unit ?? 'Plate').trim() || 'Plate',
+    isPackaged:
+      body.isPackaged === true || body.isPackaged === 'true' || body.isPackaged === '1',
     description: String(body.description ?? '').trim(),
     isVeg: body.isVeg === true || body.isVeg === 'true' || body.isVeg === '1',
     // Available → Active, Not Available → Inactive

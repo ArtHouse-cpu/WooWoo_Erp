@@ -14,6 +14,7 @@ import {
   Percent,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import Swal from "sweetalert2";
 import {
   handleCreateInvoice,
@@ -2087,12 +2088,13 @@ export default function CheckoutModal({
     );
   }
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="checkout-title"
-      className="fixed inset-0 z-[80] flex items-stretch justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      className="fixed inset-0 flex items-stretch justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      style={{ zIndex: 9990 }}
       onMouseDown={(e) => {
         if (e.currentTarget === e.target) onClose();
       }}
@@ -3027,6 +3029,7 @@ export default function CheckoutModal({
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

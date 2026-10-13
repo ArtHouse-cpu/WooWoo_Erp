@@ -19,6 +19,9 @@ import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
+import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
+import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
+import { roundPayable } from "@/features/sales/utils/paymentRoundOff";
 import CreateBookingDetailsModal, {
   type BookingFormPayload,
 } from "@/features/spacebook/modal/CreateBookingDetailsModal";
@@ -30,6 +33,7 @@ import {
   type AllBookingRow,
   type SpaceBookingPayload,
   type SpaceBookingStatus,
+  type VerifiedStaff,
 } from "@/services/apiClient";
 
 type IncludesFilter = "All" | "Space" | "Services" | "Food";
@@ -161,6 +165,12 @@ export default function AllBookings() {
   const [selected, setSelected] = useState<AllBookingRow | null>(null);
   const [editor, setEditor] = useState<AllBookingRow | null | undefined>(undefined);
   const [savingBooking, setSavingBooking] = useState(false);
+  const [pendingCheckout, setPendingCheckout] = useState<BookingFormPayload | null>(null);
+  const [openPin, setOpenPin] = useState(false);
+  const [openCheckout, setOpenCheckout] = useState(false);
+  const [checkoutSourceId, setCheckoutSourceId] = useState<string | null>(null);
+  const [verifiedStaff, setVerifiedStaff] = useState<VerifiedStaff | null>(null);
+  const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [includesFilter, setIncludesFilter] = useState<IncludesFilter>("All");
@@ -232,39 +242,182 @@ export default function AllBookings() {
 
   const resetPage = () => setPagination((prev) => ({ ...prev, pageIndex: 0 }));
 
-  const persistBooking = async (payload: BookingFormPayload, status: string) => {
+  const persistBooking = async (
+    payload: BookingFormPayload,
+    status: string,
+    sourceId?: string | null,
+    paymentStatus?: string,
+  ) => {
+    const body = {
+      customerName: payload.customerName,
+      customerPhone: payload.customerPhone,
+      customerId: payload.customerId,
+      spaceId: payload.spaceId,
+      bookingDate: payload.bookingDate,
+      startTime: payload.startTime,
+      endTime: payload.endTime,
+      spaceQty: payload.spaceQty,
+      services: (payload.selectedServices || []).map((service) => ({
+        label: service.label,
+        qty: service.qty,
+      })),
+      foods: (payload.foods || []).map((food) => ({
+        foodId: food.foodId,
+        qty: food.qty,
+      })),
+      notes: payload.notes,
+      status,
+      ...(paymentStatus ? { paymentStatus } : {}),
+    };
+    if (sourceId) await handleUpdateAllBooking(sourceId, body);
+    else await handleCreateAllBooking(body);
+  };
+
+  const saveBooking = async (
+    payload: BookingFormPayload,
+    status: string,
+    sourceId?: string | null,
+  ) => {
     setSavingBooking(true);
     try {
-      const body = {
-        customerName: payload.customerName,
-        customerPhone: payload.customerPhone,
-        customerId: payload.customerId,
-        spaceId: payload.spaceId,
-        bookingDate: payload.bookingDate,
-        startTime: payload.startTime,
-        endTime: payload.endTime,
-        spaceQty: payload.spaceQty,
-        services: (payload.selectedServices || []).map((service) => ({
-          label: service.label,
-          qty: service.qty,
-        })),
-        foods: (payload.foods || []).map((food) => ({
-          foodId: food.foodId,
-          qty: food.qty,
-        })),
-        notes: payload.notes,
-        status,
-      };
-      if (editor?.sourceId) await handleUpdateAllBooking(editor.sourceId, body);
-      else await handleCreateAllBooking(body);
+      await persistBooking(payload, status, sourceId);
       toast.success(status === "Draft" ? "Draft saved." : "Booking saved.");
       setEditor(undefined);
+      setPendingCheckout(null);
+      setCheckoutSourceId(null);
       setReloadKey((key) => key + 1);
     } catch (err: unknown) {
       toast.error(apiErrorMessage(err, "Could not save the booking."));
     } finally {
       setSavingBooking(false);
     }
+  };
+
+  const beginCheckout = (payload: BookingFormPayload) => {
+    setCheckoutSourceId(editor?.sourceId || checkoutSourceId);
+    setPendingCheckout(payload);
+    setVerifiedStaff(null);
+    setVerifiedAt(null);
+    setOpenCheckout(false);
+    setEditor(undefined);
+    setOpenPin(true);
+  };
+
+  const checkoutGrandTotal = useMemo(() => {
+    const raw = Math.max(0, Number(pendingCheckout?.lineTotal ?? 0));
+    return roundPayable(raw).payable;
+  }, [pendingCheckout]);
+
+  const checkoutItems = useMemo(() => {
+    if (!pendingCheckout) return [];
+    const services = pendingCheckout.selectedServices || [];
+    const foods = pendingCheckout.foods || [];
+    const servicesTotal = services.reduce(
+      (sum, item) => sum + (Number(item.price) || 0) * (Number(item.qty) || 0),
+      0,
+    );
+    const snapshotCharges = Number(pendingCheckout.summarySnapshot?.spaceCharges);
+    const spaceCharges = Number.isFinite(snapshotCharges)
+      ? Math.max(0, snapshotCharges)
+      : Math.max(0, Number(pendingCheckout.subTotal ?? 0) - servicesTotal);
+    const items: Array<{
+      id: number;
+      name: string;
+      qty: number;
+      price: number;
+      discount: number;
+      category: string;
+      lineCategory: string;
+      sourceType: string;
+    }> = [];
+    if (pendingCheckout.spaceId || spaceCharges > 0) {
+      const hours = Math.max(0, Number(pendingCheckout.durationHours ?? 0));
+      items.push({
+        id: 1,
+        name: [
+          pendingCheckout.spaceName || "Space",
+          hours > 0 ? `· ${hours}h` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+        qty: 1,
+        price: spaceCharges,
+        discount: 0,
+        category: "space",
+        lineCategory: "space",
+        sourceType: "space",
+      });
+    }
+    services.forEach((service, index) => {
+      items.push({
+        id: index + 2,
+        name: service.label,
+        qty: Math.max(1, Number(service.qty) || 1),
+        price: Math.max(0, Number(service.price) || 0),
+        discount: 0,
+        category: "service",
+        lineCategory: "service",
+        sourceType: "service",
+      });
+    });
+    foods.forEach((food, index) => {
+      items.push({
+        id: services.length + index + 2,
+        name: food.label,
+        qty: Math.max(1, Number(food.qty) || 1),
+        price: Math.max(0, Number(food.price) || 0),
+        discount: 0,
+        category: "food",
+        lineCategory: "food",
+        sourceType: "food",
+      });
+    });
+    return items;
+  }, [pendingCheckout]);
+
+  const confirmCheckout = async (payment: {
+    paymentStatus: string;
+    customerName: string;
+    customerPhone: string;
+    notes: string;
+    customerId?: string | null;
+  }) => {
+    if (!pendingCheckout) {
+      toast.error("Booking details were lost. Please try again.");
+      return;
+    }
+    const status =
+      !pendingCheckout.status || pendingCheckout.status === "Draft"
+        ? "Upcoming"
+        : pendingCheckout.status;
+    const notes = [pendingCheckout.notes, payment.notes]
+      .map((value) => String(value || "").trim())
+      .filter((value, index, list) => value && list.indexOf(value) === index)
+      .join("\n");
+    setSavingBooking(true);
+    try {
+      await persistBooking(
+        {
+          ...pendingCheckout,
+          customerName: payment.customerName?.trim() || pendingCheckout.customerName,
+          customerPhone:
+            payment.customerPhone?.trim() || pendingCheckout.customerPhone,
+          customerId: payment.customerId || pendingCheckout.customerId,
+          notes,
+        },
+        status,
+        checkoutSourceId,
+        payment.paymentStatus,
+      );
+    } finally {
+      setSavingBooking(false);
+    }
+    setOpenCheckout(false);
+    setPendingCheckout(null);
+    setCheckoutSourceId(null);
+    setEditor(undefined);
+    setReloadKey((key) => key + 1);
+    await Swal.fire("Success", "Booking saved.", "success");
   };
 
   const onDelete = async (row: AllBookingRow) => {
@@ -474,7 +627,11 @@ export default function AllBookings() {
               type="button"
               title="Edit booking"
               className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
-              onClick={() => setEditor(booking)}
+              onClick={() => {
+                setPendingCheckout(null);
+                setCheckoutSourceId(null);
+                setEditor(booking);
+              }}
             >
               <Pencil size={15} />
             </button>
@@ -553,7 +710,11 @@ export default function AllBookings() {
         <Can permission={PERMISSIONS.SPACE_BOOKING_CREATE}>
           <button
             type="button"
-            onClick={() => setEditor(null)}
+            onClick={() => {
+              setPendingCheckout(null);
+              setCheckoutSourceId(null);
+              setEditor(null);
+            }}
             className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700"
           >
             <Plus size={16} />
@@ -713,10 +874,80 @@ export default function AllBookings() {
       <CreateBookingDetailsModal
         isOpen={editor !== undefined}
         initialBooking={editor ? toInitialBooking(editor) : null}
+        draftValues={editor === null ? pendingCheckout : null}
         submitting={savingBooking}
-        onClose={() => setEditor(undefined)}
-        onSaveDraft={(payload) => persistBooking(payload, "Draft")}
-        onSubmit={(payload) => persistBooking(payload, payload.status || "Upcoming")}
+        showFood
+        onClose={() => {
+          if (openPin || openCheckout) return;
+          setEditor(undefined);
+          setPendingCheckout(null);
+          setCheckoutSourceId(null);
+        }}
+        onSaveDraft={(payload) =>
+          saveBooking(payload, "Draft", editor?.sourceId || checkoutSourceId)
+        }
+        onSubmit={(payload) => {
+          const checkingOut = !editor || editor.status === "Draft";
+          if (checkingOut) {
+            beginCheckout(payload);
+            return;
+          }
+          void saveBooking(payload, payload.status || "Upcoming", editor.sourceId);
+        }}
+      />
+
+      <StaffVerifyModal
+        open={openPin}
+        onClose={() => {
+          setOpenPin(false);
+          if (pendingCheckout) setEditor(null);
+        }}
+        onVerified={({ staff, verifiedAt: at }) => {
+          setVerifiedStaff(staff);
+          setVerifiedAt(at);
+          setOpenPin(false);
+          setEditor(undefined);
+          setOpenCheckout(true);
+        }}
+      />
+
+      <CheckoutModal
+        open={openCheckout}
+        onClose={() => {
+          if (savingBooking) return;
+          setOpenCheckout(false);
+          setVerifiedStaff(null);
+          setVerifiedAt(null);
+          if (pendingCheckout) setEditor(null);
+        }}
+        initialVerifiedStaff={verifiedStaff}
+        initialVerifiedAt={verifiedAt}
+        grandTotal={checkoutGrandTotal}
+        items={checkoutItems}
+        initialCustomerName={pendingCheckout?.customerName || ""}
+        initialCustomerPhone={pendingCheckout?.customerPhone || ""}
+        initialCustomerId={pendingCheckout?.customerId || undefined}
+        initialMembership={pendingCheckout?.membershipType || undefined}
+        initialMembershipPlanId={pendingCheckout?.membershipPlanId || undefined}
+        initialMembershipDiscount={pendingCheckout?.discountAmount || 0}
+        initialCashbackTotal={pendingCheckout?.cashbackAmount || 0}
+        lockMembershipDiscount
+        disableCashback
+        couponApplicableContext="all"
+        initialNotes={
+          pendingCheckout
+            ? [
+                pendingCheckout.notes,
+                pendingCheckout.spaceName ? `Space: ${pendingCheckout.spaceName}` : "",
+                pendingCheckout.bookingDate
+                  ? `${pendingCheckout.bookingDate} ${pendingCheckout.startTime}-${pendingCheckout.endTime}`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : ""
+        }
+        onConfirmPayment={confirmCheckout}
       />
     </div>
   );
