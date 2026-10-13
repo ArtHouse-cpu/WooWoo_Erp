@@ -142,60 +142,60 @@ export default function ProductForm() {
 
   return (
     <div className="space-y-4">
-      <Section
-        title="Basic details"
-        description="Name, brand, and how this product is classified."
-      >
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="md:col-span-2">
-            <label className={labelClass}>
-              Product Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              {...register("productName")}
-              placeholder="e.g. Canvas Tote Bag"
-              className={inputClass}
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Brand Name</label>
-            <input
-              {...register("brandName")}
-              placeholder="e.g. Nike, Apple"
-              className={inputClass}
-            />
-          </div>
-          <div className="md:col-span-2">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:[&>div]:grid md:[&>div]:grid-cols-2 md:[&>div]:gap-4 md:[&>div]:space-y-0 [&_label]:mb-1.5 [&_label]:block [&_label]:text-xs [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-slate-500 [&_button.flex]:h-10 [&_button.flex]:rounded-lg [&_button.flex]:border-slate-200">
-              <CategorySelect
-                categoryValue={categoryId || ""}
-                categoryName={categoryName || ""}
-                onCategoryChange={(id, name) => {
-                  setValue("categoryId", id, { shouldDirty: true });
-                  setValue("category", name, { shouldDirty: true });
-                }}
-                subCategoryValue={subCategoryId || ""}
-                subCategoryName={subCategoryName || ""}
-                onSubCategoryChange={(id, name) => {
-                  setValue("subCategoryId", id, { shouldDirty: true });
-                  setValue("subCategory", name, { shouldDirty: true });
-                }}
-              />
-            </div>
-          </div>
-        </div>
+      <Section title="Basics Details">
+        
+<div className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-4">
+  {/* Product Name */}
+  <div >
+    <label className={labelClass}>
+      Product Name <span className="text-red-500">*</span>
+    </label>
+    <input
+      {...register("productName")}
+      placeholder="e.g. Canvas Tote Bag"
+      className={inputClass}
+      autoFocus
+    />
+  </div>
+
+  {/* Brand Name */}
+  <div>
+    <label className={labelClass}>Brand Name</label>
+    <input
+      {...register("brandName")}
+      placeholder="e.g. Nike, Apple"
+      className={inputClass}
+    />
+  </div>
+
+  {/* Category and Subcategory */}
+  <div className="col-span-2">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:[&>div]:grid md:[&>div]:grid-cols-2 md:[&>div]:gap-4 md:[&>div]:space-y-0 [&_label]:mb-1.5 [&_label]:block [&_label]:text-xs [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-slate-500 [&_button.flex]:h-10 [&_button.flex]:rounded-lg [&_button.flex]:border-slate-200">
+      <CategorySelect
+        categoryValue={categoryId || ""}
+        categoryName={categoryName || ""}
+        onCategoryChange={(id, name) => {
+          setValue("categoryId", id, { shouldDirty: true });
+          setValue("category", name, { shouldDirty: true });
+        }}
+        subCategoryValue={subCategoryId || ""}
+        subCategoryName={subCategoryName || ""}
+        onSubCategoryChange={(id, name) => {
+          setValue("subCategoryId", id, { shouldDirty: true });
+          setValue("subCategory", name, { shouldDirty: true });
+        }}
+      />
+    </div>
+  </div>
+</div>
+
       </Section>
 
       <Section
         title="Pricing"
-        description={
-          hasVariants
-            ? "Optional parent prices. Variant prices below are used for each option."
-            : "Selling and purchase amounts in INR. Optional if you add variants with their own prices."
-        }
+        
       >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <div>
             <label className={labelClass}>Selling Price (INR)</label>
             <div className="relative">
@@ -238,9 +238,8 @@ export default function ProductForm() {
 
       <Section
         title="Identifiers"
-        description="SKU and barcode used for inventory and billing."
       >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <div>
             <label className={labelClass}>Item Code / SKU</label>
             <input
@@ -270,7 +269,7 @@ export default function ProductForm() {
         </div>
       </Section>
 
-      <Section title="CSP" description="Customer Seller Program settings.">
+      <Section title="CSP" >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>CSP (Customer Seller Program)</label>
@@ -381,11 +380,11 @@ export default function ProductForm() {
           />
         </Section>
 
-        <Section title="Description" description="Optional product notes.">
-          <label className={labelClass}>Description</label>
+        <Section title="Description" >
+          
           <textarea
             {...register("description")}
-            rows={4}
+            rows={0.5}
             placeholder="Short description for this product…"
             className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />

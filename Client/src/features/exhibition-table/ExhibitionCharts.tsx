@@ -23,6 +23,7 @@ const PieCard = ({ title, subtitle, slices, centerLabel }: PieCardProps) => {
         {subtitle && <p className="truncate text-[11px] text-gray-400">{subtitle}</p>}
       </div>
 
+
       {total === 0 ? (
         <div className="flex h-28 items-center justify-center text-sm text-gray-400">
           No data yet
@@ -88,7 +89,7 @@ const ExhibitionCharts = ({ passes }: Props) => {
   const stats = useMemo(() => buildExhibitionStats(passes), [passes]);
 
   return (
-    <div className="-mx-3 mb-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:-mx-4 sm:px-4 md:-mx-5 md:px-5 xl:mx-0 xl:grid xl:grid-cols-3 xl:gap-4 xl:overflow-visible xl:px-0 xl:pb-0 [&::-webkit-scrollbar]:hidden">
+<div className="-mx-3 mb-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:-mx-4 sm:px-4 md:-mx-5 md:px-5 xl:mx-0 xl:grid xl:grid-cols-4 xl:gap-4 xl:overflow-visible xl:px-0 xl:pb-0 [&::-webkit-scrollbar]:hidden">
       <PieCard title="Gender" slices={stats.gender} centerLabel="visitors" />
       <PieCard title="Age Group" slices={stats.age} centerLabel="visitors" />
       <PieCard
@@ -96,6 +97,12 @@ const ExhibitionCharts = ({ passes }: Props) => {
         subtitle="Visitors can pick more than one"
         slices={stats.interests}
         centerLabel="selections"
+      />
+      <PieCard
+        title="Visit Timing"
+        slices={stats.timing}
+        centerLabel="visitors"
+      
       />
     </div>
   );
