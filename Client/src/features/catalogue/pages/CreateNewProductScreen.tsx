@@ -14,31 +14,30 @@ export default function CreateNewProductScreen() {
   };
 
   return (
-    <div className="w-full px-2">
-      <div className="bg-white shadow-base rounded-2xl p-6 border border-gray-200">
+   <div className="w-full px-2 sm:px-3">
+  <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-base sm:p-5 lg:p-6">
         {/* HEADER */}
         <h2 className="text-xl font-semibold text-gray-800 mb-5">
           Create New Product
         </h2>
 
         {/* === REQUIRED FIELDS === */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+       <div className="mb-4 grid grid-cols-2 gap-3 sm:gap-4 md:mb-6 md:grid-cols-3 md:gap-6">
           {/* Product Name */}
           <div>
-            <label className="block font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-xs font-medium text-gray-700 sm:text-sm">
               Product Name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 
-              focus:ring-black focus:border-transparent outline-none transition"
+           className="w-full rounded-lg border border-gray-300 p-2 text-xs outline-none focus:ring-2 focus:ring-black sm:p-3 sm:text-sm"
               placeholder="Enter product name"
             />
           </div>
 
           {/* Selling Price */}
           <div>
-            <label className="block font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-xs font-medium text-gray-700 sm:text-sm">
               Selling Price (₹) <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -216,7 +215,7 @@ export default function CreateNewProductScreen() {
           Product Images
         </label>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+       <div className="flex min-h-32 w-full items-center justify-center rounded-xl border-2 border-dashed border-gray-300 p-2 sm:min-h-48 sm:p-4">
           {/* Upload Box */}
           <label
             htmlFor="imageInput"
@@ -243,44 +242,33 @@ export default function CreateNewProductScreen() {
           </label>
 
           {/* Preview Section */}
-          <div
-            className="w-full border-2 border-dashed border-gray-300 rounded-xl p-10 
-            flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 
-            hover:border-gray-400 transition"
-          >
-            {imagesPreview.length === 0 ? (
-              <p className="text-gray-500 text-center">
-                No images uploaded yet
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {imagesPreview.map((src, index) => (
-                  <div
-                    key={index}
-                    className="relative border-2 border-gray-200 rounded-lg overflow-hidden 
-                    shadow-md hover:shadow-lg transition"
-                  >
-                    <img
-                      src={src}
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-32 object-cover"
-                    />
+        <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+  {imagesPreview.map((src, index) => (
+    <div
+      key={index}
+      className="relative overflow-hidden rounded-lg border border-gray-200"
+    >
+      <img
+        src={src}
+        alt={`Preview ${index + 1}`}
+        className="h-20 w-full object-cover sm:h-32"
+      />
 
-                    <button
-                      onClick={() =>
-                        setImagesPreview((prev) =>
-                          prev.filter((_, i) => i !== index)
-                        )
-                      }
-                      className="absolute top-1 right-1 bg-black text-white rounded-full p-1"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+      <button
+        type="button"
+        onClick={() =>
+          setImagesPreview((prev) =>
+            prev.filter((_, i) => i !== index)
+          )
+        }
+        className="absolute right-1 top-1 rounded-full bg-black p-1 text-white"
+        aria-label={`Remove image ${index + 1}`}
+      >
+        <Trash2 size={12} />
+      </button>
+    </div>
+  ))}
+</div>
         </div>
 
         {/* Buttons */}

@@ -27,6 +27,26 @@ const AGE_BUCKETS = [
 
 const INTEREST_ORDER = ["Art", "Fashion", "Craft", "Live Workshops", "Food", "Music & Activities"];
 
+const TIMING_ORDER=[
+  "Morning(9 AM - 12 PM)",
+  "Afternoon(12 PM - 3 PM)",
+  "Evening(3 PM - 6 PM )",
+  "Night(6 PM - 9 PM)",
+];
+
+const getVisitTimingBucket  = (dateStr: string) : string => {
+  const date = new Date(dateStr);
+  const hour = date.getHours();
+
+  if(hour>= 9 && hour<12) return   "Morning(9 AM - 12 PM)";
+  if(hour>= 12 && hour<15) return "Afternoon(12 PM - 3 PM)";
+  if(hour>= 15 && hour<18) return "Evening(3 PM - 6 PM )";
+  if(hour>= 18 && hour<21) return  "Night(6 PM - 9 PM)";
+  return "Other";
+};
+
+
+
 const ageBucket = (age: number) =>
   AGE_BUCKETS.find((bucket) => age <= bucket.max)?.label ?? "Unknown";
 
@@ -61,4 +81,15 @@ export const buildExhibitionStats = (passes: ExhibitionPassRecord[]) => ({
     AGE_BUCKETS.map((bucket) => bucket.label),
   ),
   interests: toSlices(tally(passes.flatMap(passInterests)), INTEREST_ORDER),
+
+  timing: toSlices(
+    tally(
+      passes
+      .map((p) => p.checkedInAt || p.createdAt)
+      .filter(Boolean)
+      .map((dateStr) => getVisitTimingBucket(dateStr!)),
+   
+    ),
+    TIMING_ORDER,
+  ),
 });
