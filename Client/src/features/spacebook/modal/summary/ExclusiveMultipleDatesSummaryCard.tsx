@@ -99,11 +99,12 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
   ========================================= */
 
   const totalDuration = useMemo(() => {
-    return slots.reduce(
+    const raw = slots.reduce(
       (total, slot) =>
         total + (Number(slot.duration) || 1),
       0,
     );
+    return Math.round(raw * 100) / 100;
   }, [slots]);
 
   /* =========================================

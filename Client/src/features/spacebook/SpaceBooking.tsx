@@ -549,6 +549,12 @@ const SpaceBook = () => {
       inviterName?: string;
       label?: string;
     } | null;
+    manualDiscount?: {
+      type: "flat" | "percentage";
+      value: number;
+      discountAmount: number;
+    } | null;
+    manualDiscountAmount?: number;
     cashbackTotal: number;
     membershipDiscount: number;
     customerId?: string | null;
@@ -566,10 +572,17 @@ const SpaceBook = () => {
     }
 
     const today = getBusinessToday();
+    const manualDiscountDesc = payment.manualDiscount && payment.manualDiscount.discountAmount > 0
+      ? payment.manualDiscount.type === "percentage"
+        ? `Manual Discount (${payment.manualDiscount.value}%): -₹${payment.manualDiscount.discountAmount}`
+        : `Manual Discount (Flat): -₹${payment.manualDiscount.discountAmount}`
+      : "";
+
     const bookingNotes = [
       pendingCheckout.notes,
       `Space booking · ${pendingCheckout.spaceName || "Space"}`,
       `${formatDateDisplay(pendingCheckout.bookingDate)} · ${pendingCheckout.startTime}-${pendingCheckout.endTime}`,
+      manualDiscountDesc,
       payment.notes,
     ]
       .map((v) => String(v || "").trim())
@@ -580,7 +593,8 @@ const SpaceBook = () => {
     const couponDiscount = Number(payment.coupon?.discountAmount ?? 0);
     const referralDiscount = Number(payment.referral?.discountAmount ?? 0);
     const membershipDiscount = Number(payment.membershipDiscount ?? 0);
-    const totalDiscount = couponDiscount + referralDiscount + membershipDiscount;
+    const manualDiscount = Number(payment.manualDiscount?.discountAmount ?? payment.manualDiscountAmount ?? 0);
+    const totalDiscount = couponDiscount + referralDiscount + membershipDiscount + manualDiscount;
 
     const existingDraftId = (pendingCheckout as any)?._originalBookingId as
       | string
@@ -675,6 +689,7 @@ const SpaceBook = () => {
         grandTotal: payment.finalAmount,
         coupon: payment.coupon ?? null,
         referral: payment.referral ?? null,
+        manualDiscount: payment.manualDiscount ?? null,
         status: "final",
         mode: payment.mode,
         paymentStatus: payment.paymentStatus,

@@ -11,6 +11,7 @@ import {
   Loader2,
   Tag,
   Gift,
+  Percent,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import Swal from "sweetalert2";
@@ -158,6 +159,12 @@ type Props = {
       inviterName?: string;
       label?: string;
     } | null;
+    manualDiscount?: {
+      type: "flat" | "percentage";
+      value: number;
+      discountAmount: number;
+    } | null;
+    manualDiscountAmount?: number;
     cashbackTotal: number;
     membershipDiscount: number;
     /** True when user chose coupon instead of membership discount */
@@ -486,6 +493,9 @@ export default function CheckoutModal({
     }>
   >([]);
   const [loadingReferral, setLoadingReferral] = useState(false);
+  const [manualDiscountType, setManualDiscountType] = useState<"flat" | "percentage">("flat");
+  const [manualDiscountInput, setManualDiscountInput] = useState("");
+  const [manualDiscountValue, setManualDiscountValue] = useState(0);
 
   const [resolvedMembershipPlans, setResolvedMembershipPlans] = useState<
     MembershipPlanPayload[]
@@ -621,6 +631,9 @@ export default function CheckoutModal({
       setReferralSegments([]);
       setReferralDiscountAlreadyUsed(false);
       setReferralStatusMessage("");
+      setManualDiscountType("flat");
+      setManualDiscountInput("");
+      setManualDiscountValue(0);
     }
   }, [
     open,
@@ -1193,6 +1206,23 @@ export default function CheckoutModal({
     [items],
   );
 
+  const baseForManualDiscount = Math.max(
+    0,
+    payableBase -
+      roundToPaise(couponDiscount) -
+      roundToPaise(referralDiscount) -
+      roundToPaise(giftCardDiscount),
+  );
+
+  const manualDiscountAmount = useMemo(() => {
+    if (!manualDiscountValue || manualDiscountValue <= 0) return 0;
+    if (manualDiscountType === "percentage") {
+      const pct = Math.min(100, Math.max(0, manualDiscountValue));
+      return roundToPaise(Math.min(baseForManualDiscount, (baseForManualDiscount * pct) / 100));
+    }
+    return roundToPaise(Math.min(baseForManualDiscount, Math.max(0, manualDiscountValue)));
+  }, [manualDiscountValue, manualDiscountType, baseForManualDiscount]);
+
   useEffect(() => {
     if (!open) return;
     setPaymentStatus("full");
@@ -1204,7 +1234,8 @@ export default function CheckoutModal({
       payableBase -
         roundToPaise(couponDiscount) -
         roundToPaise(referralDiscount) -
-        roundToPaise(giftCardDiscount),
+        roundToPaise(giftCardDiscount) -
+        roundToPaise(manualDiscountAmount),
     );
 
     if (paymentStatus === "due") {
@@ -1228,6 +1259,7 @@ export default function CheckoutModal({
     couponDiscount,
     referralDiscount,
     giftCardDiscount,
+    manualDiscountAmount,
   ]);
 
   useEffect(() => {
@@ -1377,7 +1409,8 @@ export default function CheckoutModal({
     payableBase -
       roundToPaise(couponDiscount) -
       roundToPaise(referralDiscount) -
-      roundToPaise(giftCardDiscount),
+      roundToPaise(giftCardDiscount) -
+      roundToPaise(manualDiscountAmount),
   );
   const isPartialPayment = paymentStatus === "partial";
   const totalPaid = isDuePayment
@@ -1425,7 +1458,7 @@ export default function CheckoutModal({
       (sum, it) => sum + Number(it.qty) * Number(it.price),
       0,
     ),
-    discountTotal: lineDiscountsTotal + couponDiscount + referralDiscount + giftCardDiscount,
+    discountTotal: lineDiscountsTotal + couponDiscount + referralDiscount + giftCardDiscount + manualDiscountAmount,
     cashbackAmount: displayCashbackTotal,
     finalAmount: finalPayable,
     totalDue: dueAmount,
@@ -1498,7 +1531,7 @@ export default function CheckoutModal({
         0,
       ),
       discountTotal:
-        lineDiscountsTotal + couponDiscount + referralDiscount + giftCardDiscount,
+        lineDiscountsTotal + couponDiscount + referralDiscount + giftCardDiscount + manualDiscountAmount,
       extraCharges,
       grandTotal: draftTotal,
       coupon: couponCode.trim()
@@ -1515,6 +1548,14 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
+      manualDiscount:
+        manualDiscountAmount > 0
+          ? {
+              type: manualDiscountType,
+              value: manualDiscountValue,
+              discountAmount: manualDiscountAmount,
+            }
+          : null,
       giftCard:
         giftCardCode.trim() && giftCardDiscount > 0
           ? {
@@ -1747,6 +1788,15 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
+      manualDiscount:
+        manualDiscountAmount > 0
+          ? {
+              type: manualDiscountType,
+              value: manualDiscountValue,
+              discountAmount: manualDiscountAmount,
+            }
+          : null,
+      manualDiscountAmount,
       customerName: customerName.trim(),
       customerPhone: customerSearch.trim(),
       notes: instructionNotes.trim(),
@@ -1810,7 +1860,8 @@ export default function CheckoutModal({
         ) +
         couponDiscount +
         referralDiscount +
-        giftCardDiscount,
+        giftCardDiscount +
+        manualDiscountAmount,
       extraCharges: extraCharges,
       grandTotal: finalPayable,
       coupon: couponCode.trim()
@@ -1827,6 +1878,14 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
+      manualDiscount:
+        manualDiscountAmount > 0
+          ? {
+              type: manualDiscountType,
+              value: manualDiscountValue,
+              discountAmount: manualDiscountAmount,
+            }
+          : null,
       giftCard:
         giftCardCode.trim() && giftCardDiscount > 0
           ? {
@@ -2183,6 +2242,13 @@ export default function CheckoutModal({
                     label={`Gift Card (${giftCardCode})`}
                     value={`− ${formatInr(giftCardDiscount)}`}
                     tone="discount"
+                  />
+                )}
+                {manualDiscountAmount > 0 && (
+                  <SummaryLine
+                    label={`Manual Discount (${manualDiscountType === "percentage" ? `${manualDiscountValue}%` : "Flat"})`}
+                    value={`− ${formatInr(manualDiscountAmount)}`}
+                    className="text-emerald-600 font-semibold"
                   />
                 )}
                 {extraCharges.map((c, i) => (
@@ -2566,6 +2632,145 @@ export default function CheckoutModal({
                   </p>
                 )}
               </section>
+              ) : null}
+
+              {/* Manual Discount — Flat or Percentage */}
+              {!isExpenseCheckout ? (
+                <section className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Percent className="h-4 w-4 text-emerald-600" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                        Manual Discount
+                      </h3>
+                    </div>
+                    {manualDiscountAmount > 0 && (
+                      <span className="text-xs font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full">
+                        −{formatInr(manualDiscountAmount)} Applied
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Mode Buttons: Flat ₹ vs Percentage % */}
+                  <div className="flex gap-1 rounded-lg border border-emerald-100 bg-white/80 p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManualDiscountType("flat");
+                        if (manualDiscountInput) {
+                          const val = Math.max(0, Number(manualDiscountInput) || 0);
+                          setManualDiscountValue(val);
+                        }
+                      }}
+                      className={`flex-1 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition ${
+                        manualDiscountType === "flat"
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "text-emerald-700 hover:bg-emerald-50"
+                      }`}
+                    >
+                      ₹ Flat Discount
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManualDiscountType("percentage");
+                        if (manualDiscountInput) {
+                          const val = Math.min(100, Math.max(0, Number(manualDiscountInput) || 0));
+                          setManualDiscountValue(val);
+                        }
+                      }}
+                      className={`flex-1 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition ${
+                        manualDiscountType === "percentage"
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "text-emerald-700 hover:bg-emerald-50"
+                      }`}
+                    >
+                      % Percentage Discount
+                    </button>
+                  </div>
+
+                  {/* Input & Quick Buttons */}
+                  <div className="flex gap-2">
+                    <div className="relative min-w-0 flex-1">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                        {manualDiscountType === "percentage" ? "%" : "₹"}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={manualDiscountType === "percentage" ? 100 : undefined}
+                        step="any"
+                        value={manualDiscountInput}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          setManualDiscountInput(raw);
+                          const num = Math.max(0, Number(raw) || 0);
+                          const val = manualDiscountType === "percentage" ? Math.min(100, num) : num;
+                          setManualDiscountValue(val);
+                        }}
+                        placeholder={
+                          manualDiscountType === "percentage"
+                            ? "ENTER DISCOUNT PERCENTAGE (E.G. 10)"
+                            : "ENTER FLAT DISCOUNT AMOUNT (E.G. 500)"
+                        }
+                        className="h-10 w-full rounded-lg border border-emerald-200 bg-white pl-8 pr-8 text-sm font-semibold uppercase text-slate-800 outline-none placeholder:font-medium placeholder:tracking-wide placeholder:text-slate-400 focus:border-emerald-500"
+                      />
+                      {manualDiscountValue > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualDiscountInput("");
+                            setManualDiscountValue(0);
+                          }}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition p-0.5"
+                          title="Clear discount"
+                        >
+                          <X size={15} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Quick percentage pills if percentage mode is active */}
+                    {manualDiscountType === "percentage" && (
+                      <div className="hidden sm:flex items-center gap-1">
+                        {[5, 10, 15, 20].map((pct) => (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => {
+                              setManualDiscountInput(String(pct));
+                              setManualDiscountValue(pct);
+                            }}
+                            className={`h-10 px-3 rounded-lg border text-xs font-bold transition ${
+                              manualDiscountValue === pct
+                                ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
+                                : "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50"
+                            }`}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {manualDiscountAmount > 0 ? (
+                    <div className="flex items-center justify-between rounded-lg bg-emerald-100/70 border border-emerald-200 px-3.5 py-2.5 text-xs font-semibold text-emerald-800">
+                      <span>
+                        {manualDiscountType === "percentage"
+                          ? `${manualDiscountValue}% discount applied`
+                          : "Flat discount applied"}
+                      </span>
+                      <span className="font-bold text-emerald-700">
+                        −{formatInr(manualDiscountAmount)}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-emerald-600">
+                      Add a manual flat (₹) or percentage (%) discount on the total payable amount.
+                    </p>
+                  )}
+                </section>
               ) : null}
 
               <SectionCard 

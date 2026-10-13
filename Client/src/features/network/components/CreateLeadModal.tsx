@@ -11,6 +11,7 @@ import {
   Video,
   ExternalLink,
   Globe,
+  CheckCircle2,
 } from "lucide-react";
 import {
   type LeadItem,
@@ -20,6 +21,8 @@ import {
   type LeadMembership,
   handleGetAccessStaff,
   handleGetLeadMembership,
+  handleCheckCustomerPhone,
+  handleCreateCustomer,
 } from "@/services/apiClient";
 import LeadMembershipBadge from "./LeadMembershipBadge";
 
@@ -45,6 +48,7 @@ const BACKEND_STATUS_OPTIONS: LeadStatus[] = [
   "Interested",
   "Not Interested",
   "Need to message",
+  "Converted",
 ];
 
 // Common lead sources
@@ -125,6 +129,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
   const isEditing = Boolean(leadToEdit);
 
+  const [autoCreateCustomer, setAutoCreateCustomer] = useState(true);
   const [phoneMembership, setPhoneMembership] = useState<LeadMembership | null>(null);
   const [checkingMembership, setCheckingMembership] = useState(false);
   const phoneForLookup = isOpen && /^\d{10}$/.test(formData.phone || "") ? formData.phone! : "";
@@ -240,6 +245,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
       setCustomSource("");
     }
     setError("");
+    setAutoCreateCustomer(true);
   }, [leadToEdit, isOpen]);
 
   // Clean up object URLs on component unmount
@@ -345,6 +351,21 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     }
 
     setError("");
+
+    // If status is "Converted" and autoCreateCustomer is selected, ensure Customer record exists
+    if (formData.status === "Converted" && autoCreateCustomer) {
+      try {
+        const phoneCheck = await handleCheckCustomerPhone(phoneTrimmed);
+        if (!phoneCheck?.exists) {
+          await handleCreateCustomer({
+            name: formData.name.trim(),
+            mobile: phoneTrimmed,
+          });
+        }
+      } catch (custErr: any) {
+        console.warn("Could not auto-create customer upon lead conversion:", custErr);
+      }
+    }
 
     const chosenStaff = staffOptions.find(
       (s) =>
@@ -540,6 +561,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Lead Converted Notification & Customer Creation Option */}
+            
 
             {/* Purpose & Assign To (Staff) */}
             <div className="grid grid-cols-2 gap-3 sm:gap-4">

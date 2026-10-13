@@ -25,6 +25,7 @@ const leadSchema = new mongoose.Schema(
         "Interested",
         "Not Interested",
         "Need to message",
+        "Converted",
       ],
       default: "New",
     },

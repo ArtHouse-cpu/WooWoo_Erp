@@ -544,6 +544,7 @@ const createInvoice = async (req, res) => {
       pendingAmount,
       coupon,
       referral,
+      manualDiscount,
       extraCharges,
       cashbackTotal,
       membershipDiscount,
@@ -814,6 +815,14 @@ const createInvoice = async (req, res) => {
             label: appliedReferral.label,
           }
         : undefined,
+      manualDiscount:
+        manualDiscount && Number(manualDiscount.discountAmount) > 0
+          ? {
+              type: manualDiscount.type === 'percentage' ? 'percentage' : 'flat',
+              value: Number(manualDiscount.value || 0),
+              discountAmount: Number(manualDiscount.discountAmount || 0),
+            }
+          : undefined,
       grandTotal: computedGrandTotal,
       extraCharges: Array.isArray(extraCharges) ? extraCharges : [],
       membershipDiscount: Math.max(0, Number(membershipDiscount ?? 0)),
@@ -1008,7 +1017,7 @@ const getInvoices=async(req,res)=>{
           .sort({createdAt: -1})
           .limit(limit)
           .select(
-            'customerName customerPhone pendingAmount paymentBreakdown paymentStatus status invoiceCode createdAt updatedAt grandTotal returnedAmount createdBy mode salesPersonName invoiceDate items coupon referral membershipDiscount membershipType cashbackTotal discountTotal subTotal extraCharges invoiceBy notes',
+            'customerName customerPhone pendingAmount paymentBreakdown paymentStatus status invoiceCode createdAt updatedAt grandTotal returnedAmount createdBy mode salesPersonName invoiceDate items coupon referral manualDiscount membershipDiscount membershipType cashbackTotal discountTotal subTotal extraCharges invoiceBy notes',
           )
           .lean();
         return res.status(200).json({
