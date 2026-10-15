@@ -1,6 +1,6 @@
-import { Bell, User, Shuffle, ChevronDown, Menu, FilePlus2, Crown, CalendarPlus, UserPlus } from "lucide-react";
+import { Bell, User, Shuffle, ChevronDown, Menu, FilePlus2, Crown, CalendarPlus, UserPlus, ClipboardList, CalendarCheck } from "lucide-react";
 import logo from "../assets/images/logo/woo_woo_art_house_logo.png";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Swal from "sweetalert2";
 
@@ -50,13 +50,34 @@ export default function Header({
   const [pendingLeadPayload, setPendingLeadPayload] = useState<LeadPayload | null>(null);
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
 
-  const handleOpenAddBooking = () => {
-    if (location.pathname.toLowerCase().includes("spacebooking")) {
+  const [bookingMenu, setBookingMenu] = useState<null | "header" | "mobile">(null);
+
+  const openBookingChoice = (kind: "full" | "space") => {
+    setBookingMenu(null);
+    const path = location.pathname.toLowerCase();
+    if (kind === "full") {
+      if (path.includes("allbookings")) {
+        window.dispatchEvent(new CustomEvent("open-add-full-booking"));
+      } else {
+        navigate("/allBookings?create=true");
+      }
+      return;
+    }
+    if (path.includes("spacebooking")) {
       window.dispatchEvent(new CustomEvent("open-add-space-booking"));
     } else {
       navigate("/spaceBooking?create=true");
     }
   };
+
+  useEffect(() => {
+    if (!bookingMenu) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setBookingMenu(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [bookingMenu]);
 
   const handleLeadSubmit = (payload: LeadPayload) => {
     setPendingLeadPayload(payload);
@@ -206,7 +227,7 @@ export default function Header({
         </button>
         <button
           type="button"
-          onClick={handleOpenAddBooking}
+          onClick={() => setBookingMenu((current) => (current === "header" ? null : "header"))}
           className="hidden items-center gap-2 rounded-xl bg-blue-50 p-2.5 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3.5 sm:py-2 md:inline-flex md:px-5 md:py-2.5 md:text-[13px]"
           aria-label="+ Add Booking"
           title="+ Add Booking"
@@ -294,7 +315,7 @@ export default function Header({
         {
           label: "Add Booking",
           Icon: CalendarPlus,
-          onClick: handleOpenAddBooking,
+          onClick: () => setBookingMenu((current) => (current === "mobile" ? null : "mobile")),
           tone: "from-violet-500 to-fuchsia-600 shadow-violet-500/30",
         },
         {
@@ -317,6 +338,61 @@ export default function Header({
           </button>
         ))}
     </nav>
+    {bookingMenu ? (
+      <>
+        <button
+          type="button"
+          aria-label="Close booking options"
+          className="fixed inset-0 z-[70] cursor-default bg-black/20"
+          onClick={() => setBookingMenu(null)}
+        />
+        <div
+          role="menu"
+          aria-label="Add booking"
+          className={`fixed z-[80] rounded-2xl border border-slate-200 bg-white p-2 shadow-xl ${
+            bookingMenu === "mobile"
+              ? "inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))]"
+              : "right-4 top-[calc(3.6rem+env(safe-area-inset-top))] w-72"
+          }`}
+        >
+          <p className="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            Add booking
+          </p>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => openBookingChoice("full")}
+            className="flex w-full items-start gap-3 rounded-xl px-2.5 py-2.5 text-left transition hover:bg-violet-50"
+          >
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+              <ClipboardList size={18} />
+            </span>
+            <span>
+              <span className="block text-sm font-bold text-slate-900">Full Booking</span>
+              <span className="mt-0.5 block text-xs text-slate-500">
+                Space, services, and food
+              </span>
+            </span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => openBookingChoice("space")}
+            className="flex w-full items-start gap-3 rounded-xl px-2.5 py-2.5 text-left transition hover:bg-indigo-50"
+          >
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+              <CalendarCheck size={18} />
+            </span>
+            <span>
+              <span className="block text-sm font-bold text-slate-900">Space Booking</span>
+              <span className="mt-0.5 block text-xs text-slate-500">
+                Space and services
+              </span>
+            </span>
+          </button>
+        </div>
+      </>
+    ) : null}
     </>
   );
 }

@@ -41,6 +41,7 @@ export type SpaceCard = {
   id: string;
   name: string;
   category: string;
+  spaceType: string;
   description: string;
   capacity: number;
   imageUrl: string | null;
@@ -71,6 +72,7 @@ export function groupSpacesByName(rows: SpaceRecord[]): SpaceCard[] {
         id: String(row._id),
         name,
         category: String(row.category || '').trim(),
+        spaceType: String(row.spaceType || '').trim(),
         description: String(row.description || '').trim(),
         capacity: Math.max(0, Number(row.capacity) || 0),
         imageUrl: pickSpaceImage(row),
@@ -90,6 +92,9 @@ export function groupSpacesByName(rows: SpaceRecord[]): SpaceCard[] {
     }
     if (!existing.capacity && row.capacity) {
       existing.capacity = Math.max(0, Number(row.capacity) || 0);
+    }
+    if (!existing.spaceType && row.spaceType) {
+      existing.spaceType = String(row.spaceType).trim();
     }
   }
 
@@ -124,6 +129,35 @@ export async function fetchSpaceAvailability(
     today: String(data?.today || from),
     nowMinutes: Math.max(0, Number(data?.nowMinutes) || 0),
     busy: Array.isArray(data?.busy) ? data.busy : [],
+  };
+}
+
+export async function fetchAvailableSpaces(signal?: AbortSignal): Promise<SpaceRecord[]> {
+  const {data} = await api.get<SpaceListResponse>('/space', {
+    params: {status: 'Available'},
+    signal,
+  });
+  return Array.isArray(data?.spaces) ? data.spaces : [];
+}
+
+export async function fetchPublicSpace(id: string, signal?: AbortSignal): Promise<SpaceCard> {
+  const {data} = await api.get<{success: boolean; space?: SpaceCard}>(
+    `/space/${encodeURIComponent(id)}`,
+    {signal},
+  );
+  const space = data?.space;
+  if (!space?.name) throw new Error('Space not found');
+  return {
+    id: String(space.id || id),
+    name: String(space.name || '').trim(),
+    category: String(space.category || '').trim(),
+    spaceType: String(space.spaceType || '').trim(),
+    description: String(space.description || '').trim(),
+    capacity: Math.max(0, Number(space.capacity) || 0),
+    imageUrl: resolveSpaceImageUrl(space.imageUrl),
+    weekdayPrice: space.weekdayPrice == null ? null : Math.max(0, Number(space.weekdayPrice) || 0),
+    weekendPrice: space.weekendPrice == null ? null : Math.max(0, Number(space.weekendPrice) || 0),
+    fromPrice: Math.max(0, Number(space.fromPrice) || 0),
   };
 }
 

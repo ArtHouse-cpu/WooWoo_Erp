@@ -16,6 +16,18 @@ export const MEMBERSHIP_BUCKETS = Object.freeze({
   food: 'Food',
 });
 
+/** A membership plan purchase is not an eligible product, service, space, or food line. */
+export function isMembershipPurchaseLine(category) {
+  const lower = String(category ?? '')
+    .trim()
+    .toLowerCase();
+  return (
+    lower === 'membership' ||
+    lower === 'subscription' ||
+    lower === 'membership subscription'
+  );
+}
+
 /** Normalize any raw category / sourceType / lineCategory to a line type. */
 export function normalizeLineType(raw) {
   const lower = String(raw ?? '')

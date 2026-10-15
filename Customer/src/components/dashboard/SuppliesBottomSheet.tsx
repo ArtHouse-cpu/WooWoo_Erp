@@ -1,4 +1,5 @@
 import {useEffect, useState, type ReactNode} from 'react';
+import {useNavigate} from 'react-router-dom';
 import axios from 'axios';
 import {
   X,
@@ -12,6 +13,7 @@ import {
   ShoppingCart,
   MessageCircle,
   Search,
+  Compass,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {
@@ -71,6 +73,7 @@ type SuppliesBottomSheetProps = {
 type TabId = 'most-loved' | 'reviews' | 'new-arrivals';
 
 export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabId>('most-loved');
   const [activeDot, setActiveDot] = useState(0);
   const [products, setProducts] = useState<CustomerProduct[]>([]);
@@ -532,7 +535,20 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
             </div>
 
             {/* Bottom sticky CTA Buttons */}
-            <div className="sticky bottom-0 bg-white border-t border-slate-100 p-4 flex gap-3 z-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="sticky bottom-0 z-10 flex items-stretch gap-3 border-t border-slate-100 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                aria-label="Explore supplies"
+                title="Explore supplies"
+                onClick={() => {
+                  onClose();
+                  navigate('/supplies');
+                }}
+                className="flex w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#111111] text-white transition hover:bg-slate-800"
+              >
+                <Compass className="h-5 w-5" strokeWidth={2.5} />
+              </button>
+              <div className="flex min-w-0 flex-1 gap-3">
               {/* Order Online Button */}
               <button
                 type="button"
@@ -562,6 +578,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                   <span>Query Now</span>
                 </button>
               )}
+              </div>
             </div>
           </motion.div>
         </div>

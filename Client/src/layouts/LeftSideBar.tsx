@@ -66,7 +66,7 @@ const MENU_GROUPS: MenuGroup[] = [
     icon: BookOpenText,
     submenu: [
       { name: "spaceBooking", label: "Space Booking", icon: CalendarCheck  , path: "/spaceBooking" },
-      { name: "allBookings", label: "All Bookings", icon: ClipboardList, path: "/allBookings" },
+      { name: "allBookings", label: "Full Bookings", icon: ClipboardList, path: "/allBookings" },
     ],
   },
   {

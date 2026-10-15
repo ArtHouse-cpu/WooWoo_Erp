@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  addLeadTimeline,
   createLead,
   getLead,
   getLeadById,
@@ -17,6 +18,7 @@ router.use(authenticateUser, attachStaffContext);
 router.get('/', getLead);
 router.get('/membership', getLeadMembership);
 router.get('/:id', getLeadById);
+router.post('/:id/timeline', addLeadTimeline);
 router.post('/', uploadLeadAttachments.array('attachments'), createLead);
 router.delete('/:id', deleteLead);
 router.delete('/', deleteLead);

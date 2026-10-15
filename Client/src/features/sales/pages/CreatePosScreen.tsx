@@ -1770,6 +1770,7 @@ export default function CreatePosScreen({
             initialMembershipDiscount={membershipDiscountTotal}
             initialProductDiscount={productDiscountTotal}
             initialCashbackTotal={cashbackTotal}
+            allowPartialPayment={false}
             extraCharges={extraCharges}
             membershipPlans={membershipPlans}
             onClose={() => setOpenCheckout(false)}

@@ -1,4 +1,5 @@
 import {useEffect, useState, type ReactNode} from 'react';
+import {useNavigate} from 'react-router-dom';
 import axios from 'axios';
 import {
   X,
@@ -19,6 +20,7 @@ import {
   Sofa,
   MessageCircle,
   Book,
+  Compass,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {
@@ -424,6 +426,7 @@ type PillItem = {
 };
 
 export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabId>('exclusive-space');
   const [activeDot, setActiveDot] = useState(0);
   const [exclusiveSpaces, setExclusiveSpaces] = useState<SpaceCard[]>([]);
@@ -850,7 +853,20 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
             </div>
 
             {/* Bottom sticky CTA Buttons */}
-            <div className="sticky bottom-0 bg-white border-t border-slate-100 p-4 flex gap-3 z-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="sticky bottom-0 z-10 flex items-stretch gap-3 border-t border-slate-100 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                aria-label="Explore spaces"
+                title="Explore spaces"
+                onClick={() => {
+                  onClose();
+                  navigate('/spaces');
+                }}
+                className="flex w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#111111] text-white transition hover:bg-slate-800"
+              >
+                <Compass className="h-5 w-5" strokeWidth={2.5} />
+              </button>
+              <div className="flex min-w-0 flex-1 gap-3">
               {activeTab === 'exclusive-space' ? (
                 <>
                   {/* Book Online Button */}
@@ -894,6 +910,7 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                   </a>
                 </>
               )}
+              </div>
             </div>
           </motion.div>
           {detailSpace ? (

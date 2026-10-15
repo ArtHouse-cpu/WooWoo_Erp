@@ -1204,19 +1204,50 @@ export const getProducts = async (req, res) => {
     });
   }
 };
+const CUSTOMER_PRODUCT_SELECT =
+  'productName brandName sellingPrice category subCategory description discountType discountValue images imageUrl createdAt primaryUnit stockStatus';
+
+const customerCatalogueFilter = () => ({
+  type: {$ne: 'service'},
+  itemType: {$ne: 'service'},
+});
+
+/** Public catalogue shape. Omits cost, barcodes, stock counts, and staff or customer ids. */
+const serializeCustomerProduct = product => {
+  const images = Array.isArray(product.images)
+    ? product.images.map(url => String(url || '').trim()).filter(Boolean)
+    : [];
+  const imageUrl = String(product.imageUrl || '').trim() || images[0] || null;
+  const availability =
+    product.stockStatus === 'out_of_stock' ? 'out_of_stock' : 'in_stock';
+  return {
+    _id: product._id,
+    name: String(product.productName || '').trim(),
+    brandName: String(product.brandName || '').trim(),
+    price: Math.max(0, Number(product.sellingPrice) || 0),
+    category: String(product.category || '').trim(),
+    subCategory: String(product.subCategory || '').trim(),
+    description: String(product.description || '').trim(),
+    unit: String(product.primaryUnit || '').trim(),
+    discountType: product.discountType || 'flat',
+    discountValue: Math.max(0, Number(product.discountValue) || 0),
+    availability,
+    imageUrl,
+    images,
+    createdAt: product.createdAt,
+  };
+};
+
 /** Public catalogue for the customer supplies modal. No cost price or staff fields. */
 export const getCustomerProducts = async (req, res) => {
   try {
     const limit = Math.min(
       Math.max(Number(req.query.limit) || 100, 1),
-      100,
+      200,
     );
     const search = String(req.query.search || '').trim();
     const category = String(req.query.category || '').trim();
-    const filter = {
-      type: {$ne: 'service'},
-      itemType: {$ne: 'service'},
-    };
+    const filter = customerCatalogueFilter();
     if (category && category.toLowerCase() !== 'all') {
       filter.category = category;
     }
@@ -1232,16 +1263,11 @@ export const getCustomerProducts = async (req, res) => {
 
     const [products, categoryNames] = await Promise.all([
       Product.find(filter)
-        .select(
-          'productName brandName sellingPrice category subCategory description discountType discountValue images imageUrl createdAt',
-        )
+        .select(CUSTOMER_PRODUCT_SELECT)
         .sort({createdAt: -1})
         .limit(limit)
         .lean(),
-      Product.distinct('category', {
-        type: {$ne: 'service'},
-        itemType: {$ne: 'service'},
-      }),
+      Product.distinct('category', customerCatalogueFilter()),
     ]);
 
     return res.status(200).json({
@@ -1250,33 +1276,48 @@ export const getCustomerProducts = async (req, res) => {
         .map(name => String(name || '').trim())
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b)),
-      products: products.map(product => {
-        const images = Array.isArray(product.images)
-          ? product.images.map(url => String(url || '').trim()).filter(Boolean)
-          : [];
-        const imageUrl =
-          String(product.imageUrl || '').trim() || images[0] || null;
-        return {
-          _id: product._id,
-          name: String(product.productName || '').trim(),
-          brandName: String(product.brandName || '').trim(),
-          price: Math.max(0, Number(product.sellingPrice) || 0),
-          category: String(product.category || '').trim(),
-          subCategory: String(product.subCategory || '').trim(),
-          description: String(product.description || '').trim(),
-          discountType: product.discountType || 'flat',
-          discountValue: Math.max(0, Number(product.discountValue) || 0),
-          imageUrl,
-          images,
-          createdAt: product.createdAt,
-        };
-      }),
+      products: products.map(serializeCustomerProduct),
     });
   } catch (error) {
     console.error('getCustomerProducts error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch products',
+    });
+  }
+};
+
+/** One public product for a shared link. Same safe fields as the catalogue. */
+export const getCustomerProductById = async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+    const product = await Product.findOne({
+      _id: id,
+      ...customerCatalogueFilter(),
+    })
+      .select(CUSTOMER_PRODUCT_SELECT)
+      .lean();
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      product: serializeCustomerProduct(product),
+    });
+  } catch (error) {
+    console.error('getCustomerProductById error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch product',
     });
   }
 };

@@ -12,6 +12,10 @@ import {
   validateAndPersistSchedule,
   BookingValidationError,
 } from '../services/spaceBookingAvailability.service.js';
+import {
+  appliedBookingPayment,
+  bookingPaymentError,
+} from '../utils/bookingPayment.js';
 
 const STATUSES = new Set(['Upcoming', 'Ongoing', 'Expired', 'Cancelled', 'Draft']);
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -181,6 +185,8 @@ const serialize = (doc, customer) => {
     cashbackTotal: Number(plain.cashbackTotal) || 0,
     subTotal: Number(plain.subTotal) || 0,
     grandTotal: Number(plain.grandTotal) || 0,
+    paidAmount: Number(plain.paidAmount) || 0,
+    dueAmount: Number(plain.dueAmount) || 0,
     status: plain.status || 'Draft',
     notes: plain.notes || '',
     paymentStatus: plain.paymentStatus || '',
@@ -308,6 +314,27 @@ const buildRecord = async body => {
       ? status
       : computeBookingStatus(toDateKey(bookingDate), startTime, endTime, status);
 
+  const confirmingPayment =
+    Boolean(paymentStatus) && resolvedStatus !== 'Draft' && resolvedStatus !== 'Cancelled';
+  let paidAmount;
+  let dueAmount;
+  if (confirmingPayment) {
+    const tendered = Math.max(0, Number(body.paidAmount) || 0);
+    const paymentError = bookingPaymentError({
+      total: grandTotal,
+      paid: tendered,
+      paymentStatus,
+    });
+    if (paymentError) {
+      errors.push(paymentError);
+      return {errors};
+    }
+    paidAmount = appliedBookingPayment(grandTotal, tendered);
+    const gap = roundMoney(Math.max(0, grandTotal - paidAmount));
+    dueAmount = paymentStatus === 'full' && gap <= 1 ? 0 : gap;
+    if (dueAmount === 0) paidAmount = grandTotal;
+  }
+
   return {
     errors,
     record: {
@@ -337,6 +364,7 @@ const buildRecord = async body => {
       status: resolvedStatus,
       notes: String(body.notes || '').trim().slice(0, 200),
       ...(paymentStatus ? {paymentStatus} : {}),
+      ...(confirmingPayment ? {paidAmount, dueAmount} : {}),
     },
     customer,
     blocksSpace: Boolean(space) && resolvedStatus !== 'Draft' && resolvedStatus !== 'Cancelled',

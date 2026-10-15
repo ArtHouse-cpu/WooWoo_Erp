@@ -1856,6 +1856,7 @@ const SpaceBook = () => {
             : ""
         }
         couponApplicableContext="space"
+        minimumPaymentPercent={70}
         onConfirmPayment={async (payment) => {
           await handleConfirmCheckoutPayment(payment);
         }}

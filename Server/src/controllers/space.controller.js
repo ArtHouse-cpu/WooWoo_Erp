@@ -530,6 +530,78 @@ export const getSpaces = async (req, res) => {
   }
 };
 
+const publicSpaceCard = docs => {
+  const rows = docs.flatMap(doc => {
+    const serialized = serializeSpace(doc);
+    return Array.isArray(serialized) ? serialized : [serialized];
+  });
+  const first = rows[0];
+  if (!first) return null;
+  let weekdayPrice = null;
+  let weekendPrice = null;
+  let imageUrl = null;
+  let description = '';
+  let capacity = 0;
+  for (const row of rows) {
+    const price = Math.max(0, Number(row.price) || 0);
+    if (String(row.day || '').toLowerCase() === 'weekend') weekendPrice = price;
+    else weekdayPrice = price;
+    if (!imageUrl && row.imageUrl) imageUrl = String(row.imageUrl).trim();
+    if (!description && row.description) description = String(row.description).trim();
+    capacity = Math.max(capacity, Number(row.capacity) || 0);
+  }
+  const prices = [weekdayPrice, weekendPrice].filter(value => value != null);
+  return {
+    id: String(first._id),
+    name: String(first.name || '').trim(),
+    category: String(first.category || '').trim(),
+    spaceType: String(first.spaceType || '').trim(),
+    description,
+    capacity,
+    status: 'Available',
+    imageUrl: imageUrl || null,
+    weekdayPrice,
+    weekendPrice,
+    fromPrice: prices.length ? Math.min(...prices) : 0,
+  };
+};
+
+/** One public space for a shared link. No staff fields or booking records. */
+export const getCustomerSpaceById = async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({success: false, message: 'Space not found'});
+    }
+    const space = await Space.findById(id).lean();
+    if (!space) {
+      return res.status(404).json({success: false, message: 'Space not found'});
+    }
+    const name = String(space.name || '').trim();
+    const siblings = name
+      ? await Space.find({
+          name: new RegExp(`^${escapeRegex(name)}$`, 'i'),
+          status: 'Available',
+        }).lean()
+      : [];
+    if (!siblings.length) {
+      return res.status(404).json({success: false, message: 'Space not found'});
+    }
+    const card = publicSpaceCard(siblings);
+    if (!card) {
+      return res.status(404).json({success: false, message: 'Space not found'});
+    }
+    card.id = id;
+    return res.status(200).json({success: true, space: card});
+  } catch (error) {
+    console.error('getCustomerSpaceById error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch space.',
+    });
+  }
+};
+
 export const getSpaceById = async (req, res) => {
   try {
     const {id} = req.params;

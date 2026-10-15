@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -180,6 +181,35 @@ export default function AllBookings() {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [reloadKey, setReloadKey] = useState(0);
   const searchRef = useRef("");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const openCreateBooking = () => {
+    setPendingCheckout(null);
+    setCheckoutSourceId(null);
+    setVerifiedStaff(null);
+    setVerifiedAt(null);
+    setOpenPin(false);
+    setOpenCheckout(false);
+    setEditor(null);
+  };
+
+  useEffect(() => {
+    window.addEventListener("open-add-full-booking", openCreateBooking);
+    return () => window.removeEventListener("open-add-full-booking", openCreateBooking);
+  }, []);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "true") return;
+    openCreateBooking();
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("create");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -247,6 +277,7 @@ export default function AllBookings() {
     status: string,
     sourceId?: string | null,
     paymentStatus?: string,
+    paymentAmounts?: { paidAmount: number; dueAmount: number },
   ) => {
     const body = {
       customerName: payload.customerName,
@@ -268,6 +299,12 @@ export default function AllBookings() {
       notes: payload.notes,
       status,
       ...(paymentStatus ? { paymentStatus } : {}),
+      ...(paymentAmounts
+        ? {
+            paidAmount: paymentAmounts.paidAmount,
+            dueAmount: paymentAmounts.dueAmount,
+          }
+        : {}),
     };
     if (sourceId) await handleUpdateAllBooking(sourceId, body);
     else await handleCreateAllBooking(body);
@@ -377,6 +414,9 @@ export default function AllBookings() {
 
   const confirmCheckout = async (payment: {
     paymentStatus: string;
+    paidAmount: number;
+    dueAmount: number;
+    finalAmount: number;
     customerName: string;
     customerPhone: string;
     notes: string;
@@ -408,6 +448,13 @@ export default function AllBookings() {
         status,
         checkoutSourceId,
         payment.paymentStatus,
+        {
+          paidAmount: Math.min(
+            Math.max(0, Number(payment.paidAmount) || 0),
+            Math.max(0, Number(payment.finalAmount) || 0),
+          ),
+          dueAmount: Math.max(0, Number(payment.dueAmount) || 0),
+        },
       );
     } finally {
       setSavingBooking(false);
@@ -855,6 +902,22 @@ export default function AllBookings() {
               <DetailLine label="Status" value={selected.status} />
               <DetailLine label="Payment" value={paymentLabel(selected.paymentStatus)} />
               <DetailLine
+                label="Paid"
+                value={
+                  selected.paymentStatus
+                    ? `₹${Number(selected.paidAmount || 0).toLocaleString("en-IN")}`
+                    : ""
+                }
+              />
+              <DetailLine
+                label="Balance due"
+                value={
+                  selected.paymentStatus === "partial"
+                    ? `₹${Number(selected.dueAmount || 0).toLocaleString("en-IN")}`
+                    : ""
+                }
+              />
+              <DetailLine
                 label="Amount"
                 value={
                   selected.grandTotal
@@ -933,6 +996,7 @@ export default function AllBookings() {
         initialCashbackTotal={pendingCheckout?.cashbackAmount || 0}
         lockMembershipDiscount
         disableCashback
+        minimumPaymentPercent={70}
         couponApplicableContext="all"
         initialNotes={
           pendingCheckout

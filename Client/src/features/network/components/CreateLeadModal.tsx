@@ -46,9 +46,16 @@ const BACKEND_STATUS_OPTIONS: LeadStatus[] = [
   "New",
   "Contacted",
   "Interested",
+  "Contact Tomorrow",
+  "Contact in 2 Days",
+  "Come for Visit",
+  "Shared Quotation",
+  "Negotiation",
+  "Follow Up (Custom)",
   "Not Interested",
   "Need to message",
   "Converted",
+  "Lost",
 ];
 
 // Common lead sources

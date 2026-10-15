@@ -11,7 +11,6 @@ import {
   Loader2,
   Tag,
   Gift,
-  Percent,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -130,6 +129,13 @@ type Props = {
     | "food"
     | "membership"
     | "all";
+  /**
+   * Booking checkout only. Partial payment must cover at least this percent
+   * of the payable total. Due is hidden because it collects nothing.
+   */
+  minimumPaymentPercent?: number;
+  /** POS billing hides partial payment. Space booking keeps it. */
+  allowPartialPayment?: boolean;
   onConfirmPayment?: (payload: {
     mode: string;
     paymentStatus: "full" | "partial";
@@ -216,6 +222,49 @@ function formatInr(value: number) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;
+}
+
+export const BOOKING_MIN_PAYMENT_MESSAGE =
+  "Minimum 70% payment is required to confirm the booking.";
+
+/** Smallest amount that still covers the booking minimum, rounded up to paise. */
+export function minimumBookingPayment(total: number, percent = 70) {
+  const amount = Math.max(0, Number(total) || 0);
+  const rate = Math.max(0, Number(percent) || 0);
+  if (amount <= 0 || rate <= 0) return 0;
+  return Math.ceil((amount * rate) / 100 * 100 - 1e-8) / 100;
+}
+
+function BookingMinimumNotice({
+  minimumPaid,
+  balanceDue,
+  percent,
+  invalid,
+}: {
+  minimumPaid: number;
+  balanceDue: number;
+  percent: number;
+  invalid: boolean;
+}) {
+  return (
+    <div className="mt-3 space-y-1.5 text-sm">
+      <div className="flex items-center justify-between text-slate-600">
+        <span>Minimum payment ({percent}%)</span>
+        <span className="font-bold text-slate-900">{formatInr(minimumPaid)}</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-slate-600">Balance due</span>
+        <span className={`font-bold ${balanceDue > 0 ? "text-amber-700" : "text-emerald-700"}`}>
+          {formatInr(balanceDue)}
+        </span>
+      </div>
+      {invalid ? (
+        <p className="pt-1 text-xs font-semibold text-rose-600">
+          {BOOKING_MIN_PAYMENT_MESSAGE}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 /** Product-catalogue discount for a checkout line (not membership). */
@@ -395,6 +444,8 @@ export default function CheckoutModal({
   membershipPlans = DEFAULT_MEMBERSHIP_PLANS,
   checkoutContext = "sale",
   couponApplicableContext,
+  minimumPaymentPercent = 0,
+  allowPartialPayment = true,
   onConfirmPayment,
   onSavedAndNew,
 }: Props) {
@@ -494,10 +545,6 @@ export default function CheckoutModal({
     }>
   >([]);
   const [loadingReferral, setLoadingReferral] = useState(false);
-  const [manualDiscountType, setManualDiscountType] = useState<"flat" | "percentage">("flat");
-  const [manualDiscountInput, setManualDiscountInput] = useState("");
-  const [manualDiscountValue, setManualDiscountValue] = useState(0);
-
   const [resolvedMembershipPlans, setResolvedMembershipPlans] = useState<
     MembershipPlanPayload[]
   >(membershipPlans);
@@ -632,9 +679,6 @@ export default function CheckoutModal({
       setReferralSegments([]);
       setReferralDiscountAlreadyUsed(false);
       setReferralStatusMessage("");
-      setManualDiscountType("flat");
-      setManualDiscountInput("");
-      setManualDiscountValue(0);
     }
   }, [
     open,
@@ -1207,22 +1251,7 @@ export default function CheckoutModal({
     [items],
   );
 
-  const baseForManualDiscount = Math.max(
-    0,
-    payableBase -
-      roundToPaise(couponDiscount) -
-      roundToPaise(referralDiscount) -
-      roundToPaise(giftCardDiscount),
-  );
-
-  const manualDiscountAmount = useMemo(() => {
-    if (!manualDiscountValue || manualDiscountValue <= 0) return 0;
-    if (manualDiscountType === "percentage") {
-      const pct = Math.min(100, Math.max(0, manualDiscountValue));
-      return roundToPaise(Math.min(baseForManualDiscount, (baseForManualDiscount * pct) / 100));
-    }
-    return roundToPaise(Math.min(baseForManualDiscount, Math.max(0, manualDiscountValue)));
-  }, [manualDiscountValue, manualDiscountType, baseForManualDiscount]);
+  const manualDiscountAmount = 0;
 
   useEffect(() => {
     if (!open) return;
@@ -1414,6 +1443,10 @@ export default function CheckoutModal({
       roundToPaise(manualDiscountAmount),
   );
   const isPartialPayment = paymentStatus === "partial";
+  const enforcesBookingMinimum = minimumPaymentPercent > 0;
+  const minimumPaid = enforcesBookingMinimum
+    ? minimumBookingPayment(finalPayable, minimumPaymentPercent)
+    : 0;
   const totalPaid = isDuePayment
     ? 0
     : isMultiMode
@@ -1428,6 +1461,11 @@ export default function CheckoutModal({
   const dueAmount = isDuePayment
     ? finalPayable
     : Math.max(0, finalPayable - totalPaid);
+  const appliedPaid = Math.min(Math.max(0, totalPaid), finalPayable);
+  const belowBookingMinimum =
+    enforcesBookingMinimum &&
+    finalPayable > 0 &&
+    (isDuePayment || appliedPaid + 0.009 < minimumPaid);
   const remainingForFull = Math.max(0, finalPayable - totalPaid);
 
   const billedStaff =
@@ -1549,14 +1587,7 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
-      manualDiscount:
-        manualDiscountAmount > 0
-          ? {
-              type: manualDiscountType,
-              value: manualDiscountValue,
-              discountAmount: manualDiscountAmount,
-            }
-          : null,
+      manualDiscount: null,
       giftCard:
         giftCardCode.trim() && giftCardDiscount > 0
           ? {
@@ -1694,6 +1725,10 @@ export default function CheckoutModal({
         return;
       }
     }
+    if (belowBookingMinimum) {
+      Swal.fire("Payment incomplete", BOOKING_MIN_PAYMENT_MESSAGE, "warning");
+      return;
+    }
     if (!isDuePayment && paymentStatus === "full" && dueAmount > 0) {
       Swal.fire(
         "Payment incomplete",
@@ -1789,14 +1824,7 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
-      manualDiscount:
-        manualDiscountAmount > 0
-          ? {
-              type: manualDiscountType,
-              value: manualDiscountValue,
-              discountAmount: manualDiscountAmount,
-            }
-          : null,
+      manualDiscount: null,
       manualDiscountAmount,
       customerName: customerName.trim(),
       customerPhone: customerSearch.trim(),
@@ -1879,14 +1907,7 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
-      manualDiscount:
-        manualDiscountAmount > 0
-          ? {
-              type: manualDiscountType,
-              value: manualDiscountValue,
-              discountAmount: manualDiscountAmount,
-            }
-          : null,
+      manualDiscount: null,
       giftCard:
         giftCardCode.trim() && giftCardDiscount > 0
           ? {
@@ -2244,13 +2265,6 @@ export default function CheckoutModal({
                     label={`Gift Card (${giftCardCode})`}
                     value={`− ${formatInr(giftCardDiscount)}`}
                     tone="discount"
-                  />
-                )}
-                {manualDiscountAmount > 0 && (
-                  <SummaryLine
-                    label={`Manual Discount (${manualDiscountType === "percentage" ? `${manualDiscountValue}%` : "Flat"})`}
-                    value={`− ${formatInr(manualDiscountAmount)}`}
-                    className="text-emerald-600 font-semibold"
                   />
                 )}
                 {extraCharges.map((c, i) => (
@@ -2636,145 +2650,6 @@ export default function CheckoutModal({
               </section>
               ) : null}
 
-              {/* Manual Discount — Flat or Percentage */}
-              {!isExpenseCheckout ? (
-                <section className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 p-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Percent className="h-4 w-4 text-emerald-600" />
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-700">
-                        Manual Discount
-                      </h3>
-                    </div>
-                    {manualDiscountAmount > 0 && (
-                      <span className="text-xs font-bold text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                        −{formatInr(manualDiscountAmount)} Applied
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Mode Buttons: Flat ₹ vs Percentage % */}
-                  <div className="flex gap-1 rounded-lg border border-emerald-100 bg-white/80 p-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setManualDiscountType("flat");
-                        if (manualDiscountInput) {
-                          const val = Math.max(0, Number(manualDiscountInput) || 0);
-                          setManualDiscountValue(val);
-                        }
-                      }}
-                      className={`flex-1 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition ${
-                        manualDiscountType === "flat"
-                          ? "bg-emerald-600 text-white shadow-sm"
-                          : "text-emerald-700 hover:bg-emerald-50"
-                      }`}
-                    >
-                      ₹ Flat Discount
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setManualDiscountType("percentage");
-                        if (manualDiscountInput) {
-                          const val = Math.min(100, Math.max(0, Number(manualDiscountInput) || 0));
-                          setManualDiscountValue(val);
-                        }
-                      }}
-                      className={`flex-1 rounded-md px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition ${
-                        manualDiscountType === "percentage"
-                          ? "bg-emerald-600 text-white shadow-sm"
-                          : "text-emerald-700 hover:bg-emerald-50"
-                      }`}
-                    >
-                      % Percentage Discount
-                    </button>
-                  </div>
-
-                  {/* Input & Quick Buttons */}
-                  <div className="flex gap-2">
-                    <div className="relative min-w-0 flex-1">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        {manualDiscountType === "percentage" ? "%" : "₹"}
-                      </span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={manualDiscountType === "percentage" ? 100 : undefined}
-                        step="any"
-                        value={manualDiscountInput}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          setManualDiscountInput(raw);
-                          const num = Math.max(0, Number(raw) || 0);
-                          const val = manualDiscountType === "percentage" ? Math.min(100, num) : num;
-                          setManualDiscountValue(val);
-                        }}
-                        placeholder={
-                          manualDiscountType === "percentage"
-                            ? "ENTER DISCOUNT PERCENTAGE (E.G. 10)"
-                            : "ENTER FLAT DISCOUNT AMOUNT (E.G. 500)"
-                        }
-                        className="h-10 w-full rounded-lg border border-emerald-200 bg-white pl-8 pr-8 text-sm font-semibold uppercase text-slate-800 outline-none placeholder:font-medium placeholder:tracking-wide placeholder:text-slate-400 focus:border-emerald-500"
-                      />
-                      {manualDiscountValue > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setManualDiscountInput("");
-                            setManualDiscountValue(0);
-                          }}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 transition p-0.5"
-                          title="Clear discount"
-                        >
-                          <X size={15} />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Quick percentage pills if percentage mode is active */}
-                    {manualDiscountType === "percentage" && (
-                      <div className="hidden sm:flex items-center gap-1">
-                        {[5, 10, 15, 20].map((pct) => (
-                          <button
-                            key={pct}
-                            type="button"
-                            onClick={() => {
-                              setManualDiscountInput(String(pct));
-                              setManualDiscountValue(pct);
-                            }}
-                            className={`h-10 px-3 rounded-lg border text-xs font-bold transition ${
-                              manualDiscountValue === pct
-                                ? "border-emerald-600 bg-emerald-600 text-white shadow-xs"
-                                : "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50"
-                            }`}
-                          >
-                            {pct}%
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {manualDiscountAmount > 0 ? (
-                    <div className="flex items-center justify-between rounded-lg bg-emerald-100/70 border border-emerald-200 px-3.5 py-2.5 text-xs font-semibold text-emerald-800">
-                      <span>
-                        {manualDiscountType === "percentage"
-                          ? `${manualDiscountValue}% discount applied`
-                          : "Flat discount applied"}
-                      </span>
-                      <span className="font-bold text-emerald-700">
-                        −{formatInr(manualDiscountAmount)}
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-emerald-600">
-                      Add a manual flat (₹) or percentage (%) discount on the total payable amount.
-                    </p>
-                  )}
-                </section>
-              ) : null}
-
               <SectionCard 
                 title="Payment" 
                 icon={Banknote}
@@ -2796,9 +2671,16 @@ export default function CheckoutModal({
                       >
                         Full
                       </button>
+                      {allowPartialPayment ? (
                       <button
                         type="button"
-                        onClick={() => setPaymentStatus("partial")}
+                        onClick={() => {
+                          setPaymentStatus("partial");
+                          if (enforcesBookingMinimum) {
+                            setIsMultiMode(false);
+                            setCashGiven(minimumPaid);
+                          }
+                        }}
                         className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
                           paymentStatus === "partial"
                             ? "bg-white text-slate-900 shadow-sm"
@@ -2807,18 +2689,24 @@ export default function CheckoutModal({
                       >
                         Partial
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentStatus("due")}
-                        className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                          paymentStatus === "due"
-                            ? "bg-amber-500 text-white shadow-sm"
-                            : "text-slate-400 hover:text-amber-700"
-                        }`}
-                        title="Due / Credit — full amount stays outstanding"
-                      >
-                        Due
-                      </button>
+                      ) : null}
+                      {!enforcesBookingMinimum ? (
+                        // due button disabled
+                      // <button
+                      //   type="button"
+                      //   // onClick={() => setPaymentStatus("due")}
+                      //   onClick={()=>console.log("due")}
+                      //   className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                      //     paymentStatus === "due"
+                      //       ? "bg-amber-500 text-white shadow-sm"
+                      //       : "text-slate-400 hover:text-amber-700"
+                      //   }`}
+                      //   title="Due / Credit — full amount stays outstanding"
+                      // >
+                      //   Due
+                      // </button>
+                      <button></button>
+                      ) : null}
                     </div>
                     {!isDuePayment ? (
                       <label className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1 cursor-pointer">
@@ -2861,11 +2749,24 @@ export default function CheckoutModal({
                         <label className="mb-1 block text-xs font-medium text-slate-500">Amount Received</label>
                         <input
                           type="number"
+                          min={enforcesBookingMinimum ? minimumPaid : 0}
                           value={cashGiven}
                           onChange={(e) => setCashGiven(Number(e.target.value) || 0)}
-                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-lg font-bold focus:border-indigo-600 outline-none"
+                          className={`w-full rounded-lg border bg-white px-3 py-3 text-lg font-bold outline-none ${
+                            belowBookingMinimum
+                              ? "border-rose-400 focus:border-rose-500"
+                              : "border-slate-200 focus:border-indigo-600"
+                          }`}
                           placeholder="0.00"
                         />
+                        {enforcesBookingMinimum ? (
+                          <BookingMinimumNotice
+                            minimumPaid={minimumPaid}
+                            balanceDue={dueAmount}
+                            percent={minimumPaymentPercent}
+                            invalid={belowBookingMinimum}
+                          />
+                        ) : null}
                       </div>
                     )}
                   </div>
@@ -2925,6 +2826,14 @@ export default function CheckoutModal({
                           {formatInr(remainingForFull)}
                         </span>
                       </div>
+                      {enforcesBookingMinimum && isPartialPayment ? (
+                        <BookingMinimumNotice
+                          minimumPaid={minimumPaid}
+                          balanceDue={dueAmount}
+                          percent={minimumPaymentPercent}
+                          invalid={belowBookingMinimum}
+                        />
+                      ) : null}
                     </div>
                   </div>
                 )}

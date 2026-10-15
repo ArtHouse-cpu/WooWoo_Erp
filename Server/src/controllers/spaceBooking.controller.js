@@ -12,6 +12,7 @@ import {
   resolveSpaceGroup,
   validateAndPersistSchedule,
 } from '../services/spaceBookingAvailability.service.js';
+import {bookingPaymentError} from '../utils/bookingPayment.js';
 
 const ALLOWED_STATUS = new Set([
   'Upcoming',
@@ -26,6 +27,28 @@ const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const normalizeStatus = value => {
   const status = String(value || 'Upcoming').trim();
   return ALLOWED_STATUS.has(status) ? status : 'Upcoming';
+};
+
+/**
+ * Confirming a booking (not a draft or a notes-only edit) must collect at
+ * least 70% of the booking total. `requestBody` limits the check to requests
+ * that actually send payment fields.
+ */
+const bookingPaymentRejection = (record, requestBody) => {
+  const status = String(record?.status || '').trim();
+  if (status === 'Draft' || status === 'Cancelled') return '';
+  if (requestBody) {
+    const sentPayment =
+      requestBody.paymentStatus !== undefined || requestBody.paidAmount !== undefined;
+    if (!sentPayment) return '';
+  }
+  const paymentStatus = String(record?.paymentStatus || '').trim().toLowerCase();
+  if (!paymentStatus) return '';
+  return bookingPaymentError({
+    total: record?.grandTotal,
+    paid: record?.paidAmount,
+    paymentStatus,
+  });
 };
 
 export const computeBookingStatus = (
@@ -509,6 +532,11 @@ export const createSpaceBooking = async (req, res) => {
       );
     }
 
+    const paymentError = bookingPaymentRejection(payload);
+    if (paymentError) {
+      return res.status(400).json({success: false, message: paymentError});
+    }
+
     const staffFromReq = {
       m_staff_id: req.user?.userId ?? null,
       m_staff_name: req.user?.name ?? null,
@@ -728,6 +756,24 @@ export const updateSpaceBooking = async (req, res) => {
         nextEnd,
         targetStatus,
       );
+    }
+
+    const paymentError = bookingPaymentRejection(
+      {
+        status: payload.status ?? existing.status,
+        paymentStatus:
+          payload.paymentStatus !== undefined
+            ? payload.paymentStatus
+            : existing.paymentStatus,
+        grandTotal:
+          payload.grandTotal !== undefined ? payload.grandTotal : existing.grandTotal,
+        paidAmount:
+          payload.paidAmount !== undefined ? payload.paidAmount : existing.paidAmount,
+      },
+      req.body,
+    );
+    if (paymentError) {
+      return res.status(400).json({success: false, message: paymentError});
     }
 
     const persist = async () => {

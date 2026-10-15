@@ -51,8 +51,15 @@ const STATUS_OPTIONS: LeadStatus[] = [
   "New",
   "Contacted",
   "Interested",
+  "Contact Tomorrow",
+  "Contact in 2 Days",
+  "Come for Visit",
+  "Shared Quotation",
+  "Negotiation",
+  "Follow Up (Custom)",
   "Converted",
   "Not Interested",
+  "Lost",
   "Need to message",
 ];
 
@@ -1138,6 +1145,16 @@ const LeadScreen = () => {
         }}
         lead={selectedLeadForDetails}
         onEdit={(lead) => handleEdit(lead)}
+        onUpdated={(next) => {
+          setSelectedLeadForDetails(next);
+          setLeads((prev) =>
+            prev.map((item) =>
+              item._id === next._id
+                ? { ...item, ...next, membership: next.membership ?? item.membership }
+                : item,
+            ),
+          );
+        }}
       />
     </div>
   );

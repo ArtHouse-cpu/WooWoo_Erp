@@ -21,6 +21,18 @@ export const MEMBERSHIP_BUCKETS = {
 export type MembershipBucket =
   (typeof MEMBERSHIP_BUCKETS)[keyof typeof MEMBERSHIP_BUCKETS];
 
+/** A membership plan purchase is not an eligible product, service, space, or food line. */
+export function isMembershipPurchaseLine(category?: string | null): boolean {
+  const lower = String(category ?? "")
+    .trim()
+    .toLowerCase();
+  return (
+    lower === "membership" ||
+    lower === "subscription" ||
+    lower === "membership subscription"
+  );
+}
+
 /** Normalize any raw category / sourceType / lineCategory to a line type. */
 export function normalizeLineType(raw?: string | null): LineType {
   const lower = String(raw ?? "")

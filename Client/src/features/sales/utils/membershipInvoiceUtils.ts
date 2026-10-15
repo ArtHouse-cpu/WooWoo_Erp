@@ -1,7 +1,7 @@
 import type { MembershipPlanPayload } from "@/services/apiClient";
 import {
+  isMembershipPurchaseLine,
   membershipBucketForLineType,
-  normalizeLineType,
 } from "./itemClassification";
 
 export type UsageLimit = { discount?: number; cashback?: number };
@@ -157,7 +157,9 @@ export function resolveBenefitPercents(
   category: string,
   plan: MembershipPlanPayload | undefined,
 ): { discountPercent: number; cashbackPercent: number } {
-  if (!plan) return { discountPercent: 0, cashbackPercent: 0 };
+  if (!plan || isMembershipPurchaseLine(category)) {
+    return { discountPercent: 0, cashbackPercent: 0 };
+  }
 
   const benefitCategory = canonicalBenefitCategory(category);
   const limit = getUsageLimitForCategory(plan.usageLimits, benefitCategory);
@@ -248,8 +250,9 @@ export function membershipBenefitsForLine(
   plan: MembershipPlanPayload | undefined,
   options?: { isCsp?: boolean },
 ): { discount: number; cashback: number } {
-  // CSP products: no membership discount / cashback (product catalogue discount is separate)
-  if (options?.isCsp) {
+  // CSP products and membership plan purchases do not receive a membership discount.
+  // Plan cashback for a new subscription is stored on the subscription itself.
+  if (options?.isCsp || isMembershipPurchaseLine(category)) {
     return { discount: 0, cashback: 0 };
   }
   if (!plan) return { discount: 0, cashback: 0 };

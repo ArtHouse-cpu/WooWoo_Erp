@@ -2050,6 +2050,8 @@ export type AllBookingRow = {
   cashbackTotal?: number;
   subTotal?: number;
   grandTotal?: number;
+  paidAmount?: number;
+  dueAmount?: number;
   status?: string;
   notes?: string;
   paymentStatus?: string;
@@ -2070,6 +2072,8 @@ export type AllBookingWritePayload = {
   status?: string;
   notes?: string;
   paymentStatus?: "full" | "partial" | "due" | string;
+  paidAmount?: number;
+  dueAmount?: number;
 };
 
 export const handleGetAllBookings = async (
@@ -3757,10 +3761,31 @@ export type LeadStatus =
   | "New"
   | "Contacted"
   | "Interested"
+  | "Contact Tomorrow"
+  | "Contact in 2 Days"
+  | "Come for Visit"
+  | "Shared Quotation"
+  | "Negotiation"
+  | "Follow Up (Custom)"
   | "Converted"
   | "Lost"
   | "Not Interested"
   | "Need to message";
+
+export type LeadTimelineEvent = {
+  type?: "created" | "status";
+  title?: string;
+  status?: string;
+  note?: string;
+  followUpAt?: string | null;
+  reminderTime?: string;
+  at?: string;
+  by?: {
+    m_staff_id?: string | null;
+    m_staff_name?: string | null;
+    m_staff_email?: string | null;
+  };
+};
 
 export type LeadSources=  "Instagram"|
   "WhatsApp"|
@@ -3811,6 +3836,7 @@ export type LeadItem = {
   };
   createdAt?: string;
   updatedAt?: string;
+  timeline?: LeadTimelineEvent[];
   /** Present when a customer with this phone holds a membership. */
   membership?: LeadMembership | null;
 };
@@ -3962,6 +3988,23 @@ export const handleUpdateLead = async (
     headers: isFormData ? { "Content-Type": "multipart/form-data" } : undefined,
   });
   return response.data;
+};
+
+export const handleAddLeadTimeline = async (
+  id: string,
+  payload: {
+    status: LeadStatus;
+    note?: string;
+    followUpAt?: string;
+    reminderTime?: string;
+  },
+) => {
+  const response = await axiosInstance.post(`/api/lead/${id}/timeline`, payload);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    data?: LeadItem;
+  };
 };
 
 export const handleDeleteLead = async (id: string) => {

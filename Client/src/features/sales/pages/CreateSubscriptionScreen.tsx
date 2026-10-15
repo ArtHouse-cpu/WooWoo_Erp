@@ -2597,7 +2597,9 @@ useEffect(() => {
           initialCustomerName={customer}
           initialCustomerPhone={phone}
           initialCustomerId={selectedCustomerId || null}
-          initialMembership={selectedMembership?.displayName ?? ""}
+          initialMembership={selectedCustomer?.membershipType || ""}
+          initialMembershipDiscount={0}
+          lockMembershipDiscount
           initialCashbackTotal={selectedMembership?.walletCashbackAmount ?? 0}
           onClose={() => setOpenCheckout(false)}
           onConfirmPayment={async (payment) => {

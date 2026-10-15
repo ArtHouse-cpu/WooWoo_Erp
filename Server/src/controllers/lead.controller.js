@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import Lead from '../models/lead.model.js';
 import Customer from '../models/customer.model.js';
 import Membership from '../models/membership.model.js';
+import User from '../models/auth.model.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -150,6 +151,50 @@ const getMembershipsByPhone = async (phones) => {
     });
   }
   return result;
+};
+
+const LEAD_STATUSES = new Set([
+  'New',
+  'Contacted',
+  'Interested',
+  'Contact Tomorrow',
+  'Contact in 2 Days',
+  'Come for Visit',
+  'Shared Quotation',
+  'Negotiation',
+  'Follow Up (Custom)',
+  'Not Interested',
+  'Need to message',
+  'Converted',
+  'Lost',
+]);
+
+const actorFromRequest = async (req) => {
+  const userId = req.user?.userId ? String(req.user.userId) : null;
+  if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+    const user = await User.findById(userId).select('fullName email m_staff_id').lean();
+    if (user) {
+      return {
+        m_staff_id: user.m_staff_id || userId,
+        m_staff_name: user.fullName || null,
+        m_staff_email: user.email || null,
+      };
+    }
+  }
+  return { m_staff_id: userId, m_staff_name: null, m_staff_email: null };
+};
+
+const pushCreatedEvent = (lead, actor) => {
+  if (Array.isArray(lead.timeline) && lead.timeline.length) return;
+  lead.timeline = lead.timeline || [];
+  lead.timeline.push({
+    type: 'created',
+    title: 'Lead Created',
+    status: 'New',
+    note: lead.source ? `Lead from ${lead.source}` : '',
+    at: lead.createdAt || lead.date || new Date(),
+    by: lead.createdBy?.m_staff_name ? lead.createdBy : actor,
+  });
 };
 
 const withMembership = (lead, memberships) => {
@@ -351,6 +396,7 @@ export const updateLead = async (req, res) => {
       lead.phone = req.body.phone;
     }
 
+    const previousStatus = lead.status;
     if (req.body.status !== undefined) {
       lead.status = req.body.status;
     }
@@ -399,12 +445,26 @@ export const updateLead = async (req, res) => {
       lead.attachments = [...existingAttachments, ...newAttachments];
     }
 
+    if (req.body.status !== undefined && req.body.status !== previousStatus) {
+      const actor = await actorFromRequest(req);
+      pushCreatedEvent(lead, actor);
+      lead.timeline.push({
+        type: 'status',
+        title: req.body.status === 'Converted' ? 'Converted' : 'Status Updated',
+        status: req.body.status,
+        note: '',
+        at: new Date(),
+        by: actor,
+      });
+    }
+
     const updatedLead = await lead.save();
+    const memberships = await getMembershipsByPhone([updatedLead.phone]);
 
     res.status(200).json({
       success: true,
       message: "Lead updated successfully",
-      data: updatedLead,
+      data: withMembership(updatedLead, memberships),
     });
   } catch (error) {
     console.error("Update Lead Error:", error);
@@ -486,18 +546,42 @@ export const createLead = async (req, res) => {
     const newAttachments = await uploadLeadFiles(req.files);
     const allAttachments = [...existingAttachments, ...newAttachments];
 
+    const actor = await actorFromRequest(req);
+    const initialStatus = status || "New";
     const lead = await Lead.create({
       name: name.trim(),
       phone: phoneTrimmed,
-      status: status || "New",
+      status: initialStatus,
       source: source?.trim() || "",
       purpose: purpose?.trim() || "",
       deadline: parsedDeadline,
       reasonNote: reasonNote?.trim() || "",
       url: url?.trim() || "",
       attachments: allAttachments,
-      createdBy: createdByParsed || undefined,
+      createdBy: createdByParsed || actor,
       assignedTo: assignedToParsed || undefined,
+      timeline: [
+        {
+          type: 'created',
+          title: 'Lead Created',
+          status: 'New',
+          note: source?.trim() ? `Lead from ${source.trim()}` : '',
+          at: new Date(),
+          by: createdByParsed?.m_staff_name ? createdByParsed : actor,
+        },
+        ...(initialStatus !== 'New'
+          ? [
+              {
+                type: 'status',
+                title: initialStatus === 'Converted' ? 'Converted' : 'Status Updated',
+                status: initialStatus,
+                note: '',
+                at: new Date(),
+                by: createdByParsed?.m_staff_name ? createdByParsed : actor,
+              },
+            ]
+          : []),
+      ],
     });
 
     res.status(201).json({
@@ -516,6 +600,59 @@ export const createLead = async (req, res) => {
   }
 };
 //Delete
+
+export const addLeadTimeline = async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid lead ID' });
+    }
+    const status = String(req.body.status || '').trim();
+    if (!LEAD_STATUSES.has(status)) {
+      return res.status(400).json({ success: false, message: 'Choose a valid lead status.' });
+    }
+
+    const lead = await Lead.findById(id);
+    if (!lead) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+
+    let followUpAt = null;
+    if (req.body.followUpAt) {
+      const parsed = new Date(req.body.followUpAt);
+      if (!Number.isNaN(parsed.getTime())) followUpAt = parsed;
+    }
+    const reminderTime = String(req.body.reminderTime || '').trim();
+    const note = String(req.body.note || '').trim();
+    const actor = await actorFromRequest(req);
+    pushCreatedEvent(lead, actor);
+    lead.status = status;
+    lead.timeline.push({
+      type: 'status',
+      title: status === 'Converted' ? 'Converted' : 'Status Updated',
+      status,
+      note,
+      followUpAt,
+      reminderTime,
+      at: new Date(),
+      by: actor,
+    });
+    const saved = await lead.save();
+    const memberships = await getMembershipsByPhone([saved.phone]);
+    return res.status(200).json({
+      success: true,
+      message: 'Lead status updated.',
+      data: withMembership(saved, memberships),
+    });
+  } catch (error) {
+    console.error('Add Lead Timeline Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update lead status',
+      error: error.message,
+    });
+  }
+};
 
 export const deleteLead = async (req, res) => {
   try {

@@ -47,6 +47,8 @@ const allBookingSchema = new mongoose.Schema(
     cashbackTotal: {type: Number, default: 0, min: 0},
     subTotal: {type: Number, default: 0, min: 0},
     grandTotal: {type: Number, default: 0, min: 0},
+    paidAmount: {type: Number, default: 0, min: 0},
+    dueAmount: {type: Number, default: 0, min: 0},
     status: {
       type: String,
       enum: ['Upcoming', 'Ongoing', 'Expired', 'Cancelled', 'Draft'],

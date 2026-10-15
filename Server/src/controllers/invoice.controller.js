@@ -22,7 +22,8 @@ import { validateReferralDiscountForOrder } from './affiliate.controller.js';
 import { creditReferralDiscountToInviter, markReferralDiscountUsed } from '../modules/customer/services/referral.service.js';
 import { sendActivityUpdateWhatsApp } from '../modules/customer/services/whatsapp.service.js';
 import { normalizeMobile } from '../modules/customer/utils/normalize.js';
-import {normalizeLineType} from '../utils/itemClassification.utils.js';
+import {isMembershipPurchaseLine, normalizeLineType} from '../utils/itemClassification.utils.js';
+import {bookingPaymentError} from '../utils/bookingPayment.js';
 import {
   remainingCashbackToReverse,
   reverseMembershipCashback,
@@ -492,10 +493,13 @@ const normalizeInvoiceItem = (item, previous = {}) => {
   const discount = Math.max(0, Number(item.discount ?? 0) || 0);
   const lineTotal = qty * unitPrice - discount;
   const isCsp = Boolean(item.isCsp || previous.isCsp);
+  const purchasingMembership = isMembershipPurchaseLine(
+    item.category || item.lineCategory || item.sourceType,
+  );
   const cashback = isCsp
     ? 0
     : Math.max(0, Number(item.cashback ?? previous.cashback ?? 0) || 0);
-  const membershipDiscountAmount = isCsp
+  const membershipDiscountAmount = isCsp || purchasingMembership
     ? 0
     : Math.max(
         0,
@@ -768,6 +772,18 @@ const createInvoice = async (req, res) => {
       });
     }
 
+    if (status !== 'draft' && String(activityType || '').trim() === 'Space Booking') {
+      const tendered = Number(paymentBreakdown?.paidAmount ?? 0);
+      const paymentError = bookingPaymentError({
+        total: computedGrandTotal,
+        paid: Number.isFinite(tendered) ? tendered : 0,
+        paymentStatus,
+      });
+      if (paymentError) {
+        return res.status(400).json({success: false, message: paymentError});
+      }
+    }
+
     const invoice = await Invoice.create({
       invoicePrefix,
       invoiceNumber: nextNumber,
@@ -825,7 +841,40 @@ const createInvoice = async (req, res) => {
           : undefined,
       grandTotal: computedGrandTotal,
       extraCharges: Array.isArray(extraCharges) ? extraCharges : [],
-      membershipDiscount: Math.max(0, Number(membershipDiscount ?? 0)),
+      membershipDiscount: (() => {
+        const onlyMembershipPurchase =
+          Array.isArray(items) &&
+          items.length > 0 &&
+          items.every(item =>
+            isMembershipPurchaseLine(
+              item?.category || item?.lineCategory || item?.sourceType,
+            ),
+          );
+        if (onlyMembershipPurchase) return 0;
+        const membershipLineDiscount = (Array.isArray(items) ? items : []).reduce(
+          (sum, item) => {
+            if (
+              !isMembershipPurchaseLine(
+                item?.category || item?.lineCategory || item?.sourceType,
+              )
+            ) {
+              return sum;
+            }
+            return (
+              sum +
+              Math.max(
+                0,
+                Number(item?.membershipDiscountAmount ?? item?.discount ?? 0) || 0,
+              )
+            );
+          },
+          0,
+        );
+        return Math.max(
+          0,
+          Number(membershipDiscount ?? 0) - membershipLineDiscount,
+        );
+      })(),
       membershipType: String(membershipType ?? customer?.membershipType ?? '')
         .trim()
         .toLowerCase(),
