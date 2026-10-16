@@ -2113,10 +2113,28 @@ export const handleGetAllBookings = async (
   };
 };
 
-export const handleCreateAllBooking = async (payload: AllBookingWritePayload) => {
-  const response = await axiosInstance.post("/all-booking", payload);
-  return response.data as { success: boolean; message?: string; booking?: AllBookingRow };
+
+export const handleCreateAllBooking = async (
+  payload: AllBookingWritePayload
+) => {
+  try {
+    const response = await axiosInstance.post("/all-booking", payload);
+
+    return response.data as {
+      success: boolean;
+      message?: string;
+      booking?: AllBookingRow;
+    };
+  } catch (error: any) {
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to create booking. Please try again.";
+
+    throw new Error(message);
+  }
 };
+
 
 export const handleUpdateAllBooking = async (
   id: string,
@@ -2129,6 +2147,133 @@ export const handleUpdateAllBooking = async (
 export const handleDeleteAllBooking = async (id: string) => {
   const response = await axiosInstance.delete(`/all-booking/${id}`);
   return response.data as { success: boolean; message?: string };
+};
+
+export type BookingPaymentSettings = {
+  enablePartialPayment: boolean;
+  minimumPaymentType: "percentage" | "fixed";
+  minimumPaymentValue: number;
+  paymentInstructions: string;
+  refundPercent: number;
+};
+
+export type BookingOverviewRow = {
+  id: string;
+  source: "space" | "full";
+  bookingCode: string;
+  spaceName: string;
+  customerName: string;
+  customerPhone: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  duration: string;
+  grandTotal: number;
+  paidAmount: number;
+  dueAmount: number;
+  paymentStatus: string;
+  bookingStatus: string;
+  canCancel: boolean;
+  canRefund: boolean;
+  cancellation?: {
+    reason?: string;
+    cancelledAt?: string | null;
+    cancelledBy?: { m_staff_name?: string | null };
+  } | null;
+  cancellationHistory?: Array<{
+    reason?: string;
+    cancelledAt?: string | null;
+    cancelledBy?: { m_staff_name?: string | null };
+  }>;
+  refund?: {
+    amount: number;
+    refundableAmount: number;
+    status: string;
+    refundedAt?: string | null;
+    paymentReference?: string;
+    method?: string;
+    history?: Array<{
+      status?: string;
+      amount?: number;
+      at?: string | null;
+      note?: string;
+      paymentReference?: string;
+      method?: string;
+      by?: { m_staff_name?: string | null };
+    }>;
+  };
+};
+
+export const handleGetBookingPaymentSettings = async () => {
+  const response = await axiosInstance.get("/booking-overview/payment-settings");
+  return response.data.settings as BookingPaymentSettings;
+};
+
+export const handleUpdateBookingPaymentSettings = async (
+  payload: BookingPaymentSettings,
+) => {
+  const response = await axiosInstance.put("/booking-overview/payment-settings", payload);
+  return response.data.settings as BookingPaymentSettings;
+};
+
+export const handleGetBookingOverview = async (params?: {
+  search?: string;
+  bookingStatus?: string;
+  paymentStatus?: string;
+  source?: string;
+  from?: string;
+  to?: string;
+  spaceName?: string;
+  customerName?: string;
+  sort?: string;
+  order?: "asc" | "desc";
+  page?: number;
+  limit?: number;
+}) => {
+  const response = await axiosInstance.get("/booking-overview", { params });
+  return response.data as {
+    success: boolean;
+    kpis: {
+      totalBookings: number;
+      confirmedBookings: number;
+      pendingBookings: number;
+      cancelledBookings: number;
+      totalRevenue: number;
+      pendingRefundCount: number;
+      pendingRefundAmount: number;
+    };
+    bookings: BookingOverviewRow[];
+    pagination: { page: number; limit: number; total: number; pages: number };
+  };
+};
+
+export const handleCancelOverviewBooking = async (
+  source: "space" | "full",
+  id: string,
+  reason: string,
+) => {
+  const response = await axiosInstance.post(`/booking-overview/${source}/${id}/cancel`, {
+    reason,
+  });
+  return response.data as { success: boolean; booking: BookingOverviewRow; message?: string };
+};
+
+export const handleUpdateOverviewRefund = async (
+  source: "space" | "full",
+  id: string,
+  payload: {
+    status: string;
+    amount: number;
+    method: string;
+    paymentReference: string;
+    note: string;
+  },
+) => {
+  const response = await axiosInstance.post(
+    `/booking-overview/${source}/${id}/refund`,
+    payload,
+  );
+  return response.data as { success: boolean; booking: BookingOverviewRow; message?: string };
 };
 
 export const handleGetSpaceBookings = async (
@@ -2671,6 +2816,95 @@ export const handleGetVendors = async (signal?: AbortSignal) => {
 export const handleGetVendorById = async (id: string, signal?: AbortSignal) => {
   const response = await axiosInstance.get(`/vendor/${id}`, { signal });
   return response.data;
+};
+
+export type VendorBillRow = {
+  id: string;
+  invoiceNumber: string;
+  invoiceDate?: string | null;
+  amount: number;
+  paidAmount: number;
+  dueAmount: number;
+  status: string;
+  paymentMode: string;
+  purchaseType: string;
+  overdue: boolean;
+  dueDate?: string | null;
+};
+
+export type VendorPaymentRow = {
+  id: string;
+  direction: "pay-out" | "pay-in" | "adjustment";
+  adjustmentEffect: string;
+  amount: number;
+  appliedAmount: number;
+  advanceAmount: number;
+  method: string;
+  reference: string;
+  note: string;
+  paidAt?: string;
+  purchaseId: string;
+  purchaseInvoice: string;
+  createdBy: string;
+};
+
+export type Vendor360Summary = {
+  purchaseTotal: number;
+  purchaseCount: number;
+  orderTotal: number;
+  orderCount: number;
+  returnTotal: number;
+  returnCount: number;
+  paidOnBills: number;
+  paidOut: number;
+  openingBalance: number;
+  advance: number;
+  payIn: number;
+  adjustment: number;
+  payable: number;
+  pending: number;
+  credit: number;
+  overdue: number;
+  outstanding: number;
+};
+
+export type Vendor360Response = {
+  success: boolean;
+  vendor: VendorPayload & { _id: string; isActive?: boolean; createdAt?: string };
+  summary: Vendor360Summary;
+  purchases: VendorBillRow[];
+  orders: VendorBillRow[];
+  returns: VendorBillRow[];
+  payments: VendorPaymentRow[];
+};
+
+export const handleGetVendor360 = async (id: string, signal?: AbortSignal) => {
+  const response = await axiosInstance.get(`/vendor/${id}/360`, { signal });
+  return response.data as Vendor360Response;
+};
+
+export const handleRecordVendorPayment = async (
+  id: string,
+  payload: {
+    direction: "pay-out" | "pay-in" | "adjustment";
+    adjustmentEffect?: "increase" | "decrease";
+    amount: number;
+    method?: string;
+    reference?: string;
+    note?: string;
+    paidAt?: string;
+    purchaseId?: string;
+    clientKey: string;
+  },
+) => {
+  const response = await axiosInstance.post(`/vendor/${id}/payments`, payload);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    duplicate?: boolean;
+    payment: VendorPaymentRow;
+    summary?: Vendor360Summary;
+  };
 };
 
 export const handleCreateVendor = async (payload: VendorPayload) => {

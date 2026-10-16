@@ -63,6 +63,7 @@ import AllBookings from "@/features/allbookings/AllBookings";
 import GiftCard from "@/features/GiftCard/Pages/GiftCard";
 import InventorypaymentsScreen from "@/features/purchase/pages/InventorypaymentsScreen";
 import ExhibitionTable from "@/features/exhibition-table/ExhibitionTable";
+import BookingOverView from "@/features/BookingOverview/BookingOverView";
 
 
 export const router = createBrowserRouter([
@@ -138,6 +139,7 @@ export const router = createBrowserRouter([
           { path: "staffCommission", element: <StaffCommissionScreen /> },
           { path: "spaceBooking", element: <SpaceBooking /> },
           { path: "allBookings", element: <AllBookings /> },
+          { path: "bookingOverView", element: <BookingOverView /> },
         ],
       },
     ],

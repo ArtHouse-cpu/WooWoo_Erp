@@ -16,6 +16,12 @@ import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Swal from "sweetalert2";
 import {
+  bookingRuleMessage,
+  minimumBookingPayment,
+  minimumFromBookingRule,
+  type BookingPaymentRule,
+} from "@/features/BookingOverview/paymentRule";
+import {
   handleCreateInvoice,
   handleGetCustomers,
   handleGetWallets,
@@ -136,6 +142,11 @@ type Props = {
   minimumPaymentPercent?: number;
   /** POS billing hides partial payment. Space booking keeps it. */
   allowPartialPayment?: boolean;
+  /**
+   * Saved booking rule for Space Booking and Full Booking.
+   * When set, it replaces the fixed percentage minimum.
+   */
+  bookingPaymentRule?: BookingPaymentRule | null;
   onConfirmPayment?: (payload: {
     mode: string;
     paymentStatus: "full" | "partial";
@@ -227,29 +238,33 @@ function formatInr(value: number) {
 export const BOOKING_MIN_PAYMENT_MESSAGE =
   "Minimum 70% payment is required to confirm the booking.";
 
-/** Smallest amount that still covers the booking minimum, rounded up to paise. */
-export function minimumBookingPayment(total: number, percent = 70) {
-  const amount = Math.max(0, Number(total) || 0);
-  const rate = Math.max(0, Number(percent) || 0);
-  if (amount <= 0 || rate <= 0) return 0;
-  return Math.ceil((amount * rate) / 100 * 100 - 1e-8) / 100;
-}
+export { minimumBookingPayment };
 
 function BookingMinimumNotice({
+  total,
   minimumPaid,
   balanceDue,
-  percent,
+  label,
   invalid,
+  message,
+  instructions,
 }: {
+  total: number;
   minimumPaid: number;
   balanceDue: number;
-  percent: number;
+  label: string;
   invalid: boolean;
+  message: string;
+  instructions?: string;
 }) {
   return (
     <div className="mt-3 space-y-1.5 text-sm">
       <div className="flex items-center justify-between text-slate-600">
-        <span>Minimum payment ({percent}%)</span>
+        <span>Total booking price</span>
+        <span className="font-bold text-slate-900">{formatInr(total)}</span>
+      </div>
+      <div className="flex items-center justify-between text-slate-600">
+        <span>{label}</span>
         <span className="font-bold text-slate-900">{formatInr(minimumPaid)}</span>
       </div>
       <div className="flex items-center justify-between">
@@ -258,10 +273,11 @@ function BookingMinimumNotice({
           {formatInr(balanceDue)}
         </span>
       </div>
+      {instructions ? (
+        <p className="pt-1 text-xs text-slate-500">{instructions}</p>
+      ) : null}
       {invalid ? (
-        <p className="pt-1 text-xs font-semibold text-rose-600">
-          {BOOKING_MIN_PAYMENT_MESSAGE}
-        </p>
+        <p className="pt-1 text-xs font-semibold text-rose-600">{message}</p>
       ) : null}
     </div>
   );
@@ -446,6 +462,7 @@ export default function CheckoutModal({
   couponApplicableContext,
   minimumPaymentPercent = 0,
   allowPartialPayment = true,
+  bookingPaymentRule = null,
   onConfirmPayment,
   onSavedAndNew,
 }: Props) {
@@ -1260,6 +1277,12 @@ export default function CheckoutModal({
   }, [open]);
 
   useEffect(() => {
+    if (bookingPaymentRule && !bookingPaymentRule.enablePartialPayment && paymentStatus === "partial") {
+      setPaymentStatus("full");
+    }
+  }, [bookingPaymentRule, paymentStatus]);
+
+  useEffect(() => {
     const { payable } = roundPayable(
       payableBase -
         roundToPaise(couponDiscount) -
@@ -1443,10 +1466,28 @@ export default function CheckoutModal({
       roundToPaise(manualDiscountAmount),
   );
   const isPartialPayment = paymentStatus === "partial";
-  const enforcesBookingMinimum = minimumPaymentPercent > 0;
-  const minimumPaid = enforcesBookingMinimum
-    ? minimumBookingPayment(finalPayable, minimumPaymentPercent)
-    : 0;
+  const activeRule = bookingPaymentRule;
+  const partialAllowed = activeRule ? activeRule.enablePartialPayment : allowPartialPayment;
+  const minimumPaid = activeRule
+    ? activeRule.enablePartialPayment
+      ? minimumFromBookingRule(finalPayable, activeRule)
+      : finalPayable
+    : minimumPaymentPercent > 0
+      ? minimumBookingPayment(finalPayable, minimumPaymentPercent)
+      : 0;
+  const enforcesBookingMinimum = activeRule
+    ? finalPayable > 0 && (!activeRule.enablePartialPayment || minimumPaid > 0)
+    : minimumPaymentPercent > 0;
+  const bookingMinimumMessage = activeRule
+    ? bookingRuleMessage(activeRule)
+    : BOOKING_MIN_PAYMENT_MESSAGE;
+  const minimumLabel = activeRule
+    ? !activeRule.enablePartialPayment
+      ? "Amount payable"
+      : activeRule.minimumPaymentType === "fixed"
+        ? "Minimum payment"
+        : `Minimum payment (${activeRule.minimumPaymentValue}%)`
+    : `Minimum payment (${minimumPaymentPercent}%)`;
   const totalPaid = isDuePayment
     ? 0
     : isMultiMode
@@ -1463,9 +1504,10 @@ export default function CheckoutModal({
     : Math.max(0, finalPayable - totalPaid);
   const appliedPaid = Math.min(Math.max(0, totalPaid), finalPayable);
   const belowBookingMinimum =
+    paymentStatus === "partial" &&
     enforcesBookingMinimum &&
     finalPayable > 0 &&
-    (isDuePayment || appliedPaid + 0.009 < minimumPaid);
+    appliedPaid + 0.009 < minimumPaid;
   const remainingForFull = Math.max(0, finalPayable - totalPaid);
 
   const billedStaff =
@@ -1726,7 +1768,7 @@ export default function CheckoutModal({
       }
     }
     if (belowBookingMinimum) {
-      Swal.fire("Payment incomplete", BOOKING_MIN_PAYMENT_MESSAGE, "warning");
+      Swal.fire("Payment incomplete", bookingMinimumMessage, "warning");
       return;
     }
     if (!isDuePayment && paymentStatus === "full" && dueAmount > 0) {
@@ -2671,7 +2713,7 @@ export default function CheckoutModal({
                       >
                         Full
                       </button>
-                      {allowPartialPayment ? (
+                      {partialAllowed ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -2722,6 +2764,12 @@ export default function CheckoutModal({
                   </div>
                 }
               >
+                {activeRule && !partialAllowed ? (
+                  <p className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    Full payment is required for this booking.
+                    {activeRule.paymentInstructions ? ` ${activeRule.paymentInstructions}` : ""}
+                  </p>
+                ) : null}
                 {isDuePayment ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                     <p className="font-semibold">Due — full amount outstanding</p>
@@ -2761,10 +2809,13 @@ export default function CheckoutModal({
                         />
                         {enforcesBookingMinimum ? (
                           <BookingMinimumNotice
+                            total={finalPayable}
                             minimumPaid={minimumPaid}
                             balanceDue={dueAmount}
-                            percent={minimumPaymentPercent}
+                            label={minimumLabel}
                             invalid={belowBookingMinimum}
+                            message={bookingMinimumMessage}
+                            instructions={activeRule?.paymentInstructions}
                           />
                         ) : null}
                       </div>
@@ -2828,10 +2879,13 @@ export default function CheckoutModal({
                       </div>
                       {enforcesBookingMinimum && isPartialPayment ? (
                         <BookingMinimumNotice
+                          total={finalPayable}
                           minimumPaid={minimumPaid}
                           balanceDue={dueAmount}
-                          percent={minimumPaymentPercent}
+                          label={minimumLabel}
                           invalid={belowBookingMinimum}
+                          message={bookingMinimumMessage}
+                          instructions={activeRule?.paymentInstructions}
                         />
                       ) : null}
                     </div>

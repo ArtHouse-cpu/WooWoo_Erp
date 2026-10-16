@@ -10,9 +10,8 @@ import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
 import LedgerModal from "@/features/network/components/LedgerModal";
 import ImportVendorModal from "@/features/network/components/ImportVendorModal";
-import VendorDetailsModal, {
-  type VendorDetails,
-} from "@/features/network/components/VendorDetailsModal";
+import { type VendorDetails } from "@/features/network/components/VendorDetailsModal";
+import Vendor360Modal from "@/features/network/components/Vendor360Modal";
 import AddVendorModal from "@/features/purchase/Modal/AddVendorModal";
 import {
   handleCreateVendor,
@@ -533,14 +532,18 @@ export default function VendorScreen() {
         onImport={handleImport}
       />
 
-      <VendorDetailsModal
-        open={detailsOpen}
-        vendor={selectedVendorDetails}
-        onClose={() => {
-          setDetailsOpen(false);
-          setSelectedVendorDetails(null);
-        }}
-      />
+      {detailsOpen && selectedVendorDetails?._id ? (
+        <Vendor360Modal
+          vendor={selectedVendorDetails}
+          onClose={() => {
+            setDetailsOpen(false);
+            setSelectedVendorDetails(null);
+          }}
+          onChanged={() => {
+            void fetchVendors();
+          }}
+        />
+      ) : null}
 
       {openLedgerModal ? (
         <LedgerModal

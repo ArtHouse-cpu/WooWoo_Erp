@@ -3,7 +3,6 @@ import {
   X,
   User,
   Phone,
-
   Minus,
   ChevronDown,
   Camera,
@@ -762,7 +761,7 @@ const CreateBookingDetailsModal = ({
   const [, setManualStatusSelected] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const debouncedCustomerSearch = useDebounce(name.trim(), 250);
+  const debouncedCustomerSearch = useDebounce(name.trim(), 500);
 
   // Load Memberships
   useEffect(() => {
@@ -1438,7 +1437,7 @@ const CreateBookingDetailsModal = ({
     const loadCustomers = async () => {
       try {
         setLoadingCustomers(true);
-        const res = await handleGetCustomers(term, controller.signal, 10);
+        const res = await handleGetCustomers(term, controller.signal);
         const list = Array.isArray(res?.customers) ? res.customers : [];
         setCustomers(list);
       } catch (err: unknown) {

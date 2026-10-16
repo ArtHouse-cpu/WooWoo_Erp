@@ -48,7 +48,9 @@ import {
   handleCreateSpaceBooking,
   handleDeleteSpaceBooking,
   handleGetSpaceBookings,
+  handleGetBookingPaymentSettings,
   handleUpdateSpaceBooking,
+  type BookingPaymentSettings,
   type SpaceBookingPayload,
   type SpaceBookingStatus,
 } from "@/services/apiClient";
@@ -332,6 +334,22 @@ const SpaceBook = () => {
   const [pendingCheckout, setPendingCheckout] =
     useState<BookingFormPayload | null>(null);
   const [openCheckout, setOpenCheckout] = useState(false);
+  const [paymentRule, setPaymentRule] = useState<BookingPaymentSettings | null>(null);
+
+  useEffect(() => {
+    if (!openCheckout) return;
+    let cancelled = false;
+    handleGetBookingPaymentSettings()
+      .then((settings) => {
+        if (!cancelled) setPaymentRule(settings);
+      })
+      .catch(() => {
+        if (!cancelled) setPaymentRule(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [openCheckout]);
 
   const fetchBookings = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -1857,6 +1875,7 @@ const SpaceBook = () => {
         }
         couponApplicableContext="space"
         minimumPaymentPercent={70}
+        bookingPaymentRule={paymentRule}
         onConfirmPayment={async (payment) => {
           await handleConfirmCheckoutPayment(payment);
         }}

@@ -415,6 +415,7 @@ export const getLead = async (req, res) => {
       }
     }
     const leads = await Lead.find(filter).sort({ createdAt: -1 }).lean();
+    console.log(leads);
     const memberships = await getMembershipsByPhone(leads.map((l) => l.phone));
 
     res.status(200).json({
@@ -670,7 +671,6 @@ export const createLead = async (req, res) => {
     const lead = await Lead.create({
       leadId,
       leadNumber,
-      leadPrefix,
       name: name.trim(),
       phone: phoneTrimmed,
       status: initialStatus,

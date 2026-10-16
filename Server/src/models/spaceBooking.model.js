@@ -194,6 +194,53 @@ const spaceBookingSchema = new mongoose.Schema(
       m_staff_name: {type: String, default: null},
       m_staff_email: {type: String, default: null},
     },
+    cancellation: {
+      reason: {type: String, default: '', trim: true},
+      cancelledAt: {type: Date, default: null},
+      cancelledBy: {
+        m_staff_id: {type: String, default: null},
+        m_staff_name: {type: String, default: null},
+        m_staff_email: {type: String, default: null},
+      },
+    },
+    cancellationHistory: [
+      {
+        reason: {type: String, default: '', trim: true},
+        cancelledAt: {type: Date, default: null},
+        cancelledBy: {
+          m_staff_id: {type: String, default: null},
+          m_staff_name: {type: String, default: null},
+          m_staff_email: {type: String, default: null},
+        },
+      },
+    ],
+    refund: {
+      amount: {type: Number, default: 0, min: 0},
+      refundableAmount: {type: Number, default: 0, min: 0},
+      status: {
+        type: String,
+        enum: ['', 'Pending', 'Processing', 'Completed', 'Failed'],
+        default: '',
+      },
+      refundedAt: {type: Date, default: null},
+      paymentReference: {type: String, default: '', trim: true},
+      method: {type: String, default: '', trim: true},
+      history: [
+        {
+          status: {type: String, default: ''},
+          amount: {type: Number, default: 0, min: 0},
+          at: {type: Date, default: null},
+          note: {type: String, default: '', trim: true},
+          paymentReference: {type: String, default: '', trim: true},
+          method: {type: String, default: '', trim: true},
+          by: {
+            m_staff_id: {type: String, default: null},
+            m_staff_name: {type: String, default: null},
+            m_staff_email: {type: String, default: null},
+          },
+        },
+      ],
+    },
   },
   {timestamps: true},
 );

@@ -182,9 +182,11 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
     name: string;
     mimeType?: string;
   } | null>(null);
+  const [mobileTab, setMobileTab] = useState<"details" | "timeline" | "status">("timeline");
 
   useEffect(() => {
     setPanelOpen(false);
+    setMobileTab("timeline");
     setChoice(lead?.status || "New");
     setNote("");
     setFollowDate("");
@@ -242,23 +244,25 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
   return (
     <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-slate-900/40 p-0 sm:p-4">
       <div className="flex h-dvh w-full max-w-[1400px] flex-col overflow-hidden bg-[#F6F7FB] sm:h-[94vh] sm:rounded-2xl sm:shadow-2xl">
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-5">
+        <header className="flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:items-center sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700">
-              <User size={20} />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 sm:h-11 sm:w-11">
+              <User size={18} />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="truncate text-lg font-bold text-slate-900">{lead.name}</h2>
-                <span className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 shadow-2xs">
-                  {lead.leadId || leadCode(lead._id)}
-                </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(lead.status)}`}>
+              <div className="flex items-center gap-2">
+                <h2 className="truncate text-base font-bold text-slate-900 sm:text-lg">{lead.name}</h2>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(lead.status)}`}>
                   {lead.status}
                 </span>
               </div>
-              <p className="truncate text-xs text-slate-500">
-                Lead ID: <span className="font-mono font-medium text-slate-700">{lead.leadId || leadCode(lead._id)}</span> · Created on {formatWhen(lead.createdAt || lead.date)}
+              <p className="mt-0.5 truncate text-xs text-slate-500">
+                <span className="font-mono font-medium text-slate-700">{lead.leadId || leadCode(lead._id)}</span>
+                <span className="hidden sm:inline"> · Created {formatWhen(lead.createdAt || lead.date)}</span>
+              </p>
+              <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-500 sm:hidden">
+                <UserCheck size={12} className="shrink-0 text-slate-400" />
+                {lead.assignedTo?.m_staff_name || "Unassigned"}
               </p>
             </div>
           </div>
@@ -278,8 +282,29 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
           </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto p-3 lg:grid-cols-[280px_minmax(0,1fr)_300px] lg:overflow-hidden">
-          <section className="space-y-3 lg:overflow-y-auto">
+        <div className="grid grid-cols-3 gap-1 border-b border-slate-200 bg-white px-3 py-2 lg:hidden">
+          {(
+            [
+              ["details", "Details"],
+              ["timeline", "Timeline"],
+              ["status", "Status"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setMobileTab(key)}
+              className={`rounded-xl px-2 py-2 text-xs font-bold ${
+                mobileTab === key ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto overscroll-contain p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:grid-cols-[280px_minmax(0,1fr)_300px] lg:overflow-hidden">
+          <section className={`space-y-3 lg:block lg:overflow-y-auto ${mobileTab === "details" ? "block" : "hidden"}`}>
             <article className="rounded-2xl border border-slate-200 bg-white p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-900">Lead Details</h3>
@@ -300,7 +325,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
                   <Phone size={15} className="mt-0.5 text-slate-400" />
                   <div className="min-w-0 flex-1">
                     <dt className="text-[11px] text-slate-400">Phone</dt>
-                    <dd className="flex items-center gap-2 font-semibold text-slate-800">
+                    <dd className="flex flex-wrap items-center gap-2 font-semibold text-slate-800">
                       <a href={`tel:${lead.phone}`}>{lead.phone || "—"}</a>
                       {lead.phone ? (
                         <a
@@ -384,7 +409,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
             ) : null}
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 lg:overflow-y-auto">
+          <section className={`rounded-2xl border border-slate-200 bg-white p-4 lg:block lg:overflow-y-auto ${mobileTab === "timeline" ? "block" : "hidden"}`}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900">Timeline</h3>
               <button
@@ -410,12 +435,12 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
                       <Icon size={14} />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                        <div className="min-w-0">
                           <p className="text-sm font-bold text-slate-900">
                             {event.title || "Status Updated"}
                             {event.status && event.type !== "created" ? (
-                              <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${statusTone(event.status)}`}>
+                              <span className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${statusTone(event.status)}`}>
                                 {event.status}
                               </span>
                             ) : null}
@@ -432,7 +457,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
                             <p className="mt-0.5 text-xs text-slate-400">by {event.by.m_staff_name}</p>
                           ) : null}
                         </div>
-                        <time className="shrink-0 text-xs text-slate-400">{formatWhen(event.at)}</time>
+                        <time className="shrink-0 text-[11px] text-slate-400 sm:text-xs">{formatWhen(event.at)}</time>
                       </div>
                     </div>
                   </li>
@@ -441,23 +466,23 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
             </ol>
           </section>
 
-          <aside className="space-y-3 lg:overflow-y-auto">
+          <aside className={`space-y-3 lg:block lg:overflow-y-auto ${mobileTab === "status" ? "block" : "hidden"}`}>
             <article className="rounded-2xl border border-slate-200 bg-white p-4">
               <h3 className="text-sm font-bold text-slate-900">Lead Status</h3>
               <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${statusTone(lead.status)}`}>
                 {lead.status}
               </p>
-              <div className="mt-4 flex items-center justify-between gap-1">
+              <div className="mt-4 flex gap-1 overflow-x-auto pb-1">
                 {PIPELINE.map((step, index) => {
                   const reached = stage >= index && stage >= 0;
                   return (
-                    <div key={step} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                    <div key={step} className="flex min-w-[4.25rem] flex-1 flex-col items-center gap-1">
                       <span
                         className={`h-3 w-3 rounded-full border-2 ${
                           reached ? "border-violet-600 bg-violet-600" : "border-slate-300 bg-white"
                         }`}
                       />
-                      <span className={`text-center text-[10px] font-semibold ${reached ? "text-violet-700" : "text-slate-400"}`}>
+                      <span className={`text-center text-[10px] font-semibold leading-tight ${reached ? "text-violet-700" : "text-slate-400"}`}>
                         {step}
                       </span>
                     </div>
@@ -482,8 +507,8 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
       </div>
 
       {panelOpen ? (
-        <div className="fixed inset-y-0 right-0 z-[90] flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+        <div className="fixed inset-0 z-[90] flex flex-col bg-white sm:inset-y-0 sm:left-auto sm:w-full sm:max-w-md sm:border-l sm:border-slate-200 sm:shadow-2xl">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <h3 className="text-base font-bold text-slate-900">Update Lead Status</h3>
             <button type="button" onClick={() => setPanelOpen(false)} className="rounded-full p-1 text-slate-400 hover:bg-slate-100">
               <X size={18} />
@@ -491,18 +516,18 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
           </div>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Select Status</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2">
               {STATUS_CHOICES.map(({ value, icon: Icon, className }) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setChoice(value)}
-                  className={`flex items-center gap-2 rounded-xl border px-3 py-3 text-left text-sm font-semibold ${className} ${
+                  className={`flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold sm:text-sm ${className} ${
                     choice === value ? "ring-2 ring-violet-500" : ""
                   }`}
                 >
-                  <Icon size={16} />
-                  {value}
+                  <Icon size={16} className="shrink-0" />
+                  <span className="min-w-0 leading-tight">{value}</span>
                 </button>
               ))}
             </div>
@@ -516,7 +541,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
                 className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-normal outline-none focus:border-violet-500"
               />
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <label className="block text-sm font-semibold text-slate-700">
                 Next Follow Up
                 <input
@@ -538,7 +563,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
             </div>
             {error ? <p className="text-sm font-medium text-rose-600">{error}</p> : null}
           </div>
-          <div className="border-t border-slate-100 p-4">
+          <div className="border-t border-slate-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               disabled={saving}

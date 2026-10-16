@@ -16,6 +16,7 @@ import {
   appliedBookingPayment,
   bookingPaymentError,
 } from '../utils/bookingPayment.js';
+import {getBookingPaymentRule} from '../services/bookingPaymentSettings.service.js';
 
 const STATUSES = new Set(['Upcoming', 'Ongoing', 'Expired', 'Cancelled', 'Draft']);
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -320,19 +321,33 @@ const buildRecord = async body => {
   let dueAmount;
   if (confirmingPayment) {
     const tendered = Math.max(0, Number(body.paidAmount) || 0);
-    const paymentError = bookingPaymentError({
-      total: grandTotal,
-      paid: tendered,
-      paymentStatus,
-    });
-    if (paymentError) {
-      errors.push(paymentError);
-      return {errors};
+    const clientDue = roundMoney(Math.max(0, Number(body.dueAmount) || 0));
+    const clientFinal = roundMoney(Math.max(0, Number(body.finalAmount) || 0));
+    const rule = await getBookingPaymentRule();
+    const coversServerTotal = tendered + 1 >= grandTotal;
+    const paidCheckoutInFull =
+      clientDue <= 1 && tendered > 0 && (clientFinal <= 0 || tendered + 1 >= clientFinal);
+    // Full is the maximum. A checkout that already collected its whole bill
+    // is not rejected by the partial minimum.
+    if (paymentStatus === 'full' && (coversServerTotal || paidCheckoutInFull)) {
+      paidAmount = grandTotal;
+      dueAmount = 0;
+    } else {
+      const paymentError = bookingPaymentError({
+        total: grandTotal,
+        paid: tendered,
+        paymentStatus,
+        rule,
+      });
+      if (paymentError) {
+        errors.push(paymentError);
+        return {errors};
+      }
+      paidAmount = appliedBookingPayment(grandTotal, tendered);
+      const gap = roundMoney(Math.max(0, grandTotal - paidAmount));
+      dueAmount = paymentStatus === 'full' && gap <= 1 ? 0 : gap;
+      if (dueAmount === 0) paidAmount = grandTotal;
     }
-    paidAmount = appliedBookingPayment(grandTotal, tendered);
-    const gap = roundMoney(Math.max(0, grandTotal - paidAmount));
-    dueAmount = paymentStatus === 'full' && gap <= 1 ? 0 : gap;
-    if (dueAmount === 0) paidAmount = grandTotal;
   }
 
   return {

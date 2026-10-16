@@ -30,7 +30,9 @@ import {
   handleCreateAllBooking,
   handleDeleteAllBooking,
   handleGetAllBookings,
+  handleGetBookingPaymentSettings,
   handleUpdateAllBooking,
+  type BookingPaymentSettings,
   type AllBookingRow,
   type SpaceBookingPayload,
   type SpaceBookingStatus,
@@ -169,6 +171,7 @@ export default function AllBookings() {
   const [pendingCheckout, setPendingCheckout] = useState<BookingFormPayload | null>(null);
   const [openPin, setOpenPin] = useState(false);
   const [openCheckout, setOpenCheckout] = useState(false);
+  const [paymentRule, setPaymentRule] = useState<BookingPaymentSettings | null>(null);
   const [checkoutSourceId, setCheckoutSourceId] = useState<string | null>(null);
   const [verifiedStaff, setVerifiedStaff] = useState<VerifiedStaff | null>(null);
   const [verifiedAt, setVerifiedAt] = useState<string | null>(null);
@@ -182,6 +185,21 @@ export default function AllBookings() {
   const [reloadKey, setReloadKey] = useState(0);
   const searchRef = useRef("");
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (!openCheckout) return;
+    let cancelled = false;
+    handleGetBookingPaymentSettings()
+      .then((settings) => {
+        if (!cancelled) setPaymentRule(settings);
+      })
+      .catch(() => {
+        if (!cancelled) setPaymentRule(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [openCheckout]);
 
   const openCreateBooking = () => {
     setPendingCheckout(null);
@@ -272,13 +290,17 @@ export default function AllBookings() {
 
   const resetPage = () => setPagination((prev) => ({ ...prev, pageIndex: 0 }));
 
-  const persistBooking = async (
-    payload: BookingFormPayload,
-    status: string,
-    sourceId?: string | null,
-    paymentStatus?: string,
-    paymentAmounts?: { paidAmount: number; dueAmount: number },
-  ) => {
+
+
+
+const persistBooking = async (
+  payload: BookingFormPayload,
+  status: string,
+  sourceId?: string | null,
+  paymentStatus?: string,
+  paymentAmounts?: { paidAmount: number; dueAmount: number; finalAmount?: number },
+) => {
+  try {
     const body = {
       customerName: payload.customerName,
       customerPhone: payload.customerPhone,
@@ -303,12 +325,44 @@ export default function AllBookings() {
         ? {
             paidAmount: paymentAmounts.paidAmount,
             dueAmount: paymentAmounts.dueAmount,
+            ...(paymentAmounts.finalAmount != null
+              ? { finalAmount: paymentAmounts.finalAmount }
+              : {}),
           }
         : {}),
     };
-    if (sourceId) await handleUpdateAllBooking(sourceId, body);
-    else await handleCreateAllBooking(body);
-  };
+
+    const result = sourceId
+      ? await handleUpdateAllBooking(sourceId, body)
+      : await handleCreateAllBooking(body);
+
+    if (result?.success === false) {
+      toast.error(result.message || "Failed to save booking.");
+      return false;
+    }
+
+    toast.success(
+      result?.message ||
+        (sourceId
+          ? "Booking updated successfully!"
+          : "Booking created successfully!")
+    );
+
+    return true;
+  } catch (error: unknown) {
+    const message =
+      (error as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      })?.response?.data?.message ||
+      (error as { message?: string })?.message ||
+      "Something went wrong while saving the booking.";
+
+    toast.error(message);
+    return false;
+  }
+};
+
 
   const saveBooking = async (
     payload: BookingFormPayload,
@@ -435,8 +489,9 @@ export default function AllBookings() {
       .filter((value, index, list) => value && list.indexOf(value) === index)
       .join("\n");
     setSavingBooking(true);
+    let saved = false;
     try {
-      await persistBooking(
+      saved = await persistBooking(
         {
           ...pendingCheckout,
           customerName: payment.customerName?.trim() || pendingCheckout.customerName,
@@ -454,11 +509,13 @@ export default function AllBookings() {
             Math.max(0, Number(payment.finalAmount) || 0),
           ),
           dueAmount: Math.max(0, Number(payment.dueAmount) || 0),
+          finalAmount: Math.max(0, Number(payment.finalAmount) || 0),
         },
       );
     } finally {
       setSavingBooking(false);
     }
+    if (!saved) return;
     setOpenCheckout(false);
     setPendingCheckout(null);
     setCheckoutSourceId(null);
@@ -997,6 +1054,7 @@ export default function AllBookings() {
         lockMembershipDiscount
         disableCashback
         minimumPaymentPercent={70}
+        bookingPaymentRule={paymentRule}
         couponApplicableContext="all"
         initialNotes={
           pendingCheckout

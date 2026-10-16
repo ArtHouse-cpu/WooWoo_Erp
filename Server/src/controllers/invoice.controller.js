@@ -24,6 +24,7 @@ import { sendActivityUpdateWhatsApp } from '../modules/customer/services/whatsap
 import { normalizeMobile } from '../modules/customer/utils/normalize.js';
 import {isMembershipPurchaseLine, normalizeLineType} from '../utils/itemClassification.utils.js';
 import {bookingPaymentError} from '../utils/bookingPayment.js';
+import {getBookingPaymentRule} from '../services/bookingPaymentSettings.service.js';
 import {
   remainingCashbackToReverse,
   reverseMembershipCashback,
@@ -774,10 +775,12 @@ const createInvoice = async (req, res) => {
 
     if (status !== 'draft' && String(activityType || '').trim() === 'Space Booking') {
       const tendered = Number(paymentBreakdown?.paidAmount ?? 0);
+      const rule = await getBookingPaymentRule();
       const paymentError = bookingPaymentError({
         total: computedGrandTotal,
         paid: Number.isFinite(tendered) ? tendered : 0,
         paymentStatus,
+        rule,
       });
       if (paymentError) {
         return res.status(400).json({success: false, message: paymentError});

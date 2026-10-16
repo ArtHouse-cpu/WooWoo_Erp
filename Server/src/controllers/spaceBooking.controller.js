@@ -13,6 +13,7 @@ import {
   validateAndPersistSchedule,
 } from '../services/spaceBookingAvailability.service.js';
 import {bookingPaymentError} from '../utils/bookingPayment.js';
+import {getBookingPaymentRule} from '../services/bookingPaymentSettings.service.js';
 
 const ALLOWED_STATUS = new Set([
   'Upcoming',
@@ -30,11 +31,12 @@ const normalizeStatus = value => {
 };
 
 /**
- * Confirming a booking (not a draft or a notes-only edit) must collect at
- * least 70% of the booking total. `requestBody` limits the check to requests
+ * Confirming a booking (not a draft or a notes-only edit) must meet the
+ * saved partial-payment minimum. Full payment is the maximum and is not
+ * limited by that minimum. `requestBody` limits the check to requests
  * that actually send payment fields.
  */
-const bookingPaymentRejection = (record, requestBody) => {
+const bookingPaymentRejection = async (record, requestBody) => {
   const status = String(record?.status || '').trim();
   if (status === 'Draft' || status === 'Cancelled') return '';
   if (requestBody) {
@@ -44,10 +46,12 @@ const bookingPaymentRejection = (record, requestBody) => {
   }
   const paymentStatus = String(record?.paymentStatus || '').trim().toLowerCase();
   if (!paymentStatus) return '';
+  const rule = await getBookingPaymentRule();
   return bookingPaymentError({
     total: record?.grandTotal,
     paid: record?.paidAmount,
     paymentStatus,
+    rule,
   });
 };
 
@@ -532,7 +536,7 @@ export const createSpaceBooking = async (req, res) => {
       );
     }
 
-    const paymentError = bookingPaymentRejection(payload);
+    const paymentError = await bookingPaymentRejection(payload);
     if (paymentError) {
       return res.status(400).json({success: false, message: paymentError});
     }
@@ -635,11 +639,16 @@ export const getSpaceBookings = async (req, res) => {
       )
       .sort({bookingDate: -1, startTime: 1, createdAt: -1})
       .lean();
+      const totalGrandTotal = bookings.reduce(
+      (sum, booking) => sum + (Number(booking.grandTotal) || 0),
+      0
+    );
 
     return res.status(200).json({
       success: true,
       message: 'Space bookings fetched successfully.',
       bookings: bookings.map(serializeBooking),
+       totalGrandTotal: Math.round(totalGrandTotal * 100) / 100,
     });
   } catch (error) {
     console.error('getSpaceBookings error:', error);
@@ -758,7 +767,7 @@ export const updateSpaceBooking = async (req, res) => {
       );
     }
 
-    const paymentError = bookingPaymentRejection(
+    const paymentError = await bookingPaymentRejection(
       {
         status: payload.status ?? existing.status,
         paymentStatus:

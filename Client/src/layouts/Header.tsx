@@ -1,4 +1,4 @@
-import { Bell, User, Shuffle, ChevronDown, Menu, FilePlus2, Crown, CalendarPlus, UserPlus, ClipboardList, CalendarCheck } from "lucide-react";
+import { Bell, User, Shuffle, ChevronDown, Menu, FilePlus2, Crown, CalendarPlus, UserPlus, ClipboardList, CalendarCheck, Home, List } from "lucide-react";
 import logo from "../assets/images/logo/woo_woo_art_house_logo.png";
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -51,6 +51,7 @@ export default function Header({
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
 
   const [bookingMenu, setBookingMenu] = useState<null | "header" | "mobile">(null);
+  const [leadMenuOpen, setLeadMenuOpen] = useState(false);
 
   const openBookingChoice = (kind: "full" | "space") => {
     setBookingMenu(null);
@@ -71,13 +72,16 @@ export default function Header({
   };
 
   useEffect(() => {
-    if (!bookingMenu) return;
+    if (!bookingMenu && !leadMenuOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setBookingMenu(null);
+      if (event.key === "Escape") {
+        setBookingMenu(null);
+        setLeadMenuOpen(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [bookingMenu]);
+  }, [bookingMenu, leadMenuOpen]);
 
   const handleLeadSubmit = (payload: LeadPayload) => {
     setPendingLeadPayload(payload);
@@ -203,6 +207,28 @@ export default function Header({
       
 
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 md:gap-5">
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#2F6FED] transition hover:bg-blue-100 md:h-auto md:w-auto md:gap-2 md:px-5 md:py-2.5"
+          aria-label="Home"
+          title="Home"
+        >
+          <Home size={18} />
+          <span className="hidden text-[13px] font-semibold md:inline">Home</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setBookingMenu(null);
+            setLeadMenuOpen((open) => !open);
+          }}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 md:hidden"
+          aria-label="Create and list leads"
+          title="Leads"
+        >
+          <UserPlus size={18} />
+        </button>
         {hasQuickBillAccess && (
           <button
             type="button"
@@ -300,17 +326,17 @@ export default function Header({
       className="fixed inset-x-0 bottom-0 z-50 flex gap-2 border-t border-gray-200 bg-white px-2 pt-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(15,23,42,0.06)] md:hidden"
     >
       {[
+        {
+          label: "Home",
+          Icon: Home,
+          onClick: () => navigate("/"),
+          tone: "from-slate-600 to-slate-800 shadow-slate-500/30",
+        },
         hasQuickBillAccess && {
           label: "POS Bill",
           Icon: FilePlus2,
           onClick: () => setIsPosOpen(true),
           tone: "from-blue-500 to-indigo-600 shadow-blue-500/30",
-        },
-        {
-          label: "Create Lead",
-          Icon: UserPlus,
-          onClick: () => setIsCreateLeadOpen(true),
-          tone: "from-emerald-500 to-teal-600 shadow-emerald-500/30",
         },
         {
           label: "Add Booking",
@@ -338,6 +364,53 @@ export default function Header({
           </button>
         ))}
     </nav>
+    {leadMenuOpen ? (
+      <>
+        <button
+          type="button"
+          aria-label="Close lead options"
+          className="fixed inset-0 z-[70] cursor-default bg-black/20 md:hidden"
+          onClick={() => setLeadMenuOpen(false)}
+        />
+        <div
+          role="menu"
+          aria-label="Leads"
+          className="fixed right-3 top-[calc(3.4rem+env(safe-area-inset-top))] z-[80] w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl md:hidden"
+        >
+          <p className="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            Leads
+          </p>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setLeadMenuOpen(false);
+              setIsCreateLeadOpen(true);
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition hover:bg-emerald-50"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <UserPlus size={18} />
+            </span>
+            <span className="text-sm font-bold text-slate-900">Create Lead</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setLeadMenuOpen(false);
+              navigate("/leads");
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition hover:bg-emerald-50"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <List size={18} />
+            </span>
+            <span className="text-sm font-bold text-slate-900">Lead List</span>
+          </button>
+        </div>
+      </>
+    ) : null}
     {bookingMenu ? (
       <>
         <button

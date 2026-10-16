@@ -10,6 +10,7 @@ import {
   updateVendor,
   importVendors,
 } from '../controllers/vendor.controller.js';
+import {getVendor360, recordVendorPayment} from '../controllers/vendor360.controller.js';
 
 const router = express.Router();
 
@@ -22,6 +23,8 @@ router.post(
   importVendors,
 );
 router.get('/', requirePermission(PERMISSIONS.VENDOR_READ), getVendors);
+router.get('/:id/360', requirePermission(PERMISSIONS.VENDOR_READ), getVendor360);
+router.post('/:id/payments', requirePermission(PERMISSIONS.VENDOR_UPDATE), recordVendorPayment);
 router.get('/:id', requirePermission(PERMISSIONS.VENDOR_READ), getVendorById);
 router.delete('/:id', requirePermission(PERMISSIONS.VENDOR_DELETE), deleteVendor);
 router.patch('/:id', requirePermission(PERMISSIONS.VENDOR_UPDATE), updateVendor);

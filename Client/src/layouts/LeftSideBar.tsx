@@ -29,6 +29,7 @@ Sparkles ,
   ClipboardList,
   type LucideIcon,
   Megaphone,
+  ChartNoAxesCombined,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -65,8 +66,9 @@ const MENU_GROUPS: MenuGroup[] = [
     label: "Booking",
     icon: BookOpenText,
     submenu: [
+      { name: "bookingOverView", label: "Bookings Overview", icon: ClipboardList, path: "/bookingOverView" },
       { name: "spaceBooking", label: "Space Booking", icon: CalendarCheck  , path: "/spaceBooking" },
-      { name: "allBookings", label: "Full Bookings", icon: ClipboardList, path: "/allBookings" },
+      { name: "allBookings", label: "Full Bookings", icon: ChartNoAxesCombined, path: "/allBookings" },
     ],
   },
   {
