@@ -23,6 +23,7 @@ import {
   CalendarClock,
   Ban,
   Circle,
+  Hash,
 } from "lucide-react";
 import {
   handleAddLeadTimeline,
@@ -109,7 +110,11 @@ const formatDay = (value?: string | null) => {
   });
 };
 
-const leadCode = (id: string) => `LD-${id.slice(-6).toUpperCase()}`;
+export const leadCode = (id?: string) => {
+  if (!id) return "";
+  if (id.startsWith("LEAD-")) return id;
+  return `LEAD-${id.slice(-6).toUpperCase()}`;
+};
 
 const visibleEvents = (lead: LeadItem): LeadTimelineEvent[] => {
   const stored = Array.isArray(lead.timeline) ? lead.timeline : [];
@@ -243,14 +248,17 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
               <User size={20} />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="truncate text-lg font-bold text-slate-900">{lead.name}</h2>
+                <span className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 shadow-2xs">
+                  {lead.leadId || leadCode(lead._id)}
+                </span>
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(lead.status)}`}>
                   {lead.status}
                 </span>
               </div>
               <p className="truncate text-xs text-slate-500">
-                Lead ID: {leadCode(lead._id)} · Created on {formatWhen(lead.createdAt || lead.date)}
+                Lead ID: <span className="font-mono font-medium text-slate-700">{lead.leadId || leadCode(lead._id)}</span> · Created on {formatWhen(lead.createdAt || lead.date)}
               </p>
             </div>
           </div>
@@ -286,6 +294,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
                 ) : null}
               </div>
               <dl className="space-y-3 text-sm">
+                <Detail icon={Hash} label="Lead ID" value={lead.leadId || leadCode(lead._id)} />
                 <Detail icon={User} label="Name" value={lead.name} />
                 <div className="flex items-start gap-2">
                   <Phone size={15} className="mt-0.5 text-slate-400" />

@@ -3813,6 +3813,9 @@ export type LeadSources=  "Instagram"|
 
 export type LeadItem = {
   _id: string;
+  leadId?: string;
+  leadNumber?: number;
+  leadPrefix?: string;
   name: string;
   phone?: string;
   email?: string;
@@ -3900,6 +3903,8 @@ export type GetLeadsParams = {
   status?: string;
   source?: string;
   assignedTo?: string;
+  search?: string;
+  leadId?: string;
 };
 
 export const handleGetLeads = async (
@@ -3922,6 +3927,8 @@ export const handleGetLeads = async (
       ...(params?.assignedTo && params.assignedTo !== "all"
         ? { assignedTo: params.assignedTo }
         : {}),
+      ...(params?.search ? { search: params.search } : {}),
+      ...(params?.leadId ? { leadId: params.leadId } : {}),
     },
     signal,
   });

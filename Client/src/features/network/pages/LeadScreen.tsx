@@ -591,6 +591,30 @@ const LeadScreen = () => {
         ),
       },
 
+      // Lead ID
+      {
+        accessorKey: "leadId",
+        header: "Lead ID",
+        size: 110,
+        Cell: ({ cell, row }) => {
+          const id =
+            cell.getValue<string>() ||
+            (row.original._id
+              ? `LEAD-${row.original._id.slice(-6).toUpperCase()}`
+              : "-");
+          return (
+            <button
+              type="button"
+              onClick={() => handleViewDetails(row.original)}
+              className="inline-flex cursor-pointer items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-700 shadow-2xs hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 transition"
+              title="Click to view lead details"
+            >
+              {id}
+            </button>
+          );
+        },
+      },
+
       // Name
       {
         accessorKey: "name",
