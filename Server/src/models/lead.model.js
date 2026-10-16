@@ -2,6 +2,25 @@ import mongoose from "mongoose";
 
 const leadSchema = new mongoose.Schema(
   {
+    // Unique Lead Identification
+    leadId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      index: true,
+    },
+    leadNumber: {
+      type: Number,
+      sparse: true,
+      index: true,
+    },
+    leadPrefix: {
+      type: String,
+      default: "LEAD",
+      trim: true,
+    },
+
     // Name is compulsory
     name: {
       type: String,

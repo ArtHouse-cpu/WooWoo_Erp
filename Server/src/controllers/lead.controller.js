@@ -7,6 +7,7 @@ import Lead from '../models/lead.model.js';
 import Customer from '../models/customer.model.js';
 import Membership from '../models/membership.model.js';
 import User from '../models/auth.model.js';
+import Counter from '../models/counter.model.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -197,9 +198,97 @@ const pushCreatedEvent = (lead, actor) => {
   });
 };
 
+export const LEAD_PREFIX = 'LEAD';
+
+export const getNextLeadNumber = async () => {
+  const counter = await Counter.findOneAndUpdate(
+    { key: 'lead_number' },
+    { $inc: { value: 1 } },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  );
+  return counter.value;
+};
+
+export const generateUniqueLeadId = async () => {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const nextSeq = await getNextLeadNumber();
+    const leadNumber = nextSeq < 1000 ? 1000 + nextSeq : nextSeq;
+    const leadId = `${LEAD_PREFIX}-${leadNumber}`;
+    const exists = await Lead.exists({ leadId });
+    if (!exists) {
+      return { leadId, leadNumber, leadPrefix: LEAD_PREFIX };
+    }
+  }
+  const fallbackNum = Date.now();
+  return {
+    leadId: `${LEAD_PREFIX}-${fallbackNum}`,
+    leadNumber: fallbackNum,
+    leadPrefix: LEAD_PREFIX,
+  };
+};
+
+let backfillPromise = null;
+
+export const backfillExistingLeads = async () => {
+  if (backfillPromise) return backfillPromise;
+  backfillPromise = (async () => {
+    try {
+      const unassignedLeads = await Lead.find({
+        $or: [
+          { leadId: { $exists: false } },
+          { leadId: null },
+          { leadId: '' },
+          { leadNumber: { $exists: false } },
+          { leadNumber: null },
+        ],
+      }).sort({ createdAt: 1 });
+
+      if (!unassignedLeads.length) {
+        const c = await Counter.findOne({ key: 'lead_number' });
+        if (!c) {
+          await Counter.create({ key: 'lead_number', value: 1000 });
+        }
+        return;
+      }
+
+      let counterDoc = await Counter.findOne({ key: 'lead_number' });
+      let currentVal = counterDoc ? Math.max(counterDoc.value, 1000) : 1000;
+
+      for (const lead of unassignedLeads) {
+        currentVal += 1;
+        const leadId = `${LEAD_PREFIX}-${currentVal}`;
+        await Lead.updateOne(
+          { _id: lead._id },
+          {
+            $set: {
+              leadId,
+              leadNumber: currentVal,
+              leadPrefix: LEAD_PREFIX,
+            },
+          }
+        );
+      }
+
+      await Counter.findOneAndUpdate(
+        { key: 'lead_number' },
+        { $set: { value: currentVal } },
+        { upsert: true }
+      );
+      console.log(`✅ Backfilled ${unassignedLeads.length} leads with unique IDs up to ${LEAD_PREFIX}-${currentVal}`);
+    } catch (err) {
+      console.error('Error during backfillExistingLeads:', err);
+    }
+  })();
+  return backfillPromise;
+};
+
 const withMembership = (lead, memberships) => {
   const obj = typeof lead?.toObject === 'function' ? lead.toObject() : lead;
-  return { ...obj, membership: memberships.get(String(obj?.phone || '').trim()) || null };
+  return {
+    ...obj,
+    leadId: obj.leadId || (obj._id ? `${LEAD_PREFIX}-${obj._id.toString().slice(-6).toUpperCase()}` : ''),
+    membership: memberships.get(String(obj?.phone || '').trim()) || null,
+  };
 };
 
 export const getLeadMembership = async (req, res) => {
@@ -218,8 +307,23 @@ export const getLeadMembership = async (req, res) => {
 
 export const getLead = async (req, res) => {
   try {
-    const { fromDate, toDate, purpose, status, source, assignedTo, deadline, deadlineFrom, deadlineTo } = req.query;
+    await backfillExistingLeads();
+    const { fromDate, toDate, purpose, status, source, assignedTo, deadline, deadlineFrom, deadlineTo, search, leadId } = req.query;
     const filter = {};
+
+    if (leadId && leadId.trim()) {
+      filter.leadId = new RegExp(leadId.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    }
+
+    if (search && search.trim()) {
+      const s = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(s, 'i');
+      filter.$or = [
+        { leadId: rx },
+        { name: rx },
+        { phone: rx },
+      ];
+    }
 
     if (purpose && purpose !== 'all') {
       filter.purpose = purpose.trim();
@@ -332,16 +436,19 @@ export const getLead = async (req, res) => {
 export const getLeadById = async (req, res) => {
   try {
     const { id } = req.params;
+    let lead = null;
 
-    // Check valid MongoDB ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid lead ID",
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      lead = await Lead.findById(id);
+    }
+    if (!lead && id) {
+      lead = await Lead.findOne({
+        $or: [
+          { leadId: String(id).trim().toUpperCase() },
+          { leadId: String(id).trim() },
+        ],
       });
     }
-
-    const lead = await Lead.findById(id);
 
     if (!lead) {
       return res.status(404).json({
@@ -371,21 +478,32 @@ export const getLeadById = async (req, res) => {
 export const updateLead = async (req, res) => {
   try {
     const id = req.params.id || req.body.id || req.body._id;
+    let lead = null;
 
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid lead ID",
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      lead = await Lead.findById(id);
+    }
+    if (!lead && id) {
+      lead = await Lead.findOne({
+        $or: [
+          { leadId: String(id).trim().toUpperCase() },
+          { leadId: String(id).trim() },
+        ],
       });
     }
-
-    const lead = await Lead.findById(id);
 
     if (!lead) {
       return res.status(404).json({
         success: false,
         message: "Lead not found",
       });
+    }
+
+    if (!lead.leadId) {
+      const generated = await generateUniqueLeadId();
+      lead.leadId = generated.leadId;
+      lead.leadNumber = generated.leadNumber;
+      lead.leadPrefix = generated.leadPrefix;
     }
 
     if (req.body.name !== undefined) {
@@ -548,7 +666,11 @@ export const createLead = async (req, res) => {
 
     const actor = await actorFromRequest(req);
     const initialStatus = status || "New";
+    const { leadId, leadNumber, leadPrefix } = await generateUniqueLeadId();
     const lead = await Lead.create({
+      leadId,
+      leadNumber,
+      leadPrefix,
       name: name.trim(),
       phone: phoneTrimmed,
       status: initialStatus,
@@ -584,10 +706,12 @@ export const createLead = async (req, res) => {
       ],
     });
 
+    const memberships = await getMembershipsByPhone([lead.phone]);
+
     res.status(201).json({
       success: true,
       message: "Lead created successfully",
-      data: lead,
+      data: withMembership(lead, memberships),
     });
   } catch (error) {
     console.error("Create Lead Error:", error);
@@ -604,17 +728,25 @@ export const createLead = async (req, res) => {
 export const addLeadTimeline = async (req, res) => {
   try {
     const id = req.params.id;
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: 'Invalid lead ID' });
+    let lead = null;
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      lead = await Lead.findById(id);
     }
+    if (!lead && id) {
+      lead = await Lead.findOne({
+        $or: [
+          { leadId: String(id).trim().toUpperCase() },
+          { leadId: String(id).trim() },
+        ],
+      });
+    }
+    if (!lead) {
+      return res.status(404).json({ success: false, message: 'Lead not found' });
+    }
+
     const status = String(req.body.status || '').trim();
     if (!LEAD_STATUSES.has(status)) {
       return res.status(400).json({ success: false, message: 'Choose a valid lead status.' });
-    }
-
-    const lead = await Lead.findById(id);
-    if (!lead) {
-      return res.status(404).json({ success: false, message: 'Lead not found' });
     }
 
     let followUpAt = null;
@@ -657,16 +789,19 @@ export const addLeadTimeline = async (req, res) => {
 export const deleteLead = async (req, res) => {
   try {
     const id = req.params.id || req.body.id || req.body._id;
+    let deletedLead = null;
 
-    // Check valid MongoDB ID
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid lead ID",
+    if (id && mongoose.Types.ObjectId.isValid(id)) {
+      deletedLead = await Lead.findByIdAndDelete(id);
+    }
+    if (!deletedLead && id) {
+      deletedLead = await Lead.findOneAndDelete({
+        $or: [
+          { leadId: String(id).trim().toUpperCase() },
+          { leadId: String(id).trim() },
+        ],
       });
     }
-
-    const deletedLead = await Lead.findByIdAndDelete(id);
 
     if (!deletedLead) {
       return res.status(404).json({

@@ -436,9 +436,16 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
       <div className="w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden rounded-xl bg-white shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-800">
-            {isEditing ? "Update Lead" : "Create Lead"}
-          </h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {isEditing ? "Update Lead" : "Create Lead"}
+            </h2>
+            {isEditing && (leadToEdit?.leadId || leadToEdit?._id) && (
+              <span className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 shadow-2xs">
+                {leadToEdit.leadId || `LEAD-${leadToEdit._id.slice(-6).toUpperCase()}`}
+              </span>
+            )}
+          </div>
 
           <button
             type="button"
