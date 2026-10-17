@@ -11,7 +11,7 @@ import {
   Video,
   ExternalLink,
   Globe,
-  CheckCircle2,
+ 
 } from "lucide-react";
 import {
   type LeadItem,

@@ -24,8 +24,8 @@ import {
 import { previewBookingPayment } from "./paymentRule";
 
 const BOOKING_STATUSES = ["", "Upcoming", "Ongoing", "Expired", "Cancelled", "Draft"];
-const PAYMENT_STATUSES = [
-  "",
+const PAYMENT_STATUS = [
+ 
   "Unpaid",
   "Partially Paid",
   "Paid",
@@ -118,8 +118,7 @@ export default function BookingOverView() {
   const [source, setSource] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [spaceName, setSpaceName] = useState("");
-  const [customerName, setCustomerName] = useState("");
+
   const [sort, setSort] = useState("bookingDate");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [cancelTarget, setCancelTarget] = useState<BookingOverviewRow | null>(null);
@@ -148,8 +147,7 @@ export default function BookingOverView() {
         source,
         from,
         to,
-        spaceName,
-        customerName,
+     
         sort,
         order,
         page,
@@ -167,7 +165,7 @@ export default function BookingOverView() {
     } finally {
       setLoading(false);
     }
-  }, [search, bookingStatus, paymentStatus, source, from, to, spaceName, customerName, sort, order, page]);
+  }, [search, bookingStatus, paymentStatus, source, from, to,  sort, order, page]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -297,7 +295,7 @@ export default function BookingOverView() {
             Overview
           </button>
           <button type="button" onClick={() => setTab("settings")} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ${tab === "settings" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
-            <Settings2 size={15} /> Partial Payment Settings
+            <Settings2 size={15} /> Settings
           </button>
         </div>
       </div>
@@ -431,49 +429,143 @@ export default function BookingOverView() {
         </section>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {cards.map((card) => (
-              <article key={card.label} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{card.label}</p>
-                  <p className="mt-1 text-2xl font-bold text-slate-900">{card.value}</p>
-                  <p className="mt-1 text-xs text-slate-500">{card.hint}</p>
+              <article
+                key={card.label}
+                className="flex items-center justify-between rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-4 shadow-sm"
+              >
+                <div className="min-w-0 pr-1">
+                  <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wide text-slate-400 truncate">
+                    {card.label}
+                  </p>
+                  <p className="mt-0.5 sm:mt-1 text-base sm:text-2xl font-bold text-slate-900 truncate">
+                    {card.value}
+                  </p>
+                  <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-slate-500 truncate">
+                    {card.hint}
+                  </p>
                 </div>
-                <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${card.tone}`}>
-                  <card.icon size={18} />
+                <span
+                  className={`flex h-8 w-8 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl ${card.tone}`}
+                >
+                  <card.icon size={16} className="sm:hidden" />
+                  <card.icon size={18} className="hidden sm:block" />
                 </span>
               </article>
             ))}
           </div>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <label className="relative block xl:col-span-2">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="space-y-3">
+
+              {/* row 1  */}
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="relative block min-w-0">
+                <Search 
+                size={15} 
+                className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-slate-400" 
+                />
                 <input
                   value={search}
-                  onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-                  placeholder="Search booking id, customer, phone, space"
-                  className="w-full rounded-xl border border-slate-200 py-2.5 pr-3 pl-9 text-sm outline-none focus:border-indigo-500"
+                  onChange={(event) => {
+                     setSearch(event.target.value); setPage(1); 
+                    }}
+                  placeholder="Search bookings..."
+
+                  className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-2 pl-8 sm:pl-9 text-xs sm:text-sm outline-none focus:border-indigo-500 focus:ring-indigo-100 placeholder:text-xs"
                 />
               </label>
-              <select value={bookingStatus} onChange={(event) => { setBookingStatus(event.target.value); setPage(1); }} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+
+{/* booking status */}
+              <select 
+              value={bookingStatus} 
+              onChange={(event) => {
+                 setBookingStatus(event.target.value);
+                  setPage(1); 
+                  }}
+                className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-600 outline-none focus:border-indigo-500 truncate">
                 <option value="">Booking status</option>
-                {BOOKING_STATUSES.filter(Boolean).map((status) => <option key={status}>{status}</option>)}
+                {BOOKING_STATUSES.filter(Boolean).map((status) => 
+                <option key={status} value={status}>{status}</option>)}
               </select>
-              <select value={paymentStatus} onChange={(event) => { setPaymentStatus(event.target.value); setPage(1); }} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-                <option value="">Payment status</option>
-                {PAYMENT_STATUSES.filter(Boolean).map((status) => <option key={status}>{status}</option>)}
-              </select>
-              <select value={source} onChange={(event) => { setSource(event.target.value); setPage(1); }} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+              
+
+              <select value={paymentStatus}
+              onChange ={(event)=>{
+                setPaymentStatus(event.target.value);
+                setPage(1);
+
+              }}
+              className="h-9 w-full min-w-0 rounded-lg sm:rounded-xl border border-slate-200 bg-white px-2 sm:px-4 text-xs sm:text-sm text-slate-600 sm:text-slate-700 outline-none transition focus:border-indigo-500 sm:focus:ring-2 sm:focus:ring-indigo-100 truncate"
+            >
+              <option value="">Payment status</option>
+              <option value="Unpaid">Unpaid</option>
+              <option value="Partially Paid">Partially Paid</option>
+              <option value="Paid">Paid</option>
+              <option value="Refund Pending">Refund Pending</option>
+              <option value="Refunded">Refunded</option>
+          </select>
+
+             {/* { booking type} */}
+              <select 
+              value={source}
+               onChange={(event) => {
+                 setSource(event.target.value); 
+                 setPage(1); }} 
+                 className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-600 outline-none focus:border-indigo-500 truncate">
                 <option value="">All booking types</option>
                 <option value="space">Space Booking</option>
                 <option value="full">Full Booking</option>
               </select>
-              <input value={spaceName} onChange={(event) => { setSpaceName(event.target.value); setPage(1); }} placeholder="Space name" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+
+
+              {/* <input value={spaceName} onChange={(event) => { setSpaceName(event.target.value); setPage(1); }} placeholder="Space name" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
               <input value={customerName} onChange={(event) => { setCustomerName(event.target.value); setPage(1); }} placeholder="Customer name" className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
               <input type="date" value={from} onChange={(event) => { setFrom(event.target.value); setPage(1); }} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-              <input type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+              <input type="date" value={to} onChange={(event) => { setTo(event.target.value); setPage(1); }} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /> */}
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:gap-3">
+              <span className="shrink-0 text-xs font-semibold text-slate-600">
+                Custom Date Range
+
+              </span>
+
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+
+                <input
+                 type="date"
+                 value={from}
+                 onChange={(event) => {
+                  setFrom(event.target.value);
+                  setPage(1);
+                 }}
+                 aria-label="From date"
+                 className="h-9 w-full rounded-lg border border-slate-200 px-2 text-xs text-slate-600 outline-none focus:border-indigo-500 sm:w-40"
+
+                 />
+
+                 <span className="hidden text-xs text-slate-400 sm:inline">
+                  to
+                 </span>
+
+  
+              <input
+                type="date"
+                value={to}
+                onChange={(event) => { setTo(event.target.value); setPage(1); }}
+                aria-label="To date"
+                className="h-9 w-full rounded-lg sm:rounded-xl border border-slate-200 px-2 sm:px-3 text-xs sm:text-sm sm:py-2.5 text-slate-600 outline-none focus:border-indigo-500 sm:w-40"
+              />
+              </div>
+       
+
+            </div>
+
+
+
             </div>
           </section>
 
