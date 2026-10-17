@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import Vendor from "../models/vendor.model.js";
+import VendorActivity from "../models/vendorActivity.model.js";
+import {vendorListStats} from "../services/vendorInsights.service.js";
 
 const normalizeVendorGender = raw => {
   const value = String(raw ?? '')
@@ -62,7 +64,8 @@ const joinAddress = (line1, line2) =>
 export const getVendors = async (req, res) => {
   try {
     const vendors = await Vendor.find().sort({ createdAt: -1 });
-    res.status(200).json({ success: true, vendors });
+    const rows = await vendorListStats(vendors);
+    res.status(200).json({ success: true, vendors: rows });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -373,9 +376,31 @@ export const updateVendor = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ success: false, message: "Invalid vendor id." });
     }
-    const vendor = await Vendor.findByIdAndUpdate(id, { $set: req.body }, { new: true });
-    if (!vendor) {
+    const existing = await Vendor.findById(id).lean();
+    if (!existing) {
       return res.status(404).json({ success: false, message: "Vendor not found." });
+    }
+    const vendor = await Vendor.findByIdAndUpdate(id, { $set: req.body }, { new: true });
+    const bankFields = ["bankName", "branchName", "accountHolderName", "accountNumber", "IFSCcode", "UPIID"];
+    const bankChanged = bankFields.some(field => {
+      if (req.body?.[field] === undefined) return false;
+      return String(req.body[field] ?? "").trim() !== String(existing[field] ?? "").trim();
+    });
+    if (bankChanged) {
+      const account = String(req.body.accountNumber ?? existing.accountNumber ?? "").replace(/\D/g, "");
+      const masked = account.length >= 4 ? `ending ${account.slice(-4)}` : "details updated";
+      await VendorActivity.create({
+        vendorId: existing._id,
+        type: "bank",
+        title: "Bank account updated",
+        detail: `Bank details changed (${masked}).`,
+        at: new Date(),
+        by: {
+          m_staff_id: req.staff?.m_staff_id || null,
+          m_staff_name: req.staff?.fullName || req.user?.name || null,
+          m_staff_email: req.staff?.email || req.user?.email || null,
+        },
+      });
     }
     return res.status(200).json({ success: true, vendor });
   } catch (error) {

@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap");
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-display: "Syne", sans-serif;
@@ -102,4 +103,159 @@ main :where(.overflow-x-auto),
 
 .safe-pb {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Class-based dark mode. Screens keep their markup; light surfaces are remapped. */
+
+html.dark {
+  color-scheme: dark;
+  background: #0f1318;
+}
+
+html.dark body,
+html.dark #root {
+  background: #0f1318;
+  color: #e8edf3;
+}
+
+html.dark :is(
+  .bg-white,
+  .bg-white\/95,
+  .bg-white\/90,
+  .bg-white\/80,
+  .bg-white\/70,
+  .bg-white\/50
+) {
+  background-color: #171c24;
+}
+
+html.dark :is(
+  .bg-slate-50,
+  .bg-gray-50,
+  .bg-zinc-50,
+  .bg-neutral-50,
+  .bg-slate-100,
+  .bg-gray-100
+) {
+  background-color: #121820;
+}
+
+html.dark :is(.bg-slate-200, .bg-gray-200) {
+  background-color: #243041;
+}
+
+html.dark :is(
+  .bg-\[\#F7F8FA\],
+  .bg-\[\#F6F7FB\],
+  .bg-\[\#f8fafc\],
+  .bg-\[\#F8FAFC\],
+  .bg-\[\#f7f8fa\]
+) {
+  background-color: #0f1318;
+}
+
+html.dark :is(
+  .text-slate-950,
+  .text-slate-900,
+  .text-slate-800,
+  .text-gray-900,
+  .text-gray-800,
+  .text-black
+) {
+  color: #f3f4f6;
+}
+
+html.dark :is(.text-slate-700, .text-gray-700, .text-slate-600, .text-gray-600) {
+  color: #d5dbe3;
+}
+
+html.dark :is(
+  .text-slate-500,
+  .text-slate-400,
+  .text-gray-500,
+  .text-gray-400
+) {
+  color: #9aa6b4;
+}
+
+html.dark :is(
+  .border-slate-100,
+  .border-slate-200,
+  .border-slate-300,
+  .border-gray-100,
+  .border-gray-200,
+  .border-gray-300
+) {
+  border-color: #2a3340;
+}
+
+html.dark :is(.divide-slate-200, .divide-gray-200, .divide-gray-100) > :not(:last-child) {
+  border-color: #2a3340;
+}
+
+html.dark :is(
+  .hover\:bg-slate-50:hover,
+  .hover\:bg-slate-100:hover,
+  .hover\:bg-gray-50:hover,
+  .hover\:bg-gray-100:hover,
+  .hover\:bg-white:hover
+) {
+  background-color: #243041;
+}
+
+html.dark .bg-blue-50 { background-color: #182743; }
+html.dark .bg-emerald-50 { background-color: #123028; }
+html.dark .bg-amber-50 { background-color: #3a2a12; }
+html.dark .bg-rose-50 { background-color: #3a1822; }
+html.dark .bg-violet-50 { background-color: #2a2044; }
+html.dark .bg-indigo-50 { background-color: #1c2348; }
+html.dark .bg-sky-50 { background-color: #142838; }
+
+html.dark :is(.text-blue-600, .text-blue-700, .text-\[\#2F6FED\]) { color: #93c5fd; }
+html.dark :is(.text-emerald-600, .text-emerald-700, .text-emerald-800) { color: #6ee7b7; }
+html.dark :is(.text-amber-600, .text-amber-700, .text-amber-800) { color: #fcd34d; }
+html.dark :is(.text-rose-600, .text-rose-700) { color: #fda4af; }
+html.dark :is(.text-violet-600, .text-violet-700) { color: #c4b5fd; }
+html.dark :is(.text-indigo-600, .text-indigo-700) { color: #a5b4fc; }
+
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+html.dark select,
+html.dark textarea {
+  background-color: #10151c;
+  color: #f3f4f6;
+  border-color: #2a3340;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #8b97a6;
+}
+
+html.dark :is(.MuiPaper-root, .MuiTableCell-root, .MuiToolbar-root) {
+  background-color: #171c24;
+  color: #e8edf3;
+  border-color: #2a3340;
+}
+
+html.dark .MuiTableRow-root:hover {
+  background-color: #1e2631;
+}
+
+html.dark .MuiInputBase-root,
+html.dark .MuiInputBase-input {
+  color: #e8edf3;
+}
+
+html.dark .swal2-popup {
+  background: #171c24;
+  color: #f3f4f6;
+}
+
+html.dark .swal2-title,
+html.dark .swal2-html-container {
+  color: #f3f4f6;
+}
+
+html.dark .custom-scrollbar {
+  scrollbar-color: #3a4656 transparent;
 }

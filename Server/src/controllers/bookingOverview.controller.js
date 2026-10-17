@@ -156,6 +156,11 @@ const buildKpis = rows => {
         .filter(row => row.bookingStatus !== 'Draft' && row.bookingStatus !== 'Cancelled')
         .reduce((sum, row) => sum + row.grandTotal, 0),
     ),
+    pendingAmount: roundMoney(
+      rows
+        .filter(row => row.bookingStatus !== 'Draft' && row.bookingStatus !== 'Cancelled')
+        .reduce((sum, row) => sum + (Number(row.dueAmount) || 0), 0),
+    ),
     pendingRefundCount: pendingRefunds.length,
     pendingRefundAmount: roundMoney(
       pendingRefunds.reduce((sum, row) => sum + (Number(row.refund?.refundableAmount) || 0), 0),

@@ -38,6 +38,7 @@ import { handleLogout } from "@/services/apiClient";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { logout as logoutUser } from "@/store/slices/userSlice";
 import { usePermission } from "@/hooks/usePermission";
+import AppearanceButtons from "@/components/AppearanceButtons";
 
 type SubMenuItem = {
   name: string;
@@ -488,6 +489,14 @@ export default function LeftSideBar({
         })}
       </div>
       <div className="space-y-1 border-t border-gray-100 bg-white/50 p-3 backdrop-blur-sm">
+        <div className={isCollapsed ? "px-0" : "px-1 pb-2"}>
+          {!isCollapsed ? (
+            <p className="px-2 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-gray-400">
+              Settings
+            </p>
+          ) : null}
+          <AppearanceButtons compact={isCollapsed} />
+        </div>
         {mobile && onOpenProfile ? (
           <button
             type="button"

@@ -162,7 +162,17 @@ export default function CreatePurchaseScreen({
       return;
     }
 
-    const state = location.state as { purchase?: any; mode?: Mode } | null;
+    const state = location.state as {
+      purchase?: any;
+      mode?: Mode;
+      prefillVendor?: { name?: string; mobile?: string };
+    } | null;
+    if (state?.prefillVendor && !state.purchase) {
+      setVendor(String(state.prefillVendor.name || ""));
+      setPhone(String(state.prefillVendor.mobile || ""));
+      setVendorDropdownOpen(false);
+      return;
+    }
     if (!state?.mode || !state?.purchase) return;
     applyPurchase(state.purchase, state.mode);
   }, [location.state, initialData, initialMode]);

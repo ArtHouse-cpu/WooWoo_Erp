@@ -2239,6 +2239,7 @@ export const handleGetBookingOverview = async (params?: {
       pendingBookings: number;
       cancelledBookings: number;
       totalRevenue: number;
+      pendingAmount?: number;
       pendingRefundCount: number;
       pendingRefundAmount: number;
     };
@@ -2846,6 +2847,8 @@ export type VendorPaymentRow = {
   purchaseId: string;
   purchaseInvoice: string;
   createdBy: string;
+  allocations?: { purchaseId: string; purchaseInvoice: string; amount: number }[];
+  documents?: { url: string; name: string; mimeType: string; size: number }[];
 };
 
 export type Vendor360Summary = {
@@ -2866,21 +2869,55 @@ export type Vendor360Summary = {
   credit: number;
   overdue: number;
   outstanding: number;
+  purchaseFrequency?: number;
+  lastPurchaseDate?: string | null;
+  totalPaid?: number;
+};
+
+export type VendorTimelineItem = {
+  id: string;
+  type: string;
+  title: string;
+  detail: string;
+  amount: number;
+  reference: string;
+  at?: string;
+  by: string;
 };
 
 export type Vendor360Response = {
   success: boolean;
-  vendor: VendorPayload & { _id: string; isActive?: boolean; createdAt?: string };
+  vendor: VendorPayload & { _id: string; isActive?: boolean; createdAt?: string; cspLabel?: string };
   summary: Vendor360Summary;
   purchases: VendorBillRow[];
   orders: VendorBillRow[];
   returns: VendorBillRow[];
   payments: VendorPaymentRow[];
+  timeline?: VendorTimelineItem[];
 };
 
-export const handleGetVendor360 = async (id: string, signal?: AbortSignal) => {
-  const response = await axiosInstance.get(`/vendor/${id}/360`, { signal });
+export const handleGetVendor360 = async (
+  id: string,
+  signal?: AbortSignal,
+  period?: { from?: string; to?: string },
+) => {
+  const response = await axiosInstance.get(`/vendor/${id}/360`, {
+    signal,
+    params: period?.from || period?.to ? { from: period.from, to: period.to } : undefined,
+  });
   return response.data as Vendor360Response;
+};
+
+export const handleUploadVendorPaymentDocument = async (id: string, file: File) => {
+  const body = new FormData();
+  body.append("file", file);
+  const response = await axiosInstance.post(`/vendor/${id}/payment-documents`, body, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data as {
+    success: boolean;
+    document: { url: string; name: string; mimeType: string; size: number };
+  };
 };
 
 export const handleRecordVendorPayment = async (
@@ -2894,6 +2931,8 @@ export const handleRecordVendorPayment = async (
     note?: string;
     paidAt?: string;
     purchaseId?: string;
+    purchaseIds?: string[];
+    documents?: { url: string; name: string; mimeType: string; size: number }[];
     clientKey: string;
   },
 ) => {

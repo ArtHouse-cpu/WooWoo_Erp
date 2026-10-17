@@ -28,6 +28,14 @@ type VendorRow = VendorDetails & {
   _id: string;
   name: string;
   mobile: string;
+  cspLabel?: string;
+  totalPurchase?: number;
+  purchaseFrequency?: number;
+  totalPaid?: number;
+  outstandingAmount?: number;
+  lastPurchaseDate?: string | null;
+  status?: string;
+  isActive?: boolean;
 };
 
 type VendorTableRow = VendorRow & {
@@ -101,6 +109,17 @@ function vendorToFormValues(vendor: VendorRow): Partial<CustomerPayload> {
     accountHolderName: vendor.accountHolderName ?? "",
     UPIID: vendor.UPIID ?? "",
   };
+}
+
+function inr(value?: number | null) {
+  return `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+}
+
+function whenDate(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default function VendorScreen() {
@@ -304,7 +323,6 @@ export default function VendorScreen() {
 
   const columns = useMemo<MRT_ColumnDef<VendorTableRow>[]>(
     () => [
-      { accessorKey: "id", header: "ID", size: 70 },
       {
         accessorKey: "name",
         header: "Vendor Name",
@@ -313,74 +331,71 @@ export default function VendorScreen() {
             type="button"
             onClick={() => openVendorDetails(row.original)}
             className="text-left font-semibold text-blue-700 underline-offset-2 hover:underline"
-            title="View vendor details"
+            title="Open vendor 360"
           >
-            {cell.getValue<string>() || "—"}
+            <span>{cell.getValue<string>() || "—"}</span>
+            {row.original.cspLabel ? (
+              <span className="ml-2 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                {row.original.cspLabel}
+              </span>
+            ) : null}
           </button>
         ),
       },
-      { accessorKey: "company", header: "Company" },
-      { accessorKey: "mobile", header: "Mobile" },
+      { accessorKey: "mobile", header: "Contact Number" },
       { accessorKey: "email", header: "Email" },
-      { accessorKey: "gstin", header: "GSTIN" },
-      { accessorKey: "city", header: "City", size: 110 },
       {
-        accessorKey: "createdAt",
-        header: "Created At",
-        size: 160,
-        Cell: ({ cell }) => {
-          const value = cell.getValue<string | undefined>();
-          return value
-            ? new Date(value).toLocaleString("en-IN", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: true,
-              })
-            : "—";
-        },
+        accessorKey: "cspLabel",
+        header: "CSP Label",
+        Cell: ({ cell }) => cell.getValue<string>() || "—",
       },
       {
-        id: "netBalance",
-        header: "Net Balance",
-        size: 130,
-        accessorFn: (row) =>
-          Number(row.netBalance ?? row.closingBalance ?? 0),
-        Cell: ({ cell }) => {
-          const value = Number(cell.getValue<number>() ?? 0);
-          return `₹ ${value.toLocaleString("en-IN", {
-            minimumFractionDigits: 2,
-          })}`;
-        },
+        accessorKey: "totalPurchase",
+        header: "Total Purchase",
+        Cell: ({ cell }) => inr(cell.getValue<number>()),
+      },
+      { accessorKey: "purchaseFrequency", header: "Purchase Frequency" },
+      {
+        accessorKey: "totalPaid",
+        header: "Total Paid",
+        Cell: ({ cell }) => inr(cell.getValue<number>()),
       },
       {
-        id: "ledger",
-        header: "Ledger",
-        size: 70,
-        enableSorting: false,
-        Cell: ({ row }) => (
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedVendorForLedger(row.original);
-              setOpenLedgerModal(true);
-            }}
-            title="View Ledger"
-            className="rounded bg-indigo-100 px-3 py-2 text-sm hover:bg-indigo-200"
-          >
-            <Eye color="indigo" size={18} />
-          </button>
-        ),
+        accessorKey: "outstandingAmount",
+        header: "Outstanding Amount",
+        Cell: ({ cell }) => inr(cell.getValue<number>()),
+      },
+      {
+        accessorKey: "lastPurchaseDate",
+        header: "Last Purchase Date",
+        Cell: ({ cell }) => whenDate(cell.getValue<string | null>()),
+      },
+      {
+        id: "status",
+        header: "Status",
+        accessorFn: (row) => row.status || (row.isActive === false ? "Inactive" : "Active"),
+        filterVariant: "select",
+        filterSelectOptions: ["Active", "Inactive"],
       },
       {
         id: "actions",
         header: "Actions",
-        size: 90,
+        size: 120,
         enableSorting: false,
+        enableColumnFilter: false,
         Cell: ({ row }) => (
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedVendorForLedger(row.original);
+                setOpenLedgerModal(true);
+              }}
+              title="View Ledger"
+              className="rounded bg-indigo-100 px-3 py-2 text-sm hover:bg-indigo-200"
+            >
+              <Eye color="indigo" size={18} />
+            </button>
             <Can permission={PERMISSIONS.VENDOR_UPDATE}>
               <button
                 type="button"
@@ -394,7 +409,6 @@ export default function VendorScreen() {
                 <SquarePen color="blue" size={18} />
               </button>
             </Can>
-
             <Can permission={PERMISSIONS.VENDOR_DELETE}>
               <button
                 type="button"
@@ -407,13 +421,10 @@ export default function VendorScreen() {
                     confirmButtonText: "Delete",
                     confirmButtonColor: "#dc2626",
                   });
-
                   if (!result.isConfirmed) return;
-
                   try {
                     await handleDeleteVendor(row.original._id);
                     await fetchVendors();
-
                     await Swal.fire({
                       title: "Deleted",
                       text: "Vendor removed.",
@@ -422,15 +433,8 @@ export default function VendorScreen() {
                       showConfirmButton: false,
                     });
                   } catch (error: unknown) {
-                    const err = error as {
-                      response?: { data?: { message?: string } };
-                    };
-
-                    Swal.fire(
-                      "Error",
-                      err.response?.data?.message ?? "Failed to delete vendor.",
-                      "error",
-                    );
+                    const err = error as { response?: { data?: { message?: string } } };
+                    Swal.fire("Error", err.response?.data?.message ?? "Failed to delete vendor.", "error");
                   }
                 }}
                 className="rounded bg-red-100 px-3 py-2 text-sm hover:bg-red-200"
@@ -451,7 +455,14 @@ export default function VendorScreen() {
     data,
     state: { isLoading: loadingVendors },
     enableDensityToggle: false,
-    initialState: { density: "compact" },
+    enableGlobalFilter: true,
+    enableColumnFilters: true,
+    enableSorting: true,
+    initialState: {
+      density: "compact",
+      showGlobalFilter: true,
+      pagination: { pageIndex: 0, pageSize: 10 },
+    },
     muiTablePaperProps: {
       elevation: 0,
       square: true,

@@ -800,7 +800,7 @@ const persistBooking = async (
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            All Bookings
+            Full Bookings
           </h1>
           <span className="rounded-full border border-indigo-200/60 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
             {total} Total

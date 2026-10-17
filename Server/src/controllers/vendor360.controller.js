@@ -1,9 +1,17 @@
 import mongoose from 'mongoose';
+import fs from 'fs';
+import path from 'path';
+import multer from 'multer';
+import {fileURLToPath} from 'url';
+import {uploadOnCloudinary} from '../utils/cloudinary.js';
 import Vendor from '../models/vendor.model.js';
 import Purchase from '../models/purchase.model.js';
 import PurchaseOrder from '../models/purchaseOrder.model.js';
 import PurchaseReturn from '../models/purchaseReturn.model.js';
 import VendorPayment from '../models/vendorPayment.model.js';
+import VendorActivity from '../models/vendorActivity.model.js';
+import Expence from '../models/expence.model.js';
+import CustomersailorProgram from '../models/customerSellerProgram.model.js';
 
 const CLOSED = ['cancelled', 'draft'];
 const METHODS = new Set(['Cash', 'UPI', 'Card', 'Bank', 'Other']);
@@ -141,6 +149,21 @@ const serializePayment = payment => ({
   purchaseId: payment.purchaseId ? String(payment.purchaseId) : '',
   purchaseInvoice: payment.purchaseInvoice || '',
   createdBy: payment.createdBy?.m_staff_name || '',
+  allocations: Array.isArray(payment.allocations)
+    ? payment.allocations.map(row => ({
+        purchaseId: row.purchaseId ? String(row.purchaseId) : '',
+        purchaseInvoice: row.purchaseInvoice || '',
+        amount: roundMoney(row.amount),
+      }))
+    : [],
+  documents: Array.isArray(payment.documents)
+    ? payment.documents.map(row => ({
+        url: row.url || '',
+        name: row.name || '',
+        mimeType: row.mimeType || '',
+        size: Number(row.size) || 0,
+      }))
+    : [],
 });
 
 export const getVendor360 = async (req, res) => {
@@ -155,14 +178,127 @@ export const getVendor360 = async (req, res) => {
       VendorPayment.find({vendorId: loaded.vendor._id}).sort({paidAt: -1, createdAt: -1}).lean(),
     ]);
     const dueDays = loaded.vendor.defaultDueDays;
+    const [enrollment, activities, expenses] = await Promise.all([
+      CustomersailorProgram.findOne({vendorId: loaded.vendor._id, status: 'active'}).select('displayName createdAt updatedAt').lean(),
+      VendorActivity.find({vendorId: loaded.vendor._id}).sort({at: -1}).limit(80).lean(),
+      Expence.find({vendorId: loaded.vendor._id, status: {$ne: 'Cancelled'}}).sort({date: -1}).limit(80).lean(),
+    ]);
+    const cspLabel = enrollment
+      ? `CSP · ${String(enrollment.displayName || loaded.vendor.name || 'Sailor').trim()}`
+      : '';
+    const from = req.query.from ? new Date(req.query.from) : null;
+    const to = req.query.to ? new Date(req.query.to) : null;
+    const inPeriod = date => {
+      if (!from && !to) return true;
+      const value = new Date(date || 0).getTime();
+      if (Number.isNaN(value)) return false;
+      if (from && !Number.isNaN(from.getTime()) && value < from.getTime()) return false;
+      if (to && !Number.isNaN(to.getTime())) {
+        const end = new Date(to);
+        end.setHours(23, 59, 59, 999);
+        if (value > end.getTime()) return false;
+      }
+      return true;
+    };
+    const summary = buildSummary(loaded.vendor, purchases, orders, returns, payments);
+    const confirmed = active(purchases);
+    const periodBills = confirmed.filter(row => inPeriod(row.invoiceDate || row.createdAt));
+    const lastPurchaseDate = confirmed.reduce((latest, row) => {
+      const when = row.invoiceDate || row.createdAt;
+      if (!when) return latest;
+      if (!latest || new Date(when) > new Date(latest)) return when;
+      return latest;
+    }, null);
+    summary.purchaseFrequency = periodBills.length;
+    summary.lastPurchaseDate = lastPurchaseDate;
+    summary.totalPaid = summary.paidOnBills;
+    const timeline = [
+      {
+        id: `created-${loaded.vendor._id}`,
+        type: 'vendor',
+        title: 'Vendor created',
+        detail: loaded.vendor.name || '',
+        amount: 0,
+        reference: '',
+        at: loaded.vendor.createdAt,
+        by: '',
+      },
+      ...activities.map(row => ({
+        id: String(row._id),
+        type: row.type || 'updated',
+        title: row.title,
+        detail: row.detail || '',
+        amount: roundMoney(row.amount),
+        reference: row.reference || '',
+        at: row.at || row.createdAt,
+        by: row.by?.m_staff_name || '',
+      })),
+      ...(enrollment
+        ? [{
+            id: `csp-${enrollment._id}`,
+            type: 'csp',
+            title: 'CSP label assigned',
+            detail: cspLabel,
+            amount: 0,
+            reference: '',
+            at: enrollment.createdAt,
+            by: '',
+          }]
+        : []),
+      ...confirmed.map(row => ({
+        id: `purchase-${row._id}`,
+        type: 'purchase',
+        title: 'Purchase created',
+        detail: row.invoiceNumber || '',
+        amount: roundMoney(row.amount),
+        reference: row.invoiceNumber || '',
+        at: row.invoiceDate || row.createdAt,
+        by: row.createdBy?.m_staff_name || '',
+      })),
+      ...active(orders).map(row => ({
+        id: `order-${row._id}`,
+        type: 'order',
+        title: 'Purchase order created',
+        detail: row.invoiceNumber || '',
+        amount: roundMoney(row.amount),
+        reference: row.invoiceNumber || '',
+        at: row.invoiceDate || row.createdAt,
+        by: row.createdBy?.m_staff_name || '',
+      })),
+      ...payments.map(row => ({
+        id: `payment-${row._id}`,
+        type: 'payment',
+        title: row.direction === 'pay-out'
+          ? (roundMoney(row.appliedAmount) > 0 && roundMoney(row.appliedAmount) + 0.5 < roundMoney(row.amount) ? 'Partial payment recorded' : 'Payment recorded')
+          : row.direction === 'pay-in' ? 'Pay-in recorded' : 'Balance adjusted',
+        detail: [row.method, row.reference, row.purchaseInvoice, row.documents?.length ? 'Receipt attached' : ''].filter(Boolean).join(' · '),
+        amount: roundMoney(row.amount),
+        reference: row.reference || row.purchaseInvoice || '',
+        at: row.paidAt || row.createdAt,
+        by: row.createdBy?.m_staff_name || '',
+      })),
+      ...expenses.map(row => ({
+        id: `expense-${row._id}`,
+        type: 'expense',
+        title: 'Expense created',
+        detail: row.title || '',
+        amount: roundMoney(row.amount),
+        reference: row.expenseCode || '',
+        at: row.date || row.createdAt,
+        by: row.createdBy?.m_staff_name || row.addedBy?.m_staff_name || '',
+      })),
+    ]
+      .filter(row => row.at)
+      .sort((a, b) => new Date(b.at) - new Date(a.at));
     return res.status(200).json({
       success: true,
-      vendor: loaded.vendor,
-      summary: buildSummary(loaded.vendor, purchases, orders, returns, payments),
-      purchases: active(purchases).map(row => mapBill(row, dueDays)),
+      vendor: {...loaded.vendor, cspLabel},
+      summary,
+      purchases: confirmed.map(row => mapBill(row, dueDays)),
       orders: active(orders).map(row => mapBill(row, dueDays)),
       returns: active(returns).map(row => mapBill(row, dueDays)),
       payments: payments.map(serializePayment),
+      timeline,
     });
   } catch (error) {
     console.error('getVendor360 error:', error);
@@ -222,59 +358,108 @@ export const recordVendorPayment = async (req, res) => {
     let advanceAmount = direction === 'pay-out' ? amount : 0;
     let purchaseInvoice = '';
     let purchaseId = null;
-    let rolledBack = null;
+    const rolledBack = [];
+    const allocations = [];
 
-    const requestedPurchase = String(req.body?.purchaseId || '').trim();
-    if (requestedPurchase) {
+    const requestedIds = [
+      ...(Array.isArray(req.body?.purchaseIds) ? req.body.purchaseIds : []),
+      req.body?.purchaseId,
+    ]
+      .map(value => String(value || '').trim())
+      .filter((value, index, list) => value && list.indexOf(value) === index);
+
+    if (requestedIds.length) {
       if (direction !== 'pay-out') {
         return res.status(400).json({success: false, message: 'Only a pay-out can be applied to a purchase bill.'});
       }
-      if (!mongoose.Types.ObjectId.isValid(requestedPurchase)) {
-        return res.status(400).json({success: false, message: 'That purchase bill was not found.'});
+      const bills = [];
+      for (const requestedPurchase of requestedIds) {
+        if (!mongoose.Types.ObjectId.isValid(requestedPurchase)) {
+          return res.status(400).json({success: false, message: 'That purchase bill was not found.'});
+        }
+        const purchase = await Purchase.findById(requestedPurchase);
+        if (!purchase || !belongsToVendor(purchase, vendor)) {
+          return res.status(404).json({success: false, message: 'That purchase bill was not found for this vendor.'});
+        }
+        if (CLOSED.includes(String(purchase.status || '').toLowerCase())) {
+          return res.status(400).json({success: false, message: 'This bill cannot accept a payment.'});
+        }
+        const due = roundMoney(purchase.dueAmount);
+        if (due <= 0) {
+          return res.status(400).json({success: false, message: `${purchase.invoiceNumber || 'A selected bill'} has no outstanding balance.`});
+        }
+        bills.push(purchase);
       }
-      const purchase = await Purchase.findById(requestedPurchase);
-      if (!purchase || !belongsToVendor(purchase, vendor)) {
-        return res.status(404).json({success: false, message: 'That purchase bill was not found for this vendor.'});
+      const eligible = roundMoney(bills.reduce((sum, row) => sum + roundMoney(row.dueAmount), 0));
+      if (amount > eligible + 0.5) {
+        return res.status(400).json({
+          success: false,
+          message: `Payment cannot exceed the outstanding amount of ${eligible}.`,
+        });
       }
-      if (CLOSED.includes(String(purchase.status || '').toLowerCase())) {
-        return res.status(400).json({success: false, message: 'This bill cannot accept a payment.'});
-      }
-      const due = roundMoney(purchase.dueAmount);
-      if (due <= 0) {
-        return res.status(400).json({success: false, message: 'This bill has no outstanding balance.'});
-      }
-      appliedAmount = roundMoney(Math.min(amount, due));
-      advanceAmount = roundMoney(amount - appliedAmount);
-      const nextPaid = roundMoney((Number(purchase.paidAmount) || 0) + appliedAmount);
-      const nextDue = roundMoney(Math.max(0, (Number(purchase.amount) || 0) - nextPaid));
-      const settled = nextDue <= 0.5;
-      const updated = await Purchase.findOneAndUpdate(
-        {_id: purchase._id, dueAmount: {$gte: appliedAmount - 0.01}},
-        {
-          $set: {
-            paidAmount: settled ? roundMoney(purchase.amount) : nextPaid,
-            dueAmount: settled ? 0 : nextDue,
-            status: settled ? 'paid' : 'partial',
-            paymentMode: method,
-            purchaseType: 'cash',
+      let remaining = amount;
+      for (const purchase of bills) {
+        if (remaining <= 0) break;
+        const due = roundMoney(purchase.dueAmount);
+        const slice = roundMoney(Math.min(remaining, due));
+        const nextPaid = roundMoney((Number(purchase.paidAmount) || 0) + slice);
+        const nextDue = roundMoney(Math.max(0, (Number(purchase.amount) || 0) - nextPaid));
+        const settled = nextDue <= 0.5;
+        const updated = await Purchase.findOneAndUpdate(
+          {_id: purchase._id, dueAmount: {$gte: slice - 0.01}},
+          {
+            $set: {
+              paidAmount: settled ? roundMoney(purchase.amount) : nextPaid,
+              dueAmount: settled ? 0 : nextDue,
+              status: settled ? 'paid' : 'partial',
+              paymentMode: method,
+              purchaseType: 'cash',
+            },
           },
-        },
-        {new: true},
-      );
-      if (!updated) {
-        return res.status(409).json({success: false, message: 'This bill was updated by another payment. Refresh and try again.'});
+          {new: true},
+        );
+        if (!updated) {
+          for (const previous of rolledBack) {
+            await Purchase.updateOne({_id: previous.id}, {$set: {
+              paidAmount: previous.paidAmount,
+              dueAmount: previous.dueAmount,
+              status: previous.status,
+              paymentMode: previous.paymentMode,
+              purchaseType: previous.purchaseType,
+            }});
+          }
+          return res.status(409).json({success: false, message: 'A selected bill was updated by another payment. Refresh and try again.'});
+        }
+        rolledBack.push({
+          id: purchase._id,
+          paidAmount: purchase.paidAmount,
+          dueAmount: purchase.dueAmount,
+          status: purchase.status,
+          paymentMode: purchase.paymentMode,
+          purchaseType: purchase.purchaseType,
+        });
+        allocations.push({
+          purchaseId: purchase._id,
+          purchaseInvoice: purchase.invoiceNumber || '',
+          amount: slice,
+        });
+        appliedAmount = roundMoney(appliedAmount + slice);
+        remaining = roundMoney(remaining - slice);
       }
-      rolledBack = {
-        id: purchase._id,
-        paidAmount: purchase.paidAmount,
-        dueAmount: purchase.dueAmount,
-        status: purchase.status,
-        paymentMode: purchase.paymentMode,
-        purchaseType: purchase.purchaseType,
-      };
-      purchaseId = purchase._id;
-      purchaseInvoice = purchase.invoiceNumber || '';
+      advanceAmount = 0;
+      purchaseId = allocations[0]?.purchaseId || null;
+      purchaseInvoice = allocations.map(row => row.purchaseInvoice).filter(Boolean).join(', ');
     }
+
+    const documents = (Array.isArray(req.body?.documents) ? req.body.documents : [])
+      .map(row => ({
+        url: String(row?.url || '').trim().slice(0, 500),
+        name: String(row?.name || '').trim().slice(0, 180),
+        mimeType: String(row?.mimeType || '').trim().slice(0, 80),
+        size: Math.max(0, Number(row?.size) || 0),
+      }))
+      .filter(row => row.url)
+      .slice(0, 5);
 
     try {
       const payment = await VendorPayment.create({
@@ -290,6 +475,15 @@ export const recordVendorPayment = async (req, res) => {
         paidAt,
         purchaseId,
         purchaseInvoice,
+        allocations,
+        documents,
+        history: [{
+          action: 'created',
+          amount,
+          note: String(req.body?.note || '').trim().slice(0, 200),
+          at: new Date(),
+          byName: actorFrom(req).m_staff_name || '',
+        }],
         clientKey,
         createdBy: actorFrom(req),
       });
@@ -307,14 +501,16 @@ export const recordVendorPayment = async (req, res) => {
         summary,
       });
     } catch (error) {
-      if (rolledBack) {
-        await Purchase.updateOne({_id: rolledBack.id}, {$set: {
-          paidAmount: rolledBack.paidAmount,
-          dueAmount: rolledBack.dueAmount,
-          status: rolledBack.status,
-          paymentMode: rolledBack.paymentMode,
-          purchaseType: rolledBack.purchaseType,
-        }});
+      if (rolledBack.length) {
+        for (const previous of rolledBack) {
+          await Purchase.updateOne({_id: previous.id}, {$set: {
+            paidAmount: previous.paidAmount,
+            dueAmount: previous.dueAmount,
+            status: previous.status,
+            paymentMode: previous.paymentMode,
+            purchaseType: previous.purchaseType,
+          }});
+        }
       }
       if (error?.code === 11000) {
         const existing = await VendorPayment.findOne({vendorId: vendor._id, clientKey}).lean();
@@ -327,5 +523,53 @@ export const recordVendorPayment = async (req, res) => {
   } catch (error) {
     console.error('recordVendorPayment error:', error);
     return res.status(500).json({success: false, message: 'Could not record the payment.'});
+  }
+};
+
+const uploadRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../uploads/vendor-payments');
+fs.mkdirSync(uploadRoot, {recursive: true});
+
+export const paymentDocumentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => callback(null, uploadRoot),
+    filename: (_req, file, callback) => {
+      const safe = String(file.originalname || 'receipt').replace(/[^\w.\-]+/g, '_').slice(0, 80);
+      callback(null, `${Date.now()}-${safe}`);
+    },
+  }),
+  limits: {fileSize: 5 * 1024 * 1024},
+  fileFilter: (_req, file, callback) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (!allowed.includes(file.mimetype)) {
+      callback(new Error('Upload a JPG, PNG, WEBP, or PDF up to 5 MB.'));
+      return;
+    }
+    callback(null, true);
+  },
+}).single('file');
+
+export const uploadVendorPaymentDocument = async (req, res) => {
+  try {
+    const loaded = await loadVendor(req.params.id);
+    if (loaded.error) return res.status(loaded.status).json({success: false, message: loaded.error});
+    if (!req.file) {
+      return res.status(400).json({success: false, message: 'Choose a file to upload.'});
+    }
+    const url = await uploadOnCloudinary(req.file.path, {folder: 'vendor-payments'});
+    if (!url) {
+      return res.status(502).json({success: false, message: 'The receipt could not be stored. Check cloud storage and try again.'});
+    }
+    return res.status(201).json({
+      success: true,
+      document: {
+        url,
+        name: req.file.originalname || 'receipt',
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+      },
+    });
+  } catch (error) {
+    console.error('uploadVendorPaymentDocument error:', error);
+    return res.status(500).json({success: false, message: error.message || 'Could not upload the receipt.'});
   }
 };

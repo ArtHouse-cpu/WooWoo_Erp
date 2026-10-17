@@ -172,6 +172,13 @@ const BookingSummaryRenderer = ({
     []) as SelectedServiceItem[];
   const discountAmount = snap?.discountAmount ?? booking.discountAmount ?? 0;
   const cashbackAmount = snap?.cashbackAmount ?? booking.cashbackAmount ?? 0;
+  const paymentView = {
+    showPayment: true,
+    paidAmount: Number(booking.paidAmount) || 0,
+    dueAmount: booking.dueAmount,
+    storedGrandTotal: Number(booking.grandTotal) || 0,
+    storedSubTotal: Number(booking.subTotal) || Number(snap?.subTotal) || 0,
+  };
 
   if (isCoworking) {
     const startDate =
@@ -211,6 +218,7 @@ const BookingSummaryRenderer = ({
           discountAmount={discountAmount}
           cashbackAmount={cashbackAmount}
           formatDateDisplay={formatDateDisplay}
+          {...paymentView}
         />
       </div>
     );
@@ -244,6 +252,7 @@ const BookingSummaryRenderer = ({
           discountAmount={discountAmount}
           cashbackAmount={cashbackAmount}
           formatDateDisplay={formatDateDisplay}
+          {...paymentView}
         />
       </div>
     );
@@ -271,6 +280,7 @@ const BookingSummaryRenderer = ({
         discountAmount={discountAmount}
         cashbackAmount={cashbackAmount}
         formatDateDisplay={formatDateDisplay}
+        {...paymentView}
       />
     </div>
   );

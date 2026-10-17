@@ -51,7 +51,6 @@ export default function Header({
   const [isSubmittingLead, setIsSubmittingLead] = useState(false);
 
   const [bookingMenu, setBookingMenu] = useState<null | "header" | "mobile">(null);
-  const [leadMenuOpen, setLeadMenuOpen] = useState(false);
 
   const openBookingChoice = (kind: "full" | "space") => {
     setBookingMenu(null);
@@ -72,16 +71,13 @@ export default function Header({
   };
 
   useEffect(() => {
-    if (!bookingMenu && !leadMenuOpen) return;
+    if (!bookingMenu) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setBookingMenu(null);
-        setLeadMenuOpen(false);
-      }
+      if (event.key === "Escape") setBookingMenu(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [bookingMenu, leadMenuOpen]);
+  }, [bookingMenu]);
 
   const handleLeadSubmit = (payload: LeadPayload) => {
     setPendingLeadPayload(payload);
@@ -219,15 +215,21 @@ export default function Header({
         </button>
         <button
           type="button"
-          onClick={() => {
-            setBookingMenu(null);
-            setLeadMenuOpen((open) => !open);
-          }}
+          onClick={() => setIsCreateLeadOpen(true)}
           className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 md:hidden"
-          aria-label="Create and list leads"
-          title="Leads"
+          aria-label="Create Lead"
+          title="Create Lead"
         >
           <UserPlus size={18} />
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate("/leads")}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 md:hidden"
+          aria-label="Lead List"
+          title="Lead List"
+        >
+          <List size={18} />
         </button>
         {hasQuickBillAccess && (
           <button
@@ -364,53 +366,6 @@ export default function Header({
           </button>
         ))}
     </nav>
-    {leadMenuOpen ? (
-      <>
-        <button
-          type="button"
-          aria-label="Close lead options"
-          className="fixed inset-0 z-[70] cursor-default bg-black/20 md:hidden"
-          onClick={() => setLeadMenuOpen(false)}
-        />
-        <div
-          role="menu"
-          aria-label="Leads"
-          className="fixed right-3 top-[calc(3.4rem+env(safe-area-inset-top))] z-[80] w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl md:hidden"
-        >
-          <p className="px-2 py-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-            Leads
-          </p>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setLeadMenuOpen(false);
-              setIsCreateLeadOpen(true);
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition hover:bg-emerald-50"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-              <UserPlus size={18} />
-            </span>
-            <span className="text-sm font-bold text-slate-900">Create Lead</span>
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setLeadMenuOpen(false);
-              navigate("/leads");
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition hover:bg-emerald-50"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-              <List size={18} />
-            </span>
-            <span className="text-sm font-bold text-slate-900">Lead List</span>
-          </button>
-        </div>
-      </>
-    ) : null}
     {bookingMenu ? (
       <>
         <button

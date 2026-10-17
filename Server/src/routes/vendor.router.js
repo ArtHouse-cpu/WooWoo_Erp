@@ -10,7 +10,7 @@ import {
   updateVendor,
   importVendors,
 } from '../controllers/vendor.controller.js';
-import {getVendor360, recordVendorPayment} from '../controllers/vendor360.controller.js';
+import {getVendor360, recordVendorPayment, paymentDocumentUpload, uploadVendorPaymentDocument} from '../controllers/vendor360.controller.js';
 
 const router = express.Router();
 
@@ -24,6 +24,15 @@ router.post(
 );
 router.get('/', requirePermission(PERMISSIONS.VENDOR_READ), getVendors);
 router.get('/:id/360', requirePermission(PERMISSIONS.VENDOR_READ), getVendor360);
+router.post('/:id/payment-documents', requirePermission(PERMISSIONS.VENDOR_UPDATE), (req, res, next) => {
+  paymentDocumentUpload(req, res, error => {
+    if (!error) return next();
+    const message = error.code === 'LIMIT_FILE_SIZE'
+      ? 'The file must be 5 MB or smaller.'
+      : error.message || 'Could not upload the receipt.';
+    return res.status(400).json({success: false, message});
+  });
+}, uploadVendorPaymentDocument);
 router.post('/:id/payments', requirePermission(PERMISSIONS.VENDOR_UPDATE), recordVendorPayment);
 router.get('/:id', requirePermission(PERMISSIONS.VENDOR_READ), getVendorById);
 router.delete('/:id', requirePermission(PERMISSIONS.VENDOR_DELETE), deleteVendor);

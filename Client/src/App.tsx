@@ -4,9 +4,11 @@ import FullPageLoader from "@/components/FullPageLoader";
 import { router } from "@/routes/router";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { useColorMode } from "@/theme/theme";
 
 export default function App() {
   const [loading, setLoading] = useState(true);
+  const colorMode = useColorMode();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -29,7 +31,7 @@ export default function App() {
         newestOnTop
         closeOnClick
         pauseOnHover
-        theme="light"
+        theme={colorMode}
       />
       <RouterProvider router={router} />
     </>

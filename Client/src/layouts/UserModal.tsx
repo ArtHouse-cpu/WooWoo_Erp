@@ -3,6 +3,7 @@ import { X, User, MapPin, Phone, Mail, UserCircle2, CalendarDays, Save } from "l
 import { useAppSelector } from "@/store/hooks";
 import { handleUpdateUser } from "@/services/apiClient";
 import Swal from "sweetalert2";
+import AppearanceButtons from "@/components/AppearanceButtons";
 
 type UserModalProps = {
   open: boolean;
@@ -225,6 +226,16 @@ export const UserModal = ({ open, onClose, user: propUser }: UserModalProps) => 
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 pb-24">
+          <section className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
+              Settings
+            </h4>
+            <p className="mt-1 text-sm font-semibold text-gray-800">Appearance</p>
+            <p className="mb-2 text-xs text-gray-500">
+              Dark dims the ERP. Light restores the normal view.
+            </p>
+            <AppearanceButtons />
+          </section>
           {!isEditing ? (
             // --- VIEW MODE ---
             <>

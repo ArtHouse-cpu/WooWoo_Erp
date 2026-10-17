@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -317,6 +318,7 @@ const MODE_STYLES: Record<PaymentMode, string> = {
 
 const ExpenseScreen = () => {
   const user = useAppSelector((state) => state.user);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState<ExpenseRow[]>([]);
   const [activeTab, setActiveTab] = useState<ExpenseStatus | "All">("All");
   const [search, setSearch] = useState("");
@@ -326,6 +328,7 @@ const ExpenseScreen = () => {
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ExpenseModalMode>("create");
   const [activeExpense, setActiveExpense] = useState<ExpenseRow | null>(null);
+  const [createSeed, setCreateSeed] = useState<ExpenseModalValues | null>(null);
   const [savingExpense, setSavingExpense] = useState(false);
   const [openPin, setOpenPin] = useState(false);
   const [openCheckout, setOpenCheckout] = useState(false);
@@ -360,10 +363,12 @@ const ExpenseScreen = () => {
 
   const modalInitialExpense = useMemo(
     () =>
-      modalMode === "create" || !activeExpense
-        ? null
-        : rowToModalValues(activeExpense),
-    [modalMode, activeExpense],
+      modalMode === "create"
+        ? createSeed
+        : activeExpense
+          ? rowToModalValues(activeExpense)
+          : null,
+    [modalMode, activeExpense, createSeed],
   );
 
   const fetchExpenses = async (signal?: AbortSignal) => {
@@ -387,10 +392,31 @@ const ExpenseScreen = () => {
   }, [fromDate, toDate]);
 
   const openCreateModal = () => {
+    setCreateSeed(null);
     setModalMode("create");
     setActiveExpense(null);
     setIsExpenseModalOpen(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return;
+    const vendorId = searchParams.get("vendorId") || "";
+    const vendorName = searchParams.get("vendorName") || "";
+    setCreateSeed({
+      title: "",
+      description: "",
+      category: "",
+      amount: 0,
+      paidTo: vendorName,
+      vendorId,
+      date: new Date().toISOString().slice(0, 10),
+    });
+    setModalMode("create");
+    setActiveExpense(null);
+    setExpenseFormKey((key) => key + 1);
+    setIsExpenseModalOpen(true);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const openViewModal = useCallback((row: ExpenseRow) => {
     setModalMode("view");

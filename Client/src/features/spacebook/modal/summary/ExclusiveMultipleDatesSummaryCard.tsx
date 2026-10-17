@@ -13,6 +13,7 @@ import {
 import type { SpacePayload } from "@/services/apiClient";
 import type { MultiDateSlot } from "../CreateBookingDetailsModal";
 import type { SelectedServiceItem, SummaryFoodItem } from "./CoworkingSummaryCard";
+import PaymentAmounts from "./PaymentAmounts";
 
 /* =========================================
    Constants
@@ -37,6 +38,11 @@ export type ExclusiveMultipleDatesSummaryCardProps = {
   formatDateDisplay: (
     val?: string | Date | null,
   ) => string;
+  showPayment?: boolean;
+  paidAmount?: number;
+  dueAmount?: number | null;
+  storedGrandTotal?: number;
+  storedSubTotal?: number;
 };
 
 /* =========================================
@@ -55,6 +61,11 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
   discountAmount = 0,
   cashbackAmount = 0,
   formatDateDisplay,
+  showPayment = false,
+  paidAmount = 0,
+  dueAmount,
+  storedGrandTotal = 0,
+  storedSubTotal = 0,
 }) => {
   /* =========================================
      Safe Values
@@ -165,6 +176,13 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
     0,
     subTotal - safeDiscount,
   );
+  const totalPrice = storedSubTotal > 0 ? storedSubTotal : subTotal;
+  const payPrice = storedGrandTotal > 0 ? storedGrandTotal : grandTotal;
+  const paidPrice = Math.max(0, Number(paidAmount) || 0);
+  const pendingPrice =
+    dueAmount == null
+      ? Math.max(0, payPrice - paidPrice)
+      : Math.max(0, Number(dueAmount) || 0);
 
   /* =========================================
      Dates Summary
@@ -620,6 +638,14 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
             </span>
 
           </div>
+          {showPayment ? (
+            <PaymentAmounts
+              totalPrice={totalPrice}
+              payPrice={payPrice}
+              paidPrice={paidPrice}
+              pendingPrice={pendingPrice}
+            />
+          ) : null}
 
         </div>
 

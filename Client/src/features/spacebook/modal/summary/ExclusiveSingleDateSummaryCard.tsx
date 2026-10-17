@@ -12,6 +12,7 @@ import {
 
 import type { SpacePayload } from "@/services/apiClient";
 import type { SelectedServiceItem, SummaryFoodItem } from "./CoworkingSummaryCard";
+import PaymentAmounts from "./PaymentAmounts";
 
 const FALLBACK_SPACE_IMAGE =
   "https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=400&q=80";
@@ -28,6 +29,11 @@ export type ExclusiveSingleDateSummaryCardProps = {
   discountAmount?: number;
   cashbackAmount?: number;
   formatDateDisplay: (val?: string | Date | null) => string;
+  showPayment?: boolean;
+  paidAmount?: number;
+  dueAmount?: number | null;
+  storedGrandTotal?: number;
+  storedSubTotal?: number;
 };
 
 export const ExclusiveSingleDateSummaryCard: React.FC<
@@ -44,6 +50,11 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   discountAmount = 0,
   cashbackAmount = 0,
   formatDateDisplay,
+  showPayment = false,
+  paidAmount = 0,
+  dueAmount,
+  storedGrandTotal = 0,
+  storedSubTotal = 0,
 }) => {
   /* --------------------------------
      Safe / calculated values
@@ -83,6 +94,13 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   const safeDiscount = Math.max(0, Number(discountAmount) || 0);
 
   const grandTotal = Math.max(0, subTotal - safeDiscount);
+  const totalPrice = storedSubTotal > 0 ? storedSubTotal : subTotal;
+  const payPrice = storedGrandTotal > 0 ? storedGrandTotal : grandTotal;
+  const paidPrice = Math.max(0, Number(paidAmount) || 0);
+  const pendingPrice =
+    dueAmount == null
+      ? Math.max(0, payPrice - paidPrice)
+      : Math.max(0, Number(dueAmount) || 0);
 
   /* --------------------------------
      Space image
@@ -359,6 +377,14 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
               ₹{grandTotal.toLocaleString("en-IN")}
             </span>
           </div>
+          {showPayment ? (
+            <PaymentAmounts
+              totalPrice={totalPrice}
+              payPrice={payPrice}
+              paidPrice={paidPrice}
+              pendingPrice={pendingPrice}
+            />
+          ) : null}
         </div>
       </div>
 

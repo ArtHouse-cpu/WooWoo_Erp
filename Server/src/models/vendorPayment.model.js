@@ -38,6 +38,30 @@ const vendorPaymentSchema = new mongoose.Schema(
       default: null,
     },
     purchaseInvoice: {type: String, default: '', trim: true},
+    allocations: [
+      {
+        purchaseId: {type: mongoose.Schema.Types.ObjectId, ref: 'Purchase'},
+        purchaseInvoice: {type: String, default: ''},
+        amount: {type: Number, default: 0, min: 0},
+      },
+    ],
+    documents: [
+      {
+        url: {type: String, default: '', trim: true},
+        name: {type: String, default: '', trim: true},
+        mimeType: {type: String, default: '', trim: true},
+        size: {type: Number, default: 0, min: 0},
+      },
+    ],
+    history: [
+      {
+        action: {type: String, default: 'created'},
+        amount: {type: Number, default: 0},
+        note: {type: String, default: ''},
+        at: {type: Date, default: Date.now},
+        byName: {type: String, default: ''},
+      },
+    ],
     /** Caller-generated key so a retried request does not record the payment twice. */
     clientKey: {type: String, default: '', trim: true},
     createdBy: {
