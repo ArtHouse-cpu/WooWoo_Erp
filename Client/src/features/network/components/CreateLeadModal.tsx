@@ -645,8 +645,8 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
             </div>
 
 
-            {/* sm+: wrapper is display:contents; the sm:order-* classes keep Media URL below the uploads */}
-            <div className="grid grid-cols-2 gap-3 sm:contents">
+            {/* Phone: stack these. sm+: wrapper is display:contents so Media URL stays below the uploads */}
+            <div className="grid grid-cols-1 gap-3 sm:contents">
              {/*Deadline */}
              <div className="min-w-0">
              <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -663,7 +663,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                 deadline: e.target.value,
               })
              }
-             className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+             className="w-full min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
              
              />
 
