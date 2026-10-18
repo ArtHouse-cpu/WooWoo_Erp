@@ -12,7 +12,7 @@ import {
   Download,
   Ellipsis,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   handleDeleteInvoice,
@@ -82,7 +82,10 @@ const tabs: PosRow["status"][] = ["Paid", "Pending", "Draft", "Cancelled"];
 
 export default function PosScreen() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<PosRow["status"] | "All">("All");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<PosRow["status"] | "All">(() =>
+    searchParams.get("tab")?.toLowerCase() === "draft" ? "Draft" : "All",
+  );
   const [search, setSearch] = useState("");
   const [datePreset, setDatePreset] = useState<DatePreset>("today");
   const [fromDate, setFromDate] = useState(getTodayYmd);
@@ -102,6 +105,14 @@ export default function PosScreen() {
   const [returnInvoice, setReturnInvoice] = useState<any>(null);
   const [viewInvoiceOpen, setViewInvoiceOpen] = useState(false);
   const [viewInvoiceData, setViewInvoiceData] = useState<any>(null);
+
+  useEffect(() => {
+    if (searchParams.get("tab")?.toLowerCase() !== "draft") return;
+    setActiveTab("Draft");
+    const next = new URLSearchParams(searchParams);
+    next.delete("tab");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleAction = async (
     action: "view" | "edit" | "cancel" | "delete" | "Credit Note",

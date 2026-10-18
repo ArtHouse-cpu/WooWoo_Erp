@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { FileSpreadsheet, Upload, X, Download } from "lucide-react";
+import { FileSpreadsheet, Upload, X, Download, Info } from "lucide-react";
 import * as XLSX from "xlsx";
 import type { VendorImportRow } from "@/services/apiClient";
 
@@ -187,6 +187,7 @@ export default function ImportVendorModal({
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [parseError, setParseError] = useState("");
+  const [detailRow, setDetailRow] = useState<PreviewRow | null>(null);
 
   const validRows = useMemo(() => rows.filter((r) => !r._error), [rows]);
 
@@ -244,6 +245,7 @@ export default function ImportVendorModal({
     setParseError("");
     setRows([]);
     setFileName("");
+    setDetailRow(null);
     if (!file) return;
 
     try {
@@ -399,6 +401,7 @@ export default function ImportVendorModal({
                     <th className="px-3 py-2 font-semibold">City</th>
                     <th className="px-3 py-2 font-semibold">Net Balance</th>
                     <th className="px-3 py-2 font-semibold">Status</th>
+                    <th className="px-3 py-2 font-semibold">Details</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -426,6 +429,17 @@ export default function ImportVendorModal({
                         ) : (
                           <span className="text-emerald-600">Ready</span>
                         )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => setDetailRow(row)}
+                          title="View vendor details"
+                          aria-label={`View details for row ${row._row}`}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                        >
+                          <Info size={14} />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -462,6 +476,108 @@ export default function ImportVendorModal({
             {loading
               ? "Importing…"
               : `Import ${validRows.length || ""} vendor${validRows.length === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      </div>
+      {detailRow ? (
+        <VendorImportDetail row={detailRow} onClose={() => setDetailRow(null)} />
+      ) : null}
+    </div>
+  );
+}
+
+function money(value?: number | null) {
+  return `₹${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function DetailField({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | number | null;
+}) {
+  const text =
+    value === undefined || value === null || String(value).trim() === ""
+      ? "—"
+      : String(value);
+  return (
+    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <p className="mt-0.5 break-words text-sm font-medium text-slate-800">{text}</p>
+    </div>
+  );
+}
+
+function VendorImportDetail({
+  row,
+  onClose,
+}: {
+  row: PreviewRow;
+  onClose: () => void;
+}) {
+  const address = [row.billingAddress1, row.billingAddress2, row.city, row.state, row.pincode, row.country]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 p-4">
+      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Excel row {row._row}
+            </p>
+            <h3 className="mt-0.5 text-base font-bold text-slate-900">
+              {row.companyName || row.name || "Vendor"}
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              {row._error ? row._error : "Ready to import"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+            aria-label="Close vendor details"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-2 overflow-y-auto px-5 py-4 sm:grid-cols-2">
+          <DetailField label="Vendor name" value={row.name} />
+          <DetailField label="Company" value={row.companyName} />
+          <DetailField label="Phone" value={row.mobile} />
+          <DetailField label="Email" value={row.email} />
+          <DetailField label="GSTIN" value={row.gstin} />
+          <DetailField label="City" value={row.city} />
+          <DetailField label="State" value={row.state} />
+          <DetailField label="Pincode" value={row.pincode} />
+          <DetailField label="Country" value={row.country} />
+          <div className="sm:col-span-2">
+            <DetailField label="Billing address" value={address} />
+          </div>
+          <DetailField label="Opening balance" value={money(row.openingBalance)} />
+          <DetailField label="Debit limit" value={money(row.debitLimit)} />
+          <DetailField label="Default due days" value={row.defaultDueDays ?? "—"} />
+          <DetailField label="Net balance" value={money(row.netBalance)} />
+          <div className="sm:col-span-2">
+            <DetailField label="Notes" value={row.notes} />
+          </div>
+        </div>
+        <div className="flex justify-end border-t border-slate-100 px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+          >
+            Close
           </button>
         </div>
       </div>

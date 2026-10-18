@@ -51,6 +51,7 @@ export async function vendorListStats(vendors) {
   for (const vendor of list) {
     const id = String(vendor._id);
     add(byPhone, digits(vendor.mobile).slice(-10), id);
+    add(byPhone, digits(vendor.businessPhoneNumber).slice(-10), id);
     add(byName, String(vendor.name || '').trim().toLowerCase(), id);
     add(byName, String(vendor.companyName || '').trim().toLowerCase(), id);
   }

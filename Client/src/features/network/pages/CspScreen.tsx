@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -58,6 +59,7 @@ type ProductRow = {
 };
 
 export default function CspScreen() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState<CspEnrollment[]>([]);
   const [loading, setLoading] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
@@ -74,6 +76,14 @@ export default function CspScreen() {
     "active",
   );
   const searchWrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (searchParams.get("enroll") !== "1") return;
+    setShowEnroll(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("enroll");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Products modal state
   const [productsModal, setProductsModal] = useState<{

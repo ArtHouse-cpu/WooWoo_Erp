@@ -45,6 +45,7 @@ type DateRange =
   | "last-month"
   | "year"
   | "last-year";
+type CreatedSort = "newest" | "oldest";
 
 type BillLine = {
   productName: string;
@@ -129,6 +130,21 @@ const rangeBounds = (range: DateRange) => {
     end: new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999),
   };
 };
+
+const createdStamp = (value?: string | null) => {
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isNaN(time) ? 0 : time;
+};
+
+const sortByCreated = <T,>(
+  rows: T[],
+  pick: (row: T) => string | null | undefined,
+  order: CreatedSort,
+) =>
+  [...rows].sort((left, right) => {
+    const diff = createdStamp(pick(left)) - createdStamp(pick(right));
+    return order === "oldest" ? diff : -diff;
+  });
 
 const inDateRange = (value: string | null | undefined, range: DateRange) => {
   const bounds = rangeBounds(range);
@@ -228,6 +244,7 @@ export default function Vendor360Modal({
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>("");
+  const [createdSort, setCreatedSort] = useState<CreatedSort>("newest");
   const [payOpen, setPayOpen] = useState(false);
   const [payDoc, setPayDoc] = useState("");
   const [bill, setBill] = useState<VendorBillRow | null>(null);
@@ -320,6 +337,10 @@ export default function Vendor360Modal({
       return row.invoiceNumber.toLowerCase().includes(term);
     });
   }, [bills, search, status, dateRange]);
+  const sortedBills = useMemo(
+    () => sortByCreated(filteredBills, (row) => row.createdAt || row.invoiceDate, createdSort),
+    [filteredBills, createdSort],
+  );
   const filteredPayments = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (data?.payments || []).filter((row) => {
@@ -331,6 +352,14 @@ export default function Vendor360Modal({
         .includes(term);
     });
   }, [data?.payments, search, status, dateRange]);
+  const sortedPayments = useMemo(
+    () => sortByCreated(filteredPayments, (row) => row.createdAt || row.paidAt, createdSort),
+    [filteredPayments, createdSort],
+  );
+  const sortedTimeline = useMemo(
+    () => sortByCreated(data?.timeline || [], (row) => row.createdAt || row.at, createdSort),
+    [data?.timeline, createdSort],
+  );
 
   const openBills = (data?.purchases || []).filter((row) => row.dueAmount > 0);
 
@@ -755,6 +784,9 @@ export default function Vendor360Modal({
                     <Field label="GSTIN" value={profile?.gstin} />
                     <Field label="PAN" value={profile?.panNumber} />
                     <Field label="Company" value={profile?.companyName} />
+                    <Field label="MSME" value={profile?.msme} />
+                    <Field label="Udyam Number" value={profile?.udyamNumber} />
+                    <Field label="CIN Number" value={profile?.cinNumber} />
                     <Field label="Bank" value={profile?.bankName} />
                     <Field
                       label="Account"
@@ -838,11 +870,14 @@ export default function Vendor360Modal({
 
           {!loading && data && tab === "timeline" ? (
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
-              {(data.timeline || []).length === 0 ? (
+              <div className="mb-3 flex justify-end">
+                <CreatedSortSelect value={createdSort} onChange={setCreatedSort} />
+              </div>
+              {sortedTimeline.length === 0 ? (
                 <p className="text-sm text-slate-500">No activity yet.</p>
               ) : (
                 <ol className="space-y-3">
-                  {(data.timeline || []).map((item: VendorTimelineItem) => (
+                  {sortedTimeline.map((item: VendorTimelineItem) => (
                     <li
                       key={item.id}
                       className="border-l-2 border-violet-200 pl-3"
@@ -868,13 +903,15 @@ export default function Vendor360Modal({
 
           {!loading && data && (tab === "purchases" || tab === "orders") ? (
             <BillTable
-              rows={filteredBills}
+              rows={sortedBills}
               search={search}
               status={status}
               dateRange={dateRange}
               onSearch={setSearch}
               onStatus={setStatus}
               onDateRange={setDateRange}
+              createdSort={createdSort}
+              onCreatedSort={setCreatedSort}
               onOpen={
                 tab === "purchases"
                   ? (row) => void openPurchase(row)
@@ -919,6 +956,7 @@ export default function Vendor360Modal({
                   <option value="adjustment">Adjustment</option>
                 </select>
                 <DateRangeSelect value={dateRange} onChange={setDateRange} />
+                <CreatedSortSelect value={createdSort} onChange={setCreatedSort} />
               </div>
               {filteredPayments.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-slate-500">
@@ -926,7 +964,7 @@ export default function Vendor360Modal({
                 </p>
               ) : (
                 <ul className="divide-y divide-slate-100">
-                  {filteredPayments.map((payment) => (
+                  {sortedPayments.map((payment) => (
                     <li
                       key={payment.id}
                       className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
@@ -1572,6 +1610,26 @@ function Field({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
+function CreatedSortSelect({
+  value,
+  onChange,
+}: {
+  value: CreatedSort;
+  onChange: (value: CreatedSort) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value as CreatedSort)}
+      className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+      aria-label="Sort by created date"
+    >
+      <option value="newest">Newest created</option>
+      <option value="oldest">Oldest created</option>
+    </select>
+  );
+}
+
 function DateRangeSelect({
   value,
   onChange,
@@ -1604,6 +1662,8 @@ function BillTable({
   onSearch,
   onStatus,
   onDateRange,
+  createdSort,
+  onCreatedSort,
   onOpen,
   onPay,
   empty,
@@ -1612,9 +1672,11 @@ function BillTable({
   search: string;
   status: string;
   dateRange: DateRange;
+  createdSort: CreatedSort;
   onSearch: (value: string) => void;
   onStatus: (value: string) => void;
   onDateRange: (value: DateRange) => void;
+  onCreatedSort: (value: CreatedSort) => void;
   onOpen?: (row: VendorBillRow) => void;
   onPay?: (row: VendorBillRow) => void;
   empty: string;
@@ -1648,6 +1710,7 @@ function BillTable({
           <option value="overdue">Overdue</option>
         </select>
         <DateRangeSelect value={dateRange} onChange={onDateRange} />
+        <CreatedSortSelect value={createdSort} onChange={onCreatedSort} />
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-[720px] w-full text-left text-sm">

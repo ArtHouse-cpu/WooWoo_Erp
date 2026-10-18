@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -51,6 +52,7 @@ type CustomerRow = {
   dueAmount?: number;
 };
 export default function CustomerScreen() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [openCreateCustomerModal, setOpenCreateCustomerModal] = useState(false);
   const [openImportModal, setOpenImportModal] = useState(false);
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
@@ -81,6 +83,14 @@ export default function CustomerScreen() {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => window.clearTimeout(t);
   }, [search]);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return;
+    setOpenCreateCustomerModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("create");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));

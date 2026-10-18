@@ -1309,6 +1309,14 @@ export type CustomerPayload = {
   accountHolderName?: string;
   UPIID?: string;
   profileImage?: string;
+  businessPhoneNumber?: string;
+  brandName?: string;
+  website?: string;
+  businessEmail?: string;
+  msme?: string;
+  udyamNumber?: string;
+  cinNumber?: string;
+  pointsOfContact?: VendorPointOfContact[];
   createdBy?: {
     m_staff_id?: string | null;
     m_staff_name?: string | null;
@@ -2756,6 +2764,18 @@ export const handleDeletePurchaseOrder = async (id: string) => {
   return response.data;
 };
 
+export type VendorPointOfContact = {
+  name?: string;
+  mobile?: string;
+  email?: string;
+  whatsappNumber?: string;
+  alternateMobile?: string;
+  dob?: string;
+  gender?: string;
+  department?: string;
+  designation?: string;
+};
+
 export type VendorPayload = {
   name: string;
   mobile: string;
@@ -2787,6 +2807,14 @@ export type VendorPayload = {
   panNumber?: string;
   accountHolderName?: string;
   UPIID?: string;
+  businessPhoneNumber?: string;
+  brandName?: string;
+  website?: string;
+  businessEmail?: string;
+  msme?: string;
+  udyamNumber?: string;
+  cinNumber?: string;
+  pointsOfContact?: VendorPointOfContact[];
 };
 
 export type VendorImportRow = {
@@ -2823,6 +2851,7 @@ export type VendorBillRow = {
   id: string;
   invoiceNumber: string;
   invoiceDate?: string | null;
+  createdAt?: string | null;
   amount: number;
   paidAmount: number;
   dueAmount: number;
@@ -2844,6 +2873,7 @@ export type VendorPaymentRow = {
   reference: string;
   note: string;
   paidAt?: string;
+  createdAt?: string | null;
   purchaseId: string;
   purchaseInvoice: string;
   createdBy: string;
@@ -2882,6 +2912,7 @@ export type VendorTimelineItem = {
   amount: number;
   reference: string;
   at?: string;
+  createdAt?: string | null;
   by: string;
 };
 

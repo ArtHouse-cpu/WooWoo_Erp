@@ -246,6 +246,9 @@ export default function VendorDetailsModal({ open, vendor, onClose }: Props) {
               <Field label="Company" value={details.companyName} />
               <Field label="GSTIN" value={details.gstin} />
               <Field label="PAN" value={details.panNumber} />
+              <Field label="MSME" value={details.msme} />
+              <Field label="Udyam Number" value={details.udyamNumber} />
+              <Field label="CIN Number" value={details.cinNumber} />
               <Field label="Aadhar" value={details.adharNumber} />
               <Field label="Gender" value={details.gender} />
               <Field

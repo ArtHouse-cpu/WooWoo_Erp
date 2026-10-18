@@ -40,6 +40,78 @@ const asTrimmed = (raw, fallback = '') => {
   return text;
 };
 
+const phoneOk = value => /^[6-9]\d{9}$/.test(String(value || ""));
+
+const contactPhoneError = contacts => {
+  for (const row of contacts) {
+    for (const phone of [row.mobile, row.whatsappNumber, row.alternateMobile].filter(Boolean)) {
+      if (!phoneOk(phone)) {
+        return "Enter a valid 10-digit phone number for each point of contact.";
+      }
+    }
+  }
+  return "";
+};
+
+const normalizeContacts = raw => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(row => ({
+      name: asTrimmed(row?.name),
+      mobile: normalizeMobile(row?.mobile),
+      email: asTrimmed(row?.email).toLowerCase(),
+      whatsappNumber: normalizeMobile(row?.whatsappNumber),
+      alternateMobile: normalizeMobile(row?.alternateMobile ?? row?.AlternateMobile),
+      dob: row?.dob || null,
+      gender: normalizeVendorGender(row?.gender),
+      department: asTrimmed(row?.department),
+      designation: asTrimmed(row?.designation),
+    }))
+    .filter(row =>
+      row.name ||
+      row.mobile ||
+      row.email ||
+      row.whatsappNumber ||
+      row.alternateMobile ||
+      row.dob ||
+      row.gender ||
+      row.department ||
+      row.designation,
+    );
+};
+
+/** Vendor name comes from the point of contact. Phone is the business phone, or that contact's mobile. */
+const resolveVendorIdentity = body => {
+  const contacts = normalizeContacts(body?.pointsOfContact);
+  const named = contacts.find(row => row.name);
+  const personName = asTrimmed(named?.name) || asTrimmed(body?.name);
+  const personPhone = normalizeMobile(named?.mobile || body?.mobile);
+  const companyName = asTrimmed(body?.companyName);
+  const businessPhone = normalizeMobile(body?.businessPhoneNumber);
+  const mobile = businessPhone || personPhone;
+
+  if (!personName && !companyName) {
+    return { error: "Enter the vendor name in Point of Contact, or the company name." };
+  }
+  if (!mobile || !phoneOk(mobile)) {
+    return { error: "Enter a valid 10-digit business phone number or point of contact mobile number." };
+  }
+  for (const phone of [personPhone, businessPhone].filter(Boolean)) {
+    if (!phoneOk(phone)) {
+      return { error: "Enter a valid 10-digit phone number." };
+    }
+  }
+  return {
+    values: {
+      name: personName || companyName,
+      mobile,
+      companyName,
+      businessPhoneNumber: businessPhone,
+    },
+    phones: [...new Set([mobile, businessPhone, personPhone].filter(Boolean))],
+  };
+};
+
 const asNumber = (raw, fallback = 0) => {
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
   const text = String(raw ?? '')
@@ -120,29 +192,42 @@ export const createVendor = async (req, res) => {
       panNumber,
       accountHolderName,
       UPIID,
+      businessPhoneNumber,
+      brandName,
+      website,
+      businessEmail,
+      msme,
+      udyamNumber,
+      cinNumber,
+      pointsOfContact,
     } = req.body;
 
-    if (!name?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Vendor name is required.",
-      });
+    const identity = resolveVendorIdentity({
+      name,
+      mobile,
+      companyName,
+      businessPhoneNumber,
+      pointsOfContact,
+    });
+    if (identity.error) {
+      return res.status(400).json({ success: false, message: identity.error });
     }
-
-    if (!mobile?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Mobile number is required.",
-      });
+    const contacts = normalizeContacts(pointsOfContact);
+    const contactError = contactPhoneError(contacts);
+    if (contactError) {
+      return res.status(400).json({ success: false, message: contactError });
     }
     const existingVendor = await Vendor.findOne({
-      mobile: String(mobile).trim(),
+      $or: [
+        { mobile: { $in: identity.phones } },
+        { businessPhoneNumber: { $in: identity.phones } },
+      ],
     });
 
     if (existingVendor) {
       return res.status(409).json({
         success: false,
-        message: "Vendor with this mobile number already exists.",
+        message: "Vendor with this phone number already exists.",
       });
     }
 
@@ -153,12 +238,17 @@ export const createVendor = async (req, res) => {
     const closing = asNumber(closingBalance, net);
 
     const vendor = await Vendor.create({
-      name: String(name).trim(),
-      mobile: String(mobile).trim(),
+      ...identity.values,
 
       email: String(email ?? "").trim(),
       gstin: String(gstin ?? "").trim(),
-      companyName: String(companyName ?? "").trim(),
+      brandName: asTrimmed(brandName),
+      website: asTrimmed(website),
+      businessEmail: asTrimmed(businessEmail).toLowerCase(),
+      msme: asTrimmed(msme),
+      udyamNumber: asTrimmed(udyamNumber).toUpperCase(),
+      cinNumber: asTrimmed(cinNumber).toUpperCase(),
+      pointsOfContact: contacts,
 
       address: joinAddress(line1, line2) || asTrimmed(address),
       billingAddress1: line1,
@@ -380,7 +470,48 @@ export const updateVendor = async (req, res) => {
     if (!existing) {
       return res.status(404).json({ success: false, message: "Vendor not found." });
     }
-    const vendor = await Vendor.findByIdAndUpdate(id, { $set: req.body }, { new: true });
+    const identity = resolveVendorIdentity({
+      name: req.body?.name ?? existing.name,
+      mobile: req.body?.mobile ?? existing.mobile,
+      companyName: req.body?.companyName ?? existing.companyName,
+      businessPhoneNumber: req.body?.businessPhoneNumber ?? existing.businessPhoneNumber,
+      pointsOfContact: req.body?.pointsOfContact ?? existing.pointsOfContact,
+    });
+    if (identity.error) {
+      return res.status(400).json({ success: false, message: identity.error });
+    }
+    const duplicate = await Vendor.findOne({
+      _id: { $ne: existing._id },
+      $or: [
+        { mobile: { $in: identity.phones } },
+        { businessPhoneNumber: { $in: identity.phones } },
+      ],
+    }).select("_id");
+    if (duplicate) {
+      return res.status(409).json({
+        success: false,
+        message: "Vendor with this phone number already exists.",
+      });
+    }
+    if (Array.isArray(req.body?.pointsOfContact)) {
+      const contactError = contactPhoneError(normalizeContacts(req.body.pointsOfContact));
+      if (contactError) {
+        return res.status(400).json({ success: false, message: contactError });
+      }
+    }
+    const nextBody = { ...req.body, ...identity.values };
+    if (req.body?.msme !== undefined) nextBody.msme = asTrimmed(req.body.msme);
+    if (req.body?.udyamNumber !== undefined) {
+      nextBody.udyamNumber = asTrimmed(req.body.udyamNumber).toUpperCase();
+    }
+    if (req.body?.cinNumber !== undefined) {
+      nextBody.cinNumber = asTrimmed(req.body.cinNumber).toUpperCase();
+    }
+    if (Array.isArray(req.body?.pointsOfContact)) {
+      nextBody.pointsOfContact = normalizeContacts(req.body.pointsOfContact);
+    }
+    delete nextBody._id;
+    const vendor = await Vendor.findByIdAndUpdate(id, { $set: nextBody }, { new: true });
     const bankFields = ["bankName", "branchName", "accountHolderName", "accountNumber", "IFSCcode", "UPIID"];
     const bankChanged = bankFields.some(field => {
       if (req.body?.[field] === undefined) return false;

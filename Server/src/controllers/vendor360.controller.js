@@ -40,8 +40,10 @@ const vendorMatch = vendor => {
   const clauses = names.map(name => ({
     supplierName: new RegExp(`^${escapeRegex(name)}$`, 'i'),
   }));
-  const phone = String(vendor.mobile || '').replace(/\D/g, '').slice(-10);
-  if (phone.length >= 10) {
+  const phones = [vendor.mobile, vendor.businessPhoneNumber]
+    .map(value => String(value || '').replace(/\D/g, '').slice(-10))
+    .filter(phone => phone.length >= 10);
+  for (const phone of [...new Set(phones)]) {
     clauses.push({supplierContact: new RegExp(phone.split('').join('\\D*'))});
   }
   if (!clauses.length) return {_id: null};
@@ -69,6 +71,7 @@ const mapBill = (doc, dueDays) => {
     id: String(doc._id),
     invoiceNumber: doc.invoiceNumber || '',
     invoiceDate: doc.invoiceDate || doc.vendorDate || doc.createdAt || null,
+    createdAt: doc.createdAt || null,
     amount: roundMoney(doc.amount),
     paidAmount: roundMoney(doc.paidAmount),
     dueAmount,
@@ -146,6 +149,7 @@ const serializePayment = payment => ({
   reference: payment.reference || '',
   note: payment.note || '',
   paidAt: payment.paidAt || payment.createdAt,
+  createdAt: payment.createdAt || null,
   purchaseId: payment.purchaseId ? String(payment.purchaseId) : '',
   purchaseInvoice: payment.purchaseInvoice || '',
   createdBy: payment.createdBy?.m_staff_name || '',
@@ -221,6 +225,7 @@ export const getVendor360 = async (req, res) => {
         amount: 0,
         reference: '',
         at: loaded.vendor.createdAt,
+        createdAt: loaded.vendor.createdAt,
         by: '',
       },
       ...activities.map(row => ({
@@ -231,6 +236,7 @@ export const getVendor360 = async (req, res) => {
         amount: roundMoney(row.amount),
         reference: row.reference || '',
         at: row.at || row.createdAt,
+        createdAt: row.createdAt || row.at,
         by: row.by?.m_staff_name || '',
       })),
       ...(enrollment
@@ -242,6 +248,7 @@ export const getVendor360 = async (req, res) => {
             amount: 0,
             reference: '',
             at: enrollment.createdAt,
+            createdAt: enrollment.createdAt,
             by: '',
           }]
         : []),
@@ -253,6 +260,7 @@ export const getVendor360 = async (req, res) => {
         amount: roundMoney(row.amount),
         reference: row.invoiceNumber || '',
         at: row.invoiceDate || row.createdAt,
+        createdAt: row.createdAt,
         by: row.createdBy?.m_staff_name || '',
       })),
       ...active(orders).map(row => ({
@@ -263,6 +271,7 @@ export const getVendor360 = async (req, res) => {
         amount: roundMoney(row.amount),
         reference: row.invoiceNumber || '',
         at: row.invoiceDate || row.createdAt,
+        createdAt: row.createdAt,
         by: row.createdBy?.m_staff_name || '',
       })),
       ...payments.map(row => ({
@@ -275,6 +284,7 @@ export const getVendor360 = async (req, res) => {
         amount: roundMoney(row.amount),
         reference: row.reference || row.purchaseInvoice || '',
         at: row.paidAt || row.createdAt,
+        createdAt: row.createdAt,
         by: row.createdBy?.m_staff_name || '',
       })),
       ...expenses.map(row => ({
@@ -285,6 +295,7 @@ export const getVendor360 = async (req, res) => {
         amount: roundMoney(row.amount),
         reference: row.expenseCode || '',
         at: row.date || row.createdAt,
+        createdAt: row.createdAt,
         by: row.createdBy?.m_staff_name || row.addedBy?.m_staff_name || '',
       })),
     ]

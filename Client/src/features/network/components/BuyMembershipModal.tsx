@@ -10,7 +10,6 @@ import {
 // Extend window to include Razorpay loaded from CDN script
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Razorpay: any;
   }
 }

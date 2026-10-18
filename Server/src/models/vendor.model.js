@@ -1,5 +1,20 @@
 import mongoose from "mongoose";
 
+const pointOfContactSchema = new mongoose.Schema(
+  {
+    name: { type: String, default: "", trim: true },
+    mobile: { type: String, default: "", trim: true },
+    email: { type: String, default: "", trim: true, lowercase: true },
+    whatsappNumber: { type: String, default: "", trim: true },
+    alternateMobile: { type: String, default: "", trim: true },
+    dob: { type: Date, default: null },
+    gender: { type: String, enum: ["Male", "Female", "Other", ""], default: "" },
+    department: { type: String, default: "", trim: true },
+    designation: { type: String, default: "", trim: true },
+  },
+  { _id: false },
+);
+
 const vendorSchema = new mongoose.Schema(
   {
     name: {
@@ -26,6 +41,56 @@ const vendorSchema = new mongoose.Schema(
       type: String,
       default: "",
       trim: true,
+    },
+
+    businessPhoneNumber: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    brandName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    website: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    businessEmail: {
+      type: String,
+      default: "",
+      trim: true,
+      lowercase: true,
+    },
+
+    msme: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    udyamNumber: {
+      type: String,
+      default: "",
+      trim: true,
+      uppercase: true,
+    },
+
+    cinNumber: {
+      type: String,
+      default: "",
+      trim: true,
+      uppercase: true,
+    },
+
+    pointsOfContact: {
+      type: [pointOfContactSchema],
+      default: [],
     },
 
     gstin: {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -22,6 +23,7 @@ import {
   type CustomerPayload,
   type VendorImportRow,
   type VendorPayload,
+  type VendorPointOfContact,
 } from "@/services/apiClient";
 
 type VendorRow = VendorDetails & {
@@ -81,13 +83,52 @@ function toVendorPayload(payload: CustomerPayload): VendorPayload {
     panNumber: payload.panNumber,
     accountHolderName: payload.accountHolderName,
     UPIID: payload.UPIID,
+    businessPhoneNumber: payload.businessPhoneNumber,
+    brandName: payload.brandName,
+    website: payload.website,
+    businessEmail: payload.businessEmail,
+    msme: payload.msme,
+    udyamNumber: payload.udyamNumber,
+    cinNumber: payload.cinNumber,
+    pointsOfContact: payload.pointsOfContact,
   };
 }
 
 function vendorToFormValues(vendor: VendorRow): Partial<CustomerPayload> {
+  const companyName = vendor.companyName ?? "";
+  const businessPhone = vendor.businessPhoneNumber ?? "";
+  const storedAsCompany =
+    Boolean(companyName) &&
+    vendor.name === companyName &&
+    Boolean(businessPhone) &&
+    vendor.mobile === businessPhone;
+  const savedContacts = Array.isArray(vendor.pointsOfContact)
+    ? vendor.pointsOfContact
+    : [];
+  const personName = storedAsCompany ? "" : String(vendor.name ?? "").trim();
+  const personPhone = storedAsCompany ? "" : String(vendor.mobile ?? "").trim();
+  const pointsOfContact: VendorPointOfContact[] =
+    savedContacts.length > 0
+      ? savedContacts.map((row, index) =>
+          index === 0 && personName && !String(row.name ?? "").trim()
+            ? { ...row, name: personName, mobile: row.mobile || personPhone }
+            : row,
+        )
+      : personName || vendor.email || vendor.AlternateMobile || vendor.dob || vendor.gender
+        ? [
+            {
+              name: personName,
+              mobile: personPhone,
+              email: vendor.email ?? "",
+              alternateMobile: vendor.AlternateMobile ?? "",
+              dob: vendor.dob ?? "",
+              gender: vendor.gender ?? "",
+            },
+          ]
+        : [];
   return {
-    name: vendor.name ?? "",
-    mobile: vendor.mobile ?? "",
+    name: "",
+    mobile: "",
     email: vendor.email ?? "",
     gstin: vendor.gstin ?? "",
     companyName: vendor.companyName ?? "",
@@ -108,6 +149,14 @@ function vendorToFormValues(vendor: VendorRow): Partial<CustomerPayload> {
     panNumber: vendor.panNumber ?? "",
     accountHolderName: vendor.accountHolderName ?? "",
     UPIID: vendor.UPIID ?? "",
+    businessPhoneNumber: businessPhone,
+    brandName: vendor.brandName ?? "",
+    website: vendor.website ?? "",
+    businessEmail: vendor.businessEmail ?? "",
+    msme: vendor.msme ?? "",
+    udyamNumber: vendor.udyamNumber ?? "",
+    cinNumber: vendor.cinNumber ?? "",
+    pointsOfContact,
   };
 }
 
@@ -123,6 +172,7 @@ function whenDate(value?: string | null) {
 }
 
 export default function VendorScreen() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [openCreateVendorModal, setOpenCreateVendorModal] = useState(false);
   const [creatingVendor, setCreatingVendor] = useState(false);
   const [editingVendor, setEditingVendor] = useState<VendorRow | null>(null);
@@ -155,6 +205,14 @@ export default function VendorScreen() {
       setLoadingVendors(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return;
+    setOpenCreateVendorModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("create");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -383,68 +441,100 @@ export default function VendorScreen() {
         size: 120,
         enableSorting: false,
         enableColumnFilter: false,
-        Cell: ({ row }) => (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedVendorForLedger(row.original);
-                setOpenLedgerModal(true);
-              }}
-              title="View Ledger"
-              className="rounded bg-indigo-100 px-3 py-2 text-sm hover:bg-indigo-200"
-            >
-              <Eye color="indigo" size={18} />
-            </button>
-            <Can permission={PERMISSIONS.VENDOR_UPDATE}>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenCreateVendorModal(false);
-                  setEditingVendor(row.original);
-                }}
-                className="rounded bg-blue-100 px-3 py-2 text-sm hover:bg-blue-200"
-                title="Edit Vendor"
-              >
-                <SquarePen color="blue" size={18} />
-              </button>
-            </Can>
-            <Can permission={PERMISSIONS.VENDOR_DELETE}>
-              <button
-                type="button"
-                onClick={async () => {
-                  const result = await Swal.fire({
-                    title: "Delete vendor?",
-                    text: "This action cannot be undone.",
-                    icon: "warning",
-                    showCancelButton: true,
-                    confirmButtonText: "Delete",
-                    confirmButtonColor: "#dc2626",
-                  });
-                  if (!result.isConfirmed) return;
-                  try {
-                    await handleDeleteVendor(row.original._id);
-                    await fetchVendors();
-                    await Swal.fire({
-                      title: "Deleted",
-                      text: "Vendor removed.",
-                      icon: "success",
-                      timer: 1400,
-                      showConfirmButton: false,
-                    });
-                  } catch (error: unknown) {
-                    const err = error as { response?: { data?: { message?: string } } };
-                    Swal.fire("Error", err.response?.data?.message ?? "Failed to delete vendor.", "error");
-                  }
-                }}
-                className="rounded bg-red-100 px-3 py-2 text-sm hover:bg-red-200"
-                title="Delete Vendor"
-              >
-                <Trash2 color="red" size={18} />
-              </button>
-            </Can>
-          </div>
-        ),
+       
+Cell: ({ row }) => (
+  <div className="flex items-center gap-2">
+    {/* View Ledger */}
+    <button
+      type="button"
+      onClick={() => {
+        setSelectedVendorForLedger(row.original);
+        setOpenLedgerModal(true);
+      }}
+      title="View Ledger"
+      aria-label="View Ledger"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg
+        border border-slate-200 bg-white text-slate-600
+        transition-colors duration-150
+        hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-600
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+    >
+      <Eye size={18} strokeWidth={1.8} />
+    </button>
+
+    {/* Edit Vendor */}
+    <Can permission={PERMISSIONS.VENDOR_UPDATE}>
+      <button
+        type="button"
+        onClick={() => {
+          setOpenCreateVendorModal(false);
+          setEditingVendor(row.original);
+        }}
+        title="Edit Vendor"
+        aria-label="Edit Vendor"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg
+          border border-slate-200 bg-white text-slate-600
+          transition-colors duration-150
+          hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        <SquarePen size={18} strokeWidth={1.8} />
+      </button>
+    </Can>
+
+    {/* Delete Vendor */}
+    <Can permission={PERMISSIONS.VENDOR_DELETE}>
+      <button
+        type="button"
+        onClick={async () => {
+          const result = await Swal.fire({
+            title: "Delete vendor?",
+            text: "This action cannot be undone.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "Delete",
+            confirmButtonColor: "#dc2626",
+          });
+
+          if (!result.isConfirmed) return;
+
+          try {
+            await handleDeleteVendor(row.original._id);
+            await fetchVendors();
+
+            await Swal.fire({
+              title: "Deleted",
+              text: "Vendor removed.",
+              icon: "success",
+              timer: 1400,
+              showConfirmButton: false,
+            });
+          } catch (error: unknown) {
+            const err = error as {
+              response?: { data?: { message?: string } };
+            };
+
+            Swal.fire(
+              "Error",
+              err.response?.data?.message ?? "Failed to delete vendor.",
+              "error"
+            );
+          }
+        }}
+        title="Delete Vendor"
+        aria-label="Delete Vendor"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg
+          border border-slate-200 bg-white text-slate-600
+          transition-colors duration-150
+          hover:border-red-200 hover:bg-red-50 hover:text-red-600
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+      >
+        <Trash2 size={18} strokeWidth={1.8} />
+      </button>
+    </Can>
+  </div>
+),
+
       },
     ],
     [fetchVendors],
