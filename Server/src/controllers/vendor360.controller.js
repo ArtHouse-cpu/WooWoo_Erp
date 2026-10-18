@@ -526,8 +526,16 @@ export const recordVendorPayment = async (req, res) => {
   }
 };
 
-const uploadRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../uploads/vendor-payments');
-fs.mkdirSync(uploadRoot, {recursive: true});
+const localUploadsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../uploads/vendor-payments');
+const tmpUploadsDir = path.join('/tmp', 'uploads', 'vendor-payments');
+
+let uploadRoot = localUploadsDir;
+try {
+  fs.mkdirSync(localUploadsDir, {recursive: true});
+} catch {
+  fs.mkdirSync(tmpUploadsDir, {recursive: true});
+  uploadRoot = tmpUploadsDir;
+}
 
 export const paymentDocumentUpload = multer({
   storage: multer.diskStorage({
