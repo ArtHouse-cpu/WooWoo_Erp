@@ -1,12 +1,3 @@
-/**
- * BuyMembershipModal
- *
- * 1. Fetches all active membership plans.
- * 2. User selects a plan.
- * 3. Clicks "Pay with Razorpay" → calls backend to create order.
- * 4. Razorpay checkout widget opens.
- * 5. On success → calls backend verify endpoint → subscription created.
- */
 import { useEffect, useState } from "react";
 import { X, Check, Loader2, ShoppingBag } from "lucide-react";
 import Swal from "sweetalert2";
