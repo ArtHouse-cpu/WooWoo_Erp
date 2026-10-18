@@ -787,6 +787,26 @@ export default function Vendor360Modal({
                     <Field label="MSME" value={profile?.msme} />
                     <Field label="Udyam Number" value={profile?.udyamNumber} />
                     <Field label="CIN Number" value={profile?.cinNumber} />
+                    {profile?.documents?.length ? (
+                      <div className="sm:col-span-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          Documents
+                        </p>
+                        <div className="mt-1 flex flex-col gap-1">
+                          {profile.documents.map((document) => (
+                            <a
+                              key={document.url}
+                              href={document.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="truncate text-sm font-medium text-blue-700 hover:underline"
+                            >
+                              {document.name || "Document"}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <Field label="Bank" value={profile?.bankName} />
                     <Field
                       label="Account"

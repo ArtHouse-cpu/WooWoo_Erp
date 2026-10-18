@@ -1,7 +1,12 @@
+import fs from "fs";
+import path from "path";
+import multer from "multer";
+import {fileURLToPath} from "url";
 import mongoose from "mongoose";
 import Vendor from "../models/vendor.model.js";
 import VendorActivity from "../models/vendorActivity.model.js";
 import {vendorListStats} from "../services/vendorInsights.service.js";
+import {uploadOnCloudinary} from "../utils/cloudinary.js";
 
 const normalizeVendorGender = raw => {
   const value = String(raw ?? '')
@@ -78,6 +83,19 @@ const normalizeContacts = raw => {
       row.department ||
       row.designation,
     );
+};
+
+const normalizeDocuments = raw => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(row => ({
+      url: asTrimmed(row?.url),
+      name: asTrimmed(row?.name) || "document",
+      mimeType: asTrimmed(row?.mimeType),
+      size: Math.max(0, Number(row?.size) || 0),
+    }))
+    .filter(row => /^https:\/\//i.test(row.url))
+    .slice(0, 5);
 };
 
 /** Vendor name comes from the point of contact. Phone is the business phone, or that contact's mobile. */
@@ -200,6 +218,7 @@ export const createVendor = async (req, res) => {
       udyamNumber,
       cinNumber,
       pointsOfContact,
+      documents,
     } = req.body;
 
     const identity = resolveVendorIdentity({
@@ -249,6 +268,7 @@ export const createVendor = async (req, res) => {
       udyamNumber: asTrimmed(udyamNumber).toUpperCase(),
       cinNumber: asTrimmed(cinNumber).toUpperCase(),
       pointsOfContact: contacts,
+      documents: normalizeDocuments(documents),
 
       address: joinAddress(line1, line2) || asTrimmed(address),
       billingAddress1: line1,
@@ -510,6 +530,9 @@ export const updateVendor = async (req, res) => {
     if (Array.isArray(req.body?.pointsOfContact)) {
       nextBody.pointsOfContact = normalizeContacts(req.body.pointsOfContact);
     }
+    if (Array.isArray(req.body?.documents)) {
+      nextBody.documents = normalizeDocuments(req.body.documents);
+    }
     delete nextBody._id;
     const vendor = await Vendor.findByIdAndUpdate(id, { $set: nextBody }, { new: true });
     const bankFields = ["bankName", "branchName", "accountHolderName", "accountNumber", "IFSCcode", "UPIID"];
@@ -536,6 +559,65 @@ export const updateVendor = async (req, res) => {
     return res.status(200).json({ success: true, vendor });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const localUploadsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../uploads/vendor-documents");
+const tmpUploadsDir = path.join("/tmp", "uploads", "vendor-documents");
+let vendorUploadRoot = localUploadsDir;
+try {
+  fs.mkdirSync(localUploadsDir, {recursive: true});
+} catch {
+  fs.mkdirSync(tmpUploadsDir, {recursive: true});
+  vendorUploadRoot = tmpUploadsDir;
+}
+
+export const vendorDocumentUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, callback) => callback(null, vendorUploadRoot),
+    filename: (_req, file, callback) => {
+      const safe = String(file.originalname || "document").replace(/[^\w.\-]+/g, "_").slice(0, 80);
+      callback(null, `${Date.now()}-${safe}`);
+    },
+  }),
+  limits: {fileSize: 5 * 1024 * 1024},
+  fileFilter: (_req, file, callback) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    if (!allowed.includes(file.mimetype)) {
+      callback(new Error("Upload a JPG, PNG, WEBP, or PDF up to 5 MB."));
+      return;
+    }
+    callback(null, true);
+  },
+}).single("file");
+
+export const uploadVendorDocument = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({success: false, message: "Choose a file to upload."});
+    }
+    const url = await uploadOnCloudinary(req.file.path, {folder: "vendor-documents"});
+    if (!url) {
+      return res.status(502).json({
+        success: false,
+        message: "The document could not be stored. Check cloud storage and try again.",
+      });
+    }
+    return res.status(201).json({
+      success: true,
+      document: {
+        url,
+        name: req.file.originalname || "document",
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+      },
+    });
+  } catch (error) {
+    console.error("uploadVendorDocument error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Could not upload the document.",
+    });
   }
 };
 

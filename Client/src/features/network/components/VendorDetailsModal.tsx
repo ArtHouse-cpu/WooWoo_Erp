@@ -249,6 +249,28 @@ export default function VendorDetailsModal({ open, vendor, onClose }: Props) {
               <Field label="MSME" value={details.msme} />
               <Field label="Udyam Number" value={details.udyamNumber} />
               <Field label="CIN Number" value={details.cinNumber} />
+              {details.documents?.length ? (
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                      Documents
+                    </div>
+                    <div className="mt-1 flex flex-col gap-1">
+                      {details.documents.map((document) => (
+                        <a
+                          key={document.url}
+                          href={document.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="truncate text-sm font-medium text-blue-700 hover:underline"
+                        >
+                          {document.name || "Document"}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               <Field label="Aadhar" value={details.adharNumber} />
               <Field label="Gender" value={details.gender} />
               <Field

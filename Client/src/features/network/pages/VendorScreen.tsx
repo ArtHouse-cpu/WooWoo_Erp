@@ -91,6 +91,7 @@ function toVendorPayload(payload: CustomerPayload): VendorPayload {
     udyamNumber: payload.udyamNumber,
     cinNumber: payload.cinNumber,
     pointsOfContact: payload.pointsOfContact,
+    documents: payload.documents,
   };
 }
 
@@ -157,6 +158,7 @@ function vendorToFormValues(vendor: VendorRow): Partial<CustomerPayload> {
     udyamNumber: vendor.udyamNumber ?? "",
     cinNumber: vendor.cinNumber ?? "",
     pointsOfContact,
+    documents: Array.isArray(vendor.documents) ? vendor.documents : [],
   };
 }
 

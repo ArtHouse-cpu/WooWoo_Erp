@@ -1317,6 +1317,7 @@ export type CustomerPayload = {
   udyamNumber?: string;
   cinNumber?: string;
   pointsOfContact?: VendorPointOfContact[];
+  documents?: VendorDocument[];
   createdBy?: {
     m_staff_id?: string | null;
     m_staff_name?: string | null;
@@ -2764,6 +2765,13 @@ export const handleDeletePurchaseOrder = async (id: string) => {
   return response.data;
 };
 
+export type VendorDocument = {
+  url: string;
+  name?: string;
+  mimeType?: string;
+  size?: number;
+};
+
 export type VendorPointOfContact = {
   name?: string;
   mobile?: string;
@@ -2815,6 +2823,7 @@ export type VendorPayload = {
   udyamNumber?: string;
   cinNumber?: string;
   pointsOfContact?: VendorPointOfContact[];
+  documents?: VendorDocument[];
 };
 
 export type VendorImportRow = {
@@ -2974,6 +2983,18 @@ export const handleRecordVendorPayment = async (
     duplicate?: boolean;
     payment: VendorPaymentRow;
     summary?: Vendor360Summary;
+  };
+};
+
+export const handleUploadVendorDocument = async (file: File) => {
+  const body = new FormData();
+  body.append("file", file);
+  const response = await axiosInstance.post("/vendor/documents", body, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data as {
+    success: boolean;
+    document: VendorDocument;
   };
 };
 

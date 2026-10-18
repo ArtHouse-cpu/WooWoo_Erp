@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type HTMLInputTypeAttribute,
+  type RefObject,
 } from "react";
 import {
   Camera,
@@ -15,9 +16,13 @@ import {
   Contact2,
   Plus,
   Trash2,
+  UploadCloud,
+  FileText,
 } from "lucide-react";
 import {
+  handleUploadVendorDocument,
   type CustomerPayload,
+  type VendorDocument,
   type VendorPointOfContact,
 } from "@/services/apiClient";
 
@@ -36,7 +41,12 @@ type Props = {
 type FormState = Required<
   Omit<
     CustomerPayload,
-    "createdBy" | "pointsOfContact" | "_id" | "membershipPlanId" | "priority"
+    | "createdBy"
+    | "pointsOfContact"
+    | "documents"
+    | "_id"
+    | "membershipPlanId"
+    | "priority"
   >
 >;
 type FormKey = keyof FormState;
@@ -186,6 +196,56 @@ const contactFromSaved = (row?: VendorPointOfContact | null): ContactState => ({
   designation: String(row?.designation ?? ""),
 });
 
+const DOCUMENT_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+function savedDocuments(rows?: VendorDocument[] | null): VendorDocument[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .filter((row) => /^https:\/\//i.test(String(row?.url || "")))
+    .slice(0, 5)
+    .map((row) => ({
+      url: String(row.url),
+      name: String(row.name || "document"),
+      mimeType: String(row.mimeType || ""),
+      size: Number(row.size || 0),
+    }));
+}
+
+async function uploadVendorFiles(
+  files: File[],
+  setDocuments: (update: (current: VendorDocument[]) => VendorDocument[]) => void,
+  setUploading: (value: boolean) => void,
+  setFormError: (value: string) => void,
+) {
+  const accepted = files.filter(
+    (file) => DOCUMENT_TYPES.includes(file.type) && file.size <= 5 * 1024 * 1024,
+  );
+  if (!accepted.length) {
+    setFormError("Upload a JPG, PNG, WEBP, or PDF up to 5 MB.");
+    return;
+  }
+  setUploading(true);
+  setFormError("");
+  try {
+    let saved = 0;
+    for (const file of accepted) {
+      const response = await handleUploadVendorDocument(file);
+      if (!response?.document?.url) continue;
+      saved += 1;
+      const document = response.document;
+      setDocuments((current) => [...current, document].slice(0, 5));
+    }
+    if (!saved) {
+      setFormError("The document could not be stored. Check cloud storage and try again.");
+    }
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { message?: string } } };
+    setFormError(err.response?.data?.message ?? "Could not upload the document.");
+  } finally {
+    setUploading(false);
+  }
+}
+
 function formatDobForInput(value?: string | null): string {
   if (!value) return "";
   const raw = String(value).trim();
@@ -249,6 +309,11 @@ export default function AddVendorModal({
       ? initialValues.pointsOfContact.map(contactFromSaved)
       : [emptyContact()],
   );
+  const [documents, setDocuments] = useState<VendorDocument[]>(() =>
+    savedDocuments(initialValues?.documents),
+  );
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const documentInputRef = useRef<HTMLInputElement | null>(null);
   const [formError, setFormError] = useState("");
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -260,6 +325,8 @@ export default function AddVendorModal({
         ? initialValues.pointsOfContact.map(contactFromSaved)
         : [emptyContact()],
     );
+    setDocuments(savedDocuments(initialValues?.documents));
+    setUploadingDocs(false);
     setFormError("");
     setProfileImageFile(null);
     if (fileRef.current) fileRef.current.value = "";
@@ -371,6 +438,7 @@ export default function AddVendorModal({
       state: form.state.trim(),
       country: form.country.trim(),
       pointsOfContact,
+      documents,
     };
 
     await onSubmit({ payload, profileImageFile });
@@ -577,6 +645,27 @@ export default function AddVendorModal({
                     maxLength={21}
                   />
                 </div>
+                <VendorDocuments
+                  documents={documents}
+                  uploading={uploadingDocs}
+                  inputRef={documentInputRef}
+                  onUpload={(files) => {
+                    const room = 5 - documents.length;
+                    if (room <= 0) {
+                      setFormError("You can upload up to 5 documents.");
+                      return;
+                    }
+                    void uploadVendorFiles(
+                      files.slice(0, room),
+                      setDocuments,
+                      setUploadingDocs,
+                      setFormError,
+                    );
+                  }}
+                  onRemove={(url) =>
+                    setDocuments((current) => current.filter((row) => row.url !== url))
+                  }
+                />
               </section>
 
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -760,7 +849,7 @@ export default function AddVendorModal({
             </button>
             <button
               type="submit"
-              disabled={loading || !canSave}
+              disabled={loading || uploadingDocs || !canSave}
               className="flex items-center justify-center rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading
@@ -774,6 +863,108 @@ export default function AddVendorModal({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function VendorDocuments({
+  documents,
+  uploading,
+  inputRef,
+  onUpload,
+  onRemove,
+}: {
+  documents: VendorDocument[];
+  uploading: boolean;
+  inputRef: RefObject<HTMLInputElement | null>;
+  onUpload: (files: File[]) => void;
+  onRemove: (url: string) => void;
+}) {
+  const full = documents.length >= 5;
+  const take = (list: FileList | null) => {
+    if (!list || uploading || full) return;
+    onUpload(Array.from(list));
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  return (
+    <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+          Upload document
+        </p>
+        <span className="text-[10px] font-medium text-slate-400">
+          {documents.length}/5 · 5 MB
+        </span>
+      </div>
+      <button
+        type="button"
+        disabled={uploading || full}
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          take(event.dataTransfer.files);
+        }}
+        className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-blue-200 bg-white px-3 py-4 text-center transition hover:border-blue-400 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <UploadCloud size={22} className="text-blue-500" />
+        <span className="mt-1 text-sm font-semibold text-slate-800">
+          {uploading ? "Uploading…" : full ? "Five documents added" : "Click or drop a document"}
+        </span>
+        <span className="mt-0.5 text-[11px] text-slate-400">JPG, PNG, WEBP, or PDF</span>
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,application/pdf"
+        multiple
+        disabled={uploading || full}
+        className="hidden"
+        onChange={(event) => take(event.target.files)}
+      />
+      {documents.length > 0 ? (
+        <ul className="mt-3 space-y-2">
+          {documents.map((document) => {
+            const image = String(document.mimeType || "").startsWith("image/");
+            return (
+              <li
+                key={document.url}
+                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2"
+              >
+                <a
+                  href={document.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                >
+                  {image ? (
+                    <img src={document.url} alt="" className="h-10 w-10 rounded-lg object-cover" />
+                  ) : (
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                      <FileText size={16} />
+                    </span>
+                  )}
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-slate-800">
+                      {document.name || "Document"}
+                    </span>
+                    <span className="block text-[11px] text-slate-400">Open file</span>
+                  </span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => onRemove(document.url)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                  aria-label={`Remove ${document.name || "document"}`}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
     </div>
   );
 }

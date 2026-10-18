@@ -93,6 +93,18 @@ const vendorSchema = new mongoose.Schema(
       default: [],
     },
 
+    documents: {
+      type: [
+        {
+          url: { type: String, default: "", trim: true },
+          name: { type: String, default: "", trim: true },
+          mimeType: { type: String, default: "", trim: true },
+          size: { type: Number, default: 0, min: 0 },
+        },
+      ],
+      default: [],
+    },
+
     gstin: {
       type: String,
       default: "",
