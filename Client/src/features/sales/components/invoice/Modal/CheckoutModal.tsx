@@ -39,6 +39,7 @@ import {
 import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
+  billingMembershipFromCustomer,
   summarizeMembershipForCart,
   getMembershipBadgeLabel,
 } from "../../../utils/membershipInvoiceUtils";
@@ -1132,10 +1133,13 @@ export default function CheckoutModal({
   };
 
   const summary = useMemo(() => {
-    const mType =
-      selectedCustomer?.membershipType || initialMembership || membership;
+    const mType = selectedCustomer
+      ? billingMembershipFromCustomer(selectedCustomer)
+      : initialMembership || membership;
     const mId =
-      selectedCustomer?.membershipPlanId ?? initialMembershipPlanId ?? null;
+      !mType || mType === "none"
+        ? null
+        : selectedCustomer?.membershipPlanId ?? initialMembershipPlanId ?? null;
     return summarizeMembershipForCart(
       resolvedMembershipPlans,
       mType,
@@ -1429,7 +1433,7 @@ export default function CheckoutModal({
     setSelectedCustomer(customer);
     setCustomerSearch(customer.mobile || "");
     setCustomerName(customer.name || "");
-    setMembership(customer.membershipType || "");
+    setMembership(billingMembershipFromCustomer(customer));
     setWalletBalance(nextWalletBalance);
     setShowDropdown(false);
     void applyReferralDiscount({ customer, referralCode: "" });
@@ -1523,8 +1527,12 @@ export default function CheckoutModal({
       billedStaff?.staffName ||
       billedStaff?.name ||
       "—",
-    membershipType:
-      selectedCustomer?.membershipType || membership || undefined,
+    membershipType: (() => {
+      const activeType = selectedCustomer
+        ? billingMembershipFromCustomer(selectedCustomer)
+        : membership;
+      return activeType && activeType !== "none" ? activeType : undefined;
+    })(),
     items: items.map((it) => ({
       name: it.name,
       qty: Number(it.qty),
@@ -1653,8 +1661,12 @@ export default function CheckoutModal({
       pendingAmount: draftTotal,
       cashbackTotal: displayCashbackTotal,
       membershipDiscount: displayMembershipDiscount,
-      membershipType:
-        selectedCustomer?.membershipType || membership || undefined,
+      membershipType: (() => {
+        const activeType = selectedCustomer
+          ? billingMembershipFromCustomer(selectedCustomer)
+          : membership;
+        return activeType && activeType !== "none" ? activeType : undefined;
+      })(),
       activityType: "Invoice",
       createdBy: {
         m_staff_id:
@@ -1964,8 +1976,12 @@ export default function CheckoutModal({
       paymentBreakdown: paymentPayload.paymentBreakdown,
       cashbackTotal: displayCashbackTotal,
       membershipDiscount: displayMembershipDiscount,
-      membershipType:
-        selectedCustomer?.membershipType || membership || undefined,
+      membershipType: (() => {
+        const activeType = selectedCustomer
+          ? billingMembershipFromCustomer(selectedCustomer)
+          : membership;
+        return activeType && activeType !== "none" ? activeType : undefined;
+      })(),
       activityType: "Invoice",
       createdBy: {
         m_staff_id: staff.m_staff_id,
@@ -2458,14 +2474,15 @@ export default function CheckoutModal({
 
                 <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-50 pt-4">
                   {(() => {
-                    const currentMType =
-                      selectedCustomer?.membershipType ||
-                      initialMembership ||
-                      membership;
+                    const currentMType = selectedCustomer
+                      ? billingMembershipFromCustomer(selectedCustomer)
+                      : initialMembership || membership;
                     const currentMId =
-                      selectedCustomer?.membershipPlanId ??
-                      initialMembershipPlanId ??
-                      null;
+                      !currentMType || currentMType === "none"
+                        ? null
+                        : selectedCustomer?.membershipPlanId ??
+                          initialMembershipPlanId ??
+                          null;
                     const label = getMembershipBadgeLabel(
                       resolvedMembershipPlans,
                       currentMType,

@@ -57,7 +57,11 @@ export function resolveMembershipPlan(
   const list = Array.isArray(plans) ? plans : [];
   const mId = toMembershipPlanId(membershipPlanId);
   const mType = String(membershipType ?? "none").trim().toLowerCase();
-  if (!mId && (mType === "none" || mType === "")) return undefined;
+  // Expired and non-members are passed as "none". A leftover plan id must not
+  // still unlock discount or cashback.
+  if (!mType || mType === "none" || mType === "guest" || mType === "new") {
+    return undefined;
+  }
 
   if (mId) {
     const byId = list.find((p) => p._id && String(p._id) === String(mId));
@@ -241,6 +245,25 @@ export function calcCatalogueProductDiscount(
   }
   // flat = amount off per unit
   return Math.min(lineTotal, Math.round(dValue * quantity * 100) / 100);
+}
+
+/** Expired memberships keep their name on the customer, but billing treats them as none. */
+export function billingMembershipType(
+  membershipType?: string | null,
+  membershipExpired?: boolean,
+) {
+  if (membershipExpired) return "none";
+  const raw = String(membershipType || "").trim();
+  return raw || "none";
+}
+
+export function billingMembershipFromCustomer(
+  customer?: {membershipType?: string | null; membershipExpired?: boolean} | null,
+) {
+  return billingMembershipType(
+    customer?.membershipType,
+    Boolean(customer?.membershipExpired),
+  );
 }
 
 export function membershipBenefitsForLine(

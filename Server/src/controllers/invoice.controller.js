@@ -29,6 +29,10 @@ import {
   remainingCashbackToReverse,
   reverseMembershipCashback,
 } from '../services/membershipCashbackWallet.service.js';
+import {
+  isCustomerMembershipExpired,
+  MEMBERSHIP_EXPIRED_MESSAGE,
+} from '../services/membershipEligibility.service.js';
 
 const roundMoney = value => {
   const n = Number(value);
@@ -476,6 +480,58 @@ const creditCspsailorShares = async ({items, invoiceCode, createdBy, invoice}) =
 const reverseCspsailorShares = async ({invoice, createdBy}) =>
   reverseCspPaymentSplit({invoice, createdBy});
 
+const membershipBenefitsRequested = ({items, membershipDiscount, cashbackTotal} = {}) => {
+  if (Math.max(0, Number(membershipDiscount) || 0) > 0) return true;
+  if (Math.max(0, Number(cashbackTotal) || 0) > 0) return true;
+  return (Array.isArray(items) ? items : []).some(item => {
+    if (isMembershipPurchaseLine(item?.category || item?.lineCategory || item?.sourceType)) {
+      return false;
+    }
+    if (item?.isCsp) return false;
+    return (
+      Math.max(0, Number(item?.membershipDiscountAmount) || 0) > 0 ||
+      Math.max(0, Number(item?.cashback) || 0) > 0
+    );
+  });
+};
+
+const membershipBenefitTotal = ({items, membershipDiscount, cashbackTotal} = {}) => {
+  const header =
+    Math.max(0, Number(membershipDiscount) || 0) +
+    Math.max(0, Number(cashbackTotal) || 0);
+  const lines = (Array.isArray(items) ? items : []).reduce((sum, item) => {
+    if (isMembershipPurchaseLine(item?.category || item?.lineCategory || item?.sourceType)) {
+      return sum;
+    }
+    if (item?.isCsp) return sum;
+    return (
+      sum +
+      Math.max(0, Number(item?.membershipDiscountAmount) || 0) +
+      Math.max(0, Number(item?.cashback) || 0)
+    );
+  }, 0);
+  return header + lines;
+};
+
+const rejectExpiredMembershipBenefits = async (res, customer, benefitArgs, previousArgs) => {
+  if (!membershipBenefitsRequested(benefitArgs)) return false;
+  if (!(await isCustomerMembershipExpired(customer))) return false;
+  // An invoice that already has these benefits can be saved again.
+  // A larger discount or cashback after expiry is refused.
+  if (
+    previousArgs &&
+    membershipBenefitTotal(benefitArgs) <= membershipBenefitTotal(previousArgs) + 0.009
+  ) {
+    return false;
+  }
+  res.status(400).json({
+    success: false,
+    code: 'MEMBERSHIP_EXPIRED',
+    message: MEMBERSHIP_EXPIRED_MESSAGE,
+  });
+  return true;
+};
+
 const applyCouponUsageDelta = async ({ code, delta }) => {
   const normalizedCode = String(code ?? '').trim().toUpperCase();
   if (!normalizedCode || !Number.isFinite(Number(delta)) || Number(delta) === 0) return;
@@ -633,6 +689,16 @@ const createInvoice = async (req, res) => {
       customerPhone,
       customerName,
     });
+
+    if (
+      await rejectExpiredMembershipBenefits(res, customer, {
+        items,
+        membershipDiscount,
+        cashbackTotal,
+      })
+    ) {
+      return;
+    }
 
     if (coupon?.code) {
       const couponValidation = await validateCouponForOrder({
@@ -1248,6 +1314,25 @@ const updateInvoice = async (req, res) => {
       customerPhone: customerPhone ?? existingInvoice.customerPhone,
       customerName: customerName ?? existingInvoice.customerName,
     });
+
+    if (
+      await rejectExpiredMembershipBenefits(
+        res,
+        resolvedCustomer,
+        {
+          items,
+          membershipDiscount: req.body?.membershipDiscount,
+          cashbackTotal: req.body?.cashbackTotal,
+        },
+        {
+          items: existingInvoice.items,
+          membershipDiscount: existingInvoice.membershipDiscount,
+          cashbackTotal: existingInvoice.cashbackTotal,
+        },
+      )
+    ) {
+      return;
+    }
 
     const invoiceDateObj = invoiceDate ? new Date(invoiceDate) : undefined;
     const dueDateObj = dueDate ? new Date(dueDate) : undefined;

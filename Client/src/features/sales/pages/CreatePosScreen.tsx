@@ -36,6 +36,7 @@ import { useAppSelector } from "@/store/hooks";
 import {
   calcCatalogueProductDiscount,
   calcStackedLineBenefits,
+  billingMembershipFromCustomer,
   resolveMembershipPlan,
   toMembershipPlanId,
 } from "../utils/membershipInvoiceUtils";
@@ -1020,10 +1021,11 @@ export default function CreatePosScreen({
                                 key={c._id}
                                 type="button"
                                 onMouseDown={() => {
-                                  const mType = c.membershipType ?? "none";
-                                  const mId = toMembershipPlanId(
-                                    c.membershipPlanId,
-                                  );
+                                  const mType = billingMembershipFromCustomer(c);
+                                  const mId =
+                                    mType === "none" && c.membershipExpired
+                                      ? null
+                                      : toMembershipPlanId(c.membershipPlanId);
                                   setCustomer(c.name);
                                   setPhone(c.mobile);
                                   setMembership(mType);
@@ -1065,16 +1067,24 @@ export default function CreatePosScreen({
                                     {c.mobile}
                                   </div>
                                 </div>
-                                {c.membershipType &&
-                                  c.membershipType !== "none" && (
+                                {(() => {
+                                  const activeType =
+                                    billingMembershipFromCustomer(c);
+                                  if (!activeType || activeType === "none") {
+                                    return null;
+                                  }
+                                  return (
                                     <MembershipBadge
-                                      membershipType={c.membershipType}
-                                      membershipPlanId={toMembershipPlanId(
-                                        c.membershipPlanId,
-                                      )}
+                                      membershipType={activeType}
+                                      membershipPlanId={
+                                        c.membershipExpired
+                                          ? null
+                                          : toMembershipPlanId(c.membershipPlanId)
+                                      }
                                       membershipPlans={membershipPlans}
                                     />
-                                  )}
+                                  );
+                                })()}
                               </button>
                             ))
                           )}

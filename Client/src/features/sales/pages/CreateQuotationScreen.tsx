@@ -24,6 +24,7 @@ import DocumentFormModal from "@/components/DocumentFormModal";
 import {
   calcStackedLineBenefits,
   membershipBenefitsForLine,
+  billingMembershipFromCustomer,
   resolveMembershipPlan,
   toMembershipPlanId,
 } from "../utils/membershipInvoiceUtils";
@@ -84,6 +85,7 @@ export default function CreateQuotationScreen({
       companyName?: string;
       membershipType?: string;
       membershipPlanId?: string;
+      membershipExpired?: boolean;
     }>
   >([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
@@ -204,16 +206,24 @@ export default function CreateQuotationScreen({
         const list = Array.isArray(response?.customers) ? response.customers : [];
         const match =
           list.find(
-            (c: { mobile?: string }) =>
-              String(c.mobile ?? "").trim() === phoneTerm,
+            (c: {
+              mobile?: string;
+              membershipType?: string | null;
+              membershipExpired?: boolean;
+              membershipPlanId?: unknown;
+            }) => String(c.mobile ?? "").trim() === phoneTerm,
           ) || list[0];
         if (!match) return;
+        const activeType = billingMembershipFromCustomer(match);
         setMembership((prev) =>
-          prev && prev !== "none"
-            ? prev
-            : String(match.membershipType ?? "none"),
+          prev && prev !== "none" ? prev : activeType,
         );
-        setMembershipPlanId((prev) => prev || toMembershipPlanId(match.membershipPlanId));
+        setMembershipPlanId((prev) =>
+          prev ||
+          (activeType === "none" && match.membershipExpired
+            ? null
+            : toMembershipPlanId(match.membershipPlanId)),
+        );
       })
       .catch(() => undefined);
     return () => controller.abort();
@@ -641,8 +651,11 @@ export default function CreateQuotationScreen({
               setMembershipPlanId(null);
             }}
             onPickCustomer={(selectedCustomer) => {
-              const mType = selectedCustomer.membershipType ?? "none";
-              const mId = toMembershipPlanId(selectedCustomer.membershipPlanId);
+              const mType = billingMembershipFromCustomer(selectedCustomer);
+              const mId =
+                mType === "none" && selectedCustomer.membershipExpired
+                  ? null
+                  : toMembershipPlanId(selectedCustomer.membershipPlanId);
               setCustomer(selectedCustomer.name);
               setPhone(selectedCustomer.mobile);
               setMembership(mType);

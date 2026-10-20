@@ -17,6 +17,7 @@ import {
   bookingPaymentError,
 } from '../utils/bookingPayment.js';
 import {getBookingPaymentRule} from '../services/bookingPaymentSettings.service.js';
+import {isCustomerMembershipExpired} from '../services/membershipEligibility.service.js';
 
 const STATUSES = new Set(['Upcoming', 'Ongoing', 'Expired', 'Cancelled', 'Draft']);
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -113,13 +114,14 @@ const findCustomer = async phone => {
       {whatsappNumber: {$in: [digits, `+91${digits}`, `91${digits}`]}},
     ],
   })
-    .select('name mobile email membershipType membershipPlanId')
+    .select('name mobile email membershipType membershipPlanId membershipPurchase')
     .lean();
 };
 
 const findPlan = async customer => {
   const type = String(customer?.membershipType || '').trim();
   if (!customer || !type || type.toLowerCase() === 'none') return null;
+  if (await isCustomerMembershipExpired(customer)) return null;
   if (customer.membershipPlanId && mongoose.Types.ObjectId.isValid(String(customer.membershipPlanId))) {
     const byId = await Membership.findOne({
       _id: customer.membershipPlanId,

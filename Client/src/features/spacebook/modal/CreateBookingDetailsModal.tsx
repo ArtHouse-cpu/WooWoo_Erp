@@ -59,6 +59,7 @@ import { getIconComponent } from "@/features/catalogue/components/AddAdditionalS
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import MembershipBadge from "@/features/sales/components/invoice/MembershipBadge";
 import {
+  billingMembershipFromCustomer,
   resolveMembershipPlan,
   resolveBenefitPercents,
 } from "@/features/sales/utils/membershipInvoiceUtils";
@@ -798,15 +799,16 @@ const CreateBookingDetailsModal = ({
           handleGetCustomers(cleaned, undefined, 1)
             .then((res) => {
               const list = Array.isArray(res?.customers) ? res.customers : [];
-              const match =
-                list.find(
-                  (c: CustomerPayload) =>
-                    String(c.mobile || "").replace(/\D/g, "") === cleaned,
-                ) || list[0];
+              const match = list.find(
+                (c: CustomerPayload) =>
+                  String(c.mobile || "").replace(/\D/g, "") === cleaned,
+              );
               if (match) {
                 setCustomerId(match._id || (match as any).id || null);
-                setMembershipType(match.membershipType || "none");
-                setMembershipPlanId(match.membershipPlanId || null);
+                setMembershipType(billingMembershipFromCustomer(match));
+                setMembershipPlanId(
+                  match.membershipExpired ? null : match.membershipPlanId || null,
+                );
               }
             })
             .catch(() => undefined);
@@ -1474,11 +1476,11 @@ const CreateBookingDetailsModal = ({
     };
   }, []);
 
-  // Autofetch customer details by 10-digit phone
+  // Autofetch customer details by 10-digit phone, and always refresh
+  // membership from the server so an expired plan is not reused from a draft.
   useEffect(() => {
     const cleaned = phone.trim().replace(/\D/g, "");
     if (cleaned.length !== 10) return;
-    if (name.trim()) return;
 
     const controller = new AbortController();
     handleGetCustomers(cleaned, controller.signal, 1)
@@ -1488,15 +1490,18 @@ const CreateBookingDetailsModal = ({
           list.find(
             (c: CustomerPayload) =>
               String(c.mobile || "").replace(/\D/g, "") === cleaned,
-          ) || list[0];
-        if (match?.name) {
+          ) || null;
+        if (!match) return;
+        if (!name.trim() && match.name) {
           setName(match.name);
-          setCustomerId(match._id || (match as any).id || null);
-          setMembershipType(match.membershipType || "none");
-          setMembershipPlanId(match.membershipPlanId || null);
           setErrors((prev) => ({ ...prev, name: "", phone: "" }));
           setIsPhoneAutoFetched(true);
         }
+        setCustomerId(match._id || (match as any).id || null);
+        setMembershipType(billingMembershipFromCustomer(match));
+        setMembershipPlanId(
+          match.membershipExpired ? null : match.membershipPlanId || null,
+        );
       })
       .catch(() => undefined);
 
@@ -1509,8 +1514,8 @@ const CreateBookingDetailsModal = ({
     setPhone(cleanedMobile);
     setIsPhoneAutoFetched(Boolean(cleanedMobile));
     setCustomerId(c._id || (c as any).id || null);
-    setMembershipType(c.membershipType || "none");
-    setMembershipPlanId(c.membershipPlanId || null);
+    setMembershipType(billingMembershipFromCustomer(c));
+    setMembershipPlanId(c.membershipExpired ? null : c.membershipPlanId || null);
     setCustomerDropdownOpen(false);
     setCustomers([]);
     setErrors((prev) => ({
@@ -2529,16 +2534,26 @@ const CreateBookingDetailsModal = ({
                                           {c.email ? ` · ${c.email}` : ""}
                                         </p>
                                       </div>
-                                      {c.membershipType &&
-                                        c.membershipType !== "none" && (
+                                      {(() => {
+                                        const activeType =
+                                          billingMembershipFromCustomer(c);
+                                        if (!activeType || activeType === "none") {
+                                          return null;
+                                        }
+                                        return (
                                           <MembershipBadge
-                                            membershipType={c.membershipType}
-                                            membershipPlanId={c.membershipPlanId}
+                                            membershipType={activeType}
+                                            membershipPlanId={
+                                              c.membershipExpired
+                                                ? null
+                                                : c.membershipPlanId
+                                            }
                                             membershipPlans={membershipPlans}
                                             showNone={false}
                                             className="shrink-0"
                                           />
-                                        )}
+                                        );
+                                      })()}
                                     </button>
                                   ))
                                 )}

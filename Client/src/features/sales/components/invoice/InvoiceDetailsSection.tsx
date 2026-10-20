@@ -1,6 +1,9 @@
 import { CalendarDays, PhoneIcon, Search, UserPlus } from "lucide-react";
 import type { MembershipPlanPayload } from "@/services/apiClient";
-import { getMembershipBadgeLabel } from "../../utils/membershipInvoiceUtils";
+import {
+  billingMembershipFromCustomer,
+  getMembershipBadgeLabel,
+} from "../../utils/membershipInvoiceUtils";
 import MembershipBadge from "./MembershipBadge";
 
 type CustomerOption = {
@@ -10,6 +13,7 @@ type CustomerOption = {
   companyName?: string;
   membershipType?: string;
   membershipPlanId?: string;
+  membershipExpired?: boolean;
 };
 
 type Props = {
@@ -194,13 +198,16 @@ export default function InvoiceDetailsSection({
                     <div className="truncate text-xs text-slate-500">
                       {item.mobile}
                       {item.companyName ? ` · ${item.companyName}` : ""}
-                      {item.membershipType
-                        ? ` · ${getMembershipBadgeLabel(
-                            membershipPlans,
-                            item.membershipType,
-                            item.membershipPlanId,
-                          )}`
-                        : ""}
+                      {(() => {
+                        const activeType = billingMembershipFromCustomer(item);
+                        if (!activeType || activeType === "none") return "";
+                        const label = getMembershipBadgeLabel(
+                          membershipPlans,
+                          activeType,
+                          item.membershipExpired ? null : item.membershipPlanId,
+                        );
+                        return label && label !== "NONE" ? ` · ${label}` : "";
+                      })()}
                     </div>
                   </div>
                 </button>

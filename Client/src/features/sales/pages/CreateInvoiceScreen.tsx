@@ -33,6 +33,7 @@ import {
   calcStackedLineBenefits,
   distributeSavedMembershipDiscount,
   membershipBenefitsForLine,
+  billingMembershipFromCustomer,
   resolveMembershipPlan,
   scaleLineDiscount,
   toMembershipPlanId,
@@ -92,7 +93,7 @@ export default function CreateInvoiceScreen({
   const [openCheckout, setOpenCheckout] = useState(false);
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<
-    Array<{ _id: string; name: string; mobile: string; companyName?: string; membershipType?: string; membershipPlanId?: string }>
+    Array<{ _id: string; name: string; mobile: string; companyName?: string; membershipType?: string; membershipPlanId?: string; membershipExpired?: boolean }>
   >([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
@@ -292,11 +293,17 @@ export default function CreateInvoiceScreen({
       mobile?: string;
       membershipType?: string;
       membershipPlanId?: string;
+      membershipExpired?: boolean;
     }) => {
       setCustomer(String(match.name || customer));
       setPhone(String(match.mobile || phone));
-      setMembership(String(match.membershipType ?? "none"));
-      setMembershipPlanId(toMembershipPlanId(match.membershipPlanId));
+      const activeType = billingMembershipFromCustomer(match);
+      setMembership(activeType);
+      setMembershipPlanId(
+        activeType === "none" && match.membershipExpired
+          ? null
+          : toMembershipPlanId(match.membershipPlanId),
+      );
       if (match._id) setCustomerId(String(match._id));
       setCustomers([]);
       setCustomerDropdownOpen(false);
@@ -996,8 +1003,11 @@ export default function CreateInvoiceScreen({
               setCustomerId(null);
             }}
             onPickCustomer={(selectedCustomer) => {
-              const mType = selectedCustomer.membershipType ?? "none";
-              const mId = toMembershipPlanId(selectedCustomer.membershipPlanId);
+              const mType = billingMembershipFromCustomer(selectedCustomer);
+              const mId =
+                mType === "none" && selectedCustomer.membershipExpired
+                  ? null
+                  : toMembershipPlanId(selectedCustomer.membershipPlanId);
               setCustomer(selectedCustomer.name);
               setPhone(selectedCustomer.mobile);
               setMembership(mType);

@@ -1299,6 +1299,8 @@ export type CustomerPayload = {
   mobile: string;
   membershipType?: string | null;
   membershipPlanId?: string | null;
+  membershipExpired?: boolean;
+  membershipEndDate?: string | null;
   /** Priority of customer's current membership plan */
   priority?: number | null;
   email?: string;

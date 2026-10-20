@@ -9,6 +9,7 @@ import Membership from '../models/membership.model.js';
 import User from '../models/auth.model.js';
 import Counter from '../models/counter.model.js';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import { attachMembershipExpiry } from '../services/membershipEligibility.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,15 +124,18 @@ const getMembershipsByPhone = async (phones) => {
   if (!unique.length) return new Map();
 
   const customers = await Customer.find({ mobile: { $in: unique }, isDeleted: { $ne: true } })
-    .select('_id name mobile membershipType membershipPlanId')
+    .select('_id name mobile membershipType membershipPlanId membershipPurchase')
     .lean();
   const members = customers.filter(
     (c) => !NO_MEMBERSHIP.has(String(c.membershipType ?? '').trim().toLowerCase()),
   );
   if (!members.length) return new Map();
+  await attachMembershipExpiry(members);
+  const activeMembers = members.filter((c) => !c.membershipExpired);
+  if (!activeMembers.length) return new Map();
 
-  const planIds = [...new Set(members.map((c) => String(c.membershipType).trim().toLowerCase()))];
-  const planObjectIds = members.map((c) => c.membershipPlanId).filter(Boolean);
+  const planIds = [...new Set(activeMembers.map((c) => String(c.membershipType).trim().toLowerCase()))];
+  const planObjectIds = activeMembers.map((c) => c.membershipPlanId).filter(Boolean);
   const plans = await Membership.find({
     $or: [{ planId: { $in: planIds } }, { _id: { $in: planObjectIds } }],
   })
@@ -141,7 +145,7 @@ const getMembershipsByPhone = async (phones) => {
   const byPlanId = new Map(plans.map((p) => [String(p.planId).toLowerCase(), p]));
 
   const result = new Map();
-  for (const c of members) {
+  for (const c of activeMembers) {
     const key = String(c.membershipType).trim().toLowerCase();
     const plan = (c.membershipPlanId && byObjectId.get(String(c.membershipPlanId))) || byPlanId.get(key);
     result.set(c.mobile, {

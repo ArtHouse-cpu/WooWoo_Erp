@@ -28,6 +28,7 @@ import {
   type CustomerPayload,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
+import { billingMembershipFromCustomer } from "@/features/sales/utils/membershipInvoiceUtils";
 
 const PAGE_SIZE_DEFAULT = 50;
 
@@ -36,6 +37,7 @@ type CustomerRow = {
   name?: string;
   mobile?: string;
   membershipType?: string;
+  membershipExpired?: boolean;
   membershipStartDate?: string;
   membershipEndDate?: string;
   whatsappNumber?: string;
@@ -281,7 +283,7 @@ export default function CustomerScreen() {
         accessorKey: "name",
         size: 260,
         Cell: ({ row, renderedCellValue }) => {
-          const membershipType = row.original.membershipType;
+          const membershipType = billingMembershipFromCustomer(row.original);
           return (
             <div className="flex flex-col">
               <span className="font-semibold text-slate-800">

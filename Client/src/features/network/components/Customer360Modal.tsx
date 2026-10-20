@@ -214,7 +214,10 @@ export default function Customer360Modal({
     {
       label: "Memberships",
       value: String(memberships.filter((row) => !["cancelled", "draft", "expired"].includes(row.status.toLowerCase())).length),
-      hint: customer?.membershipType || "none",
+      hint:
+        currentMembership?.status === "active"
+          ? currentMembership.plan || customer?.membershipType || "none"
+          : "none",
     },
     {
       label: "Wallet",
@@ -316,7 +319,14 @@ export default function Customer360Modal({
                   <Field label="Phone" value={customer?.mobile} />
                   <Field label="WhatsApp" value={customer?.whatsappNumber} />
                   <Field label="Email" value={customer?.email} />
-                  <Field label="Membership" value={currentMembership?.plan || (customer?.membershipType && customer.membershipType !== "none" ? customer.membershipType : "none")} />
+                  <Field
+                    label="Membership"
+                    value={
+                      currentMembership?.status === "active"
+                        ? currentMembership.plan || customer?.membershipType || "none"
+                        : "none"
+                    }
+                  />
                   <Field label="Company" value={customer?.companyName} />
                   <Field label="Referral" value={customer?.referralCode} />
                   <Field label="Created" value={whenStamp(customer?.createdAt)} />

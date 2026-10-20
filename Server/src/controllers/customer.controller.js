@@ -7,6 +7,7 @@ import path from 'path';
 import {fileURLToPath} from 'url';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import { sendNewAccountWhatsApp } from '../modules/customer/services/whatsapp.service.js';
+import {attachMembershipExpiry} from '../services/membershipEligibility.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -382,7 +383,7 @@ const createCustomer = async (req, res) => {
 };
 
 const CUSTOMER_LIST_PROJECTION =
-  'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId priority walletAmount closingBalance cashbackBalance affiliateBalance withdrawable nonWithdrawable referralCode referredBy status createdAt updatedAt createdBy';
+  'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId membershipPurchase priority walletAmount closingBalance cashbackBalance affiliateBalance withdrawable nonWithdrawable referralCode referredBy status createdAt updatedAt createdBy';
 
 /** Build list filter — avoid broad case-insensitive $or scans when possible. */
 const buildCustomerListQuery = searchRaw => {
@@ -437,6 +438,8 @@ const getCustomerById = async (req, res) => {
       });
     }
 
+    await attachMembershipExpiry([customer]);
+
     return res.status(200).json({
       success: true,
       message: 'Customer fetched successfully.',
@@ -479,6 +482,7 @@ const getCustomers = async (req, res) => {
       : Promise.resolve(null);
 
     const [customers, total] = await Promise.all([findQuery, countPromise]);
+    await attachMembershipExpiry(customers);
 
     const resolvedTotal = total == null ? null : total;
     const hasMore =

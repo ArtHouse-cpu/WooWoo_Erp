@@ -20,6 +20,7 @@ import CreateCustomerModal from "@/features/network/components/CreateCustomerMod
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import InvoiceSummaryCard from "../components/invoice/InvoiceSummaryCard";
 import {
+  billingMembershipFromCustomer,
   getCustomerMembershipTypeFromPlan,
   buildMembershipBenefitLines,
 } from "../utils/membershipInvoiceUtils";
@@ -1915,9 +1916,9 @@ useEffect(() => {
                           </div>
                         ) : (
                           customers.map((selectedCustomer) => {
-                            const mType = String(
-                              selectedCustomer.membershipType ?? "none",
-                            ).trim();
+                            const mType = billingMembershipFromCustomer(
+                              selectedCustomer,
+                            );
                             const hasMembership =
                               Boolean(mType) &&
                               mType !== "-" &&

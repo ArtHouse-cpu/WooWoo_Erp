@@ -3,6 +3,10 @@ import Customer from '../models/customer.model.js';
 import Coupon from '../models/coupon.model.js';
 import Quotation from '../models/quotation.model.js';
 import { validateCouponForOrder } from './coupon.controller.js';
+import {
+  isCustomerMembershipExpired,
+  MEMBERSHIP_EXPIRED_MESSAGE,
+} from '../services/membershipEligibility.service.js';
 
 const getStartOfToday = () => {
   const d = new Date();
@@ -119,6 +123,23 @@ const createQuotation = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Invalid quotation item values.',
+      });
+    }
+
+    const quotationCustomer = await findCustomerForQuotation({customerPhone, customerName});
+    const quotationUsesMembership =
+      Math.max(0, Number(membershipDiscount) || 0) > 0 ||
+      Math.max(0, Number(cashbackTotal) || 0) > 0 ||
+      normalizedItems.some(
+        item =>
+          !item.isCsp &&
+          (item.membershipDiscountAmount > 0 || item.cashback > 0),
+      );
+    if (quotationUsesMembership && (await isCustomerMembershipExpired(quotationCustomer))) {
+      return res.status(400).json({
+        success: false,
+        code: 'MEMBERSHIP_EXPIRED',
+        message: MEMBERSHIP_EXPIRED_MESSAGE,
       });
     }
 
@@ -348,6 +369,51 @@ const updateQuotation = async (req, res) => {
           membershipDiscountAmount: Number(item.membershipDiscountAmount ?? 0) || 0,
           lineTotal,
         };
+      });
+    }
+
+    const quotationCustomer = await findCustomerForQuotation({
+      customerPhone: customerPhone ?? existingQuotation.customerPhone,
+      customerName: customerName ?? existingQuotation.customerName,
+    });
+    const quotationUsesMembership =
+      Math.max(0, Number(membershipDiscount) || 0) > 0 ||
+      Math.max(0, Number(cashbackTotal) || 0) > 0 ||
+      (normalizedItems || []).some(
+        item =>
+          !item.isCsp &&
+          (item.membershipDiscountAmount > 0 || item.cashback > 0),
+      );
+    const quotationBenefitTotal = source => {
+      const rows = Array.isArray(source?.items) ? source.items : [];
+      const header =
+        Math.max(0, Number(source?.membershipDiscount) || 0) +
+        Math.max(0, Number(source?.cashbackTotal) || 0);
+      const lines = rows.reduce((sum, item) => {
+        if (item?.isCsp) return sum;
+        return (
+          sum +
+          Math.max(0, Number(item?.membershipDiscountAmount) || 0) +
+          Math.max(0, Number(item?.cashback) || 0)
+        );
+      }, 0);
+      return header + lines;
+    };
+    const incomingBenefitTotal = quotationBenefitTotal({
+      items: normalizedItems || [],
+      membershipDiscount,
+      cashbackTotal,
+    });
+    const storedBenefitTotal = quotationBenefitTotal(existingQuotation);
+    if (
+      quotationUsesMembership &&
+      incomingBenefitTotal > storedBenefitTotal + 0.009 &&
+      (await isCustomerMembershipExpired(quotationCustomer))
+    ) {
+      return res.status(400).json({
+        success: false,
+        code: 'MEMBERSHIP_EXPIRED',
+        message: MEMBERSHIP_EXPIRED_MESSAGE,
       });
     }
 

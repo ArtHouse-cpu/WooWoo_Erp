@@ -46,6 +46,7 @@ import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionS
 import CreatePosScreen from "@/features/sales/pages/CreatePosScreen";
 import { normalizeLineType } from "@/features/sales/utils/itemClassification";
 import {
+  billingMembershipFromCustomer,
   getMembershipBadgeLabel,
   isEmptyMembership,
 } from "@/features/sales/utils/membershipInvoiceUtils";
@@ -475,13 +476,20 @@ export default function HomeScreen() {
             id: String(c?._id ?? i),
             name: String(c?.name || "Customer"),
             phone: String(c?.mobile || c?.phone || "—"),
-            membership: isEmptyMembership(String(c?.membershipType ?? ""))
-              ? "Visitor"
-              : getMembershipBadgeLabel(
-                  plans,
-                  String(c?.membershipType ?? ""),
-                  c?.membershipPlanId,
-                ),
+            membership: (() => {
+              const activeType = billingMembershipFromCustomer({
+                membershipType:
+                  typeof c?.membershipType === "string" ? c.membershipType : "",
+                membershipExpired: Boolean(c?.membershipExpired),
+              });
+              return isEmptyMembership(activeType)
+                ? "Visitor"
+                : getMembershipBadgeLabel(
+                    plans,
+                    activeType,
+                    c?.membershipExpired ? null : c?.membershipPlanId,
+                  );
+            })(),
             createdAt: parseDate(c?.createdAt),
           })),
         );

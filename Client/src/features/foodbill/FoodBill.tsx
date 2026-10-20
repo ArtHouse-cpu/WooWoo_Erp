@@ -63,6 +63,7 @@ import {
 } from "@/services/apiClient";
 import { resolveWalletBalance } from "@/utils/resolveWalletBalance";
 import {
+  billingMembershipFromCustomer,
   membershipBenefitsForLine,
   summarizeMembershipForCart,
 } from "@/features/sales/utils/membershipInvoiceUtils";
@@ -166,6 +167,7 @@ interface Customer {
   points?: number;
   membershipType?: string;
   membershipPlanId?: string | null;
+  membershipExpired?: boolean;
   /** Customer's own share code (e.g. W9454ZZ5P) — not used as checkout discount code */
   referralCode?: string;
   referredBy?: string;
@@ -266,7 +268,10 @@ function mapApiCustomer(raw: any): Customer | null {
   const id = String(raw?._id || raw?.id || "").trim();
   const name = String(raw?.name || "").trim();
   if (!id || !name) return null;
-  const membershipType = String(raw?.membershipType || "none");
+  const membershipType = billingMembershipFromCustomer({
+    membershipType: raw?.membershipType,
+    membershipExpired: Boolean(raw?.membershipExpired),
+  });
   const membershipPlanId = raw?.membershipPlanId
     ? String(
         raw.membershipPlanId._id ||
@@ -286,7 +291,8 @@ function mapApiCustomer(raw: any): Customer | null {
     phone: String(raw?.mobile || raw?.phone || "").trim(),
     tier: mapMembershipTier(membershipType),
     membershipType,
-    membershipPlanId: membershipPlanId || null,
+    membershipPlanId: raw?.membershipExpired ? null : membershipPlanId || null,
+    membershipExpired: Boolean(raw?.membershipExpired),
     points: Number(raw?.walletAmount ?? raw?.points ?? 0) || 0,
     referralCode: ownCode || undefined,
     referredBy: referredBy || undefined,
