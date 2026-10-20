@@ -13,6 +13,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
+import {CspJoinModal} from './CspJoinModal';
 
 type ProgramsBottomSheetProps = {
   isOpen: boolean;
@@ -90,6 +91,7 @@ function HapIllustration() {
 
 export function ProgramsBottomSheet({isOpen, onClose, initialTab = 'csp'}: ProgramsBottomSheetProps) {
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  const[isJoinModalOpen, setIsJoinModalOpen] = useState(false);
 
   // Sync active tab with initialTab prop when modal opens
   useEffect(() => {
@@ -233,7 +235,8 @@ export function ProgramsBottomSheet({isOpen, onClose, initialTab = 'csp'}: Progr
   ];
 
   return (
-    <AnimatePresence>
+    <>
+      <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           {/* Backdrop Overlay */}
@@ -591,6 +594,7 @@ export function ProgramsBottomSheet({isOpen, onClose, initialTab = 'csp'}: Progr
               {/* Join Now Button */}
               <button
                 type="button"
+                onClick={()=> setIsJoinModalOpen(true)}
                 className={`flex-1 py-3 px-3 rounded-[16px] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
                   activeTab === 'csp'
                     ? 'bg-[#EA580C] hover:bg-[#D97706]'
@@ -606,5 +610,11 @@ export function ProgramsBottomSheet({isOpen, onClose, initialTab = 'csp'}: Progr
         </div>
       )}
     </AnimatePresence>
+
+    <CspJoinModal
+      isOpen={isJoinModalOpen && activeTab === 'csp'}
+      onClose={() => setIsJoinModalOpen(false)}
+    />
+  </>
   );
 }
