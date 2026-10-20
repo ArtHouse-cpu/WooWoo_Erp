@@ -402,12 +402,48 @@ export default function VendorScreen() {
           </button>
         ),
       },
-      { accessorKey: "mobile", header: "Contact Number" },
-      { accessorKey: "email", header: "Email" },
       {
-        accessorKey: "cspLabel",
-        header: "CSP Label",
-        Cell: ({ cell }) => cell.getValue<string>() || "—",
+        id: "contact",
+        header: "Point of Contact",
+        accessorFn: (row) =>
+          (row.pointsOfContact || [])
+            .flatMap((item) => [item.name, item.mobile])
+            .filter(Boolean)
+            .join(" "),
+        Cell: ({ row }) => {
+          const contacts = (row.original.pointsOfContact || []).filter(
+            (item) => item.name?.trim() || item.mobile?.trim(),
+          );
+          if (!contacts.length) return <span className="text-slate-400">—</span>;
+          return (
+            <div className="min-w-0 space-y-1">
+              {contacts.map((item, index) => (
+                <div key={`${item.mobile || item.name}-${index}`}>
+                  <p className="text-slate-800">{item.mobile || "—"}</p>
+                  {item.name ? (
+                    <p className="truncate text-xs text-slate-500">{item.name}</p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          );
+        },
+      },
+      {
+        id: "company",
+        header: "Company",
+        accessorFn: (row) =>
+          [row.companyName || row.company, row.businessPhoneNumber].filter(Boolean).join(" "),
+        Cell: ({ row }) => {
+          const company = row.original.companyName || row.original.company;
+          const phone = row.original.businessPhoneNumber;
+          return (
+            <div className="min-w-0">
+              <p className="font-medium text-slate-800">{company || "—"}</p>
+              {phone ? <p className="text-xs text-slate-500">{phone}</p> : null}
+            </div>
+          );
+        },
       },
       {
         accessorKey: "totalPurchase",

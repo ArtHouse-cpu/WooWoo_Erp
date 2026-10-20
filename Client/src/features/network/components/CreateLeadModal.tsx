@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import {
   X,
   Loader2,
@@ -11,7 +12,6 @@ import {
   Video,
   ExternalLink,
   Globe,
- 
 } from "lucide-react";
 import {
   type LeadItem,
@@ -21,6 +21,7 @@ import {
   type LeadMembership,
   handleGetAccessStaff,
   handleGetLeadMembership,
+  handleGetCustomers,
   handleCheckCustomerPhone,
   handleCreateCustomer,
 } from "@/services/apiClient";
@@ -36,27 +37,13 @@ type StaffOption = {
 type CreateLeadModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (payload: LeadPayload, id?: string) => Promise<boolean | void> | void;
+  onSubmit: (
+    payload: LeadPayload,
+    id?: string,
+  ) => Promise<boolean | void> | void;
   leadToEdit?: LeadItem | null;
   isSubmitting?: boolean;
 };
-
-// Valid backend status values (from Server/src/models/lead.model.js)
-const BACKEND_STATUS_OPTIONS: LeadStatus[] = [
-  "New",
-  "Contacted",
-  "Interested",
-  "Contact Tomorrow",
-  "Contact in 2 Days",
-  "Come for Visit",
-  "Shared Quotation",
-  "Negotiation",
-  "Follow Up (Custom)",
-  "Not Interested",
-  "Need to message",
-  "Converted",
-  "Lost",
-];
 
 // Common lead sources
 const COMMON_SOURCES = [
@@ -86,7 +73,11 @@ const PURPOSE_OPTIONS = [
   "Customer Art Work",
   "Co-Working",
   "Handmade Gift",
-  "Saler Program",
+  "Atives",
+  "Woorkshop",
+  "Exhibition",
+  "Other",
+  ,
 ];
 
 const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
@@ -104,7 +95,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     purpose: "",
     reasonNote: "",
     url: "",
-    deadline:"",
+    deadline: "",
   });
 
   const [customSource, setCustomSource] = useState("");
@@ -114,7 +105,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   const [error, setError] = useState("");
 
   // Media / Document upload states
-  const [existingAttachments, setExistingAttachments] = useState<LeadAttachment[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<
+    LeadAttachment[]
+  >([]);
   const [newFiles, setNewFiles] = useState<
     {
       id: string;
@@ -137,9 +130,21 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   const isEditing = Boolean(leadToEdit);
 
   const [autoCreateCustomer, setAutoCreateCustomer] = useState(true);
-  const [phoneMembership, setPhoneMembership] = useState<LeadMembership | null>(null);
+  const [phoneMembership, setPhoneMembership] = useState<LeadMembership | null>(
+    null,
+  );
   const [checkingMembership, setCheckingMembership] = useState(false);
-  const phoneForLookup = isOpen && /^\d{10}$/.test(formData.phone || "") ? formData.phone! : "";
+  const [customerHits, setCustomerHits] = useState<
+    { _id?: string; name?: string; mobile?: string }[]
+  >([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [phoneDropdownOpen, setPhoneDropdownOpen] = useState(false);
+  const debouncedPhone = useDebounce(
+    (formData.phone || "").replace(/\D/g, "").slice(0, 10),
+    300,
+  );
+  const phoneForLookup =
+    isOpen && /^\d{10}$/.test(formData.phone || "") ? formData.phone! : "";
 
   useEffect(() => {
     if (!phoneForLookup) {
@@ -159,6 +164,45 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
       });
     return () => controller.abort();
   }, [phoneForLookup]);
+
+  useEffect(() => {
+    if (!isOpen || !phoneDropdownOpen) return;
+    const term = debouncedPhone;
+    if (term.length < 3) {
+      setCustomerHits([]);
+      setLoadingCustomers(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    setLoadingCustomers(true);
+    handleGetCustomers(term, controller.signal, 8)
+      .then((res) => {
+        const list = Array.isArray(res?.customers) ? res.customers : [];
+        setCustomerHits(list);
+        const exact = list.filter((row: { mobile?: string }) => {
+          const mobile = String(row.mobile || "").replace(/\D/g, "");
+          const last10 = mobile.length > 10 ? mobile.slice(-10) : mobile;
+          return last10 === term;
+        });
+        if (term.length === 10 && exact.length === 1 && exact[0]?.name) {
+          setFormData((prev) =>
+            prev.phone === term
+              ? { ...prev, name: String(exact[0].name) }
+              : prev,
+          );
+        }
+      })
+      .catch((err) => {
+        if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") return;
+        if (!controller.signal.aborted) setCustomerHits([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingCustomers(false);
+      });
+
+    return () => controller.abort();
+  }, [debouncedPhone, phoneDropdownOpen, isOpen]);
 
   // Fetch staff list from user/access API
   useEffect(() => {
@@ -215,13 +259,13 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         purpose: leadToEdit.purpose || "",
         reasonNote: leadToEdit.reasonNote || "",
         url: leadToEdit.url || "",
-        deadline: leadToEdit.deadline 
-         ? new Date(leadToEdit.deadline).toISOString().split("T")[0]
-         : "",
+        deadline: leadToEdit.deadline
+          ? new Date(leadToEdit.deadline).toISOString().split("T")[0]
+          : "",
       });
 
       setExistingAttachments(
-        Array.isArray(leadToEdit.attachments) ? leadToEdit.attachments : []
+        Array.isArray(leadToEdit.attachments) ? leadToEdit.attachments : [],
       );
 
       const assigned = leadToEdit.assignedTo;
@@ -253,6 +297,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     }
     setError("");
     setAutoCreateCustomer(true);
+    setCustomerHits([]);
+    setPhoneDropdownOpen(false);
+    setLoadingCustomers(false);
   }, [leadToEdit, isOpen]);
 
   // Clean up object URLs on component unmount
@@ -370,7 +417,10 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           });
         }
       } catch (custErr: any) {
-        console.warn("Could not auto-create customer upon lead conversion:", custErr);
+        console.warn(
+          "Could not auto-create customer upon lead conversion:",
+          custErr,
+        );
       }
     }
 
@@ -378,7 +428,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
       (s) =>
         s.m_staff_id === selectedStaffId ||
         s._id === selectedStaffId ||
-        s.fullName === selectedStaffId
+        s.fullName === selectedStaffId,
     );
 
     const assignedTo = chosenStaff
@@ -388,17 +438,18 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           m_staff_email: chosenStaff.email || "",
         }
       : selectedStaffId
-      ? {
-          m_staff_id: leadToEdit?.assignedTo?.m_staff_id || selectedStaffId,
-          m_staff_name: leadToEdit?.assignedTo?.m_staff_name || selectedStaffId,
-          m_staff_email: leadToEdit?.assignedTo?.m_staff_email || "",
-        }
-      : null;
+        ? {
+            m_staff_id: leadToEdit?.assignedTo?.m_staff_id || selectedStaffId,
+            m_staff_name:
+              leadToEdit?.assignedTo?.m_staff_name || selectedStaffId,
+            m_staff_email: leadToEdit?.assignedTo?.m_staff_email || "",
+          }
+        : null;
 
     const payload: LeadPayload = {
       name: formData.name.trim(),
       phone: phoneTrimmed,
-      status: formData.status || "New",
+      status: isEditing ? formData.status || "New" : "New",
       source: formData.source?.trim() || "",
       purpose: formData.purpose?.trim() || "",
       reasonNote: formData.reasonNote?.trim() || "",
@@ -429,7 +480,8 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
   const isOtherSelected =
     formData.source === "Other" ||
-    (Boolean(formData.source) && !COMMON_SOURCES.includes(formData.source || ""));
+    (Boolean(formData.source) &&
+      !COMMON_SOURCES.includes(formData.source || ""));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -442,7 +494,8 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
             </h2>
             {isEditing && (leadToEdit?.leadId || leadToEdit?._id) && (
               <span className="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700 shadow-2xs">
-                {leadToEdit.leadId || `LEAD-${leadToEdit._id.slice(-6).toUpperCase()}`}
+                {leadToEdit.leadId ||
+                  `LEAD-${leadToEdit._id.slice(-6).toUpperCase()}`}
               </span>
             )}
           </div>
@@ -481,7 +534,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
               </div>
 
               {/* Phone Number */}
-              <div>
+              <div className="relative">
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Phone Number <span className="text-red-500">*</span>
                 </label>
@@ -491,52 +544,85 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                   maxLength={10}
                   value={formData.phone || ""}
                   onChange={(e) => {
-                    const digitsOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    const digitsOnly = e.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, 10);
                     setFormData({ ...formData, phone: digitsOnly });
+                    setPhoneDropdownOpen(true);
                     if (error) setError("");
                   }}
-                  placeholder="Enter 10-digit phone number"
+                  onFocus={() => setPhoneDropdownOpen(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setPhoneDropdownOpen(false), 150);
+                  }}
+                  placeholder="Search by phone number"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
                   required
+                  autoComplete="off"
                 />
+                {phoneDropdownOpen &&
+                (formData.phone || "").replace(/\D/g, "").length >= 3 ? (
+                  <div className="absolute left-0 right-0 z-30 mt-1 max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                    {loadingCustomers ||
+                    (formData.phone || "").replace(/\D/g, "") !== debouncedPhone ? (
+                      <p className="flex items-center gap-1 px-3 py-2 text-xs text-gray-500">
+                        <Loader2 size={12} className="animate-spin" /> Searching…
+                      </p>
+                    ) : customerHits.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-gray-500">
+                        No customer with this number.
+                      </p>
+                    ) : (
+                      customerHits.map((row) => {
+                        const mobile = String(row.mobile || "").replace(/\D/g, "");
+                        const phoneText =
+                          mobile.length > 10 ? mobile.slice(-10) : mobile || "No phone";
+                        return (
+                          <button
+                            key={row._id || phoneText}
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                name: String(row.name || prev.name || ""),
+                                phone: phoneText === "No phone" ? prev.phone : phoneText,
+                              }));
+                              setPhoneDropdownOpen(false);
+                              if (error) setError("");
+                            }}
+                            className="flex w-full flex-col px-3 py-2 text-left text-sm text-gray-800 hover:bg-indigo-50"
+                          >
+                            <span className="font-semibold">{phoneText}</span>
+                            <span className="truncate text-xs text-gray-500">
+                              {row.name || "Customer"}
+                            </span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : null}
                 {checkingMembership ? (
                   <p className="mt-1 flex items-center gap-1 text-[11px] text-gray-400">
-                    <Loader2 size={11} className="animate-spin" /> Checking membership…
+                    <Loader2 size={11} className="animate-spin" /> Checking
+                    membership…
                   </p>
                 ) : phoneMembership ? (
                   <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
-                    Existing member{phoneMembership.customerName ? ` (${phoneMembership.customerName})` : ""}:
+                    Existing member
+                    {phoneMembership.customerName
+                      ? ` (${phoneMembership.customerName})`
+                      : ""}
+                    :
                     <LeadMembershipBadge membership={phoneMembership} />
                   </p>
                 ) : null}
               </div>
             </div>
 
-            {/* Status + Source */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              {/* Status */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      status: e.target.value as LeadStatus,
-                    })
-                  }
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
-                >
-                  {BACKEND_STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
+            {/* Source + Purpose. Status stays New in the payload and is not shown. */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               {/* Source */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -547,8 +633,8 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                     formData.source && COMMON_SOURCES.includes(formData.source)
                       ? formData.source
                       : isOtherSelected
-                      ? "Other"
-                      : ""
+                        ? "Other"
+                        : ""
                   }
                   onChange={handleSourceChange}
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
@@ -561,8 +647,6 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                   ))}
                 </select>
 
-
-
                 {/* Custom Source Input when "Other" is active */}
                 {isOtherSelected && (
                   <input
@@ -574,13 +658,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                   />
                 )}
               </div>
-            </div>
 
-            {/* Lead Converted Notification & Customer Creation Option */}
-            
-
-            {/* Purpose & Assign To (Staff) */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {/* Purpose */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -601,11 +679,16 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                   ))}
                   {formData.purpose &&
                     !PURPOSE_OPTIONS.includes(formData.purpose) && (
-                      <option value={formData.purpose}>{formData.purpose}</option>
+                      <option value={formData.purpose}>
+                        {formData.purpose}
+                      </option>
                     )}
                 </select>
               </div>
+            </div>
 
+            {/* Assign To + Deadline */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               {/* Assign To (Staff) */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -626,10 +709,11 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                       (s) =>
                         s.m_staff_id === selectedStaffId ||
                         s._id === selectedStaffId ||
-                        s.fullName === selectedStaffId
+                        s.fullName === selectedStaffId,
                     ) && (
                       <option value={selectedStaffId}>
-                        {leadToEdit?.assignedTo?.m_staff_name || selectedStaffId}
+                        {leadToEdit?.assignedTo?.m_staff_name ||
+                          selectedStaffId}
                       </option>
                     )}
                   {staffOptions.map((staff) => {
@@ -642,56 +726,49 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                   })}
                 </select>
               </div>
+
+              {/* Deadline */}
+              <div className="min-w-0">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Deadline
+                </label>
+
+                <input
+                  type="date"
+                  value={formData.deadline || ""}
+                  min={new Date().toISOString().split("T")[0]}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      deadline: e.target.value,
+                    })
+                  }
+                  className="w-full min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+
+                {formData.deadline && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Selected deadline:{" "}
+                    {new Date(
+                      `${formData.deadline}T00:00:00`,
+                    ).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                )}
+              </div>
             </div>
 
-
-            {/* Phone: stack these. sm+: wrapper is display:contents so Media URL stays below the uploads */}
-            <div className="grid grid-cols-1 gap-3 sm:contents">
-             {/*Deadline */}
-             <div className="min-w-0">
-             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Deadline
-             </label>
-
-             <input 
-             type="date"
-             value={formData.deadline|| ""}
-             min={new Date().toISOString().split("T")[0]}
-             onChange={(e) =>
-              setFormData({
-                ...formData,
-                deadline: e.target.value,
-              })
-             }
-             className="w-full min-w-0 max-w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-             
-             />
-
-             {formData.deadline && (
-              <p className="mt-1 text-xs text-gray-500">
-                Selected deadline:{" "}
-                {new Date(`${formData.deadline}T00:00:00`).toLocaleDateString(
-                  "en-IN",
-                  {
-                    day:"2-digit",
-                    month:"short",
-                    year:"numeric",
-                  }
-                )}
-
-
-              </p>
-             )}
-
-             </div>
-
-            {/* Media URL / Reference Link (Below Media Uploadation) */}
-            <div className="min-w-0 sm:order-2">
+            {/* Media URL / Reference Link */}
+            <div className="min-w-0">
               <div className="flex items-center justify-between mb-1">
                 <label className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-gray-700">
                   <Globe size={15} className="shrink-0 text-indigo-600" />
                   <span className="truncate">
-                    Media URL<span className="hidden sm:inline"> / Reference Link</span>
+                    Media URL
+                    <span className="hidden sm:inline"> / Reference Link</span>
                   </span>
                 </label>
                 <span className="hidden text-[11px] text-gray-400 sm:inline">
@@ -726,10 +803,25 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Reason / Note */}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Reason / Note
+              </label>
+              <textarea
+                value={formData.reasonNote || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, reasonNote: e.target.value })
+                }
+                placeholder="Add any notes, requirements, or follow-up details..."
+                rows={3}
+                className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
+              />
             </div>
 
-            {/* Media / Document Uploadation - just above Reason / Note */}
-            <div className="space-y-2 sm:order-1">
+            {/* Media / Document Uploadation */}
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
                   <Paperclip size={15} className="text-indigo-600" />
@@ -790,8 +882,14 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {/* Existing Attachments */}
                   {existingAttachments.map((att, idx) => {
-                    const isImg = isImageFile(att.mimeType, att.name || att.url);
-                    const isVid = isVideoFile(att.mimeType, att.name || att.url);
+                    const isImg = isImageFile(
+                      att.mimeType,
+                      att.name || att.url,
+                    );
+                    const isVid = isVideoFile(
+                      att.mimeType,
+                      att.name || att.url,
+                    );
                     const isPdf = isPdfFile(att.mimeType, att.name || att.url);
 
                     return (
@@ -828,8 +926,12 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                               {att.name || "Attachment"}
                             </p>
                             <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-0.5">
-                              <span className="rounded bg-gray-100 px-1 py-0.2">Uploaded</span>
-                              {att.size ? <span>{formatFileSize(att.size)}</span> : null}
+                              <span className="rounded bg-gray-100 px-1 py-0.2">
+                                Uploaded
+                              </span>
+                              {att.size ? (
+                                <span>{formatFileSize(att.size)}</span>
+                              ) : null}
                             </div>
                           </div>
                         </div>
@@ -903,7 +1005,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
                               {item.name}
                             </p>
                             <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5">
-                              <span className="rounded bg-indigo-100/70 text-indigo-700 px-1 py-0.2 font-medium">New</span>
+                              <span className="rounded bg-indigo-100/70 text-indigo-700 px-1 py-0.2 font-medium">
+                                New
+                              </span>
                               <span>{formatFileSize(item.size)}</span>
                             </div>
                           </div>
@@ -941,25 +1045,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
               )}
             </div>
 
-            {/* Reason / Note */}
-            <div className="sm:order-3">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Reason / Note
-              </label>
-              <textarea
-                value={formData.reasonNote || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, reasonNote: e.target.value })
-                }
-                placeholder="Add any notes, requirements, or follow-up details..."
-                rows={3}
-                className="w-full resize-none rounded-md border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500"
-              />
-            </div>
-
             {/* Validation message */}
             {error && (
-              <div className="rounded-md bg-red-50 p-2.5 text-sm text-red-600 sm:order-4">
+              <div className="rounded-md bg-red-50 p-2.5 text-sm text-red-600">
                 {error}
               </div>
             )}

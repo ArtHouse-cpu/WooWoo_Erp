@@ -861,7 +861,11 @@ export const handleRefundGiftCard = async (payload: {
   code: string;
   reference: string;
   note?: string;
-}): Promise<{ success: boolean; message: string; giftCard: GiftCardRecord }> => {
+}): Promise<{
+  success: boolean;
+  message: string;
+  giftCard: GiftCardRecord;
+}> => {
   const response = await axiosInstance.post("/gift-cards/refund", payload);
   return response.data;
 };
@@ -979,8 +983,15 @@ export const handleCreateExhibitionPasses = async (
 export const handleMarkExhibitionAttendance = async (
   id: string,
   present: boolean,
-): Promise<{ success: boolean; message: string; exhibition: ExhibitionPassRecord }> => {
-  const response = await axiosInstance.patch(`/api/exhibition/${id}/attendance`, { present });
+): Promise<{
+  success: boolean;
+  message: string;
+  exhibition: ExhibitionPassRecord;
+}> => {
+  const response = await axiosInstance.patch(
+    `/api/exhibition/${id}/attendance`,
+    { present },
+  );
   return response.data;
 };
 export type ExhibitionCheckInResult = "checked_in" | "already_present";
@@ -993,7 +1004,9 @@ export const handleCheckInExhibitionPass = async (
   message: string;
   exhibition: ExhibitionPassRecord;
 }> => {
-  const response = await axiosInstance.post("/api/exhibition/check-in", { code });
+  const response = await axiosInstance.post("/api/exhibition/check-in", {
+    code,
+  });
   return response.data;
 };
 
@@ -1398,6 +1411,158 @@ export const handleGetCustomerById = async (
       membershipPlanId?: string;
     };
   };
+};
+
+export type Customer360SaleItem = {
+  name: string;
+  qty: number;
+  unitPrice: number;
+  discount: number;
+  lineTotal: number;
+};
+
+export type Customer360Purchase = {
+  id: string;
+  code: string;
+  invoiceDate?: string | null;
+  createdAt?: string | null;
+  amount: number;
+  subTotal: number;
+  paidAmount: number;
+  dueAmount: number;
+  discountTotal: number;
+  membershipDiscount: number;
+  couponDiscount: number;
+  referralDiscount: number;
+  manualDiscount: number;
+  membershipType: string;
+  status: string;
+  paymentStatus: string;
+  mode: string;
+  items: Customer360SaleItem[];
+  payment: {
+    cash: number;
+    upi: number;
+    card: number;
+    wallet: number;
+    paidAmount: number;
+    dueAmount: number;
+    changeAmount: number;
+  };
+  paymentHistory: {
+    date?: string | null;
+    amount: number;
+    mode: string;
+    receivedBy: string;
+  }[];
+};
+
+export type Customer360Booking = {
+  id: string;
+  kind: "full" | "space";
+  code: string;
+  title: string;
+  bookingDate?: string | null;
+  startTime: string;
+  endTime: string;
+  createdAt?: string | null;
+  amount: number;
+  paidAmount: number;
+  dueAmount: number;
+  status: string;
+};
+
+export type Customer360Membership = {
+  id: string;
+  code: string;
+  plan: string;
+  status: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  invoiceDate?: string | null;
+  createdAt?: string | null;
+  amount: number;
+  paymentStatus: string;
+  months?: number | null;
+  term?: string;
+  current?: boolean;
+};
+
+export type Customer360WalletTx = {
+  id: string;
+  type: string;
+  amount: number;
+  walletType: string;
+  reason: string;
+  note: string;
+  balanceAfter: number;
+  createdAt?: string | null;
+  by: string;
+};
+
+export type Customer360TimelineItem = {
+  id: string;
+  type: string;
+  title: string;
+  detail: string;
+  amount: number;
+  products?: string[];
+  discount?: number;
+  credit?: number;
+  debit?: number;
+  months?: number | null;
+  paymentMode?: string;
+  paidAmount?: number;
+  dueAmount?: number;
+  at?: string | null;
+  createdAt?: string | null;
+};
+
+export type Customer360Response = {
+  success: boolean;
+  customer: {
+    _id: string;
+    name?: string;
+    mobile?: string;
+    email?: string;
+    whatsappNumber?: string;
+    companyName?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    membershipType?: string;
+    walletAmount?: number;
+    closingBalance?: number;
+    referralCode?: string;
+    createdAt?: string;
+    profileImage?: string;
+  };
+  summary: {
+    purchaseTotal: number;
+    purchaseCount: number;
+    purchaseDue: number;
+    bookingTotal: number;
+    bookingCount: number;
+    membershipCount: number;
+    currentMembership?: Customer360Membership | null;
+    walletBalance: number;
+    walletCredits: number;
+    walletDebits: number;
+  };
+  purchases: Customer360Purchase[];
+  bookings: Customer360Booking[];
+  memberships: Customer360Membership[];
+  walletTransactions: Customer360WalletTx[];
+  timeline: Customer360TimelineItem[];
+};
+
+export const handleGetCustomer360 = async (
+  id: string,
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get(`/customer/${id}/360`, { signal });
+  return response.data as Customer360Response;
 };
 
 /** Fetch every matching customer by paging until exhausted */
@@ -2122,9 +2287,8 @@ export const handleGetAllBookings = async (
   };
 };
 
-
 export const handleCreateAllBooking = async (
-  payload: AllBookingWritePayload
+  payload: AllBookingWritePayload,
 ) => {
   try {
     const response = await axiosInstance.post("/all-booking", payload);
@@ -2144,13 +2308,16 @@ export const handleCreateAllBooking = async (
   }
 };
 
-
 export const handleUpdateAllBooking = async (
   id: string,
   payload: AllBookingWritePayload,
 ) => {
   const response = await axiosInstance.patch(`/all-booking/${id}`, payload);
-  return response.data as { success: boolean; message?: string; booking?: AllBookingRow };
+  return response.data as {
+    success: boolean;
+    message?: string;
+    booking?: AllBookingRow;
+  };
 };
 
 export const handleDeleteAllBooking = async (id: string) => {
@@ -2214,14 +2381,19 @@ export type BookingOverviewRow = {
 };
 
 export const handleGetBookingPaymentSettings = async () => {
-  const response = await axiosInstance.get("/booking-overview/payment-settings");
+  const response = await axiosInstance.get(
+    "/booking-overview/payment-settings",
+  );
   return response.data.settings as BookingPaymentSettings;
 };
 
 export const handleUpdateBookingPaymentSettings = async (
   payload: BookingPaymentSettings,
 ) => {
-  const response = await axiosInstance.put("/booking-overview/payment-settings", payload);
+  const response = await axiosInstance.put(
+    "/booking-overview/payment-settings",
+    payload,
+  );
   return response.data.settings as BookingPaymentSettings;
 };
 
@@ -2262,10 +2434,17 @@ export const handleCancelOverviewBooking = async (
   id: string,
   reason: string,
 ) => {
-  const response = await axiosInstance.post(`/booking-overview/${source}/${id}/cancel`, {
-    reason,
-  });
-  return response.data as { success: boolean; booking: BookingOverviewRow; message?: string };
+  const response = await axiosInstance.post(
+    `/booking-overview/${source}/${id}/cancel`,
+    {
+      reason,
+    },
+  );
+  return response.data as {
+    success: boolean;
+    booking: BookingOverviewRow;
+    message?: string;
+  };
 };
 
 export const handleUpdateOverviewRefund = async (
@@ -2283,7 +2462,11 @@ export const handleUpdateOverviewRefund = async (
     `/booking-overview/${source}/${id}/refund`,
     payload,
   );
-  return response.data as { success: boolean; booking: BookingOverviewRow; message?: string };
+  return response.data as {
+    success: boolean;
+    booking: BookingOverviewRow;
+    message?: string;
+  };
 };
 
 export const handleGetSpaceBookings = async (
@@ -2705,10 +2888,11 @@ export type PurchaseOrderPayload = {
   purchaser?: string;
 };
 
-export const handleGetPurchasesOrder = async (signal?: AbortSignal,
+export const handleGetPurchasesOrder = async (
+  signal?: AbortSignal,
   fromDate = "",
   toDate = "",
-  limit=5000,
+  limit = 5000,
 ) => {
   const response = await axiosInstance.get("/purchaseOrder", {
     params: {
@@ -2886,7 +3070,11 @@ export type VendorPaymentRow = {
   purchaseId: string;
   purchaseInvoice: string;
   createdBy: string;
-  allocations?: { purchaseId: string; purchaseInvoice: string; amount: number }[];
+  allocations?: {
+    purchaseId: string;
+    purchaseInvoice: string;
+    amount: number;
+  }[];
   documents?: { url: string; name: string; mimeType: string; size: number }[];
 };
 
@@ -2910,6 +3098,7 @@ export type Vendor360Summary = {
   outstanding: number;
   purchaseFrequency?: number;
   lastPurchaseDate?: string | null;
+  lastPurchaseCreatedAt?: string | null;
   totalPaid?: number;
 };
 
@@ -2921,13 +3110,19 @@ export type VendorTimelineItem = {
   amount: number;
   reference: string;
   at?: string;
+  timestamp?: string | null;
   createdAt?: string | null;
   by: string;
 };
 
 export type Vendor360Response = {
   success: boolean;
-  vendor: VendorPayload & { _id: string; isActive?: boolean; createdAt?: string; cspLabel?: string };
+  vendor: VendorPayload & {
+    _id: string;
+    isActive?: boolean;
+    createdAt?: string;
+    cspLabel?: string;
+  };
   summary: Vendor360Summary;
   purchases: VendorBillRow[];
   orders: VendorBillRow[];
@@ -2943,17 +3138,27 @@ export const handleGetVendor360 = async (
 ) => {
   const response = await axiosInstance.get(`/vendor/${id}/360`, {
     signal,
-    params: period?.from || period?.to ? { from: period.from, to: period.to } : undefined,
+    params:
+      period?.from || period?.to
+        ? { from: period.from, to: period.to }
+        : undefined,
   });
   return response.data as Vendor360Response;
 };
 
-export const handleUploadVendorPaymentDocument = async (id: string, file: File) => {
+export const handleUploadVendorPaymentDocument = async (
+  id: string,
+  file: File,
+) => {
   const body = new FormData();
   body.append("file", file);
-  const response = await axiosInstance.post(`/vendor/${id}/payment-documents`, body, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const response = await axiosInstance.post(
+    `/vendor/${id}/payment-documents`,
+    body,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+    },
+  );
   return response.data as {
     success: boolean;
     document: { url: string; name: string; mimeType: string; size: number };
@@ -3246,10 +3451,16 @@ export const setLocalAdditionalServices = (items: AdditionalServiceItem[]) => {
   }
 };
 
-export const handleGetAdditionalServices = async (signal?: AbortSignal): Promise<AdditionalServiceItem[]> => {
+export const handleGetAdditionalServices = async (
+  signal?: AbortSignal,
+): Promise<AdditionalServiceItem[]> => {
   try {
-    const response = await axiosInstance.get("/additional-services", { signal });
-    const list = Array.isArray(response?.data?.services) ? response.data.services : [];
+    const response = await axiosInstance.get("/additional-services", {
+      signal,
+    });
+    const list = Array.isArray(response?.data?.services)
+      ? response.data.services
+      : [];
     if (list.length > 0) {
       setLocalAdditionalServices(list);
       return list;
@@ -3257,12 +3468,17 @@ export const handleGetAdditionalServices = async (signal?: AbortSignal): Promise
     const local = getLocalAdditionalServices();
     return local.length > 0 ? local : list;
   } catch (error) {
-    console.log("Error fetching additional services from backend, using local store:", error);
+    console.log(
+      "Error fetching additional services from backend, using local store:",
+      error,
+    );
     return getLocalAdditionalServices();
   }
 };
 
-export const handleCreateAdditionalService = async (payload: Partial<AdditionalServiceItem>) => {
+export const handleCreateAdditionalService = async (
+  payload: Partial<AdditionalServiceItem>,
+) => {
   try {
     const response = await axiosInstance.post("/additional-services", payload);
     const created = response?.data?.service;
@@ -3272,7 +3488,10 @@ export const handleCreateAdditionalService = async (payload: Partial<AdditionalS
     }
     return response.data;
   } catch (error) {
-    console.log("Error creating additional service via API, saving locally:", error);
+    console.log(
+      "Error creating additional service via API, saving locally:",
+      error,
+    );
     const localItem: AdditionalServiceItem = {
       _id: "local_" + Date.now(),
       title: payload.title || payload.name || "Untitled Service",
@@ -3303,17 +3522,25 @@ export const handleUpdateAdditionalService = async (
   payload: Partial<AdditionalServiceItem>,
 ) => {
   try {
-    const response = await axiosInstance.put(`/additional-services/${id}`, payload);
+    const response = await axiosInstance.put(
+      `/additional-services/${id}`,
+      payload,
+    );
     const updated = response?.data?.service;
     if (updated) {
       const current = getLocalAdditionalServices();
       setLocalAdditionalServices(
-        current.map((item) => (item._id === id ? { ...item, ...updated } : item)),
+        current.map((item) =>
+          item._id === id ? { ...item, ...updated } : item,
+        ),
       );
     }
     return response.data;
   } catch (error) {
-    console.log("Error updating additional service via API, saving locally:", error);
+    console.log(
+      "Error updating additional service via API, saving locally:",
+      error,
+    );
     const current = getLocalAdditionalServices();
     setLocalAdditionalServices(
       current.map((item) => (item._id === id ? { ...item, ...payload } : item)),
@@ -3329,7 +3556,10 @@ export const handleDeleteAdditionalService = async (id: string) => {
     setLocalAdditionalServices(current.filter((item) => item._id !== id));
     return response.data;
   } catch (error) {
-    console.log("Error deleting additional service via API, removing locally:", error);
+    console.log(
+      "Error deleting additional service via API, removing locally:",
+      error,
+    );
     const current = getLocalAdditionalServices();
     setLocalAdditionalServices(current.filter((item) => item._id !== id));
     return { success: true };
@@ -4112,29 +4342,33 @@ export type LeadTimelineEvent = {
   };
 };
 
-export type LeadSources=  "Instagram"|
-  "WhatsApp"|
-  "Walk-in"|
-  "Reference"|
-  "Member"|
-  "Events";
+export type LeadSources =
+  | "Instagram"
+  | "WhatsApp"
+  | "Walk-in"
+  | "Reference"
+  | "Member"
+  | "Events";
 
-  export type LeadPurpose =   "Events"|
-  "Supplies"|
-  "Space Booking (Exhibition)"|
-  "Space Booking (Corporate Booking)"|
-  "Framing"|
-  "Private Booking"|
-  "Birthday Party"|
-  "Membership"|
-  "Volunteering"|
-  "CSP"|
-  "Customer Art Work"|
-  "Co-Working"|
-  "Handmade Gift"|
-  "Hiring"|
-  "Saler Program";
-  
+export type LeadPurpose =
+  | "Events"
+  | "Supplies"
+  | "Space Booking (Exhibition)"
+  | "Space Booking (Corporate Booking)"
+  | "Framing"
+  | "Private Booking"
+  | "Birthday Party"
+  | "Membership"
+  | "Volunteering"
+  | "CSP"
+  | "Customer Art Work"
+  | "Co-Working"
+  | "Handmade Gift"
+  | "Hiring"
+  | "Atives"
+  | "Woorkshop"
+  | "Exhibition"
+  | "Other";
 
 export type LeadItem = {
   _id: string;
@@ -4206,7 +4440,8 @@ export function leadPayloadToFormData(
 ) {
   const fd = new FormData();
   for (const [key, value] of Object.entries(payload)) {
-    if (value === undefined || value === null || key === "attachmentFiles") continue;
+    if (value === undefined || value === null || key === "attachmentFiles")
+      continue;
     if (key === "assignedTo" || key === "createdBy" || key === "attachments") {
       fd.append(key, JSON.stringify(value));
       continue;
@@ -4234,7 +4469,7 @@ export type GetLeadsParams = {
 
 export const handleGetLeads = async (
   params?: GetLeadsParams,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ) => {
   const response = await axiosInstance.get("/api/lead", {
     params: {
@@ -4269,7 +4504,7 @@ export type LeadMembership = {
 
 export const handleGetLeadMembership = async (
   phone: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<LeadMembership | null> => {
   const response = await axiosInstance.get("/api/lead/membership", {
     params: { phone },
@@ -4331,7 +4566,10 @@ export const handleAddLeadTimeline = async (
     reminderTime?: string;
   },
 ) => {
-  const response = await axiosInstance.post(`/api/lead/${id}/timeline`, payload);
+  const response = await axiosInstance.post(
+    `/api/lead/${id}/timeline`,
+    payload,
+  );
   return response.data as {
     success: boolean;
     message?: string;
@@ -4343,4 +4581,3 @@ export const handleDeleteLead = async (id: string) => {
   const response = await axiosInstance.delete(`/api/lead/${id}`);
   return response.data;
 };
-

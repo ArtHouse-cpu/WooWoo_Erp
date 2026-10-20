@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import ShareGiftCardModal from "../components/ShareGiftCardModal";
 
 import {
@@ -64,6 +65,7 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 };
 
 const GiftCard = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [cards, setCards] = useState<GiftCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -75,6 +77,15 @@ const GiftCard = () => {
   const canCreate = can(PERMISSIONS.GIFT_CARD_CREATE);
   const canUpdate = can(PERMISSIONS.GIFT_CARD_UPDATE);
   const canDelete = can(PERMISSIONS.GIFT_CARD_DELETE);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return;
+    setSelectedCard(null);
+    setShowModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("create");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const authUser = useAuthStore((state) => state.user);
   const reduxStaffName = useAppSelector((state) => state.user.m_staff_name);

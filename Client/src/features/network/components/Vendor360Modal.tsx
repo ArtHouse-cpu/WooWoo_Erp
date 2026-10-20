@@ -166,6 +166,26 @@ const when = (value?: string | null) => {
   });
 };
 
+const timeOf = (value?: string | null) => {
+  if (!value) return "";
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return "";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+const whenStamp = (dateValue?: string | null, timeValue?: string | null) => {
+  const dateText = when(dateValue || timeValue);
+  if (dateText === "—") return "—";
+  const clock = timeOf(timeValue || dateValue);
+  return clock ? `${dateText}, ${clock}` : dateText;
+};
+
 const mergeDocs = (first: BillDoc[], second: BillDoc[]) => {
   const seen = new Set<string>();
   return [...first, ...second].filter((item) => {
@@ -209,7 +229,7 @@ function downloadReceipt(vendorName: string, payment: VendorPaymentRow) {
     payment.purchaseInvoice ? `Bill: ${payment.purchaseInvoice}` : "",
     payment.method ? `Method: ${payment.method}` : "",
     payment.reference ? `Reference: ${payment.reference}` : "",
-    `Date: ${when(payment.paidAt)}`,
+    `Date: ${whenStamp(payment.paidAt, payment.createdAt)}`,
     payment.createdBy ? `Recorded by: ${payment.createdBy}` : "",
     payment.note ? `Note: ${payment.note}` : "",
   ].filter(Boolean);
@@ -601,7 +621,7 @@ export default function Vendor360Modal({
     },
     {
       label: "Last Purchase",
-      value: when(summary?.lastPurchaseDate),
+      value: whenStamp(summary?.lastPurchaseDate, summary?.lastPurchaseCreatedAt),
       hint: "Most recent bill",
     },
     {
@@ -617,7 +637,7 @@ export default function Vendor360Modal({
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-wide text-violet-600">
-              Vendor 360
+              Vendor 360 View
             </p>
             <h2 className="truncate text-lg font-bold text-slate-900">
               {profile?.name || vendor.name}
@@ -906,9 +926,9 @@ export default function Vendor360Modal({
                         {item.title}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {when(item.at)}
+                        {whenStamp(item.createdAt || item.at, item.createdAt || item.at)}
                         {item.amount ? ` · ${money(item.amount)}` : ""}
-                        {item.reference ? ` · ${item.reference}` : ""}
+                        {/* {item.reference ? ` · ${item.reference}` : ""} */}
                         {item.by ? ` · ${item.by}` : ""}
                       </p>
                       {item.detail ? (
@@ -1005,7 +1025,7 @@ export default function Vendor360Modal({
                           {payment.direction} · {money(payment.amount)}
                         </p>
                         <p className="mt-0.5 text-xs text-slate-500">
-                          {when(payment.paidAt)}
+                          {whenStamp(payment.paidAt, payment.createdAt)}
                           {payment.method ? ` · ${payment.method}` : ""}
                           {payment.reference ? ` · ${payment.reference}` : ""}
                           {payment.purchaseInvoice
@@ -1049,7 +1069,7 @@ export default function Vendor360Modal({
                   {bill.invoiceNumber || "Bill"}
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  {when(bill.invoiceDate)}
+                  {whenStamp(bill.invoiceDate, bill.createdAt)}
                   {bill.dueDate ? ` · Due ${when(bill.dueDate)}` : ""}
                   {bill.paymentMode ? ` · ${bill.paymentMode}` : ""}
                 </p>
@@ -1768,7 +1788,9 @@ function BillTable({
                   >
                     {row.invoiceNumber || "—"}
                   </td>
-                  <td className="px-3 py-3">{when(row.invoiceDate)}</td>
+                  <td className="px-3 py-3 whitespace-nowrap">
+                    {whenStamp(row.invoiceDate, row.createdAt)}
+                  </td>
                   <td className="px-3 py-3">{money(row.amount)}</td>
                   <td className="px-3 py-3">{money(row.paidAmount)}</td>
                   <td className="px-3 py-3">{money(row.dueAmount)}</td>

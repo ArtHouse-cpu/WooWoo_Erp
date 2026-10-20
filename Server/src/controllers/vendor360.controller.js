@@ -207,14 +207,17 @@ export const getVendor360 = async (req, res) => {
     const summary = buildSummary(loaded.vendor, purchases, orders, returns, payments);
     const confirmed = active(purchases);
     const periodBills = confirmed.filter(row => inPeriod(row.invoiceDate || row.createdAt));
-    const lastPurchaseDate = confirmed.reduce((latest, row) => {
+    const lastPurchase = confirmed.reduce((latest, row) => {
       const when = row.invoiceDate || row.createdAt;
       if (!when) return latest;
-      if (!latest || new Date(when) > new Date(latest)) return when;
+      if (!latest || new Date(when) > new Date(latest.when)) {
+        return {when, createdAt: row.createdAt || null};
+      }
       return latest;
     }, null);
     summary.purchaseFrequency = periodBills.length;
-    summary.lastPurchaseDate = lastPurchaseDate;
+    summary.lastPurchaseDate = lastPurchase?.when || null;
+    summary.lastPurchaseCreatedAt = lastPurchase?.createdAt || null;
     summary.totalPaid = summary.paidOnBills;
     const timeline = [
       {

@@ -140,6 +140,26 @@ export default function Header({
       label: "Add Access",
       path: "/access",
     },
+    can(PERMISSIONS.COUPON_MANAGE) && {
+      label: "Create Coupon",
+      path: "/coupons?create=1",
+    },
+    can(PERMISSIONS.GIFT_CARD_CREATE) && {
+      label: "Create Gift Card",
+      path: "/giftcard?create=1",
+    },
+    can(PERMISSIONS.FOOD_CREATE) && {
+      label: "Add Food",
+      path: "/foods?create=1",
+    },
+    can(PERMISSIONS.PRODUCT_CREATE) && {
+      label: "Add Product",
+      path: "/products?create=1",
+    },
+    can(PERMISSIONS.SERVICE_CREATE) && {
+      label: "Add Service",
+      path: "/services?create=1",
+    },
   ].filter((item): item is { label: string; path: string } => Boolean(item));
 
   const handleLeadSubmit = (payload: LeadPayload) => {
@@ -269,15 +289,16 @@ export default function Header({
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3 md:gap-5">
           <button
             type="button"
-            onClick={() => navigate("/")}
-            className="hidden h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#2F6FED] transition hover:bg-blue-100 md:inline-flex md:h-auto md:w-auto md:gap-2 md:px-5 md:py-2.5"
-            aria-label="Home"
-            title="Home"
+            onClick={() => {
+              setBookingMenu(null);
+              setShortcutOpen(true);
+            }}
+            className="hidden h-9 items-center justify-center gap-2 rounded-xl bg-blue-50 px-3 text-[#2F6FED] transition hover:bg-blue-100 md:inline-flex md:h-auto md:px-5 md:py-2.5"
+            aria-label="Shortcuts"
+            title="Shortcuts"
           >
-            <Home size={18} />
-            <span className="hidden text-[13px] font-semibold md:inline">
-              Home
-            </span>
+            <Plus size={18} />
+            <span className="text-[13px] font-semibold">Shortcut</span>
           </button>
           <div className="flex items-center gap-2 md:hidden">
             {/* Combined Leads Container */}

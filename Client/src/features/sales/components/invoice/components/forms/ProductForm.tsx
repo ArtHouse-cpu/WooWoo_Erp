@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import { Pencil, Plus, Trash2, Wand2 } from "lucide-react";
 import CategorySelect from "../shared/CategorySelect";
@@ -112,33 +113,68 @@ export default function ProductForm() {
     }
   }, [cspOptions, cspEnrollmentId, setValue]);
 
-  const cspSellerLabel = (row: CspEnrollment) => {
-    const name =
-      row.label ||
-      `CSP · ${
-        row.displayName ||
+  const cspPersonName = (row: CspEnrollment) =>
+    String(
+      row.displayName ||
         row.customer?.name ||
         (typeof row.customerId === "object" ? row.customerId?.name : "") ||
-        "Seller"
-      }`;
-    const mobile =
+        row.vendor?.name ||
+        (typeof row.vendorId === "object" ? row.vendorId?.name : "") ||
+        row.label ||
+        "Seller",
+    ).trim();
+
+  const cspMobile = (row: CspEnrollment) => {
+    const raw =
       row.mobile ||
+      row.customer?.mobile ||
       (typeof row.customerId === "object" ? row.customerId?.mobile : "") ||
+      row.vendor?.mobile ||
+      (typeof row.vendorId === "object" ? row.vendorId?.mobile : "") ||
       "";
-    return mobile ? `${name} (${mobile})` : String(name);
+    const digits = String(raw).replace(/\D/g, "");
+    return digits.length > 10 ? digits.slice(-10) : digits;
   };
 
   const selectedCsp = cspOptions.find(
     (row) => String(row._id) === String(cspEnrollmentId || ""),
   );
+  const debouncedCspSearch = useDebounce(cspSearch, 300);
 
-  const filteredCspOptions = (() => {
-    const q = cspSearch.trim().toLowerCase();
+  const matchCspRows = (query: string) => {
+    const q = query.trim().toLowerCase();
     if (!q) return cspOptions;
-    return cspOptions.filter((row) =>
-      cspSellerLabel(row).toLowerCase().includes(q),
-    );
-  })();
+    const qDigits = q.replace(/\D/g, "");
+    const queryPhone = qDigits.length > 10 ? qDigits.slice(-10) : qDigits;
+    return cspOptions
+      .map((row) => {
+        const mobile = cspMobile(row);
+        const name = cspPersonName(row).toLowerCase();
+        const phoneHit = queryPhone.length >= 3 && mobile.includes(queryPhone);
+        const nameHit = name.includes(q);
+        if (!phoneHit && !nameHit) return null;
+        return { row, phoneHit };
+      })
+      .filter((item): item is { row: CspEnrollment; phoneHit: boolean } =>
+        Boolean(item),
+      )
+      .sort((a, b) => Number(b.phoneHit) - Number(a.phoneHit))
+      .map((item) => item.row);
+  };
+
+  const filteredCspOptions = matchCspRows(debouncedCspSearch);
+  const cspSearchPending = cspSearch.trim() !== debouncedCspSearch.trim();
+
+  useEffect(() => {
+    const digits = debouncedCspSearch.replace(/\D/g, "");
+    const queryPhone = digits.length > 10 ? digits.slice(-10) : digits;
+    if (queryPhone.length < 10) return;
+    const exact = cspOptions.filter((row) => cspMobile(row) === queryPhone);
+    if (exact.length !== 1) return;
+    const id = String(exact[0]._id);
+    if (id === String(cspEnrollmentId || "")) return;
+    setValue("cspEnrollmentId", id, { shouldValidate: true, shouldDirty: true });
+  }, [debouncedCspSearch, cspOptions, cspEnrollmentId, setValue]);
 
   return (
     <div className="space-y-4">
@@ -287,17 +323,28 @@ export default function ProductForm() {
             </select>
           </div>
           {isCsp === "yes" ? (
-            <div className="relative">
+            <div className="space-y-3">
+              <div>
+                <label className={labelClass}>Name</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={selectedCsp ? cspPersonName(selectedCsp) : ""}
+                  placeholder="Fills when the phone number exists"
+                  className={`${inputClass} bg-slate-50`}
+                />
+              </div>
+              <div className="relative">
               <label className={labelClass}>
-                CSP Seller <span className="text-red-500">*</span>
+                Phone Number <span className="text-red-500">*</span>
               </label>
               <input
-                type="text"
+                type="tel"
                 value={
                   cspDropdownOpen
                     ? cspSearch
                     : selectedCsp
-                      ? cspSellerLabel(selectedCsp)
+                      ? cspMobile(selectedCsp)
                       : cspSearch
                 }
                 onChange={(e) => {
@@ -309,14 +356,13 @@ export default function ProductForm() {
                 }}
                 onFocus={() => {
                   setCspDropdownOpen(true);
-                  setCspSearch("");
+                  setCspSearch(selectedCsp ? cspMobile(selectedCsp) : cspSearch);
                 }}
                 onBlur={() => {
-                  // Delay so option click registers
                   window.setTimeout(() => setCspDropdownOpen(false), 150);
                 }}
                 placeholder={
-                  loadingCsp ? "Loading sellers…" : "Search CSP seller…"
+                  loadingCsp ? "Loading sellers…" : "Search by phone number"
                 }
                 className={inputClass}
                 disabled={loadingCsp}
@@ -324,9 +370,11 @@ export default function ProductForm() {
               />
               {cspDropdownOpen && !loadingCsp ? (
                 <div className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-                  {filteredCspOptions.length === 0 ? (
+                  {cspSearchPending ? (
+                    <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>
+                  ) : filteredCspOptions.length === 0 ? (
                     <p className="px-3 py-2 text-xs text-slate-500">
-                      No sellers match “{cspSearch.trim() || "…"}”
+                      No sellers match “{debouncedCspSearch.trim() || "…"}”
                     </p>
                   ) : (
                     filteredCspOptions.map((row) => {
@@ -351,13 +399,21 @@ export default function ProductForm() {
                             setCspDropdownOpen(false);
                           }}
                         >
-                          {cspSellerLabel(row)}
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium">
+                              {cspMobile(row) || "No phone"}
+                            </span>
+                            <span className="block truncate text-xs text-slate-500">
+                              {cspPersonName(row)}
+                            </span>
+                          </span>
                         </button>
                       );
                     })
                   )}
                 </div>
               ) : null}
+              </div>
               {!loadingCsp && cspOptions.length === 0 ? (
                 <p className="mt-1.5 text-xs text-amber-600">
                   No CSP sellers found. Enroll one under Network → CSP.

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   MaterialReactTable,
@@ -43,6 +44,7 @@ type ServiceRow = {
 };
 
 export default function ServiceScreen() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [additionalServices, setAdditionalServices] = useState<
     AdditionalServiceItem[]
@@ -60,6 +62,16 @@ export default function ServiceScreen() {
   const [showAdditionalModal, setShowAdditionalModal] = useState(false);
   const [editAdditionalService, setEditAdditionalService] =
     useState<AdditionalServiceItem | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return;
+    setEditService(null);
+    setActiveTable("services");
+    setShowCreateModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("create");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const fetchData = async (signal?: AbortSignal) => {
     try {

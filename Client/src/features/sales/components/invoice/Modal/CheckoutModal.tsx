@@ -2732,22 +2732,19 @@ export default function CheckoutModal({
                         Partial
                       </button>
                       ) : null}
-                      {!enforcesBookingMinimum ? (
-                        // due button disabled
-                      // <button
-                      //   type="button"
-                      //   // onClick={() => setPaymentStatus("due")}
-                      //   onClick={()=>console.log("due")}
-                      //   className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
-                      //     paymentStatus === "due"
-                      //       ? "bg-amber-500 text-white shadow-sm"
-                      //       : "text-slate-400 hover:text-amber-700"
-                      //   }`}
-                      //   title="Due / Credit — full amount stays outstanding"
-                      // >
-                      //   Due
-                      // </button>
-                      <button></button>
+                      {isPurchaseCheckout && !enforcesBookingMinimum ? (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentStatus("due")}
+                        className={`rounded-md px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-all ${
+                          paymentStatus === "due"
+                            ? "bg-amber-500 text-white shadow-sm"
+                            : "text-slate-400 hover:text-amber-700"
+                        }`}
+                        title="Due / Credit — full amount stays outstanding"
+                      >
+                        Due
+                      </button>
                       ) : null}
                     </div>
                     {!isDuePayment ? (

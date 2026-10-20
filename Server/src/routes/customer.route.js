@@ -9,6 +9,7 @@ import {
   importCustomers,
   checkCustomerPhone,
 } from '../controllers/customer.controller.js';
+import {getCustomer360} from '../controllers/customer360.controller.js';
 import {
   createMembershipOrder,
   verifyMembershipPayment,
@@ -37,6 +38,11 @@ router.get(
   '/check-phone',
   requireAnyPermission(PERMISSIONS.CUSTOMER_READ, PERMISSIONS.CUSTOMER_CREATE),
   checkCustomerPhone,
+);
+router.get(
+  '/:id/360',
+  requirePermission(PERMISSIONS.CUSTOMER_READ),
+  getCustomer360,
 );
 router.get(
   '/:id',

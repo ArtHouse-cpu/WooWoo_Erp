@@ -6,6 +6,7 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
 } from "react";
+import { useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
   MaterialReactTable,
@@ -186,6 +187,7 @@ function toDateInput(value: unknown): string {
 }
 
 export default function CouponsScreen() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [coupons, setCoupons] = useState<CouponRow[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -200,6 +202,16 @@ export default function CouponsScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CouponPayload>(() => initialForm());
   const staff = useAppSelector((state) => state.user);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return;
+    setForm(initialForm());
+    setEditingId(null);
+    setModalOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("create");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const filtersRef = useRef<HTMLDivElement>(null);
 
   const closeActionMenu = () => setActionMenu(null);

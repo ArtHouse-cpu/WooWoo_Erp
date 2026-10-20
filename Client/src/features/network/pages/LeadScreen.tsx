@@ -4,14 +4,7 @@ import {
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
-import {
-  Pencil,
-  Trash2,
-  Plus,
-  Eye,
-  Phone,
-  Paperclip,
-} from "lucide-react";
+import { Pencil, Trash2, Plus, Eye, Phone, Paperclip } from "lucide-react";
 import Swal from "sweetalert2";
 
 import CreateLeadModal from "../components/CreateLeadModal";
@@ -63,7 +56,6 @@ const STATUS_OPTIONS: LeadStatus[] = [
   "Need to message",
 ];
 
-
 const SOURCE_OPTIONS: LeadSources[] = [
   "Instagram",
   "WhatsApp",
@@ -72,8 +64,6 @@ const SOURCE_OPTIONS: LeadSources[] = [
   "Member",
   "Events",
 ];
-
-
 
 const PURPOSE_OPTIONS: LeadPurpose[] = [
   "Events",
@@ -90,10 +80,11 @@ const PURPOSE_OPTIONS: LeadPurpose[] = [
   "Customer Art Work",
   "Co-Working",
   "Handmade Gift",
-  "Saler Program",
+  "Atives",
+  "Woorkshop",
+  "Exhibition",
+  "Other",
 ];
-
-
 
 export const getPurposeBadgeStyle = (source: LeadPurpose) => {
   switch (source) {
@@ -136,19 +127,24 @@ export const getPurposeBadgeStyle = (source: LeadPurpose) => {
     case "Co-Working":
       return "bg-indigo-50 text-indigo-700 border-indigo-200";
 
-
     case "Handmade Gift":
       return "bg-indigo-50 text-indigo-700 border-indigo-200";
 
-
-    case "Saler Program":
+    case "Atives":
       return "bg-indigo-50 text-indigo-700 border-indigo-200";
 
+    case "Woorkshop":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    case "Exhibition":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
+
+    case "Other":
+      return "bg-indigo-50 text-indigo-700 border-indigo-200";
     default:
       return "bg-gray-50 text-gray-700 border-gray-200";
   }
 };
-
 
 const LeadScreen = () => {
   const [leads, setLeads] = useState<LeadItem[]>([]);
@@ -158,10 +154,10 @@ const LeadScreen = () => {
   // Date filter state (default: this month)
   const [datePreset, setDatePreset] = useState<DatePreset>("month");
   const [fromDate, setFromDate] = useState<string>(
-    () => rangeForPreset("month").from
+    () => rangeForPreset("month").from,
   );
   const [toDate, setToDate] = useState<string>(
-    () => rangeForPreset("month").to
+    () => rangeForPreset("month").to,
   );
   const [selectedPurpose, setSelectedPurpose] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -172,14 +168,17 @@ const LeadScreen = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [leadToEdit, setLeadToEdit] = useState<LeadItem | null>(null);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
-  const [pendingLeadPayload, setPendingLeadPayload] = useState<LeadPayload | null>(null);
+  const [pendingLeadPayload, setPendingLeadPayload] =
+    useState<LeadPayload | null>(null);
 
   const [selectedLeadForDetails, setSelectedLeadForDetails] =
     useState<LeadItem | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
   // Staff users for Assign dropdown filter
-  const [staffUsers, setStaffUsers] = useState<{ id: string; name: string }[]>([]);
+  const [staffUsers, setStaffUsers] = useState<{ id: string; name: string }[]>(
+    [],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -227,7 +226,7 @@ const LeadScreen = () => {
       customStatus?: string,
       customSource?: string,
       customAssign?: string,
-      signal?: AbortSignal
+      signal?: AbortSignal,
     ) => {
       try {
         setLoading(true);
@@ -251,7 +250,7 @@ const LeadScreen = () => {
             source: pSource && pSource !== "all" ? pSource : undefined,
             assignedTo: pAssign && pAssign !== "all" ? pAssign : undefined,
           },
-          signal
+          signal,
         );
 
         let leadList: LeadItem[] = Array.isArray(res?.data)
@@ -260,8 +259,6 @@ const LeadScreen = () => {
             ? res
             : [];
 
-
-            
         // Client-side fallback filtering
         if (pPurpose && pPurpose !== "all") {
           leadList = leadList.filter((item) => item.purpose === pPurpose);
@@ -277,14 +274,16 @@ const LeadScreen = () => {
             leadList = leadList.filter(
               (item) =>
                 !item.assignedTo ||
-                (!item.assignedTo.m_staff_name && !item.assignedTo.m_staff_id) ||
-                item.assignedTo.m_staff_name?.trim() === ""
+                (!item.assignedTo.m_staff_name &&
+                  !item.assignedTo.m_staff_id) ||
+                item.assignedTo.m_staff_name?.trim() === "",
             );
           } else {
             leadList = leadList.filter(
               (item) =>
-                item.assignedTo?.m_staff_name?.toLowerCase() === pAssign.toLowerCase() ||
-                item.assignedTo?.m_staff_id === pAssign
+                item.assignedTo?.m_staff_name?.toLowerCase() ===
+                  pAssign.toLowerCase() ||
+                item.assignedTo?.m_staff_id === pAssign,
             );
           }
         }
@@ -297,13 +296,22 @@ const LeadScreen = () => {
         Swal.fire({
           icon: "error",
           title: "Error",
-          text: error?.response?.data?.message || "Failed to load leads from server.",
+          text:
+            error?.response?.data?.message ||
+            "Failed to load leads from server.",
         });
       } finally {
         setLoading(false);
       }
     },
-    [fromDate, toDate, selectedPurpose, selectedStatus, selectedSource, selectedAssign]
+    [
+      fromDate,
+      toDate,
+      selectedPurpose,
+      selectedStatus,
+      selectedSource,
+      selectedAssign,
+    ],
   );
 
   const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -313,52 +321,102 @@ const LeadScreen = () => {
     if (preset === "all") {
       setFromDate("");
       setToDate("");
-      fetchLeads("", "", selectedPurpose, selectedStatus, selectedSource, selectedAssign);
+      fetchLeads(
+        "",
+        "",
+        selectedPurpose,
+        selectedStatus,
+        selectedSource,
+        selectedAssign,
+      );
     } else if (preset === "custom") {
       // User can pick from/to dates
     } else {
       const range = rangeForPreset(preset);
       setFromDate(range.from);
       setToDate(range.to);
-      fetchLeads(range.from, range.to, selectedPurpose, selectedStatus, selectedSource, selectedAssign);
+      fetchLeads(
+        range.from,
+        range.to,
+        selectedPurpose,
+        selectedStatus,
+        selectedSource,
+        selectedAssign,
+      );
     }
   };
 
   const handleAssignFilterChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
+    e: React.ChangeEvent<HTMLSelectElement>,
   ) => {
     const nextAssign = e.target.value;
     setSelectedAssign(nextAssign);
-    fetchLeads(fromDate, toDate, selectedPurpose, selectedStatus, selectedSource, nextAssign);
+    fetchLeads(
+      fromDate,
+      toDate,
+      selectedPurpose,
+      selectedStatus,
+      selectedSource,
+      nextAssign,
+    );
   };
 
   const handleStatusFilterChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
+    e: React.ChangeEvent<HTMLSelectElement>,
   ) => {
     const nextStatus = e.target.value;
     setSelectedStatus(nextStatus);
-    fetchLeads(fromDate, toDate, selectedPurpose, nextStatus, selectedSource, selectedAssign);
+    fetchLeads(
+      fromDate,
+      toDate,
+      selectedPurpose,
+      nextStatus,
+      selectedSource,
+      selectedAssign,
+    );
   };
 
   const handleSourceFilterChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
+    e: React.ChangeEvent<HTMLSelectElement>,
   ) => {
     const nextSource = e.target.value;
     setSelectedSource(nextSource);
-    fetchLeads(fromDate, toDate, selectedPurpose, selectedStatus, nextSource, selectedAssign);
+    fetchLeads(
+      fromDate,
+      toDate,
+      selectedPurpose,
+      selectedStatus,
+      nextSource,
+      selectedAssign,
+    );
   };
 
   const handlePurposeFilterChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
+    e: React.ChangeEvent<HTMLSelectElement>,
   ) => {
     const nextPurpose = e.target.value;
     setSelectedPurpose(nextPurpose);
-    fetchLeads(fromDate, toDate, nextPurpose, selectedStatus, selectedSource, selectedAssign);
+    fetchLeads(
+      fromDate,
+      toDate,
+      nextPurpose,
+      selectedStatus,
+      selectedSource,
+      selectedAssign,
+    );
   };
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchLeads(undefined, undefined, undefined, undefined, undefined, undefined, controller.signal);
+    fetchLeads(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      controller.signal,
+    );
     return () => controller.abort();
   }, [fetchLeads]);
 
@@ -498,10 +556,9 @@ const LeadScreen = () => {
     // Optimistic UI update
     setLeads((prev) =>
       prev.map((item) =>
-        item._id === lead._id ? { ...item, status: newStatus } : item
-      )
+        item._id === lead._id ? { ...item, status: newStatus } : item,
+      ),
     );
-
 
     try {
       await handleUpdateLead(lead._id, { status: newStatus });
@@ -517,14 +574,17 @@ const LeadScreen = () => {
   };
 
   // Inline source change: PATCH /api/lead/:id
-  const handleSourcesChange = async (lead: LeadItem, newSource: LeadSources) => {
+  const handleSourcesChange = async (
+    lead: LeadItem,
+    newSource: LeadSources,
+  ) => {
     if (lead.source === newSource) return;
 
     // Optimistic UI update
     setLeads((prev) =>
       prev.map((item) =>
-        item._id === lead._id ? { ...item, source: newSource } : item
-      )
+        item._id === lead._id ? { ...item, source: newSource } : item,
+      ),
     );
 
     try {
@@ -541,14 +601,17 @@ const LeadScreen = () => {
   };
 
   // Inline purpose change: PATCH /api/lead/:id
-  const handlePurposeChange = async (lead: LeadItem, newPurpose: LeadPurpose) => {
+  const handlePurposeChange = async (
+    lead: LeadItem,
+    newPurpose: LeadPurpose,
+  ) => {
     if (lead.purpose === newPurpose) return;
 
     // Optimistic UI update
     setLeads((prev) =>
       prev.map((item) =>
-        item._id === lead._id ? { ...item, purpose: newPurpose } : item
-      )
+        item._id === lead._id ? { ...item, purpose: newPurpose } : item,
+      ),
     );
 
     try {
@@ -559,7 +622,8 @@ const LeadScreen = () => {
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: error?.response?.data?.message || "Failed to update lead purpose.",
+        text:
+          error?.response?.data?.message || "Failed to update lead purpose.",
       });
     }
   };
@@ -629,16 +693,17 @@ const LeadScreen = () => {
               >
                 {cell.getValue<string>()}
               </span>
-              {row.original.attachments && row.original.attachments.length > 0 && (
-                <span
-                  onClick={() => handleViewDetails(row.original)}
-                  className="inline-flex cursor-pointer items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 hover:bg-indigo-100 transition"
-                  title={`${row.original.attachments.length} media/document(s) attached`}
-                >
-                  <Paperclip size={10} />
-                  {row.original.attachments.length}
-                </span>
-              )}
+              {row.original.attachments &&
+                row.original.attachments.length > 0 && (
+                  <span
+                    onClick={() => handleViewDetails(row.original)}
+                    className="inline-flex cursor-pointer items-center gap-0.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 hover:bg-indigo-100 transition"
+                    title={`${row.original.attachments.length} media/document(s) attached`}
+                  >
+                    <Paperclip size={10} />
+                    {row.original.attachments.length}
+                  </span>
+                )}
             </div>
             {row.original.source && (
               <span className="block text-[11px] text-gray-400">
@@ -656,7 +721,8 @@ const LeadScreen = () => {
         size: 140,
         Cell: ({ cell, row }) => {
           const phone = cell.getValue<string>();
-          if (!phone) return <span className="text-gray-400 italic text-xs">-</span>;
+          if (!phone)
+            return <span className="text-gray-400 italic text-xs">-</span>;
           return (
             <div className="flex flex-col items-start gap-1">
               <a
@@ -672,8 +738,6 @@ const LeadScreen = () => {
         },
       },
 
-
-
       // Status
       {
         accessorKey: "status",
@@ -685,14 +749,14 @@ const LeadScreen = () => {
             status === "Converted"
               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
               : status === "Interested"
-              ? "bg-purple-50 text-purple-700 border-purple-200"
-              : status === "Contacted"
-              ? "bg-amber-50 text-amber-700 border-amber-200"
-              : status === "New"
-              ? "bg-blue-50 text-blue-700 border-blue-200"
-              : status === "Not Interested"
-              ? "bg-rose-50 text-rose-700 border-rose-200"
-              : "bg-gray-50 text-gray-700 border-gray-200";
+                ? "bg-purple-50 text-purple-700 border-purple-200"
+                : status === "Contacted"
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : status === "New"
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : status === "Not Interested"
+                      ? "bg-rose-50 text-rose-700 border-rose-200"
+                      : "bg-gray-50 text-gray-700 border-gray-200";
 
           return (
             <span
@@ -717,9 +781,9 @@ const LeadScreen = () => {
         header: "Purpose",
         size: 140,
       },
-      
+
       //deadline
-      
+
       {
         accessorKey: "deadline",
         header: "Deadline",
@@ -729,9 +793,7 @@ const LeadScreen = () => {
 
           if (!deadline) {
             return (
-              <span className="text-gray-400 italic text-xs">
-                No deadline
-              </span>
+              <span className="text-gray-400 italic text-xs">No deadline</span>
             );
           }
           const deadlineStr =
@@ -741,7 +803,8 @@ const LeadScreen = () => {
           const deadlineDate = new Date(`${deadlineStr}T23:59:59`);
           const today = new Date();
 
-          const isOverdue = !isNaN(deadlineDate.getTime()) && deadlineDate < today;
+          const isOverdue =
+            !isNaN(deadlineDate.getTime()) && deadlineDate < today;
 
           return (
             <div className="flex flex-col gap-0.5">
@@ -752,11 +815,14 @@ const LeadScreen = () => {
                     : "bg-amber-50 text-amber-700"
                 }`}
               >
-                {new Date(`${deadlineStr}T00:00:00`).toLocaleDateString("en-IN", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })}
+                {new Date(`${deadlineStr}T00:00:00`).toLocaleDateString(
+                  "en-IN",
+                  {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  },
+                )}
               </span>
 
               {isOverdue && (
@@ -793,7 +859,8 @@ const LeadScreen = () => {
         size: 100,
         Cell: ({ cell }) => {
           const note = cell.getValue<string>();
-          if (!note) return <span className="text-gray-400 italic text-xs">-</span>;
+          if (!note)
+            return <span className="text-gray-400 italic text-xs">-</span>;
           return (
             <span className="line-clamp-2 text-xs text-gray-600" title={note}>
               {note}
@@ -810,7 +877,8 @@ const LeadScreen = () => {
         Cell: ({ cell, row }) => {
           const rawDate = cell.getValue<string>() || row.original.date;
           const staffName = row.original.createdBy?.m_staff_name;
-          if (!rawDate && !staffName) return <span className="text-gray-400 italic text-xs">-</span>;
+          if (!rawDate && !staffName)
+            return <span className="text-gray-400 italic text-xs">-</span>;
           let dateStr = "";
           if (rawDate) {
             try {
@@ -881,7 +949,7 @@ const LeadScreen = () => {
         ),
       },
     ],
-    []
+    [],
   );
 
   const table = useMaterialReactTable({
@@ -922,7 +990,8 @@ const LeadScreen = () => {
               Leads
             </h1>
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 sm:px-3 py-1 text-xs font-semibold text-indigo-700 shadow-2xs whitespace-nowrap">
-              Total Leads: <span className="font-bold text-indigo-900">{leads.length}</span>
+              Total Leads:{" "}
+              <span className="font-bold text-indigo-900">{leads.length}</span>
             </span>
           </div>
 
@@ -1054,7 +1123,7 @@ const LeadScreen = () => {
                     selectedPurpose,
                     selectedStatus,
                     selectedSource,
-                    selectedAssign
+                    selectedAssign,
                   )
                 }
                 disabled={loading || (!fromDate && !toDate)}
@@ -1174,7 +1243,11 @@ const LeadScreen = () => {
           setLeads((prev) =>
             prev.map((item) =>
               item._id === next._id
-                ? { ...item, ...next, membership: next.membership ?? item.membership }
+                ? {
+                    ...item,
+                    ...next,
+                    membership: next.membership ?? item.membership,
+                  }
                 : item,
             ),
           );

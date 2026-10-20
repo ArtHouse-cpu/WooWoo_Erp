@@ -14,6 +14,7 @@ import CreateCustomerModal from "@/features/network/components/CreateCustomerMod
 import ImportCustomersModal from "@/features/network/components/ImportCustomersModal";
 import UpdateCustomerModal from "@/features/network/components/UpdateCustomerModal";
 import CustomerDetailsModal from "@/features/network/components/CustomerDetailsModal";
+import Customer360Modal from "@/features/network/components/Customer360Modal";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
 import {
@@ -78,6 +79,7 @@ export default function CustomerScreen() {
   const [detailsCustomer, setDetailsCustomer] = useState<CustomerRow | null>(
     null,
   );
+  const [customer360, setCustomer360] = useState<CustomerRow | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -297,9 +299,16 @@ export default function CustomerScreen() {
         header: "Contact Info",
         id: "contactInfo",
         accessorFn: (row: CustomerRow) =>
-          `${row.mobile || ""} ${row.whatsappNumber || ""} ${row.email || ""}`.trim() ||
-          "-",
-        size: 180,
+          [row.mobile, row.email].filter(Boolean).join(" ") || "-",
+        size: 220,
+        Cell: ({ row }) => (
+          <div className="min-w-0">
+            <p className="text-slate-800">{row.original.mobile || "—"}</p>
+            {row.original.email ? (
+              <p className="truncate text-xs text-slate-500">{row.original.email}</p>
+            ) : null}
+          </div>
+        ),
       },
       {
         header: "Wallet Amount",
@@ -419,8 +428,8 @@ export default function CustomerScreen() {
     },
     muiTableBodyRowProps: ({ row }) => ({
       onClick: () => {
-        setDetailsCustomer(row.original);
-        setDetailsOpen(true);
+        if (!row.original._id) return;
+        setCustomer360(row.original);
       },
       sx: { cursor: "pointer" },
     }),
@@ -579,6 +588,14 @@ export default function CustomerScreen() {
         onUpdate={handleUpdateCustomerSubmit}
         loading={updatingCustomer}
       />
+
+      {customer360?._id ? (
+        <Customer360Modal
+          customerId={customer360._id}
+          customerName={customer360.name}
+          onClose={() => setCustomer360(null)}
+        />
+      ) : null}
 
       <CustomerDetailsModal
         open={detailsOpen}

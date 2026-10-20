@@ -89,7 +89,10 @@ const leadSchema = new mongoose.Schema(
         "Customer Art Work",
         "Co-Working",
         "Handmade Gift",
-        "Saler Program",],
+        "Atives",
+        "Woorkshop",
+        "Exhibition",
+        "Other",],
       default: "",
     },
 

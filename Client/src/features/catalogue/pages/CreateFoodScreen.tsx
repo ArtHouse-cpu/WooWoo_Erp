@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -31,11 +32,21 @@ import { PERMISSIONS } from "@/constants/permissions";
 type FoodRow = FoodPayload & { _id: string };
 
 export default function CreateFoodScreen() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [openModal, setOpenModal] = useState(false);
   const [editing, setEditing] = useState<FoodRow | null>(null);
   const [foods, setFoods] = useState<FoodRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return;
+    setEditing(null);
+    setOpenModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("create");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const fetchFoods = async (signal?: AbortSignal) => {
     try {

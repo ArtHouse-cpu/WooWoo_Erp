@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   MaterialReactTable,
@@ -87,6 +88,7 @@ function isAbortError(error: unknown) {
 }
 
 export default function ProductScreen() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
@@ -108,6 +110,15 @@ export default function ProductScreen() {
     outOfStockCount: 0,
     categoryCount: 0,
   });
+
+  useEffect(() => {
+    if (searchParams.get("create") !== "1") return;
+    setEditProduct(null);
+    setShowCreateModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("create");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const rowVirtualizerInstanceRef = useRef<MRT_RowVirtualizer>(null);
