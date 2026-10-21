@@ -32,6 +32,7 @@ import {
   Car,
   UtensilsCrossed,
   Download,
+  ClipboardList,
 } from "lucide-react";
 import Swal from "sweetalert2";
 // Optional: import jsPDF from "jspdf"; // If you want PDF download
@@ -638,6 +639,7 @@ const CreateBookingDetailsModal = ({
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
 
   // Exclusive Dates Mode
@@ -694,6 +696,10 @@ const CreateBookingDetailsModal = ({
   const [dynamicAdditionalServices, setDynamicAdditionalServices] = useState<
     AdditionalServiceItem[]
   >([]);
+
+  useEffect(() => {
+    if (!isOpen) setSummaryOpen(false);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -2351,6 +2357,60 @@ const CreateBookingDetailsModal = ({
 
   if (!isOpen) return null;
 
+  const bookingSummary = isDurationPlan ? (
+    <CoworkingSummaryCard
+      space={selectedSpace || null}
+      spaceQty={spaceQty}
+      startDate={coworkingStartDate}
+      endDate={coworkingEndDate}
+      days={totalDaysForHours}
+      durationCount={planDurationCount}
+      durationUnit={planDurationInfo.unit}
+      durationUnitSingular={planDurationInfo.unitSingular}
+      durationUnitPlural={planDurationInfo.unitPlural}
+      priceSuffix={planDurationInfo.priceSuffix}
+      packageMultiplier={packageMultiplier}
+      unitPrice={
+        selectedSpace?.price
+          ? Number(selectedSpace.price)
+          : spaceTypeFilter === "coworking"
+          ? 400
+          : 800
+      }
+      selectedServices={selectedServicesList}
+      foods={selectedFoodsList}
+      discountAmount={discountAmount}
+      cashbackAmount={cashbackAmount}
+      formatDateDisplay={formatDateDisplay}
+    />
+  ) : dateMode === "multiple" ? (
+    <ExclusiveMultipleDatesSummaryCard
+      space={selectedSpace || null}
+      spaceQty={spaceQty}
+      slots={multiDateSlots}
+      hourlyRate={Number(selectedSpace?.price || 800)}
+      selectedServices={selectedServicesList}
+      foods={selectedFoodsList}
+      discountAmount={discountAmount}
+      cashbackAmount={cashbackAmount}
+      formatDateDisplay={formatDateDisplay}
+    />
+  ) : (
+    <ExclusiveSingleDateSummaryCard
+      space={selectedSpace || null}
+      spaceQty={spaceQty}
+      bookingDate={bookingDate}
+      timeSlot={timeSlot}
+      duration={duration}
+      hourlyRate={Number(selectedSpace?.price || 800)}
+      selectedServices={selectedServicesList}
+      foods={selectedFoodsList}
+      discountAmount={discountAmount}
+      cashbackAmount={cashbackAmount}
+      formatDateDisplay={formatDateDisplay}
+    />
+  );
+
   return (
     <>
       <div
@@ -3831,69 +3891,23 @@ const CreateBookingDetailsModal = ({
                 </form>
               </div>
 
-              {/* Right Column: Refactored Booking Summary Card (4 cols) */}
-              <div className="lg:col-span-4 lg:h-full lg:min-h-0 lg:overflow-y-auto custom-scrollbar">
-                <div>
-                  {isDurationPlan ? (
-                    <CoworkingSummaryCard
-                      space={selectedSpace || null}
-                      spaceQty={spaceQty}
-                      startDate={coworkingStartDate}
-                      endDate={coworkingEndDate}
-                      days={totalDaysForHours}
-                      durationCount={planDurationCount}
-                      durationUnit={planDurationInfo.unit}
-                      durationUnitSingular={planDurationInfo.unitSingular}
-                      durationUnitPlural={planDurationInfo.unitPlural}
-                      priceSuffix={planDurationInfo.priceSuffix}
-                      packageMultiplier={packageMultiplier}
-                      unitPrice={
-                        selectedSpace?.price
-                          ? Number(selectedSpace.price)
-                          : spaceTypeFilter === "coworking"
-                          ? 400
-                          : 800
-                      }
-                      selectedServices={selectedServicesList}
-                      foods={selectedFoodsList}
-                      discountAmount={discountAmount}
-                      cashbackAmount={cashbackAmount}
-                      formatDateDisplay={formatDateDisplay}
-                    />
-                  ) : dateMode === "multiple" ? (
-                    <ExclusiveMultipleDatesSummaryCard
-                      space={selectedSpace || null}
-                      spaceQty={spaceQty}
-                      slots={multiDateSlots}
-                      hourlyRate={Number(selectedSpace?.price || 800)}
-                      selectedServices={selectedServicesList}
-                      foods={selectedFoodsList}
-                      discountAmount={discountAmount}
-                      cashbackAmount={cashbackAmount}
-                      formatDateDisplay={formatDateDisplay}
-                    />
-                  ) : (
-                    <ExclusiveSingleDateSummaryCard
-                      space={selectedSpace || null}
-                      spaceQty={spaceQty}
-                      bookingDate={bookingDate}
-                      timeSlot={timeSlot}
-                      duration={duration}
-                      hourlyRate={Number(selectedSpace?.price || 800)}
-                      selectedServices={selectedServicesList}
-                      foods={selectedFoodsList}
-                      discountAmount={discountAmount}
-                      cashbackAmount={cashbackAmount}
-                      formatDateDisplay={formatDateDisplay}
-                    />
-                  )}
-                </div>
+              {/* Right column stays beside the form on a wide screen. */}
+              <div className="hidden lg:col-span-4 lg:block lg:h-full lg:min-h-0 lg:overflow-y-auto custom-scrollbar">
+                {bookingSummary}
               </div>
             </div>
           </div>
 
           {/* Modal Footer */}
-          <div className="flex shrink-0 justify-end border-t border-slate-100 bg-white px-6 py-3.5">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-white px-4 py-3.5 sm:px-6">
+            <button
+              type="button"
+              onClick={() => setSummaryOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 lg:hidden"
+            >
+              <FileText size={15} />
+              View booking summary
+            </button>
             {/* <a
               href="mailto:support@woowoo.in"
               target="_blank"
@@ -3906,7 +3920,7 @@ const CreateBookingDetailsModal = ({
               </span>
             </a> */}
 
-            <div className="flex justify-end gap-3">
+            <div className="ml-auto flex flex-wrap justify-end gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={onClose}
@@ -4018,6 +4032,31 @@ const CreateBookingDetailsModal = ({
           </div>
         </div>
       </div>
+
+      {summaryOpen ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-900/60 p-3 sm:items-center lg:hidden"
+          onClick={() => setSummaryOpen(false)}
+        >
+          <div
+            className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
+              <h3 className="text-sm font-bold text-slate-900">Booking Summary</h3>
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                title="Close summary"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">{bookingSummary}</div>
+          </div>
+        </div>
+      ) : null}
 
       {showCreateCustomerModal && (
         <div className="relative z-[60]">
