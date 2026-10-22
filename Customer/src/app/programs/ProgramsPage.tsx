@@ -11,7 +11,14 @@ import {
   ShoppingBag,
   IndianRupee,
   Wallet,
+  Landmark,
   Users,
+  User,
+  CreditCard,
+  Clock,
+  Copy,
+  Info,
+  Receipt,
   FileText,
   HelpCircle,
   Headset,
@@ -52,6 +59,12 @@ export interface ProgramSale {
   buyerName?: string;
   paymentMethod?: string;
   commission?: number;
+  sku?: string;
+  orderDate?: string;
+  discount?: number;
+  saleMilestone?: string;
+  transactionId?: string;
+  quantity?: number;
 }
 
 export interface ProgramTimelineEntry {
@@ -63,6 +76,16 @@ export interface ProgramTimelineEntry {
   time: string;
   amount: number;
   isCredit: boolean;
+  utr?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  payoutDate?: string;
+  totalSalesAmount?: number;
+  discount?: number;
+  earnings?: number;
+  previousPending?: number;
+  relatedOrders?: string;
 }
 
 export interface ProgramTimelineGroup {
@@ -130,12 +153,18 @@ const MOCK_SALES: ProgramSale[] = [
     orderNo: "#ATV1284",
     productName: "Handpainted Mug",
     timeAgo: "2 hours ago",
+    orderDate: "16 Oct 2026, 11:24 AM",
     amount: 499,
+    quantity: 1,
+    sku: "HM-001",
+    discount: 50,
+    saleMilestone: "4th Sale",
     status: "Paid",
     image:
       "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=400&q=80",
-    buyerName: "Aarav Sharma",
-    paymentMethod: "UPI",
+    buyerName: "Riya Sharma",
+    paymentMethod: "Online Payment (UPI)",
+    transactionId: "UPI32984756129",
     commission: 50,
   },
   {
@@ -143,12 +172,18 @@ const MOCK_SALES: ProgramSale[] = [
     orderNo: "#ATV1283",
     productName: "Art Tote Bag",
     timeAgo: "5 hours ago",
+    orderDate: "16 Oct 2026, 08:15 AM",
     amount: 699,
+    quantity: 1,
+    sku: "TB-042",
+    discount: 50,
+    saleMilestone: "3rd Sale",
     status: "Paid",
     image:
       "https://images.unsplash.com/photo-1597484662317-9bd7bdda2907?auto=format&fit=crop&w=400&q=80",
     buyerName: "Priya Patel",
-    paymentMethod: "Card",
+    paymentMethod: "Credit Card (Visa)",
+    transactionId: "CC9182374619",
     commission: 70,
   },
   {
@@ -156,12 +191,18 @@ const MOCK_SALES: ProgramSale[] = [
     orderNo: "#ATV1282",
     productName: "Sticker Pack",
     timeAgo: "1 day ago",
+    orderDate: "15 Oct 2026, 04:30 PM",
     amount: 199,
+    quantity: 1,
+    sku: "SP-108",
+    discount: 20,
+    saleMilestone: "2nd Sale",
     status: "Paid",
     image:
       "https://images.unsplash.com/photo-1589384267710-7a25be11b7df?auto=format&fit=crop&w=400&q=80",
     buyerName: "Rohan Verma",
-    paymentMethod: "UPI",
+    paymentMethod: "Online Payment (UPI)",
+    transactionId: "UPI98234102941",
     commission: 20,
   },
   {
@@ -169,12 +210,18 @@ const MOCK_SALES: ProgramSale[] = [
     orderNo: "#ATV1281",
     productName: "Scented Candle (Handpainted)",
     timeAgo: "2 days ago",
+    orderDate: "14 Oct 2026, 02:10 PM",
     amount: 399,
+    quantity: 1,
+    sku: "SC-005",
+    discount: 40,
+    saleMilestone: "1st Sale",
     status: "Paid",
     image:
       "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=400&q=80",
     buyerName: "Ananya Iyer",
-    paymentMethod: "UPI",
+    paymentMethod: "Online Payment (UPI)",
+    transactionId: "UPI44512984022",
     commission: 40,
   },
   {
@@ -182,12 +229,18 @@ const MOCK_SALES: ProgramSale[] = [
     orderNo: "#ATV1280",
     productName: "Canvas Wall Art",
     timeAgo: "2 days ago",
+    orderDate: "14 Oct 2026, 11:00 AM",
     amount: 1299,
+    quantity: 1,
+    sku: "WA-204",
+    discount: 0,
+    saleMilestone: "Cancelled",
     status: "Cancelled",
     image:
       "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=400&q=80",
     buyerName: "Vikram Malhotra",
     paymentMethod: "NetBanking",
+    transactionId: "NB1029481239",
     commission: 0,
   },
   {
@@ -195,12 +248,18 @@ const MOCK_SALES: ProgramSale[] = [
     orderNo: "#ATV1279",
     productName: "Resin Keychain",
     timeAgo: "3 days ago",
+    orderDate: "13 Oct 2026, 06:45 PM",
     amount: 299,
+    quantity: 1,
+    sku: "RK-012",
+    discount: 30,
+    saleMilestone: "5th Sale",
     status: "Paid",
     image:
       "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80",
     buyerName: "Sneha Nair",
-    paymentMethod: "UPI",
+    paymentMethod: "Online Payment (UPI)",
+    transactionId: "UPI77129481023",
     commission: 30,
   },
   {
@@ -208,12 +267,18 @@ const MOCK_SALES: ProgramSale[] = [
     orderNo: "#ATV1278",
     productName: "Mini Art Print",
     timeAgo: "4 days ago",
+    orderDate: "12 Oct 2026, 03:20 PM",
     amount: 249,
+    quantity: 1,
+    sku: "AP-088",
+    discount: 25,
+    saleMilestone: "6th Sale",
     status: "Paid",
     image:
-      "https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=400&q=80",
+      "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=400&q=80",
     buyerName: "Karan Mehta",
-    paymentMethod: "Card",
+    paymentMethod: "Credit Card (Mastercard)",
+    transactionId: "CC1928374619",
     commission: 25,
   },
   {
@@ -221,12 +286,18 @@ const MOCK_SALES: ProgramSale[] = [
     orderNo: "#ATV1277",
     productName: "Macrame Wall Hanging",
     timeAgo: "5 days ago",
+    orderDate: "11 Oct 2026, 01:15 PM",
     amount: 899,
+    quantity: 1,
+    sku: "MW-003",
+    discount: 0,
+    saleMilestone: "Returned",
     status: "Returned",
     image:
       "https://images.unsplash.com/photo-1522758971460-1d21eed7dc1d?auto=format&fit=crop&w=400&q=80",
     buyerName: "Neha Gupta",
-    paymentMethod: "UPI",
+    paymentMethod: "Online Payment (UPI)",
+    transactionId: "UPI66102938471",
     commission: 0,
   },
 ];
@@ -255,6 +326,16 @@ const MOCK_TIMELINE_GROUPS: ProgramTimelineGroup[] = [
         time: "09:15 AM",
         amount: 1200,
         isCredit: false,
+        utr: "SBIN3265987412",
+        bankName: "State Bank of India",
+        accountNumber: "••••• 7842",
+        ifsc: "SBIN0001234",
+        payoutDate: "16 Oct 2026, 09:15 AM",
+        totalSalesAmount: 1800,
+        discount: 300,
+        earnings: 1260,
+        previousPending: 60,
+        relatedOrders: "2 Orders Included (Order #ATV1284, #ATV1277)",
       },
     ],
   },
@@ -290,6 +371,16 @@ const MOCK_TIMELINE_GROUPS: ProgramTimelineGroup[] = [
         time: "11:03 AM",
         amount: 800,
         isCredit: false,
+        utr: "HDFC8932765410",
+        bankName: "HDFC Bank",
+        accountNumber: "••••• 3419",
+        ifsc: "HDFC0001892",
+        payoutDate: "15 Oct 2026, 11:03 AM",
+        totalSalesAmount: 1200,
+        discount: 100,
+        earnings: 840,
+        previousPending: 60,
+        relatedOrders: "1 Order Included (Order #ATV1283)",
       },
     ],
   },
@@ -336,7 +427,8 @@ export default function ProgramsPage() {
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProgramProduct | null>(null);
-  const [selectedTimelineItem, setSelectedTimelineItem] = useState<ProgramTimelineEntry | null>(null);
+  const [selectedSale, setSelectedSale] = useState<ProgramSale | null>(null);
+  const [selectedPayout, setSelectedPayout] = useState<ProgramTimelineEntry | null>(null);
 
   // Form states for Add / Edit
   const [formName, setFormName] = useState("");
@@ -645,7 +737,10 @@ export default function ProgramsPage() {
           </div>
 
           {/* Card 4: Payouts */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#E2EEFB]/80 bg-[#F4F8FC] p-3.5 transition hover:shadow-sm">
+          <div
+            onClick={() => setSelectedPayout(MOCK_TIMELINE_GROUPS[0].items[1])}
+            className="flex flex-col justify-between rounded-2xl border border-[#E2EEFB]/80 bg-[#F4F8FC] p-3.5 transition hover:shadow-md hover:border-blue-200 cursor-pointer"
+          >
             <div className="flex items-start gap-2.5">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100/90 text-blue-600">
                 <Wallet size={17} strokeWidth={2.2} />
@@ -1010,7 +1105,8 @@ export default function ProgramsPage() {
               {MOCK_SALES.map((sale) => (
                 <div
                   key={sale.id}
-                  className="group flex flex-wrap items-center justify-between gap-3 p-3 transition hover:bg-slate-50/70 sm:p-3.5"
+                  onClick={() => setSelectedSale(sale)}
+                  className="group flex flex-wrap items-center justify-between gap-3 p-3 transition hover:bg-slate-50/70 sm:p-3.5 cursor-pointer"
                 >
                   {/* Left: Thumbnail + Title + Order ID & Time */}
                   <div className="flex items-center gap-3 sm:gap-3.5 min-w-[200px]">
@@ -1077,7 +1173,16 @@ export default function ProgramsPage() {
                   {group.items.map((item) => (
                     <div
                       key={item.id}
-                      onClick={() => setSelectedTimelineItem(item)}
+                      onClick={() => {
+                        if (item.type === "payout") {
+                          setSelectedPayout(item);
+                        } else {
+                          const match =
+                            MOCK_SALES.find((s) => item.subtitle.includes(s.orderNo)) ||
+                            MOCK_SALES[0];
+                          setSelectedSale(match);
+                        }
+                      }}
                       className="group flex items-center justify-between gap-3 rounded-2xl border border-gray-100/90 bg-white p-3.5 sm:p-4 shadow-sm transition hover:shadow-md hover:border-gray-200 cursor-pointer"
                     >
                       {/* Left: Icon Badge + Title/Status + Subtitle + Time */}
@@ -1146,96 +1251,467 @@ export default function ProgramsPage() {
         )}
       </div>
 
-      {/* ================= TIMELINE ITEM DETAILS MODAL ================= */}
-      {selectedTimelineItem && (
+      {/* ================= PAYOUT DETAILS MODAL (MATCHING REFERENCE IMAGE) ================= */}
+      {selectedPayout && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          onClick={() => setSelectedTimelineItem(null)}
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedPayout(null)}
         >
           <div
-            className="w-full max-w-sm rounded-[24px] bg-white p-5 shadow-2xl"
+            className="relative flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-[32px] sm:rounded-[32px] bg-white shadow-2xl overflow-hidden border-t sm:border border-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div>
-                <span className="text-xs font-bold text-orange-600">
-                  {selectedTimelineItem.type === "sale" ? "Sale Transaction" : "Bank Transfer"}
-                </span>
-                <h3 className="text-base font-bold text-gray-900">{selectedTimelineItem.title}</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedTimelineItem(null)}
-                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              >
-                <X size={18} />
-              </button>
+            {/* Top Drag Handle (Mobile) */}
+            <div className="flex shrink-0 justify-center pt-3 pb-1 sm:hidden">
+              <div className="h-1.5 w-12 rounded-full bg-gray-300" />
             </div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-2xl bg-gray-50 p-3.5">
+            {/* Header: Wallet Icon + Title + UTR + Status Badge + Close Button */}
+            <div className="shrink-0 px-5 pt-3 sm:px-6 sm:pt-5 pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#EBF3FE] text-[#2563EB]">
+                    <Wallet size={22} strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-[22px] font-extrabold text-gray-950 tracking-tight leading-none">
+                      Payout Details
+                    </h2>
+                    <p className="text-xs text-gray-400 font-medium font-mono mt-1">
+                      UTR: {selectedPayout.utr || "SBIN3265987412"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-[#E8F8EE] px-2.5 py-0.5 text-xs font-bold text-[#16A34A] border border-emerald-100/60">
+                      {selectedPayout.status || "Completed"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPayout(null)}
+                      className="rounded-full p-1 text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                      aria-label="Close modal"
+                    >
+                      <X size={20} className="stroke-[2.2]" />
+                    </button>
+                  </div>
+                  <span className="mt-1 text-[11px] sm:text-xs text-gray-400 font-medium">
+                    {selectedPayout.payoutDate || "16 Oct 2026, 09:15 AM"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Body Content */}
+            <div className="flex-1 overflow-y-auto px-5 sm:px-6 pb-6 space-y-3.5">
+              {/* Payout Amount Banner Card */}
+              <div className="rounded-2xl bg-[#EEF5FF] border border-blue-100/70 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {/* Left: Amount */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-blue-600 shadow-2xs border border-blue-100/60">
+                    <ShoppingBag size={20} strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-semibold text-gray-500">
+                      Payout Amount
+                    </span>
+                    <p className="text-2xl sm:text-[26px] font-black text-gray-950 leading-tight">
+                      ₹{selectedPayout.amount ? selectedPayout.amount.toLocaleString("en-IN") : "1,200"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Vertical Divider */}
+                <div className="hidden sm:block h-10 w-[1px] bg-blue-200/60 mx-1" />
+
+                {/* Right: Transferred to Bank */}
+                <div className="flex flex-col sm:items-end">
+                  <span className="text-[11px] font-medium text-gray-500">
+                    Transferred to
+                  </span>
+                  <p className="text-xs font-bold text-gray-800 leading-snug">
+                    {selectedPayout.bankName || "State Bank of India"}
+                  </p>
+                  <p className="text-xs font-semibold text-gray-500">
+                    {selectedPayout.accountNumber || "••••• 7842"}
+                  </p>
+                  <span className="mt-1 inline-flex items-center gap-1 rounded-lg bg-white px-2 py-0.5 text-[11px] font-bold text-blue-600 border border-blue-200/60 shadow-2xs w-fit">
+                    <Landmark size={11} strokeWidth={2.5} /> Payout to Bank
+                  </span>
+                </div>
+              </div>
+
+              {/* Payout Summary Card */}
+              <div className="rounded-2xl bg-[#F8FAFC] border border-gray-100/80 p-4 space-y-2.5">
+                <h4 className="text-sm font-bold text-gray-900">Payout Summary</h4>
+
+                {/* Total Sales Amount */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <span className="text-gray-500 font-medium">Total Sales Amount</span>
+                  <span className="font-bold text-gray-900">
+                    ₹{selectedPayout.totalSalesAmount ? selectedPayout.totalSalesAmount.toLocaleString("en-IN") : "1,800"}
+                  </span>
+                </div>
+
+                {/* Discount */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <span className="text-gray-500 font-medium">Discount</span>
+                  <span className="font-bold text-gray-700">
+                    - ₹{selectedPayout.discount ?? 300}
+                  </span>
+                </div>
+
+                {/* Your Earnings (70%) */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-gray-600 font-medium">Your Earnings (70%)</span>
+                    <Info
+                      size={13}
+                      className="text-gray-400 stroke-[2] cursor-pointer"
+                      onClick={() =>
+                        toast.info("Net earnings based on 70% partner revenue share.")
+                      }
+                    />
+                  </div>
+                  <span className="font-bold text-gray-900">
+                    ₹{selectedPayout.earnings ? selectedPayout.earnings.toLocaleString("en-IN") : "1,260"}
+                  </span>
+                </div>
+
+                {/* Previous Pending */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <span className="text-gray-500 font-medium">Previous Pending</span>
+                  <span className="font-bold text-gray-700">
+                    + ₹{selectedPayout.previousPending ?? 60}
+                  </span>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-gray-200/70" />
+
+                {/* Total Payout */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-gray-950">Total Payout</span>
+                  <span className="text-base sm:text-lg font-black text-gray-950">
+                    ₹{selectedPayout.amount ? selectedPayout.amount.toLocaleString("en-IN") : "1,200"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Related Orders Card */}
               <div
-                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                  selectedTimelineItem.type === "sale"
-                    ? "bg-[#EAF8F0] text-emerald-600"
-                    : "bg-[#EBF3FE] text-blue-600"
-                }`}
+                onClick={() => {
+                  setSelectedPayout(null);
+                  setSelectedSale(MOCK_SALES[0]);
+                }}
+                className="rounded-2xl bg-[#F8FAFC] border border-gray-100/80 p-3.5 flex items-center justify-between transition hover:bg-slate-100/70 cursor-pointer"
               >
-                {selectedTimelineItem.type === "sale" ? (
-                  <ShoppingBag size={20} strokeWidth={2.2} />
-                ) : (
-                  <Wallet size={20} strokeWidth={2.2} />
-                )}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FFF3ED] text-[#EA580C]">
+                    <FileText size={18} strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <p className="text-xs sm:text-sm font-bold text-gray-900">
+                      2 Orders Included
+                    </p>
+                    <p className="text-[11px] text-gray-400 font-medium">
+                      (Order #ATV1284, #ATV1277)
+                    </p>
+                  </div>
+                </div>
+
+                <ChevronRight size={16} className="text-gray-400" />
               </div>
-              <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-bold text-gray-900 truncate">
-                  {selectedTimelineItem.subtitle}
-                </h4>
-                <p className="text-xs text-gray-400">{selectedTimelineItem.time}</p>
+
+              {/* Additional Information Card */}
+              <div className="rounded-2xl bg-[#F8FAFC] border border-gray-100/80 p-4 space-y-3">
+                <h4 className="text-sm font-bold text-gray-900">Additional Information</h4>
+
+                {/* Bank Name */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <div className="flex items-center gap-3 text-gray-500 font-medium">
+                    <Landmark size={15} className="text-gray-400 stroke-[1.8] shrink-0" />
+                    <span>Bank Name</span>
+                  </div>
+                  <span className="font-bold text-gray-900">
+                    {selectedPayout.bankName || "State Bank of India"}
+                  </span>
+                </div>
+
+                {/* Account Number */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <div className="flex items-center gap-3 text-gray-500 font-medium">
+                    <CreditCard size={15} className="text-gray-400 stroke-[1.8] shrink-0" />
+                    <span>Account Number</span>
+                  </div>
+                  <span className="font-bold text-gray-900">
+                    {selectedPayout.accountNumber || "••••• 7842"}
+                  </span>
+                </div>
+
+                {/* IFSC */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <div className="flex items-center gap-3 text-gray-500 font-medium">
+                    <Receipt size={15} className="text-gray-400 stroke-[1.8] shrink-0" />
+                    <span>IFSC</span>
+                  </div>
+                  <span className="font-bold text-gray-900 font-mono text-xs">
+                    {selectedPayout.ifsc || "SBIN0001234"}
+                  </span>
+                </div>
+
+                {/* Payout Date */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <div className="flex items-center gap-3 text-gray-500 font-medium">
+                    <Calendar size={15} className="text-gray-400 stroke-[1.8] shrink-0" />
+                    <span>Payout Date</span>
+                  </div>
+                  <span className="font-bold text-gray-900">
+                    {selectedPayout.payoutDate || "16 Oct 2026, 09:15 AM"}
+                  </span>
+                </div>
               </div>
-              <span className="text-sm font-bold text-gray-900">
-                {selectedTimelineItem.isCredit ? "+" : "-"}₹{selectedTimelineItem.amount}
-              </span>
+
+              {/* Bottom Need Help Bar */}
+              <div
+                onClick={() => navigate("/help")}
+                className="flex items-center justify-between pt-2 pb-1 text-xs text-gray-600 hover:text-gray-900 cursor-pointer transition"
+              >
+                <div className="flex items-center gap-1.5">
+                  <HelpCircle size={15} className="text-gray-400 stroke-[2]" />
+                  <span>Need any help?</span>
+                  <span className="font-bold text-blue-600 hover:underline">
+                    Contact us
+                  </span>
+                </div>
+                <ChevronRight size={14} className="text-gray-400" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= SALE DETAILS MODAL (MATCHING REFERENCE IMAGE) ================= */}
+      {selectedSale && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedSale(null)}
+        >
+          <div
+            className="relative flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-[32px] sm:rounded-[32px] bg-white shadow-2xl overflow-hidden border-t sm:border border-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Drag Handle (Mobile) */}
+            <div className="flex shrink-0 justify-center pt-3 pb-1 sm:hidden">
+              <div className="h-1.5 w-12 rounded-full bg-gray-300" />
             </div>
 
-            <div className="mt-4 space-y-2 border-t border-gray-100 pt-3 text-xs">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Transaction Status</span>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 font-bold ${
-                    selectedTimelineItem.status === "Paid"
-                      ? "bg-emerald-50 text-emerald-600"
-                      : selectedTimelineItem.status === "Completed"
-                      ? "bg-blue-50 text-blue-600"
-                      : "bg-rose-50 text-rose-600"
-                  }`}
+            {/* Header: Title + Status Pill + Close button */}
+            <div className="shrink-0 px-5 pt-3 sm:px-6 sm:pt-5 pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-xl sm:text-[22px] font-extrabold text-gray-950 tracking-tight">
+                    Sale Details
+                  </h2>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                      selectedSale.status === "Paid"
+                        ? "bg-[#E8F8EE] text-[#16A34A] border border-emerald-100/60"
+                        : selectedSale.status === "Cancelled"
+                        ? "bg-[#FEECEB] text-[#DC2626] border border-red-100/60"
+                        : "bg-[#EBF3FE] text-[#2563EB] border border-blue-100/60"
+                    }`}
+                  >
+                    {selectedSale.status}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedSale(null)}
+                  className="rounded-full p-1.5 text-gray-700 hover:bg-gray-100 transition cursor-pointer"
+                  aria-label="Close modal"
                 >
-                  {selectedTimelineItem.status}
-                </span>
+                  <X size={20} className="stroke-[2.2]" />
+                </button>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Activity Type</span>
-                <span className="font-semibold text-gray-800 capitalize">
-                  {selectedTimelineItem.type}
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-gray-100 pt-2 font-bold text-sm">
-                <span>Total Impact</span>
-                <span className={selectedTimelineItem.isCredit ? "text-emerald-600" : "text-gray-900"}>
-                  {selectedTimelineItem.isCredit ? "+ " : "- "}₹{selectedTimelineItem.amount}
-                </span>
+
+              {/* Sub-header: Order No & Date + Milestone Pill */}
+              <div className="mt-1 flex items-center justify-between text-xs sm:text-[13px]">
+                <p className="text-gray-500 font-medium">
+                  Order {selectedSale.orderNo} <span className="mx-1">•</span>{" "}
+                  {selectedSale.orderDate || "16 Oct 2026, 11:24 AM"}
+                </p>
+
+                <div className="flex items-center gap-1.5 rounded-full bg-[#FFF3ED] px-2.5 py-0.5 text-xs font-bold text-[#EA580C] border border-orange-100">
+                  <BarChart2 size={13} className="stroke-[2.5]" />
+                  <span>{selectedSale.saleMilestone || "4th Sale"}</span>
+                </div>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                toast.success("Transaction verified on chain.");
-                setSelectedTimelineItem(null);
-              }}
-              className="mt-5 w-full rounded-xl bg-orange-500 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-orange-600 active:scale-95"
-            >
-              Close Details
-            </button>
+            {/* Scrollable Body Content */}
+            <div className="flex-1 overflow-y-auto px-5 sm:px-6 pb-6 space-y-3.5">
+              {/* Product Info Box */}
+              <div className="flex items-center justify-between gap-3 pt-1">
+                {/* Product Thumbnail + Title + SKU + Price & Qty */}
+                <div className="flex items-center gap-3 min-w-0">
+                  <img
+                    src={selectedSale.image}
+                    alt={selectedSale.productName}
+                    className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl object-cover border border-gray-100 shrink-0 shadow-xs"
+                  />
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-extrabold text-gray-900 leading-snug truncate">
+                      {selectedSale.productName}
+                    </h3>
+                    <p className="text-xs text-gray-400 font-medium mt-0.5">
+                      SKU: {selectedSale.sku || "HM-001"}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2 text-xs sm:text-[13px] font-bold text-gray-900">
+                      <span>₹{selectedSale.amount}</span>
+                      <span className="text-gray-300 font-normal">|</span>
+                      <span className="text-gray-500 font-medium">
+                        Qty: {selectedSale.quantity || 1}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Total Amount Box (Light Blue) */}
+                <div className="rounded-2xl bg-[#EEF5FF] px-4 py-3 text-center shrink-0 min-w-[110px] flex flex-col justify-center border border-blue-100/50">
+                  <span className="text-[11px] font-semibold text-gray-500">
+                    Total Amount
+                  </span>
+                  <span className="text-lg sm:text-xl font-extrabold text-gray-900 mt-0.5">
+                    ₹{selectedSale.amount}
+                  </span>
+                </div>
+              </div>
+
+              {/* Order Summary Box */}
+              <div className="rounded-2xl bg-[#F8FAFC] border border-gray-100/80 p-4 space-y-3">
+                <h4 className="text-sm font-bold text-gray-900">Order Summary</h4>
+
+                {/* Subtotal */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <span className="text-gray-500 font-medium">
+                    Subtotal ({selectedSale.quantity || 1} item)
+                  </span>
+                  <span className="font-bold text-gray-900">₹{selectedSale.amount}</span>
+                </div>
+
+                {/* Discount */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 font-medium">Discount</span>
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-600 border border-emerald-100/60">
+                      - ₹{selectedSale.discount ?? 50}
+                    </span>
+                  </div>
+                  <span className="font-bold text-gray-700">
+                    - ₹{selectedSale.discount ?? 50}
+                  </span>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-gray-200/70" />
+
+                {/* Total Billing */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-gray-900">Total Billing</span>
+                  <span className="text-sm sm:text-base font-extrabold text-gray-900">
+                    ₹{Math.max(0, selectedSale.amount - (selectedSale.discount ?? 50))}
+                  </span>
+                </div>
+
+                {/* Your Earnings Banner (Green Box) */}
+                <div className="flex items-center justify-between rounded-xl bg-[#ECFDF5] px-3.5 py-2.5 border border-emerald-100/80">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-emerald-900">
+                      Your Earnings (70%)
+                    </span>
+                    <Info
+                      size={13}
+                      className="text-emerald-700 stroke-[2] cursor-pointer"
+                      onClick={() =>
+                        toast.info("70% earnings based on CSP Creative Seller partner tier.")
+                      }
+                    />
+                  </div>
+                  <span className="text-sm sm:text-base font-extrabold text-emerald-600">
+                    ₹{Math.round(
+                      Math.max(0, selectedSale.amount - (selectedSale.discount ?? 50)) * 0.7
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Additional Information Box */}
+              <div className="rounded-2xl bg-[#F8FAFC] border border-gray-100/80 p-4 space-y-3.5">
+                <h4 className="text-sm font-bold text-gray-900">Additional Information</h4>
+
+                {/* Customer Name */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <div className="flex items-center gap-3 text-gray-500 font-medium">
+                    <User size={16} className="text-gray-400 stroke-[1.8] shrink-0" />
+                    <span>Customer Name</span>
+                  </div>
+                  <span className="font-bold text-gray-900">
+                    {selectedSale.buyerName || "Riya Sharma"}
+                  </span>
+                </div>
+
+                {/* Payment Method */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <div className="flex items-center gap-3 text-gray-500 font-medium">
+                    <CreditCard size={16} className="text-gray-400 stroke-[1.8] shrink-0" />
+                    <span>Payment Method</span>
+                  </div>
+                  <span className="font-bold text-gray-900">
+                    {selectedSale.paymentMethod || "Online Payment (UPI)"}
+                  </span>
+                </div>
+
+                {/* Payment Time */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <div className="flex items-center gap-3 text-gray-500 font-medium">
+                    <Clock size={16} className="text-gray-400 stroke-[1.8] shrink-0" />
+                    <span>Payment Time</span>
+                  </div>
+                  <span className="font-bold text-gray-900">
+                    {selectedSale.orderDate || "16 Oct 2026, 11:24 AM"}
+                  </span>
+                </div>
+
+                {/* Transaction ID */}
+                <div className="flex items-center justify-between text-xs sm:text-[13px]">
+                  <div className="flex items-center gap-3 text-gray-500 font-medium">
+                    <Receipt size={16} className="text-gray-400 stroke-[1.8] shrink-0" />
+                    <span>Transaction ID</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-gray-900 font-mono text-xs">
+                      {selectedSale.transactionId || "UPI32984756129"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const tid = selectedSale.transactionId || "UPI32984756129";
+                        navigator.clipboard?.writeText(tid);
+                        toast.success("Transaction ID copied to clipboard!");
+                      }}
+                      className="rounded p-0.5 text-gray-400 hover:text-gray-700 transition cursor-pointer"
+                      title="Copy Transaction ID"
+                    >
+                      <Copy size={14} className="stroke-[2]" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
