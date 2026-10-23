@@ -120,14 +120,6 @@ export default function ServiceScreen() {
         await handleCreateService(formData);
       }
       await fetchData();
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      await Swal.fire(
-        "Error",
-        err?.response?.data?.message ?? "Failed to save service.",
-        "error",
-      );
-      throw error;
     } finally {
       setLoading(false);
     }

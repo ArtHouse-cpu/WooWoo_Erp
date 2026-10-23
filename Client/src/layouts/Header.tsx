@@ -7,7 +7,6 @@ import {
   FilePlus2,
   Crown,
   CalendarPlus,
-  UserPlus,
   ClipboardList,
   CalendarCheck,
   Home,
@@ -355,16 +354,30 @@ export default function Header({
               <span className="hidden md:inline">POS BILL</span>
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setIsCreateLeadOpen(true)}
-            className="hidden items-center gap-2 rounded-xl bg-blue-50 p-2.5 text-xs font-semibold text-[#2F6FED] transition hover:bg-blue-100 sm:px-3.5 sm:py-2 md:inline-flex md:px-5 md:py-2.5 md:text-[13px]"
-            aria-label="Create Lead"
-            title="Create Lead"
-          >
-            <UserPlus size={19} />
-            <span className="hidden md:inline">Create Lead</span>
-          </button>
+          <div className="hidden h-[45px] items-center rounded-[10px] border border-gray-200 bg-white px-2 md:inline-flex">
+            <span className="whitespace-nowrap text-[15px] font-medium text-gray-900">
+              Leads
+            </span>
+            <div className="mx-3 h-8 w-px bg-gray-200" />
+            <button
+              type="button"
+              onClick={() => setIsCreateLeadOpen(true)}
+              className="inline-flex h-8 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700 transition hover:bg-blue-100"
+              aria-label="Create Lead"
+              title="Create Lead"
+            >
+              <Plus size={24} strokeWidth={1.8} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/leads")}
+              className="ml-2 inline-flex h-8 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700 transition hover:bg-blue-100"
+              aria-label="Lead List"
+              title="Lead List"
+            >
+              <List size={24} strokeWidth={1.8} />
+            </button>
+          </div>
           <button
             type="button"
             onClick={() =>

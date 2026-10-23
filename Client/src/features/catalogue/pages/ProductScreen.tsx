@@ -285,11 +285,12 @@ export default function ProductScreen() {
         await handleCreateProduct(formData);
       }
       await reloadFromStart();
+      setEditProduct(null);
     } catch (error) {
       console.error("Error saving product:", error);
+      throw error;
     } finally {
       setLoading(false);
-      setEditProduct(null);
     }
   };
 

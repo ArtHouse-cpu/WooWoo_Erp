@@ -183,9 +183,13 @@ export default function ProductForm() {
 <div className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-4">
   {/* Product Name */}
   <div >
-    <label className={labelClass}>
-      Product Name <span className="text-red-500">*</span>
-    </label>
+   <label className={labelClass}>
+  Product Name <span className="text-red-500">*</span>
+  <span className="text-sm text-gray-500 ml-2">
+    (Must be unique)
+  </span>
+</label>
+
     <input
       {...register("productName")}
       placeholder="e.g. Canvas Tote Bag"

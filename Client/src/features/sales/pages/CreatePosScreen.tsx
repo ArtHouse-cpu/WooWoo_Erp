@@ -814,12 +814,6 @@ export default function CreatePosScreen({
         "Product has been successfully added.",
         "success",
       );
-    } catch (e: any) {
-      Swal.fire(
-        "Error",
-        e?.response?.data?.message ?? "Could not create product.",
-        "error",
-      );
     } finally {
       setCreating(false);
     }

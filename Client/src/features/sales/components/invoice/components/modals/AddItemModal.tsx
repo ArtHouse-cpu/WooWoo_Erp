@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { X, Loader2, Package, Briefcase, AlertCircle } from "lucide-react";
 import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -125,6 +125,16 @@ const schema = baseSchema.superRefine((value, ctx) => {
   }
 });
 
+function readApiError(error: unknown) {
+  const err = error as {
+    response?: { data?: { message?: string } };
+    message?: string;
+  };
+  const message = String(err?.response?.data?.message || "").trim();
+  if (message) return message;
+  return "Could not save. Please try again.";
+}
+
 export type AddItemFormValues = z.infer<typeof baseSchema>;
 
 type Props = {
@@ -212,6 +222,7 @@ export default function AddItemModal({
   });
 
   const { handleSubmit, watch, formState, reset, setFocus } = methods;
+  const [submitError, setSubmitError] = useState("");
 
   const itemType = watch("type");
 
@@ -254,6 +265,7 @@ export default function AddItemModal({
 
   const submit = handleSubmit(async (values) => {
     if (loading) return;
+    setSubmitError("");
     const resolvedType = lockType || values.type;
     const normalizedVariants =
       resolvedType === "product" && Array.isArray(values.variants)
@@ -266,9 +278,6 @@ export default function AddItemModal({
             }))
             .filter((v) => v.name)
         : [];
-
-    // When variants exist, their prices are source of truth.
-    // Parent price stays optional; if empty, use first variant for catalogue defaults.
     let sellingPrice = Number(values.sellingPrice) || 0;
     let purchasePrice = Number(values.purchasePrice) || 0;
     if (normalizedVariants.length > 0) {
@@ -310,7 +319,14 @@ export default function AddItemModal({
         : "",
     );
     values.images.forEach((image: File) => payload.append("images", image));
-    await onSubmit(payload);
+    try {
+      await onSubmit(payload);
+    } catch (error) {
+      const message = readApiError(error);
+      setSubmitError(message);
+      await Swal.fire("Could not save", message, "error");
+      return;
+    }
     reset();
     onClose();
     Swal.fire(
@@ -412,13 +428,18 @@ export default function AddItemModal({
                 </div>
 
                 {/* Form Errors */}
-                {Object.values(formState.errors).length > 0 && (
+                {(submitError || Object.keys(formState.errors).length > 0) && (
                   <div className="flex animate-in fade-in slide-in-from-bottom-2 items-start rounded-xl border border-red-200 bg-red-50 p-4 shadow-sm">
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
                     <div className="ml-3">
-                      <h3 className="text-sm font-medium text-red-800">Please review the errors below</h3>
+                      <h3 className="text-sm font-medium text-red-800">
+                        {submitError ? "Could not save" : "Please review the errors below"}
+                      </h3>
                       <div className="mt-1 text-sm text-red-700">
-                        <p>{Object.values(formState.errors)[0]?.message as string}</p>
+                        <p>
+                          {submitError ||
+                            (Object.values(formState.errors)[0]?.message as string)}
+                        </p>
                       </div>
                     </div>
                   </div>
