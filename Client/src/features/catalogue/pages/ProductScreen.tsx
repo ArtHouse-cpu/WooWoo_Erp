@@ -98,7 +98,7 @@ export default function ProductScreen() {
   const [bulkImporting, setBulkImporting] = useState(false);
   const [editProduct, setEditProduct] = useState<any | null>(null);
   const [globalFilter, setGlobalFilter] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const search = String(globalFilter ?? "").trim();
   const [sorting, setSorting] = useState<MRT_SortingState>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -124,13 +124,6 @@ export default function ProductScreen() {
   const rowVirtualizerInstanceRef = useRef<MRT_RowVirtualizer>(null);
   const fetchLockRef = useRef(false);
   const requestIdRef = useRef(0);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      setDebouncedSearch(globalFilter.trim());
-    }, 800);
-    return () => window.clearTimeout(timeout);
-  }, [globalFilter]);
 
   const sortParams = useMemo(() => {
     const first = sorting[0];
@@ -161,7 +154,7 @@ export default function ProductScreen() {
         else setLoading(true);
 
         const prodRes = await handleGetProducts({
-          search: debouncedSearch,
+          search,
           type: "product",
           page: pageToLoad,
           limit: PAGE_SIZE,
@@ -231,7 +224,7 @@ export default function ProductScreen() {
         }
       }
     },
-    [debouncedSearch, sortParams.sortBy, sortParams.sortDir],
+    [search, sortParams.sortBy, sortParams.sortDir],
   );
 
   const reloadFromStart = useCallback(
@@ -632,7 +625,6 @@ export default function ProductScreen() {
       String(row._id || `${row.productName ?? "product"}-${index}`),
     enablePagination: false,
     enableColumnFilters: false,
-    // IMPORTANT: must not be conditional (see ENABLE_ROW_VIRTUALIZATION note)
     enableRowVirtualization: ENABLE_ROW_VIRTUALIZATION,
     enableGlobalFilter: true,
     manualFiltering: true,
@@ -683,7 +675,10 @@ export default function ProductScreen() {
       ref: tableContainerRef,
       sx: {
         maxWidth: "100%",
-        maxHeight: "min(70vh, 720px)",
+        maxHeight: {
+          xs: "calc(100dvh - 9.5rem)",
+          sm: "min(70vh, 720px)",
+        },
         overflowX: "auto",
         overflowY: "auto",
         WebkitOverflowScrolling: "touch",
@@ -693,54 +688,54 @@ export default function ProductScreen() {
     },
   });
 
-  // Remount MRT when the query changes so the virtualizer starts clean
-  // (avoids stale scroll metrics; does not toggle virtualization).
-  const tableMountKey = useMemo(
-    () =>
-      `products:${debouncedSearch}|${sortParams.sortBy}:${sortParams.sortDir}`,
-    [debouncedSearch, sortParams.sortBy, sortParams.sortDir],
-  );
-
   const cards = [
     {
       title: "Total Products",
+      short: "Products",
       value: stats.totalProducts || totalRowCount,
-      icon: <ShoppingBasket size={22} className="text-gray-500" />,
+      Icon: ShoppingBasket,
     },
     {
       title: "Products In Stock",
+      short: "Stock",
       value: stats.totalStockQty,
-      icon: <Boxes size={22} className="text-gray-500" />,
+      Icon: Boxes,
     },
     {
       title: "No of Categories",
+      short: "Categories",
       value: stats.categoryCount,
-      icon: <LayoutList size={22} className="text-gray-500" />,
+      Icon: LayoutList,
     },
     {
       title: "Products In",
+      short: "In",
       value: stats.inStockCount,
-      icon: <ArrowDownCircle size={22} className="text-gray-500" />,
+      Icon: ArrowDownCircle,
     },
     {
       title: "Products Out",
+      short: "Out",
       value: stats.outOfStockCount,
-      icon: <ArrowUpCircle size={22} className="text-gray-500" />,
+      Icon: ArrowUpCircle,
     },
   ];
 
   return (
     <div className="min-w-0 p-1">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold">Products List</h1>
-        <div className="flex flex-wrap gap-2 sm:gap-3">
+      <div className="mb-2 flex items-center justify-between gap-2 sm:mb-4">
+        <h1 className="min-w-0 truncate text-base font-semibold sm:text-xl">
+          Products List
+        </h1>
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <Can permission={PERMISSIONS.PRODUCT_CREATE}>
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="flex-1 rounded bg-black px-3 py-2 text-center text-[14px] font-semibold text-white transition cursor-pointer sm:flex-none sm:w-auto"
+              className="cursor-pointer rounded bg-black px-2 py-1 text-xs font-semibold text-white transition sm:px-3 sm:py-2 sm:text-[14px]"
             >
-              + Add Product
+              <span className="sm:hidden">+ Add</span>
+              <span className="hidden sm:inline">+ Add Product</span>
             </button>
           </Can>
           <Can
@@ -749,9 +744,10 @@ export default function ProductScreen() {
             <button
               type="button"
               onClick={() => setBulkCreateModal(true)}
-              className="flex-1 rounded bg-black px-3 py-2 text-center text-[14px] font-semibold text-white transition cursor-pointer sm:flex-none sm:w-auto"
+              className="cursor-pointer rounded bg-black px-2 py-1 text-xs font-semibold text-white transition sm:px-3 sm:py-2 sm:text-[14px]"
             >
-              + Bulk Upload
+              <span className="sm:hidden">+ Bulk</span>
+              <span className="hidden sm:inline">+ Bulk Upload</span>
             </button>
           </Can>
 
@@ -822,22 +818,26 @@ export default function ProductScreen() {
           )}
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-3">
-        {cards.map((item, index) => (
+      <div className="mb-2 grid grid-cols-5 gap-1 sm:mb-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-5">
+        {cards.map((item) => (
           <div
-            key={index}
-            className="bg-white rounded-xl border border-gray-200 p-4  hover:shadow-sm transition duration-300 cursor-pointer"
+            key={item.title}
+            className="min-w-0 rounded-md border border-gray-200 bg-white px-1 py-1 sm:rounded-xl sm:p-4"
           >
-            <div className="flex items-center gap-2 text-gray-600">
-              {item.icon}
-              <span className="font-medium">{item.title}</span>
+            <div className="flex min-w-0 items-center gap-1 text-gray-600 sm:gap-2">
+              <item.Icon className="h-3 w-3 shrink-0 text-gray-500 sm:h-[22px] sm:w-[22px]" />
+              <span className="min-w-0 truncate text-[10px] font-medium leading-tight sm:text-base">
+                <span className="sm:hidden">{item.short}</span>
+                <span className="hidden sm:inline">{item.title}</span>
+              </span>
             </div>
-
-            <div className="mt-3 text-2xl font-semibold">{item.value}</div>
+            <div className="mt-0.5 truncate text-sm font-semibold leading-tight sm:mt-3 sm:text-2xl">
+              {item.value}
+            </div>
           </div>
         ))}
       </div>
-      <MaterialReactTable key={tableMountKey} table={table} />
+      <MaterialReactTable table={table} />
     </div>
   );
 }
