@@ -37,6 +37,7 @@ import {
   handleUpdateCsp,
   type CspEnrollment,
 } from "@/services/apiClient";
+import ApproveCSPModal from "../components/ApproveCSPModal";
 
 type CustomerOption = {
   _id: string;
@@ -75,6 +76,13 @@ export type ApplicationRow = {
   avatarBg: string;
   avatarText: string;
   avatarBorder: string;
+  sellingBefore?: string;
+  sellingNote?: string;
+  membershipLabel?: string;
+  membershipStatus?: string;
+  activatedAt?: string;
+  customerSince?: string;
+  submittedAt?: string;
 };
 
 const enrollmentCustomerId = (row: CspEnrollment): string => {
@@ -286,14 +294,21 @@ const INITIAL_APPLICATIONS: ApplicationRow[] = [
     id: "app-1",
     name: "Aditi Sharma",
     email: "aditi.sharma@email.com",
-    brandName: "Artly Studio",
+    brandName: "Arty Studio",
     phoneNumber: "+91 98765 43210",
-    prositeUrl: "atives.in/artlystudio",
+    prositeUrl: "atives.in/artystudio",
     status: "pending",
     avatarInitials: "AS",
     avatarBg: "bg-rose-100",
     avatarText: "text-rose-700",
     avatarBorder: "border-rose-200",
+    sellingBefore: "Yes",
+    sellingNote: "On Instagram and local exhibitions",
+    membershipLabel: "Premium Membership",
+    membershipStatus: "Active",
+    activatedAt: "15 Oct 2026, 04:32 PM",
+    customerSince: "15 Oct 2026",
+    submittedAt: "16 Oct 2026, 11:24 AM",
   },
   {
     id: "app-2",
@@ -572,6 +587,8 @@ export default function CspScreen() {
   const [enrolling, setEnrolling] = useState(false);
   const [showEnroll, setShowEnroll] = useState(false);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [openApproveModal, setOpenApproveModal] = useState(false);
+  const [approveTarget, setApproveTarget] = useState<ApplicationRow | null>(null);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [enrolledCustomerIds, setEnrolledCustomerIds] = useState<Set<string>>(
     () => new Set(),
@@ -1040,29 +1057,18 @@ export default function CspScreen() {
     filteredApplications.length,
   );
 
-  // Application Action Handlers (Pure Frontend UI)
-  const handleApproveApplication = async (app: ApplicationRow) => {
-    const result = await Swal.fire({
-      title: "Approve Application?",
-      text: `Are you sure you want to approve ${app.name} (${app.brandName}) as a CSP Partner?`,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonColor: "#ff5a36",
-      cancelButtonColor: "#94a3b8",
-      confirmButtonText: "Yes, Approve",
-      cancelButtonText: "Cancel",
+  const handleApproveCSP = () => {
+    if (!approveTarget) return;
+    const approved = approveTarget;
+    setApplications((prev) => prev.filter((row) => row.id !== approved.id));
+    setApproveTarget(null);
+    Swal.fire({
+      icon: "success",
+      title: "Application Approved!",
+      text: `${approved.name} has been approved as an active partner.`,
+      timer: 2000,
+      showConfirmButton: false,
     });
-
-    if (result.isConfirmed) {
-      setApplications((prev) => prev.filter((a) => a.id !== app.id));
-      Swal.fire({
-        icon: "success",
-        title: "Application Approved!",
-        text: `${app.name} has been approved as an active partner.`,
-        timer: 2000,
-        showConfirmButton: false,
-      });
-    }
   };
 
   // Open the Reject Modal on clicking Reject
@@ -1901,7 +1907,10 @@ export default function CspScreen() {
                             {/* Approve */}
                             <button
                               type="button"
-                              onClick={() => handleApproveApplication(app)}
+                              onClick={() => {
+                                setApproveTarget(app);
+                                setOpenApproveModal(true);
+                              }}
                               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-200/50 hover:bg-emerald-100 transition-colors cursor-pointer shadow-2xs active:scale-98"
                             >
                               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
@@ -1926,6 +1935,7 @@ export default function CspScreen() {
               </tbody>
             </table>
           )}
+          
         </div>
 
         {/* ── 6. Pagination Bar ──────────────────────────────────────── */}
@@ -2465,6 +2475,18 @@ export default function CspScreen() {
           </div>
         </div>
       )}
+      <ApproveCSPModal
+        isOpen={openApproveModal}
+        application={approveTarget}
+        onClose={() => {
+          setOpenApproveModal(false);
+          setApproveTarget(null);
+        }}
+        onApprove={handleApproveCSP}
+        onReject={() => {
+          if (approveTarget) handleOpenRejectModal(approveTarget);
+        }}
+      />
     </div>
   );
 }
