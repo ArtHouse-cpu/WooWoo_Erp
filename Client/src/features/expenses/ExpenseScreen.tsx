@@ -69,12 +69,13 @@ type ExpenseCategory =
   | "Other"
   | "Store"
   | "Cafe"
+  |"Services"
   | "Space"
   | "Events"
   | "Admin"
   | "General";
 
-type Segments = "Store" | "Cafe" | "Services" | "Space" | "general" | "Admin" | "Events";
+type Segments = "Store" | "Cafe" | "Services" | "Space" | "general" | "Events";
 
 type ExpenseStatus = "Paid" | "Pending" | "Cancelled";
 type PaymentMode = "Cash" | "UPI" | "Card" | "Bank Transfer" | "Wallet" | "Due";
@@ -119,9 +120,9 @@ const CATEGORIES: ExpenseCategory[] = [
   "Other",
   "Store",
   "Cafe",
+  "Services",
   "Space",
   "Events",
-  "Admin",
   "General",
 ];
 
@@ -131,7 +132,6 @@ const SEGMENTS: Segments[] = [
   "Services",
   "Space",
   "general",
-  "Admin",
   "Events",
 ];
 
@@ -325,7 +325,7 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
   Cafe: { bg: "bg-orange-50", text: "text-orange-700" },
   Space: { bg: "bg-amber-50", text: "text-amber-800" },
   Events: { bg: "bg-rose-50", text: "text-rose-700" },
-  Admin: { bg: "bg-purple-50", text: "text-purple-700" },
+  Sercices: { bg: "bg-purple-50", text: "text-purple-700" },
   General: { bg: "bg-purple-50", text: "text-purple-700" },
   general: { bg: "bg-purple-50", text: "text-purple-700" },
   Rent: { bg: "bg-indigo-50", text: "text-indigo-700" },
@@ -364,7 +364,7 @@ const BENCHMARK_BREAKDOWN = [
   { name: "Cafe", amount: 29900, color: "#10b981", pct: 24 },
   { name: "Space", amount: 22410, color: "#f59e0b", pct: 18 },
   { name: "Events", amount: 14950, color: "#f97316", pct: 12 },
-  { name: "Admin", amount: 9960, color: "#8b5cf6", pct: 8 },
+   { name: "Services", amount: 9960, color: "#8b5cf6", pct: 8 },
   { name: "General", amount: 7740, color: "#94a3b8", pct: 6 },
 ];
 
@@ -413,7 +413,7 @@ export default function ExpenseScreen() {
   const [expenseFormKey, setExpenseFormKey] = useState(0);
   const [receivePaymentOpen, setReceivePaymentOpen] = useState(false);
   const [receivePaymentTarget, setReceivePaymentTarget] = useState<ExpensePaymentTarget | null>(null);
-  const [selectedActionRow, setSelectedActionRow] = useState<ExpenseRow | null>(null);
+  // const [selectedActionRow, setSelectedActionRow] = useState<ExpenseRow | null>(null);
 
   const actionMenuRef = useRef<HTMLDivElement>(null);
 
@@ -682,68 +682,68 @@ export default function ExpenseScreen() {
   // Tab definitions with dynamic counters
   const TABS = useMemo(
     () => [
-      { id: "all", label: "All", icon: Sparkles, count: rows.length || 67 },
+      { id: "all", label: "All", icon: Sparkles, count: rows.length || 0},
       {
         id: "Store",
         label: "Store",
         icon: ShoppingBag,
-        count: rows.filter((r) => r.segment === "Store" || r.category === "Store").length || 18,
+        count: rows.filter((r) => r.segment === "Store" || r.category === "Store").length ||0,
       },
       {
         id: "Cafe",
         label: "Cafe",
         icon: Coffee,
-        count: rows.filter((r) => r.segment === "Cafe" || r.category === "Cafe").length || 12,
+        count: rows.filter((r) => r.segment === "Cafe" || r.category === "Cafe").length || 0,
       },
       {
         id: "Space",
         label: "Space",
         icon: CalendarDays,
-        count: rows.filter((r) => r.segment === "Space" || r.category === "Space").length || 10,
+        count: rows.filter((r) => r.segment === "Space" || r.category === "Space").length || 0,
+      },
+      {
+        id: "Services",
+        label: "Services",
+        icon: Settings,
+        count: rows.filter((r) => r.segment === "Services" || r.category === "Services").length || 0,
       },
       {
         id: "Events",
         label: "Events",
         icon: Ticket,
-        count: rows.filter((r) => r.segment === "Events" || r.category === "Events").length || 8,
-      },
-      {
-        id: "Admin",
-        label: "Admin",
-        icon: Settings,
-        count: rows.filter((r) => r.segment === "Admin" || r.category === "Admin").length || 9,
+        count: rows.filter((r) => r.segment === "Events" || r.category === "Events").length || 0,
       },
       {
         id: "general",
         label: "General",
         icon: MessageSquare,
-        count: rows.filter((r) => r.segment === "general" || r.category === "General").length || 10,
+        count: rows.filter((r) => r.segment === "general" || r.category === "General").length || 0,
       },
     ],
     [rows],
   );
 
   // Export to Excel
-  const handleExport = () => {
-    const dataToExport = sortedData.map((r, i) => ({
-      "#": i + 1,
-      "Expense Code": r.expenseCode,
-      Title: r.title,
-      Category: r.category,
-      Segment: r.segment,
-      "Amount (₹)": r.amount,
-      Vendor: r.paidTo,
-      Mode: r.mode,
-      Status: r.status,
-      Date: r.date,
-      Notes: r.notes,
-    }));
+  // const handleExport = () => {
+  //   const dataToExport = sortedData.map((r, i) => ({
+  //     "#": i + 1,
+  //     "Expense Code": r.expenseCode,
+  //     Title: r.title,
+  //     Category: r.category,
+  //     Segment: r.segment,
+  //     "Amount (₹)": r.amount,
+  //     Vendor: r.paidTo,
+  //     Mode: r.mode,
+  //     Status: r.status,
+  //     Date: r.date,
+  //     Notes: r.notes,
+  //   }));
 
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Expenses");
-    XLSX.writeFile(wb, `Expenses_${new Date().toISOString().slice(0, 10)}.xlsx`);
-  };
+  //   const ws = XLSX.utils.json_to_sheet(dataToExport);
+  //   const wb = XLSX.utils.book_new();
+  //   XLSX.utils.book_append_sheet(wb, ws, "Expenses");
+  //   XLSX.writeFile(wb, `Expenses_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  // };
 
   const checkoutItems = useMemo(
     () =>
@@ -778,9 +778,6 @@ export default function ExpenseScreen() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
             Expenses
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Track and manage all your business expenses across stores, cafe, space, events and more.
-          </p>
         </div>
 
         <Can permission={PERMISSIONS.EXPENSE_CREATE}>
@@ -1113,7 +1110,7 @@ export default function ExpenseScreen() {
           </div>
 
           {/* Export Button */}
-          <button
+          {/* <button
             type="button"
             onClick={handleExport}
             title="Export as Excel"
@@ -1121,7 +1118,7 @@ export default function ExpenseScreen() {
           >
             <Download className="h-3.5 w-3.5 text-slate-500" />
             <span>Export</span>
-          </button>
+          </button> */}
         </div>
       </div>
 

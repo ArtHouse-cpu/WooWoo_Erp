@@ -97,7 +97,7 @@ const CATEGORY_OPTIONS = [
   "Travel",
   "Other",
 ];
-const SEGMENT_OPTIONS = ["Store", "Cafe", "Services", "Space", "general"];
+const SEGMENT_OPTIONS = ["Store", "Cafe", "Services", "Space", "Events","general"];
 
 const MODE_OPTIONS = ["Cash", "UPI", "Card", "Bank Transfer", "Wallet", "Due"];
 const STATUS_OPTIONS = ["Paid", "Pending", "Cancelled"];
