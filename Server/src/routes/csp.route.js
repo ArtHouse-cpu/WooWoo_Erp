@@ -6,6 +6,10 @@ import {
 } from "../middlewares/authorize.middleware.js";
 import {PERMISSIONS} from "../constants/permissions.js";
 import {enrollCsp, getCSP, updateCsp} from "../controllers/csp.controller.js";
+import {
+  listCspApplications,
+  reviewCspApplication,
+} from "../controllers/cspApplication.controller.js";
 
 const router = express.Router();
 
@@ -26,10 +30,22 @@ router.post(
   requireAnyPermission(PERMISSIONS.CSP_WRITE, PERMISSIONS.CUSTOMER_CREATE),
   enrollCsp,
 );
+router.get(
+  "/applications",
+  requireAnyPermission(PERMISSIONS.CSP_READ, PERMISSIONS.CUSTOMER_READ),
+  listCspApplications,
+);
+router.patch(
+  "/applications/:id",
+  requireAnyPermission(PERMISSIONS.CSP_WRITE, PERMISSIONS.CUSTOMER_UPDATE),
+  reviewCspApplication,
+);
 router.patch(
   "/:id",
   requireAnyPermission(PERMISSIONS.CSP_WRITE, PERMISSIONS.CUSTOMER_UPDATE),
   updateCsp,
 );
 
+
+// router.get("/enroll",getEnrollment);
 export default router;

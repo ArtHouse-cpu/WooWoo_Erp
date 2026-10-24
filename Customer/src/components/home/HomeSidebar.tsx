@@ -12,12 +12,14 @@ import {
   ShoppingBag,
   Sparkles,
   Star,
+  Store,
   User,
   X,
 } from 'lucide-react';
 import {BrandMark} from '../auth/AuthShell';
 import {useAuthStore} from '../../store/authStore';
 import {authApi} from '../../services/auth.service';
+import {useCspApplication} from '../../hooks/useCspApplication';
 
 type HomeSidebarProps = {
   open: boolean;
@@ -38,6 +40,16 @@ export function HomeSidebar({open, onClose}: HomeSidebarProps) {
   const navigate = useNavigate();
   const customer = useAuthStore(s => s.customer);
   const logout = useAuthStore(s => s.logout);
+  const {application} = useCspApplication();
+  const menuItems =
+    application?.status === 'approved'
+      ? [
+          navItems[0],
+          navItems[1],
+          {to: '/csp-program', label: 'CSP Program', icon: Store},
+          ...navItems.slice(2),
+        ]
+      : navItems;
   const firstName = (customer?.name || 'Creator').split(' ')[0];
   const initial = (customer?.name || 'C').charAt(0).toUpperCase();
 
@@ -134,7 +146,7 @@ export function HomeSidebar({open, onClose}: HomeSidebarProps) {
             Menu
           </p>
           <ul className="space-y-1">
-            {navItems.map(item => (
+            {menuItems.map(item => (
               <li key={item.label}>
                 {item.soft ? (
                   <button

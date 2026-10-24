@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 import {DashboardSidebar} from '../../components/dashboard/DashboardSidebar';
 import {TopNavbar, MobileHeader} from '../../components/dashboard/TopNavbar';
 import {HeroBanner, ProfileAsideCard} from '../../components/dashboard/HeroBanner';
@@ -19,8 +20,11 @@ import {VisitBottomSheet} from '../../components/dashboard/VisitBottomSheet';
 import {ShareBottomSheet} from '../../components/dashboard/ShareBottomSheet';
 import {NotificationsBottomSheet} from '../../components/dashboard/NotificationsBottomSheet';
 import {ProgramsBottomSheet} from '../../components/dashboard/ProgramsBottomSheet';
+import {useCspApplication} from '../../hooks/useCspApplication';
 
 export default function HomePage() {
+  const navigate = useNavigate();
+  const {application, loaded} = useCspApplication();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [suppliesOpen, setSuppliesOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
@@ -61,6 +65,11 @@ export default function HomePage() {
     } else if (id === 'cafe') {
       setWoofooOpen(true);
     } else if (id === 'programs') {
+      if (!loaded) return;
+      if (application?.status === 'approved' || application?.status === 'rejected' || application?.status === 'under_review') {
+        navigate('/programs');
+        return;
+      }
       handleProgramClick('csp');
     }
   };

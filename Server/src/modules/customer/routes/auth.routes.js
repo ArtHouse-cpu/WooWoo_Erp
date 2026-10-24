@@ -31,12 +31,23 @@ import {getCustomerSpaceAvailability} from '../../../controllers/spaceBooking.co
 import {
   getCustomerProductById,
   getCustomerProducts,
+  upload,
 } from '../../../controllers/product.controller.js';
 import {
   getMyActivity,
   getMyActivityDetail,
   getMyActivityInsights,
 } from '../controllers/activity.controller.js';
+import {
+  applyCsp,
+  getMyCspApplication,
+} from '../../../controllers/cspApplication.controller.js';
+import {
+  createMyCspProduct,
+  deleteMyCspProduct,
+  listMyCspProducts,
+  updateMyCspProduct,
+} from '../../../controllers/cspProduct.controller.js';
 import {validateRequest} from '../middlewares/validateRequest.js';
 import {
   authenticateCustomer,
@@ -110,6 +121,44 @@ router.get('/product', getCustomerProducts);
 router.get('/product/:id', getCustomerProductById);
 
 router.get('/me', authenticateCustomer, authorizeCustomer('active'), me);
+router.get(
+  '/csp/application',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  getMyCspApplication,
+);
+router.post(
+  '/csp/apply',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  applyCsp,
+);
+router.get(
+  '/csp/products',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  listMyCspProducts,
+);
+router.post(
+  '/csp/products',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  upload.single('image'),
+  createMyCspProduct,
+);
+router.patch(
+  '/csp/products/:id',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  upload.single('image'),
+  updateMyCspProduct,
+);
+router.delete(
+  '/csp/products/:id',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  deleteMyCspProduct,
+);
 router.get(
   '/referral',
   authenticateCustomer,

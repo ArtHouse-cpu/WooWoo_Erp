@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronLeft,
@@ -22,7 +22,6 @@ import {
   FileText,
   HelpCircle,
   Headset,
-  ArrowUpRight,
   BarChart2,
   Share2,
   Pencil,
@@ -33,10 +32,14 @@ import {
   List,
   Search,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardSidebar } from "../../components/dashboard/DashboardSidebar";
 import { TopNavbar } from "../../components/dashboard/TopNavbar";
+import { CspJoinModal } from "../../components/dashboard/CspJoinModal";
+import { useCspApplication } from "../../hooks/useCspApplication";
+import { cspProductApi } from "../../services/csp.service";
 
 // ================= TYPES =================
 export interface ProgramProduct {
@@ -46,6 +49,8 @@ export interface ProgramProduct {
   stock: number;
   image: string;
   category?: string;
+  offerType?: "percent" | "flat";
+  offerValue?: number;
 }
 
 export interface ProgramSale {
@@ -93,323 +98,227 @@ export interface ProgramTimelineGroup {
   items: ProgramTimelineEntry[];
 }
 
+const PRODUCT_CATEGORIES = [
+  "Art Supplies",
+  "Home Decor",
+  "Fashion",
+  "Handmade Crafts",
+  "Pottery & Ceramics",
+  "Jewellery & Accessories",
+  "Stationery & Journals",
+  "Paintings & Canvas",
+  "Toys & Dolls",
+  "Candles & Fragrances",
+  "Gift Hampers",
+  "Prints & Digital Art",
+  "Clothing & Apparel",
+  "Organic Goods",
+];
+
+type DiscountType = "percent" | "flat";
+
+function readOffer(
+  price: number,
+  type: DiscountType,
+  raw: string,
+): { error?: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+  const value = Number(trimmed);
+  if (!Number.isFinite(value) || value <= 0) {
+    return { error: "Enter a discount greater than 0." };
+  }
+  if (type === "percent" && value > 100) {
+    return { error: "Percent discount cannot be more than 100." };
+  }
+  if (type === "flat" && value >= price) {
+    return { error: "Flat discount must be less than the price." };
+  }
+  return {};
+}
+
+function offeredPrice(product: Pick<ProgramProduct, "price" | "offerType" | "offerValue">) {
+  if (!product.offerType || !product.offerValue) return product.price;
+  if (product.offerType === "percent") {
+    return Math.max(0, Math.round((product.price * (100 - product.offerValue)) / 100));
+  }
+  return Math.max(0, product.price - product.offerValue);
+}
+
+function offerLabel(product: Pick<ProgramProduct, "offerType" | "offerValue">) {
+  if (!product.offerType || !product.offerValue) return "";
+  return product.offerType === "percent"
+    ? `${product.offerValue}% off`
+    : `₹${product.offerValue} off`;
+}
+
+function ProductOfferField({
+  price,
+  discountType,
+  offerValue,
+  onTypeChange,
+  onValueChange,
+}: {
+  price: string;
+  discountType: DiscountType;
+  offerValue: string;
+  onTypeChange: (type: DiscountType) => void;
+  onValueChange: (value: string) => void;
+}) {
+  const parsed = readOffer(Number(price) || 0, discountType, offerValue);
+  const payable =
+    !parsed.error && offerValue.trim() && Number(price) > 0
+      ? offeredPrice({
+          price: Number(price),
+          offerType: discountType,
+          offerValue: Number(offerValue),
+        })
+      : null;
+
+  return (
+    <div>
+      <label className="block text-xs font-bold text-gray-700">Discount</label>
+      <div className="mt-1.5 flex items-center gap-3">
+        <div className="flex shrink-0 rounded-lg border border-gray-200 bg-gray-50 p-1">
+          <button
+            type="button"
+            onClick={() => onTypeChange("percent")}
+            className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${
+              discountType === "percent"
+                ? "bg-orange-500 text-white"
+                : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            %
+          </button>
+          <button
+            type="button"
+            onClick={() => onTypeChange("flat")}
+            className={`rounded-md px-3 py-1.5 text-xs font-bold transition ${
+              discountType === "flat"
+                ? "bg-orange-500 text-white"
+                : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            Flat
+          </button>
+        </div>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          placeholder={discountType === "percent" ? "10" : "50"}
+          value={offerValue}
+          onChange={(event) => onValueChange(event.target.value)}
+          className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3.5 py-2 text-sm outline-none focus:border-orange-500"
+        />
+      </div>
+      <p className="mt-1.5 text-[11px] text-gray-400">
+        {discountType === "percent"
+          ? "Optional. Percent off the price."
+          : "Optional. Rupees off the price."}
+      </p>
+      {parsed.error ? (
+        <p className="mt-1 text-[11px] font-semibold text-rose-500">{parsed.error}</p>
+      ) : payable !== null ? (
+        <p className="mt-1 text-[11px] font-semibold text-emerald-600">
+          Offer price ₹{payable.toLocaleString("en-IN")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function ProductImageField({
+  image,
+  onFile,
+  onClear,
+}: {
+  image: string;
+  onFile: (file?: File) => void;
+  onClear: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  return (
+    <div>
+      <span className="block text-xs font-bold text-gray-700">Product Image</span>
+      {image ? (
+        <div className="mt-1 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50">
+          <img
+            src={image}
+            alt="Selected product"
+            className="h-44 w-full object-cover"
+          />
+          <div className="flex items-center justify-between gap-2 border-t border-gray-100 bg-white px-3 py-2">
+            <span className="text-xs font-medium text-gray-500">Image ready</span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="text-xs font-bold text-orange-600 hover:text-orange-700"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                onClick={onClear}
+                className="text-xs font-bold text-gray-500 hover:text-gray-800"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragOver(false);
+            onFile(event.dataTransfer.files?.[0]);
+          }}
+          className={`mt-1 flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed px-4 py-8 text-center transition ${
+            dragOver
+              ? "border-orange-500 bg-orange-50"
+              : "border-gray-300 bg-[#FFF9F5] hover:border-orange-400"
+          }`}
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-100 text-orange-600">
+            <Upload size={18} />
+          </span>
+          <span className="text-sm font-semibold text-gray-900">
+            Upload product image
+          </span>
+          <span className="text-xs text-gray-500">
+            Click or drop a JPG or PNG, up to 2 MB
+          </span>
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(event) => {
+          onFile(event.target.files?.[0]);
+          event.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
+
 type TabType = "products" | "sales" | "timeline";
 type ViewMode = "list" | "grid";
 type TimeFilter = "Today" | "This Week" | "This Month" | "Last Month" | "All Time";
-
-// ================= INITIAL 5 MOCK PRODUCTS =================
-const INITIAL_PRODUCTS: ProgramProduct[] = [
-  {
-    id: "p-1",
-    name: "Handpainted Mug",
-    price: 499,
-    stock: 24,
-    category: "Ceramics",
-    image:
-      "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=400&q=80",
-  },
-  {
-    id: "p-2",
-    name: "Art Tote Bag",
-    price: 699,
-    stock: 15,
-    category: "Fashion",
-    image:
-      "https://images.unsplash.com/photo-1597484662317-9bd7bdda2907?auto=format&fit=crop&w=400&q=80",
-  },
-  {
-    id: "p-3",
-    name: "Canvas Wall Art",
-    price: 1299,
-    stock: 8,
-    category: "Paintings",
-    image:
-      "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=400&q=80",
-  },
-  {
-    id: "p-4",
-    name: "Sticker Pack",
-    price: 199,
-    stock: 50,
-    category: "Stationery",
-    image:
-      "https://images.unsplash.com/photo-1589384267710-7a25be11b7df?auto=format&fit=crop&w=400&q=80",
-  },
-  {
-    id: "p-5",
-    name: "Scented Candle (Handpainted)",
-    price: 399,
-    stock: 12,
-    category: "Home Decor",
-    image:
-      "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=400&q=80",
-  },
-];
-
-// ================= 8 MOCK SALES (MATCHING REFERENCE IMAGE) =================
-const MOCK_SALES: ProgramSale[] = [
-  {
-    id: "s-1",
-    orderNo: "#ATV1284",
-    productName: "Handpainted Mug",
-    timeAgo: "2 hours ago",
-    orderDate: "16 Oct 2026, 11:24 AM",
-    amount: 499,
-    quantity: 1,
-    sku: "HM-001",
-    discount: 50,
-    saleMilestone: "4th Sale",
-    status: "Paid",
-    image:
-      "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=400&q=80",
-    buyerName: "Riya Sharma",
-    paymentMethod: "Online Payment (UPI)",
-    transactionId: "UPI32984756129",
-    commission: 50,
-  },
-  {
-    id: "s-2",
-    orderNo: "#ATV1283",
-    productName: "Art Tote Bag",
-    timeAgo: "5 hours ago",
-    orderDate: "16 Oct 2026, 08:15 AM",
-    amount: 699,
-    quantity: 1,
-    sku: "TB-042",
-    discount: 50,
-    saleMilestone: "3rd Sale",
-    status: "Paid",
-    image:
-      "https://images.unsplash.com/photo-1597484662317-9bd7bdda2907?auto=format&fit=crop&w=400&q=80",
-    buyerName: "Priya Patel",
-    paymentMethod: "Credit Card (Visa)",
-    transactionId: "CC9182374619",
-    commission: 70,
-  },
-  {
-    id: "s-3",
-    orderNo: "#ATV1282",
-    productName: "Sticker Pack",
-    timeAgo: "1 day ago",
-    orderDate: "15 Oct 2026, 04:30 PM",
-    amount: 199,
-    quantity: 1,
-    sku: "SP-108",
-    discount: 20,
-    saleMilestone: "2nd Sale",
-    status: "Paid",
-    image:
-      "https://images.unsplash.com/photo-1589384267710-7a25be11b7df?auto=format&fit=crop&w=400&q=80",
-    buyerName: "Rohan Verma",
-    paymentMethod: "Online Payment (UPI)",
-    transactionId: "UPI98234102941",
-    commission: 20,
-  },
-  {
-    id: "s-4",
-    orderNo: "#ATV1281",
-    productName: "Scented Candle (Handpainted)",
-    timeAgo: "2 days ago",
-    orderDate: "14 Oct 2026, 02:10 PM",
-    amount: 399,
-    quantity: 1,
-    sku: "SC-005",
-    discount: 40,
-    saleMilestone: "1st Sale",
-    status: "Paid",
-    image:
-      "https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=400&q=80",
-    buyerName: "Ananya Iyer",
-    paymentMethod: "Online Payment (UPI)",
-    transactionId: "UPI44512984022",
-    commission: 40,
-  },
-  {
-    id: "s-5",
-    orderNo: "#ATV1280",
-    productName: "Canvas Wall Art",
-    timeAgo: "2 days ago",
-    orderDate: "14 Oct 2026, 11:00 AM",
-    amount: 1299,
-    quantity: 1,
-    sku: "WA-204",
-    discount: 0,
-    saleMilestone: "Cancelled",
-    status: "Cancelled",
-    image:
-      "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=400&q=80",
-    buyerName: "Vikram Malhotra",
-    paymentMethod: "NetBanking",
-    transactionId: "NB1029481239",
-    commission: 0,
-  },
-  {
-    id: "s-6",
-    orderNo: "#ATV1279",
-    productName: "Resin Keychain",
-    timeAgo: "3 days ago",
-    orderDate: "13 Oct 2026, 06:45 PM",
-    amount: 299,
-    quantity: 1,
-    sku: "RK-012",
-    discount: 30,
-    saleMilestone: "5th Sale",
-    status: "Paid",
-    image:
-      "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=400&q=80",
-    buyerName: "Sneha Nair",
-    paymentMethod: "Online Payment (UPI)",
-    transactionId: "UPI77129481023",
-    commission: 30,
-  },
-  {
-    id: "s-7",
-    orderNo: "#ATV1278",
-    productName: "Mini Art Print",
-    timeAgo: "4 days ago",
-    orderDate: "12 Oct 2026, 03:20 PM",
-    amount: 249,
-    quantity: 1,
-    sku: "AP-088",
-    discount: 25,
-    saleMilestone: "6th Sale",
-    status: "Paid",
-    image:
-      "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=400&q=80",
-    buyerName: "Karan Mehta",
-    paymentMethod: "Credit Card (Mastercard)",
-    transactionId: "CC1928374619",
-    commission: 25,
-  },
-  {
-    id: "s-8",
-    orderNo: "#ATV1277",
-    productName: "Macrame Wall Hanging",
-    timeAgo: "5 days ago",
-    orderDate: "11 Oct 2026, 01:15 PM",
-    amount: 899,
-    quantity: 1,
-    sku: "MW-003",
-    discount: 0,
-    saleMilestone: "Returned",
-    status: "Returned",
-    image:
-      "https://images.unsplash.com/photo-1522758971460-1d21eed7dc1d?auto=format&fit=crop&w=400&q=80",
-    buyerName: "Neha Gupta",
-    paymentMethod: "Online Payment (UPI)",
-    transactionId: "UPI66102938471",
-    commission: 0,
-  },
-];
-
-// ================= TIMELINE GROUPS (MATCHING REFERENCE IMAGE) =================
-const MOCK_TIMELINE_GROUPS: ProgramTimelineGroup[] = [
-  {
-    date: "Today, 16 Oct 2026",
-    items: [
-      {
-        id: "tl-1",
-        type: "sale",
-        title: "Sale",
-        status: "Paid",
-        subtitle: "Handpainted Mug • #ATV1284",
-        time: "11:24 AM",
-        amount: 499,
-        isCredit: true,
-      },
-      {
-        id: "tl-2",
-        type: "payout",
-        title: "Payout to Bank",
-        status: "Completed",
-        subtitle: "UTR: SBIN3265987412",
-        time: "09:15 AM",
-        amount: 1200,
-        isCredit: false,
-        utr: "SBIN3265987412",
-        bankName: "State Bank of India",
-        accountNumber: "••••• 7842",
-        ifsc: "SBIN0001234",
-        payoutDate: "16 Oct 2026, 09:15 AM",
-        totalSalesAmount: 1800,
-        discount: 300,
-        earnings: 1260,
-        previousPending: 60,
-        relatedOrders: "2 Orders Included (Order #ATV1284, #ATV1277)",
-      },
-    ],
-  },
-  {
-    date: "Yesterday, 15 Oct 2026",
-    items: [
-      {
-        id: "tl-3",
-        type: "sale",
-        title: "Sale",
-        status: "Paid",
-        subtitle: "Art Tote Bag • #ATV1283",
-        time: "06:42 PM",
-        amount: 699,
-        isCredit: true,
-      },
-      {
-        id: "tl-4",
-        type: "sale",
-        title: "Sale",
-        status: "Cancelled",
-        subtitle: "Canvas Wall Art • #ATV1280",
-        time: "02:18 PM",
-        amount: 1299,
-        isCredit: true,
-      },
-      {
-        id: "tl-5",
-        type: "payout",
-        title: "Payout to Bank",
-        status: "Completed",
-        subtitle: "UTR: HDFC8932765410",
-        time: "11:03 AM",
-        amount: 800,
-        isCredit: false,
-        utr: "HDFC8932765410",
-        bankName: "HDFC Bank",
-        accountNumber: "••••• 3419",
-        ifsc: "HDFC0001892",
-        payoutDate: "15 Oct 2026, 11:03 AM",
-        totalSalesAmount: 1200,
-        discount: 100,
-        earnings: 840,
-        previousPending: 60,
-        relatedOrders: "1 Order Included (Order #ATV1283)",
-      },
-    ],
-  },
-  {
-    date: "14 Oct 2026",
-    items: [
-      {
-        id: "tl-6",
-        type: "sale",
-        title: "Sale",
-        status: "Paid",
-        subtitle: "Sticker Pack • #ATV1279",
-        time: "07:20 PM",
-        amount: 199,
-        isCredit: true,
-      },
-      {
-        id: "tl-7",
-        type: "sale",
-        title: "Sale",
-        status: "Paid",
-        subtitle: "Resin Keychain • #ATV1278",
-        time: "01:16 PM",
-        amount: 299,
-        isCredit: true,
-      },
-    ],
-  },
-];
 
 export default function ProgramsPage() {
   const navigate = useNavigate();
@@ -421,8 +330,10 @@ export default function ProgramsPage() {
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Products state (starts with 5 mock items)
-  const [products, setProducts] = useState<ProgramProduct[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<ProgramProduct[]>([]);
+  const [savingProduct, setSavingProduct] = useState(false);
+  const sales: ProgramSale[] = [];
+  const timelineGroups: ProgramTimelineGroup[] = [];
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -434,7 +345,29 @@ export default function ProgramsPage() {
   const [formName, setFormName] = useState("");
   const [formPrice, setFormPrice] = useState("");
   const [formStock, setFormStock] = useState("");
-  const [formCategory, setFormCategory] = useState("Art & Crafts");
+  const [formCategory, setFormCategory] = useState("");
+  const [formImage, setFormImage] = useState("");
+  const [formImageFile, setFormImageFile] = useState<File | null>(null);
+  const [formDiscountType, setFormDiscountType] = useState<DiscountType>("percent");
+  const [formOfferValue, setFormOfferValue] = useState("");
+  const [applyOpen, setApplyOpen] = useState(false);
+  const { application, loaded, refresh } = useCspApplication();
+
+  useEffect(() => {
+    if (!loaded || application?.status !== "approved") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await cspProductApi.list();
+        if (!cancelled) setProducts(Array.isArray(data.data) ? data.data : []);
+      } catch {
+        if (!cancelled) toast.error("Could not load your products.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, application?.status]);
 
   const timeOptions: TimeFilter[] = [
     "Today",
@@ -460,8 +393,47 @@ export default function ProgramsPage() {
     setFormName("");
     setFormPrice("");
     setFormStock("");
-    setFormCategory("Art & Crafts");
+    setFormCategory("");
+    setFormImage("");
+    setFormImageFile(null);
+    setFormDiscountType("percent");
+    setFormOfferValue("");
     setIsAddModalOpen(true);
+  };
+
+  const handleImageFile = (file?: File) => {
+    if (!file) {
+      setFormImage("");
+      setFormImageFile(null);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image must be 2 MB or smaller.");
+      return;
+    }
+    setFormImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setFormImage(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  };
+
+  const productPayload = () => ({
+    name: formName.trim(),
+    price: formPrice.trim(),
+    stock: formStock.trim(),
+    category: formCategory.trim(),
+    offerType: formDiscountType,
+    offerValue: formOfferValue.trim(),
+  });
+
+  const readApiError = (error: unknown) => {
+    const response = (error as { response?: { data?: { message?: string } } })
+      .response;
+    return response?.data?.message || "Could not save the product.";
   };
 
   // Open edit modal
@@ -470,59 +442,91 @@ export default function ProgramsPage() {
     setFormName(p.name);
     setFormPrice(String(p.price));
     setFormStock(String(p.stock));
-    setFormCategory(p.category || "Art & Crafts");
+    setFormCategory(p.category || "");
+    setFormImage(p.image || "");
+    setFormImageFile(null);
+    setFormDiscountType(p.offerType === "flat" ? "flat" : "percent");
+    setFormOfferValue(p.offerValue ? String(p.offerValue) : "");
   };
 
   // Submit Add
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || !formPrice.trim() || !formStock.trim()) {
+    if (savingProduct) return;
+    if (!formName.trim() || !formPrice.trim()) {
       toast.error("Please fill in all product details");
       return;
     }
-    const newProduct: ProgramProduct = {
-      id: `p-${Date.now()}`,
-      name: formName.trim(),
-      price: Number(formPrice) || 0,
-      stock: Number(formStock) || 0,
-      category: formCategory.trim() || "Art & Crafts",
-      image:
-        "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80",
-    };
-    setProducts((prev) => [newProduct, ...prev]);
-    setIsAddModalOpen(false);
-    toast.success("Product added successfully!");
+    if (!formImageFile) {
+      toast.error("Please upload a product image");
+      return;
+    }
+    if (!formCategory.trim()) {
+      toast.error("Please select a category");
+      return;
+    }
+    const offer = readOffer(Number(formPrice) || 0, formDiscountType, formOfferValue);
+    if (offer.error) {
+      toast.error(offer.error);
+      return;
+    }
+    try {
+      setSavingProduct(true);
+      const { data } = await cspProductApi.create(productPayload(), formImageFile);
+      setProducts((prev) => [data.data, ...prev]);
+      setIsAddModalOpen(false);
+      toast.success("Product added successfully!");
+    } catch (error) {
+      toast.error(readApiError(error));
+    } finally {
+      setSavingProduct(false);
+    }
   };
 
   // Submit Edit
-  const handleEditSubmit = (e: React.FormEvent) => {
+  const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingProduct) return;
+    if (!editingProduct || savingProduct) return;
     if (!formName.trim() || !formPrice.trim() || !formStock.trim()) {
       toast.error("Please fill in all product details");
       return;
     }
-    setProducts((prev) =>
-      prev.map((item) =>
-        item.id === editingProduct.id
-          ? {
-              ...item,
-              name: formName.trim(),
-              price: Number(formPrice) || item.price,
-              stock: Number(formStock) || item.stock,
-              category: formCategory.trim() || item.category,
-            }
-          : item
-      )
-    );
-    setEditingProduct(null);
-    toast.success("Product updated successfully!");
+    if (!formImage && !formImageFile) {
+      toast.error("Please upload a product image");
+      return;
+    }
+    const offer = readOffer(Number(formPrice) || 0, formDiscountType, formOfferValue);
+    if (offer.error) {
+      toast.error(offer.error);
+      return;
+    }
+    try {
+      setSavingProduct(true);
+      const { data } = await cspProductApi.update(
+        editingProduct.id,
+        productPayload(),
+        formImageFile,
+      );
+      setProducts((prev) =>
+        prev.map((item) => (item.id === editingProduct.id ? data.data : item)),
+      );
+      setEditingProduct(null);
+      toast.success("Product updated successfully!");
+    } catch (error) {
+      toast.error(readApiError(error));
+    } finally {
+      setSavingProduct(false);
+    }
   };
 
-  // Delete Product
-  const handleDeleteProduct = (id: string, name: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    toast.success(`Removed "${name}" from display.`);
+  const handleDeleteProduct = async (id: string, name: string) => {
+    try {
+      await cspProductApi.remove(id);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      toast.success(`Removed "${name}" from display.`);
+    } catch (error) {
+      toast.error(readApiError(error));
+    }
   };
 
   // Share product link
@@ -535,13 +539,62 @@ export default function ProgramsPage() {
   };
 
   // Horizontally adjustable content container
+  const helpWhatsApp = `https://wa.me/918073988123?text=${encodeURIComponent(
+    application?.status === "rejected"
+      ? `Hi, my CSP application was rejected. Reason: ${application.rejectionReason || "not specified"}. Please help.`
+      : "Hi, I need help with the CSP Program.",
+  )}`;
+
+  if (!loaded || application?.status !== "approved") {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <DashboardSidebar
+          mode="drawer"
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
+        <div className="mx-auto max-w-[1440px] p-4 md:p-6">
+          <div className="hidden gap-6 xl:flex">
+            <DashboardSidebar mode="fixed" />
+            <div className="min-w-0 flex-1 space-y-6">
+              <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
+              <ProgramAccessCard
+                loaded={loaded}
+                status={application?.status}
+                reason={application?.rejectionReason}
+                helpUrl={helpWhatsApp}
+                onApply={() => setApplyOpen(true)}
+              />
+            </div>
+          </div>
+          <div className="xl:hidden">
+            <ProgramAccessCard
+              loaded={loaded}
+              status={application?.status}
+              reason={application?.rejectionReason}
+              helpUrl={helpWhatsApp}
+              onApply={() => setApplyOpen(true)}
+            />
+          </div>
+        </div>
+        <CspJoinModal
+          isOpen={applyOpen}
+          onClose={() => {
+            setApplyOpen(false);
+            void refresh();
+          }}
+        />
+      </div>
+    );
+  }
+
   const content = (
     <div className="w-full space-y-6 pb-12">
       <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.03)] sm:p-6 md:p-8">
         
         {/* ================= HEADER ================= */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-5">
-          <div className="flex items-center gap-3">
+        <div className="mb-6 flex flex-nowrap items-center justify-between gap-3 border-b border-gray-100 pb-5">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => navigate(-1)}
@@ -553,7 +606,7 @@ export default function ProgramsPage() {
 
             <div>
               <div className="flex items-center gap-1.5">
-                <h1 className="text-xl font-black tracking-tight text-[#0f172a] sm:text-2xl md:text-3xl">
+                <h1 className="truncate text-lg font-black tracking-tight text-[#0f172a] sm:text-2xl md:text-3xl">
                   CSP Program
                 </h1>
                 {/* 3 diagonal orange spark accent dashes */}
@@ -578,7 +631,7 @@ export default function ProgramsPage() {
           </div>
 
           {/* Right Controls: Filter + More */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex shrink-0 items-center gap-2">
             {/* Filter Dropdown */}
             <div className="relative">
               <button
@@ -690,11 +743,7 @@ export default function ProgramsPage() {
               </span>
             </div>
             <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">24</p>
-              <div className="mt-1.5 flex items-center text-[11px] font-bold text-emerald-600">
-                <ArrowUpRight size={13} strokeWidth={2.5} className="mr-0.5" />
-                <span>+6%</span>
-              </div>
+              <p className="text-xl font-black text-gray-900 leading-none">{products.length}</p>
             </div>
           </div>
 
@@ -709,11 +758,9 @@ export default function ProgramsPage() {
               </span>
             </div>
             <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">8</p>
-              <div className="mt-1.5 flex items-center text-[11px] font-bold text-emerald-600">
-                <ArrowUpRight size={13} strokeWidth={2.5} className="mr-0.5" />
-                <span>+33%</span>
-              </div>
+              <p className="text-xl font-black text-gray-900 leading-none">
+                {sales.filter((sale) => sale.status === "Paid").length}
+              </p>
             </div>
           </div>
 
@@ -728,19 +775,14 @@ export default function ProgramsPage() {
               </span>
             </div>
             <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">₹2,480</p>
-              <div className="mt-1.5 flex items-center text-[11px] font-bold text-emerald-600">
-                <ArrowUpRight size={13} strokeWidth={2.5} className="mr-0.5" />
-                <span>+18%</span>
-              </div>
+              <p className="text-xl font-black text-gray-900 leading-none">
+                ₹{sales.reduce((sum, sale) => sum + (sale.status === "Paid" ? sale.commission || 0 : 0), 0).toLocaleString("en-IN")}
+              </p>
             </div>
           </div>
 
           {/* Card 4: Payouts */}
-          <div
-            onClick={() => setSelectedPayout(MOCK_TIMELINE_GROUPS[0].items[1])}
-            className="flex flex-col justify-between rounded-2xl border border-[#E2EEFB]/80 bg-[#F4F8FC] p-3.5 transition hover:shadow-md hover:border-blue-200 cursor-pointer"
-          >
+          <div className="flex flex-col justify-between rounded-2xl border border-[#E2EEFB]/80 bg-[#F4F8FC] p-3.5">
             <div className="flex items-start gap-2.5">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100/90 text-blue-600">
                 <Wallet size={17} strokeWidth={2.2} />
@@ -750,9 +792,9 @@ export default function ProgramsPage() {
               </span>
             </div>
             <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">₹1,200</p>
+              <p className="text-xl font-black text-gray-900 leading-none">₹0</p>
               <span className="mt-1.5 block text-[11px] font-medium text-gray-400">
-                1 completed
+                0 completed
               </span>
             </div>
           </div>
@@ -768,11 +810,7 @@ export default function ProgramsPage() {
               </span>
             </div>
             <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">16</p>
-              <div className="mt-1.5 flex items-center text-[11px] font-bold text-emerald-600">
-                <ArrowUpRight size={13} strokeWidth={2.5} className="mr-0.5" />
-                <span>+27%</span>
-              </div>
+              <p className="text-xl font-black text-gray-900 leading-none">0</p>
             </div>
           </div>
 
@@ -787,7 +825,7 @@ export default function ProgramsPage() {
               </span>
             </div>
             <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">42</p>
+              <p className="text-xl font-black text-gray-900 leading-none">{products.length}</p>
               <span className="mt-1.5 block text-[11px] font-medium text-gray-400">
                 Total activities
               </span>
@@ -846,8 +884,8 @@ export default function ProgramsPage() {
         {activeTab === "products" && (
           <div>
             {/* Top Toolbar: Search + View Mode Switcher + Add Button */}
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-1 items-center gap-3 min-w-[240px] max-w-md">
+            <div className="mb-5 flex flex-nowrap items-center gap-2">
+              <div className="min-w-0 flex-1">
                 <div className="relative w-full">
                   <Search
                     size={16}
@@ -872,7 +910,7 @@ export default function ProgramsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex shrink-0 items-center gap-2">
                 {/* View Mode Switcher (List vs Grid) */}
                 <div className="flex items-center rounded-xl border border-gray-200/80 bg-gray-50/70 p-1">
                   <button
@@ -907,7 +945,7 @@ export default function ProgramsPage() {
                 <button
                   type="button"
                   onClick={handleOpenAdd}
-                  className="flex items-center gap-1.5 rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-orange-600 active:scale-95"
+                  className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-orange-500 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-orange-600 active:scale-95 sm:px-4"
                 >
                   <Plus size={15} className="stroke-[2.5]" />
                   <span>Add Product</span>
@@ -956,8 +994,22 @@ export default function ProgramsPage() {
                             </span>
                           )}
                         </div>
-                        <p className="mt-0.5 text-xs sm:text-sm font-semibold text-gray-500">
-                          ₹{item.price}
+                        <p className="mt-0.5 flex items-center gap-2 text-xs sm:text-sm font-semibold text-gray-500">
+                          {offerLabel(item) ? (
+                            <>
+                              <span className="font-bold text-gray-900">
+                                ₹{offeredPrice(item).toLocaleString("en-IN")}
+                              </span>
+                              <span className="text-[11px] font-medium text-gray-400 line-through">
+                                ₹{item.price.toLocaleString("en-IN")}
+                              </span>
+                              <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600">
+                                {offerLabel(item)}
+                              </span>
+                            </>
+                          ) : (
+                            <span>₹{item.price.toLocaleString("en-IN")}</span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -1033,8 +1085,17 @@ export default function ProgramsPage() {
                           {item.name}
                         </h3>
                         <div className="mt-1 flex items-center justify-between">
-                          <span className="text-sm font-bold text-gray-700">
-                            ₹{item.price}
+                          <span className="flex items-center gap-1.5 text-sm font-bold text-gray-700">
+                            {offerLabel(item) ? (
+                              <>
+                                <span>₹{offeredPrice(item).toLocaleString("en-IN")}</span>
+                                <span className="text-[11px] font-medium text-gray-400 line-through">
+                                  ₹{item.price.toLocaleString("en-IN")}
+                                </span>
+                              </>
+                            ) : (
+                              <span>₹{item.price.toLocaleString("en-IN")}</span>
+                            )}
                           </span>
                           {item.category && (
                             <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500">
@@ -1087,12 +1148,18 @@ export default function ProgramsPage() {
             {/* Header: Recent Sales (8) + View All Button */}
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-bold text-gray-900 sm:text-lg">
-                Recent Sales ({MOCK_SALES.length})
+                Recent Sales ({sales.length})
               </h2>
 
               <button
                 type="button"
-                onClick={() => toast.info("Displaying all 8 recent sales records.")}
+                onClick={() =>
+                  toast.info(
+                    sales.length
+                      ? `Showing ${sales.length} sales.`
+                      : "No sales yet.",
+                  )
+                }
                 className="flex items-center gap-1 rounded-full border border-orange-500/80 px-3.5 py-1 text-xs font-semibold text-orange-600 transition hover:bg-orange-50 active:scale-95"
               >
                 <span>View All</span>
@@ -1102,7 +1169,12 @@ export default function ProgramsPage() {
 
             {/* Sales List */}
             <div className="divide-y divide-gray-100/90 rounded-2xl border border-gray-100/80 bg-white">
-              {MOCK_SALES.map((sale) => (
+              {sales.length === 0 ? (
+                <p className="px-4 py-10 text-center text-sm text-gray-500">
+                  No sales yet. Sales appear here after someone buys a product you added.
+                </p>
+              ) : null}
+              {sales.map((sale) => (
                 <div
                   key={sale.id}
                   onClick={() => setSelectedSale(sale)}
@@ -1158,7 +1230,12 @@ export default function ProgramsPage() {
         {/* ================= TAB 3: TIMELINE (EXACT REFERENCE DESIGN) ================= */}
         {activeTab === "timeline" && (
           <div className="space-y-6">
-            {MOCK_TIMELINE_GROUPS.map((group) => (
+            {timelineGroups.length === 0 ? (
+              <p className="px-4 py-10 text-center text-sm text-gray-500">
+                No activity yet.
+              </p>
+            ) : null}
+            {timelineGroups.map((group) => (
               <div key={group.date} className="relative">
                 {/* Date Heading with Orange Bullet */}
                 <div className="flex items-center gap-2 mb-3">
@@ -1177,10 +1254,10 @@ export default function ProgramsPage() {
                         if (item.type === "payout") {
                           setSelectedPayout(item);
                         } else {
-                          const match =
-                            MOCK_SALES.find((s) => item.subtitle.includes(s.orderNo)) ||
-                            MOCK_SALES[0];
-                          setSelectedSale(match);
+                          const match = sales.find((sale) =>
+                            item.subtitle.includes(sale.orderNo),
+                          );
+                          if (match) setSelectedSale(match);
                         }
                       }}
                       className="group flex items-center justify-between gap-3 rounded-2xl border border-gray-100/90 bg-white p-3.5 sm:p-4 shadow-sm transition hover:shadow-md hover:border-gray-200 cursor-pointer"
@@ -1404,7 +1481,10 @@ export default function ProgramsPage() {
               <div
                 onClick={() => {
                   setSelectedPayout(null);
-                  setSelectedSale(MOCK_SALES[0]);
+                  const match = sales.find((sale) =>
+                    String(selectedPayout.relatedOrders || "").includes(sale.orderNo),
+                  );
+                  if (match) setSelectedSale(match);
                 }}
                 className="rounded-2xl bg-[#F8FAFC] border border-gray-100/80 p-3.5 flex items-center justify-between transition hover:bg-slate-100/70 cursor-pointer"
               >
@@ -1724,7 +1804,7 @@ export default function ProgramsPage() {
           onClick={() => setIsAddModalOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-[24px] bg-white p-6 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -1757,45 +1837,52 @@ export default function ProgramsPage() {
                 <label className="block text-xs font-bold text-gray-700">
                   Category
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Home Decor, Ceramics, Art"
+                <select
+                  required
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm outline-none focus:border-orange-500"
+                >
+                  <option value="">Select a category</option>
+                  {PRODUCT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700">
+                  Price (₹)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  placeholder="499"
+                  value={formPrice}
+                  onChange={(e) => setFormPrice(e.target.value)}
                   className="mt-1 w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm outline-none focus:border-orange-500"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700">
-                    Price (₹)
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    placeholder="499"
-                    value={formPrice}
-                    onChange={(e) => setFormPrice(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm outline-none focus:border-orange-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700">
-                    Stock Quantity
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    placeholder="20"
-                    value={formStock}
-                    onChange={(e) => setFormStock(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm outline-none focus:border-orange-500"
-                  />
-                </div>
-              </div>
+              <ProductOfferField
+                price={formPrice}
+                discountType={formDiscountType}
+                offerValue={formOfferValue}
+                onTypeChange={setFormDiscountType}
+                onValueChange={setFormOfferValue}
+              />
+
+              <ProductImageField
+                image={formImage}
+                onFile={handleImageFile}
+                onClear={() => {
+                  setFormImage("");
+                  setFormImageFile(null);
+                }}
+              />
 
               <div className="flex items-center justify-end gap-2.5 pt-3">
                 <button
@@ -1807,9 +1894,10 @@ export default function ProgramsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-orange-500 px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-600 active:scale-95"
+                  disabled={savingProduct}
+                  className="rounded-xl bg-orange-500 px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-600 active:scale-95 disabled:opacity-60"
                 >
-                  Add Product
+                  {savingProduct ? "Adding..." : "Add Product"}
                 </button>
               </div>
             </form>
@@ -1824,7 +1912,7 @@ export default function ProgramsPage() {
           onClick={() => setEditingProduct(null)}
         >
           <div
-            className="w-full max-w-md rounded-[24px] bg-white p-6 shadow-2xl"
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[24px] bg-white p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -1856,12 +1944,22 @@ export default function ProgramsPage() {
                 <label className="block text-xs font-bold text-gray-700">
                   Category
                 </label>
-                <input
-                  type="text"
+                <select
+                  required
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm outline-none focus:border-orange-500"
-                />
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm outline-none focus:border-orange-500"
+                >
+                  <option value="">Select a category</option>
+                  {formCategory && !PRODUCT_CATEGORIES.includes(formCategory) ? (
+                    <option value={formCategory}>{formCategory}</option>
+                  ) : null}
+                  {PRODUCT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1893,6 +1991,23 @@ export default function ProgramsPage() {
                 </div>
               </div>
 
+              <ProductOfferField
+                price={formPrice}
+                discountType={formDiscountType}
+                offerValue={formOfferValue}
+                onTypeChange={setFormDiscountType}
+                onValueChange={setFormOfferValue}
+              />
+
+              <ProductImageField
+                image={formImage}
+                onFile={handleImageFile}
+                onClear={() => {
+                  setFormImage("");
+                  setFormImageFile(null);
+                }}
+              />
+
               <div className="flex items-center justify-end gap-2.5 pt-3">
                 <button
                   type="button"
@@ -1903,9 +2018,10 @@ export default function ProgramsPage() {
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-orange-500 px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-600 active:scale-95"
+                  disabled={savingProduct}
+                  className="rounded-xl bg-orange-500 px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-orange-600 active:scale-95 disabled:opacity-60"
                 >
-                  Save Changes
+                  {savingProduct ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>
@@ -1938,6 +2054,87 @@ export default function ProgramsPage() {
           <div className="space-y-5 pb-6">{content}</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ProgramAccessCard({
+  loaded,
+  status,
+  reason,
+  helpUrl,
+  onApply,
+}: {
+  loaded: boolean;
+  status?: "under_review" | "approved" | "rejected";
+  reason?: string;
+  helpUrl: string;
+  onApply: () => void;
+}) {
+  if (!loaded) {
+    return <p className="p-6 text-sm text-slate-500">Loading your program…</p>;
+  }
+
+  if (status === "rejected") {
+    return (
+      <div className="mx-auto max-w-lg rounded-3xl border border-rose-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-bold text-slate-900">Application rejected</h1>
+        <p className="mt-3 text-sm leading-relaxed text-rose-700">
+          {reason?.trim() || "No reason was provided."}
+        </p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <a
+            href={helpUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white"
+          >
+            Help
+          </a>
+          <button
+            type="button"
+            onClick={onApply}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700"
+          >
+            Apply again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "under_review") {
+    return (
+      <div className="mx-auto max-w-lg rounded-3xl border border-orange-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-bold text-slate-900">Under review</h1>
+        <p className="mt-3 text-sm text-slate-600">
+          Your CSP application is under review. The program opens after it is approved.
+        </p>
+        <a
+          href={helpUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 inline-flex items-center justify-center rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-bold text-white"
+        >
+          Help
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <h1 className="text-xl font-bold text-slate-900">CSP Program</h1>
+      <p className="mt-3 text-sm text-slate-600">
+        Apply to join. The product program opens only after your application is approved.
+      </p>
+      <button
+        type="button"
+        onClick={onApply}
+        className="mt-5 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-bold text-white"
+      >
+        Apply for CSP Program
+      </button>
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import {Link, useLocation, useNavigate} from 'react-router-dom';
-import {Crown, LogOut, X} from 'lucide-react';
+import {Crown, LogOut, Store, X} from 'lucide-react';
 import {motion} from 'framer-motion';
 import {BrandMark} from '../auth/AuthShell';
 import {dashboardNav} from '../../data/dashboard';
 import {useAuthStore} from '../../store/authStore';
 import {authApi} from '../../services/auth.service';
+import {useCspApplication} from '../../hooks/useCspApplication';
 
 type Props = {
   mode?: 'fixed' | 'drawer';
@@ -16,6 +17,7 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose}: Props) 
   const location = useLocation();
   const navigate = useNavigate();
   const logout = useAuthStore(s => s.logout);
+  const {application} = useCspApplication();
   const isDrawer = mode === 'drawer';
 
   const sections = ['Main', 'Account'] as const;
@@ -50,6 +52,16 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose}: Props) 
       <nav className="flex-1 overflow-y-auto px-3 pb-4">
         {sections.map(section => {
           const items = dashboardNav.filter(i => i.section === section);
+          if (section === 'Main' && application?.status === 'approved') {
+            const programIndex = items.findIndex(item => item.id === 'programs');
+            items.splice(programIndex + 1, 0, {
+              id: 'csp-program',
+              label: 'CSP Program',
+              icon: Store,
+              to: '/csp-program',
+              section: 'Main',
+            });
+          }
           if (!items.length) return null;
           return (
             <div key={section} className="mb-4">

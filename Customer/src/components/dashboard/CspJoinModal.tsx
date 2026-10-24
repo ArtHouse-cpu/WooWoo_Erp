@@ -16,6 +16,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
+import {useAuthStore} from '../../store/authStore';
+import {
+  cspApi,
+  normalizePrositeUrl,
+  type CspApplication,
+} from '../../services/csp.service';
 
 type CspJoinModalProps = {
   isOpen: boolean;
@@ -199,16 +205,44 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
   );
 
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [existing, setExisting] = useState<CspApplication | null>(null);
+  const customer = useAuthStore(state => state.customer);
 
   // Reset isSubmitted when modal is closed
   useEffect(() => {
     if (!isOpen) {
       setIsSubmitted(false);
+      return;
     }
+    let cancelled = false;
+    cspApi
+      .mine()
+      .then(({data}) => {
+        if (!cancelled) setExisting(data.data ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setExisting(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (existing?.status === 'under_review' || existing?.status === 'approved') {
+      return;
+    }
+    if (!customer?._id) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Sign in required',
+        text: 'Sign in so we can attach this application to your customer id.',
+        confirmButtonColor: '#EA580C',
+      });
+      return;
+    }
     if (!brandName.trim()) {
       Swal.fire({
         icon: 'warning',
@@ -227,9 +261,51 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
       });
       return;
     }
+    const prosite = normalizePrositeUrl(prositeUrl);
+    if (!prosite) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Invalid Prosite URL',
+        text: 'Use a link like 1atives.com/pro/your-name.',
+        confirmButtonColor: '#EA580C',
+      });
+      return;
+    }
+    if (alreadySelling === 'yes' && selectedPlatforms.length === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Where are you selling?',
+        text: 'Select at least one place where you currently sell.',
+        confirmButtonColor: '#EA580C',
+      });
+      return;
+    }
 
-    // Open custom "Application Submitted" confirmation dialog matching mockup
-    setIsSubmitted(true);
+    try {
+      setSubmitting(true);
+      const {data} = await cspApi.apply({
+        customerId: customer._id,
+        brandName: brandName.trim(),
+        categories: selectedCategories,
+        prositeUrl: prosite,
+        alreadySelling: alreadySelling === 'yes',
+        sellingPlatforms: alreadySelling === 'yes' ? selectedPlatforms : [],
+      });
+      setExisting(data.data);
+      setIsSubmitted(true);
+    } catch (error) {
+      const message =
+        (error as {response?: {data?: {message?: string}}})?.response?.data
+          ?.message || 'Could not submit your application.';
+      Swal.fire({
+        icon: 'error',
+        title: 'Application not submitted',
+        text: message,
+        confirmButtonColor: '#EA580C',
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCloseAll = () => {
@@ -336,6 +412,26 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
                   </span>
                 </div>
               </div>
+
+              {existing?.status === 'rejected' && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                  <p className="font-bold">Application rejected</p>
+                  <p className="mt-1">
+                    {existing.rejectionReason || 'No reason was provided.'}
+                  </p>
+                  <p className="mt-1 text-xs">Update the form and apply again.</p>
+                </div>
+              )}
+              {existing?.status === 'under_review' && (
+                <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
+                  Your application is under review. We will update you after it is approved or rejected.
+                </div>
+              )}
+              {existing?.status === 'approved' && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                  Your application is approved. Open CSP Program from the sidebar.
+                </div>
+              )}
 
               {/* Field 1: Brand Name */}
               <div>
@@ -450,7 +546,7 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
                     type="url"
                     value={prositeUrl}
                     onChange={(e) => setPrositeUrl(e.target.value)}
-                    placeholder="https://atives.com/yourname"
+                    placeholder="https://atives.com/pro/your-name"
                     className="w-full text-sm text-slate-800 placeholder:text-slate-400 outline-none bg-transparent"
                   />
                 </div>
@@ -587,9 +683,22 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
               <button
                 type="button"
                 onClick={handleSubmit}
-                className="w-full py-3.5 px-4 rounded-2xl bg-[#F95721] hover:bg-[#EA580C] text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 active:scale-[0.99] transition cursor-pointer"
+                disabled={
+                  submitting ||
+                  existing?.status === 'under_review' ||
+                  existing?.status === 'approved'
+                }
+                className="w-full py-3.5 px-4 rounded-2xl bg-[#F95721] hover:bg-[#EA580C] text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 active:scale-[0.99] transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <span>Apply for CSP Program</span>
+                <span>
+                  {submitting
+                    ? 'Submitting...'
+                    : existing?.status === 'approved'
+                      ? 'Approved'
+                      : existing?.status === 'under_review'
+                        ? 'Under Review'
+                        : 'Apply for CSP Program'}
+                </span>
                 <ArrowRight className="w-5 h-5" strokeWidth={2.5} />
               </button>
             </div>
@@ -693,7 +802,7 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
 
                   {/* Status Pill */}
                   <div className="mt-2.5 inline-flex items-center px-4 py-1 rounded-full bg-[#FFF2E8] border border-[#FDEEE4] text-[12px] font-bold text-[#EA580C]">
-                    Under Approval
+                    Under Review
                   </div>
 
                   {/* Subtitle */}

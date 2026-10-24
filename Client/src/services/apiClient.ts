@@ -3306,6 +3306,45 @@ export const handleUpdateCsp = async (
   };
 };
 
+export type CspApplicationRecord = {
+  _id: string;
+  customerId?: string | null;
+  customerName?: string;
+  email?: string;
+  mobile?: string;
+  brandName?: string;
+  categories?: string[];
+  prositeUrl?: string;
+  alreadySelling?: boolean;
+  sellingPlatforms?: string[];
+  status?: "under_review" | "approved" | "rejected";
+  rejectionReason?: string;
+  createdAt?: string;
+};
+
+export const handleGetCspApplications = async (status = "under_review") => {
+  const response = await axiosInstance.get("/csp/applications", {
+    params: { status },
+  });
+  return response.data as {
+    success: boolean;
+    applications?: CspApplicationRecord[];
+    message?: string;
+  };
+};
+
+export const handleReviewCspApplication = async (
+  id: string,
+  payload: { status: "approved" | "rejected"; rejectionReason?: string },
+) => {
+  const response = await axiosInstance.patch(`/csp/applications/${id}`, payload);
+  return response.data as {
+    success: boolean;
+    application?: CspApplicationRecord;
+    message?: string;
+  };
+};
+
 export const handleGetCspProducts = async (cspEnrollmentId: string) => {
   const response = await axiosInstance.get("/product", {
     params: { cspEnrollmentId, limit: 2000 },

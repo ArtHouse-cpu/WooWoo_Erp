@@ -32,9 +32,12 @@ import { PERMISSIONS } from "@/constants/permissions";
 import {
   handleEnrollCsp,
   handleGetAllCustomers,
+  handleGetCspApplications,
   handleGetCspEnrollments,
   handleGetCspProducts,
+  handleReviewCspApplication,
   handleUpdateCsp,
+  type CspApplicationRecord,
   type CspEnrollment,
 } from "@/services/apiClient";
 import ApproveCSPModal from "../components/ApproveCSPModal";
@@ -112,6 +115,27 @@ const AVATAR_PALETTES = [
   { bg: "bg-pink-100", text: "text-pink-700", border: "border-pink-200" },
   { bg: "bg-teal-100", text: "text-teal-700", border: "border-teal-200" },
 ];
+
+function mapApplication(row: CspApplicationRecord, index: number): ApplicationRow {
+  const name = row.customerName || "Applicant";
+  const avatar = getAvatar(name, index);
+  return {
+    id: row._id,
+    name,
+    email: row.email || "",
+    brandName: row.brandName || "",
+    phoneNumber: row.mobile || "",
+    prositeUrl: row.prositeUrl || "",
+    status: "pending",
+    avatarInitials: avatar.initials,
+    avatarBg: avatar.palette.bg,
+    avatarText: avatar.palette.text,
+    avatarBorder: avatar.palette.border,
+    sellingBefore: row.alreadySelling ? "Yes" : "No",
+    sellingNote: (row.sellingPlatforms || []).join(", "),
+    submittedAt: row.createdAt,
+  };
+}
 
 function getAvatar(name: string, index: number) {
   const clean = (name || "Partner").trim();
@@ -538,6 +562,151 @@ function formatLastSaleDate(dateStr?: string | Date | null) {
   }
 }
 
+type DatePreset =
+  | "today"
+  | "yesterday"
+  | "this-week"
+  | "last-week"
+  | "this-month"
+  | "last-month"
+  | "this-year"
+  | "last-year"
+  | "custom";
+
+const DATE_PRESETS: { id: DatePreset; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "yesterday", label: "Yesterday" },
+  { id: "this-week", label: "This Week" },
+  { id: "last-week", label: "Last Week" },
+  { id: "this-month", label: "This Month" },
+  { id: "last-month", label: "Last Month" },
+  { id: "this-year", label: "This Year" },
+  { id: "last-year", label: "Last Year" },
+  { id: "custom", label: "Custom" },
+];
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function endOfDay(date: Date) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
+}
+
+function startOfWeek(date: Date) {
+  const start = startOfDay(date);
+  const mondayOffset = (date.getDay() + 6) % 7;
+  start.setDate(start.getDate() - mondayOffset);
+  return start;
+}
+
+function parseDateValue(value?: string | Date | null) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function objectIdDate(id?: string) {
+  if (!id || !/^[a-f\d]{24}$/i.test(id)) return null;
+  const seconds = Number.parseInt(id.slice(0, 8), 16);
+  if (!Number.isFinite(seconds)) return null;
+  return new Date(seconds * 1000);
+}
+
+function partnerDate(row: CspEnrollment) {
+  const dated = row as CspEnrollment & {
+    createdAt?: string | Date;
+    updatedAt?: string | Date;
+  };
+  return (
+    parseDateValue(dated.createdAt) ||
+    objectIdDate(row._id) ||
+    parseDateValue(dated.updatedAt)
+  );
+}
+
+function presetRange(preset: DatePreset, fromDate: string, toDate: string) {
+  const now = new Date();
+  if (preset === "today") {
+    return { start: startOfDay(now), end: endOfDay(now) };
+  }
+  if (preset === "yesterday") {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
+  }
+  if (preset === "this-week") {
+    return { start: startOfWeek(now), end: endOfDay(now) };
+  }
+  if (preset === "last-week") {
+    const thisWeek = startOfWeek(now);
+    const start = new Date(thisWeek);
+    start.setDate(start.getDate() - 7);
+    const end = new Date(thisWeek);
+    end.setDate(end.getDate() - 1);
+    return { start, end: endOfDay(end) };
+  }
+  if (preset === "this-month") {
+    return {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: endOfDay(now),
+    };
+  }
+  if (preset === "last-month") {
+    return {
+      start: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+      end: new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999),
+    };
+  }
+  if (preset === "this-year") {
+    return { start: new Date(now.getFullYear(), 0, 1), end: endOfDay(now) };
+  }
+  if (preset === "last-year") {
+    return {
+      start: new Date(now.getFullYear() - 1, 0, 1),
+      end: new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999),
+    };
+  }
+  if (!fromDate && !toDate) return null;
+  const start = fromDate
+    ? startOfDay(new Date(`${fromDate}T00:00:00`))
+    : new Date(0);
+  const end = toDate
+    ? endOfDay(new Date(`${toDate}T00:00:00`))
+    : endOfDay(now);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  if (start <= end) return { start, end };
+  return { start: startOfDay(end), end: endOfDay(start) };
+}
+
+function isInsideRange(
+  value: Date | null,
+  range: { start: Date; end: Date } | null,
+) {
+  if (!range) return true;
+  if (!value) return false;
+  return value >= range.start && value <= range.end;
+}
+
+function formatInputDate(value: string) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return value;
+  return new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function CspScreen() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [liveRows, setLiveRows] = useState<CspEnrollment[]>([]);
@@ -548,7 +717,7 @@ export default function CspScreen() {
   const [activeTab, setActiveTab] = useState<"active" | "inactive">("active");
 
   // Applications Local State (pure frontend UI)
-  const [applications, setApplications] = useState<ApplicationRow[]>(INITIAL_APPLICATIONS);
+  const [applications, setApplications] = useState<ApplicationRow[]>([]);
 
   // Reject Application Modal State (pure frontend UI)
   const [rejectModal, setRejectModal] = useState<{
@@ -565,7 +734,9 @@ export default function CspScreen() {
 
   // Search & Filtering
   const [searchQuery, setSearchQuery] = useState("");
-  const [dateFilter, setDateFilter] = useState("This Month");
+  const [datePreset, setDatePreset] = useState<DatePreset>("this-month");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [filterBalanceOnly, setFilterBalanceOnly] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -598,6 +769,7 @@ export default function CspScreen() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
+  const dateMenuRef = useRef<HTMLDivElement>(null);
 
   // Auto open enroll if query param ?enroll=1
   useEffect(() => {
@@ -656,6 +828,24 @@ export default function CspScreen() {
 
   useEffect(() => {
     fetchRows();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await handleGetCspApplications("under_review");
+        if (cancelled) return;
+        const list = Array.isArray(res.applications) ? res.applications : [];
+        setApplications(list.map(mapApplication));
+      } catch (error) {
+        console.error("Failed to load CSP applications:", error);
+        if (!cancelled) setApplications([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Fetch product counts dynamically for live rows
@@ -759,6 +949,12 @@ export default function CspScreen() {
         !actionMenuRef.current.contains(e.target as Node)
       ) {
         setActionMenuId(null);
+      }
+      if (
+        dateMenuRef.current &&
+        !dateMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowDateDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleOutsideClick);
@@ -917,9 +1113,33 @@ export default function CspScreen() {
     return 24;
   }, [hasLiveRecords, productCounts]);
 
+  const activeDateRange = useMemo(
+    () => presetRange(datePreset, fromDate, toDate),
+    [datePreset, fromDate, toDate],
+  );
+
+  const dateFilterLabel = useMemo(() => {
+    if (datePreset !== "custom") {
+      return DATE_PRESETS.find((item) => item.id === datePreset)?.label || "This Month";
+    }
+    if (fromDate && toDate) {
+      return `${formatInputDate(fromDate)} – ${formatInputDate(toDate)}`;
+    }
+    if (fromDate) return `From ${formatInputDate(fromDate)}`;
+    if (toDate) return `To ${formatInputDate(toDate)}`;
+    return "Custom";
+  }, [datePreset, fromDate, toDate]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setCurrentAppPage(1);
+  }, [datePreset, fromDate, toDate]);
+
   // Filtered rows for Active Partners Table
   const filteredActiveRows = useMemo(() => {
     return sourceRows.filter((row) => {
+      if (!isInsideRange(partnerDate(row), activeDateRange)) return false;
+
       // Balance filter
       if (filterBalanceOnly) {
         const amt = Number(
@@ -955,7 +1175,7 @@ export default function CspScreen() {
 
       return true;
     });
-  }, [sourceRows, filterBalanceOnly, searchQuery]);
+  }, [sourceRows, filterBalanceOnly, searchQuery, activeDateRange]);
 
   // Sorted Active rows
   const sortedActiveRows = useMemo(() => {
@@ -1022,6 +1242,12 @@ export default function CspScreen() {
   // Filtered & Paginated Applications (Applications Tab)
   const filteredApplications = useMemo(() => {
     let list = [...applications];
+    list = list.filter((app) =>
+      isInsideRange(
+        parseDateValue(app.submittedAt || app.activatedAt || app.customerSince),
+        activeDateRange,
+      ),
+    );
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
@@ -1039,7 +1265,7 @@ export default function CspScreen() {
       list.sort((a, b) => b.name.localeCompare(a.name));
     }
     return list;
-  }, [applications, searchQuery, sortBy]);
+  }, [applications, searchQuery, sortBy, activeDateRange]);
 
   const totalAppPages =
     Math.ceil(filteredApplications.length / applicationsPageSize) || 1;
@@ -1057,18 +1283,28 @@ export default function CspScreen() {
     filteredApplications.length,
   );
 
-  const handleApproveCSP = () => {
+  const handleApproveCSP = async () => {
     if (!approveTarget) return;
     const approved = approveTarget;
-    setApplications((prev) => prev.filter((row) => row.id !== approved.id));
-    setApproveTarget(null);
-    Swal.fire({
-      icon: "success",
-      title: "Application Approved!",
-      text: `${approved.name} has been approved as an active partner.`,
-      timer: 2000,
-      showConfirmButton: false,
-    });
+    try {
+      await handleReviewCspApplication(approved.id, { status: "approved" });
+      setApplications((prev) => prev.filter((row) => row.id !== approved.id));
+      setApproveTarget(null);
+      await fetchRows();
+      Swal.fire({
+        icon: "success",
+        title: "Application Approved!",
+        text: `${approved.name} has been approved as an active partner.`,
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      Swal.fire(
+        "Error",
+        error?.response?.data?.message || "Could not approve this application.",
+        "error",
+      );
+    }
   };
 
   // Open the Reject Modal on clicking Reject
@@ -1090,7 +1326,7 @@ export default function CspScreen() {
     });
   };
 
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!rejectModal.reason) {
       Swal.fire({
         icon: "warning",
@@ -1103,15 +1339,30 @@ export default function CspScreen() {
 
     if (rejectModal.app) {
       const targetApp = rejectModal.app;
-      setApplications((prev) => prev.filter((a) => a.id !== targetApp.id));
-      handleCloseRejectModal();
-      Swal.fire({
-        icon: "info",
-        title: "Application Rejected",
-        text: `The application for ${targetApp.name} has been rejected.`,
-        timer: 1800,
-        showConfirmButton: false,
-      });
+      const rejectionReason = [rejectModal.reason, rejectModal.notes.trim()]
+        .filter(Boolean)
+        .join(". ");
+      try {
+        await handleReviewCspApplication(targetApp.id, {
+          status: "rejected",
+          rejectionReason,
+        });
+        setApplications((prev) => prev.filter((a) => a.id !== targetApp.id));
+        handleCloseRejectModal();
+        Swal.fire({
+          icon: "info",
+          title: "Application Rejected",
+          text: `The application for ${targetApp.name} has been rejected.`,
+          timer: 1800,
+          showConfirmButton: false,
+        });
+      } catch (error: any) {
+        Swal.fire(
+          "Error",
+          error?.response?.data?.message || "Could not reject this application.",
+          "error",
+        );
+      }
     }
   };
 
@@ -1220,44 +1471,62 @@ export default function CspScreen() {
 
         <div className="flex items-center gap-3 self-start sm:self-auto">
           {/* Date Range Selector */}
-          <div className="relative">
+          <div className="relative" ref={dateMenuRef}>
             <button
               type="button"
               onClick={() => setShowDateDropdown(!showDateDropdown)}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 focus:outline-none transition-colors"
+              className="inline-flex max-w-[16rem] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 focus:outline-none transition-colors"
             >
-              <Calendar className="h-4 w-4 text-slate-400" />
-              <span>{dateFilter}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+              <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
+              <span className="truncate">{dateFilterLabel}</span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             </button>
             {showDateDropdown && (
-              <div className="absolute right-0 z-40 mt-1.5 w-44 rounded-xl border border-slate-100 bg-white p-1.5 shadow-lg">
-                {[
-                  "This Month",
-                  "Last Month",
-                  "This Quarter",
-                  "This Year",
-                  "All Time",
-                ].map((item) => (
+              <div className="absolute right-0 z-40 mt-1.5 w-56 rounded-xl border border-slate-100 bg-white p-1.5 shadow-lg">
+                {DATE_PRESETS.map((item) => (
                   <button
-                    key={item}
+                    key={item.id}
                     type="button"
                     onClick={() => {
-                      setDateFilter(item);
-                      setShowDateDropdown(false);
+                      setDatePreset(item.id);
+                      if (item.id !== "custom") setShowDateDropdown(false);
                     }}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-left transition-colors ${
-                      dateFilter === item
+                      datePreset === item.id
                         ? "bg-orange-50 text-orange-600 font-semibold"
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    {item}
-                    {dateFilter === item && (
+                    {item.label}
+                    {datePreset === item.id && (
                       <Check className="h-3.5 w-3.5 text-orange-600" />
                     )}
                   </button>
                 ))}
+                {datePreset === "custom" && (
+                  <div className="mt-1 space-y-2 border-t border-slate-100 px-2 py-2">
+                    <label className="block text-[11px] font-medium text-slate-500">
+                      From
+                      <input
+                        type="date"
+                        value={fromDate}
+                        max={toDate || undefined}
+                        onChange={(event) => setFromDate(event.target.value)}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-orange-400"
+                      />
+                    </label>
+                    <label className="block text-[11px] font-medium text-slate-500">
+                      To
+                      <input
+                        type="date"
+                        value={toDate}
+                        min={fromDate || undefined}
+                        onChange={(event) => setToDate(event.target.value)}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-orange-400"
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2225,10 +2494,10 @@ export default function CspScreen() {
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                   <Package className="h-10 w-10 text-slate-300" />
                   <p className="mt-3 text-sm font-semibold text-slate-600">
-                    No products assigned
+                    No products added
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
-                    This CSP partner has no products linked yet.
+                    Products this partner adds from the customer program appear here.
                   </p>
                 </div>
               ) : (
@@ -2314,7 +2583,7 @@ export default function CspScreen() {
             <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3 bg-slate-50/50">
               <p className="text-xs text-slate-400">
                 {productsModal.products.length} product
-                {productsModal.products.length !== 1 ? "s" : ""} assigned
+                {productsModal.products.length !== 1 ? "s" : ""} added
               </p>
               <button
                 type="button"

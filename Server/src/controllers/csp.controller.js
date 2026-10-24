@@ -187,7 +187,10 @@ export const enrollCsp = async (req, res) => {
       pincode,
       sailorSharePercent,
       platformSharePercent,
+
+
     } = req.body || {};
+    console.log(req.body);
 
     let customer = null;
     if (customerId && mongoose.Types.ObjectId.isValid(customerId)) {
@@ -470,6 +473,71 @@ export const updateCsp = async (req, res) => {
       message: error.message || 'Failed to update CSP enrollment.',
     });
   }
+};
+
+/**
+ * Create the active CSP enrollment used after an application is approved.
+ * Does not require Premium membership; staff enroll still does.
+ */
+export const activateEnrollmentForCustomer = async (customer, extras = {}) => {
+  const existingActive = await CustomersailorProgram.findOne({
+    customerId: customer._id,
+    status: 'active',
+  });
+  if (existingActive) return existingActive;
+
+  const vendorMobile =
+    normalizeMobile(customer.mobile) || String(customer.mobile || '').trim();
+  if (!vendorMobile) {
+    const error = new Error(
+      'Customer mobile is required to approve this CSP application.',
+    );
+    error.status = 400;
+    throw error;
+  }
+
+  let vendor = await Vendor.findOne({mobile: vendorMobile});
+  if (!vendor && customer.mobile) {
+    vendor = await Vendor.findOne({
+      mobile: String(customer.mobile).trim(),
+    });
+  }
+  if (!vendor) {
+    vendor = await Vendor.create({
+      name: String(customer.name || 'CSP Sailor').trim(),
+      mobile: vendorMobile,
+      email: String(customer.email || '').trim(),
+      companyName: String(extras.companyName || extras.brandName || '').trim(),
+      brandName: String(extras.brandName || '').trim(),
+      website: extras.prositeUrl
+        ? `https://${String(extras.prositeUrl).replace(/^https?:\/\//i, '')}`
+        : '',
+      country: 'India',
+      notes: 'Auto-created when a CSP application was approved',
+    });
+  }
+
+  const vendorActive = await CustomersailorProgram.findOne({
+    vendorId: vendor._id,
+    status: 'active',
+  });
+  if (vendorActive) {
+    const error = new Error(
+      'Vendor is already linked to another active CSP enrollment.',
+    );
+    error.status = 409;
+    throw error;
+  }
+
+  return CustomersailorProgram.create({
+    customerId: customer._id,
+    vendorId: vendor._id,
+    status: 'active',
+    sailorSharePercent: getsailorSharePercent(),
+    platformSharePercent: getPlatformSharePercent(),
+    displayName: String(customer.name || '').trim(),
+    mobile: String(customer.mobile || '').trim(),
+  });
 };
 
 /** @deprecated Use enrollCsp — kept for older clients that posted name/phone only. */
