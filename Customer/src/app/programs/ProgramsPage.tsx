@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+
+import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronLeft,
@@ -519,15 +521,31 @@ export default function ProgramsPage() {
     }
   };
 
-  const handleDeleteProduct = async (id: string, name: string) => {
-    try {
-      await cspProductApi.remove(id);
-      setProducts((prev) => prev.filter((p) => p.id !== id));
-      toast.success(`Removed "${name}" from display.`);
-    } catch (error) {
-      toast.error(readApiError(error));
-    }
-  };
+const handleDeleteProduct = async (id: string, name: string) => {
+  const result = await Swal.fire({
+    title: "Are you sure?",
+    text: `Do you want to remove "${name}" from display?`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes, remove it!",
+    cancelButtonText: "Cancel",
+    confirmButtonColor: "#dc2626",
+    cancelButtonColor: "#6b7280",
+    reverseButtons: true,
+  });
+
+  if (!result.isConfirmed) return;
+
+  try {
+    await cspProductApi.remove(id);
+
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+
+    toast.success(`Removed "${name}" from display.`);
+  } catch (error) {
+    toast.error(readApiError(error));
+  }
+};
 
   // Share product link
   const handleShare = (product: ProgramProduct) => {
