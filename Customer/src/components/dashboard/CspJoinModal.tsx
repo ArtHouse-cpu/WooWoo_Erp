@@ -150,9 +150,8 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
   // Form states matching mockup
   const [brandName, setBrandName] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([
-    'Art Supplies',
-    'Home Decor',
-    'Fashion',
+   
+    
   ]);
   const [categorySearch, setCategorySearch] = useState('');
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
@@ -187,6 +186,8 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
       prev.includes(cat) ? prev.filter((item) => item !== cat) : [...prev, cat]
     );
   };
+
+
 
   const handleTogglePlatform = (id: string) => {
     setSelectedPlatforms((prev) =>
