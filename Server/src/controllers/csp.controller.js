@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Customer from '../models/customer.model.js';
 import Vendor from '../models/vendor.model.js';
 import CustomersailorProgram from '../models/customerSellerProgram.model.js';
+import CspApplication from '../models/cspApplication.model.js';
 import Wallet from '../models/wallet.model.js';
 import {resolveTwoBuckets} from '../utils/walletBuckets.js';
 
@@ -25,6 +26,22 @@ const normalizeMobile = raw => {
   // Vendors sometimes store non-strict mobiles; keep last 10 digits if present
   if (digits.length >= 10) return digits.slice(-10);
   return digits || null;
+};
+
+const PROSITE_PATTERN =
+  /^(?:https?:\/\/)?(?:www\.)?1atives\.com\/pro\/[a-z0-9][a-z0-9_-]*\/?$/i;
+
+const normalizePrositeUrl = raw => {
+  const value = String(raw || '')
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/+$/, '');
+  if (!value) return '';
+  if (!PROSITE_PATTERN.test(value) && !PROSITE_PATTERN.test(`https://${value}`)) {
+    return null;
+  }
+  return value.toLowerCase();
 };
 
 const formatCspLabel = name => {
@@ -187,10 +204,22 @@ export const enrollCsp = async (req, res) => {
       pincode,
       sailorSharePercent,
       platformSharePercent,
-
-
+      prositeUrl: prositeUrlRaw,
     } = req.body || {};
-    console.log(req.body);
+
+    const prositeUrl = normalizePrositeUrl(prositeUrlRaw);
+    if (String(prositeUrlRaw || '').trim() && !prositeUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Prosite URL must look like 1atives.com/pro/yourname.',
+      });
+    }
+    if (!prositeUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Prosite URL is required.',
+      });
+    }
 
     let customer = null;
     if (customerId && mongoose.Types.ObjectId.isValid(customerId)) {
@@ -291,9 +320,15 @@ export const enrollCsp = async (req, res) => {
           state: String(customer.state || state || '').trim(),
           pincode: String(customer.pincode || pincode || '').trim(),
           country: 'India',
+          website: `https://${prositeUrl}`,
           notes: 'Auto-created for Customer Sailor Program (CSP)',
         });
       }
+    }
+
+    if (vendor && prositeUrl && vendor.website !== `https://${prositeUrl}`) {
+      vendor.website = `https://${prositeUrl}`;
+      await vendor.save();
     }
 
     const vendorActive = await CustomersailorProgram.findOne({
@@ -314,7 +349,7 @@ export const enrollCsp = async (req, res) => {
       ? Number(platformSharePercent)
       : getPlatformSharePercent();
 
-    const enrollment = await CustomersailorProgram.create({
+        const enrollment = await CustomersailorProgram.create({
       customerId: customer._id,
       vendorId: vendor._id,
       status: 'active',
@@ -323,6 +358,8 @@ export const enrollCsp = async (req, res) => {
       displayName: String(customer.name || '').trim(),
       mobile: String(customer.mobile || '').trim(),
     });
+
+    await syncApprovedApplicationForEnrollment(customer, enrollment, prositeUrl);
 
     const populated = await populateEnrollment(
       CustomersailorProgram.findById(enrollment._id),
@@ -538,6 +575,71 @@ export const activateEnrollmentForCustomer = async (customer, extras = {}) => {
     displayName: String(customer.name || '').trim(),
     mobile: String(customer.mobile || '').trim(),
   });
+};
+
+const fallbackProsite = customer => {
+  const slug =
+    String(customer?.name || 'partner')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '')
+      .slice(0, 40) || 'partner';
+  return `1atives.com/pro/${slug}`;
+};
+
+/** Admin enroll is an active partner, so the customer program opens without Apply. */
+export const syncApprovedApplicationForEnrollment = async (
+  customer,
+  enrollment,
+  prositeUrlRaw = '',
+) => {
+  let prositeUrl = normalizePrositeUrl(prositeUrlRaw);
+  if (!prositeUrl && enrollment?.vendorId) {
+    const vendor = await Vendor.findById(enrollment.vendorId)
+      .select('website')
+      .lean();
+    prositeUrl = normalizePrositeUrl(vendor?.website);
+  }
+  if (!prositeUrl) prositeUrl = fallbackProsite(customer);
+
+  const brandName = String(customer?.name || 'CSP Partner').trim() || 'CSP Partner';
+  let application = await CspApplication.findOne({customerId: customer._id}).sort({
+    createdAt: -1,
+  });
+
+  if (!application) {
+    return CspApplication.create({
+      customerId: customer._id,
+      brandName,
+      categories: [],
+      prositeUrl,
+      alreadySelling: false,
+      sellingPlatforms: [],
+      status: 'approved',
+      rejectionReason: '',
+      reviewedAt: new Date(),
+      enrollmentId: enrollment._id,
+    });
+  }
+
+  application.status = 'approved';
+  application.rejectionReason = '';
+  application.reviewedAt = new Date();
+  application.enrollmentId = enrollment._id;
+  if (!application.brandName) application.brandName = brandName;
+  if (normalizePrositeUrl(prositeUrlRaw) || !application.prositeUrl) {
+    application.prositeUrl = prositeUrl;
+  }
+  await application.save();
+  return application;
+};
+
+export const applicationForActiveEnrollment = async customer => {
+  const enrollment = await CustomersailorProgram.findOne({
+    customerId: customer._id,
+    status: 'active',
+  });
+  if (!enrollment) return null;
+  return syncApprovedApplicationForEnrollment(customer, enrollment);
 };
 
 /** @deprecated Use enrollCsp — kept for older clients that posted name/phone only. */

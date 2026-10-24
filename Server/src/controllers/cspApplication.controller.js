@@ -1,7 +1,10 @@
 import mongoose from 'mongoose';
 import CspApplication from '../models/cspApplication.model.js';
 import Customer from '../models/customer.model.js';
-import {activateEnrollmentForCustomer} from './csp.controller.js';
+import {
+  activateEnrollmentForCustomer,
+  applicationForActiveEnrollment,
+} from './csp.controller.js';
 import {sendError, sendSuccess} from '../modules/customer/utils/response.js';
 
 const PROSITE_PATTERN = /^(?:https?:\/\/)?(?:www\.)?1atives\.com\/pro\/[a-z0-9][a-z0-9_-]*\/?$/i;
@@ -146,11 +149,17 @@ export const applyCsp = async (req, res) => {
 
 export const getMyCspApplication = async (req, res) => {
   try {
-    const application = await CspApplication.findOne({
-      customerId: req.customer._id,
-    })
-      .sort({createdAt: -1})
-      .populate('customerId', 'name mobile email');
+    const enrolled = await applicationForActiveEnrollment(req.customer);
+    const application = enrolled
+      ? await CspApplication.findById(enrolled._id).populate(
+          'customerId',
+          'name mobile email',
+        )
+      : await CspApplication.findOne({
+          customerId: req.customer._id,
+        })
+          .sort({createdAt: -1})
+          .populate('customerId', 'name mobile email');
 
     return sendSuccess(res, {
       message: application
@@ -172,6 +181,7 @@ export const listCspApplications = async (req, res) => {
     const status = String(req.query.status || 'under_review')
       .trim()
       .toLowerCase();
+      console.log(status);
     const query = {};
     if (['under_review', 'approved', 'rejected'].includes(status)) {
       query.status = status;

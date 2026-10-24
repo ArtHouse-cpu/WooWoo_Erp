@@ -3279,6 +3279,7 @@ export const handleEnrollCsp = async (payload: {
   pincode?: string;
   sailorSharePercent?: number;
   platformSharePercent?: number;
+  prositeUrl?: string;
 }) => {
   const response = await axiosInstance.post("/csp/enroll", payload);
   return response.data as {

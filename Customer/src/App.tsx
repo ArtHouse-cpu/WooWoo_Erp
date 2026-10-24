@@ -92,7 +92,7 @@ export default function App() {
                 <Route path="/settings" element={<ProfilePage />} />
                 <Route path="/membership" element={<MembershipOnboardingPage />} />
                 <Route path="/programs" element={<ProgramsPage />} />
-                <Route path="/csp-program" element={<CspProgramPage />} />
+                {/* <Route path="/csp-program" element={<CspProgramPage />} /> */}
                 <Route path="/activities" element={<ActivityPage />} />
 
                 <Route path="/refer-and-earn" element={<ReferAndEarnPage />} />

@@ -312,224 +312,6 @@ const BENCHMARK_SALES: Record<string, number> = {
   "bm-10": 4180,
 };
 
-// 16 Applications demo data matching the screenshot with emails
-const INITIAL_APPLICATIONS: ApplicationRow[] = [
-  {
-    id: "app-1",
-    name: "Aditi Sharma",
-    email: "aditi.sharma@email.com",
-    brandName: "Arty Studio",
-    phoneNumber: "+91 98765 43210",
-    prositeUrl: "atives.in/artystudio",
-    status: "pending",
-    avatarInitials: "AS",
-    avatarBg: "bg-rose-100",
-    avatarText: "text-rose-700",
-    avatarBorder: "border-rose-200",
-    sellingBefore: "Yes",
-    sellingNote: "On Instagram and local exhibitions",
-    membershipLabel: "Premium Membership",
-    membershipStatus: "Active",
-    activatedAt: "15 Oct 2026, 04:32 PM",
-    customerSince: "15 Oct 2026",
-    submittedAt: "16 Oct 2026, 11:24 AM",
-  },
-  {
-    id: "app-2",
-    name: "Rohan Kapoor",
-    email: "rohan.kapoor@email.com",
-    brandName: "RK Illustrations",
-    phoneNumber: "+91 91234 56789",
-    prositeUrl: "atives.in/rkillustrations",
-    status: "pending",
-    avatarInitials: "RK",
-    avatarBg: "bg-sky-100",
-    avatarText: "text-sky-700",
-    avatarBorder: "border-sky-200",
-  },
-  {
-    id: "app-3",
-    name: "Megha Patel",
-    email: "megha.patel@email.com",
-    brandName: "Palette People",
-    phoneNumber: "+91 99887 66554",
-    prositeUrl: "atives.in/palettepeople",
-    status: "pending",
-    avatarInitials: "MP",
-    avatarBg: "bg-blue-100",
-    avatarText: "text-blue-700",
-    avatarBorder: "border-blue-200",
-  },
-  {
-    id: "app-4",
-    name: "Varun Sahu",
-    email: "varun.sahu@email.com",
-    brandName: "Studio 22",
-    phoneNumber: "+91 88776 55443",
-    prositeUrl: "atives.in/studio22",
-    status: "pending",
-    avatarInitials: "VS",
-    avatarBg: "bg-orange-100",
-    avatarText: "text-orange-700",
-    avatarBorder: "border-orange-200",
-  },
-  {
-    id: "app-5",
-    name: "Neha Verma",
-    email: "neha.verma@email.com",
-    brandName: "Brush & Beyond",
-    phoneNumber: "+91 99876 54321",
-    prositeUrl: "atives.in/brushandbeyond",
-    status: "pending",
-    avatarInitials: "NV",
-    avatarBg: "bg-amber-100",
-    avatarText: "text-amber-800",
-    avatarBorder: "border-amber-200",
-  },
-  {
-    id: "app-6",
-    name: "Arjun Khandelwal",
-    email: "arjun.k@email.com",
-    brandName: "Frame Factory",
-    phoneNumber: "+91 97654 32109",
-    prositeUrl: "atives.in/framefactory",
-    status: "pending",
-    avatarInitials: "AK",
-    avatarBg: "bg-purple-100",
-    avatarText: "text-purple-700",
-    avatarBorder: "border-purple-200",
-  },
-  {
-    id: "app-7",
-    name: "Karan Malhotra",
-    email: "karan.m@email.com",
-    brandName: "Karan Creates",
-    phoneNumber: "+91 96543 21098",
-    prositeUrl: "atives.in/karancreates",
-    status: "pending",
-    avatarInitials: "KM",
-    avatarBg: "bg-slate-800",
-    avatarText: "text-white",
-    avatarBorder: "border-slate-800",
-  },
-  {
-    id: "app-8",
-    name: "Simran Pandey",
-    email: "simran.p@email.com",
-    brandName: "The Handmade Store",
-    phoneNumber: "+91 90987 65432",
-    prositeUrl: "atives.in/thehandmadestore",
-    status: "pending",
-    avatarInitials: "SP",
-    avatarBg: "bg-teal-100",
-    avatarText: "text-teal-700",
-    avatarBorder: "border-teal-200",
-  },
-  {
-    id: "app-9",
-    name: "Tanvi Shah",
-    email: "tanvi.shah@email.com",
-    brandName: "Tanvi Crafts",
-    phoneNumber: "+91 98123 45678",
-    prositeUrl: "atives.in/tanvicrafts",
-    status: "pending",
-    avatarInitials: "TS",
-    avatarBg: "bg-pink-100",
-    avatarText: "text-pink-700",
-    avatarBorder: "border-pink-200",
-  },
-  {
-    id: "app-10",
-    name: "Kabir Mehta",
-    email: "kabir.mehta@email.com",
-    brandName: "Kabir Arts",
-    phoneNumber: "+91 98234 56789",
-    prositeUrl: "atives.in/kabirarts",
-    status: "pending",
-    avatarInitials: "KM",
-    avatarBg: "bg-emerald-100",
-    avatarText: "text-emerald-700",
-    avatarBorder: "border-emerald-200",
-  },
-  {
-    id: "app-11",
-    name: "Ritu Deshmukh",
-    email: "ritu.d@email.com",
-    brandName: "Clay & Canvas",
-    phoneNumber: "+91 98345 67890",
-    prositeUrl: "atives.in/claycanvas",
-    status: "pending",
-    avatarInitials: "RD",
-    avatarBg: "bg-indigo-100",
-    avatarText: "text-indigo-700",
-    avatarBorder: "border-indigo-200",
-  },
-  {
-    id: "app-12",
-    name: "Manish Joshi",
-    email: "manish.joshi@email.com",
-    brandName: "Joshi Studios",
-    phoneNumber: "+91 98456 78901",
-    prositeUrl: "atives.in/joshistudios",
-    status: "pending",
-    avatarInitials: "MJ",
-    avatarBg: "bg-rose-100",
-    avatarText: "text-rose-700",
-    avatarBorder: "border-rose-200",
-  },
-  {
-    id: "app-13",
-    name: "Ananya Roy",
-    email: "ananya.roy@email.com",
-    brandName: "The Art Nook",
-    phoneNumber: "+91 98567 89012",
-    prositeUrl: "atives.in/artnook",
-    status: "pending",
-    avatarInitials: "AR",
-    avatarBg: "bg-sky-100",
-    avatarText: "text-sky-700",
-    avatarBorder: "border-sky-200",
-  },
-  {
-    id: "app-14",
-    name: "Gaurav Batra",
-    email: "gaurav.b@email.com",
-    brandName: "Batra Prints",
-    phoneNumber: "+91 98678 90123",
-    prositeUrl: "atives.in/batraprints",
-    status: "pending",
-    avatarInitials: "GB",
-    avatarBg: "bg-orange-100",
-    avatarText: "text-orange-700",
-    avatarBorder: "border-orange-200",
-  },
-  {
-    id: "app-15",
-    name: "Pooja Nair",
-    email: "pooja.nair@email.com",
-    brandName: "Krafty Designs",
-    phoneNumber: "+91 98789 01234",
-    prositeUrl: "atives.in/krafty",
-    status: "pending",
-    avatarInitials: "PN",
-    avatarBg: "bg-purple-100",
-    avatarText: "text-purple-700",
-    avatarBorder: "border-purple-200",
-  },
-  {
-    id: "app-16",
-    name: "Divya Rao",
-    email: "divya.rao@email.com",
-    brandName: "Rao Handmade",
-    phoneNumber: "+91 98890 12345",
-    prositeUrl: "atives.in/raodesigns",
-    status: "pending",
-    avatarInitials: "DR",
-    avatarBg: "bg-amber-100",
-    avatarText: "text-amber-800",
-    avatarBorder: "border-amber-200",
-  },
-];
 
 const REJECTION_REASONS = [
   "Profile does not meet criteria",
@@ -766,6 +548,7 @@ export default function CspScreen() {
   );
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
+  const [prositeUrl, setPrositeUrl] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
@@ -992,6 +775,7 @@ export default function CspScreen() {
     setShowEnroll(false);
     setSelectedCustomerId("");
     setCustomerSearch("");
+    setPrositeUrl("");
     setDropdownOpen(false);
   };
 
@@ -1011,14 +795,31 @@ export default function CspScreen() {
     setDropdownOpen(true);
   };
 
+  const prosite = prositeUrl.trim().replace(/\/+$/, "");
+  const prositeReady =
+    /^(?:https?:\/\/)?(?:www\.)?1atives\.com\/pro\/[a-z0-9][a-z0-9_-]*$/i.test(
+      prosite,
+    );
+
   const handleEnroll = async () => {
     if (!selectedCustomerId) {
       Swal.fire("Customer required", "Select a customer to enroll.", "warning");
       return;
     }
+    if (!prositeReady) {
+      Swal.fire(
+        "Prosite URL required",
+        "Use a link like 1atives.com/pro/yourname.",
+        "warning",
+      );
+      return;
+    }
     try {
       setEnrolling(true);
-      const res = await handleEnrollCsp({ customerId: selectedCustomerId });
+      const res = await handleEnrollCsp({
+        customerId: selectedCustomerId,
+        prositeUrl: prosite,
+      });
       if (!res?.success) {
         throw new Error(res?.message || "Enrollment failed");
       }
@@ -2707,6 +2508,20 @@ export default function CspScreen() {
                 </div>
               )}
 
+              <div className="mt-4">
+                <label className="mb-1.5 block text-xs font-semibold text-slate-700">
+                  Atives Prosite URL *
+                </label>
+                <input
+                  type="text"
+                  value={prositeUrl}
+                  onChange={(e) => setPrositeUrl(e.target.value)}
+                  placeholder="1atives.com/pro/yourname"
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
+                  autoComplete="off"
+                />
+              </div>
+
               {!loadingCustomers && availableCustomers.length === 0 && (
                 <div className="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700">
                   {customers.length === 0
@@ -2728,8 +2543,8 @@ export default function CspScreen() {
               <button
                 type="button"
                 onClick={handleEnroll}
-                disabled={enrolling || !selectedCustomerId}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#ff5a36] px-5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#ea4824] disabled:opacity-50 transition-all cursor-pointer"
+                disabled={enrolling || !selectedCustomerId || !prositeReady}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#ff5a36] px-5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#ea4824] disabled:cursor-not-allowed disabled:opacity-50 transition-all cursor-pointer"
               >
                 {enrolling ? (
                   <>

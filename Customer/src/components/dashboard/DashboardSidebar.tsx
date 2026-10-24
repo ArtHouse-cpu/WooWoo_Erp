@@ -56,7 +56,7 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose}: Props) 
             const programIndex = items.findIndex(item => item.id === 'programs');
             items.splice(programIndex + 1, 0, {
               id: 'csp-program',
-              label: 'CSP Program',
+              label: '', //Csp Program
               icon: Store,
               to: '/csp-program',
               section: 'Main',

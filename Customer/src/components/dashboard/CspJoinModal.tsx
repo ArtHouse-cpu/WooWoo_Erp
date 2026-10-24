@@ -547,12 +547,12 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
                     type="url"
                     value={prositeUrl}
                     onChange={(e) => setPrositeUrl(e.target.value)}
-                    placeholder="https://atives.com/pro/your-name"
+                    placeholder="https://1atives.com/pro/your-name"
                     className="w-full text-sm text-slate-800 placeholder:text-slate-400 outline-none bg-transparent"
                   />
                 </div>
                 <a
-                  href="https://atives.com"
+                  href="https://1atives.com"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-[#EA580C] hover:underline cursor-pointer"

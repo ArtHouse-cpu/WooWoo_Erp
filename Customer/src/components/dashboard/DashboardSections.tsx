@@ -131,11 +131,9 @@ export function MembershipBanner() {
         <div className="min-w-0">
           <p className="text-[13px] font-black text-[#111111] leading-tight sm:text-[14px]">Upgrade Membership</p>
           <p className="mt-0.5 text-[10.5px] font-semibold text-[#6B7280] leading-snug sm:text-[11px]">
-           <p>
-  Unlock more exclusive offers,
-  <br />
-  cashback & benefits.
-</p>
+            Unlock more exclusive offers,
+            <br />
+            cashback & benefits.
           </p>
         </div>
       </div>

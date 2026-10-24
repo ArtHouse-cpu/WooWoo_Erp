@@ -608,28 +608,28 @@ const handleDeleteProduct = async (id: string, name: string) => {
 
   const content = (
     <div className="w-full space-y-6 pb-12">
-      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.03)] sm:p-6 md:p-8">
+      <div className="overflow-visible rounded-[24px] border border-black/[0.04] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.03)] sm:p-6 md:p-8">
         
         {/* ================= HEADER ================= */}
-        <div className="mb-6 flex flex-nowrap items-center justify-between gap-3 border-b border-gray-100 pb-5">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <div className="mb-6 flex flex-nowrap items-center justify-between gap-2 border-b border-gray-100 pb-5 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-100 bg-gray-50 text-gray-700 transition hover:bg-gray-100 active:scale-95"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-gray-50 text-gray-700 transition hover:bg-gray-100 active:scale-95 sm:h-10 sm:w-10"
               aria-label="Go back"
             >
-              <ChevronLeft size={22} strokeWidth={2.5} />
+              <ChevronLeft size={20} strokeWidth={2.5} />
             </button>
 
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="truncate text-lg font-black tracking-tight text-[#0f172a] sm:text-2xl md:text-3xl">
+            <div className="shrink-0">
+              <div className="flex items-center gap-1">
+                <h1 className="whitespace-nowrap text-[17px] font-black tracking-tight text-[#0f172a] sm:text-2xl md:text-3xl">
                   CSP Program
                 </h1>
                 {/* 3 diagonal orange spark accent dashes */}
                 <svg
-                  className="h-5 w-5 -mt-2 text-orange-500"
+                  className="h-4 w-4 -mt-2 shrink-0 text-orange-500 sm:h-5 sm:w-5"
                   viewBox="0 0 16 16"
                   fill="none"
                   stroke="currentColor"
@@ -642,7 +642,7 @@ const handleDeleteProduct = async (id: string, name: string) => {
                 </svg>
               </div>
 
-              <p className="text-xs font-semibold text-[#94a3b8] sm:text-sm">
+              <p className="whitespace-nowrap text-[11px] font-semibold text-[#94a3b8] sm:text-sm">
                 Creative Seller Partner
               </p>
             </div>
@@ -655,7 +655,7 @@ const handleDeleteProduct = async (id: string, name: string) => {
               <button
                 type="button"
                 onClick={() => setFilterDropdownOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-xl border border-gray-200/90 bg-white px-3.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition hover:bg-gray-50"
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200/90 bg-white px-2.5 py-2 text-[11px] font-bold text-gray-700 shadow-sm transition hover:bg-gray-50 sm:gap-2 sm:px-3.5 sm:text-xs"
               >
                 <Calendar size={15} className="text-gray-500" />
                 <span>{timeFilter}</span>
