@@ -1,22 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
-import { X, Phone, Mail, Building2, Wallet, CalendarDays, Crown, Receipt } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { X, Phone, Mail, Building2, Wallet, CalendarDays, Crown, Receipt, CalendarPlus, FilePlus2 } from "lucide-react";
+import { usePermission } from "@/hooks/usePermission";
+import CreatePosScreen from "@/features/sales/pages/CreatePosScreen";
 import {
   handleGetCustomer360,
   type Customer360Booking,
   type Customer360Membership,
   type Customer360Purchase,
   type Customer360Response,
+  type Customer360CspProgram,
   type Customer360TimelineItem,
   type Customer360WalletTx,
 } from "@/services/apiClient";
 
-type Tab = "overview" | "purchases" | "bookings" | "memberships" | "wallet" | "timeline";
+type Tab = "overview" | "purchases" | "program" | "bookings" | "memberships" | "wallet" | "timeline";
+type ProgramTab = "csp" | "hap";
 type CreatedSort = "newest" | "oldest";
 type DateRange = "" | "today" | "this-week" | "this-month" | "last-month" | "this-year" | "last-year";
 
 const tabs: { key: Tab; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "purchases", label: "Shopping" },
+  { key: "program", label: "Program" },
   { key: "bookings", label: "Bookings" },
   { key: "memberships", label: "Memberships" },
   { key: "wallet", label: "Wallet" },
@@ -118,6 +124,8 @@ export default function Customer360Modal({
   customerName?: string;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
+  const { canPath } = usePermission();
   const [tab, setTab] = useState<Tab>("overview");
   const [sort, setSort] = useState<CreatedSort>("newest");
   const [dateRange, setDateRange] = useState<DateRange>("");
@@ -125,6 +133,7 @@ export default function Customer360Modal({
   const [data, setData] = useState<Customer360Response | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [posOpen, setPosOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -193,6 +202,16 @@ export default function Customer360Modal({
     [data?.timeline, sort, dateRange],
   );
 
+  const openBooking = (kind: "full" | "express") => {
+    const params = new URLSearchParams({ create: "true", customerId });
+    const name = customer?.name || customerName || "";
+    if (name) params.set("customerName", name);
+    if (customer?.mobile) params.set("customerPhone", customer.mobile);
+    if (customer?.email) params.set("customerEmail", customer.email);
+    if (customer?.membershipType) params.set("membershipType", customer.membershipType);
+    navigate(kind === "full" ? `/allBookings?${params}` : `/spaceBooking?${params}`);
+  };
+
   const openSales = purchases.filter((row) => !["cancelled", "draft"].includes(row.status.toLowerCase()));
   const openBookings = bookings.filter((row) => !["cancelled", "draft", "expired"].includes(row.status.toLowerCase()));
   const cards = [
@@ -247,9 +266,38 @@ export default function Customer360Modal({
               ) : null}
             </div>
           </div>
-          <button type="button" onClick={onClose} className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
-            <X size={14} /> Close
-          </button>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {canPath("/allBookings") ? (
+              <button
+                type="button"
+                onClick={() => openBooking("full")}
+                className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700"
+              >
+                <CalendarPlus size={14} /> Full Booking
+              </button>
+            ) : null}
+            {canPath("/spaceBooking") ? (
+              <button
+                type="button"
+                onClick={() => openBooking("express")}
+                className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700"
+              >
+                <CalendarPlus size={14} /> Express Booking
+              </button>
+            ) : null}
+            {canPath("/create-pos") || canPath("/pos") || canPath("/create-invoice") ? (
+              <button
+                type="button"
+                onClick={() => setPosOpen(true)}
+                className="inline-flex items-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-[#2F6FED]"
+              >
+                <FilePlus2 size={14} /> POS Bill
+              </button>
+            ) : null}
+            <button type="button" onClick={onClose} className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
+              <X size={14} /> Close
+            </button>
+          </div>
         </header>
 
         <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-3">
@@ -357,6 +405,14 @@ export default function Customer360Modal({
           {!loading && data && tab !== "overview" ? (
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
               {tab === "purchases" ? <PurchaseList rows={purchases} onOpen={setSale} /> : null}
+              {tab === "program" ? (
+                <ProgramPanel
+                  key={customerId}
+                  program={data.program?.csp}
+                  dateRange={dateRange}
+                  sort={sort}
+                />
+              ) : null}
               {tab === "bookings" ? <BookingList rows={bookings} /> : null}
               {tab === "memberships" ? <MembershipList rows={memberships} /> : null}
               {tab === "wallet" ? <WalletList rows={walletRows} /> : null}
@@ -366,7 +422,218 @@ export default function Customer360Modal({
         </div>
       </div>
       {sale ? <SaleDetail sale={sale} onClose={() => setSale(null)} /> : null}
+      <CreatePosScreen
+        open={posOpen}
+        onClose={() => setPosOpen(false)}
+        overlayClassName="z-[120]"
+        initialCustomer={{
+          id: customerId,
+          name: customer?.name || customerName || "",
+          phone: customer?.mobile || "",
+          membership: customer?.membershipType || "none",
+        }}
+      />
     </div>
+  );
+}
+
+function ProgramPanel({
+  program,
+  dateRange,
+  sort,
+}: {
+  program?: Customer360CspProgram | null;
+  dateRange: DateRange;
+  sort: CreatedSort;
+}) {
+  const [programTab, setProgramTab] = useState<ProgramTab>("csp");
+  const products = sortByCreated(
+    (program?.products || []).filter((row) => inDateRange(row.createdAt, dateRange)),
+    (row) => row.createdAt,
+    sort,
+  );
+  const sales = sortByCreated(
+    (program?.sales || []).filter((row) => inDateRange(row.at, dateRange)),
+    (row) => row.at,
+    sort,
+  );
+  const payouts = sortByCreated(
+    (program?.payouts || []).filter((row) => inDateRange(row.at, dateRange)),
+    (row) => row.at,
+    sort,
+  );
+  const timeline = sortByCreated(
+    (program?.timeline || []).filter((row) => inDateRange(row.at, dateRange)),
+    (row) => row.at,
+    sort,
+  );
+  const status = programStatus(program);
+
+  return (
+    <div>
+      <div className="mb-4 flex gap-2">
+        {(
+          [
+            ["csp", "CSP"],
+            ["hap", "HAP"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setProgramTab(id)}
+            className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+              programTab === id ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {programTab === "hap" ? (
+        <Empty text="No House Affiliate Program record for this customer." />
+      ) : (
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-violet-600">CSP</p>
+              <p className="text-sm font-semibold text-slate-800">
+                {program?.brandName || "Creative Seller Partner"}
+              </p>
+            </div>
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${status.className}`}>
+              {status.label}
+            </span>
+          </div>
+          {program?.applicationStatus === "rejected" && program.rejectionReason ? (
+            <p className="text-sm text-rose-600">Reason: {program.rejectionReason}</p>
+          ) : null}
+          {!program?.enrolled && program?.applicationStatus !== "under_review" && program?.applicationStatus !== "rejected" ? (
+            <p className="text-sm text-slate-500">This customer has not enrolled in CSP.</p>
+          ) : null}
+              <ProgramBlock title="Products">
+                {products.length === 0 ? (
+                  <Empty text="No CSP products for this customer." />
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {products.map((row) => (
+                      <li key={row.id} className="flex items-start justify-between gap-3 py-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900">{row.name || "Product"}</p>
+                          <p className="text-xs text-slate-500">
+                            {row.category || "No category"}
+                            {` · ${row.sold} sold`}
+                            {row.createdAt ? ` · ${when(row.createdAt)}` : ""}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-slate-900">{money(row.price)}</p>
+                          <p className="text-xs text-slate-500">Sales {money(row.sales)}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </ProgramBlock>
+              <ProgramBlock title="Sales">
+                {sales.length === 0 ? (
+                  <Empty text="No CSP sales for this customer." />
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {sales.map((row) => (
+                      <li key={row.id} className="flex items-start justify-between gap-3 py-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="font-bold text-slate-900">{row.title || "Sale"}</p>
+                          <p className="text-xs text-slate-500">
+                            {whenStamp(row.at)}
+                            {row.detail ? ` · ${row.detail}` : ""}
+                          </p>
+                        </div>
+                        <p className="font-bold text-slate-900">{money(row.amount)}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </ProgramBlock>
+              <ProgramBlock title="Payout">
+                <p className="mb-2 text-xs text-slate-500">
+                  Pending {money(program?.performance?.pendingPayout)} · Completed {money(program?.performance?.completedPayout)} · Available {money(program?.performance?.availableBalance)}
+                </p>
+                {payouts.length === 0 ? (
+                  <Empty text="No payout requests for this customer." />
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {payouts.map((row) => (
+                      <li key={row.id} className="flex items-start justify-between gap-3 py-3 text-sm">
+                        <div>
+                          <p className="font-bold capitalize text-slate-900">{row.status?.replace(/_/g, " ") || "Payout"}</p>
+                          <p className="text-xs text-slate-500">
+                            {whenStamp(row.at)}
+                            {row.method ? ` · ${row.method.toUpperCase()}` : ""}
+                          </p>
+                        </div>
+                        <p className="font-bold text-slate-900">{money(row.amount)}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </ProgramBlock>
+              <ProgramBlock title="Timeline">
+                {timeline.length === 0 ? (
+                  <Empty text="No CSP sales or payouts in this period." />
+                ) : (
+                  <ol className="space-y-2">
+                    {timeline.map((row, index) => (
+                      <li key={row.id || `${row.kind}-${index}`} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-violet-600">
+                              {row.kind === "payout" ? "Payout" : "Sale"}
+                            </p>
+                            <p className="text-sm font-bold text-slate-900">{row.title}</p>
+                            <p className="text-xs text-slate-500">
+                              {whenStamp(row.at)}
+                              {row.detail ? ` · ${row.detail}` : ""}
+                            </p>
+                          </div>
+                          <p className="shrink-0 text-sm font-bold text-slate-900">{money(row.amount)}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </ProgramBlock>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function programStatus(program?: Customer360CspProgram | null) {
+  const application = String(program?.applicationStatus || "").toLowerCase();
+  const enrollment = String(program?.status || "").toLowerCase();
+  if (program?.enrolled && enrollment === "active") {
+    return { label: "Active", className: "bg-emerald-100 text-emerald-700" };
+  }
+  if (program?.enrolled) {
+    return { label: "Inactive", className: "bg-slate-100 text-slate-600" };
+  }
+  if (application === "under_review") {
+    return { label: "Under review", className: "bg-amber-100 text-amber-700" };
+  }
+  if (application === "rejected") {
+    return { label: "Rejected", className: "bg-rose-100 text-rose-700" };
+  }
+  return { label: "Not enrolled", className: "bg-slate-100 text-slate-600" };
+}
+
+function ProgramBlock({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h3 className="mb-1 text-sm font-bold text-slate-900">{title}</h3>
+      {children}
+    </section>
   );
 }
 

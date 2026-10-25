@@ -24,6 +24,7 @@ import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutMod
 import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
 import { roundPayable } from "@/features/sales/utils/paymentRoundOff";
 import CreateBookingDetailsModal, {
+  bookingCustomerDraft,
   type BookingFormPayload,
 } from "@/features/spacebook/modal/CreateBookingDetailsModal";
 import {
@@ -219,10 +220,17 @@ export default function AllBookings() {
   useEffect(() => {
     if (searchParams.get("create") !== "true") return;
     openCreateBooking();
+    const draft = bookingCustomerDraft(searchParams);
+    if (draft) setPendingCheckout(draft);
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
         next.delete("create");
+        next.delete("customerId");
+        next.delete("customerName");
+        next.delete("customerPhone");
+        next.delete("customerEmail");
+        next.delete("membershipType");
         return next;
       },
       { replace: true },

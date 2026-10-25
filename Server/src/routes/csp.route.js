@@ -5,7 +5,12 @@ import {
   requireAnyPermission,
 } from "../middlewares/authorize.middleware.js";
 import {PERMISSIONS} from "../constants/permissions.js";
-import {enrollCsp, getCSP, updateCsp} from "../controllers/csp.controller.js";
+import {
+  enrollCsp,
+  getCSP,
+  getCspPartnerDetails,
+  updateCsp,
+} from "../controllers/csp.controller.js";
 import {
   listCspApplications,
   reviewCspApplication,
@@ -39,6 +44,11 @@ router.patch(
   "/applications/:id",
   requireAnyPermission(PERMISSIONS.CSP_WRITE, PERMISSIONS.CUSTOMER_UPDATE),
   reviewCspApplication,
+);
+router.get(
+  "/:id/details",
+  requireAnyPermission(PERMISSIONS.CSP_READ, PERMISSIONS.CUSTOMER_READ),
+  getCspPartnerDetails,
 );
 router.patch(
   "/:id",

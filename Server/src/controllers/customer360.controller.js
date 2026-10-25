@@ -6,6 +6,7 @@ import AllBooking from '../models/allBooking.model.js';
 import Subscription from '../models/subscription.model.js';
 import Membership from '../models/membership.model.js';
 import Wallet from '../models/wallet.model.js';
+import {cspProgramForCustomer} from './csp.controller.js';
 
 const LIMIT = 250;
 const CLOSED = new Set(['cancelled', 'draft', 'expired']);
@@ -379,6 +380,10 @@ export const getCustomer360 = async (req, res) => {
       memberships,
       walletTransactions,
       timeline,
+      program: {
+        csp: await cspProgramForCustomer(customer._id),
+        hap: {enrolled: false},
+      },
     });
   } catch (error) {
     console.error('getCustomer360 error:', error);

@@ -41,6 +41,7 @@ import {
   type CspEnrollment,
 } from "@/services/apiClient";
 import ApproveCSPModal from "../components/ApproveCSPModal";
+import CspPartnerDetailsModal from "../components/CspPartnerDetailsModal";
 
 type CustomerOption = {
   _id: string;
@@ -570,6 +571,14 @@ export default function CspScreen() {
     products: ProductRow[];
     loading: boolean;
   }>({ open: false, csp: null, products: [], loading: false });
+  const [detailsPartner, setDetailsPartner] = useState<CspEnrollment | null>(
+    null,
+  );
+
+  const openPartnerDetails = (row: CspEnrollment) => {
+    setActionMenuId(null);
+    setDetailsPartner(row);
+  };
 
   const openProductsModal = async (csp: CspEnrollment) => {
     setActionMenuId(null);
@@ -1768,9 +1777,13 @@ export default function CspScreen() {
                               {initials}
                             </div>
                             <div>
-                              <div className="font-semibold text-slate-900 text-sm">
+                              <button
+                                type="button"
+                                onClick={() => openPartnerDetails(row)}
+                                className="text-left text-sm font-semibold text-slate-900 hover:text-[#ff5a36] hover:underline cursor-pointer"
+                              >
                                 {partnerName}
-                              </div>
+                              </button>
                               <div className="text-xs text-slate-400">
                                 {brandName !== "—"
                                   ? brandName
@@ -2243,6 +2256,11 @@ export default function CspScreen() {
           </div>
         </div>
       )}
+
+      <CspPartnerDetailsModal
+        partner={detailsPartner}
+        onClose={() => setDetailsPartner(null)}
+      />
 
       {/* ── 8. Assigned Products Modal ───────────────────────────────── */}
       {productsModal.open && (

@@ -64,7 +64,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthBootstrap>
+          
           <Routes>
+            
             <Route element={<PublicOnlyRoute />}>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
@@ -122,6 +124,8 @@ export default function App() {
             
 
           </Routes>
+          
+          
         </AuthBootstrap>
         <Toaster richColors position="top-center" />
       </BrowserRouter>

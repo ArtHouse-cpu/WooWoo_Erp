@@ -14,7 +14,11 @@ import {validateCouponForOrder} from './coupon.controller.js';
 import {creditReferralDiscountToInviter, markReferralDiscountUsed} from '../modules/customer/services/referral.service.js';
 import {sendNewMembershipWhatsApp, sendMembershipRenewalWhatsApp, sendMembershipChangeWhatsApp} from '../modules/customer/services/whatsapp.service.js';
 import {resolvePlanMeta} from '../services/membershipPlan.service.js';
-import {appendTransaction} from './wallet.controller.js';
+import {
+  appendTransaction,
+  debitWalletForPurchase,
+  getSpendableWalletBalance,
+} from './wallet.controller.js';
 import Invoice from '../models/invoice.model.js';
 import WhatsAppReminderLog from '../models/whatsappReminderLog.model.js';
 
@@ -201,7 +205,7 @@ export const createSubscription = async (req, res) => {
     });
 
     // Junior: always allowed (priority rules do not apply).
-    // Non-Junior: only allow if newPriority > customer's current priority.
+    // Same priority renews the current plan. A lower priority is a downgrade and stays blocked.
     // Bulk historical import skips this gate (allowPastEndDate flag).
     let priorCustomerPriority = 0;
     try {
@@ -213,18 +217,22 @@ export const createSubscription = async (req, res) => {
     }
 
     if (!juniorMembership && !req.body?.allowPastEndDate) {
-      if (priorCustomerPriority > 0 && newPriority <= priorCustomerPriority) {
+      if (priorCustomerPriority > 0 && newPriority < priorCustomerPriority) {
         return res.status(409).json({
           success: false,
           message:
-            'Membership upgrade not allowed. Choose a plan with a higher priority than the customer\'s current membership. (Same or lower priority plans, and downgrades, are blocked. Junior membership is always allowed.)',
+            'Membership downgrade not allowed. Renew the same plan, or choose a higher priority than the customer\'s current membership. Junior membership is always allowed.',
         });
       }
     }
 
-    // Upgrade = customer already had a paid/main membership before this successful create
+    // Upgrade = a higher-priority plan than the one the customer already has.
+    // Renewing the same priority is a new membership, not a plan change.
     const isMembershipUpgrade =
-      !juniorMembership && priorCustomerPriority > 0 && !req.body?.allowPastEndDate;
+      !juniorMembership &&
+      priorCustomerPriority > 0 &&
+      newPriority > priorCustomerPriority &&
+      !req.body?.allowPastEndDate;
 
     let referralDiscount = 0;
     let appliedReferral = null;
@@ -844,6 +852,64 @@ export const updateSubscription = async (req, res) => {
           endDate: parsed.data.endDate ?? existing.endDate,
           customerName: parsed.data.customerName ?? existing.customerName,
         };
+      }
+    }
+
+    if (parsed.data.paymentBreakdown) {
+      const current = await Subscription.findById(id).lean();
+      if (!current) {
+        return res.status(404).json({success: false, message: 'Subscription not found.'});
+      }
+      const previousWallet = Math.max(
+        0,
+        Number(current.paymentBreakdown?.wallet) || 0,
+      );
+      const nextWallet = Math.max(
+        0,
+        Number(parsed.data.paymentBreakdown.wallet) || 0,
+      );
+      const walletDelta = Math.round((nextWallet - previousWallet) * 100) / 100;
+      if (walletDelta > 0) {
+        const customer = await Customer.findOne({
+          mobile: String(current.customerPhone || '').trim(),
+          isDeleted: {$ne: true},
+        });
+        if (!customer) {
+          return res.status(400).json({
+            success: false,
+            message: 'Customer not found for wallet payment.',
+          });
+        }
+        let wallet = await Wallet.findOne({customerId: customer._id});
+        if (!wallet) {
+          wallet = await Wallet.create({
+            customerId: customer._id,
+            customerName: String(customer.name ?? '').trim(),
+            customerPhone: String(customer.mobile ?? '').trim(),
+            walletAmount: Math.max(0, Number(customer.walletAmount ?? 0) || 0),
+            cashbackBalance: Math.max(0, Number(customer.cashbackBalance ?? 0) || 0),
+            affiliateBalance: Math.max(0, Number(customer.affiliateBalance ?? 0) || 0),
+            transactions: [],
+          });
+        }
+        const available = getSpendableWalletBalance(wallet, customer);
+        if (walletDelta > available + 0.01) {
+          return res.status(400).json({
+            success: false,
+            message: `Insufficient wallet balance. Available: ₹${Number(available).toFixed(2)}`,
+          });
+        }
+        await debitWalletForPurchase(wallet, {
+          amount: walletDelta,
+          note: `Wallet used for subscription ${current.subscriptionCode || id}`,
+          referenceType: 'subscription',
+          referenceId: String(current.subscriptionCode || id),
+          createdBy: {
+            m_staff_id: req.user?.userId ?? null,
+            m_staff_name: req.user?.name ?? null,
+            m_staff_email: req.user?.email ?? null,
+          },
+        });
       }
     }
 

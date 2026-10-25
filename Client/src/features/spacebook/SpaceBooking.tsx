@@ -29,6 +29,7 @@ import {
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import CreateBookingDetailsModal, {
+  bookingCustomerDraft,
   type BookingFormPayload,
   type MultiDateSlot,
 } from "./modal/CreateBookingDetailsModal";
@@ -325,12 +326,17 @@ const SpaceBook = () => {
   useEffect(() => {
     if (searchParams.get("create") === "true") {
       setEditingBooking(null);
-      setPendingCheckout(null);
+      setPendingCheckout(bookingCustomerDraft(searchParams));
       setIsCreateModalOpen(true);
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
           next.delete("create");
+          next.delete("customerId");
+          next.delete("customerName");
+          next.delete("customerPhone");
+          next.delete("customerEmail");
+          next.delete("membershipType");
           return next;
         },
         { replace: true }

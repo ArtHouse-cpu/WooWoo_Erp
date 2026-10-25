@@ -20,7 +20,9 @@ import {
   handleGetMemberships,
   handleGetAllSubscriptions,
   handleSendMembershipRenewalWhatsApp,
+  handleUpdateSubscription,
 } from "@/services/apiClient";
+import DuePaymentModal from "../components/invoice/Modal/DuePaymentModal";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
   buildWoowooInvoiceWhatsAppMessage,
@@ -47,6 +49,7 @@ type SubscriptionStatus =
 type SubscriptionRow = {
   id: number;
   amount: number;
+  dueAmount: number;
   subscriptionCode: string;
   customer: string;
   phone: string;
@@ -63,6 +66,26 @@ type SubscriptionRow = {
   lastRenewalReminderAt?: string;
   lastRenewalReminderStatus?: string;
 };
+
+function subscriptionDueAmount(raw: any): number {
+  const breakdown = raw?.paymentBreakdown;
+  if (breakdown && breakdown.dueAmount != null && breakdown.dueAmount !== "") {
+    return Math.max(0, Number(breakdown.dueAmount) || 0);
+  }
+  const status = String(raw?.paymentStatus ?? "").toLowerCase();
+  if (status === "partial" || status === "due") {
+    const paid = Number(breakdown?.paidAmount ?? 0);
+    const total = Number(raw?.grandTotal ?? raw?.amount ?? 0);
+    return Math.max(0, total - paid);
+  }
+  return 0;
+}
+
+const formatInr = (value: number) =>
+  `₹${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 function toDateYmd(value: Date): string {
   const y = value.getFullYear();
@@ -138,6 +161,8 @@ export default function SubscriptionScreen() {
   const [loading, setLoading] = useState(false);
   const [selectedActionRow, setSelectedActionRow] =
     useState<SubscriptionRow | null>(null);
+  const [dueActionRow, setDueActionRow] = useState<SubscriptionRow | null>(null);
+  const [duePayRow, setDuePayRow] = useState<SubscriptionRow | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<
     "create" | "edit" | "view" | "upgrade" | "bulk"
@@ -448,6 +473,7 @@ export default function SubscriptionScreen() {
             amount: Number(
               subscription?.grandTotal ?? subscription?.amount ?? 0,
             ),
+            dueAmount: subscriptionDueAmount(subscription),
             subscriptionCode: String(
               subscription?.subscriptionCode ??
                 `SUB-${subscription?.subscriptionNumber ?? index + 1001}`,
@@ -633,6 +659,26 @@ export default function SubscriptionScreen() {
             })}`}
           </span>
         ),
+        size: 120,
+      },
+      {
+        accessorKey: "dueAmount",
+        header: "Due",
+        Cell: ({ row }: { row: { original: SubscriptionRow } }) => {
+          const due = Number(row.original.dueAmount) || 0;
+          if (due <= 0) {
+            return <span className="text-xs text-slate-400">—</span>;
+          }
+          return (
+            <button
+              type="button"
+              onClick={() => setDueActionRow(row.original)}
+              className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100"
+            >
+              {formatInr(due)}
+            </button>
+          );
+        },
         size: 120,
       },
       {
@@ -1270,7 +1316,7 @@ export default function SubscriptionScreen() {
                       Upgrade Subscription
                     </div>
                     <div className="text-xs text-violet-600/80">
-                      Move to a higher-priority plan (Junior always allowed)
+                      Renew the same plan, or move to a higher priority
                     </div>
                   </div>
                 </button>
@@ -1308,6 +1354,87 @@ export default function SubscriptionScreen() {
           }}
         />
       )}
+
+      {dueActionRow ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <button
+            type="button"
+            aria-label="Close due options"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setDueActionRow(null)}
+          />
+          <div className="relative w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl">
+            <div className="mb-3">
+              <p className="text-sm font-bold text-slate-900">
+                {dueActionRow.customer || "Subscription"}
+              </p>
+              <p className="text-xs text-slate-500">
+                {dueActionRow.subscriptionCode} · Due {formatInr(dueActionRow.dueAmount)}
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setModalMode("view");
+                  setModalData(dueActionRow.raw);
+                  setIsModalOpen(true);
+                  setDueActionRow(null);
+                }}
+                className="rounded-xl border border-slate-200 px-3 py-2.5 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                Invoice
+                <span className="mt-0.5 block text-xs font-medium text-slate-500">
+                  Open this subscription invoice
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDuePayRow(dueActionRow);
+                  setDueActionRow(null);
+                }}
+                className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-left text-sm font-semibold text-amber-800 hover:bg-amber-100"
+              >
+                Pay due
+                <span className="mt-0.5 block text-xs font-medium text-amber-700/80">
+                  Record the remaining payment
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <DuePaymentModal
+        open={Boolean(duePayRow)}
+        onClose={() => setDuePayRow(null)}
+        invoice={
+          duePayRow
+            ? {
+                _id: duePayRow._id,
+                bill: duePayRow.subscriptionCode,
+                customer: duePayRow.customer,
+                customerPhone: duePayRow.phone,
+                amount: duePayRow.amount,
+                dueAmount: duePayRow.dueAmount,
+                raw: duePayRow.raw,
+              }
+            : null
+        }
+        onRecordPayment={async (payload) => {
+          if (!duePayRow) return;
+          await handleUpdateSubscription(duePayRow._id, {
+            mode: payload.mode,
+            paymentStatus: payload.paymentStatus,
+            paymentBreakdown: payload.paymentBreakdown,
+          });
+        }}
+        onSuccess={() => {
+          setDuePayRow(null);
+          void fetchSubscriptions();
+        }}
+      />
     </div>
   );
 }

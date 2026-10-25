@@ -3,7 +3,10 @@ import Customer from '../models/customer.model.js';
 import Vendor from '../models/vendor.model.js';
 import CustomersailorProgram from '../models/customerSellerProgram.model.js';
 import CspApplication from '../models/cspApplication.model.js';
+import CspSettlement from '../models/cspSettlement.model.js';
+import Product from '../models/product.model.js';
 import Wallet from '../models/wallet.model.js';
+import WalletWithdrawal from '../models/walletWithdrawal.model.js';
 import {resolveTwoBuckets} from '../utils/walletBuckets.js';
 
 const getsailorSharePercent = () => {
@@ -101,7 +104,10 @@ const populateEnrollment = query =>
       'customerId',
       'name mobile email walletAmount membershipType withdrawable affiliateBalance nonWithdrawable cashbackBalance closingBalance',
     )
-    .populate('vendorId', 'name mobile email companyName');
+    .populate(
+      'vendorId',
+      'name mobile email companyName website businessEmail',
+    );
 
 /**
  * GET /csp
@@ -640,6 +646,293 @@ export const applicationForActiveEnrollment = async customer => {
   });
   if (!enrollment) return null;
   return syncApprovedApplicationForEnrollment(customer, enrollment);
+};
+
+const roundMoney = value => Math.round((Number(value) || 0) * 100) / 100;
+
+const textOrEmpty = value => String(value || '').trim();
+
+const emptyCspProgram = () => ({
+  enrolled: false,
+  applicationStatus: '',
+  rejectionReason: '',
+  brandName: '',
+  prositeUrl: '',
+  status: '',
+  joinDate: null,
+  performance: {
+    productsSold: 0,
+    totalEarnings: 0,
+    salesAmount: 0,
+    pendingPayout: 0,
+    completedPayout: 0,
+    availableBalance: 0,
+  },
+  products: [],
+  sales: [],
+  payouts: [],
+  timeline: [],
+});
+
+const collectCspPartnerDetails = async (enrollment, {activityLimit = 8} = {}) => {
+  const dto = toEnrollmentDto(enrollment);
+    const customerId = dto.customerId ? String(dto.customerId) : '';
+    const wallet = customerId
+      ? await Wallet.findOne({customerId})
+          .select(
+            'withdrawable nonWithdrawable affiliateBalance cashbackBalance walletAmount balanceSchema',
+          )
+          .lean()
+      : null;
+    const buckets = resolveTwoBuckets(wallet, dto.customer);
+
+    let application = await CspApplication.findOne({
+      enrollmentId: enrollment._id,
+    }).lean();
+    if (!application && customerId) {
+      application = await CspApplication.findOne({customerId})
+        .sort({createdAt: -1})
+        .lean();
+    }
+
+    const products = await Product.find({
+      isCsp: true,
+      cspEnrollmentId: enrollment._id,
+    })
+      .select(
+        'productName serviceName category sellingPrice stockQty discountType discountValue createdAt',
+      )
+      .sort({createdAt: -1})
+      .lean();
+
+    const settlements = await CspSettlement.find({
+      'lines.cspEnrollmentId': enrollment._id,
+    })
+      .sort({settledAt: -1})
+      .limit(40)
+      .lean();
+
+    const withdrawals = customerId
+      ? await WalletWithdrawal.find({customer: customerId})
+          .sort({createdAt: -1})
+          .limit(20)
+          .lean()
+      : [];
+
+    const salesByProduct = new Map();
+    const activity = [];
+    let productsSold = 0;
+    let salesAmount = 0;
+    let totalEarnings = 0;
+
+    for (const settlement of settlements) {
+      if (settlement.status === 'reversed') continue;
+      for (const line of settlement.lines || []) {
+        if (String(line.cspEnrollmentId || '') !== String(enrollment._id)) {
+          continue;
+        }
+        const lineSales = Number(line.lineBaseAmount) || 0;
+        const lineEarnings = Number(line.sailorAmount) || 0;
+        productsSold += 1;
+        salesAmount += lineSales;
+        totalEarnings += lineEarnings;
+        const key = String(line.productId || line.productName || 'product');
+        const current = salesByProduct.get(key) || {
+          sold: 0,
+          sales: 0,
+        };
+        current.sold += 1;
+        current.sales += lineSales;
+        salesByProduct.set(key, current);
+        activity.push({
+          id: `sale-${settlement._id}-${activity.length}`,
+          kind: 'sale',
+          title: textOrEmpty(line.productName) || 'Product sale',
+          amount: roundMoney(lineSales),
+          at: settlement.settledAt || settlement.createdAt || null,
+          detail: textOrEmpty(settlement.invoiceCode),
+          status: 'settled',
+        });
+      }
+    }
+
+    const pendingStatuses = new Set(['requested', 'under_review', 'approved']);
+    let pendingPayout = 0;
+    let completedPayout = 0;
+    const payouts = withdrawals.map(row => {
+      const amount = Number(row.amount) || 0;
+      if (pendingStatuses.has(row.status)) pendingPayout += amount;
+      if (row.status === 'paid') completedPayout += amount;
+      activity.push({
+        id: `payout-${row._id}`,
+        kind: 'payout',
+        title: 'Payout',
+        amount: roundMoney(amount),
+        at: row.paidAt || row.reviewedAt || row.createdAt || null,
+        detail: textOrEmpty(row.method).toUpperCase(),
+        status: row.status || '',
+      });
+      return {
+        id: String(row._id),
+        amount: roundMoney(amount),
+        status: row.status || '',
+        method: textOrEmpty(row.method),
+        at: row.paidAt || row.createdAt || null,
+      };
+    });
+
+    activity.sort((a, b) => {
+      const left = a.at ? new Date(a.at).getTime() : 0;
+      const right = b.at ? new Date(b.at).getTime() : 0;
+      return right - left;
+    });
+
+    const prositeUrl = textOrEmpty(application?.prositeUrl);
+    const website =
+      textOrEmpty(dto.vendor?.website) ||
+      (prositeUrl ? `https://${prositeUrl.replace(/^https?:\/\//i, '')}` : '');
+
+    const timeline = activity.slice(0, activityLimit);
+    return {
+      partner: {
+        fullName: textOrEmpty(dto.displayName),
+        email:
+          textOrEmpty(dto.customer?.email) ||
+          textOrEmpty(dto.vendor?.email) ||
+          textOrEmpty(dto.vendor?.businessEmail),
+        phone: textOrEmpty(dto.mobile),
+        website,
+        prositeUrl,
+        status: textOrEmpty(dto.status) || 'inactive',
+        joinDate: enrollment.createdAt || null,
+        brandName:
+          textOrEmpty(application?.brandName) ||
+          textOrEmpty(dto.vendor?.companyName) ||
+          textOrEmpty(dto.vendor?.name),
+        categories: Array.isArray(application?.categories)
+          ? application.categories.filter(Boolean)
+          : [],
+        membershipType: textOrEmpty(dto.customer?.membershipType),
+        sailorSharePercent:
+          dto.sailorSharePercent == null ? null : Number(dto.sailorSharePercent),
+        platformSharePercent:
+          dto.platformSharePercent == null
+            ? null
+            : Number(dto.platformSharePercent),
+      },
+      performance: {
+        productsSold,
+        totalEarnings: roundMoney(totalEarnings),
+        salesAmount: roundMoney(salesAmount),
+        pendingPayout: roundMoney(pendingPayout),
+        completedPayout: roundMoney(completedPayout),
+        availableBalance: roundMoney(buckets.withdrawable),
+        totalLeads: null,
+      },
+      products: products.map(product => {
+        const key = String(product._id);
+        const sales = salesByProduct.get(key) || {sold: 0, sales: 0};
+        return {
+          id: key,
+          name:
+            textOrEmpty(product.productName) ||
+            textOrEmpty(product.serviceName),
+          category: textOrEmpty(product.category),
+          price: roundMoney(product.sellingPrice),
+          stock: Number(product.stockQty) || 0,
+          sold: sales.sold,
+          sales: roundMoney(sales.sales),
+          createdAt: product.createdAt || null,
+        };
+      }),
+      payouts,
+      sales: timeline.filter(row => row.kind === 'sale'),
+      timeline,
+      activity: timeline,
+    };
+};
+
+/**
+ * CSP products, sales, payouts, and timeline for one customer.
+ * Used by Customer 360. Returns an empty program when they are not enrolled.
+ */
+export const cspProgramForCustomer = async customerId => {
+  if (!customerId || !mongoose.Types.ObjectId.isValid(String(customerId))) {
+    return emptyCspProgram();
+  }
+
+  const enrollment = await populateEnrollment(
+    CustomersailorProgram.findOne({customerId}).sort({status: 1, createdAt: -1}),
+  );
+  const application = await CspApplication.findOne({customerId})
+    .sort({createdAt: -1})
+    .lean();
+
+  if (!enrollment) {
+    return {
+      ...emptyCspProgram(),
+      applicationStatus: textOrEmpty(application?.status),
+      rejectionReason: textOrEmpty(application?.rejectionReason),
+      brandName: textOrEmpty(application?.brandName),
+      prositeUrl: textOrEmpty(application?.prositeUrl),
+    };
+  }
+
+  const details = await collectCspPartnerDetails(enrollment, {activityLimit: 40});
+  return {
+    enrolled: true,
+    applicationStatus:
+      textOrEmpty(application?.status) ||
+      (enrollment.status === 'active' ? 'approved' : ''),
+    rejectionReason: textOrEmpty(application?.rejectionReason),
+    brandName: details.partner.brandName,
+    prositeUrl: details.partner.prositeUrl,
+    status: details.partner.status,
+    joinDate: details.partner.joinDate,
+    performance: details.performance,
+    products: details.products,
+    sales: details.sales,
+    payouts: details.payouts,
+    timeline: details.timeline,
+  };
+};
+
+/**
+ * GET /csp/:id/details
+ * Partner profile plus the CSP records that already exist for that enrollment.
+ */
+export const getCspPartnerDetails = async (req, res) => {
+  try {
+    const {id} = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid CSP partner id.',
+      });
+    }
+
+    const enrollment = await populateEnrollment(
+      CustomersailorProgram.findById(id),
+    );
+    if (!enrollment) {
+      return res.status(404).json({
+        success: false,
+        message: 'CSP partner not found.',
+      });
+    }
+
+    const details = await collectCspPartnerDetails(enrollment);
+    return res.status(200).json({
+      success: true,
+      ...details,
+    });
+  } catch (error) {
+    console.error('getCspPartnerDetails error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch CSP partner details.',
+    });
+  }
 };
 
 /** @deprecated Use enrollCsp — kept for older clients that posted name/phone only. */

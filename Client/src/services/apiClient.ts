@@ -1557,6 +1557,61 @@ export type Customer360Response = {
   memberships: Customer360Membership[];
   walletTransactions: Customer360WalletTx[];
   timeline: Customer360TimelineItem[];
+  program?: {
+    csp?: Customer360CspProgram | null;
+    hap?: { enrolled?: boolean };
+  };
+};
+
+export type Customer360CspProgram = {
+  enrolled: boolean;
+  applicationStatus: string;
+  rejectionReason: string;
+  brandName: string;
+  prositeUrl: string;
+  status: string;
+  joinDate: string | null;
+  performance: {
+    productsSold: number;
+    totalEarnings: number;
+    salesAmount: number;
+    pendingPayout: number;
+    completedPayout: number;
+    availableBalance: number;
+  };
+  products: Array<{
+    id: string;
+    name: string;
+    category: string;
+    price: number;
+    stock: number;
+    sold: number;
+    sales: number;
+    createdAt?: string | null;
+  }>;
+  sales: Array<{
+    id: string;
+    title: string;
+    amount: number;
+    at: string | null;
+    detail: string;
+  }>;
+  payouts: Array<{
+    id: string;
+    amount: number;
+    status: string;
+    method: string;
+    at: string | null;
+  }>;
+  timeline: Array<{
+    id?: string;
+    kind: string;
+    title: string;
+    amount: number;
+    at: string | null;
+    detail: string;
+    status?: string;
+  }>;
 };
 
 export const handleGetCustomer360 = async (
@@ -3238,8 +3293,24 @@ export type CspEnrollment = {
   displayName?: string;
   mobile?: string;
   label?: string;
-  customer?: { _id?: string; name?: string; mobile?: string; email?: string };
-  vendor?: { _id?: string; name?: string; mobile?: string };
+  createdAt?: string;
+  updatedAt?: string;
+  customer?: {
+    _id?: string;
+    name?: string;
+    mobile?: string;
+    email?: string;
+    membershipType?: string;
+  };
+  vendor?: {
+    _id?: string;
+    name?: string;
+    mobile?: string;
+    email?: string;
+    companyName?: string;
+    website?: string;
+    businessEmail?: string;
+  };
   /** CSP earnings eligible for withdrawal (wallet withdrawable bucket) */
   withdrawable?: number;
   withdrawableBalance?: number;
@@ -3344,6 +3415,64 @@ export const handleReviewCspApplication = async (
     application?: CspApplicationRecord;
     message?: string;
   };
+};
+
+export type CspPartnerDetails = {
+  partner: {
+    fullName: string;
+    email: string;
+    phone: string;
+    website: string;
+    prositeUrl: string;
+    status: string;
+    joinDate: string | null;
+    brandName: string;
+    categories: string[];
+    membershipType: string;
+    sailorSharePercent: number | null;
+    platformSharePercent: number | null;
+  };
+  performance: {
+    productsSold: number;
+    totalEarnings: number;
+    salesAmount: number;
+    pendingPayout: number;
+    completedPayout: number;
+    availableBalance: number;
+    totalLeads: number | null;
+  };
+  products: Array<{
+    id: string;
+    name: string;
+    category: string;
+    price: number;
+    stock: number;
+    sold: number;
+    sales: number;
+  }>;
+  payouts: Array<{
+    id: string;
+    amount: number;
+    status: string;
+    method: string;
+    at: string | null;
+  }>;
+  activity: Array<{
+    kind: "sale" | "payout";
+    title: string;
+    amount: number;
+    at: string | null;
+    detail: string;
+    status?: string;
+  }>;
+};
+
+export const handleGetCspPartnerDetails = async (id: string) => {
+  const response = await axiosInstance.get(`/csp/${id}/details`);
+  return response.data as {
+    success: boolean;
+    message?: string;
+  } & Partial<CspPartnerDetails>;
 };
 
 export const handleGetCspProducts = async (cspEnrollmentId: string) => {

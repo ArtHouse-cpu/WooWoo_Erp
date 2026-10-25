@@ -22,11 +22,34 @@ type SplitKey = "cash" | "upi" | "card" | "wallet";
 
 type SplitPayments = Record<SplitKey, number>;
 
+type DuePaymentPayload = {
+  mode: string;
+  paymentStatus: "full" | "partial";
+  paymentBreakdown: {
+    cash: number;
+    upi: number;
+    card: number;
+    wallet: number;
+    paidAmount: number;
+    dueAmount: number;
+    changeAmount: number;
+  };
+  pendingAmount: number;
+  newPayment: {
+    date: string;
+    amount: number;
+    mode: string;
+    receivedBy: string;
+  };
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
   invoice: any;
   onSuccess: () => void;
+  /** When set, record against this document instead of an invoice. */
+  onRecordPayment?: (payload: DuePaymentPayload) => Promise<void>;
 };
 
 const EMPTY_SPLIT: SplitPayments = {
@@ -48,6 +71,7 @@ export default function DuePaymentModal({
   onClose,
   invoice,
   onSuccess,
+  onRecordPayment,
 }: Props) {
   const [payAmount, setPayAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState("Cash");
@@ -256,7 +280,8 @@ export default function DuePaymentModal({
         },
       };
 
-      await handleUpdateInvoice(invoice._id, payload);
+      if (onRecordPayment) await onRecordPayment(payload);
+      else await handleUpdateInvoice(invoice._id, payload);
 
       Swal.fire("Success", "Payment recorded successfully", "success");
       onSuccess();

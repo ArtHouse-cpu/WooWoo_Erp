@@ -1015,7 +1015,7 @@ export default function CreateSubscriptionScreen({
     if (mode !== "upgrade") return memberships;
     return memberships.filter((m) => {
       if (isJuniorPlan(m)) return true;
-      return Number(m.priority) > effectiveCustomerPriority;
+      return Number(m.priority) >= effectiveCustomerPriority;
     });
   }, [mode, memberships, effectiveCustomerPriority]);
 
@@ -1187,11 +1187,11 @@ useEffect(() => {
       );
       if (
         effectiveCustomerPriority > 0 &&
-        newPriority <= effectiveCustomerPriority
+        newPriority < effectiveCustomerPriority
       ) {
         Swal.fire(
-          "Upgrade not allowed",
-          `Choose a membership with a higher priority than the customer's current plan (current priority: ${effectiveCustomerPriority}). Same or lower priority plans are blocked. Junior membership is always allowed.`,
+          "Downgrade not allowed",
+          `This plan is a lower priority than the customer's current plan (current priority: ${effectiveCustomerPriority}). Renew the same plan, or choose a higher priority. Junior membership is always allowed.`,
           "warning",
         );
         return false;
@@ -1820,7 +1820,7 @@ useEffect(() => {
                     </h2>
                     <div className="mt-1.5 inline-flex max-w-full items-center truncate rounded-full bg-violet-50 px-2.5 py-0.5 text-[11px] font-medium text-slate-600 sm:text-xs">
                       {mode === "upgrade"
-                        ? "Higher-priority plans only"
+                        ? "Renew the same plan, or choose a higher priority"
                         : `Invoice No: ${subscriptionNo}`}
                     </div>
                   </div>
@@ -2036,7 +2036,7 @@ useEffect(() => {
                 ) : selectableMemberships.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/50 py-8 text-center text-sm text-amber-700">
                     {mode === "upgrade"
-                      ? "No higher-priority plans available. Junior is listed when configured."
+                      ? "No plan at this priority or higher. Junior is listed when configured."
                       : "No active membership plans found."}
                   </div>
                 ) : (

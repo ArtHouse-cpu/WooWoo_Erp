@@ -749,102 +749,102 @@ const handleDeleteProduct = async (id: string, name: string) => {
         </div>
 
         {/* ================= 6 STAT CARDS (ADJUSTS HORIZONTALLY ON LARGE SCREENS) ================= */}
-        <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 sm:gap-4">
+        <div className="mb-5 grid grid-cols-3 gap-1.5 sm:mb-8 sm:gap-4 lg:grid-cols-6">
           {/* Card 1: Products Displayed */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#FFEADA]/80 bg-[#FFF9F5] p-3.5 transition hover:shadow-sm">
-            <div className="flex items-start gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-100/90 text-orange-600">
-                <Package size={17} strokeWidth={2.2} />
+          <div className="flex flex-col justify-between rounded-xl border sm:rounded-2xl border-[#FFEADA]/80 bg-[#FFF9F5] p-2 transition hover:shadow-sm sm:p-3.5">
+            <div className="flex items-start gap-1 sm:gap-2.5">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8 sm:rounded-xl bg-orange-100/90 text-orange-600">
+                <Package className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
               </div>
-              <span className="text-xs font-semibold leading-tight text-gray-600">
+              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
                 Products Displayed
               </span>
             </div>
-            <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">{products.length}</p>
+            <div className="mt-1.5 sm:mt-3">
+              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">{products.length}</p>
             </div>
           </div>
 
           {/* Card 2: Products Sold */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#E1F4E7]/80 bg-[#F3FAF5] p-3.5 transition hover:shadow-sm">
-            <div className="flex items-start gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100/90 text-emerald-600">
-                <ShoppingBag size={17} strokeWidth={2.2} />
+          <div className="flex flex-col justify-between rounded-xl border sm:rounded-2xl border-[#E1F4E7]/80 bg-[#F3FAF5] p-2 transition hover:shadow-sm sm:p-3.5">
+            <div className="flex items-start gap-1 sm:gap-2.5">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8 sm:rounded-xl bg-emerald-100/90 text-emerald-600">
+                <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
               </div>
-              <span className="text-xs font-semibold leading-tight text-gray-600">
+              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
                 Products Sold
               </span>
             </div>
-            <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">
+            <div className="mt-1.5 sm:mt-3">
+              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">
                 {sales.filter((sale) => sale.status === "Paid").length}
               </p>
             </div>
           </div>
 
           {/* Card 3: Earnings */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#F6EED8]/80 bg-[#FCFAF2] p-3.5 transition hover:shadow-sm">
-            <div className="flex items-start gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100/90 text-amber-700">
-                <IndianRupee size={17} strokeWidth={2.2} />
+          <div className="flex flex-col justify-between rounded-xl border sm:rounded-2xl border-[#F6EED8]/80 bg-[#FCFAF2] p-2 transition hover:shadow-sm sm:p-3.5">
+            <div className="flex items-start gap-1 sm:gap-2.5">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8 sm:rounded-xl bg-amber-100/90 text-amber-700">
+                <IndianRupee className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
               </div>
-              <span className="text-xs font-semibold leading-tight text-gray-600">
+              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
                 Earnings
               </span>
             </div>
-            <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">
+            <div className="mt-1.5 sm:mt-3">
+              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">
                 ₹{sales.reduce((sum, sale) => sum + (sale.status === "Paid" ? sale.commission || 0 : 0), 0).toLocaleString("en-IN")}
               </p>
             </div>
           </div>
 
           {/* Card 4: Payouts */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#E2EEFB]/80 bg-[#F4F8FC] p-3.5">
-            <div className="flex items-start gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100/90 text-blue-600">
-                <Wallet size={17} strokeWidth={2.2} />
+          <div className="flex flex-col justify-between rounded-xl border border-[#E2EEFB]/80 bg-[#F4F8FC] p-2 sm:rounded-2xl sm:p-3.5">
+            <div className="flex items-start gap-1 sm:gap-2.5">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8 sm:rounded-xl bg-blue-100/90 text-blue-600">
+                <Wallet className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
               </div>
-              <span className="text-xs font-semibold leading-tight text-gray-600">
+              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
                 Payouts
               </span>
             </div>
-            <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">₹0</p>
-              <span className="mt-1.5 block text-[11px] font-medium text-gray-400">
+            <div className="mt-1.5 sm:mt-3">
+              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">₹0</p>
+              <span className="mt-1 hidden text-[10px] font-medium text-gray-400 sm:mt-1.5 sm:block sm:text-[11px]">
                 0 completed
               </span>
             </div>
           </div>
 
           {/* Card 5: Leads */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#FBE0E3]/80 bg-[#FCF4F5] p-3.5 transition hover:shadow-sm">
-            <div className="flex items-start gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-100/90 text-rose-500">
-                <Users size={17} strokeWidth={2.2} />
+          <div className="flex flex-col justify-between rounded-xl border sm:rounded-2xl border-[#FBE0E3]/80 bg-[#FCF4F5] p-2 transition hover:shadow-sm sm:p-3.5">
+            <div className="flex items-start gap-1 sm:gap-2.5">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8 sm:rounded-xl bg-rose-100/90 text-rose-500">
+                <Users className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
               </div>
-              <span className="text-xs font-semibold leading-tight text-gray-600">
+              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
                 Leads
               </span>
             </div>
-            <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">0</p>
+            <div className="mt-1.5 sm:mt-3">
+              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">0</p>
             </div>
           </div>
 
           {/* Card 6: History */}
-          <div className="flex flex-col justify-between rounded-2xl border border-[#E9EBEF]/80 bg-[#F6F7F9] p-3.5 transition hover:shadow-sm">
-            <div className="flex items-start gap-2.5">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200/90 text-slate-700">
-                <FileText size={17} strokeWidth={2.2} />
+          <div className="flex flex-col justify-between rounded-xl border sm:rounded-2xl border-[#E9EBEF]/80 bg-[#F6F7F9] p-2 transition hover:shadow-sm sm:p-3.5">
+            <div className="flex items-start gap-1 sm:gap-2.5">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8 sm:rounded-xl bg-slate-200/90 text-slate-700">
+                <FileText className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={2.2} />
               </div>
-              <span className="text-xs font-semibold leading-tight text-gray-600">
+              <span className="text-[9px] font-semibold leading-tight text-gray-600 sm:text-xs">
                 History
               </span>
             </div>
-            <div className="mt-3">
-              <p className="text-xl font-black text-gray-900 leading-none">{products.length}</p>
-              <span className="mt-1.5 block text-[11px] font-medium text-gray-400">
+            <div className="mt-1.5 sm:mt-3">
+              <p className="text-sm font-black leading-none text-gray-900 sm:text-xl">{products.length}</p>
+              <span className="mt-1 hidden text-[10px] font-medium text-gray-400 sm:mt-1.5 sm:block sm:text-[11px]">
                 Total activities
               </span>
             </div>

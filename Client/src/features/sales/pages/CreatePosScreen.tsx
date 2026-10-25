@@ -93,9 +93,18 @@ type PosItem = {
 export default function CreatePosScreen({
   open,
   onClose,
+  overlayClassName,
+  initialCustomer,
 }: {
   open?: boolean;
   onClose?: () => void;
+  overlayClassName?: string;
+  initialCustomer?: {
+    id?: string | null;
+    name?: string;
+    phone?: string;
+    membership?: string;
+  } | null;
 }) {
   const navigate = useNavigate();
   const [internalOpen, setInternalOpen] = useState(true);
@@ -147,11 +156,11 @@ export default function CreatePosScreen({
 
   /** Fresh bill: clear previous customer + cart when POS opens. */
   const resetPosBill = () => {
-    setCustomer("");
-    setPhone("");
-    setMembership("none");
+    setCustomer(initialCustomer?.name || "");
+    setPhone(initialCustomer?.phone || "");
+    setMembership(initialCustomer?.membership || "none");
     setMembershipPlanId(null);
-    setCustomerId(null);
+    setCustomerId(initialCustomer?.id || null);
     setCustomers([]);
     setCustomerDropdownOpen(false);
     setShowCreateCustomerModal(false);
@@ -887,7 +896,7 @@ export default function CreatePosScreen({
     <>
 
       <div
-        className="fixed inset-0 z-[70] flex items-stretch justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+        className={`fixed inset-0 ${overlayClassName || "z-[70]"} flex items-stretch justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4`}
         onMouseDown={(e) => {
           if (e.currentTarget == e.target) {
             handleRequestClose();

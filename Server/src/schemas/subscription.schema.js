@@ -295,6 +295,9 @@ export function validateSubscriptionUpdateBody(body) {
     membershipPlanId,
     membershipType,
     students,
+    mode,
+    paymentStatus,
+    paymentBreakdown,
   } = body ?? {};
 
   if (customerName !== undefined) {
@@ -379,6 +382,21 @@ export function validateSubscriptionUpdateBody(body) {
     }
   }
   if (createdBy !== undefined) update.createdBy = createdBy;
+  if (mode !== undefined) update.mode = String(mode ?? '').trim();
+  if (paymentStatus !== undefined) {
+    update.paymentStatus = String(paymentStatus ?? '').trim() || 'Paid (Full)';
+  }
+  if (paymentBreakdown !== undefined) {
+    update.paymentBreakdown = {
+      cash: Math.max(0, Number(paymentBreakdown?.cash) || 0),
+      upi: Math.max(0, Number(paymentBreakdown?.upi) || 0),
+      card: Math.max(0, Number(paymentBreakdown?.card) || 0),
+      wallet: Math.max(0, Number(paymentBreakdown?.wallet) || 0),
+      paidAmount: Math.max(0, Number(paymentBreakdown?.paidAmount) || 0),
+      dueAmount: Math.max(0, Number(paymentBreakdown?.dueAmount) || 0),
+      changeAmount: Math.max(0, Number(paymentBreakdown?.changeAmount) || 0),
+    };
+  }
 
   const repeatData = normalizeRepeat({repeatType, repeatEvery, repeatUnit}, errors, true);
   Object.assign(update, repeatData);

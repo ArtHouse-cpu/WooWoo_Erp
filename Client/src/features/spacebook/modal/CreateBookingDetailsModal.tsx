@@ -138,6 +138,29 @@ export type BookingFormPayload = {
   summarySnapshot?: any;
 };
 
+export function bookingCustomerDraft(
+  params: URLSearchParams,
+): BookingFormPayload | null {
+  const customerId = params.get("customerId")?.trim() || "";
+  const customerName = params.get("customerName")?.trim() || "";
+  const customerPhone = params.get("customerPhone")?.trim() || "";
+  if (!customerId && !customerName && !customerPhone) return null;
+  const today = new Date();
+  const bookingDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  return {
+    customerName,
+    customerPhone,
+    customerEmail: params.get("customerEmail")?.trim() || "",
+    customerId: customerId || null,
+    membershipType: params.get("membershipType") || "none",
+    spaceId: "",
+    bookingDate,
+    startTime: "09:00",
+    endTime: "12:00",
+    status: "Upcoming",
+  };
+}
+
 export type SelectedFoodItem = {
   foodId: string;
   label: string;
