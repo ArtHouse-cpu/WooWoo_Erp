@@ -11,6 +11,16 @@ import {
   Trash2,
   Download,
   Ellipsis,
+  Calendar,
+  ChevronDown,
+  Plus,
+  SlidersHorizontal,
+  ArrowUpDown,
+  Home,
+  FileText,
+  Package,
+  Users,
+  Menu,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -29,6 +39,7 @@ import CreatePosScreen from "./CreatePosScreen";
 import CreateInvoiceScreen from "./CreateInvoiceScreen";
 import DuePaymentModal from "../components/invoice/Modal/DuePaymentModal";
 import SalesReturnFlowModal from "../components/invoice/Modal/SalesReturnFlowModal";
+import MobileInvoiceDetailsModal from "../components/invoice/Modal/MobileInvoiceDetailsModal";
 import {
   currentInvoiceTotal,
   originalInvoiceTotal,
@@ -78,6 +89,17 @@ function paymentStatusForWhatsApp(
   return rowStatus;
 }
 
+function formatCompactCurrency(val: number): string {
+  const abs = Math.abs(val);
+  if (abs >= 10000000) {
+    return `₹${(val / 10000000).toFixed(2)}Cr`;
+  }
+  if (abs >= 100000) {
+    return `₹${(val / 100000).toFixed(2)}L`;
+  }
+  return `₹${val.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+}
+
 const tabs: PosRow["status"][] = ["Paid", "Pending", "Draft", "Cancelled"];
 
 export default function PosScreen() {
@@ -106,6 +128,33 @@ export default function PosScreen() {
   const [viewInvoiceOpen, setViewInvoiceOpen] = useState(false);
   const [viewInvoiceData, setViewInvoiceData] = useState<any>(null);
 
+  // Mobile specific state
+  const [mobileSort, setMobileSort] = useState<
+    "default" | "amount_desc" | "amount_asc" | "date_desc" | "date_asc"
+  >("default");
+  const [mobileModeFilter, setMobileModeFilter] = useState<string>("All");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
+  const [mobileDetailsInvoice, setMobileDetailsInvoice] = useState<any>(null);
+  const [mobileDetailsLoading, setMobileDetailsLoading] = useState(false);
+
+  const handleMobileCardClick = async (row: PosRow) => {
+    setMobileDetailsInvoice(row.raw || row);
+    setMobileDetailsOpen(true);
+    setMobileDetailsLoading(true);
+    try {
+      const res = await handleGetInvoice(row._id);
+      if (res?.invoice) {
+        setMobileDetailsInvoice(res.invoice);
+      }
+    } catch (err) {
+      console.error("Failed to fetch invoice details:", err);
+    } finally {
+      setMobileDetailsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (searchParams.get("tab")?.toLowerCase() !== "draft") return;
     setActiveTab("Draft");
@@ -123,11 +172,23 @@ export default function PosScreen() {
     if (action === "view") {
       try {
         const res = await handleGetInvoice(_id);
-        setViewInvoiceData(res?.invoice ?? raw);
+        const invData = res?.invoice ?? raw;
+        if (typeof window !== "undefined" && window.innerWidth < 768) {
+          setMobileDetailsInvoice(invData);
+          setMobileDetailsOpen(true);
+        } else {
+          setViewInvoiceData(invData);
+          setViewInvoiceOpen(true);
+        }
       } catch {
-        setViewInvoiceData(raw);
+        if (typeof window !== "undefined" && window.innerWidth < 768) {
+          setMobileDetailsInvoice(raw);
+          setMobileDetailsOpen(true);
+        } else {
+          setViewInvoiceData(raw);
+          setViewInvoiceOpen(true);
+        }
       }
-      setViewInvoiceOpen(true);
       setSelectedActionRow(null);
     } else if (action === "edit") {
       if (status === "Cancelled") {
@@ -295,6 +356,200 @@ export default function PosScreen() {
       return statusOk;
     });
   }, [activeTab, data]);
+
+  const mobileDisplayData = useMemo(() => {
+    let list = filteredData;
+    if (mobileModeFilter !== "All") {
+      list = list.filter(
+        (r) => r.mode.toUpperCase() === mobileModeFilter.toUpperCase(),
+      );
+    }
+    if (mobileSort === "default") return list;
+    const sorted = [...list];
+    if (mobileSort === "amount_desc") {
+      return sorted.sort((a, b) => b.amount - a.amount);
+    }
+    if (mobileSort === "amount_asc") {
+      return sorted.sort((a, b) => a.amount - b.amount);
+    }
+    if (mobileSort === "date_desc") {
+      return sorted.sort(
+        (a, b) =>
+          new Date(b.raw?.invoiceDate || b.raw?.createdAt || 0).getTime() -
+          new Date(a.raw?.invoiceDate || a.raw?.createdAt || 0).getTime(),
+      );
+    }
+    if (mobileSort === "date_asc") {
+      return sorted.sort(
+        (a, b) =>
+          new Date(a.raw?.invoiceDate || a.raw?.createdAt || 0).getTime() -
+          new Date(b.raw?.invoiceDate || b.raw?.createdAt || 0).getTime(),
+      );
+    }
+    return sorted;
+  }, [filteredData, mobileModeFilter, mobileSort]);
+
+  const ensurePosRow = (inv: any): PosRow => {
+    if (inv && inv.bill && inv._id) return inv;
+    const raw = inv?.raw ?? inv;
+    const dueAmount = Number(
+      raw?.pendingAmount ?? raw?.paymentBreakdown?.dueAmount ?? 0,
+    );
+    return {
+      id: 1,
+      amount: currentInvoiceTotal(raw) || Number(raw?.grandTotal ?? raw?.amount ?? 0),
+      originalAmount: originalInvoiceTotal(raw),
+      returnedAmount: returnedInvoiceTotal(raw),
+      mode: toMode(raw?.mode ?? raw?.paymentMode),
+      status: toStatus(raw?.status, dueAmount, raw?.paymentStatus),
+      bill: String(raw?.invoiceCode ?? `INVVWAH-${raw?.invoiceNumber ?? 1}`),
+      owner: String(raw?.createdBy?.m_staff_name || raw?.salesPersonName || "System"),
+      customer: String(raw?.customerName ?? raw?.customer ?? ""),
+      phone: String(raw?.customerPhone ?? raw?.phone ?? ""),
+      date: formatDate(raw?.invoiceDate ?? raw?.createdAt),
+      createdTime: raw?.createdAt ? new Date(raw.createdAt).toLocaleString() : "",
+      salesPerson: String(raw?.salesPersonName ?? ""),
+      _id: String(raw?._id ?? ""),
+      raw,
+      dueAmount,
+    };
+  };
+
+  const handleWhatsAppShare = async (invoice: PosRow | any) => {
+    const raw = ((invoice?.raw ?? invoice) ?? {}) as Record<string, unknown>;
+
+    const customerName =
+      String(
+        invoice?.customer || raw.customerName || "Customer",
+      ).trim() || "Customer";
+
+    const docCode = String(
+      raw.returnCode ?? raw.invoiceCode ?? invoice?.bill ?? invoice?.id ?? "",
+    );
+
+    const isCreditNote = Boolean(raw.returnCode);
+    const docLabel = isCreditNote
+      ? "Sales Return / Credit Note"
+      : "Invoice";
+
+    const totalVal = Number(
+      currentInvoiceTotal(raw) || invoice?.amount || raw?.grandTotal || 0,
+    );
+    const totalFormatted = `₹ ${totalVal.toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+    const paymentStatus = paymentStatusForWhatsApp(
+      raw,
+      invoice?.status || (raw.status as any),
+    );
+
+    const hostedLink = resolveHostedInvoiceLink(raw);
+
+    const message = buildWoowooInvoiceWhatsAppMessage({
+      customerName,
+      docLabel,
+      docCode,
+      totalFormatted,
+      paymentStatus,
+      externalLink: hostedLink || undefined,
+    });
+
+    Swal.fire({
+      title: "Preparing…",
+      text: "Generating invoice PDF for WhatsApp",
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading(),
+    });
+
+    let blobPkg: { blob: Blob; filename: string } | null = null;
+    try {
+      blobPkg = await getInvoicePdfBlob(raw);
+    } catch (e) {
+      console.error(e);
+    }
+
+    Swal.close();
+
+    const pdfFile =
+      blobPkg &&
+      new File([blobPkg.blob], blobPkg.filename, {
+        type: "application/pdf",
+      });
+
+    const canSharePdf =
+      typeof navigator !== "undefined" &&
+      typeof navigator.share === "function" &&
+      Boolean(pdfFile) &&
+      typeof navigator.canShare === "function" &&
+      navigator.canShare({ files: [pdfFile!] });
+
+    if (canSharePdf && pdfFile) {
+      try {
+        await navigator.share({
+          text: message,
+          files: [pdfFile],
+        });
+        return;
+      } catch (err) {
+        const aborted =
+          err instanceof Error && err.name === "AbortError";
+        if (aborted) return;
+        console.warn("Share sheet failed, opening WhatsApp Web:", err);
+      }
+    }
+
+    const digits = normalizeIndianWhatsAppDigits(
+      String(invoice?.phone || raw.customerPhone || ""),
+    );
+    const waBase = digits
+      ? `https://wa.me/${digits}`
+      : "https://wa.me/";
+    window.open(
+      `${waBase}?text=${encodeURIComponent(message)}`,
+      "_blank",
+    );
+
+    if (blobPkg) {
+      const url = URL.createObjectURL(blobPkg.blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = blobPkg.filename;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      await Swal.fire({
+        icon: "info",
+        title: "PDF downloaded",
+        text: "Attach the downloaded PDF to your WhatsApp message (WhatsApp Web cannot auto-attach files).",
+      });
+    } else if (!hostedLink) {
+      await Swal.fire({
+        icon: "warning",
+        title: "PDF unavailable",
+        text: "Could not generate the invoice PDF. Try the Download button or add a hosted link from your server.",
+      });
+    }
+  };
+
+  const handleDownloadBill = async (invoice: PosRow | any) => {
+    const raw = (invoice?.raw ?? invoice) ?? invoice;
+    try {
+      Swal.fire({
+        title: "Generating PDF...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+      await downloadInvoicePdf(raw);
+      Swal.close();
+    } catch {
+      Swal.fire("Error", "Could not generate PDF.", "error");
+    }
+  };
 
   const columns = useMemo(
     () => [
@@ -464,147 +719,13 @@ export default function PosScreen() {
         header: "Share Invoice",
         size: 220,
         Cell: ({ row }: { row: { original: PosRow } }) => {
-          const invoice = row.original;
-
-          const handleWhatsAppShare = async () => {
-            const raw = (invoice.raw ?? {}) as Record<string, unknown>;
-
-            const customerName =
-              String(
-                invoice.customer || raw.customerName || "Customer",
-              ).trim() || "Customer";
-
-            const docCode = String(
-              raw.returnCode ?? raw.invoiceCode ?? invoice.bill ?? invoice.id,
-            );
-
-            const isCreditNote = Boolean(raw.returnCode);
-            const docLabel = isCreditNote
-              ? "Sales Return / Credit Note"
-              : "Invoice";
-
-            const totalVal = Number(
-              currentInvoiceTotal(raw) || invoice.amount || 0,
-            );
-            const totalFormatted = `₹ ${totalVal.toLocaleString("en-IN", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}`;
-
-            const paymentStatus = paymentStatusForWhatsApp(raw, invoice.status);
-
-            const hostedLink = resolveHostedInvoiceLink(raw);
-
-            const message = buildWoowooInvoiceWhatsAppMessage({
-              customerName,
-              docLabel,
-              docCode,
-              totalFormatted,
-              paymentStatus,
-              externalLink: hostedLink || undefined,
-            });
-
-            Swal.fire({
-              title: "Preparing…",
-              text: "Generating invoice PDF for WhatsApp",
-              allowOutsideClick: false,
-              didOpen: () => Swal.showLoading(),
-            });
-
-            let blobPkg: { blob: Blob; filename: string } | null = null;
-            try {
-              blobPkg = await getInvoicePdfBlob(raw);
-            } catch (e) {
-              console.error(e);
-            }
-
-            Swal.close();
-
-            const pdfFile =
-              blobPkg &&
-              new File([blobPkg.blob], blobPkg.filename, {
-                type: "application/pdf",
-              });
-
-            const canSharePdf =
-              typeof navigator !== "undefined" &&
-              typeof navigator.share === "function" &&
-              Boolean(pdfFile) &&
-              typeof navigator.canShare === "function" &&
-              navigator.canShare({ files: [pdfFile!] });
-
-            if (canSharePdf && pdfFile) {
-              try {
-                await navigator.share({
-                  text: message,
-                  files: [pdfFile],
-                });
-                return;
-              } catch (err) {
-                const aborted =
-                  err instanceof Error && err.name === "AbortError";
-                if (aborted) return;
-                console.warn("Share sheet failed, opening WhatsApp Web:", err);
-              }
-            }
-
-            const digits = normalizeIndianWhatsAppDigits(
-              String(invoice.phone || raw.customerPhone || ""),
-            );
-            const waBase = digits
-              ? `https://wa.me/${digits}`
-              : "https://wa.me/";
-            window.open(
-              `${waBase}?text=${encodeURIComponent(message)}`,
-              "_blank",
-            );
-
-            if (blobPkg) {
-              const url = URL.createObjectURL(blobPkg.blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = blobPkg.filename;
-              a.rel = "noopener";
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-              URL.revokeObjectURL(url);
-
-              await Swal.fire({
-                icon: "info",
-                title: "PDF downloaded",
-                text: "Attach the downloaded PDF to your WhatsApp message (WhatsApp Web cannot auto-attach files).",
-              });
-            } else if (!hostedLink) {
-              await Swal.fire({
-                icon: "warning",
-                title: "PDF unavailable",
-                text: "Could not generate the invoice PDF. Try the Download button or add a hosted link from your server.",
-              });
-            }
-          };
-
-          const handleDownloadBill = async () => {
-            try {
-              Swal.fire({
-                title: "Generating PDF...",
-                allowOutsideClick: false,
-                didOpen: () => Swal.showLoading(),
-              });
-              await downloadInvoicePdf(invoice.raw);
-              Swal.close();
-            } catch {
-              Swal.fire("Error", "Could not generate PDF.", "error");
-            }
-          };
-
           return (
             <div className="flex items-center gap-2">
               {/* WhatsApp Share */}
               <button
                 onClick={(event) => {
                   event.stopPropagation();
-                  void handleWhatsAppShare();
+                  void handleWhatsAppShare(row.original);
                 }}
                 className="flex items-center gap-1 rounded-md bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200"
               >
@@ -619,7 +740,7 @@ export default function PosScreen() {
               <button
                 onClick={(event) => {
                   event.stopPropagation();
-                  void handleDownloadBill();
+                  void handleDownloadBill(row.original);
                 }}
                 className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
               >
@@ -747,175 +868,785 @@ export default function PosScreen() {
 
   return (
     <div className="min-w-0 space-y-2.5 p-1 sm:space-y-4">
-      {/* Header — create actions stay on desktop; mobile uses a cleaner scan layout */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <div className="flex items-center gap-2.5">
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
-            Sales
-          </h1>
-          <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
-            {statusCounts.All}
-          </span>
-        </div>
-        <div className="hidden w-full grid-cols-2 gap-2 sm:grid sm:w-auto sm:min-w-[22rem]">
-          <Can permission={PERMISSIONS.INVOICE_CREATE}>
+      {/* ============================================================== */}
+      {/* MOBILE RESPONSIVE VIEW (screens < md)                         */}
+      {/* Matches user reference image: modern accounting app layout    */}
+      {/* ============================================================== */}
+      <div className="block md:hidden space-y-3 pb-24">
+        {/* A. Top Navigation Tabs */}
+        <div className="-mx-1 border-b border-slate-200 bg-white px-2">
+          <div className="hide-scrollbar flex items-center gap-6 overflow-x-auto pt-1">
             <button
               type="button"
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              onClick={() => setPosModalOpen(true)}
+              className="relative shrink-0 pb-2.5 pt-1 text-sm font-bold text-blue-600 transition"
             >
-              POS Billing
+              Sales
+              <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-blue-600" />
             </button>
-          </Can>
-          <Can permission={PERMISSIONS.INVOICE_CREATE}>
             <button
               type="button"
-              className="h-10 w-full rounded-xl bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-              onClick={() => navigate("/create-invoice")}
+              onClick={() => navigate("/purchase")}
+              className="relative shrink-0 pb-2.5 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
             >
-              + Create Invoice
+              Purchases
             </button>
-          </Can>
+            <button
+              type="button"
+              onClick={() => navigate("/quotations")}
+              className="relative shrink-0 pb-2.5 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
+            >
+              Quotations
+            </button>
+            <button
+              type="button"
+              onClick={() => setMoreMenuOpen(true)}
+              className="relative shrink-0 pb-2.5 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
+            >
+              More
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Status tabs: All → Paid → Pending → Draft → Cancelled */}
-      <div className="hide-scrollbar -mx-1 overflow-x-auto px-1">
-        <div className="flex min-w-max items-stretch gap-0.5 border-b border-slate-200">
-          {(
-            [
-              { key: "All" as const, label: "All" },
-              ...tabs.map((t) => ({ key: t, label: t })),
-            ] as { key: PosRow["status"] | "All"; label: string }[]
-          ).map((tab) => {
-            const active = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={`relative shrink-0 px-3 pb-2 pt-1 text-sm font-medium transition sm:px-3.5 sm:pb-2.5 ${
-                  active
-                    ? "text-blue-700"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
+        {/* B. Search and Summary Card */}
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs">
+          {/* Row 1: Search & Date preset */}
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search..."
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <div className="relative shrink-0">
+              <select
+                value={datePreset}
+                onChange={(e) => {
+                  const preset = e.target.value as DatePreset;
+                  setDatePreset(preset);
+                  if (preset === "custom") return;
+                  const range = rangeForPreset(preset);
+                  setFromDate(range.from);
+                  setToDate(range.to);
+                }}
+                className="h-10 cursor-pointer appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-7 text-xs font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                aria-label="Date range"
               >
-                {tab.label}
-                <span
-                  className={`ml-1.5 text-xs ${active ? "text-blue-500" : "text-slate-400"}`}
+                {SALES_DATE_PRESET_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+            </div>
+          </div>
+
+          {/* Custom Date Pickers if custom selected */}
+          {datePreset === "custom" && (
+            <div className="mt-2.5 flex items-center gap-2 border-t border-slate-100 pt-2">
+              <div className="flex-1">
+                <label className="text-[10px] font-semibold uppercase text-slate-500">
+                  From
+                </label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="h-8 w-full rounded-lg border border-slate-200 px-2 text-xs text-slate-700"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] font-semibold uppercase text-slate-500">
+                  To
+                </label>
+                <input
+                  type="date"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="h-8 w-full rounded-lg border border-slate-200 px-2 text-xs text-slate-700"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Row 2: Total Amount & Pending Amount */}
+          <div className="mt-3.5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+            <div>
+              <div className="flex items-center gap-1 text-xs text-slate-500">
+                <span>Total Amount</span>
+                <ChevronDown size={12} className="text-slate-400" />
+              </div>
+              <div className="mt-0.5 text-lg font-bold tracking-tight text-slate-900">
+                {formatCompactCurrency(totalAmount)}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500">Pending</div>
+              <div className="mt-0.5 text-lg font-bold tracking-tight text-red-500">
+                {formatCompactCurrency(DueAmount)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* C. Transaction Status Tabs (Pills) */}
+        <div className="hide-scrollbar -mx-1 overflow-x-auto px-1">
+          <div className="flex min-w-max items-center gap-2 py-0.5">
+            {(
+              [
+                { key: "All" as const, label: "All Transactions" },
+                { key: "Paid" as const, label: "Paid" },
+                { key: "Pending" as const, label: "Pending" },
+                { key: "Draft" as const, label: "Draft" },
+                { key: "Cancelled" as const, label: "Cancelled" },
+              ] as { key: PosRow["status"] | "All"; label: string }[]
+            ).map((tab) => {
+              const active = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition ${
+                    active
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
                 >
-                  {statusCounts[tab.key]}
-                </span>
-                {active ? (
-                  <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-blue-600" />
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Compact search + date filter */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm sm:p-4">
-        <div className="flex items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            <Search
-              size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search invoice no., customer…"
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 sm:h-11 sm:pl-10"
-            />
-          </div>
-          <select
-            value={datePreset}
-            onChange={(e) => {
-              const preset = e.target.value as DatePreset;
-              setDatePreset(preset);
-              if (preset === "custom") return;
-              const range = rangeForPreset(preset);
-              setFromDate(range.from);
-              setToDate(range.to);
-            }}
-            className="h-10 w-[7.75rem] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:h-11 sm:w-40 sm:px-3"
-            aria-label="Date range"
-          >
-            {SALES_DATE_PRESET_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {datePreset === "custom" ? (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
-              <label className="shrink-0 text-xs font-medium text-slate-500">
-                From
-              </label>
-              <input
-                type="date"
-                value={fromDate}
-                max={toDate || undefined}
-                onChange={(e) => {
-                  setFromDate(e.target.value);
-                  setDatePreset("custom");
-                }}
-                className={controlClass}
-              />
-            </div>
-            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
-              <label className="shrink-0 text-xs font-medium text-slate-500">
-                To
-              </label>
-              <input
-                type="date"
-                value={toDate}
-                min={fromDate || undefined}
-                onChange={(e) => {
-                  setToDate(e.target.value);
-                  setDatePreset("custom");
-                }}
-                className={controlClass}
-              />
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="table-scroll min-w-0 overflow-hidden rounded-2xl">
-        <MaterialReactTable table={table} />
-      </div>
-
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm sm:px-4">
-        <div className="flex min-w-max items-center gap-2 text-xs sm:text-sm">
-          <span className="rounded-lg bg-slate-100 px-2.5 py-1.5 font-medium text-slate-700">
-            Total ₹
-            {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </span>
-          <span className="rounded-lg bg-emerald-50 px-2.5 py-1.5 font-medium text-emerald-700">
-            Paid ₹
-            {paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </span>
-          <span className="rounded-lg bg-amber-50 px-2.5 py-1.5 font-medium text-amber-700">
-            Pending ₹
-            {DueAmount.toLocaleString("en-IN", {
-              minimumFractionDigits: 2,
+                  <span>{tab.label}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-semibold ${
+                      active
+                        ? "bg-blue-700 text-white"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {statusCounts[tab.key]}
+                  </span>
+                </button>
+              );
             })}
-          </span>
-          {returnedAmount > 0 ? (
-            <span className="rounded-lg bg-rose-50 px-2.5 py-1.5 font-medium text-rose-700">
-              Returned −₹
-              {returnedAmount.toLocaleString("en-IN", {
+          </div>
+        </div>
+
+        {/* D. Filter and Sorting Row */}
+        <div className="flex items-center justify-between px-0.5">
+          {/* Filter button */}
+          <button
+            type="button"
+            onClick={() => setMobileFilterOpen(true)}
+            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+              mobileModeFilter !== "All"
+                ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
+                : "text-slate-700 hover:bg-slate-100 active:bg-slate-200"
+            }`}
+          >
+            <SlidersHorizontal
+              size={14}
+              className={
+                mobileModeFilter !== "All" ? "text-blue-600" : "text-slate-500"
+              }
+            />
+            <span>Filter</span>
+            {mobileModeFilter !== "All" && (
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+            )}
+          </button>
+
+          {/* Sorting Dropdown */}
+          <div className="relative flex items-center">
+            <div className="pointer-events-none flex items-center gap-1 pr-1 text-xs font-semibold text-slate-700">
+              <ArrowUpDown size={14} className="text-slate-500" />
+              <span>
+                {mobileSort === "default"
+                  ? "Default"
+                  : mobileSort === "amount_desc"
+                    ? "Amount: High"
+                    : mobileSort === "amount_asc"
+                      ? "Amount: Low"
+                      : mobileSort === "date_desc"
+                        ? "Newest"
+                        : "Oldest"}
+              </span>
+              <ChevronDown size={13} className="text-slate-400" />
+            </div>
+            <select
+              value={mobileSort}
+              onChange={(e) => setMobileSort(e.target.value as any)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              aria-label="Sort transactions"
+            >
+              <option value="default">Default</option>
+              <option value="amount_desc">Amount: High to Low</option>
+              <option value="amount_asc">Amount: Low to High</option>
+              <option value="date_desc">Date: Newest First</option>
+              <option value="date_asc">Date: Oldest First</option>
+            </select>
+          </div>
+        </div>
+
+        {/* E. Invoice / Transaction Cards List */}
+        <div className="space-y-2.5">
+          {loading ? (
+            <div className="space-y-2.5">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="h-28 animate-pulse rounded-2xl border border-slate-200 bg-white p-3.5"
+                />
+              ))}
+            </div>
+          ) : mobileDisplayData.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <FileText size={24} />
+              </div>
+              <h4 className="mt-3 text-sm font-semibold text-slate-800">
+                No transactions found
+              </h4>
+              <p className="mt-1 text-xs text-slate-500">
+                Try adjusting your search, filters, or date range.
+              </p>
+            </div>
+          ) : (
+            mobileDisplayData.map((row) => {
+              const isPaid = row.status === "Paid";
+              const isPending = row.status === "Pending";
+              const isDraft = row.status === "Draft";
+              const customerName =
+                row.customer && row.customer !== "undefined"
+                  ? row.customer
+                  : "Walk-in Customer";
+
+              return (
+                <div
+                  key={row._id}
+                  onClick={() => void handleMobileCardClick(row)}
+                  className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                >
+                  {/* Card Top Section */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      {/* Customer Name */}
+                      <h3 className="truncate text-base font-bold text-slate-900">
+                        {customerName}
+                      </h3>
+                      {/* Invoice Code + Mode */}
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-medium text-slate-500">
+                          {row.bill}
+                        </span>
+                        <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                          {row.mode}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-col items-end">
+                      {/* Status Badge */}
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
+                          isPaid
+                            ? "border border-emerald-200 bg-emerald-50 text-emerald-600"
+                            : isPending
+                              ? "border border-amber-200 bg-amber-50 text-amber-600"
+                              : isDraft
+                                ? "border border-slate-200 bg-slate-100 text-slate-600"
+                                : "border border-rose-200 bg-rose-50 text-rose-600"
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            isPaid
+                              ? "bg-emerald-500"
+                              : isPending
+                                ? "bg-amber-500"
+                                : isDraft
+                                  ? "bg-slate-400"
+                                  : "bg-rose-500"
+                          }`}
+                        />
+                        {row.status.toLowerCase()}
+                      </span>
+
+                      {/* Amount */}
+                      <div className="mt-1.5 text-right">
+                        <span className="text-base font-bold text-slate-900">
+                          ₹
+                          {row.amount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                        {row.dueAmount > 0 && (
+                          <div className="text-[10px] font-semibold text-amber-600">
+                            Due ₹{row.dueAmount.toLocaleString("en-IN")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Subtle Horizontal Divider */}
+                  <div className="my-2.5 border-t border-slate-100" />
+
+                  {/* Card Bottom Section */}
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <div className="flex min-w-0 items-center gap-1 truncate text-slate-400">
+                      <Calendar
+                        size={13}
+                        className="shrink-0 text-slate-400"
+                      />
+                      <span className="truncate">
+                        {row.date} • By {row.owner || "System"}
+                      </span>
+                    </div>
+
+                    <div
+                      className="flex shrink-0 items-center gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {/* WhatsApp Share Button */}
+                      <button
+                        type="button"
+                        onClick={() => void handleWhatsAppShare(row)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100 active:scale-95"
+                        title="Share on WhatsApp"
+                        aria-label="Share on WhatsApp"
+                      >
+                        <img
+                          src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
+                          alt="WhatsApp"
+                          className="h-4 w-4"
+                        />
+                      </button>
+
+                      {/* Three-dot Action Menu */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedActionRow(row)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200 active:scale-95"
+                        title="Invoice Actions"
+                        aria-label="Invoice Actions"
+                      >
+                        <Ellipsis size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* F. Floating Action Button (FAB) */}
+        <Can permission={PERMISSIONS.INVOICE_CREATE}>
+          <button
+            type="button"
+            onClick={() => navigate("/create-invoice")}
+            className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/35 transition hover:bg-blue-700 active:scale-95 md:hidden"
+            aria-label="Create Invoice"
+          >
+            <Plus size={26} strokeWidth={2.5} />
+          </button>
+        </Can>
+
+        {/* G. Bottom Navigation Bar */}
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-md md:hidden">
+          <div className="flex h-16 items-center justify-around px-2">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="flex flex-col items-center gap-1 text-slate-500 transition hover:text-slate-800"
+            >
+              <Home size={20} />
+              <span className="text-[10px] font-medium">Home</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/pos")}
+              className="flex flex-col items-center gap-1 font-semibold text-blue-600"
+            >
+              <FileText size={20} />
+              <span className="text-[10px] font-semibold">Bills</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/products")}
+              className="flex flex-col items-center gap-1 text-slate-500 transition hover:text-slate-800"
+            >
+              <Package size={20} />
+              <span className="text-[10px] font-medium">Products</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/customers")}
+              className="flex flex-col items-center gap-1 text-slate-500 transition hover:text-slate-800"
+            >
+              <Users size={20} />
+              <span className="text-[10px] font-medium">Parties</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMoreMenuOpen(true)}
+              className="flex flex-col items-center gap-1 text-slate-500 transition hover:text-slate-800"
+            >
+              <Menu size={20} />
+              <span className="text-[10px] font-medium">More</span>
+            </button>
+          </div>
+        </nav>
+
+        {/* Mobile Filter Modal */}
+        {mobileFilterOpen && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4 md:hidden">
+            <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-base font-bold text-slate-900">
+                  Filter Transactions
+                </h3>
+                <button
+                  onClick={() => setMobileFilterOpen(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <XCircle size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4 py-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700">
+                    Payment Mode
+                  </label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {["All", "Cash", "UPI", "Card", "Multi", "Wallet"].map(
+                      (mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setMobileModeFilter(mode)}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                            mobileModeFilter === mode
+                              ? "bg-blue-600 text-white"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          }`}
+                        >
+                          {mode}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileModeFilter("All");
+                    setMobileFilterOpen(false);
+                  }}
+                  className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileFilterOpen(false)}
+                  className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
+                >
+                  Apply Filter
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile More Menu Sheet */}
+        {moreMenuOpen && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4 md:hidden">
+            <div className="w-full max-w-sm rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="text-base font-bold text-slate-900">
+                  More Pages & Tools
+                </h3>
+                <button
+                  onClick={() => setMoreMenuOpen(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <XCircle size={20} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 py-4">
+                <button
+                  onClick={() => {
+                    setMoreMenuOpen(false);
+                    navigate("/purchase");
+                  }}
+                  className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3 hover:bg-slate-100"
+                >
+                  <span className="text-xs font-bold text-slate-800">
+                    Purchases
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Bills & Vendors
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setMoreMenuOpen(false);
+                    navigate("/quotations");
+                  }}
+                  className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3 hover:bg-slate-100"
+                >
+                  <span className="text-xs font-bold text-slate-800">
+                    Quotations
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Estimates
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setMoreMenuOpen(false);
+                    navigate("/subscriptions");
+                  }}
+                  className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3 hover:bg-slate-100"
+                >
+                  <span className="text-xs font-bold text-slate-800">
+                    Subscriptions
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Recurring Plans
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setMoreMenuOpen(false);
+                    navigate("/creditnotes");
+                  }}
+                  className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50/70 p-3 hover:bg-slate-100"
+                >
+                  <span className="text-xs font-bold text-slate-800">
+                    Credit Notes
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Sales Returns
+                  </span>
+                </button>
+
+                <Can permission={PERMISSIONS.INVOICE_CREATE}>
+                  <button
+                    onClick={() => {
+                      setMoreMenuOpen(false);
+                      setPosModalOpen(true);
+                    }}
+                    className="col-span-2 flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 py-2.5 text-xs font-bold text-blue-700"
+                  >
+                    Launch POS Billing Mode
+                  </button>
+                </Can>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ============================================================== */}
+      {/* DESKTOP VIEW (Visible only on desktop: screens >= md / 768px)  */}
+      {/* 100% Original unchanged desktop layout, table, and controls   */}
+      {/* ============================================================== */}
+      <div className="hidden md:block space-y-2.5 sm:space-y-4">
+        {/* Header — create actions stay on desktop; mobile uses a cleaner scan layout */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+              Sales
+            </h1>
+            <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
+              {statusCounts.All}
+            </span>
+          </div>
+          <div className="hidden w-full grid-cols-2 gap-2 sm:grid sm:w-auto sm:min-w-[22rem]">
+            <Can permission={PERMISSIONS.INVOICE_CREATE}>
+              <button
+                type="button"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                onClick={() => setPosModalOpen(true)}
+              >
+                POS Billing
+              </button>
+            </Can>
+            <Can permission={PERMISSIONS.INVOICE_CREATE}>
+              <button
+                type="button"
+                className="h-10 w-full rounded-xl bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                onClick={() => navigate("/create-invoice")}
+              >
+                + Create Invoice
+              </button>
+            </Can>
+          </div>
+        </div>
+
+        {/* Status tabs: All → Paid → Pending → Draft → Cancelled */}
+        <div className="hide-scrollbar -mx-1 overflow-x-auto px-1">
+          <div className="flex min-w-max items-stretch gap-0.5 border-b border-slate-200">
+            {(
+              [
+                { key: "All" as const, label: "All" },
+                ...tabs.map((t) => ({ key: t, label: t })),
+              ] as { key: PosRow["status"] | "All"; label: string }[]
+            ).map((tab) => {
+              const active = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`relative shrink-0 px-3 pb-2 pt-1 text-sm font-medium transition sm:px-3.5 sm:pb-2.5 ${
+                    active
+                      ? "text-blue-700"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {tab.label}
+                  <span
+                    className={`ml-1.5 text-xs ${active ? "text-blue-500" : "text-slate-400"}`}
+                  >
+                    {statusCounts[tab.key]}
+                  </span>
+                  {active ? (
+                    <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-blue-600" />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Compact search + date filter */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm sm:p-4">
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search invoice no., customer…"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 sm:h-11 sm:pl-10"
+              />
+            </div>
+            <select
+              value={datePreset}
+              onChange={(e) => {
+                const preset = e.target.value as DatePreset;
+                setDatePreset(preset);
+                if (preset === "custom") return;
+                const range = rangeForPreset(preset);
+                setFromDate(range.from);
+                setToDate(range.to);
+              }}
+              className="h-10 w-[7.75rem] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:h-11 sm:w-40 sm:px-3"
+              aria-label="Date range"
+            >
+              {SALES_DATE_PRESET_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {datePreset === "custom" ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+                <label className="shrink-0 text-xs font-medium text-slate-500">
+                  From
+                </label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  max={toDate || undefined}
+                  onChange={(e) => {
+                    setFromDate(e.target.value);
+                    setDatePreset("custom");
+                  }}
+                  className={controlClass}
+                />
+              </div>
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+                <label className="shrink-0 text-xs font-medium text-slate-500">
+                  To
+                </label>
+                <input
+                  type="date"
+                  value={toDate}
+                  min={fromDate || undefined}
+                  onChange={(e) => {
+                    setToDate(e.target.value);
+                    setDatePreset("custom");
+                  }}
+                  className={controlClass}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="table-scroll min-w-0 overflow-hidden rounded-2xl">
+          <MaterialReactTable table={table} />
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm sm:px-4">
+          <div className="flex min-w-max items-center gap-2 text-xs sm:text-sm">
+            <span className="rounded-lg bg-slate-100 px-2.5 py-1.5 font-medium text-slate-700">
+              Total ₹
+              {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </span>
+            <span className="rounded-lg bg-emerald-50 px-2.5 py-1.5 font-medium text-emerald-700">
+              Paid ₹
+              {paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </span>
+            <span className="rounded-lg bg-amber-50 px-2.5 py-1.5 font-medium text-amber-700">
+              Pending ₹
+              {DueAmount.toLocaleString("en-IN", {
                 minimumFractionDigits: 2,
               })}
             </span>
-          ) : null}
+            {returnedAmount > 0 ? (
+              <span className="rounded-lg bg-rose-50 px-2.5 py-1.5 font-medium text-rose-700">
+                Returned −₹
+                {returnedAmount.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2,
+                })}
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -1049,6 +1780,40 @@ export default function PosScreen() {
           }}
         />
       )}
+
+      <MobileInvoiceDetailsModal
+        open={mobileDetailsOpen}
+        onClose={() => {
+          setMobileDetailsOpen(false);
+          setMobileDetailsInvoice(null);
+        }}
+        invoice={mobileDetailsInvoice}
+        loading={mobileDetailsLoading}
+        onEdit={(inv) => {
+          setMobileDetailsOpen(false);
+          const raw = inv.raw ?? inv;
+          navigate("/create-invoice", {
+            state: { invoice: raw, mode: "edit" },
+          });
+        }}
+        onConvert={(inv) => {
+          setMobileDetailsOpen(false);
+          const raw = inv.raw ?? inv;
+          setReturnIntent("return");
+          setReturnInvoice(raw);
+          setReturnModalOpen(true);
+        }}
+        onWhatsAppShare={(inv) => {
+          void handleWhatsAppShare(inv);
+        }}
+        onDownloadPdf={(inv) => {
+          void handleDownloadBill(inv);
+        }}
+        onMoreActions={(inv) => {
+          setMobileDetailsOpen(false);
+          setSelectedActionRow(ensurePosRow(inv));
+        }}
+      />
 
       <DuePaymentModal
         open={dueModalOpen}
