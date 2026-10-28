@@ -1,12 +1,12 @@
 import { useEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
-import Swal from "sweetalert2";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type Props = {
   open?: boolean;
   onClose: () => void;
   children: ReactNode;
-  /** Ask before closing (create/edit). View mode should leave this false. */
+  /** Kept for existing callers. Every close asks for confirmation. */
   confirmOnClose?: boolean;
   className?: string;
 };
@@ -19,7 +19,6 @@ export default function DocumentFormModal({
   open = true,
   onClose,
   children,
-  confirmOnClose = false,
   className = "",
 }: Props) {
   useEffect(() => {
@@ -33,21 +32,8 @@ export default function DocumentFormModal({
 
   if (!open) return null;
 
-  const handleClose = async () => {
-    if (confirmOnClose) {
-      const result = await Swal.fire({
-        title: "Are you sure?",
-        text: "Any unsaved changes will be lost.",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#4F46E5",
-        cancelButtonColor: "#6B7280",
-        confirmButtonText: "Yes, Close",
-        cancelButtonText: "Cancel",
-      });
-      if (!result.isConfirmed) return;
-    }
-    onClose();
+  const handleClose = () => {
+    void closeIfConfirmed(onClose);
   };
 
   return (

@@ -1,4 +1,5 @@
 import {useEffect} from 'react';
+import {closeIfConfirmed} from '../../utils/confirmClose';
 import {X} from 'lucide-react';
 import type {SpaceCard} from '../../services/space.service';
 import {formatInr, spacePriceLine} from './spaceActions';
@@ -15,7 +16,7 @@ export function SpaceDetailsModal({
   useEffect(() => {
     if (!space) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') void closeIfConfirmed(onClose);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -27,7 +28,7 @@ export function SpaceDetailsModal({
     <div
       className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4"
       onMouseDown={event => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) void closeIfConfirmed(onClose);
       }}
     >
       <div
@@ -42,7 +43,7 @@ export function SpaceDetailsModal({
           </p>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
             aria-label="Close space details"
           >

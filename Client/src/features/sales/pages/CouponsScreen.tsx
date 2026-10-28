@@ -47,6 +47,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Swal from "sweetalert2";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 import {
   handleActivateCoupon,
   handleCreateCoupon,
@@ -306,6 +307,9 @@ export default function CouponsScreen() {
   const closeModal = () => {
     setModalOpen(false);
     resetForm();
+  };
+  const requestCloseModal = () => {
+    void closeIfConfirmed(closeModal);
   };
 
   const submit = async () => {
@@ -759,7 +763,7 @@ export default function CouponsScreen() {
                 type="button"
                 aria-label="Close overlay"
                 className="absolute inset-0 cursor-default"
-                onClick={closeModal}
+                onClick={requestCloseModal}
               />
               <div
                 role="dialog"
@@ -771,7 +775,7 @@ export default function CouponsScreen() {
                   <div className="flex min-w-0 items-center gap-2.5">
                     <button
                       type="button"
-                      onClick={closeModal}
+                      onClick={requestCloseModal}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 sm:hidden"
                       aria-label="Back"
                     >
@@ -789,7 +793,7 @@ export default function CouponsScreen() {
                   </div>
                   <button
                     type="button"
-                    onClick={closeModal}
+                    onClick={requestCloseModal}
                     className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     aria-label="Close"
                   >

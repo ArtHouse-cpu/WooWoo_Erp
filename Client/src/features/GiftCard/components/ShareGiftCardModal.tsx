@@ -21,6 +21,7 @@ import {
   handleShareGiftCard,
 } from "@/services/apiClient";
 import type { GiftCardData } from "../Pages/GiftCard";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type Props = {
   open: boolean;
@@ -92,7 +93,7 @@ const ShareGiftCardModal = ({ open, card, onClose, onShareChange }: Props) => {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") void closeIfConfirmed(onClose);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -195,7 +196,7 @@ const ShareGiftCardModal = ({ open, card, onClose, onShareChange }: Props) => {
     <div
       className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4 backdrop-blur-xs"
       onMouseDown={(e) => {
-        if (e.currentTarget === e.target) onClose();
+        if (e.currentTarget === e.target) void closeIfConfirmed(onClose);
       }}
       role="dialog"
       aria-modal="true"
@@ -219,7 +220,7 @@ const ShareGiftCardModal = ({ open, card, onClose, onShareChange }: Props) => {
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
             aria-label="Close"
           >
@@ -367,7 +368,7 @@ const ShareGiftCardModal = ({ open, card, onClose, onShareChange }: Props) => {
           )}
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-xl border border-gray-300 px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
           >
             Done

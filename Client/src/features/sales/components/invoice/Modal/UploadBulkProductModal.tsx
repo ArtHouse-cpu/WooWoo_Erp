@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Download, FileSpreadsheet, Upload, X } from "lucide-react";
 import * as XLSX from "xlsx";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type ProductBulkImportRow = {
   productName: string;
@@ -340,7 +341,7 @@ export default function UploadBulkProductModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
           >
             <X size={18} />
@@ -458,7 +459,7 @@ export default function UploadBulkProductModal({
         <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-5 py-4">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             disabled={loading}
             className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
           >

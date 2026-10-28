@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import type { AdditionalServiceItem } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export const ICON_OPTIONS = [
   { key: "Car", label: "Parking (Car)", icon: Car },
@@ -123,7 +124,7 @@ export default function AddAdditionalServiceModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-xs"
       onMouseDown={(e) => {
-        if (e.currentTarget === e.target && !loading) onClose();
+        if (e.currentTarget === e.target && !loading) void closeIfConfirmed(onClose);
       }}
     >
       <div className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
@@ -136,7 +137,7 @@ export default function AddAdditionalServiceModal({
 
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => void closeIfConfirmed(onClose)}
           disabled={loading}
           className="absolute right-4 top-4 rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
           aria-label="Close"
@@ -295,7 +296,7 @@ export default function AddAdditionalServiceModal({
           <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               disabled={loading}
               className="rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
             >

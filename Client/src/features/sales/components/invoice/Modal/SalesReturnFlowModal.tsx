@@ -20,6 +20,7 @@ import {
   withUpdatedQty,
   type SelectedReturnLine,
 } from '@/features/sales/utils/salesReturn';
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type Intent = 'return' | 'cancel';
 type SplitKey = 'cash' | 'upi' | 'card' | 'wallet';
@@ -268,7 +269,7 @@ export default function SalesReturnFlowModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500"
           >
             <X className="h-4 w-4" />

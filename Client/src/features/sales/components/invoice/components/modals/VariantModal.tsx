@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { X } from "lucide-react";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type VariantInput = {
   name: string;
@@ -74,13 +75,13 @@ export default function VariantModal({ onClose, onSave, initialValue }: Props) {
       aria-label={initialValue ? "Edit Variant" : "Add Variant"}
       onMouseDown={(e) => {
         // Click outside panel closes; don't let events hit the product form.
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) void closeIfConfirmed(onClose);
       }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();
           e.stopPropagation();
-          onClose();
+          void closeIfConfirmed(onClose);
         }
       }}
     >
@@ -99,7 +100,7 @@ export default function VariantModal({ onClose, onSave, initialValue }: Props) {
         </h3>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => void closeIfConfirmed(onClose)}
           className="absolute right-3 top-3 rounded-full p-2 hover:bg-gray-100"
         >
           <X size={18} />
@@ -181,7 +182,7 @@ export default function VariantModal({ onClose, onSave, initialValue }: Props) {
           <div className="flex justify-end gap-2 md:col-span-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               className="rounded-lg border px-4 py-2 text-sm"
             >
               Cancel

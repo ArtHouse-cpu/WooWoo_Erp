@@ -6,6 +6,7 @@ import {
   handleCreateMembershipRazorpayOrder,
   handleVerifyMembershipRazorpayPayment,
 } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 // Extend window to include Razorpay loaded from CDN script
 declare global {
@@ -225,7 +226,7 @@ export default function BuyMembershipModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             disabled={processing}
             className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
           >
@@ -346,7 +347,7 @@ export default function BuyMembershipModal({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             disabled={processing}
             className="mt-2 w-full py-2 text-xs font-medium text-slate-400 hover:text-slate-600 disabled:opacity-50"
           >

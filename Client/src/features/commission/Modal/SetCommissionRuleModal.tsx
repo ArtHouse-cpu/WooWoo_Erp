@@ -15,6 +15,7 @@ import {
   type MembershipPlanPayload,
   type CommissionRule,
 } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 interface SetCommissionRuleModalProps {
   isOpen: boolean;
@@ -357,7 +358,7 @@ const SetCommissionRuleModal: React.FC<SetCommissionRuleModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-      onClick={onClose}
+      onClick={() => void closeIfConfirmed(onClose)}
     >
       <div
         className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl bg-white shadow-2xl"
@@ -374,7 +375,7 @@ const SetCommissionRuleModal: React.FC<SetCommissionRuleModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
           >
             <X size={18} />
@@ -492,7 +493,7 @@ const SetCommissionRuleModal: React.FC<SetCommissionRuleModalProps> = ({
             ) : (
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => void closeIfConfirmed(onClose)}
                 disabled={loading}
                 className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50"
               >

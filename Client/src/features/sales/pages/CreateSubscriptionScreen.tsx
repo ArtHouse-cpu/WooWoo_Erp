@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
@@ -1827,22 +1828,11 @@ useEffect(() => {
                 </div>
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (mode !== "view") {
-                      const result = await Swal.fire({
-                        title: "Are you sure?",
-                        text: "Any unsaved changes will be lost.",
-                        icon: "warning",
-                        showCancelButton: true,
-                        confirmButtonColor: "#7C3AED",
-                        cancelButtonColor: "#6B7280",
-                        confirmButtonText: "Yes, Close",
-                        cancelButtonText: "Cancel",
-                      });
-                      if (!result.isConfirmed) return;
-                    }
-                    if (onClose) onClose();
-                    else navigate(-1);
+                  onClick={() => {
+                    void closeIfConfirmed(() => {
+                      if (onClose) onClose();
+                      else navigate(-1);
+                    });
                   }}
                   className="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50"
                   aria-label="Close"

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { FileSpreadsheet, Upload, X, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import type { CustomerImportRow } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type Props = {
   open: boolean;
@@ -247,7 +248,7 @@ export default function ImportCustomersModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
           >
             <X size={18} />
@@ -354,7 +355,7 @@ export default function ImportCustomersModal({
         <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-lg border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
           >
             Cancel

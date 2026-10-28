@@ -34,6 +34,7 @@ import {
   type VendorTimelineItem,
 } from "@/services/apiClient";
 import type { VendorDetails } from "./VendorDetailsModal";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type Tab = "overview" | "timeline" | "purchases" | "orders" | "payments";
 type Period = "all" | "month" | "year";
@@ -720,7 +721,7 @@ export default function Vendor360Modal({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white"
             >
               <X size={14} /> Close
@@ -1076,7 +1077,7 @@ export default function Vendor360Modal({
               </div>
               <button
                 type="button"
-                onClick={() => setBill(null)}
+                onClick={() => void closeIfConfirmed(() => setBill(null))}
                 className="rounded-full p-1 text-slate-500"
                 aria-label="Close bill"
               >
@@ -1170,7 +1171,7 @@ export default function Vendor360Modal({
               ) : null}
               <button
                 type="button"
-                onClick={() => setBill(null)}
+                onClick={() => void closeIfConfirmed(() => setBill(null))}
                 className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-600"
               >
                 Close
@@ -1212,7 +1213,7 @@ export default function Vendor360Modal({
               </div>
               <button
                 type="button"
-                onClick={() => setDocOpen(false)}
+                onClick={() => void closeIfConfirmed(() => setDocOpen(false))}
                 className="rounded-full p-1 text-slate-500"
                 aria-label="Close document"
               >
@@ -1247,7 +1248,7 @@ export default function Vendor360Modal({
               </a>
               <button
                 type="button"
-                onClick={() => setDocOpen(false)}
+                onClick={() => void closeIfConfirmed(() => setDocOpen(false))}
                 className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white"
               >
                 Close
@@ -1454,7 +1455,7 @@ export default function Vendor360Modal({
               </h3>
               <button
                 type="button"
-                onClick={() => setPayDoc("")}
+                onClick={() => void closeIfConfirmed(() => setPayDoc(""))}
                 className="rounded-full p-1 text-slate-500"
                 aria-label="Close document"
               >
@@ -1475,7 +1476,7 @@ export default function Vendor360Modal({
               </a>
               <button
                 type="button"
-                onClick={() => setPayDoc("")}
+                onClick={() => void closeIfConfirmed(() => setPayDoc(""))}
                 className="rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white"
               >
                 Close

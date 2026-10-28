@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { handleGetCategories } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type Category = {
   _id: string;
@@ -48,7 +49,7 @@ export default function StockOutModal({ onClose }: Props) {
         <h2 className="mb-4 text-xl font-semibold">Stock Out</h2>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => void closeIfConfirmed(onClose)}
           className="absolute top-4 right-4 cursor-pointer rounded-full p-2 transition hover:bg-gray-100"
         >
           <X size={22} />
@@ -144,7 +145,7 @@ export default function StockOutModal({ onClose }: Props) {
         <div className="mt-5 flex w-full justify-between gap-3">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="w-full cursor-pointer rounded-lg border border-gray-300 px-5 py-3 text-[15px] font-semibold transition hover:bg-gray-100"
           >
             Cancel

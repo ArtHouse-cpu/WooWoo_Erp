@@ -18,6 +18,7 @@ import {
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
 import { nearestRupee } from "@/features/sales/utils/paymentRoundOff";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type SplitKey = "cash" | "upi" | "card" | "wallet";
 
@@ -293,7 +294,7 @@ export default function ExpenseReceivePaymentModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           >
             <X size={20} />
@@ -392,7 +393,7 @@ export default function ExpenseReceivePaymentModal({
                 </p>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={() => void closeIfConfirmed(onClose)}
                   className="mt-6 rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-300"
                 >
                   Close
@@ -620,7 +621,7 @@ export default function ExpenseReceivePaymentModal({
 
                   <button
                     type="button"
-                    onClick={onClose}
+                    onClick={() => void closeIfConfirmed(onClose)}
                     className="w-full py-2 text-xs font-medium text-gray-400 hover:text-gray-600"
                   >
                     Cancel

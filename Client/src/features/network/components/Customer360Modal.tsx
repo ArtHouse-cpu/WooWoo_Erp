@@ -13,6 +13,7 @@ import {
   type Customer360TimelineItem,
   type Customer360WalletTx,
 } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type Tab = "overview" | "purchases" | "program" | "bookings" | "memberships" | "wallet" | "timeline";
 type ProgramTab = "csp" | "hap";
@@ -294,7 +295,7 @@ export default function Customer360Modal({
                 <FilePlus2 size={14} /> POS Bill
               </button>
             ) : null}
-            <button type="button" onClick={onClose} className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
+            <button type="button" onClick={() => void closeIfConfirmed(onClose)} className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
               <X size={14} /> Close
             </button>
           </div>
@@ -862,7 +863,7 @@ function SaleDetail({ sale, onClose }: { sale: Customer360Purchase; onClose: () 
               {sale.membershipType ? ` · ${sale.membershipType}` : ""}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
+          <button type="button" onClick={() => void closeIfConfirmed(onClose)} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
             Close
           </button>
         </div>

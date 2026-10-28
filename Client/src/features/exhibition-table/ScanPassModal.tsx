@@ -5,6 +5,7 @@ import {
   handleCheckInExhibitionPass,
   type ExhibitionPassRecord,
 } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type ScanResult = {
   kind: "success" | "already" | "error";
@@ -104,7 +105,7 @@ const ScanPassModal = ({ onClose, onCheckedIn }: Props) => {
           <h2 className="text-lg font-semibold text-gray-800">Scan Entry Pass</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-full p-1 text-gray-500 hover:bg-gray-100"
           >
             <X size={20} />

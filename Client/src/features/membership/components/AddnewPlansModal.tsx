@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { type MembershipPlanPayload } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type UsageLimits = Record<string, { discount: number; cashback: number }>;
 
@@ -553,7 +554,7 @@ export default function AddnewPlansModal({
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
       onMouseDown={(e) => {
-        if (e.currentTarget === e.target) onClose();
+        if (e.currentTarget === e.target) void closeIfConfirmed(onClose);
       }}
     >
       <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-900/10">
@@ -575,7 +576,7 @@ export default function AddnewPlansModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             aria-label="Close"
           >
@@ -1223,7 +1224,7 @@ export default function AddnewPlansModal({
           <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-white px-6 py-5">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               disabled={loading}
               className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >

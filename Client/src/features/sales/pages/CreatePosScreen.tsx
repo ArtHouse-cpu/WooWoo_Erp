@@ -896,8 +896,8 @@ export default function CreatePosScreen({
 
   const handleRequestClose = async () => {
     const result = await Swal.fire({
-      title: "Are you sure?",
-      text: "any unsaved changes will be lost.",
+      title: "Do you really want to close?",
+      text: "Any unsaved changes will be lost.",
       icon: "warning",
       showCancelButton: true,
       showDenyButton: true,          // Enable the 3rd button

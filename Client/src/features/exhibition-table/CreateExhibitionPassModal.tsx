@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Check, Loader2, Plus, Trash2, X } from "lucide-react";
 import { toast } from "react-toastify";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 import {
   handleCreateExhibitionPasses,
   type ExhibitionPassPersonPayload,
@@ -116,7 +117,8 @@ const CreateExhibitionPassModal = ({ isOpen, onClose, onCreated }: Props) => {
   };
 
   const handleClose = () => {
-    if (!submitting) onClose();
+    if (submitting) return;
+    void closeIfConfirmed(onClose);
   };
 
   const handleSubmit = async (e: FormEvent) => {

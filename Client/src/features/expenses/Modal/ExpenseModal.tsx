@@ -11,6 +11,7 @@ import {
   type VendorPayload,
 } from "@/services/apiClient";
 import AddVendorModal from "@/features/purchase/Modal/AddVendorModal";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type ExpenseModalMode = "create" | "edit" | "view";
 
@@ -286,8 +287,10 @@ const ExpenseModal = ({
   };
 
   const handleCancel = () => {
-    resetForm();
-    onClose();
+    void closeIfConfirmed(() => {
+      resetForm();
+      onClose();
+    });
   };
 
   const handleChange = (

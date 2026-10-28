@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Receipt,
 } from "lucide-react";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type PaymentEntry = {
   id: string;
@@ -41,7 +42,7 @@ export default function PaymentModal({ open, onClose, payment }: Props) {
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") void closeIfConfirmed(onClose);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -54,7 +55,7 @@ export default function PaymentModal({ open, onClose, payment }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4"
-      onClick={onClose}
+      onClick={() => void closeIfConfirmed(onClose)}
     >
       <div
         className="w-full max-w-lg rounded-2xl bg-white shadow-xl overflow-hidden border border-gray-100"
@@ -73,7 +74,7 @@ export default function PaymentModal({ open, onClose, payment }: Props) {
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition cursor-pointer"
           >
             <X size={18} />
@@ -186,7 +187,7 @@ export default function PaymentModal({ open, onClose, payment }: Props) {
         <div className="flex justify-end border-t border-gray-100 px-6 py-3.5 bg-gray-50/50">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition shadow-xs cursor-pointer"
           >
             Close
