@@ -47,6 +47,7 @@ import exhibitionRoutes from './routes/exhibition.routes.js';
 import publicExhibitionRoutes from './routes/publicExhibition.route.js';
 import allBookingRoutes from './routes/allBooking.route.js';
 import bookingOverviewRoutes from './routes/bookingOverview.route.js';
+import {checkRedisConnection} from './config/redisConnection.js';
 // import activityRoutes from './routes/activity.route.js';
 
 // Load environment variables
@@ -160,4 +161,5 @@ app.use(customerErrorHandler);
 
 app.listen(PORT, () => {
   console.log(`🌐 Server is running on port ${PORT}`);
+  checkRedisConnection();
 });

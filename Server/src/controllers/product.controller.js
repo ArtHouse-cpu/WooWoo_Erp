@@ -8,6 +8,10 @@ import { computeStockByProductNames, getProductStockNames, sumStockForNames } fr
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import mongoose from 'mongoose';
 import {LINE_TYPES} from '../utils/itemClassification.utils.js';
+import {
+  invalidateProductSearchCache,
+  rememberProductSearch,
+} from '../config/productSearchCache.js';
 
 const escapeRegex = (value) =>
   String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -409,6 +413,7 @@ export const createProduct = async (req, res) => {
           );
 
           const [productWithLabel] = await withCspLabel([existingDup.toObject()]);
+          await invalidateProductSearchCache();
           return res.status(200).json({
             success: true,
             message:
@@ -453,6 +458,7 @@ export const createProduct = async (req, res) => {
     }
 
     const [productWithLabel] = await withCspLabel([product.toObject()]);
+    await invalidateProductSearchCache();
 
     return res.status(201).json({
       success: true,
@@ -937,6 +943,7 @@ export const uploadBulkProducts = async (req, res) => {
     const insertedProducts = await Product.insertMany(toInsert, {
       ordered: false,
     });
+    await invalidateProductSearchCache();
 
     return res.status(201).json({
       success: true,
@@ -957,6 +964,7 @@ export const uploadBulkProducts = async (req, res) => {
     // Partial success when ordered:false hits a validation / unique-index error mid-batch
     if (error?.name === 'MongoBulkWriteError' && Array.isArray(error?.insertedDocs)) {
       const created = error.insertedDocs.length;
+      if (created > 0) await invalidateProductSearchCache();
       const writeErrors = Array.isArray(error?.writeErrors) ? error.writeErrors : [];
       const dupErrors = writeErrors.filter(
         (e) => e?.code === 11000 || /duplicate/i.test(String(e?.errmsg || e?.message || '')),
@@ -1108,37 +1116,59 @@ export const getProducts = async (req, res) => {
       String(includeStats || '').toLowerCase() === 'true' ||
       String(includeStats || '') === '1';
 
-    const [total, products, statsAgg] = await Promise.all([
-      Product.countDocuments(query),
-      Product.find(query)
-        .select(PRODUCT_LIST_SELECT)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      wantStats
-        ? Product.aggregate([
-            { $match: query },
-            {
-              $group: {
-                _id: null,
-                totalStockQty: { $sum: { $ifNull: ['$stockQty', 0] } },
-                inStockCount: {
-                  $sum: {
-                    $cond: [{ $gt: [{ $ifNull: ['$stockQty', 0] }, 0] }, 1, 0],
+    const {total, products, statsAgg} = await rememberProductSearch(
+      'staff-list',
+      {
+        search: searchTerm.toLowerCase(),
+        type: typeFilter,
+        cspEnrollmentId: cspEnrollmentIdFilter,
+        page,
+        limit,
+        skip,
+        sortField,
+        sortDir,
+        wantStats,
+      },
+      async () => {
+        const [totalCount, rows, stats] = await Promise.all([
+          Product.countDocuments(query),
+          Product.find(query)
+            .select(PRODUCT_LIST_SELECT)
+            .sort(sort)
+            .skip(skip)
+            .limit(limit)
+            .lean(),
+          wantStats
+            ? Product.aggregate([
+                {$match: query},
+                {
+                  $group: {
+                    _id: null,
+                    totalStockQty: {$sum: {$ifNull: ['$stockQty', 0]}},
+                    inStockCount: {
+                      $sum: {
+                        $cond: [{$gt: [{$ifNull: ['$stockQty', 0]}, 0]}, 1, 0],
+                      },
+                    },
+                    outOfStockCount: {
+                      $sum: {
+                        $cond: [{$lte: [{$ifNull: ['$stockQty', 0]}, 0]}, 1, 0],
+                      },
+                    },
+                    categories: {$addToSet: '$category'},
                   },
                 },
-                outOfStockCount: {
-                  $sum: {
-                    $cond: [{ $lte: [{ $ifNull: ['$stockQty', 0] }, 0] }, 1, 0],
-                  },
-                },
-                categories: { $addToSet: '$category' },
-              },
-            },
-          ])
-        : Promise.resolve([]),
-    ]);
+              ])
+            : Promise.resolve([]),
+        ]);
+        return {total: totalCount, products: rows, statsAgg: stats};
+      },
+      value =>
+        Boolean(value) &&
+        Array.isArray(value.products) &&
+        Number.isFinite(Number(value.total)) &&
+        Array.isArray(value.statsAgg),
+    );
 
     const productNames = [
       ...new Set(products.flatMap((p) => getProductStockNames(p))),
@@ -1261,22 +1291,40 @@ export const getCustomerProducts = async (req, res) => {
       ];
     }
 
-    const [products, categoryNames] = await Promise.all([
-      Product.find(filter)
-        .select(CUSTOMER_PRODUCT_SELECT)
-        .sort({createdAt: -1})
-        .limit(limit)
-        .lean(),
-      Product.distinct('category', customerCatalogueFilter()),
-    ]);
+    const catalogue = await rememberProductSearch(
+      'customer-catalogue',
+      {
+        search: search.toLowerCase(),
+        category: category.toLowerCase(),
+        limit,
+      },
+      async () => {
+        const [products, categoryNames] = await Promise.all([
+          Product.find(filter)
+            .select(CUSTOMER_PRODUCT_SELECT)
+            .sort({createdAt: -1})
+            .limit(limit)
+            .lean(),
+          Product.distinct('category', customerCatalogueFilter()),
+        ]);
+        return {
+          categories: categoryNames
+            .map(name => String(name || '').trim())
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b)),
+          products: products.map(serializeCustomerProduct),
+        };
+      },
+      value =>
+        Boolean(value) &&
+        Array.isArray(value.products) &&
+        Array.isArray(value.categories),
+    );
 
     return res.status(200).json({
       success: true,
-      categories: categoryNames
-        .map(name => String(name || '').trim())
-        .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b)),
-      products: products.map(serializeCustomerProduct),
+      categories: catalogue.categories,
+      products: catalogue.products,
     });
   } catch (error) {
     console.error('getCustomerProducts error:', error);
@@ -1553,6 +1601,7 @@ export const updateProduct = async (req, res) => {
     }
 
     const [productWithLabel] = await withCspLabel([existingProduct.toObject()]);
+    await invalidateProductSearchCache();
 
     return res.status(200).json({
       success: true,
@@ -1582,6 +1631,7 @@ export const deleteProduct = async (req, res) => {
       });
     }
 
+    await invalidateProductSearchCache();
     return res.status(200).json({
       success: true,
       message: "Product deleted successfully",

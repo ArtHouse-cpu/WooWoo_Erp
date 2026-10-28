@@ -4,6 +4,7 @@ import Product from '../models/product.model.js';
 import CustomersailorProgram from '../models/customerSellerProgram.model.js';
 import {uploadOnCloudinary} from '../utils/cloudinary.js';
 import {sendError, sendSuccess} from '../modules/customer/utils/response.js';
+import {invalidateProductSearchCache} from '../config/productSearchCache.js';
 
 const PRODUCT_CATEGORIES = [
   'Art Supplies',
@@ -222,6 +223,7 @@ export const createMyCspProduct = async (req, res) => {
       cspVendorId: enrollment.vendorId || null,
     });
 
+    await invalidateProductSearchCache();
     return sendSuccess(res, {
       status: 201,
       message: 'Product added.',
@@ -312,6 +314,7 @@ export const updateMyCspProduct = async (req, res) => {
     product.cspCustomerId = enrollment.customerId;
     product.cspVendorId = enrollment.vendorId || null;
     await product.save();
+    await invalidateProductSearchCache();
 
     return sendSuccess(res, {
       message: 'Product updated.',
@@ -352,6 +355,7 @@ export const deleteMyCspProduct = async (req, res) => {
       return sendError(res, {status: 404, message: 'Product not found.'});
     }
 
+    await invalidateProductSearchCache();
     return sendSuccess(res, {message: 'Product removed.', data: {id}});
   } catch (error) {
     console.error('deleteMyCspProduct error:', error);
