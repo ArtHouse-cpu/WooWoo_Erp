@@ -1947,19 +1947,48 @@ export type MembershipPlanPayload = {
   };
 };
 
+const inFlightMembershipRequests = new Map<string, Promise<any>>();
+const membershipCache = new Map<string, { data: any; expiry: number }>();
+const MEMBERSHIP_CACHE_TTL_MS = 60_000;
+
+export const clearMembershipCache = () => {
+  membershipCache.clear();
+};
+
 export const handleGetMemberships = async (
   params?: { search?: string; planType?: string; status?: string },
   signal?: AbortSignal,
 ) => {
-  const response = await axiosInstance.get("/membership", {
-    params: {
-      search: params?.search?.trim() ?? "",
-      planType: params?.planType ?? "All",
-      status: params?.status ?? "All",
-    },
-    signal,
-  });
-  return response.data;
+  const search = params?.search?.trim() ?? "";
+  const planType = params?.planType ?? "All";
+  const status = params?.status ?? "All";
+  const cacheKey = `${search}::${planType}::${status}`;
+
+  const cached = membershipCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiry) {
+    return cached.data;
+  }
+
+  if (inFlightMembershipRequests.has(cacheKey)) {
+    return inFlightMembershipRequests.get(cacheKey)!;
+  }
+
+  const reqPromise = (async () => {
+    try {
+      const response = await axiosInstance.get("/membership", {
+        params: { search, planType, status },
+        signal,
+      });
+      const data = response.data;
+      membershipCache.set(cacheKey, { data, expiry: Date.now() + MEMBERSHIP_CACHE_TTL_MS });
+      return data;
+    } finally {
+      inFlightMembershipRequests.delete(cacheKey);
+    }
+  })();
+
+  inFlightMembershipRequests.set(cacheKey, reqPromise);
+  return reqPromise;
 };
 
 export const handleCreateMembership = async (
@@ -3766,6 +3795,14 @@ export type CatalogueLookupItem = {
   barcode?: string;
 };
 
+const inFlightCatalogueRequests = new Map<string, Promise<any>>();
+const catalogueCache = new Map<string, { data: any; expiry: number }>();
+const CATALOGUE_CACHE_TTL_MS = 25_000;
+
+export const clearCatalogueCache = () => {
+  catalogueCache.clear();
+};
+
 export const handleCatalogueLookup = async (
   search = "",
   signal?: AbortSignal,
@@ -3778,16 +3815,43 @@ export const handleCatalogueLookup = async (
   const limit = options.limit ?? 48;
   const page = options.page ?? 1;
   const sourceType = options.sourceType ?? "all";
-  const response = await axiosInstance.get("/catalogue/lookup", {
-    params: {
-      search: search.trim(),
-      limit,
-      page,
-      sourceType,
-    },
-    signal,
-  });
-  return response.data as {
+  const trimmedSearch = search.trim();
+  const cacheKey = `${trimmedSearch.toLowerCase()}::${limit}::${page}::${sourceType}`;
+
+  const cached = catalogueCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiry) {
+    return cached.data;
+  }
+
+  if (inFlightCatalogueRequests.has(cacheKey)) {
+    return inFlightCatalogueRequests.get(cacheKey)!;
+  }
+
+  const reqPromise = (async () => {
+    try {
+      const response = await axiosInstance.get("/catalogue/lookup", {
+        params: {
+          search: trimmedSearch,
+          limit,
+          page,
+          sourceType,
+        },
+        signal,
+      });
+      const data = response.data;
+      catalogueCache.set(cacheKey, { data, expiry: Date.now() + CATALOGUE_CACHE_TTL_MS });
+      if (catalogueCache.size > 50) {
+        const oldestKey = catalogueCache.keys().next().value;
+        if (oldestKey) catalogueCache.delete(oldestKey);
+      }
+      return data;
+    } finally {
+      inFlightCatalogueRequests.delete(cacheKey);
+    }
+  })();
+
+  inFlightCatalogueRequests.set(cacheKey, reqPromise);
+  return reqPromise as Promise<{
     success: boolean;
     message?: string;
     items: CatalogueLookupItem[];
@@ -3800,10 +3864,11 @@ export const handleCatalogueLookup = async (
       total: number;
       sourceType: string;
     };
-  };
+  }>;
 };
 
 export const handleCreateProduct = async (formData: FormData) => {
+  clearCatalogueCache();
   try {
     const response = await axiosInstance.post("/product", formData, {
       headers: {

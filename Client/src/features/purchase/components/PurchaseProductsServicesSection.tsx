@@ -9,6 +9,7 @@ import {
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
 import CatalogueItemLabel from "@/features/sales/components/CatalogueItemLabel";
 import Swal from "sweetalert2";
+import { useDebounce } from "@/hooks/useDebounce";
 
 type DraftItem = {
   name: string;
@@ -101,6 +102,7 @@ export default function ProductsServicesSection({
   const [loadingGrid, setLoadingGrid] = useState(false);
   const [selectedType, setSelectedType] = useState<string>("product");
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const debouncedDraftName = useDebounce(draft.name.trim(), 350);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -131,7 +133,7 @@ export default function ProductsServicesSection({
     const fetchGridItems = async () => {
       try {
         setLoadingGrid(true);
-        const term = draft.name.trim();
+        const term = debouncedDraftName;
         const response = await handleCatalogueLookup(term, controller.signal, {
           page: 1,
           limit: 48,
@@ -144,21 +146,20 @@ export default function ProductsServicesSection({
       }
     };
 
-    const timeout = window.setTimeout(fetchGridItems, 250);
+    void fetchGridItems();
     return () => {
       controller.abort();
-      window.clearTimeout(timeout);
     };
-  }, [draft.name, readOnly]);
+  }, [debouncedDraftName, readOnly]);
 
   useEffect(() => {
     if (readOnly || !dropdownOpen) return;
     const controller = new AbortController();
-    const timeout = window.setTimeout(async () => {
+    (async () => {
       try {
         setLoadingProducts(true);
         const response = await handleCatalogueLookup(
-          draft.name.trim(),
+          debouncedDraftName,
           controller.signal,
           { page: 1, limit: 48, sourceType: "product" },
         );
@@ -169,13 +170,12 @@ export default function ProductsServicesSection({
       } finally {
         setLoadingProducts(false);
       }
-    }, 250);
+    })();
 
     return () => {
       controller.abort();
-      window.clearTimeout(timeout);
     };
-  }, [draft.name, dropdownOpen, readOnly]);
+  }, [debouncedDraftName, dropdownOpen, readOnly]);
 
   const filteredGridItems = useMemo(
     () =>

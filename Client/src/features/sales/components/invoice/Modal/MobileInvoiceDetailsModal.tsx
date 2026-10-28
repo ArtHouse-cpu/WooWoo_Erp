@@ -6,8 +6,6 @@ import {
   ChevronRight,
   FileText,
   ArrowLeftRight,
-  Send,
-  Ellipsis,
   Landmark,
   PenTool,
   Tag,
@@ -18,6 +16,8 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 export type MobileInvoiceDetailsModalProps = {
@@ -27,19 +27,84 @@ export type MobileInvoiceDetailsModalProps = {
   loading?: boolean;
   onEdit: (invoice: any) => void;
   onConvert: (invoice: any) => void;
-  onWhatsAppShare: (invoice: any) => void;
-  onDownloadPdf: (invoice: any) => void;
-  onMoreActions: (invoice: any) => void;
+  onCancelInvoice: (invoice: any) => void;
+  onDeleteInvoice: (invoice: any) => void;
+  onWhatsAppShare?: (invoice: any) => void;
+  onDownloadPdf?: (invoice: any) => void;
+  onMoreActions?: (invoice: any) => void;
 };
 
 function formatDetailDate(val?: string | Date): string {
   if (!val) return "";
   const d = new Date(val);
   if (Number.isNaN(d.getTime())) return "";
-  const day = d.getDate();
-  const month = d.toLocaleDateString("en-GB", { month: "short" });
-  const year = d.getFullYear();
-  return `${day} ${month}, ${year}`;
+  const shortDate = d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+  const time = d.toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `${shortDate}, ${time}`;
+}
+
+function getInvoiceCategories(raw: any): string[] {
+  if (!raw) return [];
+  const categories = new Set<string>();
+
+  const notes = String(raw.notes || "").toLowerCase();
+  if (notes.includes("food bill") || notes.includes("food")) {
+    categories.add("Food");
+  }
+  if (notes.includes("space booking") || notes.includes("space")) {
+    categories.add("Space");
+  }
+
+  const directCat = String(
+    raw.invoiceCategory || raw.category || raw.billType || raw.sourceType || "",
+  ).toLowerCase();
+  if (directCat.includes("food")) categories.add("Food");
+  if (directCat.includes("space")) categories.add("Space");
+  if (directCat.includes("service")) categories.add("Service");
+  if (directCat.includes("membership") || directCat.includes("subscription")) {
+    categories.add("Membership");
+  }
+
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  for (const item of items) {
+    const cat = String(
+      item.lineCategory || item.sourceType || item.category || "",
+    ).toLowerCase();
+    const name = String(item.productName || item.name || "").toLowerCase();
+    if (cat === "food" || cat === "foods" || name.includes("food") || item.isFood) {
+      categories.add("Food");
+    } else if (cat === "space" || cat === "spaces" || name.includes("space") || item.isSpace) {
+      categories.add("Space");
+    } else if (cat === "service" || cat === "services") {
+      categories.add("Service");
+    } else if (/membership|subscription/.test(cat) || /membership|subscription/.test(name)) {
+      categories.add("Membership");
+    }
+  }
+
+  return Array.from(categories);
+}
+
+function getCustomerMembershipLabel(raw: any): string | null {
+  if (!raw) return null;
+  const m =
+    raw.membershipType ||
+    raw.membershipPlan ||
+    raw.membership ||
+    raw.customerMembership ||
+    raw.customer?.membershipType ||
+    raw.customer?.membership;
+  if (!m || String(m).toLowerCase() === "none" || String(m).toLowerCase() === "visitor") {
+    return null;
+  }
+  return String(m);
 }
 
 export default function MobileInvoiceDetailsModal({
@@ -49,6 +114,8 @@ export default function MobileInvoiceDetailsModal({
   loading = false,
   onEdit,
   onConvert,
+  onCancelInvoice,
+  onDeleteInvoice,
   onWhatsAppShare,
   onDownloadPdf,
   onMoreActions,
@@ -92,6 +159,8 @@ export default function MobileInvoiceDetailsModal({
   const invoiceDateStr = formatDetailDate(
     raw.invoiceDate || raw.createdAt || raw.date,
   );
+  const categories = getInvoiceCategories(raw);
+  const membershipLabel = getCustomerMembershipLabel(raw);
 
   const items: any[] = Array.isArray(raw.items) && raw.items.length > 0
     ? raw.items
@@ -166,10 +235,6 @@ export default function MobileInvoiceDetailsModal({
       role="dialog"
       aria-modal="true"
     >
-      {/* ============================================================== */}
-      {/* A. STICKY HEADER                                               */}
-      {/* Back arrow, Invoice code, Type & status, Edit, Overflow menu   */}
-      {/* ============================================================== */}
       <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200/90 bg-white px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] shadow-xs">
         <div className="flex items-center justify-between gap-2">
           {/* Left: Back Arrow + Invoice Title */}
@@ -186,27 +251,28 @@ export default function MobileInvoiceDetailsModal({
               <h2 className="truncate text-lg font-bold tracking-tight text-slate-900">
                 {invoiceCode}
               </h2>
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="font-normal text-slate-500">Invoice</span>
-                <span className="text-slate-400">•</span>
-                <span
-                  className={`font-semibold capitalize ${
-                    isPaid
-                      ? "text-emerald-600"
-                      : isPending
-                        ? "text-amber-600"
-                        : isDraft
-                          ? "text-slate-500"
-                          : "text-rose-600"
-                  }`}
-                >
-                  {rawStatus}
-                </span>
+              <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                {categories.map((cat) => (
+                  <span
+                    key={cat}
+                    className={`inline-flex items-center rounded-md px-1.5 py-0.2 text-[10px] font-semibold ${
+                      cat === "Food"
+                        ? "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200"
+                        : cat === "Space"
+                          ? "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200"
+                          : cat === "Membership"
+                            ? "bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-200"
+                            : "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200"
+                    }`}
+                  >
+                    {cat}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Right: Edit Button + Overflow Action Menu */}
+          {/* Right: Edit Button */}
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
@@ -216,22 +282,9 @@ export default function MobileInvoiceDetailsModal({
             >
               Edit
             </button>
-            <button
-              type="button"
-              onClick={() => onMoreActions(raw)}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 active:scale-95"
-              aria-label="More actions"
-            >
-              <Ellipsis size={20} />
-            </button>
           </div>
         </div>
       </header>
-
-      {/* ============================================================== */}
-      {/* B. SCROLLABLE CONTENT BODY                                     */}
-      {/* Customer Details, Items, Bill Summary, Payment History, Others */}
-      {/* ============================================================== */}
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3.5 pb-36 space-y-4">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-3">
@@ -252,10 +305,15 @@ export default function MobileInvoiceDetailsModal({
                   className="flex cursor-pointer items-center justify-between"
                   onClick={() => setCustomerExpanded((prev) => !prev)}
                 >
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-base font-bold text-slate-900">
                       {customerName}
                     </span>
+                    {membershipLabel && (
+                      <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 ring-1 ring-inset ring-purple-200">
+                        {membershipLabel}
+                      </span>
+                    )}
                     <ChevronDown
                       size={16}
                       className={`text-slate-400 transition-transform duration-200 ${
@@ -266,7 +324,7 @@ export default function MobileInvoiceDetailsModal({
                 </div>
 
                 <div className="mt-2 text-xs">
-                  <div className="text-slate-400 font-normal">Invoice Date</div>
+                  <div className="text-slate-400 font-normal">Invoice Date & Time</div>
                   <div className="font-semibold text-slate-800">
                     {invoiceDateStr || "—"}
                   </div>
@@ -296,14 +354,6 @@ export default function MobileInvoiceDetailsModal({
                         {signatoryName}
                       </span>
                     </div>
-                    {raw.membershipType && (
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Membership:</span>
-                        <span className="font-semibold text-blue-600 capitalize">
-                          {raw.membershipType}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -336,7 +386,7 @@ export default function MobileInvoiceDetailsModal({
                       item.unitPrice || item.price || 0,
                     );
                     const itemQty = Number(item.qty || item.quantity || 1);
-                    const itemUnit = item.unit || "OTH";
+                    const itemUnit = item.unit;
                     const itemTotal = Number(
                       item.lineTotal ||
                         item.totalAmount ||
@@ -637,53 +687,45 @@ export default function MobileInvoiceDetailsModal({
 
       {/* ============================================================== */}
       {/* C. FIXED BOTTOM ACTION PANEL                                   */}
-      {/* View (PDF), Convert, Share (WhatsApp), More (•••)              */}
+      {/* Edit, Convert, Cancel, Delete                                  */}
       {/* ============================================================== */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/90 bg-white/95 px-4 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-8px_25px_rgba(0,0,0,0.06)] backdrop-blur-md">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/90 bg-white/95 px-3 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-8px_25px_rgba(0,0,0,0.06)] backdrop-blur-md">
         {/* Top subtle drag pill */}
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-slate-300" />
 
-        <div className="flex items-center justify-between gap-2">
-          {/* View PDF Button */}
-          <button
-            type="button"
-            onClick={() => onDownloadPdf(raw)}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50/80 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 active:scale-95"
-          >
-            <FileText size={15} className="text-slate-600" />
-            <span>View</span>
-          </button>
+       <div className="grid w-full grid-cols-3 gap-2">
+  {/* Convert Button */}
+  <button
+    type="button"
+    disabled={isCancelled}
+    onClick={() => onConvert(raw)}
+    className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full border border-blue-200/80 bg-blue-50/80 px-2 py-2.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+  >
+    <ArrowLeftRight size={13} className="shrink-0 text-blue-600" />
+    <span className="truncate">Convert</span>
+  </button>
 
-          {/* Convert (Sales Return / Credit Note) Button */}
-          <button
-            type="button"
-            onClick={() => onConvert(raw)}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-slate-200/80 bg-slate-50/80 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 active:scale-95"
-          >
-            <ArrowLeftRight size={15} className="text-slate-600" />
-            <span>Convert</span>
-          </button>
+  {/* Cancel Invoice Button */}
+  <button
+    type="button"
+    disabled={isCancelled}
+    onClick={() => onCancelInvoice(raw)}
+    className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/80 px-2 py-2.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+  >
+    <XCircle size={13} className="shrink-0 text-amber-600" />
+    <span className="truncate">Cancel Invoice</span>
+  </button>
 
-          {/* WhatsApp Share Button */}
-          <button
-            type="button"
-            onClick={() => onWhatsAppShare(raw)}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-emerald-100 text-emerald-800 py-2.5 text-xs font-semibold transition hover:bg-emerald-200 active:scale-95"
-          >
-            <Send size={15} className="text-emerald-700" />
-            <span>Share</span>
-          </button>
-
-          {/* More Action Menu Button */}
-          <button
-            type="button"
-            onClick={() => onMoreActions(raw)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200/80 bg-slate-50/80 text-slate-700 transition hover:bg-slate-100 active:scale-95"
-            aria-label="More"
-          >
-            <Ellipsis size={18} />
-          </button>
-        </div>
+  {/* Delete Invoice Button */}
+  <button
+    type="button"
+    onClick={() => onDeleteInvoice(raw)}
+    className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full border border-rose-200/80 bg-rose-50/80 px-2 py-2.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 active:scale-95"
+  >
+    <Trash2 size={13} className="shrink-0 text-rose-600" />
+    <span className="truncate">Delete</span>
+  </button>
+</div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import {
   Plus,
   Minus,
@@ -20,6 +20,7 @@ import {
   getCatalogueLineKey,
 } from "../utils/catalogueLineKey";
 import { filterCatalogueRowsForPos } from "../utils/cataloguePosFilter";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const PAGE_SIZE = 48;
 
@@ -106,7 +107,7 @@ const SOURCE_BADGE: Record<
   },
 };
 
-export default function ProductSidebar({
+function ProductSidebar({
   cartItems,
   onAddItem,
   onIncrementItem,
@@ -123,7 +124,7 @@ export default function ProductSidebar({
   const setSearchTerm = isControlledSearch
     ? onSearchTermChange
     : setInternalSearch;
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debouncedSearch = useDebounce(searchTerm.trim(), 350);
   const [selectedType, setSelectedType] = useState<string>("all");
   const [items, setItems] = useState<CatalogueLookupItem[]>([]);
   const [page, setPage] = useState(1);
@@ -139,13 +140,6 @@ export default function ProductSidebar({
   const handleImageError = (id: string) => {
     setImageErrors((prev) => ({ ...prev, [id]: true }));
   };
-
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      setDebouncedSearch(searchTerm.trim());
-    }, 250);
-    return () => window.clearTimeout(t);
-  }, [searchTerm]);
 
   useEffect(() => {
     listEpochRef.current += 1;
@@ -562,3 +556,5 @@ export default function ProductSidebar({
     </div>
   );
 }
+
+export default memo(ProductSidebar);
