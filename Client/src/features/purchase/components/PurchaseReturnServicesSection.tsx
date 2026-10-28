@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import type { InvoiceItem } from "./types";
 import { handleGetProducts, handleCreateProduct } from "@/services/apiClient";
 import Swal from "sweetalert2";
+import { useDebounce } from "@/hooks/useDebounce";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
 import CatalogueItemLabel from "@/features/sales/components/CatalogueItemLabel";
 
@@ -37,6 +38,7 @@ export default function PurchaseReturnServicesSection({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const debouncedDraftName = useDebounce(draft.name.trim(), 350);
 
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
@@ -133,18 +135,15 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
 
   useEffect(() => {
     if (!dropdownOpen) return;
-    const term = draft.name.trim();
+    const term = debouncedDraftName;
 
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => {
-      fetchProducts(term, controller.signal);
-    }, 250);
+    void fetchProducts(term, controller.signal);
 
     return () => {
       controller.abort();
-      window.clearTimeout(timeout);
     };
-  }, [draft.name, dropdownOpen]);
+  }, [debouncedDraftName, dropdownOpen]);
 
   const handleSelectProduct = (product: any) => {
     onDraftChange("name", product.productName);

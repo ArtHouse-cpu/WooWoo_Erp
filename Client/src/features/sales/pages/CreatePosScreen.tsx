@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   X,
   ShoppingCart,
@@ -204,79 +204,85 @@ export default function CreatePosScreen({
     return () => ac.abort();
   }, []);
 
-  const stackLineBenefits = (
-    price: number,
-    qty: number,
-    category: string,
-    mType: string,
-    mId?: string | null,
-    isCsp?: boolean,
-    discountType?: string,
-    discountValue?: number,
-  ) => {
-    const plan = resolveMembershipPlan(membershipPlans, mType, mId);
-    return calcStackedLineBenefits({
-      unitPrice: price,
-      qty,
-      category,
-      plan,
-      discountType,
-      discountValue,
-      isCsp,
-    });
-  };
+  const stackLineBenefits = useCallback(
+    (
+      price: number,
+      qty: number,
+      category: string,
+      mType: string,
+      mId?: string | null,
+      isCsp?: boolean,
+      discountType?: string,
+      discountValue?: number,
+    ) => {
+      const plan = resolveMembershipPlan(membershipPlans, mType, mId);
+      return calcStackedLineBenefits({
+        unitPrice: price,
+        qty,
+        category,
+        plan,
+        discountType,
+        discountValue,
+        isCsp,
+      });
+    },
+    [membershipPlans],
+  );
 
-  const handleChange = (
-    id: number,
-    field: keyof Pick<PosItem, "qty" | "price" | "discount" | "cashback">,
-    value: string | number,
-  ) => {
-    setItems((prev) =>
-      prev.map((it) => {
-        if (it.id !== id) return it;
+  const handleChange = useCallback(
+    (
+      id: number,
+      field: keyof Pick<PosItem, "qty" | "price" | "discount" | "cashback">,
+      value: string | number,
+    ) => {
+      setItems((prev) =>
+        prev.map((it) => {
+          if (it.id !== id) return it;
 
-        let nextValue = Number(value);
-        if (field === "qty" && (!Number.isFinite(nextValue) || nextValue < 1)) {
-          nextValue = 1;
-        }
-        if (
-          field === "qty" &&
-          it.stockQty != null &&
-          Number.isFinite(Number(it.stockQty)) &&
-          nextValue > Number(it.stockQty)
-        ) {
-          Swal.fire(
-            "Insufficient stock",
-            `${it.name} has only ${it.stockQty} qty available from purchases.`,
-            "warning",
-          );
-          nextValue = Number(it.stockQty);
-        }
+          let nextValue = Number(value);
+          if (field === "qty" && (!Number.isFinite(nextValue) || nextValue < 1)) {
+            nextValue = 1;
+          }
+          if (
+            field === "qty" &&
+            it.stockQty != null &&
+            Number.isFinite(Number(it.stockQty)) &&
+            nextValue > Number(it.stockQty)
+          ) {
+            Swal.fire(
+              "Insufficient stock",
+              `${it.name} has only ${it.stockQty} qty available from purchases.`,
+              "warning",
+            );
+            nextValue = Number(it.stockQty);
+          }
 
-        const updated = { ...it, [field]: nextValue };
-        if (field === "qty" || field === "price") {
-          const stacked = stackLineBenefits(
-            updated.price,
-            updated.qty,
-            updated.category || "General",
-            membership,
-            membershipPlanId,
-            Boolean(updated.isCsp),
-            updated.productDiscountType,
-            updated.productDiscountValue,
-          );
-          return {
-            ...updated,
-            discount: stacked.discount,
-            cashback: stacked.cashback,
-            productDiscountAmount: stacked.productDiscount,
-            membershipDiscountAmount: stacked.membershipDiscount,
-          };
-        }
-        return updated;
-      }),
-    );
-  };
+          const updated = { ...it, [field]: nextValue };
+          if (field === "qty" || field === "price") {
+            const stacked = stackLineBenefits(
+              updated.price,
+              updated.qty,
+              updated.category || "General",
+              membership,
+              membershipPlanId,
+              Boolean(updated.isCsp),
+              updated.productDiscountType,
+              updated.productDiscountValue,
+            );
+            return {
+              ...updated,
+              discount: stacked.discount,
+              cashback: stacked.cashback,
+              productDiscountAmount: stacked.productDiscount,
+              membershipDiscountAmount: stacked.membershipDiscount,
+            };
+          }
+          return updated;
+        }),
+      );
+    },
+    [membership, membershipPlanId, stackLineBenefits],
+  );
 
   const addItem = () => {
     const name = searchText.trim();
@@ -371,111 +377,120 @@ export default function CreatePosScreen({
     setProducts([]);
   };
 
-  const removeItem = (id: number) => {
+  const removeItem = useCallback((id: number) => {
     setItems((prev) => prev.filter((it) => it.id !== id));
-  };
+  }, []);
 
-  const addSidebarItem = (p: CatalogueLookupItem) => {
-    if (p.trackStock && Number(p.stockQty ?? 0) <= 0) {
-      Swal.fire(
-        "Out of stock",
-        `${p.productName || p.name} has no purchased quantity left to sell.`,
-        "warning",
-      );
-      return;
-    }
-
-    const name = p.productName || p.name || "";
-    const catalogueKey = getCatalogueLineKey(p);
-    const existingItem = findCartItemForCatalogueLine(items, p);
-
-    if (existingItem) {
-      const newQty = existingItem.qty + 1;
-      if (p.trackStock && Number(p.stockQty ?? 0) < newQty) {
+  const addSidebarItem = useCallback(
+    (p: CatalogueLookupItem) => {
+      if (p.trackStock && Number(p.stockQty ?? 0) <= 0) {
         Swal.fire(
-          "Insufficient stock",
-          `${name} has only ${p.stockQty} qty available from purchases.`,
+          "Out of stock",
+          `${p.productName || p.name} has no purchased quantity left to sell.`,
           "warning",
         );
         return;
       }
-      handleChange(existingItem.id, "qty", newQty);
-    } else {
-      const qty = 1;
-      const price = Number(p.sellingPrice ?? 0);
-      const lineCategory = resolveInvoiceLineCategory(p);
-      const isCsp = Boolean(p.isCsp);
-      const productDiscountType = p.discountType;
-      const productDiscountValue = Number(p.discountValue ?? 0);
-      const stacked = stackLineBenefits(
-        price,
-        qty,
-        lineCategory,
-        membership,
-        membershipPlanId,
-        isCsp,
-        productDiscountType,
-        productDiscountValue,
-      );
 
-      setItems((prev) => [
-        ...prev,
-        {
-          id: prev.length ? Math.max(...prev.map((item) => item.id)) + 1 : 1,
-          name,
-          qty,
+      const name = p.productName || p.name || "";
+      const catalogueKey = getCatalogueLineKey(p);
+      const existingItem = findCartItemForCatalogueLine(items, p);
+
+      if (existingItem) {
+        const newQty = existingItem.qty + 1;
+        if (p.trackStock && Number(p.stockQty ?? 0) < newQty) {
+          Swal.fire(
+            "Insufficient stock",
+            `${name} has only ${p.stockQty} qty available from purchases.`,
+            "warning",
+          );
+          return;
+        }
+        handleChange(existingItem.id, "qty", newQty);
+      } else {
+        const qty = 1;
+        const price = Number(p.sellingPrice ?? 0);
+        const lineCategory = resolveInvoiceLineCategory(p);
+        const isCsp = Boolean(p.isCsp);
+        const productDiscountType = p.discountType;
+        const productDiscountValue = Number(p.discountValue ?? 0);
+        const stacked = stackLineBenefits(
           price,
-          discount: stacked.discount,
-          cashback: stacked.cashback,
-          category: lineCategory,
-          stockQty: p.trackStock ? Number(p.stockQty ?? 0) : undefined,
-          image: p.imageUrl || (p as any).images?.[0] || "",
+          qty,
+          lineCategory,
+          membership,
+          membershipPlanId,
           isCsp,
-          catalogueKey,
-          sourceId: String(p.sourceId || ""),
-          sourceType: p.sourceType,
-          variantName: p.variantName ?? null,
           productDiscountType,
           productDiscountValue,
-          productDiscountAmount: stacked.productDiscount,
-          membershipDiscountAmount: stacked.membershipDiscount,
-        },
-      ]);
-    }
-  };
+        );
 
-  const removeSidebarItem = (p: CatalogueLookupItem) => {
+        setItems((prev) => [
+          ...prev,
+          {
+            id: prev.length ? Math.max(...prev.map((item) => item.id)) + 1 : 1,
+            name,
+            qty,
+            price,
+            discount: stacked.discount,
+            cashback: stacked.cashback,
+            category: lineCategory,
+            stockQty: p.trackStock ? Number(p.stockQty ?? 0) : undefined,
+            image: p.imageUrl || (p as any).images?.[0] || "",
+            isCsp,
+            catalogueKey,
+            sourceId: String(p.sourceId || ""),
+            sourceType: p.sourceType,
+            variantName: p.variantName ?? null,
+            productDiscountType,
+            productDiscountValue,
+            productDiscountAmount: stacked.productDiscount,
+            membershipDiscountAmount: stacked.membershipDiscount,
+          },
+        ]);
+      }
+    },
+    [items, handleChange, membership, membershipPlanId, stackLineBenefits],
+  );
+
+  const removeSidebarItem = useCallback((p: CatalogueLookupItem) => {
     const key = getCatalogueLineKey(p);
     setItems((prev) =>
       prev.filter((it) => getCatalogueLineKey(it) !== key),
     );
-  };
+  }, []);
 
-  const incrementSidebarItem = (p: CatalogueLookupItem, existingQty: number) => {
-    const matchedItem = findCartItemForCatalogueLine(items, p);
-    if (matchedItem) {
-      if (p.trackStock && Number(p.stockQty ?? 0) <= existingQty) {
-        Swal.fire(
-          "Insufficient stock",
-          `${p.productName || p.name} has only ${p.stockQty} qty available from purchases.`,
-          "warning",
-        );
-        return;
+  const incrementSidebarItem = useCallback(
+    (p: CatalogueLookupItem, existingQty: number) => {
+      const matchedItem = findCartItemForCatalogueLine(items, p);
+      if (matchedItem) {
+        if (p.trackStock && Number(p.stockQty ?? 0) <= existingQty) {
+          Swal.fire(
+            "Insufficient stock",
+            `${p.productName || p.name} has only ${p.stockQty} qty available from purchases.`,
+            "warning",
+          );
+          return;
+        }
+        handleChange(matchedItem.id, "qty", existingQty + 1);
       }
-      handleChange(matchedItem.id, "qty", existingQty + 1);
-    }
-  };
+    },
+    [items, handleChange],
+  );
 
-  const decrementSidebarItem = (p: CatalogueLookupItem, existingQty: number) => {
-    const matchedItem = findCartItemForCatalogueLine(items, p);
-    if (matchedItem) {
-      if (existingQty <= 1) {
-        removeItem(matchedItem.id);
-      } else {
-        handleChange(matchedItem.id, "qty", existingQty - 1);
+  const decrementSidebarItem = useCallback(
+    (p: CatalogueLookupItem, existingQty: number) => {
+      const matchedItem = findCartItemForCatalogueLine(items, p);
+      if (matchedItem) {
+        if (existingQty <= 1) {
+          removeItem(matchedItem.id);
+        } else {
+          handleChange(matchedItem.id, "qty", existingQty - 1);
+        }
       }
-    }
-  };
+    },
+    [items, handleChange, removeItem],
+  );
 
   const openCheckoutModal = () => {
     if (items.length === 0) {
@@ -527,19 +542,32 @@ export default function CreatePosScreen({
     [items],
   );
 
-  const extraChargesTotal = roundToPaise(
-    extraCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0),
+  const extraChargesTotal = useMemo(
+    () =>
+      roundToPaise(
+        extraCharges.reduce((sum, c) => sum + Number(c.amount || 0), 0),
+      ),
+    [extraCharges],
   );
+
   /** Net bill before nearest-rupee round-off (source for checkout + coupons). */
-  const totalBeforeRound = roundToPaise(
-    Math.max(0, subTotal - discountTotal + extraChargesTotal),
+  const totalBeforeRound = useMemo(
+    () =>
+      roundToPaise(
+        Math.max(0, subTotal - discountTotal + extraChargesTotal),
+      ),
+    [subTotal, discountTotal, extraChargesTotal],
   );
+
   /** Round-off applies only on the final total amount (not per line). */
   const {
     payable: grandTotal,
     roundOff,
     preRound: billTotalBeforeRoundOff,
-  } = roundPayable(totalBeforeRound);
+  } = useMemo(
+    () => roundPayable(totalBeforeRound),
+    [totalBeforeRound],
+  );
 
   const creditCashbackForInvoice = async (
     amount: number,
@@ -567,6 +595,7 @@ export default function CreatePosScreen({
   };
 
   const handleSave = async (payment: any) => {
+    if (saving) return;
     try {
       setSaving(true);
       const waiveMembership = Boolean(payment.waiveMembershipForCoupon);
@@ -664,6 +693,7 @@ export default function CreatePosScreen({
     staff: VerifiedStaff;
     verifiedAt: string;
   }) => {
+    if (saving) return;
     if (!items.length) {
       Swal.fire("Empty cart", "Add at least one item before saving a draft.", "warning");
       return;
@@ -768,7 +798,7 @@ export default function CreatePosScreen({
     }
   };
 
-  const debouncedCustomer = useDebounce(customer.trim(), 250);
+  const debouncedCustomer = useDebounce(customer.trim(), 350);
 
   useEffect(() => {
     if (!customerDropdownOpen) return;
@@ -837,9 +867,10 @@ export default function CreatePosScreen({
     }
 
     const term = debouncedSearchText;
-    if (!term) {
+    if (!term || term.length < 2) {
       setProducts([]);
       setSelectedProduct(null);
+      setLoadingProducts(false);
       return;
     }
 

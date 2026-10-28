@@ -14,6 +14,7 @@ import {resolveInvoiceLineCategory} from "../../utils/itemClassification";
 import CreateProductModal from "./Modal/CreateProductModal";
 import CatalogueItemLabel from "@/features/sales/components/CatalogueItemLabel";
 import Swal from "sweetalert2";
+import { useDebounce } from "@/hooks/useDebounce";
 
 type DraftItem = {
   name: string;
@@ -94,6 +95,7 @@ export default function ProductsServicesSection({
   const [gridItems, setGridItems] = useState<CatalogueLookupItem[]>([]);
   const [loadingGrid, setLoadingGrid] = useState(false);
   const [selectedType, setSelectedType] = useState<string>("all");
+  const debouncedDraftName = useDebounce(draft.name.trim(), 350);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   const handleImageError = (id: string) => {
@@ -106,7 +108,7 @@ export default function ProductsServicesSection({
     const fetchGridItems = async () => {
       try {
         setLoadingGrid(true);
-        const term = draft.name.trim();
+        const term = debouncedDraftName;
         const response = await handleCatalogueLookup(term, controller.signal, {
           page: 1,
           limit: 48,
@@ -119,15 +121,12 @@ export default function ProductsServicesSection({
       }
     };
 
-    const timeout = window.setTimeout(() => {
-      fetchGridItems();
-    }, 250);
+    fetchGridItems();
 
     return () => {
       controller.abort();
-      window.clearTimeout(timeout);
     };
-  }, [draft.name, readOnly]);
+  }, [debouncedDraftName, readOnly]);
 
   const getPlan = () =>
     resolveMembershipPlan(membershipPlans, membershipType, membershipPlanId);
@@ -238,18 +237,15 @@ export default function ProductsServicesSection({
 
   useEffect(() => {
     if (readOnly || !dropdownOpen) return;
-    const term = draft.name.trim();
+    const term = debouncedDraftName;
 
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => {
-      fetchCatalogue(term, controller.signal);
-    }, 250);
+    fetchCatalogue(term, controller.signal);
 
     return () => {
       controller.abort();
-      window.clearTimeout(timeout);
     };
-  }, [draft.name, dropdownOpen, readOnly]);
+  }, [debouncedDraftName, dropdownOpen, readOnly]);
 
   const applyItemToDraft = (item: CatalogueLookupItem | any) => {
     const qty = Number(draft.qty || 1);

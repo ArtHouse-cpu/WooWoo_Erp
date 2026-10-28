@@ -100,6 +100,86 @@ function formatCompactCurrency(val: number): string {
   return `₹${val.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
+function getInvoiceCategories(raw: any): string[] {
+  if (!raw) return [];
+  const categories = new Set<string>();
+
+  // 1. Check notes
+  const notes = String(raw.notes || "").toLowerCase();
+  if (notes.includes("food bill") || notes.includes("food")) {
+    categories.add("Food");
+  }
+  if (notes.includes("space booking") || notes.includes("space")) {
+    categories.add("Space");
+  }
+
+  // 2. Check direct category fields
+  const directCat = String(
+    raw.invoiceCategory || raw.category || raw.billType || raw.sourceType || "",
+  ).toLowerCase();
+  if (directCat.includes("food")) categories.add("Food");
+  if (directCat.includes("space")) categories.add("Space");
+  if (directCat.includes("service")) categories.add("Service");
+  if (directCat.includes("membership") || directCat.includes("subscription")) {
+    categories.add("Membership");
+  }
+
+  // 3. Check items
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  for (const item of items) {
+    const cat = String(
+      item.lineCategory || item.sourceType || item.category || "",
+    ).toLowerCase();
+    const name = String(item.productName || item.name || "").toLowerCase();
+    if (cat === "food" || cat === "foods" || name.includes("food") || item.isFood) {
+      categories.add("Food");
+    } else if (cat === "space" || cat === "spaces" || name.includes("space") || item.isSpace) {
+      categories.add("Space");
+    } else if (cat === "service" || cat === "services") {
+      categories.add("Service");
+    } else if (/membership|subscription/.test(cat) || /membership|subscription/.test(name)) {
+      categories.add("Membership");
+    }
+  }
+
+  return Array.from(categories);
+}
+
+function getCustomerMembershipLabel(raw: any): string | null {
+  if (!raw) return null;
+  const m =
+    raw.membershipType ||
+    raw.membershipPlan ||
+    raw.membership ||
+    raw.customerMembership ||
+    raw.customer?.membershipType ||
+    raw.customer?.membership;
+  if (!m || String(m).toLowerCase() === "none" || String(m).toLowerCase() === "visitor") {
+    return null;
+  }
+  return String(m);
+}
+
+function formatCardDateTime(raw: any, fallbackDate: string): string {
+  const dateVal = raw?.createdAt || raw?.invoiceDate || fallbackDate;
+  if (!dateVal) return fallbackDate;
+  const d = new Date(dateVal);
+  if (Number.isNaN(d.getTime())) return fallbackDate;
+
+  const shortDate = d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+
+  const time = d.toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  return `${shortDate}, ${time}`;
+}
+
 const tabs: PosRow["status"][] = ["Paid", "Pending", "Draft", "Cancelled"];
 
 export default function PosScreen() {
@@ -138,6 +218,7 @@ export default function PosScreen() {
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
   const [mobileDetailsInvoice, setMobileDetailsInvoice] = useState<any>(null);
   const [mobileDetailsLoading, setMobileDetailsLoading] = useState(false);
+  const [mobilePage, setMobilePage] = useState(1);
 
   const handleMobileCardClick = async (row: PosRow) => {
     setMobileDetailsInvoice(row.raw || row);
@@ -388,6 +469,14 @@ export default function PosScreen() {
     }
     return sorted;
   }, [filteredData, mobileModeFilter, mobileSort]);
+
+  useEffect(() => {
+    setMobilePage(1);
+  }, [activeTab, search, datePreset, fromDate, toDate, mobileModeFilter, mobileSort]);
+
+  const paginatedMobileData = useMemo(() => {
+    return mobileDisplayData.slice(0, mobilePage * 20);
+  }, [mobileDisplayData, mobilePage]);
 
   const ensurePosRow = (inv: any): PosRow => {
     if (inv && inv.bill && inv._id) return inv;
@@ -1006,7 +1095,7 @@ export default function PosScreen() {
           <div className="flex min-w-max items-center gap-2 py-0.5">
             {(
               [
-                { key: "All" as const, label: "All Transactions" },
+                { key: "All" as const, label: "All" },
                 { key: "Paid" as const, label: "Paid" },
                 { key: "Pending" as const, label: "Pending" },
                 { key: "Draft" as const, label: "Draft" },
@@ -1121,7 +1210,7 @@ export default function PosScreen() {
               </p>
             </div>
           ) : (
-            mobileDisplayData.map((row) => {
+            paginatedMobileData.map((row) => {
               const isPaid = row.status === "Paid";
               const isPending = row.status === "Pending";
               const isDraft = row.status === "Draft";
@@ -1129,6 +1218,9 @@ export default function PosScreen() {
                 row.customer && row.customer !== "undefined"
                   ? row.customer
                   : "Walk-in Customer";
+              const categories = getInvoiceCategories(row.raw);
+              const membershipLabel = getCustomerMembershipLabel(row.raw);
+              const shortDateTime = formatCardDateTime(row.raw, row.date);
 
               return (
                 <div
@@ -1139,11 +1231,19 @@ export default function PosScreen() {
                   {/* Card Top Section */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      {/* Customer Name */}
-                      <h3 className="truncate text-base font-bold text-slate-900">
-                        {customerName}
-                      </h3>
-                      {/* Invoice Code + Mode */}
+                      {/* Customer Name + Membership Label */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="truncate text-base font-bold text-slate-900">
+                          {customerName}
+                        </h3>
+                        {membershipLabel && (
+                          <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 ring-1 ring-inset ring-purple-200">
+                            {membershipLabel}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Invoice Code + Mode + Category Labels (Food, Space, etc.) */}
                       <div className="mt-1 flex flex-wrap items-center gap-1.5">
                         <span className="text-xs font-medium text-slate-500">
                           {row.bill}
@@ -1151,6 +1251,22 @@ export default function PosScreen() {
                         <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
                           {row.mode}
                         </span>
+                        {categories.map((cat) => (
+                          <span
+                            key={cat}
+                            className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+                              cat === "Food"
+                                ? "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200"
+                                : cat === "Space"
+                                  ? "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200"
+                                  : cat === "Membership"
+                                    ? "bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-200"
+                                    : "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200"
+                            }`}
+                          >
+                            {cat}
+                          </span>
+                        ))}
                       </div>
                     </div>
 
@@ -1210,7 +1326,7 @@ export default function PosScreen() {
                         className="shrink-0 text-slate-400"
                       />
                       <span className="truncate">
-                        {row.date} • By {row.owner || "System"}
+                        {shortDateTime} • By {row.owner || "System"}
                       </span>
                     </div>
 
@@ -1218,21 +1334,6 @@ export default function PosScreen() {
                       className="flex shrink-0 items-center gap-1.5"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {/* WhatsApp Share Button */}
-                      <button
-                        type="button"
-                        onClick={() => void handleWhatsAppShare(row)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition hover:bg-emerald-100 active:scale-95"
-                        title="Share on WhatsApp"
-                        aria-label="Share on WhatsApp"
-                      >
-                        <img
-                          src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
-                          alt="WhatsApp"
-                          className="h-4 w-4"
-                        />
-                      </button>
-
                       {/* Three-dot Action Menu */}
                       <button
                         type="button"
@@ -1248,6 +1349,17 @@ export default function PosScreen() {
                 </div>
               );
             })
+          )}
+          {mobileDisplayData.length > paginatedMobileData.length && (
+            <div className="pt-2 pb-4 text-center">
+              <button
+                type="button"
+                onClick={() => setMobilePage((p) => p + 1)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 active:scale-95 transition"
+              >
+                Load more ({mobileDisplayData.length - paginatedMobileData.length} remaining)
+              </button>
+            </div>
           )}
         </div>
 
@@ -1792,6 +1904,14 @@ export default function PosScreen() {
         onEdit={(inv) => {
           setMobileDetailsOpen(false);
           const raw = inv.raw ?? inv;
+          if (raw.status === "Cancelled") {
+            Swal.fire(
+              "Cannot Edit",
+              "Cancelled invoices cannot be edited.",
+              "warning",
+            );
+            return;
+          }
           navigate("/create-invoice", {
             state: { invoice: raw, mode: "edit" },
           });
@@ -1799,19 +1919,54 @@ export default function PosScreen() {
         onConvert={(inv) => {
           setMobileDetailsOpen(false);
           const raw = inv.raw ?? inv;
+          if (raw.status === "Cancelled") {
+            Swal.fire(
+              "Cannot return",
+              "Cancelled invoices cannot be returned.",
+              "info",
+            );
+            return;
+          }
           setReturnIntent("return");
           setReturnInvoice(raw);
           setReturnModalOpen(true);
         }}
-        onWhatsAppShare={(inv) => {
-          void handleWhatsAppShare(inv);
-        }}
-        onDownloadPdf={(inv) => {
-          void handleDownloadBill(inv);
-        }}
-        onMoreActions={(inv) => {
+        onCancelInvoice={(inv) => {
           setMobileDetailsOpen(false);
-          setSelectedActionRow(ensurePosRow(inv));
+          const raw = inv.raw ?? inv;
+          if (raw.status === "Cancelled") {
+            Swal.fire(
+              "Already Cancelled",
+              "This invoice is already cancelled.",
+              "info",
+            );
+            return;
+          }
+          setReturnIntent("cancel");
+          setReturnInvoice(raw);
+          setReturnModalOpen(true);
+        }}
+        onDeleteInvoice={async (inv) => {
+          const raw = inv.raw ?? inv;
+          const invoiceId = raw._id || inv._id;
+          const confirm = await Swal.fire({
+            title: "Delete Invoice?",
+            text: "This action cannot be undone.",
+            icon: "error",
+            showCancelButton: true,
+            confirmButtonText: "Yes, Delete",
+          });
+          if (confirm.isConfirmed) {
+            try {
+              await handleDeleteInvoice(invoiceId);
+              Swal.fire("Deleted", "Invoice deleted successfully.", "success");
+              setMobileDetailsOpen(false);
+              setMobileDetailsInvoice(null);
+              fetchInvoices();
+            } catch {
+              Swal.fire("Error", "Could not delete invoice.", "error");
+            }
+          }
         }}
       />
 

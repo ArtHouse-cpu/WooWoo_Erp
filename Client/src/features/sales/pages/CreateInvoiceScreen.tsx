@@ -24,6 +24,7 @@ import {
 } from "@/services/apiClient";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
+import MobileUpdateInvoiceView from "../components/invoice/MobileUpdateInvoiceView";
 import DocumentFormModal from "@/components/DocumentFormModal";
 import {
   resolveBilledBy,
@@ -648,7 +649,7 @@ export default function CreateInvoiceScreen({
             m_staff_name: staff.m_staff_name,
             m_staff_email: staff.m_staff_email,
           },
-        });
+      });
         const createdId = String(response?.invoice?._id ?? "");
         const createdCode = String(response?.invoice?.invoiceCode ?? "");
         if (createdId) setInvoiceId(createdId);
@@ -893,7 +894,7 @@ export default function CreateInvoiceScreen({
     }
   };
 
-  const debouncedCustomer = useDebounce(customer.trim(), 250);
+  const debouncedCustomer = useDebounce(customer.trim(), 350);
 
   useEffect(() => {
     // View Invoice: never search/list customers by name
@@ -958,7 +959,86 @@ export default function CreateInvoiceScreen({
   };
 
   const content = (
-    <div className="min-w-0 space-y-3 p-1 pb-24 sm:space-y-4 sm:p-2 lg:pb-4">
+    <>
+      {/* Mobile view only for Edit Invoice mode */}
+      {mode === "edit" && (
+        <div className="block md:hidden">
+          <MobileUpdateInvoiceView
+            invoiceNo={invoiceNo}
+            invoiceDate={invoiceDate}
+            dueDate={dueDate}
+            customer={customer}
+            phone={phone}
+            customerId={customerId}
+            membership={membership}
+            membershipPlanId={membershipPlanId}
+            membershipPlans={membershipPlans}
+            salesPerson={createdByDisplay || salesPerson}
+            bankName={viewSourceInvoice?.bankName || "JSA BOB CC"}
+            signatoryName={createdByDisplay || salesPerson || "Ankur Anand"}
+            items={items}
+            subTotal={subTotal}
+            grandTotal={grandTotal}
+            discountTotal={discountTotal}
+            extraCharges={extraCharges}
+            notes={notes}
+            saving={saving}
+            onBack={handleBack}
+            onUpdate={() => {
+              if (validateBeforeCheckout()) setOpenCheckout(true);
+            }}
+            onPickCustomer={(selectedCustomer) => {
+              const mType = billingMembershipFromCustomer(selectedCustomer);
+              const mId =
+                mType === "none" && selectedCustomer.membershipExpired
+                  ? null
+                  : toMembershipPlanId(selectedCustomer.membershipPlanId);
+              setCustomer(selectedCustomer.name);
+              setPhone(selectedCustomer.mobile);
+              setMembership(mType);
+              setMembershipPlanId(mId);
+              setCustomerId(selectedCustomer._id);
+            }}
+            onOpenCreateCustomer={() => setShowCreateCustomerModal(true)}
+            onUpdateItemQty={updateItemQty}
+            onUpdateItemDiscount={updateItemDiscount}
+            onRemoveItem={removeItem}
+            onAddDirectItem={(newItem) => {
+              setItems((prev) => {
+                const nextId =
+                  prev.length > 0 ? Math.max(...prev.map((i) => i.id)) + 1 : 1;
+                const isCsp = Boolean(newItem.isCsp);
+                return [
+                  ...prev,
+                  {
+                    ...newItem,
+                    id: nextId,
+                    discount: Number(newItem.discount || 0),
+                    cashback: isCsp ? 0 : Number(newItem.cashback || 0),
+                    isCsp,
+                    productDiscountType: newItem.productDiscountType,
+                    productDiscountValue: newItem.productDiscountValue,
+                    productDiscountAmount: Number(
+                      newItem.productDiscountAmount ?? 0,
+                    ),
+                    membershipDiscountAmount: isCsp
+                      ? 0
+                      : Number(newItem.membershipDiscountAmount ?? 0),
+                  },
+                ];
+              });
+            }}
+            onInvoiceDateChange={setInvoiceDate}
+            onInvoiceNoChange={setInvoiceNo}
+            onNotesChange={setNotes}
+            onExtraChargesChange={setExtraCharges}
+          />
+        </div>
+      )}
+
+      {/* Desktop view (and mobile view when NOT in edit mode) */}
+      <div className={mode === "edit" ? "hidden md:block" : ""}>
+        <div className="min-w-0 space-y-3 p-1 pb-24 sm:space-y-4 sm:p-2 lg:pb-4">
       <div className="sticky top-0 z-30 space-y-3 rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-sm backdrop-blur-md sm:p-4">
         <CreateInvoiceHeader
           embedded
@@ -1252,7 +1332,7 @@ export default function CreateInvoiceScreen({
       )}
 
       {/* Mobile sticky checkout bar */}
-      {mode !== "view" && (
+      {mode !== "view" && mode !== "edit" && (
         <div className="fixed inset-x-0 bottom-0 z-40 max-md:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] border-t border-slate-200 bg-white/95 px-3 py-3 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-md lg:hidden">
           <div className="mx-auto flex max-w-lg items-center gap-3">
             <div className="min-w-0 flex-1">
@@ -1281,6 +1361,8 @@ export default function CreateInvoiceScreen({
         </div>
       )}
     </div>
+    </div>
+  </>
   );
 
   if (onClose) {
