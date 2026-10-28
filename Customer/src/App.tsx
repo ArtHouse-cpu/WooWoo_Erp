@@ -33,7 +33,7 @@ import RefundTermsPage from './app/legal/RefundTermsPage';
 import {useAuthStore} from './store/authStore';
 import {getPostAuthPath} from './utils/onboarding';
 import ProgramsPage from './app/programs/ProgramsPage';
-import CspProgramPage from './app/programs/CspProgramPage';
+// import CspProgramPage from './app/programs/CspProgramPage';
 import ActivityPage from './app/activity/ActivityPage';
 import HelpScreen from './app/help/HelpScreen'
 import ExhibitionPage from './app/exhibition/ExhibitionPage';

@@ -53,7 +53,7 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose}: Props) 
         {sections.map(section => {
           const items = dashboardNav.filter(i => i.section === section);
           if (section === 'Main' && application?.status === 'approved') {
-            const programIndex = items.findIndex(item => item.id === 'programs');
+            // const programIndex = items.findIndex(item => item.id === 'programs');
             // items.splice(programIndex + 1, 0, {
             //   id: 'csp-program',
             //   label: 'CSP Programs', //Csp Program
