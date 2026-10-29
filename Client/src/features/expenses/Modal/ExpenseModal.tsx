@@ -1,4 +1,4 @@
-import { ImagePlus, X, ArrowRight, Save, Search } from "lucide-react";
+import { Camera, ImagePlus, X, ArrowRight, Save, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -88,17 +88,235 @@ const EMPTY_FORM = {
   receiptUrl: "",
 };
 
-const CATEGORY_OPTIONS = [
-  "Rent",
-  "Utilities",
-  "Salary",
-  "Marketing",
-  "Supplies",
-  "Maintenance",
-  "Travel",
-  "Other",
-];
-const SEGMENT_OPTIONS = ["Store", "Cafe", "Services", "Space", "Events","general"];
+const SEGMENT_OPTIONS = ["Store", "Cafe", "Services", "Space", "Events", "General", "Admin"];
+
+const CATEGORIES_BY_SEGMENT: Record<string, string[]> = {
+  Store: [
+    "Stock Purchase",
+    "Packaging",
+    "Staff Salary",
+    "Staff Incentives",
+    "Staff Welfare",
+    "Delivery Charges",
+    "Courier Charges",
+    "Transportation",
+    "Loading Charges",
+    "Unloading Charges",
+    "Advertising",
+    "Promotions",
+    "Photography",
+    "POS Charges",
+    "Payment Charges",
+    "Platform Commission",
+    "Marketplace Fees",
+    "Customer Refunds",
+    "Discounts",
+    "Sales Returns",
+    "Stock Damage",
+    "Stock Shortage",
+    "Stock Writeoff",
+    "Cash Shortage",
+    "Electricity",
+    "Internet",
+    "Telephone",
+    "Cleaning",
+    "Pest Control",
+    "Security",
+    "Repairs",
+    "Maintenance",
+    "Furniture",
+    "Store Display",
+    "Printing",
+    "Barcode Labels",
+    "Warranty Claims",
+    "Insurance",
+    "Miscellaneous",
+  ],
+  Cafe: [
+    "Grocery Purchase",
+    "Vegetable Purchase",
+    "Fruit Purchase",
+    "Dairy Purchase",
+    "Bakery Purchase",
+    "Meat Purchase",
+    "Egg Purchase",
+    "Beverage Purchase",
+    "Coffee Purchase",
+    "Tea Purchase",
+    "Snack Purchase",
+    "Condiment Purchase",
+    "Frozen Food Purchase",
+    "Water Purchase",
+    "Disposables",
+    "Gas Charges",
+    "Water Charges",
+    "Laundry",
+    "Waste Disposal",
+    "Food Wastage",
+    "Equipment Repairs",
+    "Delivery Commission",
+    "Complimentary Orders",
+    "Menu Printing",
+    "Food Testing",
+    "Hygiene Testing",
+    "License Fees",
+    "Music License",
+  ],
+  Services: [],
+  Space: [
+    "Rent",
+    "Housekeeping",
+    "CCTV Maintenance",
+    "AC Maintenance",
+    "Plumbing Repairs",
+    "Electrical Repairs",
+    "Furniture Repairs",
+    "Painting",
+    "Deep Cleaning",
+    "Booking Software",
+    "Software Fees",
+    "Booking Commission",
+    "Member Amenities",
+    "Guest Refreshments",
+    "Office Supplies",
+    "Signage",
+    "Equipment Rental",
+    "Parking Charges",
+    "Fire Safety",
+  ],
+  Events: [
+    "Event Materials",
+    "Craft Supplies",
+    "Artist Fees",
+    "Trainer Fees",
+    "Freelancer Fees",
+    "Host Fees",
+    "Performer Fees",
+    "Venue Rental",
+    "Venue Setup",
+    "Decoration",
+    "Sound Rental",
+    "Lighting Rental",
+    "Furniture Rental",
+    "Stage Rental",
+    "Generator Rental",
+    "Event Catering",
+    "Refreshments",
+    "Guest Hospitality",
+    "Event Kits",
+    "Participant Gifts",
+    "Certificates",
+    "Videography",
+    "Editing Charges",
+    "Travel Expenses",
+    "Accommodation",
+    "Event Security",
+    "Volunteer Expenses",
+    "Ticketing Fees",
+    "Cancellation Charges",
+    "Vendor Payments",
+    "Permit Fees",
+    "First Aid",
+    "Safety Equipment",
+  ],
+  Admin: [
+    "Management Salary",
+    "Recruitment",
+    "Training",
+    "Professional Fees",
+    "Accounting Fees",
+    "Audit Fees",
+    "Legal Fees",
+    "Consulting Fees",
+    "Secretarial Fees",
+    "Compliance Fees",
+    "Filing Fees",
+    "Registration Fees",
+    "Renewal Fees",
+    "Bank Charges",
+    "Interest Expense",
+    "Loan Processing Fees",
+    "Stationery",
+    "Postage",
+    "Subscriptions",
+    "Cloud Services",
+    "Data Charges",
+    "Local Conveyance",
+    "Meals",
+    "Meeting Expenses",
+    "Staff Uniforms",
+    "Medical Expenses",
+    "Background Checks",
+    "Office Repairs",
+    "Depreciation",
+    "Amortization",
+    "Bad Debts",
+    "Penalties",
+    "Late Fees",
+    "Taxes",
+    "Property Tax",
+  ],
+  General: [
+    "Common Rent",
+    "Common Electricity",
+    "Common Utilities",
+    "Common Internet",
+    "Common Telephone",
+    "Common Cleaning",
+    "Common Security",
+    "Common Repairs",
+    "Common Maintenance",
+    "Shared Staff",
+    "Shared Transportation",
+    "Digital Marketing",
+    "Brand Marketing",
+    "Branding",
+    "Graphic Design",
+    "Content Creation",
+    "Social Media",
+    "Public Relations",
+    "Influencer Fees",
+    "Promotional Materials",
+    "Website Hosting",
+    "Domain Charges",
+    "Email Hosting",
+    "Website Maintenance",
+    "App Maintenance",
+    "IT Support",
+    "Technical Support",
+    "Data Backup",
+    "Cybersecurity",
+    "Business Meals",
+    "Networking Fees",
+    "Membership Fees",
+    "Community Welfare",
+    "Donations",
+    "Asset Disposal Loss",
+    "Foreign Exchange Loss",
+    "Customer Goodwill",
+    "Compensation",
+    "Emergency Repairs",
+    "Legal Settlements",
+    "Fraud Loss",
+    "Environmental Fees",
+    "Waste Management",
+    "Unrecoverable GST",
+    "Rounding Difference",
+    "Unallocated Expenses",
+    "Utilities",
+    "Salary",
+    "Marketing",
+    "Supplies",
+    "Other",
+  ],
+};
+
+function categoriesForSegment(segment: string) {
+  const key = Object.keys(CATEGORIES_BY_SEGMENT).find(
+    (name) => name.toLowerCase() === segment.trim().toLowerCase(),
+  );
+  return key ? CATEGORIES_BY_SEGMENT[key] : [];
+}
 
 const MODE_OPTIONS = ["Cash", "UPI", "Card", "Bank Transfer", "Wallet", "Due"];
 const STATUS_OPTIONS = ["Paid", "Pending", "Cancelled"];
@@ -138,6 +356,8 @@ const ExpenseModal = ({
   onSave,
 }: ExpenseModalProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const categoryValueRef = useRef("");
   const isView = mode === "view";
   const isEdit = mode === "edit";
   const isCreate = mode === "create";
@@ -153,6 +373,9 @@ const ExpenseModal = ({
   const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [paidByDropdownOpen, setPaidByDropdownOpen] = useState(false);
+  const [categoryQuery, setCategoryQuery] = useState("");
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  categoryValueRef.current = formData.category;
   const [showCreateVendor, setShowCreateVendor] = useState(false);
   const [creatingVendor, setCreatingVendor] = useState(false);
   const debouncedVendorSearch = useDebounce(formData.paidTo.trim(), 250);
@@ -176,8 +399,11 @@ const ExpenseModal = ({
     setPreview(initialExpense?.receiptUrl || null);
     setVendorDropdownOpen(false);
     setPaidByDropdownOpen(false);
+    setCategoryDropdownOpen(false);
+    setCategoryQuery(base.category || "");
     setShowCreateVendor(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   }, [isOpen, initialExpense, mode, currentUser]);
 
   useEffect(() => {
@@ -284,6 +510,7 @@ const ExpenseModal = ({
     setFormData(EMPTY_FORM);
     setPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
   const handleCancel = () => {
@@ -310,16 +537,50 @@ const ExpenseModal = ({
   ) => {
     if (isView) return;
     const { value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      segment: value,
-    }));
+    const allowed = categoriesForSegment(value);
+    let nextCategory = "";
+    setFormData((prev) => {
+      nextCategory = allowed.includes(prev.category) ? prev.category : "";
+      return {
+        ...prev,
+        segment: value,
+        category: nextCategory,
+      };
+    });
+    setCategoryQuery(nextCategory);
+    setCategoryDropdownOpen(false);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const clearReceiptInputs = () => {
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isView) return;
     const file = e.target.files?.[0];
     if (!file) return;
+    const isImage =
+      /^image\/(png|jpe?g|webp)$/i.test(file.type) ||
+      (!file.type && /\.(png|jpe?g|webp)$/i.test(file.name));
+    if (!isImage) {
+      clearReceiptInputs();
+      await Swal.fire(
+        "Image required",
+        "Choose a PNG, JPG, or WEBP photo, or take one with the camera.",
+        "warning",
+      );
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      clearReceiptInputs();
+      await Swal.fire(
+        "File too large",
+        "Receipt photos must be 5MB or smaller.",
+        "warning",
+      );
+      return;
+    }
     setFormData((prev) => ({
       ...prev,
       receipt: file,
@@ -335,7 +596,7 @@ const ExpenseModal = ({
       receiptUrl: "",
     }));
     setPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    clearReceiptInputs();
   };
 
   const buildDraft = async (): Promise<ExpenseDraft | null> => {
@@ -486,7 +747,8 @@ const ExpenseModal = ({
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid max-h-[70vh] grid-cols-1 gap-4 overflow-y-auto px-6 py-5 md:grid-cols-2">
+          <div className="grid max-h-[70vh] grid-cols-1 gap-4 overflow-y-auto px-4 py-4 md:grid-cols-2 md:px-6 md:py-5">
+            <div className="grid grid-cols-2 gap-3 md:contents [&>*]:min-w-0">
             <div className="md:col-span-2">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Amount <span className="text-rose-500">*</span>
@@ -511,7 +773,7 @@ const ExpenseModal = ({
             </div>
 
             <div className="relative">
-              <div className="mb-1.5 flex items-center justify-between">
+              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
                 <label className="block text-sm font-medium text-gray-700">
                   Paid To (Vendor) <span className="text-rose-500">*</span>
                 </label>
@@ -600,7 +862,9 @@ const ExpenseModal = ({
                 </p>
               ) : null}
             </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-3 md:contents [&>*]:min-w-0">
             <div className="relative">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Paid By <span className="text-rose-500">*</span>
@@ -699,6 +963,9 @@ const ExpenseModal = ({
                 className={fieldClass}
               />
             </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 md:contents [&>*]:min-w-0">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Date <span className="text-rose-500">*</span>
@@ -728,7 +995,9 @@ const ExpenseModal = ({
                 className={fieldClass}
               />
             </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-3 md:contents [&>*]:min-w-0">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Segment <span className="text-rose-500">*</span>
@@ -749,25 +1018,92 @@ const ExpenseModal = ({
                 ))}
               </select>
             </div>
-            <div>
+            <div className="relative">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Category <span className="text-rose-500">*</span>
               </label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                required={!isView}
-                disabled={isView}
-                className={fieldClass}
-              >
-                <option value="">Select category</option>
-                {CATEGORY_OPTIONS.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                {!isView ? (
+                  <Search
+                    size={15}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                ) : null}
+                <input
+                  type="text"
+                  value={categoryDropdownOpen ? categoryQuery : formData.category}
+                  onChange={(e) => {
+                    if (isView || !formData.segment) return;
+                    setCategoryQuery(e.target.value);
+                    setCategoryDropdownOpen(true);
+                  }}
+                  onFocus={() => {
+                    if (isView || !formData.segment) return;
+                    setCategoryQuery("");
+                    setCategoryDropdownOpen(true);
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => {
+                      setCategoryDropdownOpen(false);
+                      setCategoryQuery(categoryValueRef.current);
+                    }, 150);
+                  }}
+                  placeholder={
+                    formData.segment ? "Search category" : "Select segment first"
+                  }
+                  readOnly={isView || !formData.segment}
+                  autoComplete="off"
+                  className={`${fieldClass} ${isView ? "" : "pl-9"}`}
+                />
+                {!isView ? (
+                  <input
+                    tabIndex={-1}
+                    className="pointer-events-none absolute h-0 w-0 opacity-0"
+                    value={formData.category}
+                    required={!isView}
+                    onChange={() => undefined}
+                  />
+                ) : null}
+              </div>
+              {!isView && categoryDropdownOpen && formData.segment ? (
+                <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                  {(() => {
+                    const mapped = categoriesForSegment(formData.segment);
+                    const options =
+                      formData.category && !mapped.includes(formData.category)
+                        ? [formData.category, ...mapped]
+                        : mapped;
+                    const query = categoryQuery.trim().toLowerCase();
+                    const visible = query
+                      ? options.filter((name) =>
+                          name.toLowerCase().includes(query),
+                        )
+                      : options;
+                    if (!visible.length) {
+                      return (
+                        <p className="px-3 py-2 text-xs text-gray-500">
+                          No categories found.
+                        </p>
+                      );
+                    }
+                    return visible.map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onMouseDown={() => {
+                          setFormData((prev) => ({ ...prev, category: cat }));
+                          setCategoryQuery(cat);
+                          setCategoryDropdownOpen(false);
+                        }}
+                        className="flex w-full border-b border-gray-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-gray-50"
+                      >
+                        {cat}
+                      </button>
+                    ));
+                  })()}
+                </div>
+              ) : null}
+            </div>
             </div>
 
             {!isCreate ? (
@@ -858,21 +1194,38 @@ const ExpenseModal = ({
                       No receipt uploaded
                     </p>
                   ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-7 transition hover:border-blue-400 hover:bg-blue-50/50"
-                  >
-                    <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                      <ImagePlus size={20} />
-                    </div>
-                    <p className="text-sm font-medium text-gray-700">
-                      Upload receipt
-                    </p>
-                    <p className="mt-1 text-xs text-gray-400">
-                      PNG, JPG or JPEG up to 5MB
-                    </p>
-                  </button>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-7 transition hover:border-blue-400 hover:bg-blue-50/50"
+                    >
+                      <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                        <ImagePlus size={20} />
+                      </div>
+                      <p className="text-sm font-medium text-gray-700">
+                        Upload file
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        PNG, JPG or WEBP up to 5MB
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-7 transition hover:border-blue-400 hover:bg-blue-50/50"
+                    >
+                      <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                        <Camera size={20} />
+                      </div>
+                      <p className="text-sm font-medium text-gray-700">
+                        Open camera
+                      </p>
+                      <p className="mt-1 text-xs text-gray-400">
+                        Take a photo of the receipt
+                      </p>
+                    </button>
+                  </div>
                   )
                 ) : (
                   <div className="relative overflow-hidden rounded-lg border border-gray-200">
@@ -890,27 +1243,55 @@ const ExpenseModal = ({
                         <X size={16} />
                       </button>
                     ) : null}
-                    <div className="flex items-center justify-between border-t border-gray-200 bg-white px-3 py-2">
-                      <p className="max-w-[80%] truncate text-xs text-gray-600">
+                    <div className="flex items-center justify-between gap-2 border-t border-gray-200 bg-white px-3 py-2">
+                      <p className="min-w-0 flex-1 truncate text-xs text-gray-600">
                         {formData.receipt?.name || "Receipt image"}
                       </p>
-                      <span className="text-xs text-gray-400">
+                      <span className="shrink-0 text-xs text-gray-400">
                         {formData.receipt
                           ? `${(formData.receipt.size / 1024 / 1024).toFixed(2)} MB`
                           : ""}
                       </span>
+                      {!isView ? (
+                        <div className="flex shrink-0 gap-1">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                          >
+                            Upload
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => cameraInputRef.current?.click()}
+                            className="rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                          >
+                            Camera
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 )}
 
                 {!isView ? (
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </>
                 ) : null}
               </div>
           </div>

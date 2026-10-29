@@ -24,6 +24,7 @@ import {
   resolveCreatedByName,
 } from "../utils/resolveBilledBy";
 import { printThermalReceipt } from "@/utils/printUtils";
+import { useAutosaveFormDraft } from "../utils/formDraft";
 
 
 const today = new Date().toISOString().split("T")[0];
@@ -87,6 +88,63 @@ export default function CreateSalesReturnScreen({
   const [draftDiscount, setDraftDiscount] = useState("0");
   const [draftImage, setDraftImage] = useState("");
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  const routeDoc = location.state as {
+    mode?: Mode;
+    invoice?: unknown;
+    returnSale?: unknown;
+  } | null;
+  const freshCreate =
+    (initialMode ?? "create") === "create" &&
+    !initialData &&
+    !routeDoc?.returnSale &&
+    !routeDoc?.invoice;
+  const creditNoteDraft = {
+    invoiceNo,
+    customer,
+    phone,
+    invoiceDate,
+    dueDate,
+    billBy,
+    notes,
+    originalInvoiceId,
+    items,
+    draftName,
+    draftQty,
+    draftPrice,
+    draftDiscount,
+    draftImage,
+  };
+  const { clearDraft: clearCreditNoteDraft } = useAutosaveFormDraft({
+    storageKey: "credit-note",
+    enabled: freshCreate && mode === "create" && !returnSaleId,
+    snapshot: creditNoteDraft,
+    hasContent: (data) =>
+      Boolean(
+        data.customer.trim() ||
+          data.phone.trim() ||
+          data.notes.trim() ||
+          data.billBy.trim() ||
+          (data.items?.length ?? 0) ||
+          data.draftName.trim() ||
+          data.draftPrice.trim(),
+      ),
+    restore: (data) => {
+      setInvoiceNo(data.invoiceNo || getNextReturnNumber());
+      setCustomer(data.customer || "");
+      setPhone(data.phone || "");
+      setInvoiceDate(data.invoiceDate || today);
+      setDueDate(data.dueDate || today);
+      setBillBy(data.billBy || "");
+      setNotes(data.notes || "");
+      setOriginalInvoiceId(data.originalInvoiceId ?? null);
+      setItems(Array.isArray(data.items) ? data.items : []);
+      setDraftName(data.draftName || "");
+      setDraftQty(data.draftQty || "1");
+      setDraftPrice(data.draftPrice || "0");
+      setDraftDiscount(data.draftDiscount || "0");
+      setDraftImage(data.draftImage || "");
+    },
+  });
 
   useEffect(() => {
     type Line = {
@@ -339,6 +397,7 @@ export default function CreateSalesReturnScreen({
         Swal.fire("Draft saved", "Sales return draft updated.", "success");
       } else {
         await handleCreateReturnSale(buildPayload("draft"));
+        clearCreditNoteDraft();
         Swal.fire("Draft saved", "Sales return saved as draft.", "success").then(() => navigate(-1));
       }
     } catch (error: unknown) {
@@ -404,6 +463,7 @@ export default function CreateSalesReturnScreen({
         Swal.fire("Return Updated", "Sales Return updated successfully.", "success").then(() => navigate(-1));
       } else {
         const response = await handleCreateReturnSale(buildPayload("final"));
+        clearCreditNoteDraft();
 
         const savedCode = response?.returnSale?.returnCode || invoiceNo;
 
@@ -669,6 +729,7 @@ export default function CreateSalesReturnScreen({
                 const response = await handleCreateReturnSale(
                   buildPayload("final", payment),
                 );
+                clearCreditNoteDraft();
                 const savedCode =
                   response?.returnSale?.returnCode || invoiceNo;
                 printThermalReceipt({

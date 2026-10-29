@@ -18,6 +18,7 @@ import {
   type CustomerPayload,
   type MembershipPlanPayload,
 } from "@/services/apiClient";
+import { useAutosaveFormDraft } from "../utils/formDraft";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CheckoutModal from "../components/invoice/Modal/CheckoutModal";
 import DocumentFormModal from "@/components/DocumentFormModal";
@@ -104,6 +105,70 @@ export default function CreateQuotationScreen({
   const [draftIsCsp, setDraftIsCsp] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [extraCharges, setExtraCharges] = useState<Array<{ label: string; amount: number }>>([]);
+  const routeDoc = location.state as { quotation?: unknown; mode?: Mode } | null;
+  const freshCreate =
+    (initialMode ?? "create") === "create" &&
+    !initialData &&
+    !(routeDoc?.quotation && routeDoc.mode && routeDoc.mode !== "create");
+  const quotationDraft = {
+    quotationNo,
+    customer,
+    phone,
+    membership,
+    membershipPlanId,
+    quotationDate,
+    dueDate,
+    billBy,
+    notes,
+    extraCharges,
+    items,
+    draftName,
+    draftQty,
+    draftPrice,
+    draftDiscount,
+    draftCashback,
+    draftImage,
+    draftCategory,
+    draftIsCsp,
+  };
+  const { clearDraft: clearQuotationDraft } = useAutosaveFormDraft({
+    storageKey: "quotation",
+    enabled: freshCreate && mode === "create" && !quotationId,
+    snapshot: quotationDraft,
+    hasContent: (data) =>
+      Boolean(
+        data.customer.trim() ||
+          data.phone.trim() ||
+          data.notes.trim() ||
+          data.billBy.trim() ||
+          (data.items?.length ?? 0) ||
+          (data.extraCharges?.length ?? 0) ||
+          data.draftName.trim() ||
+          data.draftPrice.trim() ||
+          data.draftDiscount.trim(),
+      ),
+    restore: (data) => {
+      setQuotationNo(data.quotationNo || getNextQuotationNumber());
+      setCustomer(data.customer || "");
+      setPhone(data.phone || "");
+      setMembership(data.membership || "none");
+      setMembershipPlanId(data.membershipPlanId ?? null);
+      setQuotationDate(data.quotationDate || today);
+      setDueDate(data.dueDate || today);
+      setBillBy(data.billBy || "");
+      setNotes(data.notes || "");
+      setExtraCharges(Array.isArray(data.extraCharges) ? data.extraCharges : []);
+      setItems(Array.isArray(data.items) ? data.items : []);
+      setDraftName(data.draftName || "");
+      setDraftQty(data.draftQty || "1");
+      setDraftPrice(data.draftPrice || "");
+      setDraftDiscount(data.draftDiscount || "");
+      setDraftCashback(data.draftCashback || "");
+      setDraftImage(data.draftImage || "");
+      setDraftCategory(data.draftCategory || "General");
+      setDraftIsCsp(Boolean(data.draftIsCsp));
+    },
+  });
   const [viewCashbackTotal, setViewCashbackTotal] = useState<number | null>(null);
   const [viewMembershipDiscount, setViewMembershipDiscount] = useState<number | null>(null);
   const [viewCouponDiscount, setViewCouponDiscount] = useState(0);
@@ -510,6 +575,7 @@ export default function CreateQuotationScreen({
         if (createdId) setQuotationId(createdId);
         if (createdCode) setQuotationNo(createdCode);
         
+        clearQuotationDraft();
         Swal.fire("Saved", "Quotation has been saved.", "success").then(() => {
           navigate(-1);
         });

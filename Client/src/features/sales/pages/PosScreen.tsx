@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -35,7 +35,7 @@ import {
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
-import CreatePosScreen from "./CreatePosScreen";
+import CreatePosScreen, { INVOICE_SAVED_EVENT } from "./CreatePosScreen";
 import CreateInvoiceScreen from "./CreateInvoiceScreen";
 import DuePaymentModal from "../components/invoice/Modal/DuePaymentModal";
 import SalesReturnFlowModal from "../components/invoice/Modal/SalesReturnFlowModal";
@@ -429,6 +429,17 @@ export default function PosScreen() {
     void fetchInvoices(controller.signal);
     return () => controller.abort();
   }, [fromDate, toDate, search]);
+
+  const fetchInvoicesRef = useRef(fetchInvoices);
+  fetchInvoicesRef.current = fetchInvoices;
+
+  useEffect(() => {
+    const onSaved = () => {
+      void fetchInvoicesRef.current();
+    };
+    window.addEventListener(INVOICE_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(INVOICE_SAVED_EVENT, onSaved);
+  }, []);
 
   // Server already filters by fromDate/toDate — only filter status client-side.
   // Search is also sent to the API; keep a light client filter for status tabs.

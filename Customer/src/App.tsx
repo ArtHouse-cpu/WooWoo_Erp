@@ -96,6 +96,7 @@ export default function App() {
                 <Route path="/programs" element={<ProgramsPage />} />
                 <Route path="/csp-program" element={<CspProgramPage />} />
                 <Route path="/activities" element={<ActivityPage />} />
+                <Route path="/activities/:invoiceId" element={<ActivityPage />} />
 
                 <Route path="/refer-and-earn" element={<ReferAndEarnPage />} />
                 <Route path="/supplies" element={<SuppliesMarketplacePage />} />

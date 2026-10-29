@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {Link, useNavigate, useSearchParams} from 'react-router-dom';
+import {Link, useLocation, useNavigate, useSearchParams} from 'react-router-dom';
 import {useForm} from 'react-hook-form';
 import {z} from 'zod';
 import {zodResolver} from '@hookform/resolvers/zod';
@@ -14,6 +14,7 @@ import {getErrorMessage} from '../../services/axios';
 import {useAuthStore} from '../../store/authStore';
 import {useIsDesktop} from '../../hooks/useIsDesktop';
 import {getPostAuthPath} from '../../utils/onboarding';
+import {consumeReturnTo, readReturnTo} from '../../utils/returnTo';
 import {captureInviteRefFromSearch} from '../../utils/inviteRef';
 
 const otpSchema = z.object({
@@ -34,6 +35,7 @@ type PasswordForm = z.infer<typeof passwordSchema>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const setSession = useAuthStore(s => s.setSession);
   const [mode, setMode] = useState<'otp' | 'password'>('otp');
@@ -66,6 +68,7 @@ export default function LoginPage() {
           mobile,
           purpose: 'login',
           debugOtp: (data.data as {debugOtp?: string} | undefined)?.debugOtp,
+          returnTo: readReturnTo(location.state),
         },
       });
     } catch (error) {
@@ -82,7 +85,9 @@ export default function LoginPage() {
       if (!data.token || !data.data) throw new Error(data.message);
       setSession({customer: data.data, token: data.token});
       toast.success(data.message || 'Login Successful');
-      navigate(getPostAuthPath(data.data), {replace: true});
+      navigate(consumeReturnTo(location.state) || getPostAuthPath(data.data), {
+        replace: true,
+      });
     } catch (error) {
       toast.error(getErrorMessage(error, 'Login failed'));
     } finally {

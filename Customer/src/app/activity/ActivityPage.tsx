@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Calendar,
   ChevronLeft,
@@ -141,6 +141,7 @@ const isInDateFilter = (timestamp: number, dateFilter: DateFilter) => {
 
 export default function ActivityPage() {
   const navigate = useNavigate();
+  const { invoiceId: linkedInvoiceId } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
@@ -232,6 +233,52 @@ const handleDownloadInvoice = async () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const invoiceId = String(linkedInvoiceId || "").trim();
+    if (!invoiceId) return;
+
+    let cancelled = false;
+
+    const openLinkedInvoice = async () => {
+      setDownloadingInvoice(true);
+      setLoadingInvoice(true);
+      try {
+        const res = await authApi.getActivityInvoice(invoiceId);
+        if (cancelled) return;
+        const detail = res.data.data;
+        if (!detail) {
+          toast.error("Invoice not found");
+          return;
+        }
+        const account = useAuthStore.getState().customer;
+        const props = mapActivityInvoiceToThermalPrint(detail, {
+          name: account?.name,
+          mobile: account?.mobile,
+          membershipType: account?.membershipType,
+        });
+        setInvoicePreview(props);
+        await downloadThermalInvoicePdf(props);
+        if (!cancelled) {
+          toast.success(`Invoice ${props.invoiceNo} downloaded`);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(getErrorMessage(error, "Failed to download invoice"));
+        }
+      } finally {
+        if (!cancelled) {
+          setDownloadingInvoice(false);
+          setLoadingInvoice(false);
+        }
+      }
+    };
+
+    void openLinkedInvoice();
+    return () => {
+      cancelled = true;
+    };
+  }, [linkedInvoiceId]);
 
   const transactions = useMemo(
     () => activities.map(mapActivityToTransaction),
@@ -981,6 +1028,8 @@ const handleDownloadInvoice = async () => {
       {invoicePreview && (
         <InvoicePreviewModal
           invoice={invoicePreview}
+          downloading={downloadingInvoice}
+          onDownload={() => void handleDownloadInvoice()}
           onClose={() => setInvoicePreview(null)}
         />
       )}
