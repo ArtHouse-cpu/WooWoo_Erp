@@ -73,8 +73,8 @@ const MENU_GROUPS: MenuGroup[] = [
     ],
   },
   {
-    key: "sales",
-    label: "Sales",
+    key: "bills",
+    label: "Bills",
     icon: Banknote,
     submenu: [
       { name: "pos", label: "Invoice", icon: Receipt, path: "/pos" },

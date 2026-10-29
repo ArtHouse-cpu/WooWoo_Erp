@@ -219,6 +219,7 @@ export default function PosScreen() {
   const [mobileDetailsInvoice, setMobileDetailsInvoice] = useState<any>(null);
   const [mobileDetailsLoading, setMobileDetailsLoading] = useState(false);
   const [mobilePage, setMobilePage] = useState(1);
+  const [showTotalDetails, setShowTotalDetails] = useState(false);
 
   const handleMobileCardClick = async (row: PosRow) => {
     setMobileDetailsInvoice(row.raw || row);
@@ -952,6 +953,126 @@ export default function PosScreen() {
     0,
   );
 
+  const paymentModesBreakdown = useMemo(() => {
+    const modes: Record<string, number> = {
+      Cash: 0,
+      UPI: 0,
+      Card: 0,
+      Wallet: 0,
+      Other: 0,
+    };
+
+    for (const row of filteredData) {
+      const raw = row.raw || {};
+      const pb = raw.paymentBreakdown;
+
+      const hasPb =
+        pb &&
+        (Number(pb.cash || 0) > 0 ||
+          Number(pb.upi || 0) > 0 ||
+          Number(pb.card || 0) > 0 ||
+          Number(pb.wallet || 0) > 0);
+
+      if (hasPb) {
+        modes.Cash += Number(pb.cash || 0);
+        modes.UPI += Number(pb.upi || 0);
+        modes.Card += Number(pb.card || 0);
+        modes.Wallet += Number(pb.wallet || 0);
+      } else {
+        const m = String(raw.mode || row.mode || "Cash").toUpperCase();
+        const amt = Number(row.amount || 0);
+        if (m.includes("CASH")) {
+          modes.Cash += amt;
+        } else if (m.includes("UPI")) {
+          modes.UPI += amt;
+        } else if (m.includes("CARD")) {
+          modes.Card += amt;
+        } else if (m.includes("WALLET")) {
+          modes.Wallet += amt;
+        } else {
+          modes.Other += amt;
+        }
+      }
+    }
+
+    return modes;
+  }, [filteredData]);
+
+  const segmentsBreakdown = useMemo(() => {
+    const segments: Record<string, number> = {
+      Food: 0,
+      Space: 0,
+      Service: 0,
+      Membership: 0,
+      General: 0,
+    };
+
+    for (const row of filteredData) {
+      const raw = row.raw || {};
+      const items = Array.isArray(raw.items) ? raw.items : [];
+
+      if (items.length > 0) {
+        for (const item of items) {
+          const itemTotal = Number(
+            item.lineTotal ??
+              item.totalAmount ??
+              Number(item.unitPrice || item.price || 0) *
+                Number(item.qty || item.quantity || 1),
+          );
+          const cat = String(
+            item.lineCategory || item.sourceType || item.category || "",
+          ).toLowerCase();
+          const name = String(item.productName || item.name || "").toLowerCase();
+
+          if (
+            cat === "food" ||
+            cat === "foods" ||
+            name.includes("food") ||
+            item.isFood
+          ) {
+            segments.Food += itemTotal;
+          } else if (
+            cat === "space" ||
+            cat === "spaces" ||
+            name.includes("space") ||
+            item.isSpace
+          ) {
+            segments.Space += itemTotal;
+          } else if (
+            cat === "service" ||
+            cat === "services" ||
+            name.includes("service")
+          ) {
+            segments.Service += itemTotal;
+          } else if (
+            /membership|subscription/.test(cat) ||
+            /membership|subscription/.test(name)
+          ) {
+            segments.Membership += itemTotal;
+          } else {
+            segments.General += itemTotal;
+          }
+        }
+      } else {
+        const cats = getInvoiceCategories(raw);
+        const amt = Number(row.amount || 0);
+        if (cats.includes("Food")) {
+          segments.Food += amt;
+        } else if (cats.includes("Space")) {
+          segments.Space += amt;
+        } else if (cats.includes("Service")) {
+          segments.Service += amt;
+        } else if (cats.includes("Membership")) {
+          segments.Membership += amt;
+        } else {
+          segments.General += amt;
+        }
+      }
+    }
+
+    return segments;
+  }, [filteredData]);
+
   const controlClass =
     "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 
@@ -996,24 +1117,11 @@ export default function PosScreen() {
           </div>
         </div>
 
-        {/* B. Search and Summary Card */}
+        {/* B. Summary Card: Date filter above Total Amount & Pending box */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs">
-          {/* Row 1: Search & Date preset */}
-          <div className="flex items-center gap-2">
-            <div className="relative min-w-0 flex-1">
-              <Search
-                size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-            <div className="relative shrink-0">
+          {/* Row 1: Date Filter (Above Total Amount and Pending Box) - Right aligned */}
+          <div className="flex justify-end">
+            <div className="relative">
               <select
                 value={datePreset}
                 onChange={(e) => {
@@ -1024,7 +1132,7 @@ export default function PosScreen() {
                   setFromDate(range.from);
                   setToDate(range.to);
                 }}
-                className="h-10 cursor-pointer appearance-none rounded-xl border border-slate-200 bg-white pl-3 pr-7 text-xs font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className="h-8 cursor-pointer appearance-none rounded-xl border border-slate-200 bg-slate-50/70 pl-2.5 pr-7 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white"
                 aria-label="Date range"
               >
                 {SALES_DATE_PRESET_OPTIONS.map((opt) => (
@@ -1034,8 +1142,8 @@ export default function PosScreen() {
                 ))}
               </select>
               <ChevronDown
-                size={14}
-                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                size={13}
+                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
               />
             </div>
           </div>
@@ -1070,23 +1178,191 @@ export default function PosScreen() {
             </div>
           )}
 
-          {/* Row 2: Total Amount & Pending Amount */}
-          <div className="mt-3.5 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+          {/* Row 2: Total Amount & Pending Box (Below Date Filter) */}
+          <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
             <div>
-              <div className="flex items-center gap-1 text-xs text-slate-500">
-                <span>Total Amount</span>
-                <ChevronDown size={12} className="text-slate-400" />
-              </div>
-              <div className="mt-0.5 text-lg font-bold tracking-tight text-slate-900">
-                {formatCompactCurrency(totalAmount)}
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowTotalDetails((prev) => !prev)}
+                className="group flex flex-col text-left cursor-pointer focus:outline-none"
+                aria-expanded={showTotalDetails}
+              >
+                <div className="flex items-center gap-1 text-xs text-slate-500 group-hover:text-slate-700">
+                  <span className="font-medium">Total Amount</span>
+                  <ChevronDown
+                    size={13}
+                    className={`text-slate-400 transition-transform duration-200 ${
+                      showTotalDetails ? "rotate-180 text-blue-600" : ""
+                    }`}
+                  />
+                </div>
+                <div className="mt-0.5 text-lg font-bold tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
+                  {formatCompactCurrency(totalAmount)}
+                </div>
+              </button>
             </div>
             <div>
-              <div className="text-xs text-slate-500">Pending</div>
+              <div className="text-xs font-medium text-slate-500">Pending</div>
               <div className="mt-0.5 text-lg font-bold tracking-tight text-red-500">
                 {formatCompactCurrency(DueAmount)}
               </div>
             </div>
+          </div>
+
+          {/* Collapsible Total Amount Details: Payment Modes (Left) & Segments (Right) */}
+          {showTotalDetails && (
+            <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/80 p-3 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
+              <div className="grid grid-cols-2 gap-3 divide-x divide-slate-200">
+                {/* Column 1: Payment Modes */}
+                <div className="space-y-1.5 pr-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Payment Modes
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">Cash</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatCompactCurrency(paymentModesBreakdown.Cash)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">UPI</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatCompactCurrency(paymentModesBreakdown.UPI)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">Card</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatCompactCurrency(paymentModesBreakdown.Card)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">Wallet</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatCompactCurrency(paymentModesBreakdown.Wallet)}
+                    </span>
+                  </div>
+                  {paymentModesBreakdown.Other > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Other</span>
+                      <span className="font-semibold text-slate-800">
+                        {formatCompactCurrency(paymentModesBreakdown.Other)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Column 2: Segments */}
+                <div className="space-y-1.5 pl-3">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Segments
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">Food</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatCompactCurrency(segmentsBreakdown.Food)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">Space</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatCompactCurrency(segmentsBreakdown.Space)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">Service</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatCompactCurrency(segmentsBreakdown.Service)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">Membership</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatCompactCurrency(segmentsBreakdown.Membership)}
+                    </span>
+                  </div>
+                  {segmentsBreakdown.General > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">General</span>
+                      <span className="font-semibold text-slate-800">
+                        {formatCompactCurrency(segmentsBreakdown.General)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Row below box: Search bar with Filter and Default */}
+        <div className="flex items-center gap-2">
+          {/* Search bar */}
+          <div className="relative min-w-0 flex-1">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="h-10 w-full rounded-xl border border-slate-200/90 bg-white pl-8.5 pr-2.5 text-xs text-slate-800 placeholder:text-slate-400 shadow-xs focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          {/* Filter button */}
+          <button
+            type="button"
+            onClick={() => setMobileFilterOpen(true)}
+            className={`flex h-10 shrink-0 items-center gap-1 rounded-xl border px-2.5 text-xs font-semibold shadow-xs transition active:scale-95 ${
+              mobileModeFilter !== "All"
+                ? "border-blue-200 bg-blue-50 text-blue-700"
+                : "border-slate-200/90 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            <SlidersHorizontal
+              size={13}
+              className={
+                mobileModeFilter !== "All" ? "text-blue-600" : "text-slate-500"
+              }
+            />
+            <span>Filter</span>
+            {mobileModeFilter !== "All" && (
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+            )}
+          </button>
+
+          {/* Default (Sort) Dropdown */}
+          <div className="relative flex h-10 shrink-0 items-center rounded-xl border border-slate-200/90 bg-white px-2 shadow-xs">
+            <div className="pointer-events-none flex items-center gap-1 text-xs font-semibold text-slate-700">
+              <ArrowUpDown size={13} className="text-slate-500" />
+              <span>
+                {mobileSort === "default"
+                  ? "Default"
+                  : mobileSort === "amount_desc"
+                    ? "High"
+                    : mobileSort === "amount_asc"
+                      ? "Low"
+                      : mobileSort === "date_desc"
+                        ? "Newest"
+                        : "Oldest"}
+              </span>
+              <ChevronDown size={12} className="text-slate-400" />
+            </div>
+            <select
+              value={mobileSort}
+              onChange={(e) => setMobileSort(e.target.value as any)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              aria-label="Sort transactions"
+            >
+              <option value="default">Default</option>
+              <option value="amount_desc">Amount: High to Low</option>
+              <option value="amount_asc">Amount: Low to High</option>
+              <option value="date_desc">Date: Newest First</option>
+              <option value="date_asc">Date: Oldest First</option>
+            </select>
           </div>
         </div>
 
@@ -1127,62 +1403,6 @@ export default function PosScreen() {
                 </button>
               );
             })}
-          </div>
-        </div>
-
-        {/* D. Filter and Sorting Row */}
-        <div className="flex items-center justify-between px-0.5">
-          {/* Filter button */}
-          <button
-            type="button"
-            onClick={() => setMobileFilterOpen(true)}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-              mobileModeFilter !== "All"
-                ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200"
-                : "text-slate-700 hover:bg-slate-100 active:bg-slate-200"
-            }`}
-          >
-            <SlidersHorizontal
-              size={14}
-              className={
-                mobileModeFilter !== "All" ? "text-blue-600" : "text-slate-500"
-              }
-            />
-            <span>Filter</span>
-            {mobileModeFilter !== "All" && (
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-            )}
-          </button>
-
-          {/* Sorting Dropdown */}
-          <div className="relative flex items-center">
-            <div className="pointer-events-none flex items-center gap-1 pr-1 text-xs font-semibold text-slate-700">
-              <ArrowUpDown size={14} className="text-slate-500" />
-              <span>
-                {mobileSort === "default"
-                  ? "Default"
-                  : mobileSort === "amount_desc"
-                    ? "Amount: High"
-                    : mobileSort === "amount_asc"
-                      ? "Amount: Low"
-                      : mobileSort === "date_desc"
-                        ? "Newest"
-                        : "Oldest"}
-              </span>
-              <ChevronDown size={13} className="text-slate-400" />
-            </div>
-            <select
-              value={mobileSort}
-              onChange={(e) => setMobileSort(e.target.value as any)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              aria-label="Sort transactions"
-            >
-              <option value="default">Default</option>
-              <option value="amount_desc">Amount: High to Low</option>
-              <option value="amount_asc">Amount: Low to High</option>
-              <option value="date_desc">Date: Newest First</option>
-              <option value="date_asc">Date: Oldest First</option>
-            </select>
           </div>
         </div>
 
