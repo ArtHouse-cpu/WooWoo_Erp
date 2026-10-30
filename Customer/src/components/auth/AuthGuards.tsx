@@ -60,7 +60,6 @@ export function ProtectedRoute() {
   return <Outlet />;
 }
 
-/** Authenticated users who still need Create Account / Membership */
 export function OnboardingRoute({step}: {step: 'profile' | 'membership'}) {
   const customer = useAuthStore(s => s.customer);
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
