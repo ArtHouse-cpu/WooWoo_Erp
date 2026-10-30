@@ -13,6 +13,9 @@ import {
 import type { SpacePayload } from "@/services/apiClient";
 import type { SelectedServiceItem, SummaryFoodItem } from "./CoworkingSummaryCard";
 import PaymentAmounts from "./PaymentAmounts";
+import SelectedSpacesSummary, {
+  type SummaryBookedSpace,
+} from "./SelectedSpacesSummary";
 
 const FALLBACK_SPACE_IMAGE =
   "https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=400&q=80";
@@ -29,6 +32,7 @@ export type ExclusiveSingleDateSummaryCardProps = {
   discountAmount?: number;
   cashbackAmount?: number;
   formatDateDisplay: (val?: string | Date | null) => string;
+  bookedSpaces?: SummaryBookedSpace[];
   showPayment?: boolean;
   paidAmount?: number;
   dueAmount?: number | null;
@@ -50,6 +54,7 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   discountAmount = 0,
   cashbackAmount = 0,
   formatDateDisplay,
+  bookedSpaces = [],
   showPayment = false,
   paidAmount = 0,
   dueAmount,
@@ -64,10 +69,12 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   const safeQty = Math.max(1, Number(spaceQty) || 1);
   const safeHourlyRate = Math.max(0, Number(hourlyRate) || 0);
 
-  const spaceCharges = useMemo(
-    () => safeHourlyRate * safeDuration * safeQty,
-    [safeHourlyRate, safeDuration, safeQty],
-  );
+  const spaceCharges = useMemo(() => {
+    if (bookedSpaces.length > 1) {
+      return bookedSpaces.reduce((sum, space) => sum + Number(space.lineTotal || 0), 0);
+    }
+    return safeHourlyRate * safeDuration * safeQty;
+  }, [bookedSpaces, safeHourlyRate, safeDuration, safeQty]);
 
   const servicesTotal = useMemo(
     () =>
@@ -142,6 +149,10 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
         {/* ==============================
             Selected Space
         ============================== */}
+        {bookedSpaces.length > 1 ? (
+          <SelectedSpacesSummary spaces={bookedSpaces} />
+        ) : null}
+        {bookedSpaces.length > 1 ? null : (
         <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5">
 
           {/* Space Image */}
@@ -182,6 +193,7 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
             </span>
           </div>
         </div>
+        )}
 
         {/* ==============================
             Booking Details

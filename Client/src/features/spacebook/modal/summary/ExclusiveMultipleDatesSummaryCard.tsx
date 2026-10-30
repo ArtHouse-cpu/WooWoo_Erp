@@ -14,6 +14,9 @@ import type { SpacePayload } from "@/services/apiClient";
 import type { MultiDateSlot } from "../CreateBookingDetailsModal";
 import type { SelectedServiceItem, SummaryFoodItem } from "./CoworkingSummaryCard";
 import PaymentAmounts from "./PaymentAmounts";
+import SelectedSpacesSummary, {
+  type SummaryBookedSpace,
+} from "./SelectedSpacesSummary";
 
 /* =========================================
    Constants
@@ -38,6 +41,7 @@ export type ExclusiveMultipleDatesSummaryCardProps = {
   formatDateDisplay: (
     val?: string | Date | null,
   ) => string;
+  bookedSpaces?: SummaryBookedSpace[];
   showPayment?: boolean;
   paidAmount?: number;
   dueAmount?: number | null;
@@ -61,6 +65,7 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
   discountAmount = 0,
   cashbackAmount = 0,
   formatDateDisplay,
+  bookedSpaces = [],
   showPayment = false,
   paidAmount = 0,
   dueAmount,
@@ -125,6 +130,9 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
   ========================================= */
 
   const spaceCharges = useMemo(() => {
+    if (bookedSpaces.length > 1) {
+      return bookedSpaces.reduce((sum, space) => sum + Number(space.lineTotal || 0), 0);
+    }
     return slots.reduce((total, slot) => {
       const duration =
         Number(slot.duration) || 1;
@@ -136,7 +144,7 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
           safeQty
       );
     }, 0);
-  }, [slots, safeHourlyRate, safeQty]);
+  }, [bookedSpaces, slots, safeHourlyRate, safeQty]);
 
   /* =========================================
      Services Total
@@ -224,6 +232,10 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
             Selected Space
         ===================================== */}
 
+        {bookedSpaces.length > 1 ? (
+          <SelectedSpacesSummary spaces={bookedSpaces} />
+        ) : null}
+        {bookedSpaces.length > 1 ? null : (
         <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5">
 
           {/* Space Image */}
@@ -273,6 +285,7 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
           </div>
 
         </div>
+        )}
 
         {/* =====================================
             Booking Details

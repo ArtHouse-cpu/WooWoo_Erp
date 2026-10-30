@@ -2537,6 +2537,7 @@ const CreateBookingDetailsModal = ({
       discountAmount={discountAmount}
       cashbackAmount={cashbackAmount}
       formatDateDisplay={formatDateDisplay}
+      bookedSpaces={bookedSpaces}
     />
   ) : dateMode === "multiple" ? (
     <ExclusiveMultipleDatesSummaryCard
@@ -2549,6 +2550,7 @@ const CreateBookingDetailsModal = ({
       discountAmount={discountAmount}
       cashbackAmount={cashbackAmount}
       formatDateDisplay={formatDateDisplay}
+      bookedSpaces={bookedSpaces}
     />
   ) : (
     <ExclusiveSingleDateSummaryCard
@@ -2563,6 +2565,7 @@ const CreateBookingDetailsModal = ({
       discountAmount={discountAmount}
       cashbackAmount={cashbackAmount}
       formatDateDisplay={formatDateDisplay}
+      bookedSpaces={bookedSpaces}
     />
   );
 
@@ -4100,16 +4103,32 @@ const CreateBookingDetailsModal = ({
                 type="button"
                 onClick={() => {
                   const code = `QT-${phone.replace(/\D/g, "").slice(-4) || "BOOK"}`;
-                  const items = [
-                    ...(selectedSpace
-                      ? [{
-                          productName: selectedSpace.name || "Space",
-                          qty: spaceQty,
-                          unitPrice: Number(selectedSpace.price) || 0,
+                  const spaceLines =
+                    bookedSpaces.length > 0
+                      ? bookedSpaces.map((space) => ({
+                          productName: [
+                            space.spaceName || "Space",
+                            space.spaceDay ? `(${space.spaceDay})` : "",
+                            space.spaceCode || "",
+                          ]
+                            .filter(Boolean)
+                            .join(" "),
+                          qty: 1,
+                          unitPrice: Number(space.lineTotal) || 0,
                           discount: 0,
                           category: "space",
-                        }]
-                      : []),
+                        }))
+                      : selectedSpace
+                        ? [{
+                            productName: selectedSpace.name || "Space",
+                            qty: spaceQty,
+                            unitPrice: Number(selectedSpace.price) || 0,
+                            discount: 0,
+                            category: "space",
+                          }]
+                        : [];
+                  const items = [
+                    ...spaceLines,
                     ...selectedServicesList.map((service) => ({
                       productName: service.label,
                       qty: service.qty,
