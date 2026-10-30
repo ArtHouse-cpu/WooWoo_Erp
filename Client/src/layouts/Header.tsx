@@ -151,6 +151,10 @@ export default function Header({
       label: "Add Food",
       path: "/foods?create=1",
     },
+    canPath("/foodBill") && {
+      label: "Food Bill",
+      path: "/foodBill",
+    },
     can(PERMISSIONS.PRODUCT_CREATE) && {
       label: "Add Product",
       path: "/products?create=1",

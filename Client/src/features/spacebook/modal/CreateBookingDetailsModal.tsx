@@ -2,7 +2,6 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import {
   X,
   User,
-  Phone,
   Minus,
   ChevronDown,
   Camera,
@@ -32,7 +31,6 @@ import {
   Car,
   UtensilsCrossed,
   Download,
-  ClipboardList,
 } from "lucide-react";
 import Swal from "sweetalert2";
 // Optional: import jsPDF from "jspdf"; // If you want PDF download
@@ -137,6 +135,15 @@ export type BookingFormPayload = {
   selectedServices?: SelectedServiceItem[];
   foods?: SelectedFoodItem[];
   summarySnapshot?: any;
+  selectedSpaces?: Array<{
+    spaceId: string;
+    spaceName: string;
+    spaceCode?: string;
+    spaceDay?: string;
+    spaceCategory?: string;
+    unitPrice: number;
+    lineTotal: number;
+  }>;
 };
 
 export function bookingCustomerDraft(
@@ -651,11 +658,13 @@ const CreateBookingDetailsModal = ({
 
   // Space Selection
   const [spaceId, setSpaceId] = useState("");
+  const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([]);
   const [spaceQty, setSpaceQty] = useState(1);
   const [spaces, setSpaces] = useState<SpacePayload[]>([]);
   const [spacesLoading, setSpacesLoading] = useState(false);
   const [spacesError, setSpacesError] = useState("");
   const [spaceTypeFilter, setSpaceTypeFilter] = useState<"coworking" | "exclusive">("coworking");
+  const [dayFilter, setDayFilter] = useState<"all" | "weekday" | "weekend">("all");
   const [spaceSearch, setSpaceSearch] = useState("");
 
   // Customer Autocomplete & Create Modal
@@ -818,6 +827,9 @@ const CreateBookingDetailsModal = ({
       setPhone(initialBooking.customerPhone || "");
       setIsPhoneAutoFetched(Boolean(initialBooking.customerPhone));
       setSpaceId(String(initialBooking.spaceId || ""));
+      setSelectedSpaceIds(
+        initialBooking.spaceId ? [String(initialBooking.spaceId)] : [],
+      );
       setSpaceQty(1);
       setCustomerId(null);
       setMembershipType("none");
@@ -975,6 +987,13 @@ const CreateBookingDetailsModal = ({
       setMembershipType(draftValues.membershipType || "none");
       setMembershipPlanId(draftValues.membershipPlanId || null);
       setSpaceId(String(draftValues.spaceId || ""));
+      setSelectedSpaceIds(
+        draftValues.selectedSpaces?.length
+          ? draftValues.selectedSpaces.map((space) => space.spaceId)
+          : draftValues.spaceId
+            ? [String(draftValues.spaceId)]
+            : [],
+      );
       setSpaceQty(draftValues.spaceQty || 1);
       const bDate = toDateInput(draftValues.bookingDate);
       const bFrom = draftValues.startTime || "09:00";
@@ -1102,7 +1121,9 @@ const CreateBookingDetailsModal = ({
       setMembershipType("none");
       setMembershipPlanId(null);
       setSpaceId("");
+      setSelectedSpaceIds([]);
       setSpaceQty(1);
+      setDayFilter("all");
       setPurpose("");
       setNotes("");
       setFoodQty({});
@@ -1162,6 +1183,9 @@ const CreateBookingDetailsModal = ({
             const current = list.find((s) => String(s._id) === String(targetId));
             if (current) {
               setSpaceId(String(current._id));
+              setSelectedSpaceIds((prev) =>
+                prev.length ? prev : [String(current._id)],
+              );
               setSpaceTypeFilter(isCoworkingSpace(current) ? "coworking" : "exclusive");
             }
           } else {
@@ -1169,9 +1193,11 @@ const CreateBookingDetailsModal = ({
             if (firstCowork) {
               setSpaceTypeFilter("coworking");
               setSpaceId(String(firstCowork._id));
+              setSelectedSpaceIds([String(firstCowork._id)]);
             } else if (list[0]) {
               setSpaceTypeFilter("exclusive");
               setSpaceId(String(list[0]._id));
+              setSelectedSpaceIds([String(list[0]._id)]);
             }
           }
         }
@@ -1191,23 +1217,60 @@ const CreateBookingDetailsModal = ({
     return () => ac.abort();
   }, [isOpen]);
 
+  const handleDayFilter = (next: "all" | "weekday" | "weekend") => {
+    setDayFilter(next);
+    const matching = spaces.filter((space) => {
+      const matchesType =
+        spaceTypeFilter === "coworking"
+          ? isCoworkingSpace(space)
+          : isExclusiveSpace(space);
+      return matchesType && spaceMatchesDay(space, next);
+    });
+    const kept = selectedSpaceIds.filter((id) =>
+      matching.some((space) => String(space._id) === id),
+    );
+    if (kept.length > 0) {
+      setSelectedSpaceIds(kept);
+      if (!kept.includes(String(spaceId))) setSpaceId(kept[0]);
+      return;
+    }
+    if (matching.length === 0) {
+      setSelectedSpaceIds([]);
+      return;
+    }
+    const nextSpace = matching[0];
+    setSpaceId(String(nextSpace._id));
+    setSelectedSpaceIds([String(nextSpace._id)]);
+    setSpaceQty(1);
+    const info = parsePlanDuration(nextSpace.name, nextSpace.spaceType || spaceTypeFilter);
+    setPlanDurationCount(info.baseCount);
+  };
+
   const handleSpaceTypeToggle = (type: "coworking" | "exclusive") => {
     setSpaceTypeFilter(type);
     if (type === "exclusive") {
       setDateMode("single");
     }
-    const matching = spaces.filter(
-      type === "coworking" ? isCoworkingSpace : isExclusiveSpace,
+    const matching = spaces.filter((space) => {
+      const matchesType =
+        type === "coworking" ? isCoworkingSpace(space) : isExclusiveSpace(space);
+      return matchesType && spaceMatchesDay(space, dayFilter);
+    });
+    const kept = selectedSpaceIds.filter((id) =>
+      matching.some((space) => String(space._id) === id),
     );
+    if (kept.length > 0) {
+      setSelectedSpaceIds(kept);
+      if (!kept.includes(String(spaceId))) setSpaceId(kept[0]);
+      return;
+    }
     if (matching.length > 0) {
-      const alreadyMatches = matching.some((s) => String(s._id) === String(spaceId));
-      if (!alreadyMatches) {
-        const nextSpace = matching[0];
-        setSpaceId(String(nextSpace._id));
-        setSpaceQty(1);
-        const info = parsePlanDuration(nextSpace.name, nextSpace.spaceType || type);
-        setPlanDurationCount(info.baseCount);
-      }
+      const nextSpace = matching[0];
+      setSpaceId(String(nextSpace._id));
+      setSelectedSpaceIds([String(nextSpace._id)]);
+      setSpaceQty(1);
+      const info = parsePlanDuration(nextSpace.name, nextSpace.spaceType || type);
+      setPlanDurationCount(info.baseCount);
     }
   };
 
@@ -1221,6 +1284,16 @@ const CreateBookingDetailsModal = ({
     [spaces],
   );
 
+  const spaceMatchesDay = (
+    space: SpacePayload,
+    filter: "all" | "weekday" | "weekend",
+  ) => {
+    if (filter === "all") return true;
+    const day = String(space.day || "").toLowerCase();
+    if (filter === "weekend") return day.includes("weekend");
+    return !day.includes("weekend");
+  };
+
   const filteredSpaces = useMemo(() => {
     return spaces.filter((space) => {
       const matchesType =
@@ -1228,6 +1301,7 @@ const CreateBookingDetailsModal = ({
           ? isCoworkingSpace(space)
           : isExclusiveSpace(space);
       if (!matchesType) return false;
+      if (!spaceMatchesDay(space, dayFilter)) return false;
 
       const q = spaceSearch.trim().toLowerCase();
       if (!q) return true;
@@ -1239,7 +1313,7 @@ const CreateBookingDetailsModal = ({
 
       return sName.includes(q) || sCode.includes(q) || sCat.includes(q) || sDay.includes(q);
     });
-  }, [spaces, spaceTypeFilter, spaceSearch]);
+  }, [spaces, spaceTypeFilter, spaceSearch, dayFilter]);
 
   const selectedSpace = useMemo(() => {
     return spaces.find((s) => String(s._id) === String(spaceId)) || filteredSpaces[0] || null;
@@ -1899,21 +1973,57 @@ const CreateBookingDetailsModal = ({
     return resolveMembershipPlan(membershipPlans, membershipType, membershipPlanId);
   }, [membershipPlans, membershipType, membershipPlanId]);
 
+  const bookedSpaces = useMemo(() => {
+    const ids = selectedSpaceIds.length
+      ? selectedSpaceIds
+      : spaceId
+        ? [spaceId]
+        : [];
+    const qtyEach = ids.length > 1 ? 1 : Math.max(1, spaceQty);
+    const hours = calcDurationHours(bookingFrom, bookingTo) || duration;
+    const fallback = spaceTypeFilter === "coworking" ? 400 : 800;
+    return ids
+      .map((id) => spaces.find((space) => String(space._id) === String(id)))
+      .filter((space): space is NonNullable<typeof space> => Boolean(space))
+      .map((space) => {
+        const unitPrice = Math.max(0, Number(space.price ?? fallback));
+        const lineTotal = isDurationPlan
+          ? unitPrice * packageMultiplier * qtyEach
+          : dateMode === "multiple"
+            ? multiDateSlots.reduce(
+                (sum, slot) => sum + unitPrice * (slot.duration || 1) * qtyEach,
+                0,
+              )
+            : unitPrice * hours * qtyEach;
+        return {
+          spaceId: String(space._id),
+          spaceName: space.name || "",
+          spaceCode: getSpaceCode(space),
+          spaceDay: space.day || "",
+          spaceCategory: space.category || "space",
+          unitPrice,
+          lineTotal,
+          qty: qtyEach,
+        };
+      });
+  }, [
+    selectedSpaceIds,
+    spaceId,
+    spaces,
+    spaceQty,
+    spaceTypeFilter,
+    isDurationPlan,
+    packageMultiplier,
+    dateMode,
+    multiDateSlots,
+    bookingFrom,
+    bookingTo,
+    duration,
+  ]);
+
   const { discountAmount, cashbackAmount, pricedSubTotal } = useMemo(() => {
     const benefit = resolveBenefitPercents("space", activeMembershipPlan);
-    const unitRate = Math.max(
-      0,
-      Number(selectedSpace?.price ?? (spaceTypeFilter === "coworking" ? 400 : 800)),
-    );
-    const baseSpaceTotal =
-      isDurationPlan
-        ? unitRate * packageMultiplier * spaceQty
-        : dateMode === "multiple"
-        ? multiDateSlots.reduce(
-            (acc, s) => acc + unitRate * (s.duration || 1) * spaceQty,
-            0,
-          )
-        : unitRate * (calcDurationHours(bookingFrom, bookingTo) || duration) * spaceQty;
+    const baseSpaceTotal = bookedSpaces.reduce((sum, space) => sum + space.lineTotal, 0);
 
     const servicesTotal = selectedServicesList.reduce(
       (acc, s) => acc + s.price * s.qty,
@@ -1954,6 +2064,7 @@ const CreateBookingDetailsModal = ({
     bookingFrom,
     bookingTo,
     duration,
+    bookedSpaces,
     selectedServicesList,
     selectedFoodsList,
   ]);
@@ -1966,7 +2077,7 @@ const CreateBookingDetailsModal = ({
       err.phone = "Please enter a valid 10-digit phone number.";
     }
 
-    if (!spaceId) err.spaceId = "Please select a space.";
+    if (!selectedSpaceIds.length && !spaceId) err.spaceId = "Please select a space.";
 
     if (isDurationPlan) {
       if (!coworkingStartDate) err.coworkingStartDate = "Start date is required.";
@@ -2064,14 +2175,16 @@ const CreateBookingDetailsModal = ({
       (acc, s) => acc + s.price * s.qty,
       0,
     );
-    const spaceCharges = isDuration
-      ? unitPrice * packageMultiplier * spaceQty
-      : isMultiple
-      ? multiDateSlots.reduce(
-          (acc, s) => acc + unitPrice * (s.duration || 1) * spaceQty,
-          0,
-        )
-      : unitPrice * (calcDurationHours(bookingFrom, bookingTo) || duration) * spaceQty;
+    const spaceCharges =
+      bookedSpaces.reduce((sum, space) => sum + space.lineTotal, 0) ||
+      (isDuration
+        ? unitPrice * packageMultiplier * spaceQty
+        : isMultiple
+          ? multiDateSlots.reduce(
+              (acc, s) => acc + unitPrice * (s.duration || 1) * spaceQty,
+              0,
+            )
+          : unitPrice * (calcDurationHours(bookingFrom, bookingTo) || duration) * spaceQty);
 
     const lineTotal = Math.max(0, spaceCharges + servicesTotal + foodCharges - discountAmount);
 
@@ -2108,7 +2221,11 @@ const CreateBookingDetailsModal = ({
     const summarySnapshot = {
       spaceType: spaceTypeFilter,
       dateMode,
-      spaceName: selectedSpace?.name || "",
+      spaceName:
+        bookedSpaces.map((space) => space.spaceName).filter(Boolean).join(", ") ||
+        selectedSpace?.name ||
+        "",
+      selectedSpaces: bookedSpaces,
       spaceCode,
       spaceImageUrl: (selectedSpace as any)?.images?.[0] || selectedSpace?.imageUrl || null,
       spaceDay: selectedSpace?.day || "",
@@ -2174,7 +2291,11 @@ const CreateBookingDetailsModal = ({
         : bookingTo,
       status,
       notes: finalNotes || undefined,
-      spaceName: selectedSpace?.name || "",
+      spaceName:
+        bookedSpaces.map((space) => space.spaceName).filter(Boolean).join(", ") ||
+        selectedSpace?.name ||
+        "",
+      selectedSpaces: bookedSpaces,
       spaceCode,
       spaceType,
       spaceDay: selectedSpace?.day || "",
@@ -2210,7 +2331,7 @@ const CreateBookingDetailsModal = ({
     const err: Record<string, string> = {};
     if (!name.trim()) err.name = "Customer name is required.";
     if (!phone.trim()) err.phone = "Phone number is required.";
-    if (!spaceId) err.spaceId = "Please select a space.";
+    if (!selectedSpaceIds.length && !spaceId) err.spaceId = "Please select a space.";
 
     if (Object.keys(err).length > 0) {
       setErrors((prev) => ({ ...prev, ...err }));
@@ -2236,14 +2357,16 @@ const CreateBookingDetailsModal = ({
       (acc, s) => acc + s.price * s.qty,
       0,
     );
-    const spaceCharges = isDuration
-      ? unitPrice * packageMultiplier * spaceQty
-      : isMultiple
-      ? multiDateSlots.reduce(
-          (acc, s) => acc + unitPrice * (s.duration || 1) * spaceQty,
-          0,
-        )
-      : unitPrice * (calcDurationHours(bookingFrom, bookingTo) || duration) * spaceQty;
+    const spaceCharges =
+      bookedSpaces.reduce((sum, space) => sum + space.lineTotal, 0) ||
+      (isDuration
+        ? unitPrice * packageMultiplier * spaceQty
+        : isMultiple
+          ? multiDateSlots.reduce(
+              (acc, s) => acc + unitPrice * (s.duration || 1) * spaceQty,
+              0,
+            )
+          : unitPrice * (calcDurationHours(bookingFrom, bookingTo) || duration) * spaceQty);
 
     const lineTotal = Math.max(0, spaceCharges + servicesTotal + foodCharges - discountAmount);
 
@@ -2275,7 +2398,11 @@ const CreateBookingDetailsModal = ({
     const summarySnapshot = {
       spaceType: spaceTypeFilter,
       dateMode,
-      spaceName: selectedSpace?.name || "",
+      spaceName:
+        bookedSpaces.map((space) => space.spaceName).filter(Boolean).join(", ") ||
+        selectedSpace?.name ||
+        "",
+      selectedSpaces: bookedSpaces,
       spaceCode,
       spaceImageUrl: (selectedSpace as any)?.images?.[0] || selectedSpace?.imageUrl || null,
       spaceDay: selectedSpace?.day || "",
@@ -2341,7 +2468,11 @@ const CreateBookingDetailsModal = ({
         : bookingTo,
       status: "Draft",
       notes: finalNotes || undefined,
-      spaceName: selectedSpace?.name || "",
+      spaceName:
+        bookedSpaces.map((space) => space.spaceName).filter(Boolean).join(", ") ||
+        selectedSpace?.name ||
+        "",
+      selectedSpaces: bookedSpaces,
       spaceCode,
       spaceType,
       spaceDay: selectedSpace?.day || "",
@@ -2667,55 +2798,16 @@ const CreateBookingDetailsModal = ({
                               </div>
                             )}
 
+                          {phone ? (
+                            <p className="mt-1.5 text-sm text-slate-600">
+                              {phone.replace(/\D/g, "").length === 10
+                                ? `+91 ${phone.replace(/\D/g, "")}`
+                                : phone}
+                            </p>
+                          ) : null}
                           {errors.name && (
                             <p className="mt-1 text-xs text-rose-500">{errors.name}</p>
                           )}
-                        </div>
-
-                        {/* Phone Number */}
-                        <div>
-                          <div className="mb-1 flex items-center justify-between">
-                            <label className="block text-xs font-semibold text-slate-600">
-                              Phone Number <span className="text-rose-500">*</span>
-                            </label>
-                          </div>
-
-                          <div className="relative">
-                            <Phone
-                              size={16}
-                              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                            />
-
-                            <input
-                              type="tel"
-                              required
-                              maxLength={10}
-                              value={phone}
-                              onChange={(e) => {
-                                setPhone(e.target.value.replace(/\D/g, ""));
-                                if (errors.phone) {
-                                  setErrors((prev) => ({ ...prev, phone: "" }));
-                                }
-                              }}
-                              readOnly={isPhoneAutoFetched}
-                              tabIndex={isPhoneAutoFetched ? -1 : 0}
-                              placeholder="9876543210"
-                              title={
-                                isPhoneAutoFetched
-                                  ? "Phone number auto-fetched from customer details (not editable)"
-                                  : undefined
-                              }
-                              className={`h-10 w-full rounded-xl border pl-10 ${
-                                isPhoneAutoFetched
-                                  ? "cursor-not-allowed border-slate-200 bg-slate-100 pr-9 text-slate-500 select-none"
-                                  : "border-slate-200 bg-white pr-3 focus:border-indigo-500 focus:ring-indigo-100"
-                              } text-sm outline-none transition focus:ring-2 ${
-                                errors.phone
-                                  ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-rose-100"
-                                  : ""
-                              }`}
-                            />
-                          </div>
                           {errors.phone && (
                             <p className="mt-1 text-xs text-rose-500">{errors.phone}</p>
                           )}
@@ -2778,6 +2870,11 @@ const CreateBookingDetailsModal = ({
                       </span>
                       <h3 className="font-bold text-slate-800 text-sm">
                         Select Space <span className="text-rose-500">*</span>
+                        {selectedSpaceIds.length > 1 ? (
+                          <span className="ml-2 text-xs font-semibold text-indigo-600">
+                            {selectedSpaceIds.length} selected
+                          </span>
+                        ) : null}
                       </h3>
                     </div>
 
@@ -2857,6 +2954,29 @@ const CreateBookingDetailsModal = ({
                           </span>
                         </button>
                       </div>
+
+                      <div className="inline-flex self-start rounded-xl border border-slate-200/80 bg-slate-100 p-1 sm:self-auto">
+                        {(
+                          [
+                            ["all", "All"],
+                            ["weekday", "Weekday"],
+                            ["weekend", "Weekend"],
+                          ] as const
+                        ).map(([id, label]) => (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => handleDayFilter(id)}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                              dayFilter === id
+                                ? "border border-indigo-200 bg-white text-indigo-700 shadow-xs"
+                                : "border border-transparent text-slate-600 hover:text-slate-900"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     {errors.spaceId && (
@@ -2882,15 +3002,16 @@ const CreateBookingDetailsModal = ({
                         <p className="text-xs font-semibold text-slate-700">No spaces found</p>
                         <p className="text-[11px] text-slate-400 max-w-xs">
                           {spaceSearch
-                            ? `No ${spaceTypeFilter} spaces matched "${spaceSearch}".`
-                            : `No ${spaceTypeFilter} spaces are currently available.`}
+                            ? `No ${dayFilter === "all" ? "" : `${dayFilter} `}${spaceTypeFilter} spaces matched "${spaceSearch}".`
+                            : `No ${dayFilter === "all" ? "" : `${dayFilter} `}${spaceTypeFilter} spaces are currently available.`}
                         </p>
                       </div>
                      
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                         {filteredSpaces.map((space) => {
-                          const isSelected = String(space._id) === String(spaceId);
+                          const spaceKey = String(space._id);
+                          const isSelected = selectedSpaceIds.includes(spaceKey);
                           const code = getSpaceCode(space);
                           const img =
                             space.imageUrl ||
@@ -2903,16 +3024,25 @@ const CreateBookingDetailsModal = ({
                             <div
                               key={String(space._id)}
                               onClick={() => {
-                                const isNew = spaceId !== String(space._id);
-                                setSpaceId(String(space._id));
-                                if (isNew) {
-                                  setSpaceQty(1);
-                                  const info = parsePlanDuration(
-                                    space.name,
-                                    space.spaceType || spaceTypeFilter,
-                                  );
-                                  setPlanDurationCount(info.baseCount);
-                                }
+                                setSelectedSpaceIds((prev) => {
+                                  if (prev.includes(spaceKey)) {
+                                    const next = prev.filter((id) => id !== spaceKey);
+                                    if (String(spaceId) === spaceKey) {
+                                      setSpaceId(next[0] || "");
+                                    }
+                                    return next;
+                                  }
+                                  setSpaceId(spaceKey);
+                                  if (!prev.length) {
+                                    setSpaceQty(1);
+                                    const info = parsePlanDuration(
+                                      space.name,
+                                      space.spaceType || spaceTypeFilter,
+                                    );
+                                    setPlanDurationCount(info.baseCount);
+                                  }
+                                  return [...prev, spaceKey];
+                                });
                                 if (errors.spaceId) {
                                   setErrors((prev) => ({ ...prev, spaceId: "" }));
                                 }
@@ -2952,11 +3082,17 @@ const CreateBookingDetailsModal = ({
                                       {space.day || "Weekday"}
                                     </span>
                                   )}
-                                  {isSelected && (
-                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-white shadow-xs">
-                                      <Check size={12} strokeWidth={3} />
-                                    </span>
-                                  )}
+                                  <span
+                                    className={`flex h-5 w-5 items-center justify-center rounded border shadow-xs ${
+                                      isSelected
+                                        ? "border-indigo-600 bg-indigo-600 text-white"
+                                        : "border-slate-300 bg-white text-transparent"
+                                    }`}
+                                    aria-checked={isSelected}
+                                    role="checkbox"
+                                  >
+                                    <Check size={12} strokeWidth={3} />
+                                  </span>
                                 </div>
 
                                 {/* Bottom-Right: Capacity Badge */}
@@ -3007,26 +3143,31 @@ const CreateBookingDetailsModal = ({
                                           setSpaceQty((prev) => Math.max(1, prev - 1));
                                         }
                                       }}
-                                      disabled={!isSelected || spaceQty <= 1}
+                                      disabled={
+                                        !isSelected ||
+                                        selectedSpaceIds.length > 1 ||
+                                        spaceQty <= 1
+                                      }
                                       className="flex h-full w-7 items-center justify-center border-r border-slate-100 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
                                     >
                                       <Minus size={11} />
                                     </button>
                                     <div className="flex w-6 items-center justify-center text-xs font-semibold text-slate-700">
-                                      {isSelected ? spaceQty : 0}
+                                      {isSelected
+                                        ? selectedSpaceIds.length > 1
+                                          ? 1
+                                          : spaceQty
+                                        : 0}
                                     </div>
                                     <button
                                       type="button"
                                       onClick={() => {
                                         if (!isSelected) {
-                                          setSpaceId(String(space._id));
-                                          setSpaceQty(1);
-                                          const info = parsePlanDuration(
-                                            space.name,
-                                            space.spaceType || spaceTypeFilter,
+                                          setSelectedSpaceIds((prev) =>
+                                            prev.includes(spaceKey) ? prev : [...prev, spaceKey],
                                           );
-                                          setPlanDurationCount(info.baseCount);
-                                        } else {
+                                          setSpaceId(spaceKey);
+                                        } else if (selectedSpaceIds.length === 1) {
                                           setSpaceQty((prev) => Math.min(10, prev + 1));
                                         }
                                       }}

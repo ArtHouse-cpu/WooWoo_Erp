@@ -309,7 +309,6 @@ const SpaceBook = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Listen for event from Header "+ Add Booking" button when already on /spaceBooking
   useEffect(() => {
     const handleOpen = () => {
       setEditingBooking(null);
@@ -525,18 +524,32 @@ const SpaceBook = () => {
       category?: string;
       lineCategory?: string;
       sourceType?: string;
-    }> = [
-      {
-        id: 1,
-        name: nameParts,
-        qty: 1,
-        price: spaceCharges,
-        discount: 0,
-        category: "space",
-        lineCategory: "space",
-        sourceType: "space",
-      },
-    ];
+    }> =
+      pendingCheckout.selectedSpaces && pendingCheckout.selectedSpaces.length > 1
+        ? pendingCheckout.selectedSpaces.map((space, index) => ({
+            id: index + 1,
+            name: [space.spaceName || "Space", space.spaceDay ? `(${space.spaceDay})` : ""]
+              .filter(Boolean)
+              .join(" "),
+            qty: 1,
+            price: Math.max(0, Number(space.lineTotal) || 0),
+            discount: 0,
+            category: "space",
+            lineCategory: "space",
+            sourceType: "space",
+          }))
+        : [
+            {
+              id: 1,
+              name: nameParts,
+              qty: 1,
+              price: spaceCharges,
+              discount: 0,
+              category: "space",
+              lineCategory: "space",
+              sourceType: "space",
+            },
+          ];
 
     services.forEach((s: any, idx: number) => {
       const sQty = Math.max(1, Number(s.qty) || 1);
@@ -662,14 +675,22 @@ const SpaceBook = () => {
     };
 
     let reservedBookingId = existingDraftId || "";
+    const reservedBookingIds: string[] = [];
     const releaseReservation = async () => {
       if (existingDraftId) {
         await handleUpdateSpaceBooking(existingDraftId, { status: "Draft" }).catch(
           () => undefined,
         );
-      } else if (reservedBookingId) {
-        await handleDeleteSpaceBooking(reservedBookingId).catch(() => undefined);
+        return;
       }
+      const ids = reservedBookingIds.length
+        ? reservedBookingIds
+        : reservedBookingId
+          ? [reservedBookingId]
+          : [];
+      await Promise.all(
+        ids.map((id) => handleDeleteSpaceBooking(id).catch(() => undefined)),
+      );
     };
 
     try {
@@ -679,6 +700,18 @@ const SpaceBook = () => {
       // taken slot before any payment is recorded.
       if (existingDraftId) {
         await handleUpdateSpaceBooking(existingDraftId, bookingData);
+      } else if ((pendingCheckout.selectedSpaces?.length || 0) > 1) {
+        for (const space of pendingCheckout.selectedSpaces || []) {
+          const created = await handleCreateSpaceBooking({
+            ...bookingData,
+            spaceId: space.spaceId,
+            subTotal: space.lineTotal,
+            notes: [pendingCheckout.notes, space.spaceName].filter(Boolean).join(" | "),
+          });
+          const createdId = created?.booking ? bookingId(created.booking) : "";
+          if (createdId) reservedBookingIds.push(createdId);
+        }
+        reservedBookingId = reservedBookingIds[0] || "";
       } else {
         const created = await handleCreateSpaceBooking(bookingData);
         reservedBookingId = created?.booking ? bookingId(created.booking) : "";

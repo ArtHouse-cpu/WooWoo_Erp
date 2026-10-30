@@ -341,6 +341,24 @@ const persistBooking = async (
         : {}),
     };
 
+    if (!sourceId && (payload.selectedSpaces?.length || 0) > 1) {
+      for (const space of payload.selectedSpaces || []) {
+        const result = await handleCreateAllBooking({
+          ...body,
+          spaceId: space.spaceId,
+          notes: [payload.notes, space.spaceName].filter(Boolean).join(" | "),
+          paidAmount: space.lineTotal,
+          dueAmount: 0,
+        });
+        if (result?.success === false) {
+          toast.error(result.message || "Failed to save booking.");
+          return false;
+        }
+      }
+      toast.success(`${payload.selectedSpaces?.length} bookings created successfully!`);
+      return true;
+    }
+
     const result = sourceId
       ? await handleUpdateAllBooking(sourceId, body)
       : await handleCreateAllBooking(body);
@@ -430,7 +448,20 @@ const persistBooking = async (
       lineCategory: string;
       sourceType: string;
     }> = [];
-    if (pendingCheckout.spaceId || spaceCharges > 0) {
+    if ((pendingCheckout.selectedSpaces?.length || 0) > 1) {
+      pendingCheckout.selectedSpaces?.forEach((space, index) => {
+        items.push({
+          id: index + 1,
+          name: space.spaceName || "Space",
+          qty: 1,
+          price: Math.max(0, Number(space.lineTotal) || 0),
+          discount: 0,
+          category: "space",
+          lineCategory: "space",
+          sourceType: "space",
+        });
+      });
+    } else if (pendingCheckout.spaceId || spaceCharges > 0) {
       const hours = Math.max(0, Number(pendingCheckout.durationHours ?? 0));
       items.push({
         id: 1,

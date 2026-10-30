@@ -2697,6 +2697,39 @@ export type FoodPayload = {
   updatedAt?: string;
 };
 
+export type FoodOfferPayload = {
+  _id: string;
+  buyFoodId: string;
+  freeFoodId: string;
+  buyFood?: { id: string; name: string; price: number; status?: string } | null;
+  freeFood?: { id: string; name: string; price: number; status?: string } | null;
+};
+
+export const handleGetFoodOffers = async (signal?: AbortSignal) => {
+  const response = await axiosInstance.get("/food/offers", { signal });
+  return response.data as {
+    success: boolean;
+    offers: FoodOfferPayload[];
+  };
+};
+
+export const handleCreateFoodOffer = async (payload: {
+  buyFoodId: string;
+  freeFoodId: string;
+}) => {
+  const response = await axiosInstance.post("/food/offers", payload);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    offer: FoodOfferPayload;
+  };
+};
+
+export const handleDeleteFoodOffer = async (id: string) => {
+  const response = await axiosInstance.delete(`/food/offers/${id}`);
+  return response.data as { success: boolean; message?: string };
+};
+
 export const handleGetFoods = async (
   params?: { search?: string; category?: string; status?: string },
   signal?: AbortSignal,

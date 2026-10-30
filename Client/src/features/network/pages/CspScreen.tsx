@@ -1247,7 +1247,7 @@ export default function CspScreen() {
     });
   };
 
-  return (
+          return (
     <div className="min-w-0 space-y-5 p-2 sm:p-4 md:p-6 bg-[#fcfdfe] min-h-screen text-slate-800">
       {/* ── 1. Top Header ────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -1405,7 +1405,7 @@ export default function CspScreen() {
                 <span>↗ +28%</span>
                 <span className="font-normal text-slate-400 hidden xl:inline">
                   vs last month
-                </span>
+            </span>
               </div>
             </div>
           </div>
@@ -1777,13 +1777,13 @@ export default function CspScreen() {
                               {initials}
                             </div>
                             <div>
-                              <button
-                                type="button"
+            <button
+              type="button"
                                 onClick={() => openPartnerDetails(row)}
                                 className="text-left text-sm font-semibold text-slate-900 hover:text-[#ff5a36] hover:underline cursor-pointer"
-                              >
+            >
                                 {partnerName}
-                              </button>
+            </button>
                               <div className="text-xs text-slate-400">
                                 {brandName !== "—"
                                   ? brandName
@@ -1805,8 +1805,8 @@ export default function CspScreen() {
 
                         {/* Products (count) */}
                         <td className="py-3 px-4 text-center">
-                          <button
-                            type="button"
+              <button
+                type="button"
                             onClick={() => openProductsModal(row)}
                             title="Click to view assigned products"
                             className="inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
@@ -1875,8 +1875,8 @@ export default function CspScreen() {
                                       ? "Deactivate Partner"
                                       : "Activate Partner"}
                                   </span>
-                                </button>
-                              </Can>
+              </button>
+            </Can>
 
                               {mobile && (
                                 <button
@@ -1890,7 +1890,7 @@ export default function CspScreen() {
                                   <span>Copy Mobile ({mobile})</span>
                                 </button>
                               )}
-                            </div>
+          </div>
                           )}
                         </td>
                       </tr>
@@ -2082,7 +2082,7 @@ export default function CspScreen() {
                 activeTab === "active"
                   ? currentPage === pageNum
                   : currentAppPage === pageNum;
-              return (
+  return (
                 <button
                   key={pageNum}
                   type="button"
@@ -2134,14 +2134,14 @@ export default function CspScreen() {
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-500 border border-rose-100">
                   <XCircle className="h-5 w-5" />
                 </div>
-                <div>
+        <div>
                   <h3 className="text-base font-bold text-slate-900">
                     Reject Application
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Please provide a reason for rejecting this application.
-                  </p>
-                </div>
+          </p>
+        </div>
               </div>
               <button
                 type="button"
@@ -2188,9 +2188,9 @@ export default function CspScreen() {
                 Reason for Rejection <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <select
+          <select
                   value={rejectModal.reason}
-                  onChange={(e) =>
+            onChange={(e) =>
                     setRejectModal((prev) => ({
                       ...prev,
                       reason: e.target.value,
@@ -2206,7 +2206,7 @@ export default function CspScreen() {
                       {r}
                     </option>
                   ))}
-                </select>
+          </select>
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               </div>
             </div>
@@ -2238,13 +2238,13 @@ export default function CspScreen() {
 
             {/* Footer Buttons */}
             <div className="mt-5 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
+            <button
+              type="button"
                 onClick={handleCloseRejectModal}
                 className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
+            >
                 Cancel
-              </button>
+            </button>
               <button
                 type="button"
                 onClick={handleConfirmReject}
@@ -2252,8 +2252,8 @@ export default function CspScreen() {
               >
                 Reject Application
               </button>
-            </div>
-          </div>
+        </div>
+      </div>
         </div>
       )}
 
@@ -2355,17 +2355,17 @@ export default function CspScreen() {
                             {name}
                             {Array.isArray(p.variants) &&
                               p.variants.length > 0 && (
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {p.variants.map((v, vi) => (
-                                    <span
-                                      key={vi}
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {p.variants.map((v, vi) => (
+                                  <span
+                                    key={vi}
                                       className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
-                                    >
-                                      {v.name} · ₹{v.sellingPrice}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
+                                  >
+                                    {v.name} · ₹{v.sellingPrice}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 pr-4">
                             <span
@@ -2400,18 +2400,18 @@ export default function CspScreen() {
 
             {/* Footer */}
             <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3 bg-slate-50/50">
-              <p className="text-xs text-slate-400">
-                {productsModal.products.length} product
+                <p className="text-xs text-slate-400">
+                  {productsModal.products.length} product
                 {productsModal.products.length !== 1 ? "s" : ""} added
-              </p>
-              <button
-                type="button"
-                onClick={closeProductsModal}
+                </p>
+                <button
+                  type="button"
+                  onClick={closeProductsModal}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
-              >
-                Close
-              </button>
-            </div>
+                >
+                  Close
+                </button>
+              </div>
           </div>
         </div>
       )}
@@ -2424,7 +2424,7 @@ export default function CspScreen() {
               <div>
                 <h2 className="text-lg font-bold text-slate-900">
                   Add CSP Partner
-                </h2>
+            </h2>
                 <p className="mt-0.5 text-xs text-slate-500">
                   Select a{" "}
                   <span className="font-semibold text-orange-600">Premium</span>{" "}
@@ -2443,80 +2443,80 @@ export default function CspScreen() {
 
             <div className="mt-4">
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Premium Customer *
-              </label>
-              <div ref={searchWrapRef} className="relative">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={customerSearch}
-                    onChange={(e) => {
-                      setCustomerSearch(e.target.value);
-                      setDropdownOpen(true);
-                      if (selectedCustomerId) setSelectedCustomerId("");
-                    }}
-                    onFocus={() => setDropdownOpen(true)}
-                    placeholder="Search by name, mobile, or email..."
+              Premium Customer *
+            </label>
+            <div ref={searchWrapRef} className="relative">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => {
+                    setCustomerSearch(e.target.value);
+                    setDropdownOpen(true);
+                    if (selectedCustomerId) setSelectedCustomerId("");
+                  }}
+                  onFocus={() => setDropdownOpen(true)}
+                  placeholder="Search by name, mobile, or email..."
                     className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-16 text-sm outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500"
-                    autoComplete="off"
-                  />
+                  autoComplete="off"
+                />
                   <div className="absolute right-2.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
-                    {(selectedCustomerId || customerSearch) && (
-                      <button
-                        type="button"
-                        onClick={clearSelectedCustomer}
-                        className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                        title="Clear"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <ChevronDown className="h-4 w-4 text-slate-400" />
-                  </div>
+                  {(selectedCustomerId || customerSearch) && (
+                    <button
+                      type="button"
+                      onClick={clearSelectedCustomer}
+                      className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                      title="Clear"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <ChevronDown className="h-4 w-4 text-slate-400" />
                 </div>
-
-                {dropdownOpen && (
-                  <div className="absolute z-50 mt-1.5 max-h-56 w-full overflow-auto rounded-xl border border-slate-100 bg-white shadow-xl">
-                    {loadingCustomers ? (
-                      <div className="p-4 text-center text-xs text-slate-400">
-                        <Loader2 className="mx-auto h-4 w-4 animate-spin text-orange-500 mb-1" />
-                        Loading Premium customers…
-                      </div>
-                    ) : filteredCustomers.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-slate-500">
-                        {availableCustomers.length === 0
-                          ? "No eligible Premium customers available."
-                          : "No matches found."}
-                      </div>
-                    ) : (
-                      filteredCustomers.map((customer) => (
-                        <button
-                          key={customer._id}
-                          type="button"
-                          onClick={() => handleSelectCustomer(customer)}
-                          className={`flex w-full flex-col border-b border-slate-50 p-2.5 text-left last:border-0 hover:bg-slate-50 transition-colors ${
-                            selectedCustomerId === customer._id
-                              ? "bg-orange-50"
-                              : ""
-                          }`}
-                        >
-                          <span className="text-xs font-semibold text-slate-800">
-                            {customer.name || "Customer"}
-                          </span>
-                          <span className="text-[11px] text-slate-400">
-                            {customer.mobile || "No mobile"}
-                            {customer.email ? ` · ${customer.email}` : ""} ·
-                            Premium
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
               </div>
 
-              {selectedCustomer && (
+              {dropdownOpen && (
+                  <div className="absolute z-50 mt-1.5 max-h-56 w-full overflow-auto rounded-xl border border-slate-100 bg-white shadow-xl">
+                  {loadingCustomers ? (
+                    <div className="p-4 text-center text-xs text-slate-400">
+                        <Loader2 className="mx-auto h-4 w-4 animate-spin text-orange-500 mb-1" />
+                      Loading Premium customers…
+                    </div>
+                  ) : filteredCustomers.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-slate-500">
+                      {availableCustomers.length === 0
+                          ? "No eligible Premium customers available."
+                          : "No matches found."}
+                    </div>
+                  ) : (
+                    filteredCustomers.map((customer) => (
+                      <button
+                        key={customer._id}
+                        type="button"
+                        onClick={() => handleSelectCustomer(customer)}
+                          className={`flex w-full flex-col border-b border-slate-50 p-2.5 text-left last:border-0 hover:bg-slate-50 transition-colors ${
+                          selectedCustomerId === customer._id
+                              ? "bg-orange-50"
+                            : ""
+                        }`}
+                      >
+                          <span className="text-xs font-semibold text-slate-800">
+                          {customer.name || "Customer"}
+                        </span>
+                          <span className="text-[11px] text-slate-400">
+                          {customer.mobile || "No mobile"}
+                            {customer.email ? ` · ${customer.email}` : ""} ·
+                            Premium
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {selectedCustomer && (
                 <div className="mt-2.5 rounded-lg bg-emerald-50 p-2 text-xs text-emerald-700 font-medium flex items-center gap-1.5">
                   <Check className="h-3.5 w-3.5 shrink-0" />
                   <span>
@@ -2540,9 +2540,9 @@ export default function CspScreen() {
                 />
               </div>
 
-              {!loadingCustomers && availableCustomers.length === 0 && (
+            {!loadingCustomers && availableCustomers.length === 0 && (
                 <div className="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700">
-                  {customers.length === 0
+                {customers.length === 0
                     ? "No Premium customers found. Upgrade customers to Premium membership to enroll them."
                     : "All Premium customers are already enrolled as CSP partners."}
                 </div>

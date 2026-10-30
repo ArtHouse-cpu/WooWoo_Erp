@@ -204,6 +204,7 @@ export default function CouponsScreen() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CouponPayload>(() => initialForm());
+  const [limitPerCustomer, setLimitPerCustomer] = useState(false);
   const staff = useAppSelector((state) => state.user);
 
   useEffect(() => {
@@ -306,6 +307,7 @@ export default function CouponsScreen() {
       isActive: Boolean(coupon.isActive),
     });
     closeActionMenu();
+    setLimitPerCustomer(Number(coupon.perCustomerLimit) > 0);
     setModalOpen(true);
   };
 
@@ -327,6 +329,14 @@ export default function CouponsScreen() {
       return;
     }
     try {
+    if (limitPerCustomer && !(Number(form.perCustomerLimit) > 0)) {
+      Swal.fire(
+        "Missing limit",
+        "Enter how many times each customer can use this coupon.",
+        "warning",
+      );
+      return;
+    }
       setSaving(true);
       const payload: CouponPayload = {
         ...form,
@@ -342,8 +352,8 @@ export default function CouponsScreen() {
             : null,
         perCustomerLimit:
           form.perCustomerLimit && Number(form.perCustomerLimit) > 0
-            ? Number(form.perCustomerLimit)
-            : null,
+          limitPerCustomer && Number(form.perCustomerLimit) > 0
+            ? Math.floor(Number(form.perCustomerLimit))
         applicableOn: form.applicableOn?.length
           ? form.applicableOn
           : ["all"],
@@ -413,6 +423,7 @@ export default function CouponsScreen() {
       isActive: true,
     });
     setModalOpen(true);
+    setLimitPerCustomer(Number(coupon.perCustomerLimit) > 0);
   };
 
   const removeCoupon = async (coupon: CouponRow) => {
@@ -986,6 +997,50 @@ export default function CouponsScreen() {
                   </div>
                 </div>
 
+                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={limitPerCustomer}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setLimitPerCustomer(checked);
+                        if (!checked) {
+                          setForm((prev) => ({ ...prev, perCustomerLimit: null }));
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                    />
+                    Limit to use per customer
+                  </label>
+                  {limitPerCustomer ? (
+                    <div className="max-w-xs">
+                      <FieldLabel required>Uses per customer</FieldLabel>
+                      <IconInput
+                        icon={Users}
+                        type="number"
+                        min={1}
+                        step={1}
+                        placeholder="E.g. 2"
+                        value={form.perCustomerLimit ?? ""}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            perCustomerLimit: e.target.value
+                              ? Math.max(1, Math.floor(Number(e.target.value) || 0))
+                              : null,
+                          }))
+                        }
+                      />
+                      {Number(form.perCustomerLimit) > 0 ? (
+                        <p className="mt-1.5 text-xs text-slate-500">
+                          Each customer can use this coupon{" "}
+                          {Math.floor(Number(form.perCustomerLimit))}{" "}
+                          {Number(form.perCustomerLimit) === 1 ? "time" : "times"}.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                 <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
                   <button
                     type="button"
@@ -1003,7 +1058,10 @@ export default function CouponsScreen() {
                   <button
                     type="button"
                     onClick={() => setForm(initialForm())}
-                    className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    onClick={() => {
+                      setForm(initialForm());
+                      setLimitPerCustomer(false);
+                    }}
                   >
                     <RotateCcw size={16} />
                     Reset

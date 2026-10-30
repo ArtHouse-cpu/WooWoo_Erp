@@ -47,8 +47,11 @@ import {
   customerPayloadToFormData,
   foodPayloadToFormData,
   handleCreateCustomer,
+  handleCreateFoodOffer,
   handleCreateInvoice,
+  handleDeleteFoodOffer,
   handleGetCustomers,
+  handleGetFoodOffers,
   handleGetFoods,
   handleGetMemberships,
   handleGetWalletById,
@@ -68,6 +71,15 @@ import {
   summarizeMembershipForCart,
 } from "@/features/sales/utils/membershipInvoiceUtils";
 import { creditWalletCashback } from "@/features/sales/utils/walletCashback";
+import FoodOfferModal, {
+  type SavedFoodOffer,
+} from "@/features/foodbill/FoodOfferModal";
+import {
+  applyFoodOffers,
+  offerLineKey,
+  offerLinesEqual,
+  type FoodOfferRule,
+} from "@/features/foodbill/foodOffers";
 
 type SplitPayments = {
   cash: number;
@@ -176,6 +188,9 @@ interface Customer {
 interface OrderItem {
   item: FoodItem;
   quantity: number;
+  /** Promotional free item. Manual lines of the same food stay separate. */
+  promo?: boolean;
+  promoBuyFoodId?: string;
 }
 
 type FoodBillDraft = {
@@ -327,6 +342,11 @@ export default function FoodBill() {
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [showEditFoodModal, setShowEditFoodModal] = useState(false);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerFoods, setOfferFoods] = useState<FoodItem[]>([]);
+  const [loadingOfferFoods, setLoadingOfferFoods] = useState(false);
+  const [foodOffers, setFoodOffers] = useState<SavedFoodOffer[]>([]);
+  const [savingOffer, setSavingOffer] = useState(false);
   const [editingFood, setEditingFood] = useState<FoodPayload | null>(null);
   const [savingFood, setSavingFood] = useState(false);
   // Call customers API only after typing stops (300ms) — not on every keystroke
@@ -584,6 +604,123 @@ export default function FoodBill() {
     return () => controller.abort();
   }, [debouncedItemSearch]);
 
+  const reloadFoodOffers = async (signal?: AbortSignal) => {
+    const response = await handleGetFoodOffers(signal);
+    const rows = Array.isArray(response?.offers) ? response.offers : [];
+    setFoodOffers(
+      rows
+        .map((row) => {
+          const id = String(row?._id || "").trim();
+          const buyFoodId = String(row?.buyFoodId || row?.buyFood?.id || "").trim();
+          const freeFoodId = String(row?.freeFoodId || row?.freeFood?.id || "").trim();
+          if (!id || !buyFoodId || !freeFoodId) return null;
+          return {
+            id,
+            buyFoodId,
+            freeFoodId,
+            buyName: String(row?.buyFood?.name || "Food"),
+            buyPrice: Math.max(0, Number(row?.buyFood?.price ?? 0) || 0),
+            freeName: String(row?.freeFood?.name || "Food"),
+            freePrice: Math.max(0, Number(row?.freeFood?.price ?? 0) || 0),
+          };
+        })
+        .filter((row): row is SavedFoodOffer => Boolean(row)),
+    );
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void reloadFoodOffers(controller.signal).catch(() => setFoodOffers([]));
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!showOfferModal) return;
+    const controller = new AbortController();
+    setLoadingOfferFoods(true);
+    handleGetFoods({ status: "Active" }, controller.signal)
+      .then((response) => {
+        const rows = Array.isArray(response?.foods) ? response.foods : [];
+        setOfferFoods(
+          rows
+            .map(mapApiFood)
+            .filter((food: FoodItem | null): food is FoodItem => Boolean(food)),
+        );
+      })
+      .catch(() => setOfferFoods([]))
+      .finally(() => setLoadingOfferFoods(false));
+    return () => controller.abort();
+  }, [showOfferModal]);
+
+  const saveFoodOffer = async (buyFoodId: string, freeFoodId: string) => {
+    if (!buyFoodId || !freeFoodId) {
+      await Swal.fire(
+        "Select both items",
+        "Choose a purchase item and a free item.",
+        "warning",
+      );
+      return;
+    }
+    if (buyFoodId === freeFoodId) {
+      await Swal.fire(
+        "Invalid offer",
+        "The free item must be different from the purchase item.",
+        "warning",
+      );
+      return;
+    }
+    if (foodOffers.some((offer) => offer.buyFoodId === buyFoodId)) {
+      await Swal.fire(
+        "Offer already exists",
+        "Remove the existing offer for this purchase item before saving another.",
+        "warning",
+      );
+      return;
+    }
+    try {
+      setSavingOffer(true);
+      await handleCreateFoodOffer({ buyFoodId, freeFoodId });
+      await reloadFoodOffers();
+      setShowOfferModal(false);
+      await Swal.fire({
+        icon: "success",
+        title: "Offer saved",
+        text: "The free item will be added automatically when the purchase item is billed.",
+        timer: 1800,
+        showConfirmButton: false,
+      });
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Could not save offer",
+        err?.response?.data?.message || "Try again.",
+        "error",
+      );
+    } finally {
+      setSavingOffer(false);
+    }
+  };
+
+  const removeFoodOffer = async (offerId: string) => {
+    try {
+      await handleDeleteFoodOffer(offerId);
+      await reloadFoodOffers();
+      await Swal.fire({
+        icon: "success",
+        title: "Offer removed",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Could not remove offer",
+        err?.response?.data?.message || "Try again.",
+        "error",
+      );
+    }
+  };
+
   // Active membership plans (Food usage-limit discounts)
   useEffect(() => {
     const controller = new AbortController();
@@ -751,16 +888,45 @@ export default function FoodBill() {
     return filteredItems.slice(0, 8);
   }, [filteredItems, viewAllItems]);
 
+  const offerRules = useMemo<FoodOfferRule[]>(
+    () =>
+      foodOffers.map((offer) => ({
+        id: offer.id,
+        buyFoodId: offer.buyFoodId,
+        freeFoodId: offer.freeFoodId,
+      })),
+    [foodOffers],
+  );
+
+  const offerCatalog = useMemo(() => {
+    const catalog = new Map<string, FoodItem>();
+    for (const food of foodItems) catalog.set(food.id, food);
+    for (const food of offerFoods) catalog.set(food.id, food);
+    return catalog;
+  }, [foodItems, offerFoods]);
+
+  const reconcileCart = (lines: OrderItem[]) =>
+    applyFoodOffers(lines, offerRules, offerCatalog) as OrderItem[];
+
+  useEffect(() => {
+    setCart((prev) => {
+      const next = applyFoodOffers(prev, offerRules, offerCatalog) as OrderItem[];
+      return offerLinesEqual(prev, next) ? prev : next;
+    });
+  }, [offerRules, offerCatalog]);
+
   // Cart operations
   const addToCart = (item: FoodItem) => {
     setCart((prev) => {
-      const existing = prev.find((i) => i.item.id === item.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.item.id === item.id ? { ...i, quantity: i.quantity + 1 } : i,
-        );
-      }
-      return [...prev, { item, quantity: 1 }];
+      const existing = prev.find((i) => !i.promo && i.item.id === item.id);
+      const manual = existing
+        ? prev.map((i) =>
+            !i.promo && i.item.id === item.id
+              ? { ...i, quantity: i.quantity + 1 }
+              : i,
+          )
+        : [...prev, { item, quantity: 1 }];
+      return reconcileCart(manual);
     });
   };
 
@@ -813,27 +979,39 @@ export default function FoodBill() {
     }
   };
 
-  const updateQuantity = (itemId: string, change: number) => {
+  const updateQuantity = (lineKey: string, change: number) => {
     setCart((prev) => {
-      return prev
+      const next = prev
         .map((i) => {
-          if (i.item.id === itemId) {
-            const newQty = i.quantity + change;
-            return { ...i, quantity: newQty > 0 ? newQty : 1 };
-          }
-          return i;
+          if (i.promo || offerLineKey(i) !== lineKey) return i;
+          const newQty = i.quantity + change;
+          return { ...i, quantity: newQty > 0 ? newQty : 1 };
         })
         .filter((i) => i.quantity > 0);
+      return reconcileCart(next);
     });
   };
 
-  const removeFromCart = (itemId: string) => {
-    setCart((prev) => prev.filter((i) => i.item.id !== itemId));
+  const removeFromCart = (lineKey: string) => {
+    setCart((prev) =>
+      reconcileCart(prev.filter((i) => i.promo || offerLineKey(i) !== lineKey)),
+    );
   };
 
   // Pricing calculations (membership discount → coupon/referral; no tax)
+  const offerDiscount = useMemo(() => {
+    return cart.reduce(
+      (sum, line) =>
+        line.promo ? sum + line.item.price * line.quantity : sum,
+      0,
+    );
+  }, [cart]);
+
   const subtotal = useMemo(() => {
-    return cart.reduce((sum, item) => sum + item.item.price * item.quantity, 0);
+    return cart.reduce((sum, line) => {
+      if (line.promo) return sum;
+      return sum + line.item.price * line.quantity;
+    }, 0);
   }, [cart]);
 
   const membershipSummary = useMemo(() => {
@@ -852,7 +1030,9 @@ export default function FoodBill() {
       membershipPlans,
       selectedCustomer.membershipType,
       selectedCustomer.membershipPlanId,
-      cart.map((line) => ({
+      cart
+        .filter((line) => !line.promo)
+        .map((line) => ({
         price: line.item.price,
         qty: line.quantity,
         // Use Food so plan usageLimits.Food applies (also matches food item categories)
@@ -1005,11 +1185,11 @@ export default function FoodBill() {
           productName: line.item.name,
           name: line.item.name,
           qty: line.quantity,
-          unitPrice: line.item.price,
-          price: line.item.price,
-          discount: 0,
+          unitPrice: line.promo ? 0 : line.item.price,
+          price: line.promo ? 0 : line.item.price,
+          discount: line.promo ? line.item.price * line.quantity : 0,
           category: "Food",
-          lineTotal: line.item.price * line.quantity,
+          lineTotal: line.promo ? 0 : line.item.price * line.quantity,
         })),
       });
       const data = response?.data || response;
@@ -1407,8 +1587,8 @@ export default function FoodBill() {
               .map(
                 (item) => `
               <div class="flex justify-between text-xs">
-                <span class="text-gray-700">${item.item.name} x${item.quantity}</span>
-                <span class="font-medium text-gray-900">₹${item.item.price * item.quantity}</span>
+                <span class="text-gray-700">${item.item.name}${item.promo ? " (Free)" : ""} x${item.quantity}</span>
+                <span class="font-medium text-gray-900">₹${item.promo ? "0.00" : (item.item.price * item.quantity).toFixed(2)}</span>
               </div>
             `,
               )
@@ -1495,16 +1675,42 @@ export default function FoodBill() {
       );
 
       const invoiceItems = (() => {
-        if (waiveMembershipForCoupon) {
-          return cart.map((line) => ({
+        const promoLine = (line: OrderItem) => {
+          const gross = line.item.price * line.quantity;
+          return {
             productName: line.item.name,
             qty: line.quantity,
             unitPrice: line.item.price,
-            discount: 0,
+            discount: gross,
             category: "Food" as const,
-          }));
+            productDiscountAmount: gross,
+            membershipDiscountAmount: 0,
+            promo: true as const,
+          };
+        };
+        if (waiveMembershipForCoupon) {
+          return cart.map((line) =>
+            line.promo
+              ? promoLine(line)
+              : {
+                  productName: line.item.name,
+                  qty: line.quantity,
+                  unitPrice: line.item.price,
+                  discount: 0,
+                  category: "Food" as const,
+                  productDiscountAmount: 0,
+                  membershipDiscountAmount: 0,
+                },
+          );
         }
         const lines = cart.map((line) => {
+          if (line.promo) {
+            const gross = line.item.price * line.quantity;
+            return {
+              ...promoLine(line),
+              lineGross: gross,
+            };
+          }
           const fromPlan = membershipBenefitsForLine(
             line.item.price,
             line.quantity,
@@ -1518,14 +1724,19 @@ export default function FoodBill() {
             discount: Math.max(0, Number(fromPlan.discount || 0)),
             category: "Food" as const,
             lineGross: line.item.price * line.quantity,
+            promo: false as const,
           };
         });
-        const rawSum = lines.reduce((s, l) => s + l.discount, 0);
+        const rawSum = lines.reduce(
+          (sum, line) => (line.promo ? sum : sum + line.discount),
+          0,
+        );
         const target = membershipDiscountForInvoice;
         const delta = Math.round((target - rawSum) * 100) / 100;
-        if (lines.length > 0 && Math.abs(delta) >= 0.01) {
-          // Adjust last line so invoice grand total matches Food Bill UI (incl. round off)
-          const last = lines[lines.length - 1];
+        const adjustable = lines.filter((line) => !line.promo);
+        if (adjustable.length > 0 && Math.abs(delta) >= 0.01) {
+          // Adjust last paid line so invoice grand total matches Food Bill UI (incl. round off)
+          const last = adjustable[adjustable.length - 1];
           last.discount = Math.max(
             0,
             Math.round((last.discount + delta) * 100) / 100,
@@ -1533,10 +1744,11 @@ export default function FoodBill() {
           // Cap so line discount never exceeds line gross
           last.discount = Math.min(last.discount, last.lineGross);
         }
-        return lines.map(({ lineGross: _g, ...item }) => ({
+        return lines.map(({ lineGross: _g, promo: _promo, ...item }) => ({
           ...item,
-          productDiscountAmount: 0,
-          membershipDiscountAmount: item.discount,
+          productDiscountAmount: item.productDiscountAmount || 0,
+          membershipDiscountAmount:
+            item.membershipDiscountAmount ?? item.discount,
         }));
       })();
 
@@ -1620,11 +1832,12 @@ export default function FoodBill() {
         verifiedAt: verifiedAt || new Date().toISOString(),
         notes,
         items: invoiceItems,
-        subTotal: subtotal,
+        subTotal: subtotal + offerDiscount,
         discountTotal:
           Number(membershipDiscountForInvoice || 0) +
           Number(appliedCouponDiscount || 0) +
-          Number(appliedReferralDiscount || 0),
+          Number(appliedReferralDiscount || 0) +
+          Number(offerDiscount || 0),
         grandTotal: payableTotal,
         coupon:
           couponCode && appliedCouponDiscount > 0
@@ -1986,7 +2199,8 @@ export default function FoodBill() {
             {/* Dishes list grid (3/4 columns on desktop) */}
             <div className="md:col-span-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-2xs flex flex-col">
               {/* Search item */}
-              <div className="mb-3.5 flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-gray-600 focus-within:border-blue-400 transition-colors">
+              <div className="mb-3.5 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-gray-600 focus-within:border-blue-400 transition-colors">
                 <Search size={16} className="text-gray-400" />
                 <input
                   type="text"
@@ -2002,6 +2216,15 @@ export default function FoodBill() {
                   <SlidersIcon size={16} />
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowOfferModal(true)}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-bold text-blue-600 transition hover:bg-blue-100"
+              >
+                <Tag size={14} />
+                Add Discount
+              </button>
+              </div>
 
               {/* Items Rows */}
               <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
@@ -2014,7 +2237,9 @@ export default function FoodBill() {
                   ))
                 ) : visibleItems.length > 0 ? (
                   visibleItems.map((food) => {
-                    const isInCart = cart.some((c) => c.item.id === food.id);
+                    const isInCart = cart.some(
+                      (c) => !c.promo && c.item.id === food.id,
+                    );
 
                     return (
                       <div
@@ -2153,7 +2378,7 @@ export default function FoodBill() {
                 {cart.length > 0 ? (
                   cart.map((item) => (
                     <div
-                      key={item.item.id}
+                      key={offerLineKey(item)}
                       className="flex items-center justify-between py-1"
                     >
                       <div className="min-w-0 flex-1 mr-2">
@@ -2161,15 +2386,21 @@ export default function FoodBill() {
                           {item.item.name}
                         </h4>
                         <p className="text-[11px] text-gray-400">
-                          {item.quantity} x ₹{item.item.price}
+                          {item.promo
+                            ? `Free offer · ${item.quantity} x ₹${item.item.price}`
+                            : `${item.quantity} x ₹${item.item.price}`}
                         </p>
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
-                        {/* Qty Selector */}
+                        {item.promo ? (
+                          <span className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                            Free x{item.quantity}
+                          </span>
+                        ) : (
                         <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-1">
                           <button
-                            onClick={() => updateQuantity(item.item.id, -1)}
+                            onClick={() => updateQuantity(offerLineKey(item), -1)}
                             className="flex h-5 w-5 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-black cursor-pointer"
                           >
                             <Minus size={10} />
@@ -2178,26 +2409,28 @@ export default function FoodBill() {
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() => updateQuantity(item.item.id, 1)}
+                            onClick={() => updateQuantity(offerLineKey(item), 1)}
                             className="flex h-5 w-5 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-black cursor-pointer"
                           >
                             <Plus size={10} />
                           </button>
                         </div>
+                        )}
 
                         {/* Price */}
                         <span className="text-xs font-bold text-gray-800 min-w-[32px] text-right">
-                          ₹{item.item.price * item.quantity}
+                          {item.promo ? "₹0" : `₹${item.item.price * item.quantity}`}
                         </span>
 
-                        {/* Delete button */}
+                        {item.promo ? null : (
                         <button
-                          onClick={() => removeFromCart(item.item.id)}
+                          onClick={() => removeFromCart(offerLineKey(item))}
                           className="text-gray-400 hover:text-red-500 transition cursor-pointer"
                           title="Remove item"
                         >
                           <Trash2 size={13} />
                         </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -2213,9 +2446,15 @@ export default function FoodBill() {
                 <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
                   <span className="font-semibold text-gray-850">
-                    ₹{subtotal.toFixed(2)}
+                    ₹{(subtotal + offerDiscount).toFixed(2)}
                   </span>
                 </div>
+                {offerDiscount > 0 ? (
+                  <div className="flex justify-between text-emerald-700">
+                    <span>Free offer</span>
+                    <span className="font-semibold">−₹{offerDiscount.toFixed(2)}</span>
+                  </div>
+                ) : null}
 
                 {(membershipDiscount > 0 ||
                   membershipCashback > 0 ||
@@ -2767,6 +3006,25 @@ export default function FoodBill() {
         onVerified={({ staff: verified, verifiedAt }) => {
           setShowStaffVerify(false);
           void completeGenerateBill(verified, verifiedAt);
+        }}
+      />
+
+      <FoodOfferModal
+        open={showOfferModal}
+        foods={offerFoods.map((food) => ({
+          id: food.id,
+          name: food.name,
+          price: food.price,
+        }))}
+        loadingFoods={loadingOfferFoods}
+        offers={foodOffers}
+        saving={savingOffer}
+        onClose={() => setShowOfferModal(false)}
+        onSave={(buyFoodId, freeFoodId) => {
+          void saveFoodOffer(buyFoodId, freeFoodId);
+        }}
+        onDelete={(offerId) => {
+          void removeFoodOffer(offerId);
         }}
       />
 

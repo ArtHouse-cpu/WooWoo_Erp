@@ -1,4 +1,17 @@
-import { Camera, ImagePlus, X, ArrowRight, Save, Search } from "lucide-react";
+import {
+  Calendar,
+  Camera,
+  ChevronDown,
+  FileText,
+  ImagePlus,
+  Save,
+  Search,
+  Store,
+  Tag,
+  User,
+  X,
+  ArrowRight,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Swal from "sweetalert2";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -521,7 +534,9 @@ const ExpenseModal = ({
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
   ) => {
     if (isView) return;
     const { name, value } = e.target;
@@ -725,14 +740,16 @@ const ExpenseModal = ({
       ? "Update this expense record"
       : "Add a new expense record";
 
-  const fieldClass = `w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 ${
+  const fieldClass = `w-full min-w-0 rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 ${
     isView ? "bg-gray-50 text-gray-700" : "bg-white"
   }`;
+  const filledCategoryCount =
+    (formData.segment ? 1 : 0) + (formData.category ? 1 : 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 md:items-center md:px-4">
+      <div className="flex max-h-[96vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-slate-100 shadow-xl md:max-h-[90vh] md:rounded-xl md:bg-white">
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 py-4 md:px-6">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
             <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>
@@ -746,15 +763,19 @@ const ExpenseModal = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="grid max-h-[70vh] grid-cols-1 gap-4 overflow-y-auto px-4 py-4 md:grid-cols-2 md:px-6 md:py-5">
-            <div className="grid grid-cols-2 gap-3 md:contents [&>*]:min-w-0">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-100 px-3 py-3 md:space-y-4 md:bg-white md:px-6 md:py-5">
+            <section className="rounded-2xl bg-white p-4 shadow-sm md:rounded-none md:bg-transparent md:p-0 md:shadow-none">
+              <h3 className="mb-3 text-[15px] font-bold text-slate-900 md:hidden">
+                Basic Details
+              </h3>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="md:col-span-2">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Amount <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">
+                <span className="pointer-events-none absolute left-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg bg-white text-sm font-semibold text-slate-500 shadow-sm">
                   ₹
                 </span>
                 <input
@@ -767,113 +788,41 @@ const ExpenseModal = ({
                   step="0.01"
                   required={!isView}
                   readOnly={isView}
-                  className={`${fieldClass} pl-8`}
+                  className={`${fieldClass} border-[#d7e6ff] bg-[#eef4ff] pl-11`}
                 />
               </div>
             </div>
 
-            <div className="relative">
-              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
-                <label className="block text-sm font-medium text-gray-700">
-                  Paid To (Vendor) <span className="text-rose-500">*</span>
-                </label>
-                {!isView ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateVendor(true)}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-700"
-                  >
-                    + Create Vendor
-                  </button>
-                ) : null}
-              </div>
+            <div className="grid grid-cols-2 gap-3 md:col-span-2 [&>*]:min-w-0">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Date <span className="text-rose-500">*</span>
+              </label>
               <div className="relative">
-                {!isView ? (
-                  <Search
-                    size={15}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                ) : null}
+                <Calendar
+                  size={15}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
                 <input
-                  type="text"
-                  name="paidTo"
-                  value={formData.paidTo}
-                  onChange={(e) => {
-                    if (isView) return;
-                    setFormData((prev) => ({
-                      ...prev,
-                      paidTo: e.target.value,
-                      vendorId: "",
-                    }));
-                    setVendorDropdownOpen(true);
-                  }}
-                  onFocus={() => {
-                    if (!isView) setVendorDropdownOpen(true);
-                  }}
-                  onBlur={() => {
-                    window.setTimeout(() => setVendorDropdownOpen(false), 150);
-                  }}
-                  placeholder="Search vendor / property owner..."
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleChange}
                   required={!isView}
                   readOnly={isView}
-                  autoComplete="off"
-                  className={`${fieldClass} ${isView ? "" : "pl-9"}`}
+                  className={`${fieldClass} pl-9`}
                 />
               </div>
-              {!isView && vendorDropdownOpen && loadingVendors ? (
-                <p className="mt-2 text-xs text-gray-500">Loading vendors...</p>
-              ) : null}
-              {!isView &&
-              vendorDropdownOpen &&
-              !loadingVendors &&
-              vendors.length > 0 ? (
-                <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
-                  {vendors.map((item) => (
-                    <button
-                      key={item._id}
-                      type="button"
-                      onMouseDown={() => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          paidTo: item.name,
-                          vendorId: item._id,
-                        }));
-                        setVendorDropdownOpen(false);
-                      }}
-                      className="flex w-full flex-col border-b border-gray-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-gray-50"
-                    >
-                      <span className="font-medium text-gray-800">
-                        {item.name}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {item.mobile}
-                        {item.companyName ? ` • ${item.companyName}` : ""}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              {!isView &&
-              vendorDropdownOpen &&
-              !loadingVendors &&
-              vendors.length === 0 ? (
-                <p className="mt-2 text-xs text-gray-500">
-                  No vendors found. Create a vendor to continue.
-                </p>
-              ) : null}
             </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 md:contents [&>*]:min-w-0">
             <div className="relative">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Paid By <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 {!isView ? (
-                  <Search
+                  <User
                     size={15}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                   />
                 ) : null}
                 <input
@@ -947,68 +896,164 @@ const ExpenseModal = ({
                 </p>
               ) : null}
             </div>
+            </div>
 
-            <div>
+            <div className="relative md:col-span-2">
+              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+                <label className="block text-sm font-medium text-gray-700">
+                  Paid To (Vendor) <span className="text-rose-500">*</span>
+                </label>
+                {!isView ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateVendor(true)}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    + Create Vendor
+                  </button>
+                ) : null}
+              </div>
+              <div className="relative">
+                {!isView ? (
+                  <Search
+                    size={15}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  />
+                ) : null}
+                <input
+                  type="text"
+                  name="paidTo"
+                  value={formData.paidTo}
+                  onChange={(e) => {
+                    if (isView) return;
+                    setFormData((prev) => ({
+                      ...prev,
+                      paidTo: e.target.value,
+                      vendorId: "",
+                    }));
+                    setVendorDropdownOpen(true);
+                  }}
+                  onFocus={() => {
+                    if (!isView) setVendorDropdownOpen(true);
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => setVendorDropdownOpen(false), 150);
+                  }}
+                  placeholder="Search or select vendor"
+                  required={!isView}
+                  readOnly={isView}
+                  autoComplete="off"
+                  className={`${fieldClass} ${isView ? "" : "pl-9"}`}
+                />
+              </div>
+              {!isView && vendorDropdownOpen && loadingVendors ? (
+                <p className="mt-2 text-xs text-gray-500">Loading vendors...</p>
+              ) : null}
+              {!isView &&
+              vendorDropdownOpen &&
+              !loadingVendors &&
+              vendors.length > 0 ? (
+                <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                  {vendors.map((item) => (
+                    <button
+                      key={item._id}
+                      type="button"
+                      onMouseDown={() => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          paidTo: item.name,
+                          vendorId: item._id,
+                        }));
+                        setVendorDropdownOpen(false);
+                      }}
+                      className="flex w-full flex-col border-b border-gray-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-gray-50"
+                    >
+                      <span className="font-medium text-gray-800">
+                        {item.name}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {item.mobile}
+                        {item.companyName ? ` • ${item.companyName}` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {!isView &&
+              vendorDropdownOpen &&
+              !loadingVendors &&
+              vendors.length === 0 ? (
+                <p className="mt-2 text-xs text-gray-500">
+                  No vendors found. Create a vendor to continue.
+                </p>
+              ) : null}
+            </div>
+            <div className="relative md:col-span-2">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Title <span className="text-rose-500">*</span>
               </label>
+              <FileText
+                size={15}
+                className="pointer-events-none absolute left-3 top-[2.35rem] text-slate-400"
+              />
               <input
                 type="text"
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
-                placeholder="e.g. Monthly Studio Rent"
+                placeholder="e.g. Monthly Studio"
                 required={!isView}
                 readOnly={isView}
-                className={fieldClass}
+                className={`${fieldClass} pl-9`}
               />
             </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 md:contents [&>*]:min-w-0">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Date <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="date"
-                name="date"
-                value={formData.date}
-                onChange={handleChange}
-                required={!isView}
-                readOnly={isView}
-                className={fieldClass}
-              />
-            </div>
-
-            <div className="md:col-span-2">
+            <div className="relative md:col-span-2">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Description
               </label>
-              <input
-                type="text"
+              <FileText
+                size={15}
+                className="pointer-events-none absolute left-3 top-[2.35rem] text-slate-400"
+              />
+              <textarea
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                placeholder="e.g. August rent payment"
+                placeholder="e.g. August rent pay"
                 readOnly={isView}
-                className={fieldClass}
+                maxLength={300}
+                rows={3}
+                className={`${fieldClass} min-h-[88px] resize-none pl-9 pb-6`}
               />
+              <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] text-slate-400">
+                {formData.description.length}/300
+              </span>
             </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 md:contents [&>*]:min-w-0">
-            <div>
+              </div>
+            </section>
+            <section className="rounded-2xl bg-white p-4 shadow-sm md:rounded-none md:bg-transparent md:p-0 md:shadow-none">
+              <div className="mb-3 flex items-center justify-between md:hidden">
+                <h3 className="text-[15px] font-bold text-slate-900">Categorization</h3>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
+                  {filledCategoryCount}/2
+                </span>
+              </div>
+            <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
+            <div className="relative">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Segment <span className="text-rose-500">*</span>
               </label>
+              <Store
+                size={15}
+                className="pointer-events-none absolute left-3 top-[2.35rem] text-slate-400"
+              />
               <select
                 name="segment"
                 value={formData.segment}
                 onChange={handleSegmentChange}
                 required={!isView}
                 disabled={isView}
-                className={fieldClass}
+                className={`${fieldClass} appearance-none pl-9 pr-8`}
               >
                 <option value="">Select segment</option>
                 {SEGMENT_OPTIONS.map((cat) => (
@@ -1017,11 +1062,19 @@ const ExpenseModal = ({
                   </option>
                 ))}
               </select>
+              <ChevronDown
+                size={14}
+                className="pointer-events-none absolute right-3 top-[2.4rem] text-slate-400"
+              />
             </div>
             <div className="relative">
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Category <span className="text-rose-500">*</span>
               </label>
+              <Tag
+                size={15}
+                className="pointer-events-none absolute left-3 top-[2.35rem] z-10 text-slate-400"
+              />
               <div className="relative">
                 {!isView ? (
                   <Search
@@ -1053,7 +1106,7 @@ const ExpenseModal = ({
                   }
                   readOnly={isView || !formData.segment}
                   autoComplete="off"
-                  className={`${fieldClass} ${isView ? "" : "pl-9"}`}
+                  className={`${fieldClass} pl-9`}
                 />
                 {!isView ? (
                   <input
@@ -1105,6 +1158,7 @@ const ExpenseModal = ({
               ) : null}
             </div>
             </div>
+            </section>
 
             {!isCreate ? (
               <div>
@@ -1296,7 +1350,7 @@ const ExpenseModal = ({
               </div>
           </div>
 
-          <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+          <div className="flex shrink-0 justify-end gap-3 border-t border-gray-200 bg-white px-4 py-4 md:px-6">
             <button
               type="button"
               onClick={handleCancel}

@@ -43,12 +43,20 @@ export default function CreateSpacesScreen() {
   const [spaces, setSpaces] = useState<SpaceRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
   const fetchSpaces = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       const res = await handleGetSpaces({}, signal);
-      setSpaces(Array.isArray(res?.spaces) ? res.spaces : []);
+      const rows = Array.isArray(res?.spaces) ? res.spaces : [];
+      setSpaces(rows);
+      setRowSelection((current) => {
+        const ids = new Set(rows.map((space: SpaceRow) => space._id));
+        return Object.fromEntries(
+          Object.entries(current).filter(([id, selected]) => selected && ids.has(id)),
+        );
+      });
     } catch {
       setSpaces([]);
     } finally {
@@ -197,10 +205,71 @@ export default function CreateSpacesScreen() {
     [],
   );
 
+  const selectedSpaces = useMemo(
+    () => spaces.filter((space) => rowSelection[space._id]),
+    [spaces, rowSelection],
+  );
+
+  const handleDeleteMany = async () => {
+    const targets = selectedSpaces.filter((space) => space._id);
+    if (!targets.length) return;
+    const result = await Swal.fire({
+      title: `Delete ${targets.length} space${targets.length === 1 ? "" : "s"}?`,
+      text: targets.map((space) => space.name).join(", "),
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete",
+      confirmButtonColor: "#111111",
+    });
+    if (!result.isConfirmed) return;
+
+    const failed: string[] = [];
+    for (const space of targets) {
+      try {
+        await handleDeleteSpace(space._id);
+      } catch {
+        failed.push(space.name || space._id);
+      }
+    }
+    setRowSelection({});
+    await fetchSpaces();
+    if (failed.length) {
+      await Swal.fire(
+        "Some spaces were not deleted",
+        failed.join(", "),
+        "error",
+      );
+      return;
+    }
+    await Swal.fire({
+      icon: "success",
+      title: "Deleted",
+      timer: 1400,
+      showConfirmButton: false,
+    });
+  };
+
   const table = useMaterialReactTable({
     columns,
     data: spaces,
-    state: { isLoading: loading },
+    getRowId: (row) => row._id,
+    enableRowSelection: true,
+    enableMultiRowSelection: true,
+    onRowSelectionChange: setRowSelection,
+    state: { isLoading: loading, rowSelection },
+    renderTopToolbarCustomActions: () =>
+      selectedSpaces.length > 0 ? (
+        <Can permission={PERMISSIONS.SPACE_DELETE}>
+          <button
+            type="button"
+            onClick={() => void handleDeleteMany()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700"
+          >
+            <Trash2 size={15} />
+            Delete selected ({selectedSpaces.length})
+          </button>
+        </Can>
+      ) : null,
     muiTablePaperProps: {
       elevation: 0,
       style: {

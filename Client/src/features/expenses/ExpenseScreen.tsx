@@ -749,17 +749,6 @@ function formatDisplayDate(dateStr: string) {
   }
 }
 
-// Benchmark breakdown data matching mockup when empty
-const BENCHMARK_BREAKDOWN = [
-  { name: "Store", amount: 39620, color: "#3b82f6", pct: 32 },
-  { name: "Cafe", amount: 29900, color: "#10b981", pct: 24 },
-  { name: "Space", amount: 22410, color: "#f59e0b", pct: 18 },
-  { name: "Events", amount: 14950, color: "#f97316", pct: 12 },
-   { name: "Services", amount: 9960, color: "#8b5cf6", pct: 8 },
-  { name: "General", amount: 7740, color: "#94a3b8", pct: 6 },
-  { name: "Admin", amount: 7740, color: "#41679c", pct: 6 },
-];
-
 export default function ExpenseScreen() {
   const user = useAppSelector((state) => state.user);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1021,55 +1010,55 @@ export default function ExpenseScreen() {
   // ─── Metrics Calculations ──────────────────────────────────────────────────
 
   const totalExpenseAmount = useMemo(() => {
-    const sum = rows.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
-    return sum > 0 ? sum : 124580;
-  }, [rows]);
+    return filteredData.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
+  }, [filteredData]);
 
   const paidExpenseAmount = useMemo(() => {
-    const sum = rows
+    return filteredData
       .filter((r) => r.status === "Paid")
       .reduce((acc, r) => acc + (Number(r.paidAmount || r.amount) || 0), 0);
-    return sum > 0 ? sum : 87200;
-  }, [rows]);
+  }, [filteredData]);
 
   const pendingExpenseAmount = useMemo(() => {
-    const sum = rows
+    return filteredData
       .filter((r) => r.status === "Pending")
       .reduce((acc, r) => acc + (Number(r.dueAmount || r.amount) || 0), 0);
-    return sum > 0 ? sum : 37380;
-  }, [rows]);
+  }, [filteredData]);
 
-  const paidCount = rows.filter((r) => r.status === "Paid").length || 102;
-  const pendingCount = rows.filter((r) => r.status === "Pending").length || 18;
+  const paidCount = filteredData.filter((r) => r.status === "Paid").length;
+  const pendingCount = filteredData.filter((r) => r.status === "Pending").length;
 
-  const paidPercentage = Math.round((paidExpenseAmount / totalExpenseAmount) * 100) || 70;
-  const pendingPercentage = 100 - paidPercentage;
+  const paidPercentage =
+    totalExpenseAmount > 0
+      ? Math.round((paidExpenseAmount / totalExpenseAmount) * 100)
+      : 0;
+  const pendingPercentage = totalExpenseAmount > 0 ? 100 - paidPercentage : 0;
 
-  // Breakdown segments calculation
+  // Breakdown follows the active search, date, status, and segment filters.
   const breakdownData = useMemo(() => {
-    if (rows.length === 0) return BENCHMARK_BREAKDOWN;
-
     const segmentMap: Record<string, number> = {};
-    rows.forEach((r) => {
+    filteredData.forEach((r) => {
       const key = r.segment || r.category || "General";
       segmentMap[key] = (segmentMap[key] || 0) + (Number(r.amount) || 0);
     });
 
     const colors = ["#3b82f6", "#10b981", "#f59e0b", "#f97316", "#8b5cf6", "#94a3b8"];
-    const entries = Object.entries(segmentMap).map(([name, amount], i) => ({
+    return Object.entries(segmentMap).map(([name, amount], i) => ({
       name,
       amount,
       color: colors[i % colors.length],
       pct: totalExpenseAmount > 0 ? Math.round((amount / totalExpenseAmount) * 100) : 0,
     }));
-
-    return entries.length > 0 ? entries : BENCHMARK_BREAKDOWN;
-  }, [rows, totalExpenseAmount]);
+  }, [filteredData, totalExpenseAmount]);
 
   const totalVendorsCount = useMemo(() => {
-    const set = new Set(rows.map((r) => r.paidTo || r.vendorId).filter((v) => v && v !== "Unknown"));
-    return set.size > 0 ? set.size : 26;
-  }, [rows]);
+    const set = new Set(
+      filteredData
+        .map((r) => r.paidTo || r.vendorId)
+        .filter((v) => v && v !== "Unknown"),
+    );
+    return set.size;
+  }, [filteredData]);
 
   // Tab definitions with dynamic counters
   const TABS = useMemo(
@@ -1171,190 +1160,21 @@ export default function ExpenseScreen() {
   return (
     <div className="min-w-0 space-y-5 p-2 sm:p-4 md:p-6 bg-[#fcfdfe] min-h-screen text-slate-800">
       {/* ── 1. Top Header ────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Expenses
-          </h1>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+          Expenses
+        </h1>
 
         <Can permission={PERMISSIONS.EXPENSE_CREATE}>
           <button
             type="button"
             onClick={openCreateModal}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-blue-700 transition-all cursor-pointer active:scale-98 self-start sm:self-auto"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-all cursor-pointer active:scale-98 sm:text-sm"
           >
             <Plus className="h-4 w-4" />
             <span>Add Expense</span>
           </button>
         </Can>
-      </div>
-
-      {/* ── 2. Top Analytics Cards Grid (Donut & Status Cards) ───── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Card 1: Expense Breakdown Donut & Legend Table */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center gap-1.5 text-slate-900 font-bold text-sm">
-            <span>Expense Breakdown</span>
-            <Info className="h-3.5 w-3.5 text-slate-400" />
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
-            {/* SVG Donut Chart */}
-            <div className="sm:col-span-5 flex items-center justify-center relative">
-              <div className="relative w-44 h-44 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
-                  {/* Background Circle */}
-                  <circle
-                    cx="80"
-                    cy="80"
-                    r="58"
-                    stroke="#f1f5f9"
-                    strokeWidth="20"
-                    fill="transparent"
-                  />
-                  {/* Segments */}
-                  {(() => {
-                    let cumulativePercent = 0;
-                    const circumference = 2 * Math.PI * 58; // ≈ 364.42
-                    return breakdownData.map((slice) => {
-                      const strokeDasharray = `${(slice.pct / 100) * circumference} ${circumference}`;
-                      const strokeDashoffset = -((cumulativePercent / 100) * circumference);
-                      cumulativePercent += slice.pct;
-                      return (
-                        <circle
-                          key={slice.name}
-                          cx="80"
-                          cy="80"
-                          r="58"
-                          stroke={slice.color}
-                          strokeWidth="20"
-                          strokeDasharray={strokeDasharray}
-                          strokeDashoffset={strokeDashoffset}
-                          fill="transparent"
-                          className="transition-all duration-500"
-                        />
-                      );
-                    });
-                  })()}
-                </svg>
-
-                {/* Donut Center Text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                  <span className="text-base font-bold text-slate-900 leading-tight">
-                    ₹{totalExpenseAmount.toLocaleString("en-IN")}
-                  </span>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    Total Expenses
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Legend List */}
-            <div className="sm:col-span-7 space-y-2">
-              {breakdownData.map((slice) => (
-                <div
-                  key={slice.name}
-                  className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: slice.color }}
-                    />
-                    <span className="font-medium text-slate-700">{slice.name}</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="font-bold text-slate-900">
-                      ₹{slice.amount.toLocaleString("en-IN")}
-                    </span>
-                    <span className="text-slate-400 font-medium w-8 text-right">
-                      {slice.pct}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Expense Status Progress & Vendors */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-900 font-bold text-sm">Expense Status</span>
-            <span className="text-xs font-semibold text-slate-700">
-              Total ₹{totalExpenseAmount.toLocaleString("en-IN")}
-            </span>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="mt-4">
-            <div className="h-4 w-full overflow-hidden rounded-full bg-slate-100 flex">
-              <div
-                style={{ width: `${paidPercentage}%` }}
-                className="bg-emerald-500 h-full transition-all duration-300"
-                title={`Paid: ${paidPercentage}%`}
-              />
-              <div
-                style={{ width: `${pendingPercentage}%` }}
-                className="bg-rose-300 h-full transition-all duration-300"
-                title={`Pending: ${pendingPercentage}%`}
-              />
-            </div>
-          </div>
-
-          {/* Paid vs Pending Metrics */}
-          <div className="mt-5 grid grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span>Paid</span>
-              </div>
-              <div className="mt-1 text-xl sm:text-2xl font-bold text-slate-900">
-                ₹{paidExpenseAmount.toLocaleString("en-IN")}{" "}
-                <span className="text-xs sm:text-sm font-normal text-slate-500">
-                  ({paidPercentage}%)
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                {paidCount} expense(s)
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                <span className="h-2 w-2 rounded-full bg-rose-400" />
-                <span>Pending</span>
-              </div>
-              <div className="mt-1 text-xl sm:text-2xl font-bold text-slate-900">
-                ₹{pendingExpenseAmount.toLocaleString("en-IN")}{" "}
-                <span className="text-xs sm:text-sm font-normal text-slate-500">
-                  ({pendingPercentage}%)
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                {pendingCount} expense(s)
-              </div>
-            </div>
-          </div>
-
-          {/* Total Vendors Counter */}
-          <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                <Users className="h-4.5 w-4.5" />
-              </div>
-              <span className="text-xs font-medium text-slate-600">Total Vendors</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-slate-900">{totalVendorsCount}</span>
-              <span className="text-xs font-semibold text-emerald-600 flex items-center">
-                ↑ +4 <span className="text-slate-400 font-normal ml-1">vs last month</span>
-              </span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* ── 3. Category / Segment Tabs Bar ─────────────────────────── */}
@@ -1520,9 +1340,344 @@ export default function ExpenseScreen() {
         </div>
       </div>
 
+
+      {/* ── 2. Top Analytics Cards Grid (Donut & Status Cards) ───── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Card 1: Expense Breakdown Donut & Legend Table */}
+        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center gap-1.5 text-slate-900 font-bold text-sm">
+            <span>Expense Breakdown</span>
+            <Info className="h-3.5 w-3.5 text-slate-400" />
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
+            {/* SVG Donut Chart */}
+            <div className="sm:col-span-5 flex items-center justify-center relative">
+              <div className="relative w-44 h-44 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
+                  {/* Background Circle */}
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="58"
+                    stroke="#f1f5f9"
+                    strokeWidth="20"
+                    fill="transparent"
+                  />
+                  {/* Segments */}
+                  {(() => {
+                    let cumulativePercent = 0;
+                    const circumference = 2 * Math.PI * 58; // ≈ 364.42
+                    return breakdownData.map((slice) => {
+                      const strokeDasharray = `${(slice.pct / 100) * circumference} ${circumference}`;
+                      const strokeDashoffset = -((cumulativePercent / 100) * circumference);
+                      cumulativePercent += slice.pct;
+                      return (
+                        <circle
+                          key={slice.name}
+                          cx="80"
+                          cy="80"
+                          r="58"
+                          stroke={slice.color}
+                          strokeWidth="20"
+                          strokeDasharray={strokeDasharray}
+                          strokeDashoffset={strokeDashoffset}
+                          fill="transparent"
+                          className="transition-all duration-500"
+                        />
+                      );
+                    });
+                  })()}
+                </svg>
+
+                {/* Donut Center Text */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                  <span className="text-base font-bold text-slate-900 leading-tight">
+                    ₹{totalExpenseAmount.toLocaleString("en-IN")}
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    Total Expenses
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Legend List */}
+            <div className="sm:col-span-7 space-y-2">
+              {breakdownData.length === 0 ? (
+                <p className="text-xs text-slate-400">No expenses for this filter.</p>
+              ) : null}
+              {breakdownData.map((slice) => (
+                <div
+                  key={slice.name}
+                  className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: slice.color }}
+                    />
+                    <span className="font-medium text-slate-700">{slice.name}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="font-bold text-slate-900">
+                      ₹{slice.amount.toLocaleString("en-IN")}
+                    </span>
+                    <span className="text-slate-400 font-medium w-8 text-right">
+                      {slice.pct}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Expense Status Progress & Vendors */}
+        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-900 font-bold text-sm">Expense Status</span>
+            <span className="text-xs font-semibold text-slate-700">
+              Total ₹{totalExpenseAmount.toLocaleString("en-IN")}
+            </span>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mt-4">
+            <div className="h-4 w-full overflow-hidden rounded-full bg-slate-100 flex">
+              <div
+                style={{ width: `${paidPercentage}%` }}
+                className="bg-emerald-500 h-full transition-all duration-300"
+                title={`Paid: ${paidPercentage}%`}
+              />
+              <div
+                style={{ width: `${pendingPercentage}%` }}
+                className="bg-rose-300 h-full transition-all duration-300"
+                title={`Pending: ${pendingPercentage}%`}
+              />
+            </div>
+          </div>
+
+          {/* Paid vs Pending Metrics */}
+          <div className="mt-5 grid grid-cols-2 gap-4">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span>Paid</span>
+              </div>
+              <div className="mt-1 text-xl sm:text-2xl font-bold text-slate-900">
+                ₹{paidExpenseAmount.toLocaleString("en-IN")}{" "}
+                <span className="text-xs sm:text-sm font-normal text-slate-500">
+                  ({paidPercentage}%)
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                {paidCount} expense(s)
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                <span className="h-2 w-2 rounded-full bg-rose-400" />
+                <span>Pending</span>
+              </div>
+              <div className="mt-1 text-xl sm:text-2xl font-bold text-slate-900">
+                ₹{pendingExpenseAmount.toLocaleString("en-IN")}{" "}
+                <span className="text-xs sm:text-sm font-normal text-slate-500">
+                  ({pendingPercentage}%)
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                {pendingCount} expense(s)
+              </div>
+            </div>
+          </div>
+
+          {/* Total Vendors Counter */}
+          <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                <Users className="h-4.5 w-4.5" />
+              </div>
+              <span className="text-xs font-medium text-slate-600">Total Vendors</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-bold text-slate-900">{totalVendorsCount}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── 5. Main Custom Table ────────────────────────────────────── */}
       <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="space-y-2.5 p-3 md:hidden">
+          {loading ? (
+            <div className="space-y-2.5">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-28 animate-pulse rounded-2xl border border-slate-200 bg-slate-50"
+                />
+              ))}
+            </div>
+          ) : paginatedData.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+              <h4 className="text-sm font-semibold text-slate-800">No expenses found</h4>
+              <p className="mt-1 text-xs text-slate-500">
+                {search
+                  ? "Try clearing your search query."
+                  : "Click Add Expense to record a new expense."}
+              </p>
+            </div>
+          ) : (
+            paginatedData.map((row) => {
+              const catColor =
+                CATEGORY_COLORS[row.category] ||
+                CATEGORY_COLORS[row.segment] || {
+                  bg: "bg-slate-100",
+                  text: "text-slate-700",
+                };
+              const isPaid = row.status === "Paid";
+              const isPending = row.status === "Pending";
+              const isMenuOpen = actionMenuRowId === row._id;
+              return (
+                <div
+                  key={row._id}
+                  className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-base font-bold text-slate-900">
+                        {row.title}
+                      </h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {row.expenseCode ? (
+                          <span className="text-xs font-medium text-slate-500">
+                            {row.expenseCode}
+                          </span>
+                        ) : null}
+                        <span
+                          className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${catColor.bg} ${catColor.text}`}
+                        >
+                          {row.category || row.segment}
+                        </span>
+                        <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                          {row.mode}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          isPaid
+                            ? "border border-emerald-200 bg-emerald-50 text-emerald-600"
+                            : isPending
+                              ? "border border-amber-200 bg-amber-50 text-amber-600"
+                              : "border border-slate-200 bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            isPaid
+                              ? "bg-emerald-500"
+                              : isPending
+                                ? "bg-amber-500"
+                                : "bg-slate-400"
+                          }`}
+                        />
+                        {row.status}
+                      </span>
+                      <div className="mt-1.5 text-base font-bold text-slate-900">
+                        ₹
+                        {row.amount.toLocaleString("en-IN", {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 2,
+                        })}
+                      </div>
+                      {row.dueAmount > 0 ? (
+                        <div className="text-[10px] font-semibold text-amber-600">
+                          Due ₹{row.dueAmount.toLocaleString("en-IN")}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="my-2.5 border-t border-slate-100" />
+                  <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
+                    <div className="flex min-w-0 items-center gap-1 truncate text-slate-400">
+                      <Calendar className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">
+                        {formatDisplayDate(row.date)}
+                        {row.paidTo ? ` • ${row.paidTo}` : ""}
+                      </span>
+                    </div>
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setActionMenuRowId(isMenuOpen ? null : row._id)
+                        }
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600"
+                        aria-label="Expense actions"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                      {isMenuOpen ? (
+                        <div
+                          ref={actionMenuRef}
+                          className="absolute right-0 top-10 z-50 w-44 rounded-xl border border-slate-100 bg-white py-1.5 text-left shadow-xl"
+                        >
+                          {row.status === "Pending" && row.dueAmount > 0 ? (
+                            <Can permission={PERMISSIONS.EXPENSE_UPDATE}>
+                              <button
+                                type="button"
+                                onClick={() => openReceivePaymentModal(row)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50"
+                              >
+                                <IndianRupee className="h-3.5 w-3.5" />
+                                <span>Receive Payment</span>
+                              </button>
+                            </Can>
+                          ) : null}
+                          <Can permission={PERMISSIONS.EXPENSE_READ}>
+                            <button
+                              type="button"
+                              onClick={() => openViewModal(row)}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                              <Eye className="h-3.5 w-3.5 text-slate-400" />
+                              <span>View Details</span>
+                            </button>
+                          </Can>
+                          <Can permission={PERMISSIONS.EXPENSE_UPDATE}>
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(row)}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                              <SquarePen className="h-3.5 w-3.5 text-slate-400" />
+                              <span>Edit Expense</span>
+                            </button>
+                          </Can>
+                          <Can permission={PERMISSIONS.EXPENSE_DELETE}>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteExpense(row)}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                              <span>Delete Expense</span>
+                            </button>
+                          </Can>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-white text-xs font-semibold text-slate-600">

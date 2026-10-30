@@ -32,14 +32,6 @@ const BOOKING_STATUSES = [
   "Cancelled",
   "Draft",
 ];
-// const PAYMENT_STATUS = [
-//   "Unpaid",
-//   "Partially Paid",
-//   "Paid",
-//   "Refund Pending",
-//   "Partially Refunded",
-//   "Refunded",
-// ];
 const REFUND_STATUSES = ["Pending", "Processing", "Completed", "Failed"];
 
 const inr = (value: number) =>
@@ -322,12 +314,18 @@ export default function BookingOverView() {
         paymentReference: refundForm.paymentReference,
         note: refundForm.note,
       });
+      const creditedToWallet =
+        refundForm.status === "Completed" &&
+        refundForm.method.trim().toLowerCase() === "wallet";
       setRefundTarget(null);
       await load();
       await Swal.fire({
         icon: "success",
-        title: "Refund updated",
-        timer: 1400,
+        title: creditedToWallet ? "Refund added to wallet" : "Refund updated",
+        text: creditedToWallet
+          ? `₹${(Number(refundForm.amount) || 0).toLocaleString("en-IN")} was added to the customer wallet.`
+          : undefined,
+        timer: 1600,
         showConfirmButton: false,
       });
     } catch (err: unknown) {
@@ -1008,6 +1006,11 @@ export default function BookingOverView() {
                     ),
                   )}
                 </select>
+                {refundForm.method === "Wallet" ? (
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Completed wallet refunds are added to the customer wallet.
+                  </span>
+                ) : null}
               </label>
               <label className="text-sm">
                 <span className="mb-1 block font-semibold">
