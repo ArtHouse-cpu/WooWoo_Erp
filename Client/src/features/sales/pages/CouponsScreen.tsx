@@ -328,7 +328,6 @@ export default function CouponsScreen() {
       );
       return;
     }
-    try {
     if (limitPerCustomer && !(Number(form.perCustomerLimit) > 0)) {
       Swal.fire(
         "Missing limit",
@@ -337,6 +336,7 @@ export default function CouponsScreen() {
       );
       return;
     }
+    try {
       setSaving(true);
       const payload: CouponPayload = {
         ...form,
@@ -351,9 +351,9 @@ export default function CouponsScreen() {
             ? Number(form.usageLimit)
             : null,
         perCustomerLimit:
-          form.perCustomerLimit && Number(form.perCustomerLimit) > 0
           limitPerCustomer && Number(form.perCustomerLimit) > 0
             ? Math.floor(Number(form.perCustomerLimit))
+            : null,
         applicableOn: form.applicableOn?.length
           ? form.applicableOn
           : ["all"],
