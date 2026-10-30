@@ -1320,6 +1320,7 @@ export default function SubscriptionScreen() {
   const completedAmount = filteredData
     .filter((row) => row.status === "completed")
     .reduce((sum, row) => sum + row.amount, 0);
+  const paidAmount = Math.max(0, totalAmount - totalDueAmount);
 
   const paymentModesBreakdown = useMemo(() => {
     const modes: Record<string, number> = {
@@ -1493,13 +1494,20 @@ export default function SubscriptionScreen() {
 
         {/* B. Summary Card: Date filter above Total Amount & Pending Due box */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs">
-          {/* Row 1: Date Filter (Above Total Amount and Pending Due Box) - Right aligned */}
-          <div className="flex justify-end">
-            <div className="relative">
+          {/* Row 1: Total Sales (Left, prominent) & Date Filter (Right, compact) */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-baseline gap-1.5 text-left">
+              <span className="text-xs font-semibold text-slate-500">Total Sales:</span>
+              <span className="text-xl font-extrabold tracking-tight text-slate-900">
+                {formatCompactCurrency(totalAmount)}
+              </span>
+            </div>
+
+            <div className="relative shrink-0">
               <select
                 value={datePreset}
                 onChange={(e) => applyDatePreset(e.target.value as DatePreset)}
-                className="h-8 cursor-pointer appearance-none rounded-xl border border-slate-200 bg-slate-50/70 pl-2.5 pr-7 text-xs font-semibold text-slate-700 outline-none transition focus:border-blue-500 focus:bg-white"
+                className="h-5 max-w-[95px] cursor-pointer appearance-none truncate rounded-full border border-slate-200/90 bg-slate-50 pl-2 pr-3.5 text-[9.5px] font-semibold text-slate-600 outline-none transition focus:border-blue-500 focus:bg-white"
                 aria-label="Date range"
               >
                 {DATE_PRESET_OPTIONS.map((opt) => (
@@ -1509,17 +1517,17 @@ export default function SubscriptionScreen() {
                 ))}
               </select>
               <ChevronDown
-                size={13}
-                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
+                size={8}
+                className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-slate-400"
               />
             </div>
           </div>
 
           {/* Custom Date Pickers */}
           {datePreset === "custom" && (
-            <div className="mt-2.5 flex items-center gap-2 border-t border-slate-100 pt-2">
+            <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-2">
               <div className="flex-1">
-                <label className="text-[10px] font-semibold uppercase text-slate-500">
+                <label className="text-[9px] font-semibold uppercase text-slate-500">
                   From
                 </label>
                 <input
@@ -1530,11 +1538,11 @@ export default function SubscriptionScreen() {
                     setFromDate(e.target.value);
                     setDatePreset("custom");
                   }}
-                  className="h-8 w-full rounded-lg border border-slate-200 px-2 text-xs text-slate-700"
+                  className="h-7 w-full rounded-md border border-slate-200 px-1.5 text-[11px] text-slate-700"
                 />
               </div>
               <div className="flex-1">
-                <label className="text-[10px] font-semibold uppercase text-slate-500">
+                <label className="text-[9px] font-semibold uppercase text-slate-500">
                   To
                 </label>
                 <input
@@ -1545,13 +1553,13 @@ export default function SubscriptionScreen() {
                     setToDate(e.target.value);
                     setDatePreset("custom");
                   }}
-                  className="h-8 w-full rounded-lg border border-slate-200 px-2 text-xs text-slate-700"
+                  className="h-7 w-full rounded-md border border-slate-200 px-1.5 text-[11px] text-slate-700"
                 />
               </div>
             </div>
           )}
 
-          {/* Row 2: Total Amount & Pending Due Box (Below Date Filter) */}
+          {/* Row 2: Paid Amount & Pending Due Box (Below Date Filter) */}
           <div className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
             <div>
               <button
@@ -1561,7 +1569,7 @@ export default function SubscriptionScreen() {
                 aria-expanded={showTotalDetails}
               >
                 <div className="flex items-center gap-1 text-xs text-slate-500 group-hover:text-slate-700">
-                  <span className="font-medium">Total Amount</span>
+                  <span className="font-medium">Paid Amount</span>
                   <ChevronDown
                     size={13}
                     className={`text-slate-400 transition-transform duration-200 ${
@@ -1570,7 +1578,7 @@ export default function SubscriptionScreen() {
                   />
                 </div>
                 <div className="mt-0.5 text-lg font-bold tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors">
-                  {formatCompactCurrency(totalAmount)}
+                  {formatCompactCurrency(paidAmount)}
                 </div>
               </button>
             </div>
@@ -1685,43 +1693,43 @@ export default function SubscriptionScreen() {
             />
           </div>
 
-          {/* Filter button */}
+          {/* Filter button (icon only) */}
           <button
             type="button"
             onClick={() => setMobileFilterOpen(true)}
-            className={`flex h-10 shrink-0 items-center gap-1 rounded-xl border px-2.5 text-xs font-semibold shadow-xs transition active:scale-95 ${
+            aria-label="Filter"
+            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-xs transition active:scale-95 ${
               subscriptionTypeFilter !== "all" || expiryFilter !== "all"
                 ? "border-blue-200 bg-blue-50 text-blue-700"
                 : "border-slate-200/90 bg-white text-slate-700 hover:bg-slate-50"
             }`}
           >
             <SlidersHorizontal
-              size={13}
+              size={15}
               className={subscriptionTypeFilter !== "all" || expiryFilter !== "all" ? "text-blue-600" : "text-slate-500"}
             />
-            <span>Filter</span>
             {(subscriptionTypeFilter !== "all" || expiryFilter !== "all") && (
-              <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
+              <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-blue-600 ring-2 ring-white" />
             )}
           </button>
 
-          {/* Default (Sort) Dropdown */}
-          <div className="relative flex h-10 shrink-0 items-center rounded-xl border border-slate-200/90 bg-white px-2 shadow-xs">
-            <div className="pointer-events-none flex items-center gap-1 text-xs font-semibold text-slate-700">
-              <ArrowUpDown size={13} className="text-slate-500" />
-              <span>
-                {mobileSort === "default"
-                  ? "Default"
-                  : mobileSort === "amount_desc"
-                    ? "High"
-                    : mobileSort === "amount_asc"
-                      ? "Low"
-                      : mobileSort === "date_desc"
-                        ? "Newest"
-                        : "Oldest"}
-              </span>
-              <ChevronDown size={12} className="text-slate-400" />
-            </div>
+          {/* Default (Sort) Dropdown (icon only) */}
+          <div
+            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-xs transition ${
+              mobileSort !== "default"
+                ? "border-blue-200 bg-blue-50 text-blue-700"
+                : "border-slate-200/90 bg-white text-slate-700"
+            }`}
+          >
+            <ArrowUpDown
+              size={15}
+              className={
+                mobileSort !== "default" ? "text-blue-600" : "text-slate-500"
+              }
+            />
+            {mobileSort !== "default" && (
+              <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-blue-600 ring-2 ring-white" />
+            )}
             <select
               value={mobileSort}
               onChange={(e) => setMobileSort(e.target.value as any)}

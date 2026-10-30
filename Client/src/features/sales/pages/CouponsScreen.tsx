@@ -187,6 +187,8 @@ function toDateInput(value: unknown): string {
   return String(value).slice(0, 10);
 }
 
+
+
 export default function CouponsScreen() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [coupons, setCoupons] = useState<CouponRow[]>([]);
@@ -279,6 +281,9 @@ export default function CouponsScreen() {
     resetForm();
     setModalOpen(true);
   };
+
+
+
 
   const openEdit = (coupon: CouponRow) => {
     setEditingId(coupon._id);
