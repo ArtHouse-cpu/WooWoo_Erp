@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Globe,
 } from "lucide-react";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 import {
   type LeadItem,
   type LeadPayload,
@@ -464,6 +465,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   };
 
   const handleClose = () => {
+    void closeIfConfirmed(() => {
     setError("");
     setSelectedStaffId("");
     setCustomSource("");
@@ -476,6 +478,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     setViewingMedia(null);
     setIsDragging(false);
     onClose();
+    });
   };
 
   const isOtherSelected =

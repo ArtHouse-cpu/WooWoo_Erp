@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import Swal from "sweetalert2";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
   handleCreateAnnouncement,
@@ -219,8 +220,10 @@ export default function SendAnnouncementModal({
 
   const handleClose = () => {
     if (submitting) return;
-    resetForm();
-    onClose();
+    void closeIfConfirmed(() => {
+      resetForm();
+      onClose();
+    });
   };
 
   /** Meta names: lowercase letters/numbers/underscore only ("new cafe" → "newcafe") */

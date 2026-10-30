@@ -6,6 +6,7 @@ import {
   handleVerifyStaffPin,
   type VerifiedStaff,
 } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 const PIN_AUTO_LENGTH = 6;
 
@@ -96,7 +97,7 @@ export default function StaffVerifyModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             disabled={verifying}
             className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
             aria-label="Close"
@@ -156,7 +157,7 @@ export default function StaffVerifyModal({
         <div className="flex items-center justify-end border-t border-slate-100 bg-slate-50/80 px-5 py-4">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             disabled={verifying}
             className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
           >

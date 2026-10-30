@@ -40,6 +40,7 @@ import {
   toMembershipPlanId,
 } from "../utils/membershipInvoiceUtils";
 import { creditWalletCashback } from "../utils/walletCashback";
+import { useAutosaveFormDraft } from "../utils/formDraft";
 
 const today = new Date().toISOString().split("T")[0];
 const INVOICE_SEQ_KEY = "wooerp-invoice-seq";
@@ -110,6 +111,72 @@ export default function CreateInvoiceScreen({
   const [draftCashback, setDraftCashback] = useState("");
   const [draftIsCsp, setDraftIsCsp] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
+  const routeDoc = location.state as { invoice?: unknown; mode?: Mode } | null;
+  const freshCreate =
+    (initialMode ?? "create") === "create" &&
+    !initialData &&
+    !(routeDoc?.invoice && routeDoc.mode && routeDoc.mode !== "create");
+  const invoiceDraft = {
+    invoiceNo,
+    customer,
+    phone,
+    membership,
+    membershipPlanId,
+    customerId,
+    invoiceDate,
+    dueDate,
+    billBy,
+    notes,
+    extraCharges,
+    items,
+    draftName,
+    draftQty,
+    draftPrice,
+    draftDiscount,
+    draftImage,
+    draftCategory,
+    draftCashback,
+    draftIsCsp,
+  };
+  const { clearDraft: clearInvoiceDraft } = useAutosaveFormDraft({
+    storageKey: "invoice",
+    enabled: freshCreate && mode === "create" && !invoiceId,
+    snapshot: invoiceDraft,
+    hasContent: (data) =>
+      Boolean(
+        data.customer.trim() ||
+          data.phone.trim() ||
+          data.notes.trim() ||
+          data.billBy.trim() ||
+          (data.items?.length ?? 0) ||
+          (data.extraCharges?.length ?? 0) ||
+          data.draftName.trim() ||
+          data.draftPrice.trim() ||
+          data.draftDiscount.trim(),
+      ),
+    restore: (data) => {
+      setInvoiceNo(data.invoiceNo || getNextInvoiceNumber());
+      setCustomer(data.customer || "");
+      setPhone(data.phone || "");
+      setMembership(data.membership || "none");
+      setMembershipPlanId(data.membershipPlanId ?? null);
+      setCustomerId(data.customerId ?? null);
+      setInvoiceDate(data.invoiceDate || today);
+      setDueDate(data.dueDate || today);
+      setBillBy(data.billBy || "");
+      setNotes(data.notes || "");
+      setExtraCharges(Array.isArray(data.extraCharges) ? data.extraCharges : []);
+      setItems(Array.isArray(data.items) ? data.items : []);
+      setDraftName(data.draftName || "");
+      setDraftQty(data.draftQty || "1");
+      setDraftPrice(data.draftPrice || "");
+      setDraftDiscount(data.draftDiscount || "");
+      setDraftImage(data.draftImage || "");
+      setDraftCategory(data.draftCategory || "General");
+      setDraftCashback(data.draftCashback || "");
+      setDraftIsCsp(Boolean(data.draftIsCsp));
+    },
+  });
   const [membershipPlans, setMembershipPlans] = useState<MembershipPlanPayload[]>([]);
   /** Saved payment snapshot for view mode (POS View Invoice). */
   const [viewPaymentMode, setViewPaymentMode] = useState("");
@@ -656,6 +723,7 @@ export default function CreateInvoiceScreen({
         if (createdCode) setInvoiceNo(createdCode);
       }
 
+      clearInvoiceDraft();
       Swal.fire("Saved", "Invoice has been saved as draft.", "success").then(() => {
         navigate(-1);
       });
@@ -862,6 +930,7 @@ export default function CreateInvoiceScreen({
           payment.customerId,
         );
 
+        clearInvoiceDraft();
         Swal.fire(
           "Invoice Saved",
           response?.invoice?.invoiceCode

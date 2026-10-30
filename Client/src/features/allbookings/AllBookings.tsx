@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
@@ -924,7 +925,7 @@ const persistBooking = async (
             type="button"
             aria-label="Close booking details"
             className="absolute inset-0 bg-black/50"
-            onClick={() => setSelected(null)}
+            onClick={() => void closeIfConfirmed(() => setSelected(null))}
           />
           <div className="relative z-10 max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl">
             <div className="mb-4 flex items-start justify-between gap-3">
@@ -936,7 +937,7 @@ const persistBooking = async (
               </div>
               <button
                 type="button"
-                onClick={() => setSelected(null)}
+                onClick={() => void closeIfConfirmed(() => setSelected(null))}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600"
                 aria-label="Close"
               >

@@ -246,6 +246,11 @@ html.dark .MuiInputBase-input {
   color: #e8edf3;
 }
 
+/* Checkout and staff PIN dialogs portal to document.body above 9990. */
+.swal2-container {
+  z-index: 20000 !important;
+}
+
 html.dark .swal2-popup {
   background: #171c24;
   color: #f3f4f6;

@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import {closeIfConfirmed} from '../../utils/confirmClose';
 import {createPortal} from 'react-dom';
 import {useFieldArray, useForm} from 'react-hook-form';
 import {z} from 'zod';
@@ -100,7 +101,7 @@ export default function EntryPassFormModal({open, onClose, onGenerate}: Props) {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !submitting) onClose();
+      if (e.key === 'Escape' && !submitting) void closeIfConfirmed(onClose);
     };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -152,7 +153,7 @@ export default function EntryPassFormModal({open, onClose, onGenerate}: Props) {
     <div
       className="fixed inset-0 z-[100] flex items-end justify-center bg-[#1c1917]/60 backdrop-blur-sm sm:items-center sm:px-4"
       onMouseDown={e => {
-        if (e.currentTarget === e.target && !submitting) onClose();
+        if (e.currentTarget === e.target && !submitting) void closeIfConfirmed(onClose);
       }}
       role="dialog"
       aria-modal="true"
@@ -180,7 +181,7 @@ export default function EntryPassFormModal({open, onClose, onGenerate}: Props) {
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             disabled={submitting}
             className="rounded-full p-2 text-[#a8a29e] transition hover:bg-white hover:text-[#1c1917] disabled:opacity-50"
             aria-label="Close"

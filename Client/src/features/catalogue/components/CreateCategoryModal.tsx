@@ -1,5 +1,6 @@
 import { X, ImagePlus } from "lucide-react";
 import React, { useState } from "react";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export default function CreateCategoryModal({ onClose }: any) {
   const [preview, setPreview] = useState<string | null>(null);
@@ -18,7 +19,7 @@ export default function CreateCategoryModal({ onClose }: any) {
 
         {/* Close Button */}
         <button
-          onClick={onClose}
+          onClick={() => void closeIfConfirmed(onClose)}
           className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition cursor-pointer"
         >
           <X size={22} />
@@ -86,7 +87,7 @@ export default function CreateCategoryModal({ onClose }: any) {
         {/* Button Group */}
         <div className="flex justify-between gap-3 mt-4 w-full">
           <button
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="px-5 py-3 rounded-lg border border-gray-300 hover:bg-gray-100 transition w-full cursor-pointer font-semibold text-[15px]"
           >
             Cancel

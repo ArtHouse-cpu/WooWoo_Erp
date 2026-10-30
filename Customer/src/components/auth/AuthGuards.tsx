@@ -8,6 +8,7 @@ import {
   needsOnboarding,
   needsProfileSetup,
 } from '../../utils/onboarding';
+import {isInvoiceReturnPath, rememberReturnTo} from '../../utils/returnTo';
 
 export function AuthBootstrap({children}: {children: React.ReactNode}) {
   const {isLoading, setSession, setLoading, logout} = useAuthStore();
@@ -53,6 +54,7 @@ export function ProtectedRoute() {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
   const location = useLocation();
   if (!isAuthenticated) {
+    rememberReturnTo(`${location.pathname}${location.search}`);
     return <Navigate to="/login" replace state={{from: location}} />;
   }
   return <Outlet />;
@@ -87,11 +89,15 @@ export function OnboardingRoute({step}: {step: 'profile' | 'membership'}) {
 export function AppRoute() {
   const customer = useAuthStore(s => s.customer);
   const isAuthenticated = useAuthStore(s => s.isAuthenticated);
+  const location = useLocation();
+  const invoiceLink = isInvoiceReturnPath(
+    `${location.pathname}${location.search}`,
+  );
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  if (needsOnboarding(customer)) {
+  if (needsOnboarding(customer) && !invoiceLink) {
     return <Navigate to={getPostAuthPath(customer)} replace />;
   }
   return <Outlet />;

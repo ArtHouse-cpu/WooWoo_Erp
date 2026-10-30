@@ -1160,9 +1160,7 @@ export const sendActivityUpdateWhatsApp = async ({
   const detailsParam = String(
     detailsUrlParam ?? config.detailsUrlParam ?? '',
   ).trim();
-  const walletParam = String(
-    walletUrlParam ?? config.walletUrlParam ?? '',
-  ).trim();
+  void walletUrlParam;
 
   // Final safety: never deliver Amount Paid ₹0 with Discount = bill total
   let paidSend = Number(amountPaid);
@@ -1211,18 +1209,15 @@ export const sendActivityUpdateWhatsApp = async ({
 
   let lastError = null;
 
-  // Prefer body-only first (static URL buttons on template), then dynamic URL suffixes
-  const buttonModes = [
-    {detailsParam: '', walletParam: ''},
-    {
-      detailsParam: detailsParam || 'details',
-      walletParam: walletParam || 'wallet',
-    },
-    {detailsParam: detailsParam || '', walletParam: ''},
-  ];
+  // Button 0 "Download Invoice" is a dynamic URL (.../activities/{{1}}).
+  // Button 1 "View wallet" is static, so it must not receive a parameter.
+  // Body-only is the fallback for an older template that has no dynamic button.
+  const buttonModes = detailsParam
+    ? [detailsParam, '']
+    : [''];
 
   for (const lang of languageCandidates(language)) {
-    for (const mode of buttonModes) {
+    for (const invoiceParam of buttonModes) {
       const components = [
         {
           type: 'body',
@@ -1230,20 +1225,12 @@ export const sendActivityUpdateWhatsApp = async ({
         },
       ];
 
-      if (mode.detailsParam) {
+      if (invoiceParam) {
         components.push({
           type: 'button',
           sub_type: 'url',
           index: '0',
-          parameters: [{type: 'text', text: String(mode.detailsParam)}],
-        });
-      }
-      if (mode.walletParam) {
-        components.push({
-          type: 'button',
-          sub_type: 'url',
-          index: '1',
-          parameters: [{type: 'text', text: String(mode.walletParam)}],
+          parameters: [{type: 'text', text: String(invoiceParam)}],
         });
       }
 
@@ -1268,7 +1255,7 @@ export const sendActivityUpdateWhatsApp = async ({
       if (result.ok) {
         const messageId = result.json?.messages?.[0]?.id || null;
         console.log(
-          `[ActivityUpdate][WhatsApp] delivered to=${recipient} template=${templateName} lang=${lang} body=${JSON.stringify(bodyValues)} buttons=${JSON.stringify(mode)} id=${messageId}`,
+          `[ActivityUpdate][WhatsApp] delivered to=${recipient} template=${templateName} lang=${lang} body=${JSON.stringify(bodyValues)} invoiceButton=${invoiceParam || '(none)'} id=${messageId}`,
         );
         return {
           channel: 'whatsapp',

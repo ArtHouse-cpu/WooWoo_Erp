@@ -23,6 +23,7 @@ import {
   type CspEnrollment,
   type CspPartnerDetails,
 } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type Props = {
   partner: CspEnrollment | null;
@@ -150,7 +151,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
   useEffect(() => {
     if (!partner) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") void closeIfConfirmed(onClose);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -292,7 +293,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs"
-      onClick={onClose}
+      onClick={() => void closeIfConfirmed(onClose)}
     >
       <div
         className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
@@ -317,7 +318,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             aria-label="Close partner details"
           >

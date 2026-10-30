@@ -4,6 +4,7 @@ import type { GiftCardData } from "../Pages/GiftCard";
 import { useAuthStore } from "@/store/authStore";
 import { useAppSelector } from "@/store/hooks";
 import { toast } from "react-toastify";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type GiftCardFormData = Omit<GiftCardData, "_id"> & {
   _id?: string;
@@ -189,7 +190,7 @@ export default function CreateGiftCardModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-xs"
       onMouseDown={(e) => {
-        if (e.currentTarget === e.target) onClose();
+        if (e.currentTarget === e.target) void closeIfConfirmed(onClose);
       }}
     >
       <div className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
@@ -207,7 +208,7 @@ export default function CreateGiftCardModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
             aria-label="Close"
           >
@@ -372,7 +373,7 @@ export default function CreateGiftCardModal({
           <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               className="cursor-pointer rounded-xl border border-gray-300 px-5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
             >
               Cancel

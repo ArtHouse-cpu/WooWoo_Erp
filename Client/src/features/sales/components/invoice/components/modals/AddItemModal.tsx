@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Swal from "sweetalert2";
 import ProductForm from "../forms/ProductForm";
 import ServiceForm from "../forms/ServiceForm";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 const variantSchema = z.object({
   name: z.string().min(1, "Variant name is required"),
@@ -363,7 +364,7 @@ export default function AddItemModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-full p-2.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-200"
           >
             <X size={20} />
@@ -452,7 +453,7 @@ export default function AddItemModal({
             <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-4 backdrop-blur-sm">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => void closeIfConfirmed(onClose)}
                 disabled={loading}
                 className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:opacity-50"
               >

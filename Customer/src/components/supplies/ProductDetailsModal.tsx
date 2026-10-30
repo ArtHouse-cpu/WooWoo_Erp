@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import {closeIfConfirmed} from '../../utils/confirmClose';
 import {X} from 'lucide-react';
 import type {CustomerProduct} from '../../services/product.service';
 import {formatInr} from './productActions';
@@ -20,7 +21,7 @@ export function ProductDetailsModal({product, onClose}: ProductDetailsModalProps
   useEffect(() => {
     if (!product) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') void closeIfConfirmed(onClose);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -34,7 +35,7 @@ export function ProductDetailsModal({product, onClose}: ProductDetailsModalProps
     <div
       className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4"
       onMouseDown={event => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) void closeIfConfirmed(onClose);
       }}
     >
       <div
@@ -49,7 +50,7 @@ export function ProductDetailsModal({product, onClose}: ProductDetailsModalProps
           </p>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
             aria-label="Close product details"
           >

@@ -8,6 +8,7 @@ import {
 } from "@/services/apiClient";
 import UpdateCustomerModal from "./UpdateCustomerModal";
 import BuyMembershipModal from "./BuyMembershipModal";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type CustomerDetails = CustomerPayload & {
   _id?: string;
@@ -178,7 +179,7 @@ export default function CustomerDetailsModal({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-full p-2.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
           >
             <X size={20} />
@@ -344,7 +345,7 @@ export default function CustomerDetailsModal({
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
           >
             Close

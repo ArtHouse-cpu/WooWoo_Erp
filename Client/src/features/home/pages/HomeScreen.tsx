@@ -58,6 +58,9 @@ import {
   normalizeIndianWhatsAppDigits,
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
+import CreatePosScreen, {
+  INVOICE_SAVED_EVENT,
+} from "@/features/sales/pages/CreatePosScreen";
 import { normalizeLineType } from "@/features/sales/utils/itemClassification";
 import {
   billingMembershipFromCustomer,
@@ -463,6 +466,7 @@ export default function HomeScreen() {
   const [foods, setFoods] = useState<GenericRow[]>([]);
   const [subscriptions, setSubscriptions] = useState<GenericRow[]>([]);
   const [tabLoading, setTabLoading] = useState(false);
+  const [invoiceRefresh, setInvoiceRefresh] = useState(0);
 
   const welcomeName =
     String(staff?.m_staff_name ?? "")
@@ -599,6 +603,13 @@ export default function HomeScreen() {
       alive = false;
     };
   }, [loadDashboardData]);
+  }, [canPath, invoiceRefresh]);
+
+  useEffect(() => {
+    const onSaved = () => setInvoiceRefresh((current) => current + 1);
+    window.addEventListener(INVOICE_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(INVOICE_SAVED_EVENT, onSaved);
+  }, []);
 
   useEffect(() => {
     let alive = true;

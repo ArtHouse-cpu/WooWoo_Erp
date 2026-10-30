@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
+import { closeIfConfirmed } from "@/utils/confirmClose";
+import { useAutosaveFormDraft } from "../utils/formDraft";
 import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
@@ -687,6 +689,69 @@ export default function CreateSubscriptionScreen({
   const [endDateManuallyEdited, setEndDateManuallyEdited] = useState(false);
   /** Customer's current membership priority (Junior treated as 0 for upgrades) */
   const [customerPriority, setCustomerPriority] = useState(0);
+  const routeDoc = location.state as {
+    mode?: Mode;
+    subscription?: unknown;
+  } | null;
+  const freshCreate =
+    (initialMode ?? "create") === "create" &&
+    !initialData &&
+    !(routeDoc?.subscription && routeDoc.mode && routeDoc.mode !== "create");
+  const subscriptionDraft = {
+    subscriptionNo,
+    customer,
+    selectedCustomerId,
+    phone,
+    membership,
+    startDate,
+    endDate,
+    repeatType,
+    notes,
+    selectedMembershipId,
+    students,
+    endDateManuallyEdited,
+    customerPriority,
+  };
+  const { clearDraft: clearSubscriptionDraft } = useAutosaveFormDraft({
+    storageKey: "subscription",
+    enabled: freshCreate && mode === "create" && !subscriptionId,
+    snapshot: subscriptionDraft,
+    hasContent: (data) =>
+      Boolean(
+        data.customer.trim() ||
+          data.phone.trim() ||
+          data.notes.trim() ||
+          data.selectedMembershipId ||
+          (data.students ?? []).some((student) =>
+            Boolean(
+              student.studentName.trim() ||
+                student.schoolName.trim() ||
+                student.parentName.trim() ||
+                student.dob ||
+                student.classStd.trim(),
+            ),
+          ),
+      ),
+    restore: (data) => {
+      setSubscriptionNo(data.subscriptionNo || getNextSubscriptionNumber());
+      setCustomer(data.customer || "");
+      setSelectedCustomerId(data.selectedCustomerId || "");
+      setPhone(data.phone || "");
+      setMembership(data.membership || "-");
+      setStartDate(data.startDate || today);
+      setEndDate(data.endDate || today);
+      setRepeatType(data.repeatType || "monthly");
+      setNotes(data.notes || "");
+      setSelectedMembershipId(data.selectedMembershipId || "");
+      setStudents(
+        Array.isArray(data.students) && data.students.length
+          ? data.students
+          : [createEmptyStudent()],
+      );
+      setEndDateManuallyEdited(Boolean(data.endDateManuallyEdited));
+      setCustomerPriority(Number(data.customerPriority) || 0);
+    },
+  });
 
   // View-mode snapshots
   const [viewSubTotal, setViewSubTotal] = useState<number | null>(null);
@@ -1506,6 +1571,7 @@ useEffect(() => {
         referral: payment.referral ?? null,
       };
       const response = await handleCreateSubscription(payload);
+      clearSubscriptionDraft();
       if (selectedCustomerId && selectedMembership) {
         const nextType = getCustomerMembershipType(selectedMembership);
         // Don't overwrite a main membership with Junior on the client either
@@ -1827,22 +1893,11 @@ useEffect(() => {
                 </div>
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (mode !== "view") {
-                      const result = await Swal.fire({
-                        title: "Are you sure?",
-                        text: "Any unsaved changes will be lost.",
-                        icon: "warning",
-                        showCancelButton: true,
-                        confirmButtonColor: "#7C3AED",
-                        cancelButtonColor: "#6B7280",
-                        confirmButtonText: "Yes, Close",
-                        cancelButtonText: "Cancel",
-                      });
-                      if (!result.isConfirmed) return;
-                    }
-                    if (onClose) onClose();
-                    else navigate(-1);
+                  onClick={() => {
+                    void closeIfConfirmed(() => {
+                      if (onClose) onClose();
+                      else navigate(-1);
+                    });
                   }}
                   className="shrink-0 rounded-xl border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50"
                   aria-label="Close"

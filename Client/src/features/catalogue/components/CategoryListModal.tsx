@@ -4,6 +4,7 @@ import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export default function CategoryListModal({ onClose }: any) {
   const [onlineStatus, setOnlineStatus] = useState<{ [key: number]: boolean }>(
@@ -166,7 +167,7 @@ export default function CategoryListModal({ onClose }: any) {
       <div className="bg-white rounded-xl shadow-xl w-auto max-w-[90%] p-6 relative">
         {/* Close Button */}
         <button
-          onClick={onClose}
+          onClick={() => void closeIfConfirmed(onClose)}
           className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100"
         >
           <X size={22} />

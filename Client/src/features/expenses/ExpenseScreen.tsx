@@ -8,12 +8,10 @@ import {
   Trash2,
   IndianRupee,
   MoreHorizontal,
-  XCircle,
   Calendar,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Download,
   Info,
   Users,
   ShoppingBag,
@@ -23,13 +21,11 @@ import {
   Settings,
   MessageSquare,
   Sparkles,
-  ArrowUpDown,
   Check,
   X,
   CreditCard,
 } from "lucide-react";
 import Swal from "sweetalert2";
-import * as XLSX from "xlsx";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
 import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
 import ExpenseReceivePaymentModal, {
@@ -58,24 +54,227 @@ import { PERMISSIONS } from "@/constants/permissions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ExpenseCategory =
+export type ExpenseCategory =
+  // Store
+  | "Stock Purchase"
+  | "Packaging"
+  | "Staff Salary"
+  | "Staff Incentives"
+  | "Staff Welfare"
+  | "Delivery Charges"
+  | "Courier Charges"
+  | "Transportation"
+  | "Loading Charges"
+  | "Unloading Charges"
+  | "Advertising"
+  | "Promotions"
+  | "Photography"
+  | "POS Charges"
+  | "Payment Charges"
+  | "Platform Commission"
+  | "Marketplace Fees"
+  | "Customer Refunds"
+  | "Discounts"
+  | "Sales Returns"
+  | "Stock Damage"
+  | "Stock Shortage"
+  | "Stock Writeoff"
+  | "Cash Shortage"
+  | "Electricity"
+  | "Internet"
+  | "Telephone"
+  | "Cleaning"
+  | "Pest Control"
+  | "Security"
+  | "Repairs"
+  | "Maintenance"
+  | "Furniture"
+  | "Store Display"
+  | "Printing"
+  | "Barcode Labels"
+  | "Warranty Claims"
+  | "Insurance"
+  | "Miscellaneous"
+
+  // Cafe
+  | "Grocery Purchase"
+  | "Vegetable Purchase"
+  | "Fruit Purchase"
+  | "Dairy Purchase"
+  | "Bakery Purchase"
+  | "Meat Purchase"
+  | "Egg Purchase"
+  | "Beverage Purchase"
+  | "Coffee Purchase"
+  | "Tea Purchase"
+  | "Snack Purchase"
+  | "Condiment Purchase"
+  | "Frozen Food Purchase"
+  | "Water Purchase"
+  | "Disposables"
+  | "Gas Charges"
+  | "Water Charges"
+  | "Laundry"
+  | "Waste Disposal"
+  | "Food Wastage"
+  | "Equipment Repairs"
+  | "Delivery Commission"
+  | "Complimentary Orders"
+  | "Menu Printing"
+  | "Food Testing"
+  | "Hygiene Testing"
+  | "License Fees"
+  | "Music License"
+
+  // Space
   | "Rent"
+  | "Housekeeping"
+  | "CCTV Maintenance"
+  | "AC Maintenance"
+  | "Plumbing Repairs"
+  | "Electrical Repairs"
+  | "Furniture Repairs"
+  | "Painting"
+  | "Deep Cleaning"
+  | "Booking Software"
+  | "Software Fees"
+  | "Booking Commission"
+  | "Member Amenities"
+  | "Guest Refreshments"
+  | "Office Supplies"
+  | "Signage"
+  | "Equipment Rental"
+  | "Parking Charges"
+  | "Fire Safety"
+
+  // Events
+  | "Event Materials"
+  | "Craft Supplies"
+  | "Artist Fees"
+  | "Trainer Fees"
+  | "Freelancer Fees"
+  | "Host Fees"
+  | "Performer Fees"
+  | "Venue Rental"
+  | "Venue Setup"
+  | "Decoration"
+  | "Sound Rental"
+  | "Lighting Rental"
+  | "Furniture Rental"
+  | "Stage Rental"
+  | "Generator Rental"
+  | "Event Catering"
+  | "Refreshments"
+  | "Guest Hospitality"
+  | "Event Kits"
+  | "Participant Gifts"
+  | "Certificates"
+  | "Videography"
+  | "Editing Charges"
+  | "Travel Expenses"
+  | "Accommodation"
+  | "Event Security"
+  | "Volunteer Expenses"
+  | "Ticketing Fees"
+  | "Cancellation Charges"
+  | "Vendor Payments"
+  | "Permit Fees"
+  | "First Aid"
+  | "Safety Equipment"
+
+  // Admin
+  | "Management Salary"
+  | "Recruitment"
+  | "Training"
+  | "Professional Fees"
+  | "Accounting Fees"
+  | "Audit Fees"
+  | "Legal Fees"
+  | "Consulting Fees"
+  | "Secretarial Fees"
+  | "Compliance Fees"
+  | "Filing Fees"
+  | "Registration Fees"
+  | "Renewal Fees"
+  | "Bank Charges"
+  | "Interest Expense"
+  | "Loan Processing Fees"
+  | "Stationery"
+  | "Postage"
+  | "Subscriptions"
+  | "Cloud Services"
+  | "Data Charges"
+  | "Local Conveyance"
+  | "Meals"
+  | "Meeting Expenses"
+  | "Staff Uniforms"
+  | "Medical Expenses"
+  | "Background Checks"
+  | "Office Repairs"
+  | "Depreciation"
+  | "Amortization"
+  | "Bad Debts"
+  | "Penalties"
+  | "Late Fees"
+  | "Taxes"
+  | "Property Tax"
+
+  // General
+  | "Common Rent"
+  | "Common Electricity"
+  | "Common Utilities"
+  | "Common Internet"
+  | "Common Telephone"
+  | "Common Cleaning"
+  | "Common Security"
+  | "Common Repairs"
+  | "Common Maintenance"
+  | "Shared Staff"
+  | "Shared Transportation"
+  | "Digital Marketing"
+  | "Brand Marketing"
+  | "Branding"
+  | "Graphic Design"
+  | "Content Creation"
+  | "Social Media"
+  | "Public Relations"
+  | "Influencer Fees"
+  | "Promotional Materials"
+  | "Website Hosting"
+  | "Domain Charges"
+  | "Email Hosting"
+  | "Website Maintenance"
+  | "App Maintenance"
+  | "IT Support"
+  | "Technical Support"
+  | "Data Backup"
+  | "Cybersecurity"
+  | "Business Meals"
+  | "Networking Fees"
+  | "Membership Fees"
+  | "Community Welfare"
+  | "Donations"
+  | "Asset Disposal Loss"
+  | "Foreign Exchange Loss"
+  | "Customer Goodwill"
+  | "Compensation"
+  | "Emergency Repairs"
+  | "Legal Settlements"
+  | "Fraud Loss"
+  | "Environmental Fees"
+  | "Waste Management"
+  | "Unrecoverable GST"
+  | "Rounding Difference"
+  | "Unallocated Expenses"
+
+  // Existing general categories
   | "Utilities"
   | "Salary"
   | "Marketing"
   | "Supplies"
-  | "Maintenance"
-  | "Travel"
-  | "Other"
-  | "Store"
-  | "Cafe"
-  |"Services"
-  | "Space"
-  | "Events"
-  | "Admin"
-  | "General";
+  | "Other";
 
-type Segments = "Store" | "Cafe" | "Services" | "Space" | "general" | "Events";
+type Segments = "Store" | "Cafe" | "Services" | "Space" | "General" | "Events"|"Admin";
 
 type ExpenseStatus = "Paid" | "Pending" | "Cancelled";
 type PaymentMode = "Cash" | "UPI" | "Card" | "Bank Transfer" | "Wallet" | "Due";
@@ -110,20 +309,211 @@ type ExpenseRow = {
 };
 
 const CATEGORIES: ExpenseCategory[] = [
+  "Stock Purchase",
+  "Packaging",
+  "Staff Salary",
+  "Staff Incentives",
+  "Staff Welfare",
+  "Delivery Charges",
+  "Courier Charges",
+  "Transportation",
+  "Loading Charges",
+  "Unloading Charges",
+  "Advertising",
+  "Promotions",
+  "Photography",
+  "POS Charges",
+  "Payment Charges",
+  "Platform Commission",
+  "Marketplace Fees",
+  "Customer Refunds",
+  "Discounts",
+  "Sales Returns",
+  "Stock Damage",
+  "Stock Shortage",
+  "Stock Writeoff",
+  "Cash Shortage",
+  "Electricity",
+  "Internet",
+  "Telephone",
+  "Cleaning",
+  "Pest Control",
+  "Security",
+  "Repairs",
+  "Maintenance",
+  "Furniture",
+  "Store Display",
+  "Printing",
+  "Barcode Labels",
+  "Warranty Claims",
+  "Insurance",
+  "Miscellaneous",
+  "Grocery Purchase",
+  "Vegetable Purchase",
+  "Fruit Purchase",
+  "Dairy Purchase",
+  "Bakery Purchase",
+  "Meat Purchase",
+  "Egg Purchase",
+  "Beverage Purchase",
+  "Coffee Purchase",
+  "Tea Purchase",
+  "Snack Purchase",
+  "Condiment Purchase",
+  "Frozen Food Purchase",
+  "Water Purchase",
+  "Disposables",
+  "Gas Charges",
+  "Water Charges",
+  "Laundry",
+  "Waste Disposal",
+  "Food Wastage",
+  "Equipment Repairs",
+  "Delivery Commission",
+  "Complimentary Orders",
+  "Menu Printing",
+  "Food Testing",
+  "Hygiene Testing",
+  "License Fees",
+  "Music License",
   "Rent",
+  "Housekeeping",
+  "CCTV Maintenance",
+  "AC Maintenance",
+  "Plumbing Repairs",
+  "Electrical Repairs",
+  "Furniture Repairs",
+  "Painting",
+  "Deep Cleaning",
+  "Booking Software",
+  "Software Fees",
+  "Booking Commission",
+  "Member Amenities",
+  "Guest Refreshments",
+  "Office Supplies",
+  "Signage",
+  "Equipment Rental",
+  "Parking Charges",
+  "Fire Safety",
+  "Event Materials",
+  "Craft Supplies",
+  "Artist Fees",
+  "Trainer Fees",
+  "Freelancer Fees",
+  "Host Fees",
+  "Performer Fees",
+  "Venue Rental",
+  "Venue Setup",
+  "Decoration",
+  "Sound Rental",
+  "Lighting Rental",
+  "Furniture Rental",
+  "Stage Rental",
+  "Generator Rental",
+  "Event Catering",
+  "Refreshments",
+  "Guest Hospitality",
+  "Event Kits",
+  "Participant Gifts",
+  "Certificates",
+  "Videography",
+  "Editing Charges",
+  "Travel Expenses",
+  "Accommodation",
+  "Event Security",
+  "Volunteer Expenses",
+  "Ticketing Fees",
+  "Cancellation Charges",
+  "Vendor Payments",
+  "Permit Fees",
+  "First Aid",
+  "Safety Equipment",
+  "Management Salary",
+  "Recruitment",
+  "Training",
+  "Professional Fees",
+  "Accounting Fees",
+  "Audit Fees",
+  "Legal Fees",
+  "Consulting Fees",
+  "Secretarial Fees",
+  "Compliance Fees",
+  "Filing Fees",
+  "Registration Fees",
+  "Renewal Fees",
+  "Bank Charges",
+  "Interest Expense",
+  "Loan Processing Fees",
+  "Stationery",
+  "Postage",
+  "Subscriptions",
+  "Cloud Services",
+  "Data Charges",
+  "Local Conveyance",
+  "Meals",
+  "Meeting Expenses",
+  "Staff Uniforms",
+  "Medical Expenses",
+  "Background Checks",
+  "Office Repairs",
+  "Depreciation",
+  "Amortization",
+  "Bad Debts",
+  "Penalties",
+  "Late Fees",
+  "Taxes",
+  "Property Tax",
+  "Common Rent",
+  "Common Electricity",
+  "Common Utilities",
+  "Common Internet",
+  "Common Telephone",
+  "Common Cleaning",
+  "Common Security",
+  "Common Repairs",
+  "Common Maintenance",
+  "Shared Staff",
+  "Shared Transportation",
+  "Digital Marketing",
+  "Brand Marketing",
+  "Branding",
+  "Graphic Design",
+  "Content Creation",
+  "Social Media",
+  "Public Relations",
+  "Influencer Fees",
+  "Promotional Materials",
+  "Website Hosting",
+  "Domain Charges",
+  "Email Hosting",
+  "Website Maintenance",
+  "App Maintenance",
+  "IT Support",
+  "Technical Support",
+  "Data Backup",
+  "Cybersecurity",
+  "Business Meals",
+  "Networking Fees",
+  "Membership Fees",
+  "Community Welfare",
+  "Donations",
+  "Asset Disposal Loss",
+  "Foreign Exchange Loss",
+  "Customer Goodwill",
+  "Compensation",
+  "Emergency Repairs",
+  "Legal Settlements",
+  "Fraud Loss",
+  "Environmental Fees",
+  "Waste Management",
+  "Unrecoverable GST",
+  "Rounding Difference",
+  "Unallocated Expenses",
   "Utilities",
   "Salary",
   "Marketing",
   "Supplies",
-  "Maintenance",
-  "Travel",
   "Other",
-  "Store",
-  "Cafe",
-  "Services",
-  "Space",
-  "Events",
-  "General",
 ];
 
 const SEGMENTS: Segments[] = [
@@ -131,8 +521,9 @@ const SEGMENTS: Segments[] = [
   "Cafe",
   "Services",
   "Space",
-  "general",
+  "General",
   "Events",
+  "Admin",
 ];
 
 const MODES: PaymentMode[] = [
@@ -150,14 +541,14 @@ function asCategory(value: unknown): ExpenseCategory {
   const v = String(value ?? "").trim();
   return (CATEGORIES as string[]).includes(v)
     ? (v as ExpenseCategory)
-    : "General";
+    : "general";
 }
 
 function asSegment(value: unknown): Segments {
   const v = String(value ?? "").trim();
   return (SEGMENTS as string[]).includes(v)
     ? (v as Segments)
-    : "general";
+    : "General";
 }
 
 function asMode(value: unknown, status?: ExpenseStatus): PaymentMode {
@@ -366,6 +757,7 @@ const BENCHMARK_BREAKDOWN = [
   { name: "Events", amount: 14950, color: "#f97316", pct: 12 },
    { name: "Services", amount: 9960, color: "#8b5cf6", pct: 8 },
   { name: "General", amount: 7740, color: "#94a3b8", pct: 6 },
+  { name: "Admin", amount: 7740, color: "#41679c", pct: 6 },
 ];
 
 export default function ExpenseScreen() {
@@ -687,37 +1079,43 @@ export default function ExpenseScreen() {
         id: "Store",
         label: "Store",
         icon: ShoppingBag,
-        count: rows.filter((r) => r.segment === "Store" || r.category === "Store").length ||0,
+        count: rows.filter((r) => r.segment === "Store").length ||0,
       },
       {
         id: "Cafe",
         label: "Cafe",
         icon: Coffee,
-        count: rows.filter((r) => r.segment === "Cafe" || r.category === "Cafe").length || 0,
+        count: rows.filter((r) => r.segment === "Cafe").length || 0,
       },
       {
         id: "Space",
         label: "Space",
         icon: CalendarDays,
-        count: rows.filter((r) => r.segment === "Space" || r.category === "Space").length || 0,
+        count: rows.filter((r) => r.segment === "Space").length || 0,
       },
       {
         id: "Services",
         label: "Services",
         icon: Settings,
-        count: rows.filter((r) => r.segment === "Services" || r.category === "Services").length || 0,
+        count: rows.filter((r) => r.segment === "Services" ).length || 0,
       },
       {
         id: "Events",
         label: "Events",
         icon: Ticket,
-        count: rows.filter((r) => r.segment === "Events" || r.category === "Events").length || 0,
+        count: rows.filter((r) => r.segment === "Events" ).length || 0,
       },
       {
         id: "general",
         label: "General",
         icon: MessageSquare,
-        count: rows.filter((r) => r.segment === "general" || r.category === "General").length || 0,
+        count: rows.filter((r) => r.segment === "General" ).length || 0,
+      },
+      {
+        id: "admin",
+        label: "Admin",
+        icon: MessageSquare,
+        count: rows.filter((r) => r.segment === "Admin" ).length || 0,
       },
     ],
     [rows],

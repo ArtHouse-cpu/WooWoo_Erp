@@ -49,6 +49,7 @@ import StaffVerifyModal from "./StaffVerifyModal";
 import type { VerifiedStaff } from "@/services/apiClient";
 import { resolveWalletBalance } from "@/utils/resolveWalletBalance";
 import { normalizeLineType } from "@/features/sales/utils/itemClassification";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type CheckoutItem = {
   id?: number;
@@ -2175,7 +2176,7 @@ export default function CheckoutModal({
       className="fixed inset-0 flex items-stretch justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       style={{ zIndex: 9990 }}
       onMouseDown={(e) => {
-        if (e.currentTarget === e.target) onClose();
+        if (e.currentTarget === e.target) void closeIfConfirmed(onClose);
       }}
     >
       <div className="relative flex h-dvh max-h-dvh w-full max-w-5xl flex-col overflow-hidden border border-slate-200 bg-white shadow-2xl sm:h-auto sm:max-h-[92vh] sm:rounded-2xl">
@@ -2201,7 +2202,7 @@ export default function CheckoutModal({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
             aria-label="Close checkout"
           >

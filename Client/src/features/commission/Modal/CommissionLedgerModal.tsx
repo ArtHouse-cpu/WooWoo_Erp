@@ -10,6 +10,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { createPortal } from "react-dom";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type CommissionInvoice = {
   id: string;
@@ -199,7 +200,7 @@ const CommissionLedgerModal = ({
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-150"
-      onClick={onClose}
+      onClick={() => void closeIfConfirmed(onClose)}
     >
       {/* Modal Box */}
       <div
@@ -272,7 +273,7 @@ const CommissionLedgerModal = ({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               className="p-2 rounded-full hover:bg-gray-200/70 text-gray-400 hover:text-gray-700 transition shrink-0"
               title="Close"
             >
@@ -468,7 +469,7 @@ const CommissionLedgerModal = ({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="px-5 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 font-semibold transition shadow-sm"
           >
             Close Ledger

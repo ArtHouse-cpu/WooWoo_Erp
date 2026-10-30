@@ -89,6 +89,7 @@ import {
   timeToMinutes,
   type SlotAvailability,
 } from "../utils/bookingAvailability";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type MultiDateSlot = {
   id: string;
@@ -2439,7 +2440,7 @@ const CreateBookingDetailsModal = ({
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 backdrop-blur-sm sm:p-4 animate-in fade-in duration-200"
         onClick={(e) => {
-          if (e.target === e.currentTarget && !submitting) onClose();
+          if (e.target === e.currentTarget && !submitting) void closeIfConfirmed(onClose);
         }}
       >
         <div className="flex h-[92vh] max-h-[94vh] w-full max-w-[1240px] flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-2xl animate-in zoom-in-95 duration-200">
@@ -2461,7 +2462,7 @@ const CreateBookingDetailsModal = ({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               disabled={submitting}
               className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
               title="Close"
@@ -3946,7 +3947,7 @@ const CreateBookingDetailsModal = ({
             <div className="ml-auto flex flex-wrap justify-end gap-2 sm:gap-3">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => void closeIfConfirmed(onClose)}
                 disabled={submitting}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:opacity-50 sm:text-sm"
               >

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, type ChangeEvent, type FormEvent } from "react";
 import { ImagePlus, Loader2, X, Sparkles, Calendar } from "lucide-react";
 import type { SpacePayload } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type SpaceDay = "Weekday" | "Weekend";
 export type SpaceStatus = "Available" | "Booked" | "Maintenance";
@@ -256,7 +257,7 @@ export default function AddSpaceModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
       onMouseDown={(e) => {
-        if (e.currentTarget === e.target && !loading) onClose();
+        if (e.currentTarget === e.target && !loading) void closeIfConfirmed(onClose);
       }}
     >
       <div className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
@@ -271,7 +272,7 @@ export default function AddSpaceModal({
 
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => void closeIfConfirmed(onClose)}
           disabled={loading}
           className="absolute right-4 top-4 rounded-full p-2 transition hover:bg-gray-100 disabled:opacity-50"
           aria-label="Close"
@@ -599,7 +600,7 @@ export default function AddSpaceModal({
           <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               disabled={loading}
               className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >

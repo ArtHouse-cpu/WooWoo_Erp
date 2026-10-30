@@ -1,4 +1,5 @@
 import {useEffect, useState} from 'react';
+import {closeIfConfirmed} from '../../utils/confirmClose';
 import {
   ArrowRight,
   Check,
@@ -114,7 +115,7 @@ export function BenefitsSheet({
         type="button"
         aria-label="Close benefits"
         className="absolute inset-0 bg-black/45"
-        onClick={onClose}
+        onClick={() => void closeIfConfirmed(onClose)}
       />
       <div className="relative z-10 flex max-h-[88dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:mx-4 sm:max-h-[90dvh] sm:max-w-3xl sm:rounded-[28px]">
         <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[#D1D5DB] sm:hidden" />
@@ -144,7 +145,7 @@ export function BenefitsSheet({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563]"
             >
               <X className="h-4 w-4" />
@@ -462,14 +463,14 @@ export function CheckoutSheet({
         type="button"
         aria-label="Close checkout"
         className="absolute inset-0 bg-black/45"
-        onClick={onClose}
+        onClick={() => void closeIfConfirmed(onClose)}
       />
       <div className="relative z-10 flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:mx-4 sm:rounded-[28px]">
         <div className="relative shrink-0 px-4 pb-1 pt-3 sm:px-5">
           <div className="mx-auto h-1 w-10 rounded-full bg-[#D1D5DB]" />
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="absolute right-3 top-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] sm:right-4"
           >
             <X className="h-4 w-4" />

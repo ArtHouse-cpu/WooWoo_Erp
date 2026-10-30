@@ -8,6 +8,7 @@ import {
     handleSwitchCompany as apiSwitchCompany 
 } from "@/services/apiClient";
 import Swal from "sweetalert2";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type CompanySelectorModalProps = {
   open: boolean;
@@ -130,7 +131,7 @@ export const CompanySelectorModal = ({ open, onClose }: CompanySelectorModalProp
             />
           </div>
           <button 
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"
           >
             <X size={20} />

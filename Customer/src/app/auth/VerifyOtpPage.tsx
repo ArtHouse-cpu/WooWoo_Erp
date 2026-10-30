@@ -11,6 +11,7 @@ import {getErrorMessage} from '../../services/axios';
 import {useAuthStore} from '../../store/authStore';
 import type {Customer, OtpPurpose} from '../../types/auth';
 import {getPostAuthPath} from '../../utils/onboarding';
+import {consumeReturnTo} from '../../utils/returnTo';
 import {clearInviteRef, getInviteRef} from '../../utils/inviteRef';
 
 interface LocationState {
@@ -18,6 +19,7 @@ interface LocationState {
   identifier?: string;
   purpose?: OtpPurpose;
   debugOtp?: string;
+  returnTo?: string | null;
 }
 
 export default function VerifyOtpPage() {
@@ -84,7 +86,11 @@ export default function VerifyOtpPage() {
       sessionStorage.removeItem('customer_profile_draft');
       clearInviteRef();
       toast.success(data.message || 'OTP verified successfully');
-      navigate(getPostAuthPath(data.data as Customer), {replace: true});
+      navigate(
+        consumeReturnTo({returnTo: state.returnTo}) ||
+          getPostAuthPath(data.data as Customer),
+        {replace: true},
+      );
     } catch (error) {
       toast.error(getErrorMessage(error, 'OTP verification failed'));
     } finally {

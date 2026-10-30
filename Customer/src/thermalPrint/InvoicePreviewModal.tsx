@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { closeIfConfirmed } from "../utils/confirmClose";
 import { ThermalPrint, type ThermalPrintProps } from "./ThermalPrint";
 
 /** Must match `[data-invoice-pdf-root]` width in ThermalPrint (A4 @ 96dpi). */
@@ -7,6 +8,8 @@ const INVOICE_WIDTH_PX = 794;
 type Props = {
   invoice: ThermalPrintProps;
   onClose: () => void;
+  onDownload?: () => void;
+  downloading?: boolean;
 };
 
 /**
@@ -14,7 +17,12 @@ type Props = {
  * to fit narrow mobile viewports without horizontal overflow.
  * Print/PDF keep the original 794px layout (transform is preview-only).
  */
-export function InvoicePreviewModal({ invoice, onClose }: Props) {
+export function InvoicePreviewModal({
+  invoice,
+  onClose,
+  onDownload,
+  downloading = false,
+}: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -60,7 +68,7 @@ export function InvoicePreviewModal({ invoice, onClose }: Props) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") void closeIfConfirmed(onClose);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -83,6 +91,16 @@ export function InvoicePreviewModal({ invoice, onClose }: Props) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {onDownload ? (
+            <button
+              type="button"
+              disabled={downloading}
+              onClick={onDownload}
+              className="rounded-lg bg-white px-3 py-2 text-[12px] font-extrabold text-[#111111] transition hover:bg-slate-100 disabled:opacity-60"
+            >
+              {downloading ? "Downloading…" : "Download PDF"}
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => window.print()}
@@ -92,8 +110,8 @@ export function InvoicePreviewModal({ invoice, onClose }: Props) {
           </button>
           <button
             type="button"
-            onClick={onClose}
-            className="rounded-lg bg-white px-3 py-2 text-[12px] font-extrabold text-[#111111] transition hover:bg-slate-100"
+            onClick={() => void closeIfConfirmed(onClose)}
+            className="rounded-lg bg-white/10 px-3 py-2 text-[12px] font-extrabold text-white transition hover:bg-white/20"
           >
             Close
           </button>

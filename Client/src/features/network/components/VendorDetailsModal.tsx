@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { handleGetVendorById, type VendorPayload } from "@/services/apiClient";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type VendorDetails = VendorPayload & {
   _id?: string;
@@ -144,7 +145,7 @@ export default function VendorDetailsModal({ open, vendor, onClose }: Props) {
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-full p-2.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
           >
             <X size={20} />
@@ -302,7 +303,7 @@ export default function VendorDetailsModal({ open, vendor, onClose }: Props) {
         <div className="flex justify-end border-t border-slate-200 bg-white px-6 py-3">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
           >
             Close

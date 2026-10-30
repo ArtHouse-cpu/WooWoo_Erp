@@ -17,6 +17,7 @@ import {
 import { useAppSelector } from "@/store/hooks";
 import { resolveWalletBalance } from "@/utils/resolveWalletBalance";
 import { nearestRupee, roundPayable } from "@/features/sales/utils/paymentRoundOff";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type SplitKey = "cash" | "upi" | "card" | "wallet";
 
@@ -324,7 +325,7 @@ export default function DuePaymentModal({
         type="button"
         aria-label="Close overlay"
         className="absolute inset-0 cursor-default"
-        onClick={onClose}
+        onClick={() => void closeIfConfirmed(onClose)}
       />
 
       <div
@@ -364,7 +365,7 @@ export default function DuePaymentModal({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               className="shrink-0 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               aria-label="Close"
             >
@@ -679,7 +680,7 @@ export default function DuePaymentModal({
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="mt-2 w-full py-2 text-center text-xs font-medium text-slate-400 transition hover:text-slate-600"
           >
             Cancel

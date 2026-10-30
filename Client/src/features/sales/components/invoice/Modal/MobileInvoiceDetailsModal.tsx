@@ -19,6 +19,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type MobileInvoiceDetailsModalProps = {
   open: boolean;
@@ -241,7 +242,7 @@ export default function MobileInvoiceDetailsModal({
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => void closeIfConfirmed(onClose)}
               className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-700 transition hover:bg-slate-100 active:scale-95"
               aria-label="Back"
             >

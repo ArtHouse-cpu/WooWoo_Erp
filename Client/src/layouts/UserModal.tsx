@@ -4,6 +4,7 @@ import { useAppSelector } from "@/store/hooks";
 import { handleUpdateUser } from "@/services/apiClient";
 import Swal from "sweetalert2";
 import AppearanceButtons from "@/components/AppearanceButtons";
+import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type UserModalProps = {
   open: boolean;
@@ -123,7 +124,7 @@ export const UserModal = ({ open, onClose, user: propUser }: UserModalProps) => 
 
   const handleEsc = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") void closeIfConfirmed(onClose);
     },
     [onClose],
   );
@@ -203,7 +204,7 @@ export const UserModal = ({ open, onClose, user: propUser }: UserModalProps) => 
         className={`fixed inset-0 z-[60] bg-black/30 transition-opacity duration-300 ${
           open ? "opacity-100 visible" : "opacity-0 invisible"
         }`}
-        onClick={onClose}
+        onClick={() => void closeIfConfirmed(onClose)}
       />
 
       <div 
@@ -218,7 +219,7 @@ export const UserModal = ({ open, onClose, user: propUser }: UserModalProps) => 
           </h2>
           <button 
             type="button"
-            onClick={onClose}
+            onClick={() => void closeIfConfirmed(onClose)}
             className="p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
           >
             <X size={20} />

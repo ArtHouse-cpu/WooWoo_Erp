@@ -49,6 +49,7 @@ import {
 } from "../utils/catalogueLineKey";
 import { filterCatalogueRowsForPos } from "../utils/cataloguePosFilter";
 import { useNavigate } from "react-router-dom";
+import { readFormDraft, useAutosaveFormDraft } from "../utils/formDraft";
 
 
 const todayStr = new Date().toISOString().split("T")[0];
@@ -88,6 +89,12 @@ type PosItem = {
   productDiscountValue?: number;
   productDiscountAmount?: number;
   membershipDiscountAmount?: number;
+};
+
+export const INVOICE_SAVED_EVENT = "erp:invoice-saved";
+
+const notifyInvoiceSaved = () => {
+  window.dispatchEvent(new Event(INVOICE_SAVED_EVENT));
 };
 
 export default function CreatePosScreen({
@@ -145,6 +152,43 @@ export default function CreatePosScreen({
   const staffName = staff.m_staff_name || "Staff";
 
   const [items, setItems] = useState<PosItem[]>([]);
+  const posDraft = {
+    invoiceNo,
+    invoiceDate,
+    dueDate,
+    customer,
+    phone,
+    membership,
+    membershipPlanId,
+    customerId,
+    extraCharges,
+    items,
+  };
+  const posDraftHasContent = (data: typeof posDraft) =>
+    Boolean(
+      String(data.customer || "").trim() ||
+        String(data.phone || "").trim() ||
+        (data.items?.length ?? 0) ||
+        (data.extraCharges?.length ?? 0),
+    );
+  const { clearDraft: clearPosDraft } = useAutosaveFormDraft({
+    storageKey: "pos",
+    enabled: isOpen,
+    snapshot: posDraft,
+    hasContent: posDraftHasContent,
+    restore: (data) => {
+      setInvoiceNo(data.invoiceNo || "");
+      setInvoiceDate(data.invoiceDate || todayStr);
+      setDueDate(data.dueDate || todayStr);
+      setCustomer(data.customer || "");
+      setPhone(data.phone || "");
+      setMembership(data.membership || "none");
+      setMembershipPlanId(data.membershipPlanId ?? null);
+      setCustomerId(data.customerId ?? null);
+      setExtraCharges(Array.isArray(data.extraCharges) ? data.extraCharges : []);
+      setItems(Array.isArray(data.items) ? data.items : []);
+    },
+  });
 
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [isDesktopLayout, setIsDesktopLayout] = useState(() =>
@@ -183,7 +227,15 @@ export default function CreatePosScreen({
 
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
-      resetPosBill();
+      const saved = readFormDraft<typeof posDraft>("pos");
+      if (!saved || !posDraftHasContent(saved)) {
+        resetPosBill();
+      } else {
+        setOpenCheckout(false);
+        setOpenDraftPin(false);
+        setSearchText("");
+        setSelectedProduct(null);
+      }
     }
     wasOpenRef.current = Boolean(isOpen);
   }, [isOpen]);
@@ -679,6 +731,8 @@ export default function CreatePosScreen({
         payment.customerId,
       );
 
+      clearPosDraft();
+      notifyInvoiceSaved();
       await Swal.fire("Success", "POS Transaction completed.", "success");
       setItems([]);
       setOpenCheckout(false);
@@ -763,6 +817,8 @@ export default function CreatePosScreen({
         },
       });
 
+      clearPosDraft();
+      notifyInvoiceSaved();
       await Swal.fire(
         "Success",
         `Draft saved by ${salesPersonName}.`,
@@ -896,8 +952,8 @@ export default function CreatePosScreen({
 
   const handleRequestClose = async () => {
     const result = await Swal.fire({
-      title: "Are you sure?",
-      text: "any unsaved changes will be lost.",
+      title: "Do you really want to close?",
+      text: "Any unsaved changes will be lost.",
       icon: "warning",
       showCancelButton: true,
       showDenyButton: true,          // Enable the 3rd button
