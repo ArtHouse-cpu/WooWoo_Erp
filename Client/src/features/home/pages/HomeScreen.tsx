@@ -602,8 +602,7 @@ export default function HomeScreen() {
     return () => {
       alive = false;
     };
-  }, [loadDashboardData]);
-  }, [canPath, invoiceRefresh]);
+  }, [loadDashboardData, invoiceRefresh]);
 
   useEffect(() => {
     const onSaved = () => setInvoiceRefresh((current) => current + 1);
