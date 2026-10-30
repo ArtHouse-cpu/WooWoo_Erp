@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   Briefcase,
+  Calendar,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Crown,
+  Ellipsis,
+  FileText,
   Filter,
   MapPin,
   Monitor,
@@ -24,9 +27,11 @@ import {
 import {
   customerPayloadToFormData,
   handleCreateCustomer,
+  handleDeleteInvoice,
   handleGetCustomers,
   handleGetDashboardSummary,
   handleGetFoods,
+  handleGetInvoice,
   handleGetInvoices,
   handleGetMemberships,
   handleGetProducts,
@@ -44,6 +49,15 @@ import RevenueCard from "@/features/home/components/RevenueCard";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
 import CreatePosScreen from "@/features/sales/pages/CreatePosScreen";
+import MobileInvoiceDetailsModal from "@/features/sales/components/invoice/Modal/MobileInvoiceDetailsModal";
+import SalesReturnFlowModal from "@/features/sales/components/invoice/Modal/SalesReturnFlowModal";
+import { currentInvoiceTotal } from "@/features/sales/utils/salesReturn";
+import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
+import {
+  buildWoowooInvoiceWhatsAppMessage,
+  normalizeIndianWhatsAppDigits,
+  resolveHostedInvoiceLink,
+} from "@/utils/whatsappInvoiceShare";
 import { normalizeLineType } from "@/features/sales/utils/itemClassification";
 import {
   billingMembershipFromCustomer,
@@ -324,6 +338,79 @@ function statusStyles(status: RecentBill["status"]) {
   return { pill: "bg-gray-100 text-gray-600", dot: "bg-gray-400" };
 }
 
+function getCustomerMembershipLabel(raw: any): string | null {
+  if (!raw) return null;
+  const m =
+    raw.membershipType ||
+    raw.membershipPlan ||
+    raw.membership ||
+    raw.customerMembership ||
+    raw.customer?.membershipType ||
+    raw.customer?.membership;
+  if (!m || String(m).toLowerCase() === "none" || String(m).toLowerCase() === "visitor") {
+    return null;
+  }
+  return String(m);
+}
+
+function getInvoiceCategories(raw: any): string[] {
+  if (!raw) return [];
+  const categories = new Set<string>();
+
+  const notes = String(raw.notes || "").toLowerCase();
+  if (notes.includes("food bill") || notes.includes("food")) {
+    categories.add("Food");
+  }
+  if (notes.includes("space booking") || notes.includes("space")) {
+    categories.add("Space");
+  }
+
+  const directCat = String(
+    raw.invoiceCategory || raw.category || raw.billType || raw.sourceType || "",
+  ).toLowerCase();
+  if (directCat.includes("food")) categories.add("Food");
+  if (directCat.includes("space")) categories.add("Space");
+  if (directCat.includes("service")) categories.add("Service");
+  if (directCat.includes("membership") || directCat.includes("subscription")) {
+    categories.add("Membership");
+  }
+
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  for (const item of items) {
+    const cat = String(
+      item.lineCategory || item.sourceType || item.category || "",
+    ).toLowerCase();
+    const name = String(item.productName || item.name || "").toLowerCase();
+    if (cat === "food" || cat === "foods" || name.includes("food") || item.isFood) {
+      categories.add("Food");
+    } else if (cat === "space" || cat === "spaces" || name.includes("space") || item.isSpace) {
+      categories.add("Space");
+    } else if (cat === "service" || cat === "services") {
+      categories.add("Service");
+    } else if (/membership|subscription/.test(cat) || /membership|subscription/.test(name)) {
+      categories.add("Membership");
+    }
+  }
+
+  return Array.from(categories);
+}
+
+function paymentStatusForWhatsApp(
+  raw: Record<string, unknown>,
+  rowStatus: string,
+): string {
+  const due = Number(
+    (raw as any)?.pendingAmount ??
+      (raw as any)?.paymentBreakdown?.dueAmount ??
+      0,
+  );
+  if (due > 0.001 || rowStatus === "Pending") return "Pending";
+  const ps = String(raw.paymentStatus ?? "").toLowerCase();
+  if (ps === "full") return "Paid";
+  if (ps === "partial" || ps === "due") return "Pending";
+  return rowStatus;
+}
+
 export default function HomeScreen() {
   const navigate = useNavigate();
   const staff = useAppSelector((state) => state.user);
@@ -362,6 +449,14 @@ export default function HomeScreen() {
   const [kpisLoading, setKpisLoading] = useState(true);
   const [billsLoading, setBillsLoading] = useState(true);
 
+  // Mobile invoice details and actions state
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
+  const [mobileDetailsInvoice, setMobileDetailsInvoice] = useState<any>(null);
+  const [mobileDetailsLoading, setMobileDetailsLoading] = useState(false);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnIntent, setReturnIntent] = useState<"return" | "cancel">("return");
+  const [returnInvoice, setReturnInvoice] = useState<any>(null);
+
   const [products, setProducts] = useState<GenericRow[]>([]);
   const [spaces, setSpaces] = useState<GenericRow[]>([]);
   const [services, setServices] = useState<GenericRow[]>([]);
@@ -393,123 +488,117 @@ export default function HomeScreen() {
     setPage(1);
   }, [tab, search, dateFilter, statusFilter]);
 
+  const loadDashboardData = useCallback(async () => {
+    setKpisLoading(true);
+    setBillsLoading(true);
+    try {
+      const [
+        invoiceRes,
+        customerRes,
+        membershipRes,
+      ] = await Promise.allSettled([
+        // Home KPIs: load sales even if menu path checks are narrow
+        handleGetInvoices("", undefined, 2000),
+        canPath("/customers")
+          ? handleGetCustomers("", undefined, 2000, 1)
+          : Promise.resolve(null),
+        canPath("/membership") || canPath("/manage-plans")
+          ? handleGetMemberships({ status: "Active" })
+          : Promise.resolve(null),
+      ]);
+
+      const invoices =
+        invoiceRes.status === "fulfilled" &&
+        Array.isArray(invoiceRes.value?.invoices)
+          ? invoiceRes.value.invoices
+          : [];
+
+      const mappedBills: RecentBill[] = invoices.map(
+        (invoice: Record<string, unknown>, index: number) => {
+          const due = Number(
+            invoice?.pendingAmount ??
+              (
+                invoice?.paymentBreakdown as
+                  | { dueAmount?: number }
+                  | undefined
+              )?.dueAmount ??
+              0,
+          );
+          return {
+            id: String(invoice?._id ?? index),
+            customer: String(invoice?.customerName || "Walk-in customer"),
+            phone: String(invoice?.customerPhone || "—"),
+            invoiceCode: String(
+              invoice?.invoiceCode ??
+                `INV-${invoice?.invoiceNumber ?? index + 1}`,
+            ),
+            amount: Math.max(
+              0,
+              Number(invoice?.grandTotal ?? 0) -
+                Number(invoice?.returnedAmount ?? 0),
+            ),
+            status: toStatus(invoice?.status ?? invoice?.paymentStatus, due),
+            paymentType: formatPaymentType(invoice?.mode),
+            category: billCategoryFromItems(invoice?.items),
+            createdAt:
+              parseDate(invoice?.updatedAt) ?? parseDate(invoice?.createdAt),
+            raw: invoice,
+          };
+        },
+      );
+      setBills(mappedBills);
+      setBillsLoading(false);
+
+      const plans =
+        membershipRes.status === "fulfilled" &&
+        Array.isArray(membershipRes.value?.memberships)
+          ? membershipRes.value.memberships
+          : [];
+      setMembershipPlans(plans);
+
+      const customerList =
+        customerRes.status === "fulfilled" &&
+        Array.isArray(customerRes.value?.customers)
+          ? customerRes.value.customers
+          : [];
+      setCustomers(
+        customerList.map((c: Record<string, unknown>, i: number) => ({
+          id: String(c?._id ?? i),
+          name: String(c?.name || "Customer"),
+          phone: String(c?.mobile || c?.phone || "—"),
+          membership: (() => {
+            const activeType = billingMembershipFromCustomer({
+              membershipType:
+                typeof c?.membershipType === "string" ? c.membershipType : "",
+              membershipExpired: Boolean(c?.membershipExpired),
+            });
+            return isEmptyMembership(activeType)
+              ? "Visitor"
+              : getMembershipBadgeLabel(
+                  plans,
+                  activeType,
+                  c?.membershipExpired ? null : c?.membershipPlanId,
+                );
+          })(),
+          createdAt: parseDate(c?.createdAt),
+        })),
+      );
+    } catch {
+      setBills([]);
+      setCustomers([]);
+    } finally {
+      setKpisLoading(false);
+      setBillsLoading(false);
+    }
+  }, [canPath]);
+
   useEffect(() => {
     let alive = true;
-    const load = async () => {
-      setKpisLoading(true);
-      setBillsLoading(true);
-      try {
-        const [
-          invoiceRes,
-          customerRes,
-          membershipRes,
-        ] = await Promise.allSettled([
-          // Home KPIs: load sales even if menu path checks are narrow
-          handleGetInvoices("", undefined, 2000),
-          canPath("/customers")
-            ? handleGetCustomers("", undefined, 2000, 1)
-            : Promise.resolve(null),
-          canPath("/membership") || canPath("/manage-plans")
-            ? handleGetMemberships({ status: "Active" })
-            : Promise.resolve(null),
-        ]);
-
-        if (!alive) return;
-
-        const invoices =
-          invoiceRes.status === "fulfilled" &&
-          Array.isArray(invoiceRes.value?.invoices)
-            ? invoiceRes.value.invoices
-            : [];
-
-        const mappedBills: RecentBill[] = invoices.map(
-          (invoice: Record<string, unknown>, index: number) => {
-            const due = Number(
-              invoice?.pendingAmount ??
-                (
-                  invoice?.paymentBreakdown as
-                    | { dueAmount?: number }
-                    | undefined
-                )?.dueAmount ??
-                0,
-            );
-            return {
-              id: String(invoice?._id ?? index),
-              customer: String(invoice?.customerName || "Walk-in customer"),
-              phone: String(invoice?.customerPhone || "—"),
-              invoiceCode: String(
-                invoice?.invoiceCode ??
-                  `INV-${invoice?.invoiceNumber ?? index + 1}`,
-              ),
-              amount: Math.max(
-                0,
-                Number(invoice?.grandTotal ?? 0) -
-                  Number(invoice?.returnedAmount ?? 0),
-              ),
-              status: toStatus(invoice?.status ?? invoice?.paymentStatus, due),
-              paymentType: formatPaymentType(invoice?.mode),
-              category: billCategoryFromItems(invoice?.items),
-              createdAt:
-                parseDate(invoice?.updatedAt) ?? parseDate(invoice?.createdAt),
-              raw: invoice,
-
-            };
-          },
-        );
-        setBills(mappedBills);
-        setBillsLoading(false);
-
-        const plans =
-          membershipRes.status === "fulfilled" &&
-          Array.isArray(membershipRes.value?.memberships)
-            ? membershipRes.value.memberships
-            : [];
-        setMembershipPlans(plans);
-
-        const customerList =
-          customerRes.status === "fulfilled" &&
-          Array.isArray(customerRes.value?.customers)
-            ? customerRes.value.customers
-            : [];
-        setCustomers(
-          customerList.map((c: Record<string, unknown>, i: number) => ({
-            id: String(c?._id ?? i),
-            name: String(c?.name || "Customer"),
-            phone: String(c?.mobile || c?.phone || "—"),
-            membership: (() => {
-              const activeType = billingMembershipFromCustomer({
-                membershipType:
-                  typeof c?.membershipType === "string" ? c.membershipType : "",
-                membershipExpired: Boolean(c?.membershipExpired),
-              });
-              return isEmptyMembership(activeType)
-                ? "Visitor"
-                : getMembershipBadgeLabel(
-                    plans,
-                    activeType,
-                    c?.membershipExpired ? null : c?.membershipPlanId,
-                  );
-            })(),
-            createdAt: parseDate(c?.createdAt),
-          })),
-        );
-      } catch {
-        if (alive) {
-          setBills([]);
-          setCustomers([]);
-        }
-      } finally {
-        if (alive) {
-          setKpisLoading(false);
-          setBillsLoading(false);
-        }
-      }
-    };
-    void load();
+    void loadDashboardData();
     return () => {
       alive = false;
     };
-  }, [canPath]);
+  }, [loadDashboardData]);
 
   useEffect(() => {
     let alive = true;
@@ -875,6 +964,159 @@ export default function HomeScreen() {
     navigate("/create-invoice", { state: { invoice: bill.raw, mode: "view" } });
   };
 
+  const handleMobileBillClick = async (bill: RecentBill) => {
+    setMobileDetailsInvoice(bill.raw || bill);
+    setMobileDetailsOpen(true);
+    setMobileDetailsLoading(true);
+    try {
+      const billId = String((bill.raw as any)?._id || bill.id);
+      const res = await handleGetInvoice(billId);
+      if (res?.invoice) {
+        setMobileDetailsInvoice(res.invoice);
+      }
+    } catch (err) {
+      console.error("Failed to fetch invoice details:", err);
+    } finally {
+      setMobileDetailsLoading(false);
+    }
+  };
+
+  const handleWhatsAppShare = async (invoice: any) => {
+    const raw = ((invoice?.raw ?? invoice) ?? {}) as Record<string, unknown>;
+
+    const customerName =
+      String(
+        invoice?.customer || raw.customerName || "Customer",
+      ).trim() || "Customer";
+
+    const docCode = String(
+      raw.returnCode ?? raw.invoiceCode ?? invoice?.invoiceCode ?? invoice?.bill ?? invoice?.id ?? "",
+    );
+
+    const isCreditNote = Boolean(raw.returnCode);
+    const docLabel = isCreditNote
+      ? "Sales Return / Credit Note"
+      : "Invoice";
+
+    const totalVal = Number(
+      currentInvoiceTotal(raw) || invoice?.amount || raw?.grandTotal || 0,
+    );
+    const totalFormatted = `₹ ${totalVal.toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+    const paymentStatus = paymentStatusForWhatsApp(
+      raw,
+      String(invoice?.status || raw.status || ""),
+    );
+
+    const hostedLink = resolveHostedInvoiceLink(raw);
+
+    const message = buildWoowooInvoiceWhatsAppMessage({
+      customerName,
+      docLabel,
+      docCode,
+      totalFormatted,
+      paymentStatus,
+      externalLink: hostedLink || undefined,
+    });
+
+    Swal.fire({
+      title: "Preparing…",
+      text: "Generating invoice PDF for WhatsApp",
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading(),
+    });
+
+    let blobPkg: { blob: Blob; filename: string } | null = null;
+    try {
+      blobPkg = await getInvoicePdfBlob(raw);
+    } catch (e) {
+      console.error(e);
+    }
+
+    Swal.close();
+
+    const pdfFile =
+      blobPkg &&
+      new File([blobPkg.blob], blobPkg.filename, {
+        type: "application/pdf",
+      });
+
+    const canSharePdf =
+      typeof navigator !== "undefined" &&
+      typeof navigator.share === "function" &&
+      Boolean(pdfFile) &&
+      typeof navigator.canShare === "function" &&
+      navigator.canShare({ files: [pdfFile!] });
+
+    if (canSharePdf && pdfFile) {
+      try {
+        await navigator.share({
+          text: message,
+          files: [pdfFile],
+        });
+        return;
+      } catch (err) {
+        const aborted =
+          err instanceof Error && err.name === "AbortError";
+        if (aborted) return;
+        console.warn("Share sheet failed, opening WhatsApp Web:", err);
+      }
+    }
+
+    const digits = normalizeIndianWhatsAppDigits(
+      String(invoice?.phone || raw.customerPhone || ""),
+    );
+    const waBase = digits
+      ? `https://wa.me/${digits}`
+      : "https://wa.me/";
+    window.open(
+      `${waBase}?text=${encodeURIComponent(message)}`,
+      "_blank",
+    );
+
+    if (blobPkg) {
+      const url = URL.createObjectURL(blobPkg.blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = blobPkg.filename;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      await Swal.fire({
+        icon: "info",
+        title: "PDF downloaded",
+        text: "Attach the downloaded PDF to your WhatsApp message (WhatsApp Web cannot auto-attach files).",
+      });
+    } else if (!hostedLink) {
+      await Swal.fire({
+        icon: "warning",
+        title: "PDF unavailable",
+        text: "Could not generate the invoice PDF. Try the Download button or add a hosted link from your server.",
+      });
+    }
+  };
+
+  const handleDownloadBill = async (invoice: any) => {
+    const raw = (invoice?.raw ?? invoice) ?? invoice;
+    try {
+      Swal.fire({
+        title: "Generating PDF...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+      await downloadInvoicePdf(raw);
+      Swal.close();
+    } catch {
+      Swal.fire("Error", "Could not generate PDF.", "error");
+    }
+  };
+
   const tabRoutes: Record<TabKey, string> = {
     bills: canPath("/pos") ? "/pos" : "/invoices",
     customers: "/customers",
@@ -1169,135 +1411,327 @@ export default function HomeScreen() {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          {tab === "bills" ? (
-            <table className="min-w-[860px] w-full text-sm">
-              <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-4 py-3">Invoice No.</th>
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Date & Time</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3 text-right">Total Amount</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Payment Type</th>
-                  <th className="px-4 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {billsLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="border-t border-gray-50">
-                      <td colSpan={8} className="px-4 py-3">
-                        <div className="h-10 animate-pulse rounded-lg bg-gray-100" />
-                      </td>
-                    </tr>
-                  ))
-                ) : pageBills.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-4 py-12 text-center text-gray-500"
+        {tab === "bills" ? (
+          <>
+            {/* Mobile View: Dedicated Card per transaction (Mobile only) */}
+            <div className="block md:hidden space-y-2.5 p-3">
+              {billsLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-28 animate-pulse rounded-2xl border border-slate-200 bg-white p-3.5"
+                  />
+                ))
+              ) : pageBills.length === 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                    <FileText size={24} />
+                  </div>
+                  <h4 className="mt-3 text-sm font-semibold text-slate-800">
+                    No bills found
+                  </h4>
+                  <p className="mt-1 text-xs text-slate-500">
+                    No bills found for this filter.
+                  </p>
+                </div>
+              ) : (
+                pageBills.map((bill) => {
+                  const raw = (bill.raw || {}) as Record<string, unknown>;
+                  const isPaid = bill.status === "Paid";
+                  const isPending =
+                    bill.status === "Pending" || bill.status === "Unpaid";
+                  const isDraft = bill.status === "Draft";
+                  const customerName =
+                    bill.customer && bill.customer !== "undefined"
+                      ? bill.customer
+                      : "Walk-in Customer";
+                  const categories = getInvoiceCategories(bill.raw);
+                  const membershipLabel = getCustomerMembershipLabel(bill.raw);
+                  const when = formatBillDate(bill.createdAt);
+                  const dueAmount = Number(
+                    raw.pendingAmount ??
+                      (
+                        raw.paymentBreakdown as
+                          | { dueAmount?: number }
+                          | undefined
+                      )?.dueAmount ??
+                      0,
+                  );
+                  const owner = String(
+                    (raw.createdBy as { m_staff_name?: string } | undefined)
+                      ?.m_staff_name ||
+                      raw.salesPersonName ||
+                      "System",
+                  );
+                  const displayStatus = isPending ? "Pending" : bill.status;
+
+                  return (
+                    <div
+                      key={bill.id}
+                      onClick={() => void handleMobileBillClick(bill)}
+                      className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
                     >
-                      No bills found for this filter.
-                    </td>
-                  </tr>
-                ) : (
-                  pageBills.map((bill, index) => {
-                    const tone = AVATAR_TONES[index % AVATAR_TONES.length];
-                    const styles = statusStyles(bill.status);
-                    const when = formatBillDate(bill.createdAt);
-                    const displayStatus =
-                      bill.status === "Pending" || bill.status === "Unpaid"
-                        ? "Pending"
-                        : bill.status;
-                    return (
-                      <tr
-                        key={bill.id}
-                        className="border-t border-gray-50 transition hover:bg-slate-50/80"
-                      >
-                        <td className="px-4 py-3 font-semibold text-gray-900">
-                          {bill.invoiceCode}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${tone.bg} ${tone.text}`}
-                            >
-                              {initials(bill.customer)}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-gray-900">
-                                {bill.customer}
-                              </p>
-                              <p className="truncate text-xs text-gray-500">
-                                {bill.phone}
-                              </p>
-                            </div>
+                      {/* Card Top Section */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          {/* Customer Name + Membership Label */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="truncate text-base font-bold text-slate-900">
+                              {customerName}
+                            </h3>
+                            {membershipLabel && (
+                              <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 ring-1 ring-inset ring-purple-200">
+                                {membershipLabel}
+                              </span>
+                            )}
                           </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          <p>{when.day}</p>
-                          <p className="text-xs text-gray-400">{when.time}</p>
-                        </td>
-                        <td className="px-4 py-3">
+
+                          {/* Invoice Code + Mode + Category Labels */}
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-medium text-slate-500">
+                              {bill.invoiceCode}
+                            </span>
+                            <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                              {bill.paymentType}
+                            </span>
+                            {categories.length > 0 ? (
+                              categories.map((cat) => (
+                                <span
+                                  key={cat}
+                                  className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+                                    cat === "Food"
+                                      ? "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200"
+                                      : cat === "Space"
+                                        ? "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200"
+                                        : cat === "Membership"
+                                          ? "bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-200"
+                                          : "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200"
+                                  }`}
+                                >
+                                  {cat}
+                                </span>
+                              ))
+                            ) : (
+                              <span
+                                className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${CATEGORY_PILL[bill.category]}`}
+                              >
+                                {bill.category}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 flex-col items-end">
+                          {/* Status Badge */}
                           <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${CATEGORY_PILL[bill.category]}`}
-                          >
-                            {bill.category}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-gray-900">
-                          {formatMoney(bill.amount)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${styles.pill}`}
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${
+                              isPaid
+                                ? "border border-emerald-200 bg-emerald-50 text-emerald-600"
+                                : isPending
+                                  ? "border border-amber-200 bg-amber-50 text-amber-600"
+                                  : isDraft
+                                    ? "border border-slate-200 bg-slate-100 text-slate-600"
+                                    : "border border-rose-200 bg-rose-50 text-rose-600"
+                            }`}
                           >
                             <span
-                              className={`h-1.5 w-1.5 rounded-full ${styles.dot}`}
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                isPaid
+                                  ? "bg-emerald-500"
+                                  : isPending
+                                    ? "bg-amber-500"
+                                    : isDraft
+                                      ? "bg-slate-400"
+                                      : "bg-rose-500"
+                              }`}
                             />
-                            {displayStatus}
+                            {displayStatus.toLowerCase()}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {bill.paymentType}
-                        </td>
-                        <td className="relative px-4 py-3 text-right">
+
+                          {/* Amount */}
+                          <div className="mt-1.5 text-right">
+                            <span className="text-base font-bold text-slate-900">
+                              {formatMoney(bill.amount)}
+                            </span>
+                            {dueAmount > 0 && (
+                              <div className="text-[10px] font-semibold text-amber-600">
+                                Due {formatMoney(dueAmount)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Subtle Horizontal Divider */}
+                      <div className="my-2.5 border-t border-slate-100" />
+
+                      {/* Card Bottom Section */}
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <div className="flex min-w-0 items-center gap-1 truncate text-slate-400">
+                          <Calendar
+                            size={13}
+                            className="shrink-0 text-slate-400"
+                          />
+                          <span className="truncate">
+                            {when.day}
+                            {when.time ? `, ${when.time}` : ""} • By {owner}
+                          </span>
+                        </div>
+
+                        <div
+                          className="flex shrink-0 items-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             type="button"
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMenuId(menuId === bill.id ? null : bill.id);
-                            }}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                            aria-label="Bill actions"
+                            onClick={() => void handleMobileBillClick(bill)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200 active:scale-95"
+                            title="Bill Actions"
+                            aria-label="Bill Actions"
                           >
-                            <MoreVertical size={16} />
+                            <Ellipsis size={16} />
                           </button>
-                          {menuId === bill.id ? (
-                            <div
-                              className="absolute right-4 z-20 mt-1 w-36 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 text-left shadow-lg"
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => openBill(bill)}
-                                className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                View bill
-                              </button>
-                            </div>
-                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop Table (Desktop only) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-[860px] w-full text-sm">
+                <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3">Invoice No.</th>
+                    <th className="px-4 py-3">Customer</th>
+                    <th className="px-4 py-3">Date & Time</th>
+                    <th className="px-4 py-3">Category</th>
+                    <th className="px-4 py-3 text-right">Total Amount</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Payment Type</th>
+                    <th className="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {billsLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i} className="border-t border-gray-50">
+                        <td colSpan={8} className="px-4 py-3">
+                          <div className="h-10 animate-pulse rounded-lg bg-gray-100" />
                         </td>
                       </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          ) : tab === "customers" ? (
+                    ))
+                  ) : pageBills.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="px-4 py-12 text-center text-gray-500"
+                      >
+                        No bills found for this filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    pageBills.map((bill, index) => {
+                      const tone = AVATAR_TONES[index % AVATAR_TONES.length];
+                      const styles = statusStyles(bill.status);
+                      const when = formatBillDate(bill.createdAt);
+                      const displayStatus =
+                        bill.status === "Pending" || bill.status === "Unpaid"
+                          ? "Pending"
+                          : bill.status;
+                      return (
+                        <tr
+                          key={bill.id}
+                          className="border-t border-gray-50 transition hover:bg-slate-50/80"
+                        >
+                          <td className="px-4 py-3 font-semibold text-gray-900">
+                            {bill.invoiceCode}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <span
+                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${tone.bg} ${tone.text}`}
+                              >
+                                {initials(bill.customer)}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-gray-900">
+                                  {bill.customer}
+                                </p>
+                                <p className="truncate text-xs text-gray-500">
+                                  {bill.phone}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            <p>{when.day}</p>
+                            <p className="text-xs text-gray-400">{when.time}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${CATEGORY_PILL[bill.category]}`}
+                            >
+                              {bill.category}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                            {formatMoney(bill.amount)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${styles.pill}`}
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${styles.dot}`}
+                              />
+                              {displayStatus}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {bill.paymentType}
+                          </td>
+                          <td className="relative px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMenuId(menuId === bill.id ? null : bill.id);
+                              }}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                              aria-label="Bill actions"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+                            {menuId === bill.id ? (
+                              <div
+                                className="absolute right-4 z-20 mt-1 w-36 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 text-left shadow-lg"
+                                onMouseDown={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => openBill(bill)}
+                                  className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                  View bill
+                                </button>
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="overflow-x-auto">
+            {tab === "customers" ? (
             <table className="min-w-[640px] w-full text-sm">
               <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                 <tr>
@@ -1436,6 +1870,7 @@ export default function HomeScreen() {
             </table>
           )}
         </div>
+      )}
 
         <div className="flex flex-col gap-3 border-t border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-gray-500">
@@ -1502,6 +1937,100 @@ export default function HomeScreen() {
       ) : null}
 
       <CreatePosScreen open={openPos} onClose={() => setOpenPos(false)} />
+
+      <MobileInvoiceDetailsModal
+        open={mobileDetailsOpen}
+        onClose={() => {
+          setMobileDetailsOpen(false);
+          setMobileDetailsInvoice(null);
+        }}
+        invoice={mobileDetailsInvoice}
+        loading={mobileDetailsLoading}
+        onEdit={(inv) => {
+          setMobileDetailsOpen(false);
+          const raw = inv.raw ?? inv;
+          if (raw.status === "Cancelled") {
+            Swal.fire(
+              "Cannot Edit",
+              "Cancelled invoices cannot be edited.",
+              "warning",
+            );
+            return;
+          }
+          navigate("/create-invoice", {
+            state: { invoice: raw, mode: "edit" },
+          });
+        }}
+        onConvert={(inv) => {
+          setMobileDetailsOpen(false);
+          const raw = inv.raw ?? inv;
+          if (raw.status === "Cancelled") {
+            Swal.fire(
+              "Cannot return",
+              "Cancelled invoices cannot be returned.",
+              "info",
+            );
+            return;
+          }
+          setReturnIntent("return");
+          setReturnInvoice(raw);
+          setReturnModalOpen(true);
+        }}
+        onCancelInvoice={(inv) => {
+          setMobileDetailsOpen(false);
+          const raw = inv.raw ?? inv;
+          if (raw.status === "Cancelled") {
+            Swal.fire(
+              "Already Cancelled",
+              "This invoice is already cancelled.",
+              "info",
+            );
+            return;
+          }
+          setReturnIntent("cancel");
+          setReturnInvoice(raw);
+          setReturnModalOpen(true);
+        }}
+        onDeleteInvoice={async (inv) => {
+          const raw = inv.raw ?? inv;
+          const invoiceId = raw._id || inv._id;
+          const confirm = await Swal.fire({
+            title: "Delete Invoice?",
+            text: "This action cannot be undone.",
+            icon: "error",
+            showCancelButton: true,
+            confirmButtonText: "Yes, Delete",
+          });
+          if (confirm.isConfirmed) {
+            try {
+              await handleDeleteInvoice(invoiceId);
+              Swal.fire("Deleted", "Invoice deleted successfully.", "success");
+              setMobileDetailsOpen(false);
+              setMobileDetailsInvoice(null);
+              void loadDashboardData();
+            } catch {
+              Swal.fire("Error", "Could not delete invoice.", "error");
+            }
+          }
+        }}
+        onWhatsAppShare={handleWhatsAppShare}
+        onDownloadPdf={handleDownloadBill}
+      />
+
+      <SalesReturnFlowModal
+        open={returnModalOpen}
+        invoice={returnInvoice}
+        intent={returnIntent}
+        onClose={() => {
+          setReturnModalOpen(false);
+          setReturnInvoice(null);
+        }}
+        onSuccess={() => {
+          setReturnModalOpen(false);
+          setReturnInvoice(null);
+          void loadDashboardData();
+        }}
+      />
     </div>
   );
 }
