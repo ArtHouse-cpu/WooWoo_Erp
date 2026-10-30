@@ -48,7 +48,9 @@ import { useAppSelector } from "@/store/hooks";
 import RevenueCard from "@/features/home/components/RevenueCard";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
-import CreatePosScreen from "@/features/sales/pages/CreatePosScreen";
+import CreatePosScreen, {
+  INVOICE_SAVED_EVENT,
+} from "@/features/sales/pages/CreatePosScreen";
 import MobileInvoiceDetailsModal from "@/features/sales/components/invoice/Modal/MobileInvoiceDetailsModal";
 import SalesReturnFlowModal from "@/features/sales/components/invoice/Modal/SalesReturnFlowModal";
 import { currentInvoiceTotal } from "@/features/sales/utils/salesReturn";
@@ -58,9 +60,6 @@ import {
   normalizeIndianWhatsAppDigits,
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
-import CreatePosScreen, {
-  INVOICE_SAVED_EVENT,
-} from "@/features/sales/pages/CreatePosScreen";
 import { normalizeLineType } from "@/features/sales/utils/itemClassification";
 import {
   billingMembershipFromCustomer,
