@@ -28,6 +28,7 @@ import {
   customerPayloadToFormData,
   handleCreateCustomer,
   handleDeleteInvoice,
+  handleGetAllBookings,
   handleGetCustomers,
   handleGetDashboardSummary,
   handleGetFoods,
@@ -38,6 +39,7 @@ import {
   handleGetServices,
   handleGetSpaces,
   handleGetSubscriptions,
+  type AllBookingRow,
   type CustomerPayload,
   type DashboardPeriod,
   type DashboardSummaryData,
@@ -69,9 +71,10 @@ import {
 
 type TabKey =
   | "bills"
+  | "bookings"
+  | "subscriptions"
   | "customers"
   | "memberships"
-  | "subscriptions"
   | "products"
   | "spaces"
   | "services"
@@ -109,8 +112,16 @@ type GenericRow = {
   subtitle: string;
   meta: string;
   amount?: string;
+  numAmount?: number;
+  dueAmount?: number;
   badge?: string;
   createdAt?: Date | null;
+  phone?: string;
+  code?: string;
+  paymentType?: string;
+  inclusions?: string[];
+  owner?: string;
+  raw?: Record<string, unknown>;
 };
 
 const PAGE_SIZE = 5;
@@ -134,9 +145,10 @@ const CATEGORY_PILL: Record<BillCategory, string> = {
 
 const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: "bills", label: "Bills", icon: Monitor },
+  { key: "bookings", label: "Bookings", icon: Calendar },
+  { key: "subscriptions", label: "Subscriptions", icon: Ticket },
   { key: "customers", label: "Customers", icon: Users },
   { key: "memberships", label: "Memberships", icon: Crown },
-  { key: "subscriptions", label: "Subscriptions", icon: Ticket },
   { key: "products", label: "Products", icon: Package },
   { key: "spaces", label: "Spaces", icon: MapPin },
   { key: "services", label: "Services", icon: Briefcase },
@@ -340,6 +352,48 @@ function statusStyles(status: RecentBill["status"]) {
   return { pill: "bg-gray-100 text-gray-600", dot: "bg-gray-400" };
 }
 
+function genericStatusStyles(statusStr: string) {
+  const s = String(statusStr || "").toLowerCase();
+  if (
+    s === "paid" ||
+    s === "active" ||
+    s === "confirmed" ||
+    s === "ongoing" ||
+    s === "completed"
+  ) {
+    return {
+      pill: "border border-emerald-200 bg-emerald-50 text-emerald-600",
+      dot: "bg-emerald-500",
+      tablePill: "bg-emerald-50 text-emerald-700",
+    };
+  }
+  if (
+    s === "upcoming" ||
+    s === "pending" ||
+    s === "unpaid" ||
+    s === "partial" ||
+    s === "due"
+  ) {
+    return {
+      pill: "border border-amber-200 bg-amber-50 text-amber-600",
+      dot: "bg-amber-500",
+      tablePill: "bg-amber-50 text-amber-700",
+    };
+  }
+  if (s === "draft") {
+    return {
+      pill: "border border-slate-200 bg-slate-100 text-slate-600",
+      dot: "bg-slate-400",
+      tablePill: "bg-gray-100 text-gray-600",
+    };
+  }
+  return {
+    pill: "border border-rose-200 bg-rose-50 text-rose-600",
+    dot: "bg-rose-500",
+    tablePill: "bg-rose-50 text-rose-700",
+  };
+}
+
 function getCustomerMembershipLabel(raw: any): string | null {
   if (!raw) return null;
   const m =
@@ -464,6 +518,9 @@ export default function HomeScreen() {
   const [services, setServices] = useState<GenericRow[]>([]);
   const [foods, setFoods] = useState<GenericRow[]>([]);
   const [subscriptions, setSubscriptions] = useState<GenericRow[]>([]);
+  const [bookings, setBookings] = useState<GenericRow[]>([]);
+  const [selectedSubscription, setSelectedSubscription] = useState<any>(null);
+  const [subscriptionMode, setSubscriptionMode] = useState<"create" | "view">("create");
   const [tabLoading, setTabLoading] = useState(false);
   const [invoiceRefresh, setInvoiceRefresh] = useState(0);
 
@@ -675,6 +732,43 @@ export default function HomeScreen() {
     const load = async () => {
       setTabLoading(true);
       try {
+        if (tab === "bookings" && bookings.length === 0) {
+          const res = await handleGetAllBookings({ page: 1, limit: 100 });
+          if (!alive) return;
+          const list = Array.isArray(res?.bookings) ? res.bookings : [];
+          setBookings(
+            list.map((b: AllBookingRow, i: number) => {
+              const customerName = b.customerName || b.customer?.name || "Customer";
+              const code = b.bookingCode || `BK-${i + 1}`;
+              const space = b.spaceName || b.spaceType || "";
+              const inclusions: string[] = [];
+              if (space) inclusions.push(space);
+              if (b.services && b.services.length > 0) inclusions.push("Services");
+              if (b.foods && b.foods.length > 0) inclusions.push("Food");
+              const subtitle = inclusions.join(" · ") || "Booking";
+              const dateObj =
+                parseDate(b.bookingDate) ||
+                parseDate(b.createdAt) ||
+                null;
+              return {
+                id: String(b.id || b.sourceId || i),
+                title: customerName,
+                subtitle: `${subtitle} · ${code}`,
+                meta: String(b.status || "Upcoming"),
+                amount: formatMoney(Number(b.grandTotal ?? 0)),
+                numAmount: Number(b.grandTotal ?? 0),
+                dueAmount: Number(b.dueAmount ?? 0),
+                createdAt: dateObj,
+                phone: b.customerPhone || b.customer?.phone || "",
+                code,
+                paymentType: b.paymentStatus || "—",
+                inclusions,
+                badge: b.membershipType || b.customer?.membershipType || "",
+                raw: b as unknown as Record<string, unknown>,
+              };
+            }),
+          );
+        }
         if (tab === "subscriptions" && subscriptions.length === 0) {
           const res = await handleGetSubscriptions("", 100);
           if (!alive) return;
@@ -702,19 +796,26 @@ export default function HomeScreen() {
                 s?.subscriptionCode ??
                   `SUB-${s?.subscriptionNumber ?? i + 1}`,
               );
+              const total = Number(s?.grandTotal ?? s?.amount ?? 0);
+              const due = Number(s?.dueAmount ?? s?.pendingAmount ?? 0);
               return {
                 id: String(s?._id ?? i),
                 title: String(s?.customerName || s?.name || "Customer"),
                 subtitle: `${plan} · ${code}`,
                 meta: String(s?.status || "active"),
-                amount: formatMoney(
-                  Number(s?.grandTotal ?? s?.amount ?? 0),
-                ),
-                // Date column + sort key: prefer createdAt
+                amount: formatMoney(total),
+                numAmount: total,
+                dueAmount: due,
                 createdAt:
                   parseDate(s?.createdAt) ||
                   parseDate(s?.invoiceDate) ||
                   parseDate(s?.startDate),
+                phone: String(s?.customerPhone || s?.phone || ""),
+                code,
+                paymentType: String(s?.paymentMethod || s?.paymentMode || "UPI"),
+                badge: plan,
+                owner: String(s?.salesPersonName || "System"),
+                raw: s,
               };
             }),
           );
@@ -871,17 +972,19 @@ export default function HomeScreen() {
   const genericRows =
     tab === "memberships"
       ? membershipRows
-      : tab === "subscriptions"
-        ? subscriptions
-        : tab === "products"
-          ? products
-          : tab === "spaces"
-            ? spaces
-            : tab === "services"
-              ? services
-              : tab === "food"
-                ? foods
-                : [];
+      : tab === "bookings"
+        ? bookings
+        : tab === "subscriptions"
+          ? subscriptions
+          : tab === "products"
+            ? products
+            : tab === "spaces"
+              ? spaces
+              : tab === "services"
+                ? services
+                : tab === "food"
+                  ? foods
+                  : [];
 
   const filteredGeneric = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -893,12 +996,14 @@ export default function HomeScreen() {
       return (
         row.title.toLowerCase().includes(term) ||
         row.subtitle.toLowerCase().includes(term) ||
-        row.meta.toLowerCase().includes(term)
+        row.meta.toLowerCase().includes(term) ||
+        (row.code && row.code.toLowerCase().includes(term)) ||
+        (row.phone && row.phone.toLowerCase().includes(term))
       );
     });
 
-    // Subscriptions: always newest createdAt first (matches Date column)
-    if (tab === "subscriptions") {
+    // Subscriptions and Bookings: always newest createdAt first (matches Date column)
+    if (tab === "subscriptions" || tab === "bookings") {
       return [...filtered].sort((a, b) => {
         const ta = a.createdAt?.getTime() ?? 0;
         const tb = b.createdAt?.getTime() ?? 0;
@@ -925,11 +1030,13 @@ export default function HomeScreen() {
   const searchPlaceholder =
     tab === "bills"
       ? "Search by invoice no., customer name or phone..."
-      : tab === "customers"
-        ? "Search customers by name or phone..."
-        : tab === "subscriptions"
-          ? "Search subscriptions by customer, plan or status..."
-          : `Search ${tab}...`;
+      : tab === "bookings"
+        ? "Search bookings by customer, phone or booking code..."
+        : tab === "customers"
+          ? "Search customers by name or phone..."
+          : tab === "subscriptions"
+            ? "Search subscriptions by customer, plan or status..."
+            : `Search ${tab}...`;
 
   const handleCreateCustomerSubmit = async (args: {
     payload: CustomerPayload;
@@ -1128,13 +1235,28 @@ export default function HomeScreen() {
 
   const tabRoutes: Record<TabKey, string> = {
     bills: canPath("/pos") ? "/pos" : "/invoices",
+    bookings: "/allBookings",
+    subscriptions: "/subscriptions",
     customers: "/customers",
     memberships: "/manage-plans",
-    subscriptions: "/subscriptions",
     products: "/products",
     spaces: "/spaces",
     services: "/services",
     food: "/foods",
+  };
+
+  const handleMobileSubscriptionClick = (sub: GenericRow) => {
+    if (sub.raw) {
+      setSelectedSubscription(sub.raw);
+      setSubscriptionMode("view");
+      setOpenCreateSubscriptionModal(true);
+    } else {
+      navigate("/subscriptions");
+    }
+  };
+
+  const handleMobileBookingClick = (_b: GenericRow) => {
+    navigate("/allBookings");
   };
 
   return (
@@ -1405,7 +1527,7 @@ export default function HomeScreen() {
             </h2>
             <p className="text-xs text-gray-500">
               {tab === "bills"
-                ? "Manage and view all your transaction bills."
+                ? " "
                 : tab === "subscriptions"
                   ? "Recent membership subscriptions from this dashboard."
                   : `Browse ${TABS.find((t) => t.key === tab)?.label ?? tab} from this dashboard.`}
@@ -1738,6 +1860,450 @@ export default function HomeScreen() {
               </table>
             </div>
           </>
+        ) : tab === "bookings" ? (
+          <>
+            {/* Mobile Cards (Mobile only) */}
+            <div className="block md:hidden space-y-2.5 p-3">
+              {tabLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-28 animate-pulse rounded-2xl border border-slate-200/80 bg-slate-50 p-3.5"
+                  />
+                ))
+              ) : pageGeneric.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
+                  <Package className="mx-auto h-8 w-8 text-slate-300" />
+                  <h4 className="mt-3 text-sm font-semibold text-slate-800">
+                    No bookings found
+                  </h4>
+                  <p className="mt-1 text-xs text-slate-500">
+                    No bookings found for this filter.
+                  </p>
+                </div>
+              ) : (
+                pageGeneric.map((row, index) => {
+                  const s = genericStatusStyles(row.meta);
+                  const when = formatBillDate(row.createdAt ?? null);
+                  return (
+                    <div
+                      key={row.id || index}
+                      onClick={() => handleMobileBookingClick(row)}
+                      className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                    >
+                      {/* Card Top Section */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          {/* Customer Name + Membership Label */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="truncate text-base font-bold text-slate-900">
+                              {row.title || "Customer"}
+                            </h3>
+                            {row.badge && (
+                              <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 ring-1 ring-inset ring-purple-200">
+                                {row.badge}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Booking Code + Payment Status + Inclusions */}
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-medium text-slate-500">
+                              {row.code}
+                            </span>
+                            <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                              {row.paymentType || "Pending"}
+                            </span>
+                            {row.inclusions && row.inclusions.length > 0 ? (
+                              row.inclusions.map((inc) => (
+                                <span
+                                  key={inc}
+                                  className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+                                    inc === "Food"
+                                      ? "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200"
+                                      : inc.toLowerCase().includes("space") ||
+                                          inc.toLowerCase().includes("desk") ||
+                                          inc.toLowerCase().includes("cabin") ||
+                                          inc.toLowerCase().includes("room")
+                                        ? "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200"
+                                        : "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200"
+                                  }`}
+                                >
+                                  {inc}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                                Space
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 flex-col items-end">
+                          {/* Status Badge */}
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${s.pill}`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                            {row.meta.toLowerCase()}
+                          </span>
+
+                          {/* Amount */}
+                          <div className="mt-1.5 text-right">
+                            <span className="text-base font-bold text-slate-900">
+                              {row.amount}
+                            </span>
+                            {(row.dueAmount ?? 0) > 0 && (
+                              <div className="text-[10px] font-semibold text-amber-600">
+                                Due {formatMoney(row.dueAmount!)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Subtle Horizontal Divider */}
+                      <div className="my-2.5 border-t border-slate-100" />
+
+                      {/* Card Bottom Section */}
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <div className="flex min-w-0 items-center gap-1 truncate text-slate-400">
+                          <Calendar
+                            size={13}
+                            className="shrink-0 text-slate-400"
+                          />
+                          <span className="truncate">
+                            {when.day}
+                            {when.time ? `, ${when.time}` : ""}
+                            {row.phone ? ` • ${row.phone}` : ""}
+                          </span>
+                        </div>
+
+                        <div
+                          className="flex shrink-0 items-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleMobileBookingClick(row)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200 active:scale-95"
+                            title="View Booking"
+                            aria-label="View Booking"
+                          >
+                            <Ellipsis size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop Table (Desktop only) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-[760px] w-full text-sm">
+                <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3">Booking Code</th>
+                    <th className="px-4 py-3">Customer</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Inclusions</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Payment</th>
+                    <th className="px-4 py-3 text-right">Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tabLoading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <tr key={i} className="border-t border-gray-50">
+                        <td colSpan={7} className="px-4 py-3">
+                          <div className="h-10 animate-pulse rounded-lg bg-gray-100" />
+                        </td>
+                      </tr>
+                    ))
+                  ) : pageGeneric.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-4 py-12 text-center text-gray-500"
+                      >
+                        No bookings found.
+                      </td>
+                    </tr>
+                  ) : (
+                    pageGeneric.map((row) => {
+                      const s = genericStatusStyles(row.meta);
+                      const when = formatBillDate(row.createdAt ?? null);
+                      return (
+                        <tr
+                          key={row.id}
+                          onClick={() => handleMobileBookingClick(row)}
+                          className="cursor-pointer border-t border-gray-50 transition hover:bg-slate-50/80"
+                        >
+                          <td className="px-4 py-3 font-semibold text-gray-900">
+                            {row.code}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {row.title}
+                              </p>
+                              {row.phone && (
+                                <p className="text-xs text-gray-400">
+                                  {row.phone}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            <p>{when.day}</p>
+                            {when.time && (
+                              <p className="text-xs text-gray-400">
+                                {when.time}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-1">
+                              {row.inclusions && row.inclusions.length > 0 ? (
+                                row.inclusions.map((inc) => (
+                                  <span
+                                    key={inc}
+                                    className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700"
+                                  >
+                                    {inc}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${s.tablePill}`}
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${s.dot}`}
+                              />
+                              {row.meta}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {row.paymentType || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                            {row.amount}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : tab === "subscriptions" ? (
+          <>
+            {/* Mobile Cards (Mobile only) */}
+            <div className="block md:hidden space-y-2.5 p-3">
+              {tabLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-28 animate-pulse rounded-2xl border border-slate-200/80 bg-slate-50 p-3.5"
+                  />
+                ))
+              ) : pageGeneric.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
+                  <Ticket className="mx-auto h-8 w-8 text-slate-300" />
+                  <h4 className="mt-3 text-sm font-semibold text-slate-800">
+                    No subscriptions found
+                  </h4>
+                  <p className="mt-1 text-xs text-slate-500">
+                    No subscriptions found for this filter.
+                  </p>
+                </div>
+              ) : (
+                pageGeneric.map((row, index) => {
+                  const s = genericStatusStyles(row.meta);
+                  const when = formatBillDate(row.createdAt ?? null);
+                  return (
+                    <div
+                      key={row.id || index}
+                      onClick={() => handleMobileSubscriptionClick(row)}
+                      className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                    >
+                      {/* Card Top Section */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          {/* Customer Name + Plan Label */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="truncate text-base font-bold text-slate-900">
+                              {row.title || "Customer"}
+                            </h3>
+                            {row.badge && (
+                              <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700 ring-1 ring-inset ring-purple-200">
+                                {row.badge}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Code + Payment Method + Membership Tag */}
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs font-medium text-slate-500">
+                              {row.code}
+                            </span>
+                            <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                              {row.paymentType || "UPI"}
+                            </span>
+                            <span className="inline-flex items-center rounded-md bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 ring-1 ring-inset ring-purple-200">
+                              Membership
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 flex-col items-end">
+                          {/* Status Badge */}
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${s.pill}`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                            {row.meta.toLowerCase()}
+                          </span>
+
+                          {/* Amount */}
+                          <div className="mt-1.5 text-right">
+                            <span className="text-base font-bold text-slate-900">
+                              {row.amount}
+                            </span>
+                            {(row.dueAmount ?? 0) > 0 && (
+                              <div className="text-[10px] font-semibold text-amber-600">
+                                Due {formatMoney(row.dueAmount!)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Subtle Horizontal Divider */}
+                      <div className="my-2.5 border-t border-slate-100" />
+
+                      {/* Card Bottom Section */}
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <div className="flex min-w-0 items-center gap-1 truncate text-slate-400">
+                          <Calendar
+                            size={13}
+                            className="shrink-0 text-slate-400"
+                          />
+                          <span className="truncate">
+                            {when.day}
+                            {when.time ? `, ${when.time}` : ""}
+                            {row.owner ? ` • By ${row.owner}` : ""}
+                          </span>
+                        </div>
+
+                        <div
+                          className="flex shrink-0 items-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleMobileSubscriptionClick(row)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200 active:scale-95"
+                            title="View Subscription"
+                            aria-label="View Subscription"
+                          >
+                            <Ellipsis size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop Table (Desktop only) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-[640px] w-full text-sm">
+                <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3">Customer</th>
+                    <th className="px-4 py-3">Plan</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tabLoading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <tr key={i} className="border-t border-gray-50">
+                        <td colSpan={5} className="px-4 py-3">
+                          <div className="h-10 animate-pulse rounded-lg bg-gray-100" />
+                        </td>
+                      </tr>
+                    ))
+                  ) : pageGeneric.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-4 py-12 text-center text-gray-500"
+                      >
+                        No subscriptions found.
+                      </td>
+                    </tr>
+                  ) : (
+                    pageGeneric.map((row) => {
+                      const when = formatBillDate(row.createdAt ?? null);
+                      const s = genericStatusStyles(row.meta);
+                      return (
+                        <tr
+                          key={row.id}
+                          onClick={() => handleMobileSubscriptionClick(row)}
+                          className="cursor-pointer border-t border-gray-50 transition hover:bg-slate-50/80"
+                        >
+                          <td className="px-4 py-3 font-medium text-gray-900">
+                            {row.title}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {row.badge || row.subtitle}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            <div className="flex flex-col">
+                              <span>{when?.day || "—"}</span>
+                              {when?.time ? (
+                                <span className="text-[11px] text-gray-400">
+                                  {when.time}
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${s.tablePill}`}
+                            >
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${s.dot}`}
+                              />
+                              {row.meta}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                            {row.amount || "—"}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <div className="overflow-x-auto">
             {tab === "customers" ? (
@@ -1939,9 +2505,19 @@ export default function HomeScreen() {
 
       {openCreateSubscriptionModal ? (
         <CreateSubscriptionScreen
-          initialMode="create"
-          onClose={() => setOpenCreateSubscriptionModal(false)}
-          onSave={() => setOpenCreateSubscriptionModal(false)}
+          initialMode={subscriptionMode}
+          initialData={selectedSubscription}
+          onClose={() => {
+            setOpenCreateSubscriptionModal(false);
+            setSelectedSubscription(null);
+            setSubscriptionMode("create");
+          }}
+          onSave={() => {
+            setOpenCreateSubscriptionModal(false);
+            setSelectedSubscription(null);
+            setSubscriptionMode("create");
+            setSubscriptions([]);
+          }}
         />
       ) : null}
 
