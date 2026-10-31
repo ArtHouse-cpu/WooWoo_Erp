@@ -183,11 +183,37 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
     name: string;
     mimeType?: string;
   } | null>(null);
-  const [mobileTab, setMobileTab] = useState<"details" | "timeline" | "status">("timeline");
+  const [mobileTab, setMobileTab] = useState<"details" | "timeline" | "status">("details");
+
+  const handleSafeClose = () => {
+    if (panelOpen && (note.trim() || followDate || followTime)) {
+      void closeIfConfirmed(onClose);
+    } else {
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (viewingMedia) {
+          setViewingMedia(null);
+        } else if (panelOpen) {
+          setPanelOpen(false);
+        } else {
+          handleSafeClose();
+        }
+      }
+    };
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [isOpen, viewingMedia, panelOpen, note, followDate, followTime]);
 
   useEffect(() => {
     setPanelOpen(false);
-    setMobileTab("timeline");
+    setMobileTab("details");
     setChoice(lead?.status || "New");
     setNote("");
     setFollowDate("");
@@ -243,8 +269,16 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-slate-900/40 p-0 sm:p-4">
-      <div className="flex h-dvh w-full max-w-[1400px] flex-col overflow-hidden bg-[#F6F7FB] sm:h-[94vh] sm:rounded-2xl sm:shadow-2xl">
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/60 p-2.5 sm:p-4 backdrop-blur-xs transition-opacity"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleSafeClose();
+      }}
+    >
+      <div
+        className="flex max-h-[90vh] sm:max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-[#F6F7FB] shadow-2xl ring-1 ring-slate-900/10"
+        onClick={(e) => e.stopPropagation()}
+      >
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:items-center sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 sm:h-11 sm:w-11">
@@ -274,8 +308,8 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => void closeIfConfirmed(onClose)}
-              className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              onClick={handleSafeClose}
+              className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
               aria-label="Close"
             >
               <X size={18} />

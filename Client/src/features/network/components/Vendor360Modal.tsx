@@ -635,58 +635,73 @@ export default function Vendor360Modal({
   return (
     <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4">
       <div className="flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-[#F6F7FB] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl">
-        <header className="flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-violet-600">
-              Vendor 360 View
-            </p>
-            <h2 className="truncate text-lg font-bold text-slate-900">
-              {profile?.name || vendor.name}
-              {profile?.cspLabel ? (
-                <span className="ml-2 align-middle rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">
-                  {profile.cspLabel}
+        <header className="border-b border-slate-200 bg-white px-3 sm:px-4 py-2.5 sm:py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          {/* Top row: Title, Name and Close Button */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-violet-600">
+                  Vendor 360 View
                 </span>
-              ) : null}
-            </h2>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              <span>
-                {profile?.companyName || vendor.companyName || "No company"}
-              </span>
-              {phoneLink(profile?.mobile || vendor.mobile) ? (
-                <a
-                  href={phoneLink(profile?.mobile || vendor.mobile)}
-                  className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700"
-                >
-                  <Phone size={12} /> Call
-                </a>
-              ) : null}
-              {mailLink(profile?.email) ? (
-                <a
-                  href={mailLink(profile?.email)}
-                  className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700"
-                >
-                  <Mail size={12} /> Email
-                </a>
-              ) : null}
-              {whatsAppLink(profile?.whatsappNumber) ? (
-                <a
-                  href={whatsAppLink(profile?.whatsappNumber)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 font-semibold text-emerald-700"
-                >
-                  <MessageCircle size={12} /> WhatsApp
-                </a>
-              ) : null}
+                {profile?.cspLabel ? (
+                  <span className="rounded-full bg-violet-100 px-2 py-0.2 text-[10px] font-bold text-violet-700">
+                    {profile.cspLabel}
+                  </span>
+                ) : null}
+              </div>
+              <h2 className="truncate text-base sm:text-lg font-bold text-slate-900 mt-0.5">
+                {profile?.name || vendor.name}
+              </h2>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                <span className="truncate max-w-[150px] font-medium text-slate-600">
+                  {profile?.companyName || vendor.companyName || "No company"}
+                </span>
+                {phoneLink(profile?.mobile || vendor.mobile) ? (
+                  <a
+                    href={phoneLink(profile?.mobile || vendor.mobile)}
+                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition"
+                  >
+                    <Phone size={11} /> Call
+                  </a>
+                ) : null}
+                {mailLink(profile?.email) ? (
+                  <a
+                    href={mailLink(profile?.email)}
+                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition"
+                  >
+                    <Mail size={11} /> Email
+                  </a>
+                ) : null}
+                {whatsAppLink(profile?.whatsappNumber) ? (
+                  <a
+                    href={whatsAppLink(profile?.whatsappNumber)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+                  >
+                    <MessageCircle size={11} /> WhatsApp
+                  </a>
+                ) : null}
+              </div>
             </div>
+
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => void closeIfConfirmed(onClose)}
+              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white hover:bg-slate-800 transition"
+            >
+              <X size={14} /> Close
+            </button>
           </div>
-          <div className="flex shrink-0 items-start gap-2">
-            <div className="flex flex-wrap justify-end gap-2">
+
+          {/* Action buttons row: scrollable on mobile, flex on desktop */}
+          <div className="mt-2.5 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar sm:mt-3 sm:flex-wrap sm:overflow-visible">
             <Can permission={PERMISSIONS.VENDOR_UPDATE}>
               <button
                 type="button"
                 onClick={() => setPayOpen(true)}
-                className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white"
+                className="shrink-0 rounded-xl bg-violet-600 px-3 py-1.5 sm:py-2 text-xs font-bold text-white shadow-xs hover:bg-violet-700 transition"
               >
                 Record Payment
               </button>
@@ -698,33 +713,25 @@ export default function Vendor360Modal({
                   `/expenses?create=1&vendorId=${vendor._id}&vendorName=${encodeURIComponent(profile?.name || vendor.name)}`,
                 )
               }
-              className="inline-flex items-center gap-1 rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200"
+              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 transition"
             >
-              <Receipt size={14} /> Add Expense
+              <Receipt size={13} /> Add Expense
             </button>
             <button
               type="button"
               onClick={() => openWithVendor("/create-purchase", vendorState)}
-              className="inline-flex items-center gap-1 rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200"
+              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 transition"
             >
-              <ShoppingCart size={14} /> Create Purchase
+              <ShoppingCart size={13} /> Create Purchase
             </button>
             <button
               type="button"
               onClick={() =>
                 openWithVendor("/create-purchase-order", vendorState)
               }
-              className="inline-flex items-center gap-1 rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200"
+              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 transition"
             >
-              <FilePlus2 size={14} /> Create Purchase Order
-            </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => void closeIfConfirmed(onClose)}
-              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white"
-            >
-              <X size={14} /> Close
+              <FilePlus2 size={13} /> Create Purchase Order
             </button>
           </div>
         </header>
@@ -777,19 +784,19 @@ export default function Vendor360Modal({
                   <option value="year">This year</option>
                 </select>
               </div> */}
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
                 {cards.map((card) => (
                   <article
                     key={card.label}
-                    className="rounded-2xl border border-slate-200 bg-white p-4"
+                    className="rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs transition hover:border-slate-300"
                   >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    <p className="truncate text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-400">
                       {card.label}
                     </p>
-                    <p className="mt-1 text-xl font-bold text-slate-900">
+                    <p className="mt-1 truncate text-base sm:text-xl font-bold text-slate-900">
                       {card.value}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">{card.hint}</p>
+                    <p className="mt-0.5 truncate text-[11px] sm:text-xs text-slate-500">{card.hint}</p>
                   </article>
                 ))}
               </div>
@@ -1753,7 +1760,8 @@ function BillTable({
         <DateRangeSelect value={dateRange} onChange={onDateRange} />
         <CreatedSortSelect value={createdSort} onChange={onCreatedSort} />
       </div>
-      <div className="overflow-x-auto">
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="min-w-[720px] w-full text-left text-sm">
           <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
             <tr>
@@ -1825,6 +1833,54 @@ function BillTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="block md:hidden divide-y divide-slate-100">
+        {rows.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-400">
+            {empty}
+          </div>
+        ) : (
+          rows.map((row) => (
+            <div
+              key={row.id}
+              onClick={onOpen ? () => onOpen(row) : undefined}
+              className={`p-3 space-y-2 transition active:bg-slate-50/70 ${onOpen ? "cursor-pointer" : ""}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-xs text-slate-900 truncate">
+                  {row.invoiceNumber || "—"}
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone(row.status, row.overdue)}`}>
+                  {row.overdue ? "Overdue" : row.status || "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>{whenStamp(row.invoiceDate, row.createdAt)}</span>
+                <span className="font-bold text-slate-900">{money(row.amount)}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-100/80 pt-1.5 text-[11px]">
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-500">Paid: <b className="text-slate-700">{money(row.paidAmount)}</b></span>
+                  <span className="text-slate-500">Due: <b className={Number(row.dueAmount) > 0 ? "text-rose-600" : "text-slate-700"}>{money(row.dueAmount)}</b></span>
+                </div>
+                {onPay && row.dueAmount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPay(row);
+                    }}
+                    className="rounded-lg bg-violet-600 px-2 py-1 text-[11px] font-bold text-white shadow-xs"
+                  >
+                    Pay
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </section>
   );

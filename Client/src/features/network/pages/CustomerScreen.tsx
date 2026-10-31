@@ -7,7 +7,7 @@ import {
   type MRT_PaginationState,
   type MRT_Row,
 } from "material-react-table";
-import { Eye, FileSpreadsheet, SquarePen, Trash2 } from "lucide-react";
+import { Eye, FileSpreadsheet, Loader2, Search, SquarePen, Trash2, X } from "lucide-react";
 import Swal from "sweetalert2";
 import LedgerModal from "@/features/network/components/LedgerModal";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
@@ -469,7 +469,214 @@ export default function CustomerScreen() {
         </div>
       </div>
 
-      <MaterialReactTable table={table} />
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <MaterialReactTable table={table} />
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="block md:hidden space-y-2.5">
+        <div className="relative mb-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search customers..."
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-slate-400"
+          />
+        </div>
+
+        {loadingCustomers && customers.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            Loading customers...
+          </div>
+        ) : customers.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            No customers found
+          </div>
+        ) : (
+          customers.map((customer, idx) => {
+            const hasMembership = Boolean(customer.membershipType && customer.membershipType !== "None");
+
+            return (
+              <div
+                key={customer._id || idx}
+                className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-bold text-slate-900">
+                        {customer.name || "Unnamed Customer"}
+                      </span>
+                      {hasMembership && (
+                        <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.2 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-200/60">
+                          {customer.membershipType}
+                        </span>
+                      )}
+                    </div>
+                    {customer.companyName && (
+                      <p className="mt-0.5 text-xs font-medium text-slate-600 truncate">
+                        {customer.companyName}
+                      </p>
+                    )}
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      {customer.mobile && (
+                        <span className="font-medium text-slate-700">
+                          {customer.mobile}
+                        </span>
+                      )}
+                      {customer.city && (
+                        <>
+                          <span>•</span>
+                          <span>{customer.city}</span>
+                        </>
+                      )}
+                      {customer.email && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate max-w-[140px]">
+                            {customer.email}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {customer.dueAmount !== undefined && Number(customer.dueAmount) > 0 ? (
+                    <span className="shrink-0 rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200/60">
+                      Due: ₹{Number(customer.dueAmount).toLocaleString("en-IN")}
+                    </span>
+                  ) : (
+                    <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200/60">
+                      Clear
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                  <div className="flex items-center gap-4 text-xs">
+                    <div>
+                      <span className="block text-[10px] font-medium uppercase text-slate-400">
+                        Wallet
+                      </span>
+                      <span className="text-sm font-bold text-slate-900">
+                        ₹{Number(customer.walletAmount || 0).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div
+                    className="flex items-center gap-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCustomer(customer);
+                        setOpenLedgerModal(true);
+                      }}
+                      className="cursor-pointer rounded-lg bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100"
+                      title="View Ledger"
+                    >
+                      <Eye size={15} />
+                    </button>
+                    <Can permission={PERMISSIONS.CUSTOMER_UPDATE}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCustomer(customer);
+                          setEditOpen(true);
+                        }}
+                        className="cursor-pointer rounded-lg bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100"
+                        title="Edit Customer"
+                      >
+                        <SquarePen size={15} />
+                      </button>
+                    </Can>
+                    <Can permission={PERMISSIONS.CUSTOMER_DELETE}>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!customer._id) return;
+                          const res = await Swal.fire({
+                            title: "Delete customer?",
+                            text: "This action cannot be undone.",
+                            icon: "warning",
+                            showCancelButton: true,
+                            confirmButtonText: "Delete",
+                            confirmButtonColor: "#dc2626",
+                          });
+                          if (!res.isConfirmed) return;
+                          try {
+                            await handleDeleteCustomer(customer._id);
+                            await fetchCustomers();
+                            Swal.fire({
+                              title: "Deleted",
+                              text: "Customer removed.",
+                              icon: "success",
+                              timer: 1400,
+                              showConfirmButton: false,
+                            });
+                          } catch (err: any) {
+                            Swal.fire(
+                              "Error",
+                              err?.response?.data?.message ?? "Failed to delete customer.",
+                              "error",
+                            );
+                          }
+                        }}
+                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                        title="Delete Customer"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </Can>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        {/* Mobile Pagination */}
+        {rowCount > pagination.pageSize && (
+          <div className="flex items-center justify-between pt-2 text-xs text-slate-500">
+            <button
+              type="button"
+              disabled={pagination.pageIndex === 0}
+              onClick={() =>
+                setPagination((prev) => ({
+                  ...prev,
+                  pageIndex: Math.max(0, prev.pageIndex - 1),
+                }))
+              }
+              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-medium disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span>
+              Page {pagination.pageIndex + 1} of{" "}
+              {Math.ceil(rowCount / pagination.pageSize) || 1}
+            </span>
+            <button
+              type="button"
+              disabled={
+                (pagination.pageIndex + 1) * pagination.pageSize >= rowCount
+              }
+              onClick={() =>
+                setPagination((prev) => ({
+                  ...prev,
+                  pageIndex: prev.pageIndex + 1,
+                }))
+              }
+              className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 font-medium disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
 
       {openCreateCustomerModal && (
         <CreateCustomerModal

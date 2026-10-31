@@ -5,7 +5,8 @@ import {
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
-import { Eye, FileSpreadsheet, Trash2,SquarePen } from "lucide-react";
+import { Eye, FileSpreadsheet,
+  Search, Trash2,SquarePen } from "lucide-react";
 import Swal from "sweetalert2";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -182,6 +183,8 @@ export default function VendorScreen() {
   const [openImportVendorModal, setOpenImportVendorModal] = useState(false);
   const [importingVendor, setImportingVendor] = useState(false);
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
+  const [mobileSearch, setMobileSearch] = useState("");
+
   const [selectedVendorForLedger, setSelectedVendorForLedger] =
     useState<VendorRow | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -375,6 +378,19 @@ export default function VendorScreen() {
       })),
     [vendors],
   );
+
+  const filteredVendors = useMemo(() => {
+    if (!mobileSearch.trim()) return data;
+    const q = mobileSearch.toLowerCase();
+    return data.filter(
+      (v) =>
+        (v.name || "").toLowerCase().includes(q) ||
+        (v.company || "").toLowerCase().includes(q) ||
+        (v.mobile || "").toLowerCase().includes(q) ||
+        (v.gstin || "").toLowerCase().includes(q) ||
+        (v.city || "").toLowerCase().includes(q),
+    );
+  }, [data, mobileSearch]);
 
   const openVendorDetails = (vendor: VendorTableRow) => {
     setSelectedVendorDetails(vendor);
@@ -643,7 +659,186 @@ Cell: ({ row }) => (
         </div>
       </div>
 
-      <MaterialReactTable table={table} />
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <MaterialReactTable table={table} />
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="block md:hidden space-y-2.5">
+        <div className="relative mb-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            value={mobileSearch}
+            onChange={(e) => setMobileSearch(e.target.value)}
+            placeholder="Search vendors..."
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-slate-400"
+          />
+        </div>
+
+        {loadingVendors && data.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            Loading vendors...
+          </div>
+        ) : filteredVendors.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            No vendors found
+          </div>
+        ) : (
+          filteredVendors.map((vendor) => (
+            <div
+              key={vendor._id || vendor.id}
+              onClick={() => openVendorDetails(vendor)}
+              className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate text-sm font-bold text-slate-900">
+                      {vendor.name}
+                    </span>
+                    {vendor.cspLabel && (
+                      <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.2 text-[10px] font-semibold text-amber-800">
+                        {vendor.cspLabel}
+                      </span>
+                    )}
+                  </div>
+                  {vendor.company && vendor.company !== "—" && (
+                    <p className="mt-0.5 text-xs font-medium text-slate-600 truncate">
+                      {vendor.company}
+                    </p>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    {vendor.mobile && <span>{vendor.mobile}</span>}
+                    {vendor.city && (
+                      <>
+                        <span>•</span>
+                        <span>{vendor.city}</span>
+                      </>
+                    )}
+                    {vendor.gstin && (
+                      <>
+                        <span>•</span>
+                        <span className="font-mono text-[11px] text-slate-400">
+                          GST: {vendor.gstin}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                    vendor.status === "Inactive" || vendor.isActive === false
+                      ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200/60"
+                      : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60"
+                  }`}
+                >
+                  {vendor.status === "Inactive" || vendor.isActive === false
+                    ? "Inactive"
+                    : "Active"}
+                </span>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                <div className="flex items-center gap-4 text-xs">
+                  <div>
+                    <span className="block text-[10px] font-medium uppercase text-slate-400">
+                      Total Purchase
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      ₹{Number(vendor.totalPurchase || 0).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  {vendor.outstandingAmount !== undefined && (
+                    <div>
+                      <span className="block text-[10px] font-medium uppercase text-slate-400">
+                        Due Balance
+                      </span>
+                      <span
+                        className={`text-xs font-bold ${
+                          Number(vendor.outstandingAmount) > 0
+                            ? "text-rose-600"
+                            : "text-slate-600"
+                        }`}
+                      >
+                        ₹{Number(vendor.outstandingAmount || 0).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="flex items-center gap-1.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedVendorForLedger(vendor);
+                      setOpenLedgerModal(true);
+                    }}
+                    className="cursor-pointer rounded-lg bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100"
+                    title="View Ledger"
+                  >
+                    <Eye size={15} />
+                  </button>
+                  <Can permission={PERMISSIONS.VENDOR_UPDATE}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOpenCreateVendorModal(false);
+                        setEditingVendor(vendor);
+                      }}
+                      className="cursor-pointer rounded-lg bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100"
+                      title="Edit Vendor"
+                    >
+                      <SquarePen size={15} />
+                    </button>
+                  </Can>
+                  <Can permission={PERMISSIONS.VENDOR_DELETE}>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const result = await Swal.fire({
+                          title: "Delete vendor?",
+                          text: "This action cannot be undone.",
+                          icon: "warning",
+                          showCancelButton: true,
+                          confirmButtonText: "Delete",
+                          confirmButtonColor: "#dc2626",
+                        });
+                        if (!result.isConfirmed) return;
+                        try {
+                          await handleDeleteVendor(vendor._id);
+                          await fetchVendors();
+                          await Swal.fire({
+                            title: "Deleted",
+                            text: "Vendor removed.",
+                            icon: "success",
+                            timer: 1400,
+                            showConfirmButton: false,
+                          });
+                        } catch (error: any) {
+                          Swal.fire(
+                            "Error",
+                            error?.response?.data?.message ?? "Failed to delete vendor.",
+                            "error",
+                          );
+                        }
+                      }}
+                      className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                      title="Delete Vendor"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </Can>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
 
       {openCreateVendorModal ? (
         <AddVendorModal
