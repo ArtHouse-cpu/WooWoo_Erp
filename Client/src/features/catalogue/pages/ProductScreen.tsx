@@ -19,9 +19,11 @@ import {
   ArrowUpCircle,
   Boxes,
   LayoutList,
+  Search,
   ShoppingBasket,
   SquarePen,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   handleGetProducts,
@@ -97,6 +99,7 @@ export default function ProductScreen() {
   const [showBulkCreateModal, setBulkCreateModal] = useState(false);
   const [bulkImporting, setBulkImporting] = useState(false);
   const [editProduct, setEditProduct] = useState<any | null>(null);
+  const [viewProduct, setViewProduct] = useState<any | null>(null);
   const [globalFilter, setGlobalFilter] = useState("");
   const search = String(globalFilter ?? "").trim();
   const [sorting, setSorting] = useState<MRT_SortingState>([]);
@@ -819,26 +822,354 @@ export default function ProductScreen() {
           )}
         </div>
       </div>
-      <div className="mb-2 grid grid-cols-5 gap-1 sm:mb-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-5">
-        {cards.map((item) => (
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-5">
+        {cards.map((item, index) => (
           <div
             key={item.title}
-            className="min-w-0 rounded-md border border-gray-200 bg-white px-1 py-1 sm:rounded-xl sm:p-4"
+            className={`min-w-0 rounded-xl border border-gray-200 bg-white p-2.5 sm:p-4 transition duration-300 hover:shadow-sm ${
+              index === 4 ? "col-span-2 sm:col-span-1" : ""
+            }`}
           >
-            <div className="flex min-w-0 items-center gap-1 text-gray-600 sm:gap-2">
-              <item.Icon className="h-3 w-3 shrink-0 text-gray-500 sm:h-[22px] sm:w-[22px]" />
-              <span className="min-w-0 truncate text-[10px] font-medium leading-tight sm:text-base">
-                <span className="sm:hidden">{item.short}</span>
-                <span className="hidden sm:inline">{item.title}</span>
+            <div className="flex min-w-0 items-center gap-1.5 text-gray-600 sm:gap-2">
+              <item.Icon className="h-4 w-4 shrink-0 text-gray-500 sm:h-[22px] sm:w-[22px]" />
+              <span className="min-w-0 truncate text-xs font-medium sm:text-base">
+                {item.title}
               </span>
             </div>
-            <div className="mt-0.5 truncate text-sm font-semibold leading-tight sm:mt-3 sm:text-2xl">
+            <div className="mt-1 truncate text-base font-semibold sm:mt-3 sm:text-2xl">
               {item.value}
             </div>
           </div>
         ))}
       </div>
-      <MaterialReactTable table={table} />
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <MaterialReactTable table={table} />
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="block md:hidden space-y-2.5">
+        <div className="relative mb-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            value={globalFilter ?? ""}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            placeholder="Search products..."
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-slate-400"
+          />
+        </div>
+
+        {loading && products.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            Loading products...
+          </div>
+        ) : products.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            No products found
+          </div>
+        ) : (
+          products.map((p, idx) => {
+            const variantNames = getVariantNames(p);
+            const variantLabel =
+              variantNames.length > 0 ? ` (${variantNames.join(", ")})` : "";
+            const stock = Number(p.stockQty ?? 0);
+            const isOutOfStock = stock <= 0;
+
+            return (
+              <div
+                key={p._id || idx}
+                onClick={() => setViewProduct(p)}
+                className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-bold text-slate-900">
+                        {p.productName || "Unnamed Product"}
+                      </span>
+                      {variantLabel && (
+                        <span className="text-xs font-normal text-slate-500">
+                          {variantLabel}
+                        </span>
+                      )}
+                      {p.isCsp && (
+                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                          {p.cspLabel || "CSP"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span className="font-medium text-slate-600">
+                        {p.category || "Uncategorized"}
+                      </span>
+                      {p.subCategory && (
+                        <>
+                          <span>•</span>
+                          <span>{p.subCategory}</span>
+                        </>
+                      )}
+                      {(p.barCode || p.barcode) && (
+                        <>
+                          <span>•</span>
+                          <span className="font-mono text-[11px] text-slate-400">
+                            {p.barCode || p.barcode}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                      isOutOfStock
+                        ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200/60"
+                        : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60"
+                    }`}
+                  >
+                    {isOutOfStock ? "Out of Stock" : `Stock: ${stock}`}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                  <div className="flex items-center gap-4 text-xs">
+                    <div>
+                      <span className="block text-[10px] font-medium uppercase text-slate-400">
+                        Selling
+                      </span>
+                      <span className="text-sm font-bold text-slate-900">
+                        ₹{Number(p.sellingPrice || 0).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    {p.purchasePrice !== undefined && (
+                      <div>
+                        <span className="block text-[10px] font-medium uppercase text-slate-400">
+                          Cost
+                        </span>
+                        <span className="text-xs font-medium text-slate-600">
+                          ₹{Number(p.purchasePrice || 0).toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    className="flex items-center gap-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Can permission={PERMISSIONS.PRODUCT_UPDATE}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditProduct(p);
+                          setShowCreateModal(true);
+                        }}
+                        className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"
+                        title="Edit product"
+                      >
+                        <SquarePen size={15} />
+                      </button>
+                    </Can>
+                    <Can permission={PERMISSIONS.PRODUCT_DELETE}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (p._id) void handleDeleteProductClick(p._id);
+                        }}
+                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                        title="Delete product"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </Can>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        {hasMore && (
+          <div className="pt-2 text-center">
+            <button
+              type="button"
+              disabled={isFetchingMore}
+              onClick={() =>
+                void fetchPage({
+                  pageToLoad: page + 1,
+                  append: true,
+                  withStats: false,
+                })
+              }
+              className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-50"
+            >
+              {isFetchingMore ? "Loading more..." : "Load More Products"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Product View Details Modal */}
+      {viewProduct && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setViewProduct(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <ShoppingBasket size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Product Details
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {viewProduct.category || "General"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewProduct(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-y-auto p-5 space-y-4">
+              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Product Name
+                    </span>
+                    <h4 className="text-lg font-bold text-slate-900 mt-0.5 truncate">
+                      {viewProduct.productName}
+                    </h4>
+                    {getVariantNames(viewProduct).length > 0 && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Variants: {getVariantNames(viewProduct).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                        Number(viewProduct.stockQty ?? 0) <= 0
+                          ? "bg-rose-100 text-rose-800"
+                          : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
+                      {Number(viewProduct.stockQty ?? 0) <= 0
+                        ? "Out of Stock"
+                        : "In Stock"}
+                    </span>
+                    {viewProduct.isCsp && (
+                      <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                        {viewProduct.cspLabel || "CSP"}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Metric Tiles */}
+                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-200/60 pt-3 text-center">
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Selling Price
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      ₹{Number(viewProduct.sellingPrice || 0).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Cost Price
+                    </span>
+                    <span className="text-sm font-bold text-slate-600">
+                      ₹{Number(viewProduct.purchasePrice || 0).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Stock Qty
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      {Number(viewProduct.stockQty || 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Specs List */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-2.5 text-xs">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Category</span>
+                  <span className="font-semibold text-slate-800">
+                    {viewProduct.category || "—"}
+                  </span>
+                </div>
+                {viewProduct.subCategory && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Sub Category</span>
+                    <span className="font-semibold text-slate-800">
+                      {viewProduct.subCategory}
+                    </span>
+                  </div>
+                )}
+                {(viewProduct.barCode || viewProduct.barcode) && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Barcode</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {viewProduct.barCode || viewProduct.barcode}
+                    </span>
+                  </div>
+                )}
+                {viewProduct.itemCode && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Item Code</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {viewProduct.itemCode}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => setViewProduct(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Close
+              </button>
+              <Can permission={PERMISSIONS.PRODUCT_UPDATE}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prod = viewProduct;
+                    setViewProduct(null);
+                    setEditProduct(prod);
+                    setShowCreateModal(true);
+                  }}
+                  className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/90 transition"
+                >
+                  Edit Product
+                </button>
+              </Can>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

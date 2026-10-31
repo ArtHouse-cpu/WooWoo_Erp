@@ -5,7 +5,7 @@ import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
-import { Boxes, Briefcase, LayoutList, SquarePen, Trash2 } from "lucide-react";
+import { Boxes, Search, Briefcase, LayoutList, SquarePen, Trash2, X } from "lucide-react";
 import {
   handleGetServices,
   handleCreateService,
@@ -57,11 +57,38 @@ export default function ServiceScreen() {
   // Regular service modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editService, setEditService] = useState<ServiceRow | null>(null);
+  const [viewService, setViewService] = useState<ServiceRow | null>(null);
+  const [viewAdditionalService, setViewAdditionalService] = useState<AdditionalServiceItem | null>(null);
 
   // Additional service modal state
   const [showAdditionalModal, setShowAdditionalModal] = useState(false);
   const [editAdditionalService, setEditAdditionalService] =
     useState<AdditionalServiceItem | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredServices = useMemo(() => {
+    if (!searchQuery.trim()) return services;
+    const q = searchQuery.toLowerCase();
+    return services.filter(
+      (s) =>
+        (s.serviceName || s.productName || "").toLowerCase().includes(q) ||
+        (s.category || "").toLowerCase().includes(q) ||
+        (s.barcode || s.barCode || s.itemCode || "")
+          .toLowerCase()
+          .includes(q),
+    );
+  }, [services, searchQuery]);
+
+  const filteredAdditionalServices = useMemo(() => {
+    if (!searchQuery.trim()) return additionalServices;
+    const q = searchQuery.toLowerCase();
+    return additionalServices.filter(
+      (s) =>
+        (s.name || "").toLowerCase().includes(q) ||
+        (s.description || "").toLowerCase().includes(q) ||
+        (s.spaceType || "").toLowerCase().includes(q),
+    );
+  }, [additionalServices, searchQuery]);
 
   useEffect(() => {
     if (searchParams.get("create") !== "1") return;
@@ -683,14 +710,14 @@ export default function ServiceScreen() {
         </div>
 
         <Can permission={PERMISSIONS.SERVICE_CREATE}>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-3">
             <button
               type="button"
               onClick={() => {
                 setEditAdditionalService(null);
                 setShowAdditionalModal(true);
               }}
-              className="w-full cursor-pointer rounded bg-black px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-black/90 sm:w-auto"
+              className="flex-1 cursor-pointer rounded bg-black px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-black/90 sm:flex-none sm:px-4 sm:py-2 sm:text-[14px] whitespace-nowrap text-center"
             >
               + Additional Services
             </button>
@@ -702,7 +729,7 @@ export default function ServiceScreen() {
                 setActiveTable("services");
                 setShowCreateModal(true);
               }}
-              className="w-full cursor-pointer rounded bg-black px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-black/90 sm:w-auto"
+              className="flex-1 cursor-pointer rounded bg-black px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-black/90 sm:flex-none sm:px-4 sm:py-2 sm:text-[14px] whitespace-nowrap text-center"
             >
               + Create Service
             </button>
@@ -710,27 +737,473 @@ export default function ServiceScreen() {
         </Can>
       </div>
 
-      <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((item) => (
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map((item, index) => (
           <div
             key={item.title}
-            className="rounded-xl border border-gray-200 bg-white p-4 transition duration-300 hover:shadow-sm"
+            className={`cursor-pointer rounded-xl border border-gray-200 bg-white p-2.5 sm:p-4 transition duration-300 hover:shadow-sm ${
+              index === 2 ? "col-span-2 sm:col-span-1" : ""
+            }`}
           >
-            <div className="flex items-center gap-2 text-gray-600">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-gray-600">
               {item.icon}
-              <span className="font-medium">{item.title}</span>
+              <span className="text-xs font-medium sm:text-base truncate">{item.title}</span>
             </div>
-            <div className="mt-3 text-2xl font-semibold">{item.value}</div>
+            <div className="mt-1 text-base sm:mt-3 sm:text-2xl font-semibold">{item.value}</div>
           </div>
         ))}
       </div>
 
-      {/* Render the Active MRT Table */}
-      {activeTable === "services" ? (
-        <MaterialReactTable table={servicesTable} />
-      ) : (
-        <MaterialReactTable table={additionalTable} />
+      {/* Desktop MRT Table View */}
+      <div className="hidden md:block">
+        {activeTable === "services" ? (
+          <MaterialReactTable table={servicesTable} />
+        ) : (
+          <MaterialReactTable table={additionalTable} />
+        )}
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="block md:hidden space-y-2.5">
+        <div className="relative mb-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={activeTable === "services" ? "Search services..." : "Search additional services..."}
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-slate-400"
+          />
+        </div>
+
+        {activeTable === "services" ? (
+          loading && services.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+              Loading services...
+            </div>
+          ) : filteredServices.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+              No services found
+            </div>
+          ) : (
+            filteredServices.map((service, idx) => {
+              const name = service.serviceName || service.productName || "Unnamed Service";
+
+              return (
+                <div
+                  key={service._id || idx}
+                  onClick={() => setViewService(service)}
+                  className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <span className="truncate text-sm font-bold text-slate-900 block">
+                        {name}
+                      </span>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <span className="font-medium text-slate-600">
+                          {service.category || "General"}
+                        </span>
+                        {service.primaryUnit && (
+                          <>
+                            <span>•</span>
+                            <span>Unit: {service.primaryUnit}</span>
+                          </>
+                        )}
+                        {(service.barcode || service.barCode || service.itemCode) && (
+                          <>
+                            <span>•</span>
+                            <span className="font-mono text-[11px] text-slate-400">
+                              {service.barcode || service.barCode || service.itemCode}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                    <div className="flex items-center gap-4 text-xs">
+                      <div>
+                        <span className="block text-[10px] font-medium uppercase text-slate-400">
+                          Selling Price
+                        </span>
+                        <span className="text-sm font-bold text-slate-900">
+                          ₹{Number(service.sellingPrice || 0).toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                      {service.purchasePrice !== undefined && (
+                        <div>
+                          <span className="block text-[10px] font-medium uppercase text-slate-400">
+                            Cost
+                          </span>
+                          <span className="text-xs font-medium text-slate-600">
+                            ₹{Number(service.purchasePrice || 0).toLocaleString("en-IN")}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div
+                      className="flex items-center gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Can permission={PERMISSIONS.SERVICE_UPDATE}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditService(service);
+                            setShowCreateModal(true);
+                          }}
+                          className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"
+                          title="Edit service"
+                        >
+                          <SquarePen size={15} />
+                        </button>
+                      </Can>
+                      <Can permission={PERMISSIONS.SERVICE_DELETE}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (service._id) void handleDelete(service._id);
+                          }}
+                          className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                          title="Delete service"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </Can>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )
+        ) : (
+          loading && additionalServices.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+              Loading additional services...
+            </div>
+          ) : filteredAdditionalServices.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+              No additional services found
+            </div>
+          ) : (
+            filteredAdditionalServices.map((item, idx) => {
+              const IconComp = getIconComponent(item.icon);
+              const title = item.title || item.name || "Unnamed Service";
+              const amount = Number(item.amount ?? item.price ?? 0);
+
+              return (
+                <div
+                  key={item._id || idx}
+                  onClick={() => setViewAdditionalService(item)}
+                  className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1 flex items-center gap-2.5">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                        <IconComp size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="truncate text-sm font-bold text-slate-900 block">
+                          {title}
+                        </span>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <span className="rounded-full bg-slate-100 px-2 py-0.2 text-[10px] font-semibold capitalize text-slate-600">
+                            {item.spaceType || "All"}
+                          </span>
+                          {item.unit && (
+                            <>
+                              <span>•</span>
+                              <span>{item.unit}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-slate-900">
+                      ₹{amount.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  {typeof (item as any).description === "string" && (item as any).description ? (
+                    <p className="mt-2 text-xs text-slate-500 line-clamp-2">
+                      {(item as any).description}
+                    </p>
+                  ) : null}
+
+                <div className="mt-3 flex items-center justify-end border-t border-slate-100 pt-2.5">
+                  <div
+                    className="flex items-center gap-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Can permission={PERMISSIONS.SERVICE_UPDATE}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditAdditionalService(item);
+                          setShowAdditionalModal(true);
+                        }}
+                        className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"
+                        title="Edit additional service"
+                      >
+                        <SquarePen size={15} />
+                      </button>
+                    </Can>
+                    <Can permission={PERMISSIONS.SERVICE_DELETE}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (item._id) void handleDeleteAdditional(item._id);
+                        }}
+                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                        title="Delete additional service"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </Can>
+                  </div>
+                </div>
+              </div>
+              );
+            })
+          )
+        )}
+      </div>
+      {/* Service View Details Modal */}
+      {viewService && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setViewService(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <Briefcase size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Service Details
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {viewService.category || "General"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewService(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-5 space-y-4">
+              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Service Name
+                </span>
+                <h4 className="text-lg font-bold text-slate-900 mt-0.5 truncate">
+                  {viewService.serviceName || viewService.productName || "Unnamed Service"}
+                </h4>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-3 text-center">
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Selling Price
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      ₹{Number(viewService.sellingPrice || 0).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Cost Price
+                    </span>
+                    <span className="text-sm font-bold text-slate-600">
+                      ₹{Number(viewService.purchasePrice || 0).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-2.5 text-xs">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Category</span>
+                  <span className="font-semibold text-slate-800">
+                    {viewService.category || "—"}
+                  </span>
+                </div>
+                {viewService.primaryUnit && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Unit</span>
+                    <span className="font-semibold text-slate-800">
+                      {viewService.primaryUnit}
+                    </span>
+                  </div>
+                )}
+                {(viewService.barcode || viewService.barCode || viewService.itemCode) && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Barcode / Item Code</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {viewService.barcode || viewService.barCode || viewService.itemCode}
+                    </span>
+                  </div>
+                )}
+                {viewService.description && (
+                  <div className="pt-1">
+                    <span className="text-slate-500 block mb-1">Description</span>
+                    <p className="text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      {viewService.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => setViewService(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Close
+              </button>
+              <Can permission={PERMISSIONS.SERVICE_UPDATE}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = viewService;
+                    setViewService(null);
+                    setEditService(s);
+                    setShowCreateModal(true);
+                  }}
+                  className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/90 transition"
+                >
+                  Edit Service
+                </button>
+              </Can>
+            </div>
+          </div>
+        </div>
       )}
+
+      {/* Additional Service View Details Modal */}
+      {viewAdditionalService && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setViewAdditionalService(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                  {(() => {
+                    const IconComp = getIconComponent(viewAdditionalService.icon);
+                    return <IconComp size={20} />;
+                  })()}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Additional Service Details
+                  </h3>
+                  <p className="text-xs text-slate-400 capitalize">
+                    {viewAdditionalService.spaceType || "All"} Spaces
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewAdditionalService(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-5 space-y-4">
+              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Amenity / Service
+                </span>
+                <h4 className="text-lg font-bold text-slate-900 mt-0.5 truncate">
+                  {viewAdditionalService.title || viewAdditionalService.name || "Unnamed"}
+                </h4>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-3 text-center">
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Price / Amount
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      ₹{Number(viewAdditionalService.amount ?? viewAdditionalService.price ?? 0).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Unit / Frequency
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700">
+                      {viewAdditionalService.unit || "per month"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-2.5 text-xs">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Applies To</span>
+                  <span className="font-semibold text-slate-800 capitalize">
+                    {viewAdditionalService.spaceType === "all" ? "All Spaces" : viewAdditionalService.spaceType || "All Spaces"}
+                  </span>
+                </div>
+                {viewAdditionalService.description && (
+                  <div className="pt-1">
+                    <span className="text-slate-500 block mb-1">Description</span>
+                    <p className="text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      {viewAdditionalService.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => setViewAdditionalService(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Close
+              </button>
+              <Can permission={PERMISSIONS.SERVICE_UPDATE}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const item = viewAdditionalService;
+                    setViewAdditionalService(null);
+                    setEditAdditionalService(item);
+                    setShowAdditionalModal(true);
+                  }}
+                  className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/90 transition"
+                >
+                  Edit Service
+                </button>
+              </Can>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {showCreateModal && (
         <CreateServiceModal
