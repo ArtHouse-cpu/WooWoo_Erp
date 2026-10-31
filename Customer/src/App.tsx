@@ -35,6 +35,7 @@ import {getPostAuthPath} from './utils/onboarding';
 import ProgramsPage from './app/programs/ProgramsPage';
 import CspProgramPage from './app/programs/CspProgramPage';
 import ActivityPage from './app/activity/ActivityPage';
+import PublicInvoicePage from './app/activity/PublicInvoicePage';
 import HelpScreen from './app/help/HelpScreen'
 import ExhibitionPage from './app/exhibition/ExhibitionPage';
 import SuppliesMarketplacePage from './app/supplies/SuppliesMarketplacePage';
@@ -96,7 +97,6 @@ export default function App() {
                 <Route path="/programs" element={<ProgramsPage />} />
                 <Route path="/csp-program" element={<CspProgramPage />} />
                 <Route path="/activities" element={<ActivityPage />} />
-                <Route path="/activities/:invoiceId" element={<ActivityPage />} />
 
                 <Route path="/refer-and-earn" element={<ReferAndEarnPage />} />
                 <Route path="/supplies" element={<SuppliesMarketplacePage />} />
@@ -105,6 +105,7 @@ export default function App() {
             </Route>
 
             <Route path="/" element={<RootRedirect />} />
+            <Route path="/activities/:invoiceId" element={<PublicInvoicePage />} />
             <Route path="/payment/result" element={<PaymentResultPage />} />
             <Route path="/legal" element={<LegalIndexPage />} />
             <Route path="/privacy" element={<PrivacyPolicyPage />} />

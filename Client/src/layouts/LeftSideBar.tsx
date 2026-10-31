@@ -205,6 +205,12 @@ const MENU_GROUPS: MenuGroup[] = [
         icon: Users,
         path: "/csp",
       },
+      {
+        name: "hap",
+        label: "HAP",
+        icon: Users,
+        path: "/hap",
+      },
     ],
   },
   {

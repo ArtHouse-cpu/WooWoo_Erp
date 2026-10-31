@@ -20,6 +20,7 @@ import {
 import {
   CustomerScreen,
   CspScreen,
+  HapScreen,
   GuestScreen,
   PartnerScreen,
   VendorScreen,
@@ -86,6 +87,7 @@ export const router = createBrowserRouter([
           { path: "vendors", element: <VendorScreen /> },
           { path: "customers", element: <CustomerScreen /> },
           { path: "csp", element: <CspScreen /> },
+          { path: "hap", element: <HapScreen /> },
           { path: "leads", element: <LeadScreen /> },
           { path: "partners", element: <PartnerScreen /> },
           { path: "guests", element: <GuestScreen /> },

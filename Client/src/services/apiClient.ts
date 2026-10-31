@@ -3467,6 +3467,49 @@ export const handleGetCspApplications = async (status = "under_review") => {
   };
 };
 
+export type HapApplicationRecord = {
+  _id: string;
+  customerId?: string | null;
+  customerName?: string;
+  email?: string;
+  mobile?: string;
+  profession?: string;
+  networkSize?: number;
+  payoutDetail?: string;
+  presence?: string;
+  status?: "under_review" | "approved" | "rejected";
+  rejectionReason?: string;
+  createdAt?: string;
+};
+
+export const handleGetHapApplications = async (status = "under_review") => {
+  const response = await axiosInstance.get("/hap/applications", {
+    params: status ? { status } : {},
+  });
+  return response.data as {
+    success: boolean;
+    applications?: HapApplicationRecord[];
+    message?: string;
+  };
+};
+
+export const handleReviewHapApplication = async (
+  id: string,
+  payload: { status: "approved" | "rejected"; rejectionReason?: string },
+) => {
+  const response = await axiosInstance.patch(`/hap/applications/${id}`, payload);
+  return response.data as {
+    success: boolean;
+    application?: HapApplicationRecord;
+    message?: string;
+  };
+};
+
+export const handleDeleteHapApplication = async (id: string) => {
+  const response = await axiosInstance.delete(`/hap/applications/${id}`);
+  return response.data as { success: boolean; message?: string };
+};
+
 export const handleReviewCspApplication = async (
   id: string,
   payload: { status: "approved" | "rejected"; rejectionReason?: string },

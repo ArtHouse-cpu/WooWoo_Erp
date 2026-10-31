@@ -46,14 +46,27 @@ import {
 } from "./MembershipModal";
 import type { ActivityInsights } from "../../types/auth";
 
+function ownsMembershipPlan(
+  membershipType: string | undefined,
+  planId: string,
+) {
+  const current = String(membershipType || "").trim().toLowerCase();
+  if (!current || current === "none" || current === "guest" || current === "new") {
+    return false;
+  }
+  return current === String(planId || "").trim().toLowerCase();
+}
+
 function MembershipCard({
   plan,
   selected,
+  owned,
   onSelect,
   onSeeBenefits,
 }: {
   plan: MembershipPlan;
   selected: boolean;
+  owned: boolean;
   onSelect: () => void;
   onSeeBenefits: () => void;
 }) {
@@ -88,6 +101,11 @@ function MembershipCard({
               <span className="shrink-0 rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#334155] lg:text-[10px]">
                 {plan.badge}
               </span>
+              {owned ? (
+                <span className="shrink-0 rounded-full bg-[#ECFDF3] px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide text-[#15803D] lg:text-[10px]">
+                  Your plan
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -478,7 +496,11 @@ export default function MembershipOnboardingPage() {
           : [];
         if (apiPlans.length > 0) {
           setPlans(apiPlans);
-          setSelected(apiPlans[0].id);
+          const current = String(customer?.membershipType || "").trim().toLowerCase();
+          const owned = apiPlans.find(
+            (plan) => plan.id.trim().toLowerCase() === current,
+          );
+          setSelected(owned?.id || apiPlans[0].id);
         }
       })
       .catch(() => {
@@ -491,7 +513,7 @@ export default function MembershipOnboardingPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [customer?.membershipType]);
 
   const selectedPlan = useMemo(
     () => getMembershipPlan(selected, plans),
@@ -619,9 +641,18 @@ export default function MembershipOnboardingPage() {
     if (result.isConfirmed) await finishOnboarding("none");
   };
 
-  const onContinue = () => setCheckoutOpen(true);
+  const selectedOwned = ownsMembershipPlan(customer?.membershipType, selectedPlan.id);
+
+  const onContinue = () => {
+    if (selectedOwned) {
+      setBenefitsOpen(true);
+      return;
+    }
+    setCheckoutOpen(true);
+  };
 
   const onPay = async (couponCode?: string, payableAmount?: number) => {
+    if (selectedOwned) return;
     const plan = getMembershipPlan(selected, plans);
     const amount = payableAmount ?? plan.price;
     const result = await Swal.fire({
@@ -801,7 +832,13 @@ export default function MembershipOnboardingPage() {
                       key={plan.id}
                       plan={plan}
                       selected={selected === plan.id}
-                      onSelect={() => setSelected(plan.id)}
+                      owned={ownsMembershipPlan(customer?.membershipType, plan.id)}
+                      onSelect={() => {
+                        setSelected(plan.id);
+                        if (ownsMembershipPlan(customer?.membershipType, plan.id)) {
+                          setBenefitsOpen(true);
+                        }
+                      }}
                       onSeeBenefits={() => {
                         setSelected(plan.id);
                         setBenefitsOpen(true);
@@ -820,7 +857,11 @@ export default function MembershipOnboardingPage() {
                   onClick={onContinue}
                   className="relative w-full rounded-[14px] bg-[#111111] px-10 py-3.5 text-[14px] font-semibold hover:bg-black sm:py-4"
                 >
-                  <span>Continue · ₹ {selectedPlan.price}</span>
+                  <span>
+                    {selectedOwned
+                      ? "View benefits"
+                      : `Continue · ₹ ${selectedPlan.price}`}
+                  </span>
                   <ArrowRight className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 sm:right-5" />
                 </Button>
               </div>
@@ -834,8 +875,10 @@ export default function MembershipOnboardingPage() {
       <BenefitsSheet
         plan={selectedPlan}
         open={benefitsOpen}
+        alreadyOwned={selectedOwned}
         onClose={() => setBenefitsOpen(false)}
         onContinue={() => {
+          if (selectedOwned) return;
           setBenefitsOpen(false);
           setCheckoutOpen(true);
         }}

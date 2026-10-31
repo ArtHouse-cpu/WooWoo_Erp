@@ -31,6 +31,7 @@ import companyRoutes from './routes/company.route.js';
 import affiliateRoutes from './routes/affiliate.route.js';
 import accessRoutes from './routes/access.route.js';
 import cspRouters from './routes/csp.route.js';
+import hapRouters from './routes/hap.route.js';
 import customerAuthRoutes from './modules/customer/routes/auth.routes.js';
 import {customerErrorHandler} from './modules/customer/middlewares/errorHandler.js';
 import path from 'path';
@@ -45,6 +46,7 @@ import additionalServiceRoutes from './routes/additionalService.route.js';
 import publicGiftCardRoutes from './routes/publicGiftCard.route.js';
 import exhibitionRoutes from './routes/exhibition.routes.js';
 import publicExhibitionRoutes from './routes/publicExhibition.route.js';
+import publicInvoiceRoutes from './routes/publicInvoice.route.js';
 import allBookingRoutes from './routes/allBooking.route.js';
 import bookingOverviewRoutes from './routes/bookingOverview.route.js';
 import {checkRedisConnection} from './config/redisConnection.js';
@@ -56,7 +58,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({path: path.join(__dirname, '.env')});
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT =  process.env.PORT||3000;
 
 // Behind Vercel's proxy: use X-Forwarded-For so rate limits apply per visitor, not globally.
 app.set('trust proxy', 1);
@@ -129,9 +131,12 @@ app.use('/affiliate', affiliateRoutes);
 app.use('/access', accessRoutes);
 app.use('/public/gift-cards', publicGiftCardRoutes);
 app.use('/public/exhibition', publicExhibitionRoutes);
+app.use('/public/invoices', publicInvoiceRoutes);
 
 //CSP APIs
 app.use('/csp', cspRouters);
+
+app.use('/hap', hapRouters);
 // Customer portal auth APIs — isolated namespace (does not conflict with admin /customer)
 app.use('/api/customer', customerAuthRoutes);
 //send whatsapp announcement

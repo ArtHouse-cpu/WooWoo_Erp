@@ -98,11 +98,13 @@ export function BenefitsSheet({
   open,
   onClose,
   onContinue,
+  alreadyOwned = false,
 }: {
   plan: MembershipPlan;
   open: boolean;
   onClose: () => void;
   onContinue: () => void;
+  alreadyOwned?: boolean;
 }) {
   if (!open) return null;
 
@@ -141,6 +143,11 @@ export function BenefitsSheet({
                 <p className="mt-0.5 text-[12px] leading-snug text-[#6B7280]">
                   {plan.description}
                 </p>
+                {alreadyOwned ? (
+                  <p className="mt-2 inline-flex rounded-full bg-[#ECFDF3] px-2.5 py-1 text-[11px] font-bold text-[#15803D]">
+                    You already have this plan. You can&apos;t buy it again.
+                  </p>
+                ) : null}
               </div>
             </div>
             <button
@@ -362,6 +369,7 @@ export function BenefitsSheet({
             </ul>
           ) : null}
 
+          {alreadyOwned ? null : (
           <a
             href="/membershipterms"
             target="_blank"
@@ -374,16 +382,27 @@ export function BenefitsSheet({
             </p>
             <span className="text-[20px] leading-none text-[#64748B]">›</span>
           </a>
+          )}
         </div>
 
         <div className="shrink-0 border-t border-[#E8EEF5] bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5 sm:pb-4">
-          <button
-            type="button"
-            onClick={onContinue}
-            className="w-full rounded-[7px] bg-[#1448F5] py-2.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#0F3FD6]"
-          >
-            Continue to Purchase
-          </button>
+          {alreadyOwned ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full rounded-[7px] bg-[#15803D] py-2.5 text-[13px] font-bold text-white shadow-sm"
+            >
+              You already have this plan
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onContinue}
+              className="w-full rounded-[7px] bg-[#1448F5] py-2.5 text-[13px] font-bold text-white shadow-sm transition hover:bg-[#0F3FD6]"
+            >
+              Continue to Purchase
+            </button>
+          )}
         </div>
       </div>
     </div>

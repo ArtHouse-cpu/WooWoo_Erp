@@ -1209,7 +1209,7 @@ export const sendActivityUpdateWhatsApp = async ({
 
   let lastError = null;
 
-  // Button 0 "Download Invoice" is a dynamic URL (.../activities/{{1}}).
+  // Button 0 "Download Invoice" is a public URL (.../activities/{{1}}).
   // Button 1 "View wallet" is static, so it must not receive a parameter.
   // Body-only is the fallback for an older template that has no dynamic button.
   const buttonModes = detailsParam

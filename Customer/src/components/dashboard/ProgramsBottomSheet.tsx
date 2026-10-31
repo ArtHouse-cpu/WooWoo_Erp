@@ -18,7 +18,9 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CspJoinModal } from "./CspJoinModal";
+import { HapJoinModal } from "./HapJoinModal";
 import { useCspApplication } from "../../hooks/useCspApplication";
+import { useHapApplication } from "../../hooks/useHapApplication";
 import { useMembership } from "../../context/MembershipContext";
 import { cspProductApi, type CspProgramProduct } from "../../services/csp.service";
 import Swal from "sweetalert2";
@@ -275,9 +277,13 @@ export function ProgramsBottomSheet({
   const navigate = useNavigate();
   const { isPremium } = useMembership();
   const { application } = useCspApplication();
+  const { application: hapApplication, refresh: refreshHap } = useHapApplication();
   const enrolled = application?.status === "approved";
+  const hapWaiting = hapApplication?.status === "under_review";
+  const hapApproved = hapApplication?.status === "approved";
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const [isHapJoinOpen, setIsHapJoinOpen] = useState(false);
   const [cspProducts, setCspProducts] = useState<CspProgramProduct[]>([]);
   const [cspProductsLoading, setCspProductsLoading] = useState(false);
 
@@ -601,6 +607,36 @@ export function ProgramsBottomSheet({
                     status={application.status}
                     reason={application.rejectionReason}
                   />
+                ) : null}
+                {activeTab === "hap" &&
+                (hapApplication?.status === "under_review" ||
+                  hapApplication?.status === "rejected" ||
+                  hapApplication?.status === "approved") ? (
+                  <div
+                    className={`mx-5 mb-4 rounded-2xl border px-3.5 py-3 text-left ${
+                      hapApplication.status === "rejected"
+                        ? "border-rose-200 bg-rose-50"
+                        : hapApplication.status === "approved"
+                          ? "border-violet-200 bg-violet-50"
+                          : "border-amber-200 bg-amber-50"
+                    }`}
+                  >
+                    <span className="inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-700">
+                      {hapApplication.status === "rejected"
+                        ? "Rejected"
+                        : hapApplication.status === "approved"
+                          ? "Approved"
+                          : "Waiting for approval"}
+                    </span>
+                    <p className="mt-2 text-[12px] font-semibold leading-relaxed text-slate-700">
+                      {hapApplication.status === "rejected"
+                        ? hapApplication.rejectionReason?.trim() ||
+                          "No reason was provided. You can apply again."
+                        : hapApplication.status === "approved"
+                          ? "You are a House Affiliate. Commission appears after real activity."
+                          : "Your HAP application is under review. Please wait for approval."}
+                    </p>
+                  </div>
                 ) : null}
                 {/* Horizontal Gallery */}
                 <div className="px-5 mb-1.5 flex gap-3 overflow-x-auto scrollbar-none py-1">
@@ -935,6 +971,10 @@ export function ProgramsBottomSheet({
                       navigate("/programs");
                       return;
                     }
+                    if (activeTab === "hap") {
+                      setIsHapJoinOpen(true);
+                      return;
+                    }
                     if (activeTab === "csp" && !isPremium) {
                       // keep the programs modal open; do not open the apply form
                       Swal.fire({
@@ -957,7 +997,14 @@ export function ProgramsBottomSheet({
                   <span>
                     {activeTab === "csp" && enrolled
                       ? "View programs"
-                      : "Join Now"}
+                      : activeTab === "hap" && hapWaiting
+                        ? "Waiting"
+                        : activeTab === "hap" && hapApproved
+                          ? "Joined"
+                          : activeTab === "hap" &&
+                              hapApplication?.status === "rejected"
+                            ? "Apply again"
+                            : "Join Now"}
                   </span>
                   <ArrowRight className="h-4.5 w-4.5" strokeWidth={2.5} />
                 </button>
@@ -970,6 +1017,13 @@ export function ProgramsBottomSheet({
       <CspJoinModal
         isOpen={isJoinModalOpen && activeTab === "csp"}
         onClose={() => setIsJoinModalOpen(false)}
+      />
+      <HapJoinModal
+        isOpen={isHapJoinOpen}
+        onClose={() => setIsHapJoinOpen(false)}
+        onSubmitted={() => {
+          void refreshHap();
+        }}
       />
     </>
   );

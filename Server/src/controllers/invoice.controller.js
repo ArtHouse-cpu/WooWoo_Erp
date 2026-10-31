@@ -330,7 +330,8 @@ const notifyActivityUpdateWhatsApp = async ({
     );
 
     // WhatsApp "Download Invoice" is a dynamic URL ending in /activities/{{1}}.
-    // {{1}} must be this bill's id so the link opens that customer's invoice.
+    // {{1}} is this bill's id. That page is public, so the customer opens it
+    // without logging in.
     const detailsUrlParam = String(invoice?._id || '').trim();
 
     const membershipLabel = membershipLabelForCustomer(
