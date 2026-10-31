@@ -17,7 +17,6 @@ import {
   SlidersHorizontal,
   ArrowUpDown,
   FileText,
-  Plus,
   Home,
   FileCheck2,
   Package,
@@ -1939,22 +1938,6 @@ export default function SubscriptionScreen() {
             </div>
           )}
         </div>
-
-        {/* F. Floating Action Button (FAB) */}
-        <Can permission={PERMISSIONS.SUBSCRIPTION_CREATE}>
-          <button
-            type="button"
-            onClick={() => {
-              setModalMode("create");
-              setModalData(null);
-              setIsModalOpen(true);
-            }}
-            className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg transition hover:bg-blue-700 active:scale-95"
-            aria-label="Create subscription"
-          >
-            <Plus size={26} strokeWidth={2.5} />
-          </button>
-        </Can>
 
         {/* G. Bottom Navigation Bar */}
         <nav

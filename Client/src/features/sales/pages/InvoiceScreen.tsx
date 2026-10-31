@@ -3,7 +3,7 @@ import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
-import { Eye, IndianRupee, MoreHorizontal, SendHorizontal, Plus, FileText } from "lucide-react";
+import { Eye, IndianRupee, MoreHorizontal, SendHorizontal, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -232,7 +232,6 @@ export default function InvoiceScreen() {
                 onClick={() => navigate("/create-invoice")}
                 className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:w-auto"
               >
-                <Plus size={18} />
                 Create Invoice
               </button>
             </Can>

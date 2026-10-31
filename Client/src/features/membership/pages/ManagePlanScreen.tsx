@@ -5,7 +5,7 @@ import {
   type MRT_ColumnDef,
   type MRT_Row,
 } from "material-react-table";
-import { Pencil, Power, Plus, Search, Trash2 } from "lucide-react";
+import { Pencil, Power, Plus, Search, Trash2, X } from "lucide-react";
 import Swal from "sweetalert2";
 import AddnewPlansModal from "@/features/membership/components/AddnewPlansModal";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -69,6 +69,7 @@ export default function ManagePlanScreen() {
   const staff = useAppSelector((s) => s.user);
   const [openModal, setOpenModal] = useState(false);
   const [editing, setEditing] = useState<PlanRow | null>(null);
+  const [viewPlan, setViewPlan] = useState<PlanRow | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
@@ -411,7 +412,240 @@ export default function ManagePlanScreen() {
 
   
 
-      <MaterialReactTable table={table} />
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <MaterialReactTable table={table} />
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="block md:hidden space-y-2.5">
+        {loading && plans.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            Loading plans...
+          </div>
+        ) : plans.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            No plans found
+          </div>
+        ) : (
+          plans.map((plan, idx) => {
+            const selling = Number(plan.pricing?.amount ?? 0);
+            const gross = Number(plan.pricing?.grossAmount ?? 0);
+
+            return (
+              <div
+                key={plan._id || idx}
+                onClick={() => setViewPlan(plan)}
+                className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-bold text-slate-900">
+                        {plan.displayName}
+                      </span>
+                      <TypePill type={plan.planType} />
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span className="font-mono text-[11px] text-slate-400">
+                        {plan.planId}
+                      </span>
+                      {plan.pricing?.period && (
+                        <>
+                          <span>•</span>
+                          <span className="font-medium text-slate-600">
+                            Period: {plan.pricing.period}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <StatusPill status={plan.status} />
+                </div>
+
+                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                  <div className="flex flex-col">
+                    <span className="block text-[10px] font-medium uppercase text-slate-400">
+                      Selling Price
+                    </span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-sm font-bold text-slate-900">
+                        ₹ {selling.toLocaleString("en-IN")}
+                      </span>
+                      {gross > selling && (
+                        <span className="text-[11px] text-slate-400 line-through">
+                          ₹ {gross.toLocaleString("en-IN")}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    className="flex items-center gap-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+                      <button
+                        type="button"
+                        onClick={() => openEdit(plan)}
+                        className="cursor-pointer rounded-lg bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100"
+                        title="Edit plan"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    </Can>
+                    <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+                      <button
+                        type="button"
+                        onClick={() => void toggleStatus(plan)}
+                        className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"
+                        title="Toggle status"
+                      >
+                        <Power size={15} />
+                      </button>
+                    </Can>
+                    <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+                      <button
+                        type="button"
+                        onClick={() => void confirmDelete(plan._id)}
+                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                        title="Delete plan"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </Can>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+      {/* Plan View Details Modal */}
+      {viewPlan && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setViewPlan(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                  <Plus size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Membership Plan Details
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    {viewPlan.planId}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewPlan(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-5 space-y-4">
+              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Plan Name
+                    </span>
+                    <h4 className="text-lg font-bold text-slate-900 mt-0.5 truncate">
+                      {viewPlan.displayName}
+                    </h4>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusPill status={viewPlan.status} />
+                    <TypePill type={viewPlan.planType} />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200/60 pt-3 text-center">
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Selling Price
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      ₹ {Number(viewPlan.pricing?.amount ?? 0).toLocaleString("en-IN")}
+                    </span>
+                    {Number(viewPlan.pricing?.grossAmount ?? 0) > Number(viewPlan.pricing?.amount ?? 0) && (
+                      <span className="text-[10px] text-slate-400 line-through block mt-0.5">
+                        ₹ {Number(viewPlan.pricing?.grossAmount ?? 0).toLocaleString("en-IN")}
+                      </span>
+                    )}
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Period / Cycle
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700">
+                      {viewPlan.pricing?.period || "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-2.5 text-xs">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Plan Identifier</span>
+                  <span className="font-mono font-semibold text-slate-800">
+                    {viewPlan.planId}
+                  </span>
+                </div>
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Plan Type</span>
+                  <span className="font-semibold text-slate-800">
+                    {viewPlan.planType}
+                  </span>
+                </div>
+                {viewPlan.description && (
+                  <div className="pt-1">
+                    <span className="text-slate-500 block mb-1">Description</span>
+                    <p className="text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      {viewPlan.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => setViewPlan(null)}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                Close
+              </button>
+              <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const pl = viewPlan;
+                    setViewPlan(null);
+                    openEdit(pl);
+                  }}
+                  className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition"
+                >
+                  Edit Plan
+                </button>
+              </Can>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       <AddnewPlansModal
         open={openModal}
