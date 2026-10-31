@@ -15,6 +15,7 @@ import type { MultiDateSlot } from "../CreateBookingDetailsModal";
 import type { SelectedServiceItem, SummaryFoodItem } from "./CoworkingSummaryCard";
 import PaymentAmounts from "./PaymentAmounts";
 import SelectedSpacesSummary, {
+  SpaceChargeBreakdown,
   type SummaryBookedSpace,
 } from "./SelectedSpacesSummary";
 
@@ -415,7 +416,9 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
 
             {/* Per Date Breakdown */}
 
-            {slots.length > 0 && (
+            {bookedSpaces.length > 1 ? (
+              <SpaceChargeBreakdown spaces={bookedSpaces} />
+            ) : slots.length > 0 ? (
               <div className="mt-1 space-y-0.5">
 
                 {slots.map((slot) => {
@@ -456,7 +459,7 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
                 })}
 
               </div>
-            )}
+            ) : null}
 
           </div>
 

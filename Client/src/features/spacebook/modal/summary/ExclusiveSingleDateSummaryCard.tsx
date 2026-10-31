@@ -14,6 +14,7 @@ import type { SpacePayload } from "@/services/apiClient";
 import type { SelectedServiceItem, SummaryFoodItem } from "./CoworkingSummaryCard";
 import PaymentAmounts from "./PaymentAmounts";
 import SelectedSpacesSummary, {
+  SpaceChargeBreakdown,
   type SummaryBookedSpace,
 } from "./SelectedSpacesSummary";
 
@@ -253,12 +254,16 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
               </span>
             </div>
 
+            {bookedSpaces.length > 1 ? (
+              <SpaceChargeBreakdown spaces={bookedSpaces} />
+            ) : (
             <p className="mt-0.5 text-[11px] text-slate-400">
               ₹{safeHourlyRate.toLocaleString("en-IN")} ×{" "}
               {safeDuration}{" "}
               {safeDuration === 1 ? "hour" : "hours"} ×{" "}
               {safeQty}
             </p>
+            )}
           </div>
 
           {/* Additional Services */}

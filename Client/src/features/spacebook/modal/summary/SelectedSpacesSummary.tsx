@@ -7,6 +7,33 @@ export type SummaryBookedSpace = {
   lineTotal: number;
 };
 
+export function SpaceChargeBreakdown({
+  spaces,
+}: {
+  spaces: SummaryBookedSpace[];
+}) {
+  if (spaces.length <= 1) return null;
+  return (
+    <div className="mt-1 space-y-0.5">
+      {spaces.map((space) => (
+        <div
+          key={space.spaceId}
+          className="flex items-center justify-between gap-2 text-[11px] text-slate-500"
+        >
+          <span className="min-w-0 truncate">
+            {space.spaceName || "Space"}
+            {space.spaceDay ? ` (${space.spaceDay})` : ""}
+            {space.unitPrice ? ` · ₹${Number(space.unitPrice).toLocaleString("en-IN")}` : ""}
+          </span>
+          <span className="shrink-0 font-medium text-slate-700">
+            ₹{Number(space.lineTotal || 0).toLocaleString("en-IN")}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function SelectedSpacesSummary({
   spaces,
 }: {

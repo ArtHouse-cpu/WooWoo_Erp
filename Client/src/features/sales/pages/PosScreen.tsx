@@ -13,7 +13,6 @@ import {
   Ellipsis,
   Calendar,
   ChevronDown,
-  Plus,
   SlidersHorizontal,
   ArrowUpDown,
   Home,
@@ -1600,18 +1599,6 @@ export default function PosScreen() {
             </div>
           )}
         </div>
-
-        {/* F. Floating Action Button (FAB) */}
-        <Can permission={PERMISSIONS.INVOICE_CREATE}>
-          <button
-            type="button"
-            onClick={() => navigate("/create-invoice")}
-            className="fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/35 transition hover:bg-blue-700 active:scale-95 md:hidden"
-            aria-label="Create Invoice"
-          >
-            <Plus size={26} strokeWidth={2.5} />
-          </button>
-        </Can>
 
         {/* G. Bottom Navigation Bar */}
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-md md:hidden">

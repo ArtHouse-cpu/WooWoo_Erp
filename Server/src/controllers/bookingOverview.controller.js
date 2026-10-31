@@ -331,8 +331,13 @@ const findRefundCustomer = async doc => {
     if (byId) return byId;
   }
   const phone = String(doc?.customerPhone || '').trim();
-  if (!phone) return null;
-  return Customer.findOne({mobile: phone});
+  const digits = phone.replace(/\D/g, '');
+  const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+  if (!phone && !last10) return null;
+  const phones = [...new Set([phone, digits, last10, last10 ? `+91${last10}` : '', last10 ? `91${last10}` : ''].filter(Boolean))];
+  return Customer.findOne({
+    $or: phones.flatMap(value => [{mobile: value}, {whatsappNumber: value}]),
+  });
 };
 
 /** Credit a completed wallet refund once per booking. */
@@ -426,7 +431,7 @@ export const updateOverviewRefund = async (req, res) => {
     const actor = actorFrom(req);
     const now = new Date();
 
-    if (status === 'Completed' && isWalletMethod(method)) {
+    if (isWalletMethod(method) && status !== 'Failed') {
       try {
         await creditBookingRefundToWallet(loaded.doc, amount, note, actor);
       } catch (error) {

@@ -315,8 +315,8 @@ export default function BookingOverView() {
         note: refundForm.note,
       });
       const creditedToWallet =
-        refundForm.status === "Completed" &&
-        refundForm.method.trim().toLowerCase() === "wallet";
+        refundForm.method.trim().toLowerCase() === "wallet" &&
+        refundForm.status !== "Failed";
       setRefundTarget(null);
       await load();
       await Swal.fire({
@@ -1008,7 +1008,7 @@ export default function BookingOverView() {
                 </select>
                 {refundForm.method === "Wallet" ? (
                   <span className="mt-1 block text-xs text-slate-500">
-                    Completed wallet refunds are added to the customer wallet.
+                    This amount is added to the customer wallet, including space bookings.
                   </span>
                 ) : null}
               </label>
