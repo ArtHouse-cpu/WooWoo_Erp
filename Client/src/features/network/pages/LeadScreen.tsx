@@ -4,7 +4,8 @@ import {
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
-import { Pencil, Trash2, Plus, Eye, Phone, Paperclip } from "lucide-react";
+import { Pencil,
+  Search, Trash2, Plus, Eye, Phone, Paperclip } from "lucide-react";
 import Swal from "sweetalert2";
 
 import CreateLeadModal from "../components/CreateLeadModal";
@@ -174,6 +175,22 @@ const LeadScreen = () => {
   const [selectedLeadForDetails, setSelectedLeadForDetails] =
     useState<LeadItem | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [mobileSearch, setMobileSearch] = useState("");
+
+  const filteredLeads = useMemo(() => {
+    if (!mobileSearch.trim()) return leads;
+    const q = mobileSearch.toLowerCase();
+    return leads.filter(
+      (l) =>
+        (l.name || "").toLowerCase().includes(q) ||
+        (l.mobile || "").toLowerCase().includes(q) ||
+        (l.email || "").toLowerCase().includes(q) ||
+        (l.purpose || "").toLowerCase().includes(q) ||
+        (l.status || "").toLowerCase().includes(q) ||
+        (l.source || "").toLowerCase().includes(q) ||
+        (l.assignedTo?.m_staff_name || "").toLowerCase().includes(q),
+    );
+  }, [leads, mobileSearch]);
 
   // Staff users for Assign dropdown filter
   const [staffUsers, setStaffUsers] = useState<{ id: string; name: string }[]>(
@@ -1207,7 +1224,162 @@ const LeadScreen = () => {
       </div>
 
       {/* MRT Table */}
-      <MaterialReactTable table={table} />
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <MaterialReactTable table={table} />
+      </div>
+
+      {/* Mobile Card List View */}
+      <div className="block md:hidden space-y-2.5">
+        <div className="relative mb-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            value={mobileSearch}
+            onChange={(e) => setMobileSearch(e.target.value)}
+            placeholder="Search leads..."
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-slate-400"
+          />
+        </div>
+
+        {loading && leads.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            Loading leads...
+          </div>
+        ) : filteredLeads.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            No leads found
+          </div>
+        ) : (
+          filteredLeads.map((lead, idx) => {
+            const status = lead.status;
+            const badgeStyle =
+              status === "Converted"
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : status === "Interested"
+                  ? "bg-purple-50 text-purple-700 border-purple-200"
+                  : status === "Contacted"
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                    : status === "New"
+                      ? "bg-blue-50 text-blue-700 border-blue-200"
+                      : status === "Not Interested" || status === "Lost"
+                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                        : "bg-gray-50 text-gray-700 border-gray-200";
+
+            return (
+              <div
+                key={lead._id || idx}
+                onClick={() => handleViewDetails(lead)}
+                className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-bold text-slate-900">
+                        {lead.name}
+                      </span>
+                      {lead.purpose && (
+                        <span
+                          className={`inline-flex rounded-md border px-2 py-0.2 text-[10px] font-semibold ${getPurposeBadgeStyle(
+                            lead.purpose,
+                          )}`}
+                        >
+                          {lead.purpose}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      {lead.mobile && (
+                        <span className="font-medium text-slate-700">
+                          {lead.mobile}
+                        </span>
+                      )}
+                      {lead.email && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate max-w-[150px]">
+                            {lead.email}
+                          </span>
+                        </>
+                      )}
+                      {lead.source && (
+                        <>
+                          <span>•</span>
+                          <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-medium text-slate-600">
+                            {lead.source}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold ${badgeStyle}`}
+                  >
+                    {lead.status || "New"}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                  <div className="text-xs text-slate-500">
+                    {lead.assignedTo?.m_staff_name ? (
+                      <span>
+                        Assigned:{" "}
+                        <b className="text-slate-700">
+                          {lead.assignedTo.m_staff_name}
+                        </b>
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 italic">Unassigned</span>
+                    )}
+                  </div>
+
+                  <div
+                    className="flex items-center gap-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {lead.mobile && (
+                      <a
+                        href={`tel:${lead.mobile}`}
+                        className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"
+                        title="Call Lead"
+                      >
+                        <Phone size={15} />
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewDetails(lead);
+                      }}
+                      className="cursor-pointer rounded-lg bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100"
+                      title="View Details"
+                    >
+                      <Eye size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(lead)}
+                      className="cursor-pointer rounded-lg bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100"
+                      title="Edit Lead"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(lead._id)}
+                      className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                      title="Delete Lead"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
 
       {/* Create / Edit Lead Modal */}
       <CreateLeadModal
@@ -1237,7 +1409,10 @@ const LeadScreen = () => {
           setSelectedLeadForDetails(null);
         }}
         lead={selectedLeadForDetails}
-        onEdit={(lead) => handleEdit(lead)}
+        onEdit={(lead) => {
+          setIsDetailsModalOpen(false);
+          handleEdit(lead);
+        }}
         onUpdated={(next) => {
           setSelectedLeadForDetails(next);
           setLeads((prev) =>

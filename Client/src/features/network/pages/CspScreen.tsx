@@ -14,6 +14,7 @@ import {
   Package,
   PlusCircle,
   Search,
+  Phone,
   ArrowUpDown,
   ShoppingCart,
   Users,
@@ -1356,7 +1357,7 @@ export default function CspScreen() {
       </div>
 
       {/* ── 2. Top Summary KPI Cards (4 Grid) ─────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Total CSP Partners */}
         <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-xs transition-shadow hover:shadow-sm">
           <div className="flex items-start gap-3">
@@ -1675,7 +1676,8 @@ export default function CspScreen() {
 
       {/* ── 5. Main Custom Table ────────────────────────────────────── */}
       <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View - Hidden on mobile */}
+        <div className="hidden md:block overflow-x-auto">
           {activeTab === "active" ? (
             /* ──── Active Partners Table ──── */
             <table className="w-full border-collapse text-left text-sm">
@@ -2018,7 +2020,323 @@ export default function CspScreen() {
               </tbody>
             </table>
           )}
-          
+        </div>
+
+        {/* Mobile Card List View - Only on mobile */}
+        <div className="block md:hidden p-3 space-y-3">
+          {activeTab === "active" ? (
+            loading ? (
+              <div className="py-12 text-center text-slate-400">
+                <Loader2 className="mx-auto h-6 w-6 animate-spin text-orange-500" />
+                <p className="mt-2 text-xs font-medium">Loading CSP partners…</p>
+              </div>
+            ) : paginatedActiveRows.length === 0 ? (
+              <div className="py-10 text-center text-slate-400">
+                <Package className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-2 text-sm font-semibold text-slate-600">
+                  No CSP partners found
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {searchQuery
+                    ? "Try clearing your search query."
+                    : "Enroll a Premium customer to add your first partner."}
+                </p>
+              </div>
+            ) : (
+              paginatedActiveRows.map((row, idx) => {
+                const globalIdx = (currentPage - 1) * partnersPageSize + idx;
+                const partnerName =
+                  row.customer?.name || row.displayName || "Partner";
+                const brandName =
+                  row.vendor?.companyName ||
+                  row.vendor?.name ||
+                  row.label ||
+                  "Brand";
+                const mobile =
+                  row.mobile ||
+                  row.customer?.mobile ||
+                  row.vendor?.mobile ||
+                  "";
+                const { initials, palette } = getAvatar(partnerName, globalIdx);
+
+                const withdrawableAmt = Number(
+                  row.withdrawable ??
+                    row.withdrawableBalance ??
+                    row.affiliateBalance ??
+                    0,
+                );
+
+                const salesAmt =
+                  BENCHMARK_SALES[row._id] ??
+                  (withdrawableAmt > 0
+                    ? Math.round(withdrawableAmt / 0.7)
+                    : 0);
+
+                const prodCount =
+                  productCounts[row._id] ??
+                  BENCHMARK_PRODUCT_COUNTS[row._id] ??
+                  0;
+
+                const lastSaleDate = formatLastSaleDate(
+                  row.updatedAt || row.createdAt,
+                );
+
+                return (
+                  <div
+                    key={row._id}
+                    onClick={() => openPartnerDetails(row)}
+                    className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                  >
+                    {/* Top Row: Avatar, Partner Name, Brand, Index, Status */}
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${palette.bg} ${palette.text} ${palette.border}`}
+                        >
+                          {initials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-sm font-bold text-slate-900 block">
+                              {partnerName}
+                            </span>
+                            <span className="shrink-0 text-[10px] font-mono text-slate-400">
+                              #{globalIdx + 1}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-500 font-medium truncate block mt-0.5">
+                            {brandName !== "—" ? brandName : "CSP Seller"}
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${
+                          row.status === "inactive"
+                            ? "bg-rose-50 text-rose-700 ring-rose-200/60"
+                            : "bg-emerald-50 text-emerald-700 ring-emerald-200/60"
+                        }`}
+                      >
+                        {row.status === "inactive" ? "Inactive" : "Active"}
+                      </span>
+                    </div>
+
+                    {/* Metrics Grid: Sales, Products, Earnings */}
+                    <div className="mt-3.5 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center text-xs">
+                      <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100/80">
+                        <span className="block text-[10px] uppercase font-bold text-slate-400">
+                          Sales
+                        </span>
+                        <span className="text-xs font-bold text-slate-900 mt-0.5 block">
+                          ₹{salesAmt.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openProductsModal(row);
+                        }}
+                        className="rounded-xl bg-slate-50 p-2.5 border border-slate-100/80 hover:bg-blue-50 transition cursor-pointer"
+                      >
+                        <span className="block text-[10px] uppercase font-bold text-slate-400">
+                          Products
+                        </span>
+                        <span className="text-xs font-bold text-blue-600 mt-0.5 block">
+                          {prodCount}
+                        </span>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100/80">
+                        <span className="block text-[10px] uppercase font-bold text-slate-400">
+                          Earnings
+                        </span>
+                        <span className="text-xs font-bold text-emerald-700 mt-0.5 block">
+                          ₹{withdrawableAmt.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Meta Details: Mobile & Last Sale */}
+                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        <Phone size={12} className="text-slate-400 shrink-0" />
+                        <span>{mobile || "No phone"}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
+                        <Clock size={11} className="shrink-0" />
+                        <span>Last sale: {lastSaleDate}</span>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons Row */}
+                    <div
+                      className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openProductsModal(row)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 transition cursor-pointer"
+                        >
+                          <Package size={13} />
+                          <span>Products ({prodCount})</span>
+                        </button>
+
+                        {mobile && (
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(mobile, "Mobile number")}
+                            className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-200 transition cursor-pointer"
+                            title="Copy phone"
+                          >
+                            <Copy size={12} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <Can anyOf={[PERMISSIONS.CSP_WRITE, PERMISSIONS.CUSTOMER_UPDATE]}>
+                          <button
+                            type="button"
+                            onClick={() => toggleStatus(row)}
+                            className={`rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition cursor-pointer ${
+                              row.status === "inactive"
+                                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                            }`}
+                          >
+                            {row.status === "inactive" ? "Activate" : "Deactivate"}
+                          </button>
+                        </Can>
+
+                        <button
+                          type="button"
+                          onClick={() => openPartnerDetails(row)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-orange-50 px-2.5 py-1.5 text-[11px] font-semibold text-[#ff5a36] hover:bg-orange-100 transition cursor-pointer"
+                          title="View details"
+                        >
+                          <Eye size={13} />
+                          <span>Details</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )
+          ) : (
+            paginatedApplications.length === 0 ? (
+              <div className="py-10 text-center text-slate-400">
+                <Package className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-2 text-sm font-semibold text-slate-600">
+                  No CSP applications found
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {searchQuery
+                    ? "Try clearing your search query."
+                    : "No pending partner applications."}
+                </p>
+              </div>
+            ) : (
+              paginatedApplications.map((app, idx) => {
+                const globalIdx = (currentAppPage - 1) * applicationsPageSize + idx;
+
+                return (
+                  <div
+                    key={app.id || idx}
+                    onClick={() => {
+                      setApproveTarget(app);
+                      setOpenApproveModal(true);
+                    }}
+                    className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                  >
+                    {/* Header: Avatar, Name, Brand, Index, Status */}
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${app.avatarBg} ${app.avatarText} ${app.avatarBorder}`}
+                        >
+                          {app.avatarInitials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-sm font-bold text-slate-900 block">
+                              {app.name}
+                            </span>
+                            <span className="shrink-0 text-[10px] font-mono text-slate-400">
+                              #{globalIdx + 1}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-500 font-medium truncate block mt-0.5">
+                            {app.brandName}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60 capitalize">
+                        {app.status || "Pending"}
+                      </span>
+                    </div>
+
+                    {/* Contact & Link Details */}
+                    <div className="mt-3 space-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        {app.phoneNumber && (
+                          <div className="flex items-center gap-1 text-slate-700 font-medium">
+                            <Phone size={12} className="text-slate-400 shrink-0" />
+                            <span>{app.phoneNumber}</span>
+                          </div>
+                        )}
+                        {app.phoneNumber && app.email && <span>•</span>}
+                        {app.email && (
+                          <span className="truncate text-slate-500">{app.email}</span>
+                        )}
+                      </div>
+                      {app.prositeUrl && (
+                        <div className="pt-0.5">
+                          <a
+                            href={`https://${app.prositeUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-blue-600 hover:underline inline-flex items-center gap-1 text-xs font-medium"
+                          >
+                            <Link2 size={12} />
+                            <span>{app.prositeUrl}</span>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions: Approve / Reject */}
+                    <div
+                      className="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-2.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRejectModal(app)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-200/50 hover:bg-rose-100 transition-colors cursor-pointer shadow-2xs"
+                      >
+                        <XCircle className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                        <span>Reject</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setApproveTarget(app);
+                          setOpenApproveModal(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-200/50 hover:bg-emerald-100 transition-colors cursor-pointer shadow-2xs"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span>Approve</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )
+          )}
         </div>
 
         {/* ── 6. Pagination Bar ──────────────────────────────────────── */}

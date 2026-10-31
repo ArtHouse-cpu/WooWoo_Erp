@@ -249,55 +249,78 @@ export default function Customer360Modal({
   return (
     <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4">
       <div className="flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-[#F6F7FB] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl">
-        <header className="flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-violet-600">Customer 360 View</p>
-            <h2 className="truncate text-lg font-bold text-slate-900">{customer?.name || customerName || "Customer"}</h2>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              <span>{customer?.companyName || "No company"}</span>
-              {customer?.mobile ? (
-                <a href={`tel:${customer.mobile}`} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">
-                  <Phone size={12} /> {customer.mobile}
-                </a>
-              ) : null}
-              {customer?.email ? (
-                <a href={`mailto:${customer.email}`} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">
-                  <Mail size={12} /> {customer.email}
-                </a>
-              ) : null}
+        <header className="border-b border-slate-200 bg-white px-3 sm:px-4 py-2.5 sm:py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          {/* Top row: Title, Name, and Close Button */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-violet-600">
+                Customer 360 View
+              </span>
+              <h2 className="truncate text-base sm:text-lg font-bold text-slate-900 mt-0.5">
+                {customer?.name || customerName || "Customer"}
+              </h2>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                <span className="truncate max-w-[150px] font-medium text-slate-600">
+                  {customer?.companyName || "No company"}
+                </span>
+                {customer?.mobile ? (
+                  <a
+                    href={`tel:${customer.mobile}`}
+                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition"
+                  >
+                    <Phone size={11} /> {customer.mobile}
+                  </a>
+                ) : null}
+                {customer?.email ? (
+                  <a
+                    href={`mailto:${customer.email}`}
+                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition"
+                  >
+                    <Mail size={11} /> {customer.email}
+                  </a>
+                ) : null}
+              </div>
             </div>
+
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => void closeIfConfirmed(onClose)}
+              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white hover:bg-slate-800 transition"
+            >
+              <X size={14} /> Close
+            </button>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+
+          {/* Action buttons row */}
+          <div className="mt-2.5 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar sm:mt-3 sm:flex-wrap sm:overflow-visible">
             {canPath("/allBookings") ? (
               <button
                 type="button"
                 onClick={() => openBooking("full")}
-                className="inline-flex items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700"
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition"
               >
-                <CalendarPlus size={14} /> Full Booking
+                <CalendarPlus size={13} /> Full Booking
               </button>
             ) : null}
             {canPath("/spaceBooking") ? (
               <button
                 type="button"
                 onClick={() => openBooking("express")}
-                className="inline-flex items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700"
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"
               >
-                <CalendarPlus size={14} /> Express Booking
+                <CalendarPlus size={13} /> Express Booking
               </button>
             ) : null}
             {canPath("/create-pos") || canPath("/pos") || canPath("/create-invoice") ? (
               <button
                 type="button"
                 onClick={() => setPosOpen(true)}
-                className="inline-flex items-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-[#2F6FED]"
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-[#2F6FED] hover:bg-blue-100 transition"
               >
-                <FilePlus2 size={14} /> POS Bill
+                <FilePlus2 size={13} /> POS Bill
               </button>
             ) : null}
-            <button type="button" onClick={() => void closeIfConfirmed(onClose)} className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
-              <X size={14} /> Close
-            </button>
           </div>
         </header>
 
@@ -351,12 +374,12 @@ export default function Customer360Modal({
 
           {!loading && data && tab === "overview" ? (
             <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
                 {cards.map((card) => (
-                  <article key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{card.label}</p>
-                    <p className="mt-1 text-xl font-bold text-slate-900">{card.value}</p>
-                    <p className="mt-1 text-xs text-slate-500">{card.hint}</p>
+                  <article key={card.label} className="rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs transition hover:border-slate-300">
+                    <p className="truncate text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-400">{card.label}</p>
+                    <p className="mt-1 truncate text-base sm:text-xl font-bold text-slate-900">{card.value}</p>
+                    <p className="mt-0.5 truncate text-[11px] sm:text-xs text-slate-500">{card.hint}</p>
                   </article>
                 ))}
               </div>

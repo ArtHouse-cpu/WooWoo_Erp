@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { FileText, Share, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FileText, Loader2, Share, X } from "lucide-react";
+import Swal from "sweetalert2";
 import {
   handleGetWalletById,
   handleGetWallets,
@@ -84,6 +85,148 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
   const [invoiceLines, setInvoiceLines] = useState<InvoiceLine[]>([]);
   const [paymentLines, setPaymentLines] = useState<PaymentHistoryLine[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const ledgerPrintRef = useRef<HTMLDivElement>(null);
+
+  const generateLedgerPdfBlob = async (): Promise<{ blob: Blob; fileName: string; title: string }> => {
+    const el = ledgerPrintRef.current;
+    if (!el) throw new Error("Ledger content not found");
+
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import("html2canvas-pro"),
+      import("jspdf"),
+    ]);
+
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      windowWidth: 800,
+      onclone: (_doc, clone) => {
+        // Expand horizontally scrollable wrappers in clone so full tables are rendered in PDF
+        clone.querySelectorAll(".overflow-x-auto").forEach((container) => {
+          const c = container as HTMLElement;
+          c.style.overflow = "visible";
+          c.style.maxWidth = "none";
+          c.style.width = "auto";
+        });
+        clone.querySelectorAll("table").forEach((tbl) => {
+          const t = tbl as HTMLElement;
+          t.style.minWidth = "100%";
+          t.style.width = "100%";
+        });
+      },
+    });
+
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const pdfWidth = 210;
+    const pdfHeight = 297;
+    const margin = 10;
+    const contentWidth = pdfWidth - margin * 2;
+    const contentHeight = (canvas.height * contentWidth) / canvas.width;
+
+    let heightLeft = contentHeight;
+    let position = margin;
+    const imgData = canvas.toDataURL("image/png");
+
+    pdf.addImage(imgData, "PNG", margin, position, contentWidth, contentHeight);
+    heightLeft -= (pdfHeight - margin * 2);
+
+    while (heightLeft > 0) {
+      position = heightLeft - contentHeight + margin;
+      pdf.addPage();
+      pdf.addImage(imgData, "PNG", margin, position, contentWidth, contentHeight);
+      heightLeft -= (pdfHeight - margin * 2);
+    }
+
+    const partyName = vendor?.name || customer?.name || "Customer";
+    const title = `${partyName} Ledger`;
+    const safeName = partyName.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const fileName = `${safeName}_Ledger.pdf`;
+    const blob = pdf.output("blob");
+    return { blob, fileName, title };
+  };
+
+  const handleViewPdf = async () => {
+    if (isGeneratingPdf || isSharing) return;
+    setIsGeneratingPdf(true);
+    try {
+      const { blob } = await generateLedgerPdfBlob();
+      const blobUrl = URL.createObjectURL(blob);
+      const opened = window.open(blobUrl, "_blank");
+      if (!opened) {
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.click();
+      }
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      Swal.fire("Error", "Could not generate PDF. Please try again.", "error");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (isSharing || isGeneratingPdf) return;
+    setIsSharing(true);
+    try {
+      const { blob, fileName, title } = await generateLedgerPdfBlob();
+      const pdfFile = new File([blob], fileName, { type: "application/pdf" });
+
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({
+          title,
+          text: `${title} - Statement and transactions`,
+          files: [pdfFile],
+        });
+        return;
+      }
+
+      if (navigator.share) {
+        await navigator.share({
+          title,
+          text: `${title}\nParty: ${vendor?.name || customer?.name || "Customer"}\nBalance: ${money(closingBalance)}`,
+        });
+        return;
+      }
+
+      const shareText = `${title}\nParty: ${vendor?.name || customer?.name || "Customer"}\nContact: ${vendor?.mobile || customer?.mobile || "N/A"}\nBalance: ${money(closingBalance)}\nDate: ${new Date().toLocaleDateString("en-IN")}`;
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+      }
+
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+
+      Swal.fire({
+        icon: "success",
+        title: "Shared / Downloaded",
+        text: "Ledger PDF downloaded and summary copied to clipboard.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (err: any) {
+      if (err?.name === "AbortError") return;
+      console.error("Share failed:", err);
+      Swal.fire("Error", "Failed to share ledger.", "error");
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   useEffect(() => {
     const loadWallet = async () => {
@@ -348,8 +491,8 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
   );
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 relative animate-fadeIn overflow-y-auto max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-2 sm:px-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-4 sm:p-6 relative animate-fadeIn overflow-y-auto max-h-[90vh]">
         {/* Title */}
         <h2 className="text-xl font-semibold mb-4">
           {(vendor?.name || customer?.name || "Customer") + " Ledger"}
@@ -363,15 +506,39 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
           <X size={22} />
         </button>
 
-        <div className="flex gap-2">
-          <button className="px-4 py-2 rounded-lg bg-green-100 font-medium flex items-center gap-2 cursor-pointer text-green-800">
-            <Share size={18} />
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={isSharing || isGeneratingPdf}
+            className="px-3.5 py-2 rounded-lg bg-green-100 font-medium flex items-center gap-1.5 cursor-pointer text-green-800 hover:bg-green-200 transition disabled:opacity-50 active:scale-98 shadow-2xs"
+            title="Share Ledger (PDF)"
+          >
+            {isSharing ? (
+              <Loader2 size={18} className="animate-spin text-green-800" />
+            ) : (
+              <Share size={18} />
+            )}
+            <span className="text-xs font-semibold">Share</span>
           </button>
 
-          <button className="px-4 py-2 rounded-lg bg-purple-100 text-purple-700 font-medium flex items-center gap-2 cursor-pointer">
-            <FileText size={18} />
+          <button
+            type="button"
+            onClick={handleViewPdf}
+            disabled={isSharing || isGeneratingPdf}
+            className="px-3.5 py-2 rounded-lg bg-purple-100 text-purple-700 font-medium flex items-center gap-1.5 cursor-pointer hover:bg-purple-200 transition disabled:opacity-50 active:scale-98 shadow-2xs"
+            title="View PDF"
+          >
+            {isGeneratingPdf ? (
+              <Loader2 size={18} className="animate-spin text-purple-700" />
+            ) : (
+              <FileText size={18} />
+            )}
+            <span className="text-xs font-semibold">View PDF</span>
           </button>
         </div>
+
+        <div ref={ledgerPrintRef} className="space-y-5 bg-white">
 
         {!!vendor && (
           <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -390,31 +557,31 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
               </div>
             </div>
 
-            <div className="mt-4 border border-gray-300 rounded-lg overflow-hidden bg-white">
-              <table className="w-full text-sm">
+            <div className="mt-4 border border-gray-300 rounded-lg overflow-x-auto bg-white">
+              <table className="min-w-[620px] sm:min-w-full w-full text-sm">
                 <thead className="bg-gray-100 text-gray-600">
                   <tr>
-                    <th className="p-3 text-left">Date</th>
-                    <th className="p-3 text-left">Invoice #</th>
-                    <th className="p-3 text-left">Item</th>
-                    <th className="p-3 text-right">Qty</th>
-                    <th className="p-3 text-right">Unit</th>
-                    <th className="p-3 text-right">Disc</th>
-                    <th className="p-3 text-right">Total</th>
+                    <th className="p-3 text-left whitespace-nowrap">Date</th>
+                    <th className="p-3 text-left whitespace-nowrap">Invoice #</th>
+                    <th className="p-3 text-left whitespace-nowrap">Item</th>
+                    <th className="p-3 text-right whitespace-nowrap">Qty</th>
+                    <th className="p-3 text-right whitespace-nowrap">Unit</th>
+                    <th className="p-3 text-right whitespace-nowrap">Disc</th>
+                    <th className="p-3 text-right whitespace-nowrap">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {purchaseLines.map((r) => (
                     <tr key={`${r.purchaseId}-${r.itemName}`} className="border-t border-gray-200">
-                      <td className="p-3">
+                      <td className="p-3 whitespace-nowrap">
                         {r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString("en-IN") : "-"}
                       </td>
-                      <td className="p-3">{r.invoiceNumber}</td>
-                      <td className="p-3">{r.itemName}</td>
-                      <td className="p-3 text-right">{r.qty}</td>
-                      <td className="p-3 text-right">{money(r.unitPrice)}</td>
-                      <td className="p-3 text-right">{money(r.discount)}</td>
-                      <td className="p-3 text-right font-semibold">{money(r.lineTotal)}</td>
+                      <td className="p-3 whitespace-nowrap">{r.invoiceNumber}</td>
+                      <td className="p-3 whitespace-nowrap">{r.itemName}</td>
+                      <td className="p-3 text-right whitespace-nowrap">{r.qty}</td>
+                      <td className="p-3 text-right whitespace-nowrap">{money(r.unitPrice)}</td>
+                      <td className="p-3 text-right whitespace-nowrap">{money(r.discount)}</td>
+                      <td className="p-3 text-right font-semibold whitespace-nowrap">{money(r.lineTotal)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -442,34 +609,29 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
                   Sales & Payments
                 </div>
               </div>
-              <div className="text-sm font-semibold text-gray-900 flex gap-4">
-                <span className="text-blue-700">Total Billed: {money(invoiceTotal)}</span>
-                <span className="text-green-700">Total Received: {money(totalPaid)}</span>
-                <span className="text-green-700">Total Wallet Adjusted: {money(totalWalletAdjusted)}</span>
-                <span className="text-amber-700">Total Due: {money(invoiceTotal - totalPaid - totalWalletAdjusted)}</span>
-              </div>
+
             </div>
 
-            <div className="mt-4 border border-gray-300 rounded-lg overflow-hidden bg-white">
-              <table className="w-full text-sm">
+            <div className="mt-4 border border-gray-300 rounded-lg overflow-x-auto bg-white">
+              <table className="min-w-[580px] sm:min-w-full w-full text-sm">
                 <thead className="bg-gray-100 text-gray-600">
                   <tr>
-                    <th className="p-3 text-left">Date</th>
-                    <th className="p-3 text-left">Invoice #</th>
-                    <th className="p-3 text-left">Status</th>
-                    <th className="p-3 text-right">Total Amount</th>
-                    <th className="p-3 text-right">Amount Received</th>
-                    <th className="p-3 text-right">Due Amount</th>
+                    <th className="p-3 text-left whitespace-nowrap">Date</th>
+                    <th className="p-3 text-left whitespace-nowrap">Invoice #</th>
+                    <th className="p-3 text-left whitespace-nowrap">Status</th>
+                    <th className="p-3 text-right whitespace-nowrap">Total Amount</th>
+                    <th className="p-3 text-right whitespace-nowrap">Amount Received</th>
+                    <th className="p-3 text-right whitespace-nowrap">Due Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {invoiceLines.map((r) => (
                     <tr key={r.invoiceId} className="border-t border-gray-200">
-                      <td className="p-3">
+                      <td className="p-3 whitespace-nowrap">
                         {r.invoiceDate ? new Date(r.invoiceDate).toLocaleDateString("en-IN") : "-"}
                       </td>
-                      <td className="p-3 font-medium">{r.invoiceNumber}</td>
-                      <td className="p-3">
+                      <td className="p-3 font-medium whitespace-nowrap">{r.invoiceNumber}</td>
+                      <td className="p-3 whitespace-nowrap">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                           r.status.toLowerCase() === 'full' || r.status.toLowerCase() === 'paid' ? 'bg-green-100 text-green-700' : 
                           r.status.toLowerCase() === 'partial' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
@@ -477,7 +639,7 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
                           {r.status}
                         </span>
                       </td>
-                      <td className="p-3 text-right font-semibold">{money(r.totalAmount)}</td>
+                      <td className="p-3 text-right font-semibold whitespace-nowrap">{money(r.totalAmount)}</td>
                       <td className="p-3 text-right text-green-600 font-medium">{money(r.paidAmount)}</td>
                       <td className="p-3 text-right text-amber-600 font-medium">{money(r.dueAmount)}</td>
                     </tr>
@@ -501,24 +663,24 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
             {paymentLines.length > 0 && (
               <div className="mt-6">
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">Recent Invoice Payments</h4>
-                <div className="border border-gray-300 rounded-lg overflow-hidden bg-white">
-                  <table className="w-full text-sm">
+                <div className="border border-gray-300 rounded-lg overflow-x-auto bg-white">
+                  <table className="min-w-[520px] sm:min-w-full w-full text-sm">
                     <thead className="bg-gray-100 text-gray-600">
                       <tr>
-                        <th className="p-3 text-left">Date</th>
-                        <th className="p-3 text-left">Invoice #</th>
-                        <th className="p-3 text-left">Mode</th>
-                        <th className="p-3 text-left">Collected By</th>
-                        <th className="p-3 text-right">Amount</th>
+                        <th className="p-3 text-left whitespace-nowrap">Date</th>
+                        <th className="p-3 text-left whitespace-nowrap">Invoice #</th>
+                        <th className="p-3 text-left whitespace-nowrap">Mode</th>
+                        <th className="p-3 text-left whitespace-nowrap">Collected By</th>
+                        <th className="p-3 text-right whitespace-nowrap">Amount</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paymentLines.map((p) => (
                         <tr key={p.id} className="border-t border-gray-200">
-                          <td className="p-3">
+                          <td className="p-3 whitespace-nowrap">
                             {p.date ? new Date(p.date).toLocaleString("en-IN") : "-"}
                           </td>
-                          <td className="p-3 font-medium">{p.invoiceNumber}</td>
+                          <td className="p-3 font-medium whitespace-nowrap">{p.invoiceNumber}</td>
                           <td className="p-3 uppercase text-xs font-semibold">{p.mode}</td>
                           <td className="p-3 text-gray-600">{p.receivedBy}</td>
                           <td className="p-3 text-right text-green-700 font-semibold">{money(p.amount)}</td>
@@ -533,17 +695,17 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
           </div>
         )}
 
-        <div className="mt-6 border border-gray-300 rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="mt-6 border border-gray-300 rounded-lg overflow-x-auto bg-white">
+          <table className="min-w-[650px] sm:min-w-full w-full text-sm">
             <thead className="bg-gray-100 text-gray-600">
               <tr>
-                <th className="p-3 text-left">Id #</th>
-                <th className="p-3 text-left">Date</th>
-                <th className="p-3 text-left">Status</th>
-                <th className="p-3 text-left">Mode</th>
-                <th className="p-3 text-left">Amount</th>
-                <th className="p-3 text-left">Closing Balance</th>
-                <th className="p-3 text-left">Actions</th>
+                <th className="p-3 text-left whitespace-nowrap">Id #</th>
+                <th className="p-3 text-left whitespace-nowrap">Date</th>
+                <th className="p-3 text-left whitespace-nowrap">Status</th>
+                <th className="p-3 text-left whitespace-nowrap">Mode</th>
+                <th className="p-3 text-left whitespace-nowrap">Amount</th>
+                <th className="p-3 text-left whitespace-nowrap">Closing Balance</th>
+                <th className="p-3 text-left whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -574,19 +736,19 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
 
                 return (
                   <tr key={id} className="border-t border-gray-200">
-                    <td className="p-3">{id}</td>
-                    <td className="p-3">
+                    <td className="p-3 whitespace-nowrap">{id}</td>
+                    <td className="p-3 whitespace-nowrap">
                       {dateValue
                         ? new Date(dateValue).toLocaleString("en-IN")
                         : "-"}
                     </td>
                     <td className="p-3 capitalize">{status}</td>
                     <td className="p-3 uppercase">{mode}</td>
-                    <td className="p-3">₹ {amount.toLocaleString("en-IN")}</td>
-                    <td className="p-3 font-medium">
+                    <td className="p-3 whitespace-nowrap">₹ {amount.toLocaleString("en-IN")}</td>
+                    <td className="p-3 font-medium whitespace-nowrap">
                       ₹ {closing.toLocaleString("en-IN")}
                     </td>
-                    <td className="p-3">{String(entry?.note ?? entry?.remark ?? "-")}</td>
+                    <td className="p-3 whitespace-nowrap">{String(entry?.note ?? entry?.remark ?? "-")}</td>
                   </tr>
                 );
               })}
@@ -604,6 +766,8 @@ export default function LedgerModal({ onClose, customer, vendor }: Props) {
             </div>
           )}
         </div>
+        </div>
+
         {/* Buttons */}
         <div className="flex justify-between gap-3 mt-6 w-full">
           <button
