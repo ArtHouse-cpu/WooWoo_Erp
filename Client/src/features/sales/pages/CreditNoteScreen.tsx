@@ -847,7 +847,7 @@ export default function CreditNoteScreen() {
                   setFromDate(range.from);
                   setToDate(range.to);
                 }}
-                className="h-5 max-w-[95px] cursor-pointer appearance-none truncate rounded-full border border-slate-200/90 bg-slate-50 pl-2 pr-3.5 text-[9.5px] font-semibold text-slate-600 outline-none transition focus:border-blue-500 focus:bg-white"
+                className="h-6 cursor-pointer appearance-none rounded-full border border-slate-200/90 bg-white pl-2.5 pr-6 text-[11px] font-semibold text-slate-700 shadow-xs outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 aria-label="Date range"
               >
                 {DATE_PRESET_OPTIONS.map((opt) => (
@@ -857,8 +857,8 @@ export default function CreditNoteScreen() {
                 ))}
               </select>
               <ChevronDown
-                size={8}
-                className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-slate-400"
+                size={12}
+                className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
               />
             </div>
           </div>
@@ -875,7 +875,7 @@ export default function CreditNoteScreen() {
                   value={fromDate}
                   max={toDate || undefined}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className="h-7 w-full rounded-md border border-slate-200 px-1.5 text-[11px] text-slate-700"
+                  className="h-7 w-full rounded-md border border-slate-200 bg-white px-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-500"
                 />
               </div>
               <div className="flex-1">
@@ -887,7 +887,7 @@ export default function CreditNoteScreen() {
                   value={toDate}
                   min={fromDate || undefined}
                   onChange={(e) => setToDate(e.target.value)}
-                  className="h-7 w-full rounded-md border border-slate-200 px-1.5 text-[11px] text-slate-700"
+                  className="h-7 w-full rounded-md border border-slate-200 bg-white px-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-500"
                 />
               </div>
             </div>

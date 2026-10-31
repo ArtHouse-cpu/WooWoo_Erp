@@ -1057,7 +1057,6 @@ export default function CouponsScreen() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setForm(initialForm())}
                     onClick={() => {
                       setForm(initialForm());
                       setLimitPerCustomer(false);
