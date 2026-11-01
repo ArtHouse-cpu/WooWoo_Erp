@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
  Gift,
 Sparkles ,
@@ -31,7 +31,7 @@ Sparkles ,
   Megaphone,
   ChartNoAxesCombined,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { useAuthStore } from "@/store/authStore";
 import { handleLogout } from "@/services/apiClient";
@@ -47,11 +47,19 @@ type SubMenuItem = {
   path: string;
 };
 
+type SubCategory = {
+  name: string;
+  label: string;
+  icon: LucideIcon;
+  items: SubMenuItem[];
+};
+
 type MenuGroup = {
   key: string;
   label: string;
   icon: LucideIcon;
-  submenu: SubMenuItem[];
+  submenu?: SubMenuItem[];
+  categories?: SubCategory[];
 };
 
 type TopLink = {
@@ -76,50 +84,57 @@ const MENU_GROUPS: MenuGroup[] = [
     key: "bills",
     label: "Bills",
     icon: Banknote,
-    submenu: [
-      { name: "pos", label: "Invoice", icon: Receipt, path: "/pos" },
+    categories: [
       {
-        name: "creditnotes",
-        label: "Credit Notes",
-        icon: FileText,
-        path: "/creditnotes",
+        name: "sales",
+        label: "Sales",
+        icon: Receipt,
+        items: [
+          { name: "pos", label: "Invoice", icon: Receipt, path: "/pos" },
+          {
+            name: "creditnotes",
+            label: "Credit Notes",
+            icon: FileText,
+            path: "/creditnotes",
+          },
+          {
+            name: "subscriptions",
+            label: "Subscription",
+            icon: DollarSign,
+            path: "/subscriptions",
+          },
+          {
+            name: "quotations",
+            label: "Quotations",
+            icon: Percent,
+            path: "/quotations",
+          },
+        ],
       },
       {
-        name: "subscriptions",
-        label: "Subscription",
-        icon: DollarSign,
-        path: "/subscriptions",
-      },
-      {
-        name: "quotations",
-        label: "Quotations",
-        icon: Percent,
-        path: "/quotations",
-      },
-    ],
-  },
-  {
-    key: "purchases",
-    label: "Purchases",
-    icon: ShoppingCart,
-    submenu: [
-      {
-        name: "purchase",
-        label: "Purchase",
-        icon: Package,
-        path: "/purchase",
-      },
-      {
-        name: "purchaseOrder",
-        label: "Purchase Order",
-        icon: FileText,
-        path: "/purchase-orders",
-      },
-      {
-        name: "debitNotes",
-        label: "Debit Notes",
-        icon: FileText,
-        path: "/debit-notes",
+        name: "purchases",
+        label: "Purchases",
+        icon: ShoppingCart,
+        items: [
+          {
+            name: "purchase",
+            label: "Purchase",
+            icon: Package,
+            path: "/purchase",
+          },
+          {
+            name: "purchaseOrder",
+            label: "Purchase Order",
+            icon: FileText,
+            path: "/purchase-orders",
+          },
+          {
+            name: "debitNotes",
+            label: "Debit Notes",
+            icon: FileText,
+            path: "/debit-notes",
+          },
+        ],
       },
     ],
   },
@@ -317,12 +332,61 @@ export default function LeftSideBar({
   const { canPath } = usePermission();
   const isCollapsed = mobile ? false : collapsed;
 
+  const location = useLocation();
+  const currentPath = location.pathname;
+
+  const [openSubCategories, setOpenSubCategories] = useState<Record<string, boolean>>({
+    sales: true,
+    purchases: false,
+  });
+
+  const handleToggleSubCategory = (categoryName: string) => {
+    setOpenSubCategories((prev) => ({
+      ...prev,
+      [categoryName]: !prev[categoryName],
+    }));
+  };
+
+  useEffect(() => {
+    const isSalesRoute = ["/pos", "/creditnotes", "/subscriptions", "/quotations"].includes(currentPath);
+    const isPurchaseRoute = ["/purchase", "/purchase-orders", "/debit-notes"].includes(currentPath);
+
+    if (isSalesRoute || isPurchaseRoute) {
+      setActiveMenu("bills");
+      setOpenMenu("bills");
+      if (isSalesRoute) {
+        setOpenSubCategories((prev) => ({ ...prev, sales: true }));
+      }
+      if (isPurchaseRoute) {
+        setOpenSubCategories((prev) => ({ ...prev, purchases: true }));
+      }
+    }
+  }, [currentPath]);
+
   const visibleGroups = useMemo(
     () =>
-      MENU_GROUPS.map((group) => ({
-        ...group,
-        submenu: group.submenu.filter((sub) => canPath(sub.path)),
-      })).filter((group) => group.submenu.length > 0),
+      MENU_GROUPS.map((group) => {
+        if (group.categories) {
+          const filteredCategories = group.categories
+            .map((cat) => ({
+              ...cat,
+              items: cat.items.filter((item) => canPath(item.path)),
+            }))
+            .filter((cat) => cat.items.length > 0);
+          return {
+            ...group,
+            categories: filteredCategories,
+          };
+        }
+        return {
+          ...group,
+          submenu: (group.submenu || []).filter((sub) => canPath(sub.path)),
+        };
+      }).filter(
+        (group) =>
+          (group.categories && group.categories.length > 0) ||
+          (group.submenu && group.submenu.length > 0),
+      ),
     [canPath],
   );
 
@@ -448,26 +512,97 @@ export default function LeftSideBar({
               </button>
 
               {openMenu === menu.key && !isCollapsed && (
-                <div className="mt-2 ml-9 space-y-1.5">
-                  {menu.submenu.map((sub) => {
-                    const SubIcon = sub.icon;
+                <div className="mt-2 ml-7 space-y-1.5">
+                  {menu.categories ? (
+                    <div className="space-y-2">
+                      {menu.categories.map((cat) => {
+                        const CatIcon = cat.icon;
+                        const isCatOpen = Boolean(openSubCategories[cat.name]);
+                        const hasActiveChild = cat.items.some(
+                          (item) => activeSubmenu === item.name || currentPath === item.path,
+                        );
 
-                    return (
-                      <div
-                        key={sub.name}
-                        className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-all ${activeSubmenu === sub.name
-                            ? "bg-gray-100 font-medium text-black"
-                            : "text-gray-600 hover:bg-gray-50 hover:text-black"
+                        return (
+                          <div key={cat.name} className="space-y-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleSubCategory(cat.name);
+                              }}
+                              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-bold uppercase tracking-wide transition-all ${
+                                hasActiveChild
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "text-gray-600 hover:bg-gray-100 hover:text-black"
+                              }`}
+                            >
+                              <CatIcon
+                                size={15}
+                                className={hasActiveChild ? "text-blue-600" : "text-gray-400"}
+                              />
+                              <span>{cat.label}</span>
+                              <ChevronDown
+                                size={14}
+                                className={`ml-auto transition-transform duration-200 ${
+                                  isCatOpen ? "rotate-180 text-gray-700" : "text-gray-400"
+                                }`}
+                              />
+                            </button>
+
+                            {isCatOpen && (
+                              <div className="ml-2.5 space-y-1 border-l-2 border-gray-100 pl-2">
+                                {cat.items.map((sub) => {
+                                  const SubIcon = sub.icon;
+                                  const isActive =
+                                    activeSubmenu === sub.name || currentPath === sub.path;
+
+                                  return (
+                                    <div
+                                      key={sub.name}
+                                      className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-all ${
+                                        isActive
+                                          ? "bg-gray-100 font-medium text-black"
+                                          : "text-gray-600 hover:bg-gray-50 hover:text-black"
+                                      }`}
+                                      onClick={() =>
+                                        handleSubmenuClick(menu.key, sub.name, sub.path)
+                                      }
+                                    >
+                                      <SubIcon size={16} className={isActive ? "text-blue-600" : "text-gray-400"} />
+                                      <span className="text-[14px]">{sub.label}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    (menu.submenu || []).map((sub) => {
+                      const SubIcon = sub.icon;
+                      const isActive =
+                        activeSubmenu === sub.name || currentPath === sub.path;
+
+                      return (
+                        <div
+                          key={sub.name}
+                          className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-all ${
+                            isActive
+                              ? "bg-gray-100 font-medium text-black"
+                              : "text-gray-600 hover:bg-gray-50 hover:text-black"
                           }`}
-                        onClick={() =>
-                          handleSubmenuClick(menu.key, sub.name, sub.path)
-                        }
-                      >
-                        <SubIcon size={16} className="text-gray-400" />
-                        <span className="text-[14px]">{sub.label}</span>
-                      </div>
-                    );
-                  })}
+                          onClick={() =>
+                            handleSubmenuClick(menu.key, sub.name, sub.path)
+                          }
+                        >
+                          <SubIcon size={16} className={isActive ? "text-blue-600" : "text-gray-400"} />
+                          <span className="text-[14px]">{sub.label}</span>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               )}
             </div>
