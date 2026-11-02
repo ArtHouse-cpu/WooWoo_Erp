@@ -7,6 +7,7 @@ import {
   ArrowDownCircle,
   Boxes,
   Building2,
+  MapPin,
   Search,
   LayoutList,
   Loader2,
@@ -48,11 +49,38 @@ export default function CreateSpacesScreen() {
   const [saving, setSaving] = useState(false);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSpaceType, setSelectedSpaceType] = useState<string>("all");
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
+  const spaceTypeCounts = useMemo(() => {
+    const counts = { all: spaces.length, coworking: 0, exclusive: 0 };
+    for (const s of spaces) {
+      const typeStr = String(s.spaceType || s.category || "")
+        .toLowerCase()
+        .replace(/[^a-z]/g, "");
+      if (typeStr.includes("cowork")) {
+        counts.coworking++;
+      } else if (typeStr.includes("exclusive")) {
+        counts.exclusive++;
+      }
+    }
+    return counts;
+  }, [spaces]);
 
   const filteredSpaces = useMemo(() => {
-    if (!searchQuery.trim()) return spaces;
+    let list = spaces;
+    if (selectedSpaceType !== "all") {
+      const target = selectedSpaceType.toLowerCase().replace(/[^a-z]/g, "");
+      list = list.filter((s) => {
+        const typeStr = String(s.spaceType || s.category || "")
+          .toLowerCase()
+          .replace(/[^a-z]/g, "");
+        return typeStr.includes(target);
+      });
+    }
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return spaces.filter(
+    return list.filter(
       (s) =>
         (s.name || "").toLowerCase().includes(q) ||
         (s.spaceCode || "").toLowerCase().includes(q) ||
@@ -60,7 +88,7 @@ export default function CreateSpacesScreen() {
         (s.spaceType || "").toLowerCase().includes(q) ||
         (s.status || "").toLowerCase().includes(q),
     );
-  }, [spaces, searchQuery]);
+  }, [spaces, searchQuery, selectedSpaceType]);
 
   const fetchSpaces = async (signal?: AbortSignal) => {
     try {
@@ -268,7 +296,7 @@ export default function CreateSpacesScreen() {
 
   const table = useMaterialReactTable({
     columns,
-    data: spaces,
+    data: filteredSpaces,
     getRowId: (row) => row._id,
     enableRowSelection: true,
     enableMultiRowSelection: true,
@@ -464,7 +492,67 @@ export default function CreateSpacesScreen() {
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden md:block">
+      <div className="hidden md:block space-y-3">
+        {/* Category Pills (Desktop) */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <button
+            type="button"
+            onClick={() => setSelectedSpaceType("all")}
+            className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
+              selectedSpaceType === "all"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            All
+            {selectedSpaceType === "all" && spaces.length > 0 && (
+              <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
+                {spaceTypeCounts.all}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedSpaceType(
+                selectedSpaceType === "Coworking" ? "all" : "Coworking",
+              )
+            }
+            className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
+              selectedSpaceType === "Coworking"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Co-working
+            {selectedSpaceType === "Coworking" && (
+              <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
+                {spaceTypeCounts.coworking}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedSpaceType(
+                selectedSpaceType === "Exclusive" ? "all" : "Exclusive",
+              )
+            }
+            className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
+              selectedSpaceType === "Exclusive"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Exclusive
+            {selectedSpaceType === "Exclusive" && (
+              <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
+                {spaceTypeCounts.exclusive}
+              </span>
+            )}
+          </button>
+        </div>
+
         <MaterialReactTable table={table} />
       </div>
 
@@ -481,6 +569,66 @@ export default function CreateSpacesScreen() {
           />
         </div>
 
+        {/* Space Category Filter Pills (Mobile) */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <button
+            type="button"
+            onClick={() => setSelectedSpaceType("all")}
+            className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-semibold transition active:scale-95 cursor-pointer ${
+              selectedSpaceType === "all"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            All
+            {selectedSpaceType === "all" && spaces.length > 0 && (
+              <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-blue-600">
+                {spaceTypeCounts.all}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedSpaceType(
+                selectedSpaceType === "Coworking" ? "all" : "Coworking",
+              )
+            }
+            className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-semibold transition active:scale-95 cursor-pointer ${
+              selectedSpaceType === "Coworking"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Co-working
+            {selectedSpaceType === "Coworking" && (
+              <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-blue-600">
+                {spaceTypeCounts.coworking}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedSpaceType(
+                selectedSpaceType === "Exclusive" ? "all" : "Exclusive",
+              )
+            }
+            className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-semibold transition active:scale-95 cursor-pointer ${
+              selectedSpaceType === "Exclusive"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Exclusive
+            {selectedSpaceType === "Exclusive" && (
+              <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-blue-600">
+                {spaceTypeCounts.exclusive}
+              </span>
+            )}
+          </button>
+        </div>
+
         {loading && spaces.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
             Loading spaces...
@@ -490,117 +638,118 @@ export default function CreateSpacesScreen() {
             No spaces found
           </div>
         ) : (
-          filteredSpaces.map((space, idx) => {
-            const raw = String(space.spaceType || "").toLowerCase();
-            const cat = String(space.category || "").toLowerCase();
-            const isCoworking =
-              raw === "coworking" ||
-              (raw !== "exclusive" &&
-                (COWORKING_CATEGORIES.some((c) => c.toLowerCase() === cat) ||
-                  cat.includes("cowork")));
+          <div className="grid grid-cols-2 gap-3">
+            {filteredSpaces.map((space, idx) => {
+              const raw = String(space.spaceType || "").toLowerCase();
+              const cat = String(space.category || "").toLowerCase();
+              const isCoworking =
+                raw === "coworking" ||
+                (raw !== "exclusive" &&
+                  (COWORKING_CATEGORIES.some((c) => c.toLowerCase() === cat) ||
+                    cat.includes("cowork")));
 
-            return (
-              <div
-                key={space._id || idx}
-                onClick={() => setViewSpace(space)}
-                className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-bold text-slate-900">
-                        {space.name}
-                      </span>
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-700 border border-slate-200">
-                        {space.spaceCode ||
-                          `SP-${String(space._id || "").slice(-5).toUpperCase()}`}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span className="font-medium text-slate-600">
-                        {space.category || "General"}
-                      </span>
-                      <span>•</span>
+              const img =
+                (typeof (space as any).imageUrl === "string" && (space as any).imageUrl.trim()
+                  ? (space as any).imageUrl.trim()
+                  : null) ||
+                (Array.isArray((space as any).images) &&
+                (space as any).images.length > 0 &&
+                typeof (space as any).images[0] === "string" &&
+                (space as any).images[0].trim()
+                  ? (space as any).images[0].trim()
+                  : null) ||
+                (typeof (space as any).image === "string" && (space as any).image.trim()
+                  ? (space as any).image.trim()
+                  : null) ||
+                null;
+
+              return (
+                <div
+                  key={space._id || idx}
+                  onClick={() => setViewSpace(space)}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs transition hover:border-slate-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
+                >
+                  {/* Image Container */}
+                  <div className="relative aspect-4/3 w-full bg-slate-100 overflow-hidden">
+                    {img && !imageErrors[space._id || String(idx)] ? (
+                      <img
+                        src={img}
+                        alt={space.name || "Space"}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={() =>
+                          setImageErrors((prev) => ({
+                            ...prev,
+                            [space._id || String(idx)]: true,
+                          }))
+                        }
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-slate-50 text-slate-300">
+                        <MapPin size={28} className="stroke-[1.5]" />
+                      </div>
+                    )}
+
+                    {/* Status Badge */}
+                    <div className="absolute top-2 right-2">
                       <span
-                        className={`rounded-full px-2 py-0.2 text-[10px] font-semibold ${
-                          isCoworking
-                            ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200/50"
-                            : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/50"
+                        className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[9px] font-bold shadow-xs ${
+                          space.status === "Available"
+                            ? "bg-emerald-600 text-white"
+                            : space.status === "Booked"
+                              ? "bg-rose-500 text-white"
+                              : "bg-amber-500 text-white"
                         }`}
                       >
-                        {isCoworking ? "Coworking" : "Exclusive"}
+                        {space.status || "Available"}
                       </span>
-                      {space.day && (
-                        <>
-                          <span>•</span>
-                          <span className="font-medium text-slate-500">
-                            {space.day}
+                    </div>
+
+                    {/* Space Type / Day Tag */}
+                    <div className="absolute bottom-2 left-2">
+                      <span className="inline-flex max-w-[100px] truncate items-center rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-xs">
+                        {space.day || (isCoworking ? "Coworking" : "Exclusive")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Content Area */}
+                  <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-3">
+                    <div>
+                      {/* Space Category + Capacity */}
+                      <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-medium text-slate-500">
+                        <span className="truncate">
+                          {space.category || (isCoworking ? "Coworking" : "Exclusive")}
+                        </span>
+                        {space.capacity ? (
+                          <span className="shrink-0 text-slate-400">
+                            Cap: {space.capacity}
                           </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusClass(
-                      space.status,
-                    )}`}
-                  >
-                    {space.status || "Available"}
-                  </span>
-                </div>
+                        ) : null}
+                      </div>
 
-                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                  <div className="flex items-center gap-4 text-xs">
-                    <div>
-                      <span className="block text-[10px] font-medium uppercase text-slate-400">
-                        Rate
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        ₹{Number(space.price || 0).toLocaleString("en-IN")}
-                      </span>
+                      {/* Space Name */}
+                      <h4
+                        className="mt-1 min-h-[2rem] text-xs font-bold leading-snug text-slate-900 line-clamp-2 transition group-hover:text-blue-600 sm:text-sm"
+                        title={space.name}
+                      >
+                        {space.name}
+                      </h4>
                     </div>
-                    <div>
-                      <span className="block text-[10px] font-medium uppercase text-slate-400">
-                        Capacity
-                      </span>
-                      <span className="text-xs font-medium text-slate-700">
-                        {Number(space.capacity || 0)} people
-                      </span>
-                    </div>
-                  </div>
 
-                  <div
-                    className="flex items-center gap-1.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Can permission={PERMISSIONS.SPACE_UPDATE}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditing(space);
-                          setOpenModal(true);
-                        }}
-                        className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"
-                        title="Edit space"
-                      >
-                        <SquarePen size={15} />
-                      </button>
-                    </Can>
-                    <Can permission={PERMISSIONS.SPACE_DELETE}>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(space)}
-                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
-                        title="Delete space"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </Can>
+                    {/* Footer: Price */}
+                    <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-medium">Price / Day</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900">
+                          ₹{Number(space.price || 0).toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
       {/* Space View Details Modal */}
@@ -639,6 +788,34 @@ export default function CreateSpacesScreen() {
 
             {/* Modal Body */}
             <div className="overflow-y-auto p-5 space-y-4">
+              {/* Space Image Preview */}
+              {(() => {
+                const spaceImg =
+                  (typeof (viewSpace as any).imageUrl === "string" && (viewSpace as any).imageUrl.trim()
+                    ? (viewSpace as any).imageUrl.trim()
+                    : null) ||
+                  (Array.isArray((viewSpace as any).images) &&
+                  (viewSpace as any).images.length > 0 &&
+                  typeof (viewSpace as any).images[0] === "string" &&
+                  (viewSpace as any).images[0].trim()
+                    ? (viewSpace as any).images[0].trim()
+                    : null) ||
+                  (typeof (viewSpace as any).image === "string" && (viewSpace as any).image.trim()
+                    ? (viewSpace as any).image.trim()
+                    : null) ||
+                  null;
+
+                return spaceImg ? (
+                  <div className="relative aspect-16/9 w-full overflow-hidden rounded-2xl bg-slate-100 border border-slate-200/80">
+                    <img
+                      src={spaceImg}
+                      alt={viewSpace.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : null;
+              })()}
+
               <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -711,28 +888,46 @@ export default function CreateSpacesScreen() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/50">
-              <button
-                type="button"
-                onClick={() => setViewSpace(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
-              >
-                Close
-              </button>
-              <Can permission={PERMISSIONS.SPACE_UPDATE}>
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              <Can permission={PERMISSIONS.SPACE_DELETE}>
                 <button
                   type="button"
                   onClick={() => {
                     const sp = viewSpace;
                     setViewSpace(null);
-                    setEditing(sp);
-                    setOpenModal(true);
+                    void handleDelete(sp);
                   }}
-                  className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/90 transition"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
                 >
-                  Edit Space
+                  <Trash2 size={14} />
+                  Delete
                 </button>
               </Can>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewSpace(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Close
+                </button>
+                <Can permission={PERMISSIONS.SPACE_UPDATE}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sp = viewSpace;
+                      setViewSpace(null);
+                      setEditing(sp);
+                      setOpenModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer shadow-xs"
+                  >
+                    <SquarePen size={14} />
+                    Edit Space
+                  </button>
+                </Can>
+              </div>
             </div>
           </div>
         </div>
