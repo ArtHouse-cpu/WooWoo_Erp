@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useLayoutEffect, useRef, useState, type ReactNode} from 'react';
 import {useNavigate, useParams} from 'react-router-dom';
 import axios from 'axios';
 import {Download} from 'lucide-react';
@@ -15,6 +15,54 @@ type PublicInvoice = ActivityInvoiceDetail & {
   customerPhone?: string;
   membershipType?: string;
 };
+
+const SHEET_WIDTH = 794;
+
+function FitInvoice({children}: {children: ReactNode}) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [sheetHeight, setSheetHeight] = useState(1123);
+
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    const sheet = sheetRef.current;
+    if (!frame || !sheet) return;
+
+    const fit = () => {
+      const width = frame.clientWidth;
+      const next = width > 0 ? Math.min(1, width / SHEET_WIDTH) : 1;
+      setScale(next);
+      setSheetHeight(sheet.offsetHeight || 1123);
+    };
+
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(frame);
+    observer.observe(sheet);
+    return () => observer.disconnect();
+  }, [children]);
+
+  return (
+    <div ref={frameRef} className="w-full">
+      <div
+        className="mx-auto overflow-hidden rounded-lg bg-white shadow-sm"
+        style={{width: SHEET_WIDTH * scale, height: sheetHeight * scale}}
+      >
+        <div
+          ref={sheetRef}
+          style={{
+            width: SHEET_WIDTH,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function readInvoiceId(raw: string | undefined) {
   const text = String(raw || '').trim();
@@ -104,8 +152,8 @@ export default function PublicInvoicePage() {
   };
 
   return (
-    <div className="min-h-dvh bg-[#F4F6F8]">
-      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3">
+    <div className="min-h-dvh overflow-x-hidden bg-[#F4F6F8]">
+      <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-3 [padding-top:max(0.75rem,env(safe-area-inset-top))] sm:px-4">
         <div className="min-w-0">
           <p className="text-sm font-bold text-slate-900">Your bill</p>
           <p className="truncate text-xs text-slate-500">
@@ -120,12 +168,12 @@ export default function PublicInvoicePage() {
             className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#111111] px-3 py-2 text-xs font-semibold text-white disabled:opacity-60"
           >
             <Download className="h-3.5 w-3.5" />
-            {downloading ? 'Downloading…' : 'Download invoice'}
+            {downloading ? 'Saving…' : 'Download'}
           </button>
         ) : null}
       </div>
 
-      <div className="px-3 py-4">
+      <div className="px-2 py-3 sm:px-4 sm:py-4">
         {loading ? (
           <p className="py-16 text-center text-sm font-semibold text-slate-500">
             Opening your bill…
@@ -133,9 +181,9 @@ export default function PublicInvoicePage() {
         ) : error ? (
           <p className="py-16 text-center text-sm font-semibold text-slate-600">{error}</p>
         ) : bill ? (
-          <div className="overflow-x-auto">
+          <FitInvoice>
             <ThermalPrint {...bill} />
-          </div>
+          </FitInvoice>
         ) : null}
       </div>
     </div>
