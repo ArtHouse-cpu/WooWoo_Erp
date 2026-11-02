@@ -157,26 +157,14 @@ app.get("/", (req, res) => {
   res.send("🚀 Server is live and running...");
 });
 
+// Ensure MongoDB is connected before any API route executes.
+connectDB();
 app.use(customerErrorHandler);
 
-// Start the server only after MongoDB connects
-const startServer = async () => {
-  try {
-    await connectDB();
+app.listen(PORT, async () => {
+  console.log(`Server is running on port ${PORT}`);
+  await checkRedisConnection();
+});
 
-    console.log("✅ MongoDB connection is ready");
-
-    app.listen(PORT, () => {
-      console.log(`🌐 Server is running on port ${PORT}`);
-
-      checkRedisConnection().catch((error) => {
-        console.error("Redis connection error:", error);
-      });
-    });
-  } catch (error) {
-    console.error("❌ Failed to initialize the server:", error);
-    process.exit(1);
-  }
-};
-
-startServer();
+// Export the Express application for Vercel.
+export default app;
