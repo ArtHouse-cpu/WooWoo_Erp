@@ -13,7 +13,7 @@ interface SalesHeaderNavProps {
 }
 
 const TABS: Array<{ id: SalesSubcategory; label: string; path: string }> = [
-  { id: "invoice", label: "Sales", path: "/pos" },
+  { id: "invoice", label: "Invoice", path: "/pos" },
   { id: "creditnotes", label: "Credit Notes", path: "/creditnotes" },
   { id: "quotations", label: "Quotations", path: "/quotations" },
   { id: "subscriptions", label: "Subscription", path: "/subscriptions" },
@@ -51,14 +51,6 @@ export default function SalesHeaderNav({
             </button>
           );
         })}
-
-        <button
-          type="button"
-          onClick={() => navigate("/purchase")}
-          className="relative shrink-0 pb-2.5 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800 whitespace-nowrap"
-        >
-         Purchases
-        </button>
       </div>
     </div>
   );

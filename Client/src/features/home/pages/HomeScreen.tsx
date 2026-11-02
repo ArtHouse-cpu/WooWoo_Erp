@@ -17,7 +17,10 @@ import {
   Package,
   Search,
   ShoppingCart,
+  SquarePen,
   Ticket,
+  Trash2,
+  X,
   TrendingUp,
   UserPlus,
   Users,
@@ -29,15 +32,24 @@ import {
   handleCreateCustomer,
   handleDeleteInvoice,
   handleGetAllBookings,
+  handleGetCategories,
   handleGetCustomers,
   handleGetDashboardSummary,
   handleGetFoods,
   handleGetInvoice,
   handleGetInvoices,
   handleGetMemberships,
+  handleCreateProduct,
+  handleDeleteProduct,
   handleGetProducts,
   handleGetServices,
+  handleUpdateProduct,
+  handleCreateSpace,
+  handleDeleteSpace,
   handleGetSpaces,
+  handleUpdateSpace,
+  spacePayloadToFormData,
+  type SpacePayload,
   handleGetSubscriptions,
   type AllBookingRow,
   type CustomerPayload,
@@ -50,6 +62,10 @@ import { useAppSelector } from "@/store/hooks";
 import RevenueCard from "@/features/home/components/RevenueCard";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
+import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
+import AddSpaceModal, {
+  type SpaceFormPayload,
+} from "@/features/catalogue/components/AddSpaceModal";
 import CreatePosScreen, {
   INVOICE_SAVED_EVENT,
 } from "@/features/sales/pages/CreatePosScreen";
@@ -121,6 +137,11 @@ type GenericRow = {
   paymentType?: string;
   inclusions?: string[];
   owner?: string;
+  imageUrl?: string | null;
+  stockQty?: number;
+  capacity?: number;
+  spaceType?: string;
+  day?: string;
   raw?: Record<string, unknown>;
 };
 
@@ -528,6 +549,18 @@ export default function HomeScreen() {
   const [bookings, setBookings] = useState<GenericRow[]>([]);
   const [selectedSubscription, setSelectedSubscription] = useState<any>(null);
   const [subscriptionMode, setSubscriptionMode] = useState<"create" | "view">("create");
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [productCategories, setProductCategories] = useState<{ _id?: string; name?: string }[]>([]);
+  const [selectedProductCategory, setSelectedProductCategory] = useState<string>("all");
+  const [viewProduct, setViewProduct] = useState<any | null>(null);
+  const [editProduct, setEditProduct] = useState<any | null>(null);
+  const [showCreateProductModal, setShowCreateProductModal] = useState(false);
+  const [productModalLoading, setProductModalLoading] = useState(false);
+  const [selectedSpaceType, setSelectedSpaceType] = useState<string>("all");
+  const [viewSpace, setViewSpace] = useState<any | null>(null);
+  const [editingSpace, setEditingSpace] = useState<any | null>(null);
+  const [openSpaceModal, setOpenSpaceModal] = useState(false);
+  const [spaceModalSaving, setSpaceModalSaving] = useState(false);
   const [tabLoading, setTabLoading] = useState(false);
   const [invoiceRefresh, setInvoiceRefresh] = useState(0);
 
@@ -553,8 +586,19 @@ export default function HomeScreen() {
 
   useEffect(() => {
     setPage(1);
-    setVisibleCount(PAGE_SIZE);
+    setVisibleCount(tab === "products" || tab === "spaces" ? 6 : PAGE_SIZE);
+    if (tab !== "products") {
+      setSelectedProductCategory("all");
+    }
+    if (tab !== "spaces") {
+      setSelectedSpaceType("all");
+    }
   }, [tab, search, dateFilter, statusFilter]);
+
+  useEffect(() => {
+    setPage(1);
+    setVisibleCount(tab === "products" || tab === "spaces" ? 6 : PAGE_SIZE);
+  }, [selectedProductCategory, selectedSpaceType]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
@@ -836,19 +880,56 @@ export default function HomeScreen() {
             }),
           );
         }
+        if (tab === "products") {
+          if (productCategories.length === 0) {
+            try {
+              const catRes = await handleGetCategories();
+              if (alive) {
+                const list = Array.isArray(catRes?.categories)
+                  ? catRes.categories
+                  : Array.isArray(catRes)
+                    ? catRes
+                    : [];
+                setProductCategories(list);
+              }
+            } catch (err) {
+              console.error("Failed to load categories:", err);
+            }
+          }
+        }
         if (tab === "products" && products.length === 0) {
           const res = await handleGetProducts({ type: "product", limit: 50 });
           if (!alive) return;
           setProducts(
             (Array.isArray(res?.products) ? res.products : []).map(
-              (p: Record<string, unknown>, i: number) => ({
-                id: String(p?._id ?? i),
-                title: String(p?.productName || p?.name || "Product"),
-                subtitle: String(p?.category || "General"),
-                meta:
-                  Number(p?.stockQty ?? 0) > 0 ? "In stock" : "Out of stock",
-                amount: formatMoney(Number(p?.sellingPrice ?? 0)),
-              }),
+              (p: Record<string, unknown>, i: number) => {
+                const stock = Number(p?.stockQty ?? 0);
+                const img =
+                  (typeof p?.imageUrl === "string" && p.imageUrl.trim()
+                    ? p.imageUrl.trim()
+                    : null) ||
+                  (Array.isArray(p?.images) &&
+                  p.images.length > 0 &&
+                  typeof p.images[0] === "string" &&
+                  p.images[0].trim()
+                    ? p.images[0].trim()
+                    : null) ||
+                  (typeof p?.image === "string" && p.image.trim()
+                    ? p.image.trim()
+                    : null) ||
+                  null;
+                return {
+                  id: String(p?._id ?? i),
+                  title: String(p?.productName || p?.name || "Product"),
+                  subtitle: String(p?.category || "General"),
+                  meta: stock > 0 ? "In stock" : "Out of stock",
+                  amount: formatMoney(Number(p?.sellingPrice ?? 0)),
+                  imageUrl: img,
+                  stockQty: stock,
+                  code: String(p?.barCode || p?.barcode || p?.itemCode || ""),
+                  raw: p,
+                };
+              },
             ),
           );
         }
@@ -857,13 +938,36 @@ export default function HomeScreen() {
           if (!alive) return;
           setSpaces(
             (Array.isArray(res?.spaces) ? res.spaces : []).map(
-              (s: Record<string, unknown>, i: number) => ({
-                id: String(s?._id ?? i),
-                title: String(s?.name || "Space"),
-                subtitle: String(s?.category || "Space"),
-                meta: String(s?.status || "Available"),
-                amount: formatMoney(Number(s?.price ?? 0)),
-              }),
+              (s: Record<string, unknown>, i: number) => {
+                const img =
+                  (typeof s?.imageUrl === "string" && s.imageUrl.trim()
+                    ? s.imageUrl.trim()
+                    : null) ||
+                  (Array.isArray(s?.images) &&
+                  s.images.length > 0 &&
+                  typeof s.images[0] === "string" &&
+                  s.images[0].trim()
+                    ? s.images[0].trim()
+                    : null) ||
+                  (typeof s?.image === "string" && s.image.trim()
+                    ? s.image.trim()
+                    : null) ||
+                  null;
+                const statusStr = String(s?.status || "Available");
+                return {
+                  id: String(s?._id ?? i),
+                  title: String(s?.name || "Space"),
+                  subtitle: String(s?.category || s?.spaceType || "Space"),
+                  meta: statusStr,
+                  amount: formatMoney(Number(s?.price ?? 0)),
+                  imageUrl: img,
+                  capacity: Number(s?.capacity ?? 0),
+                  spaceType: String(s?.spaceType || ""),
+                  day: String(s?.day || ""),
+                  code: String(s?.spaceCode || ""),
+                  raw: s,
+                };
+              },
             ),
           );
         }
@@ -1002,11 +1106,64 @@ export default function HomeScreen() {
                   ? foods
                   : [];
 
+  const categoriesList = useMemo(() => {
+    const fromApi = productCategories
+      .map((c) => String(c?.name || "").trim())
+      .filter(Boolean);
+    const fromProducts = products
+      .map((p) => String(p?.subtitle || "").trim())
+      .filter(Boolean);
+    return Array.from(new Set([...fromApi, ...fromProducts]));
+  }, [productCategories, products]);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of products) {
+      const cat = String(p.subtitle || "General").trim().toLowerCase();
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+    return counts;
+  }, [products]);
+
+  const spaceTypeCounts = useMemo(() => {
+    const counts = { all: spaces.length, coworking: 0, exclusive: 0 };
+    for (const s of spaces) {
+      const typeStr = String(
+        s.spaceType || (s.raw as any)?.spaceType || s.subtitle || "",
+      )
+        .toLowerCase()
+        .replace(/[^a-z]/g, "");
+      if (typeStr.includes("cowork")) {
+        counts.coworking++;
+      } else if (typeStr.includes("exclusive")) {
+        counts.exclusive++;
+      }
+    }
+    return counts;
+  }, [spaces]);
+
   const filteredGeneric = useMemo(() => {
     const term = search.trim().toLowerCase();
     const filtered = genericRows.filter((row) => {
       if (row.createdAt !== undefined && !inDateRange(row.createdAt ?? null, dateFilter)) {
         return false;
+      }
+      if (tab === "products" && selectedProductCategory !== "all") {
+        const rowCat = String(row.subtitle || "").trim().toLowerCase();
+        if (rowCat !== selectedProductCategory.toLowerCase()) {
+          return false;
+        }
+      }
+      if (tab === "spaces" && selectedSpaceType !== "all") {
+        const typeStr = String(
+          row.spaceType || (row.raw as any)?.spaceType || row.subtitle || "",
+        )
+          .toLowerCase()
+          .replace(/[^a-z]/g, "");
+        const targetStr = selectedSpaceType.toLowerCase().replace(/[^a-z]/g, "");
+        if (!typeStr.includes(targetStr)) {
+          return false;
+        }
       }
       if (!term) return true;
       return (
@@ -1028,18 +1185,19 @@ export default function HomeScreen() {
     }
 
     return filtered;
-  }, [genericRows, search, dateFilter, tab]);
+  }, [genericRows, search, dateFilter, tab, selectedProductCategory, selectedSpaceType]);
 
+  const pageSize = tab === "products" || tab === "spaces" ? 6 : PAGE_SIZE;
   const tableTotal =
     tab === "bills"
       ? filteredBills.length
       : tab === "customers"
         ? filteredCustomers.length
         : filteredGeneric.length;
-  const pageCount = Math.max(1, Math.ceil(tableTotal / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(tableTotal / pageSize));
   const safePage = Math.min(page, pageCount);
-  const start = isMobile ? 0 : (safePage - 1) * PAGE_SIZE;
-  const rowCount = isMobile ? visibleCount : PAGE_SIZE;
+  const start = isMobile ? 0 : (safePage - 1) * pageSize;
+  const rowCount = isMobile ? visibleCount : pageSize;
   const pageBills = filteredBills.slice(start, start + rowCount);
   const pageCustomers = filteredCustomers.slice(start, start + rowCount);
   const pageGeneric = filteredGeneric.slice(start, start + rowCount);
@@ -1056,7 +1214,7 @@ export default function HomeScreen() {
         loadingMoreRef.current = true;
         setLoadingMore(true);
         timer = window.setTimeout(() => {
-          setVisibleCount((current) => current + PAGE_SIZE);
+          setVisibleCount((current) => current + pageSize);
           setLoadingMore(false);
           loadingMoreRef.current = false;
         }, 250);
@@ -1068,7 +1226,7 @@ export default function HomeScreen() {
       observer.disconnect();
       window.clearTimeout(timer);
     };
-  }, [hasMore, tab, visibleCount]);
+  }, [hasMore, tab, visibleCount, pageSize]);
 
   const searchPlaceholder =
     tab === "bills"
@@ -1293,6 +1451,208 @@ export default function HomeScreen() {
     spaces: "/spaces",
     services: "/services",
     food: "/foods",
+  };
+
+  const refreshProducts = async () => {
+    try {
+      const res = await handleGetProducts({ type: "product", limit: 50 });
+      setProducts(
+        (Array.isArray(res?.products) ? res.products : []).map(
+          (p: Record<string, unknown>, i: number) => {
+            const stock = Number(p?.stockQty ?? 0);
+            const img =
+              (typeof p?.imageUrl === "string" && p.imageUrl.trim()
+                ? p.imageUrl.trim()
+                : null) ||
+              (Array.isArray(p?.images) &&
+              p.images.length > 0 &&
+              typeof p.images[0] === "string" &&
+              p.images[0].trim()
+                ? p.images[0].trim()
+                : null) ||
+              (typeof p?.image === "string" && p.image.trim()
+                ? p.image.trim()
+                : null) ||
+              null;
+            return {
+              id: String(p?._id ?? i),
+              title: String(p?.productName || p?.name || "Product"),
+              subtitle: String(p?.category || "General"),
+              meta: stock > 0 ? "In stock" : "Out of stock",
+              amount: formatMoney(Number(p?.sellingPrice ?? 0)),
+              imageUrl: img,
+              stockQty: stock,
+              code: String(p?.barCode || p?.barcode || p?.itemCode || ""),
+              raw: p,
+            };
+          },
+        ),
+      );
+    } catch (e) {
+      console.error("Failed to refresh products:", e);
+    }
+  };
+
+  const handleDeleteProductDashboard = async (productId: string) => {
+    try {
+      const result = await Swal.fire({
+        title: "Delete Product?",
+        text: "You won't be able to revert this!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#ef4444",
+        cancelButtonColor: "#6b7280",
+        confirmButtonText: "Yes, delete it!",
+      });
+
+      if (result.isConfirmed) {
+        await handleDeleteProduct(productId);
+        setViewProduct(null);
+        Swal.fire("Deleted!", "Product has been deleted.", "success");
+        await refreshProducts();
+      }
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      Swal.fire("Error!", "Failed to delete product.", "error");
+    }
+  };
+
+  const handleSubmitProductDashboard = async (formData: FormData) => {
+    try {
+      setProductModalLoading(true);
+      const prodId = editProduct?._id || editProduct?.id;
+      if (prodId) {
+        await handleUpdateProduct(prodId, formData);
+        Swal.fire("Updated!", "Product updated successfully.", "success");
+      } else {
+        await handleCreateProduct(formData);
+        Swal.fire("Created!", "Product created successfully.", "success");
+      }
+      setShowCreateProductModal(false);
+      setEditProduct(null);
+      await refreshProducts();
+    } catch (error) {
+      console.error("Error saving product:", error);
+      throw error;
+    } finally {
+      setProductModalLoading(false);
+    }
+  };
+
+  const refreshSpaces = async () => {
+    try {
+      const res = await handleGetSpaces();
+      setSpaces(
+        (Array.isArray(res?.spaces) ? res.spaces : []).map(
+          (s: Record<string, unknown>, i: number) => {
+            const img =
+              (typeof s?.imageUrl === "string" && s.imageUrl.trim()
+                ? s.imageUrl.trim()
+                : null) ||
+              (Array.isArray(s?.images) &&
+              s.images.length > 0 &&
+              typeof s.images[0] === "string" &&
+              s.images[0].trim()
+                ? s.images[0].trim()
+                : null) ||
+              (typeof s?.image === "string" && s.image.trim()
+                ? s.image.trim()
+                : null) ||
+              null;
+            const statusStr = String(s?.status || "Available");
+            return {
+              id: String(s?._id ?? i),
+              title: String(s?.name || "Space"),
+              subtitle: String(s?.category || s?.spaceType || "Space"),
+              meta: statusStr,
+              amount: formatMoney(Number(s?.price ?? 0)),
+              imageUrl: img,
+              capacity: Number(s?.capacity ?? 0),
+              spaceType: String(s?.spaceType || ""),
+              day: String(s?.day || ""),
+              code: String(s?.spaceCode || ""),
+              raw: s,
+            };
+          },
+        ),
+      );
+    } catch (e) {
+      console.error("Failed to refresh spaces:", e);
+    }
+  };
+
+  const handleDeleteSpaceDashboard = async (spaceId: string, spaceName: string) => {
+    try {
+      const result = await Swal.fire({
+        title: "Delete space?",
+        text: `Remove "${spaceName || "this space"}" from catalogue?`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Yes, delete",
+        confirmButtonColor: "#ef4444",
+      });
+
+      if (result.isConfirmed) {
+        await handleDeleteSpace(spaceId);
+        setViewSpace(null);
+        Swal.fire({
+          icon: "success",
+          title: "Deleted",
+          text: "Space deleted successfully.",
+          timer: 1400,
+          showConfirmButton: false,
+        });
+        await refreshSpaces();
+      }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      Swal.fire(
+        "Delete failed",
+        err?.response?.data?.message || "Could not delete space.",
+        "error",
+      );
+    }
+  };
+
+  const handleSubmitSpaceDashboard = async (
+    payload: SpaceFormPayload,
+    imageFile: File | null,
+  ) => {
+    try {
+      setSpaceModalSaving(true);
+      const formData = spacePayloadToFormData(payload, imageFile);
+      const spaceId = editingSpace?._id || editingSpace?.id;
+
+      if (spaceId) {
+        await handleUpdateSpace(spaceId, formData);
+        Swal.fire({
+          icon: "success",
+          title: "Space updated",
+          timer: 1400,
+          showConfirmButton: false,
+        });
+      } else {
+        await handleCreateSpace(formData);
+        Swal.fire({
+          icon: "success",
+          title: "Space created",
+          timer: 1400,
+          showConfirmButton: false,
+        });
+      }
+      setOpenSpaceModal(false);
+      setEditingSpace(null);
+      await refreshSpaces();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      Swal.fire(
+        "Save failed",
+        err?.response?.data?.message || "Could not save space.",
+        "error",
+      );
+    } finally {
+      setSpaceModalSaving(false);
+    }
   };
 
   const handleMobileSubscriptionClick = (sub: GenericRow) => {
@@ -1577,6 +1937,120 @@ export default function HomeScreen() {
             View all
           </button>
         </div>
+
+        {/* Category Pills Bar (for Products tab) */}
+        {tab === "products" && (categoriesList.length > 0 || productCategories.length > 0) && (
+          <div className="flex items-center gap-2 overflow-x-auto px-3 pb-3 sm:px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <button
+              type="button"
+              onClick={() => setSelectedProductCategory("all")}
+              className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
+                selectedProductCategory === "all"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              All
+              {selectedProductCategory === "all" && products.length > 0 && (
+                <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
+                  {products.length}
+                </span>
+              )}
+            </button>
+            {categoriesList.map((catName) => {
+              const isSelected =
+                selectedProductCategory.toLowerCase() ===
+                catName.toLowerCase();
+              const count =
+                categoryCounts[catName.toLowerCase()] || 0;
+              return (
+                <button
+                  key={catName}
+                  type="button"
+                  onClick={() =>
+                    setSelectedProductCategory(
+                      isSelected ? "all" : catName,
+                    )
+                  }
+                  className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
+                    isSelected
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {catName}
+                  {isSelected && (
+                    <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Space Type Pills Bar (for Spaces tab) */}
+        {tab === "spaces" && (
+          <div className="flex items-center gap-2 overflow-x-auto px-3 pb-3 sm:px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <button
+              type="button"
+              onClick={() => setSelectedSpaceType("all")}
+              className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
+                selectedSpaceType === "all"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              All
+              {selectedSpaceType === "all" && spaces.length > 0 && (
+                <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
+                  {spaceTypeCounts.all}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setSelectedSpaceType(
+                  selectedSpaceType === "Coworking" ? "all" : "Coworking",
+                )
+              }
+              className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
+                selectedSpaceType === "Coworking"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              Co-working
+              {selectedSpaceType === "Coworking" && (
+                <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
+                  {spaceTypeCounts.coworking}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setSelectedSpaceType(
+                  selectedSpaceType === "Exclusive" ? "all" : "Exclusive",
+                )
+              }
+              className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
+                selectedSpaceType === "Exclusive"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              Exclusive
+              {selectedSpaceType === "Exclusive" && (
+                <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
+                  {spaceTypeCounts.exclusive}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
 
      
 
@@ -2395,6 +2869,200 @@ export default function HomeScreen() {
               </table>
             </div>
           </>
+        ) : tab === "products" || tab === "spaces" ? (
+          <>
+            {tabLoading ? (
+              <div className="grid grid-cols-2 gap-2.5 p-3 sm:gap-3.5 sm:p-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs"
+                  >
+                    <div className="aspect-4/3 w-full animate-pulse bg-slate-100" />
+                    <div className="space-y-2 p-2.5 sm:p-3">
+                      <div className="h-2.5 w-1/2 animate-pulse rounded bg-slate-100" />
+                      <div className="h-3.5 w-3/4 animate-pulse rounded bg-slate-200" />
+                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
+                        <div className="h-3.5 w-1/3 animate-pulse rounded bg-slate-200" />
+                        <div className="h-6 w-6 animate-pulse rounded-full bg-slate-100" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : pageGeneric.length === 0 ? (
+              <div className="p-4 sm:p-6">
+                <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
+                  {tab === "products" ? (
+                    <Package className="mx-auto h-8 w-8 text-slate-300" />
+                  ) : (
+                    <MapPin className="mx-auto h-8 w-8 text-slate-300" />
+                  )}
+                  <h4 className="mt-3 text-sm font-semibold text-slate-800">
+                    No {tab} found
+                  </h4>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {search
+                      ? `No ${tab} matching "${search}".`
+                      : `No ${tab} available in the dashboard.`}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2.5 p-3 sm:gap-3.5 sm:p-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {pageGeneric.map((row, index) => {
+                  const hasImage = Boolean(row.imageUrl && !imageErrors[row.id]);
+                  return (
+                    <div
+                      key={row.id || index}
+                      onClick={() => {
+                        if (tab === "products") {
+                          setViewProduct(row);
+                        } else if (tab === "spaces") {
+                          setViewSpace(row);
+                        } else {
+                          navigate(
+                            tabRoutes[tab] || "/spaces",
+                          );
+                        }
+                      }}
+                      className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs transition hover:border-blue-300 hover:shadow-md cursor-pointer active:scale-[0.98]"
+                    >
+                      {/* Image Area */}
+                      <div className="relative aspect-4/3 w-full overflow-hidden bg-slate-100">
+                        {hasImage ? (
+                          <img
+                            src={row.imageUrl!}
+                            alt={row.title}
+                            loading="lazy"
+                            onError={() =>
+                              setImageErrors((prev) => ({
+                                ...prev,
+                                [row.id]: true,
+                              }))
+                            }
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 text-slate-300">
+                            {tab === "products" ? (
+                              <Package
+                                size={28}
+                                className="text-slate-300 transition group-hover:text-blue-400"
+                              />
+                            ) : (
+                              <MapPin
+                                size={28}
+                                className="text-slate-300 transition group-hover:text-blue-400"
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* Top-Right Badge: Stock / Status */}
+                        <div className="absolute right-2 top-2">
+                          {tab === "products" ? (
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-xs backdrop-blur-xs ${
+                                (row.stockQty ?? 0) > 0 ||
+                                row.meta === "In stock"
+                                  ? "bg-emerald-500/90 text-white"
+                                  : "bg-rose-500/90 text-white"
+                              }`}
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                              {(row.stockQty ?? 0) > 0 ||
+                              row.meta === "In stock"
+                                ? "In stock"
+                                : "Out of stock"}
+                            </span>
+                          ) : (
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-xs backdrop-blur-xs ${
+                                row.meta === "Available"
+                                  ? "bg-emerald-500/90 text-white"
+                                  : row.meta === "Booked"
+                                    ? "bg-rose-500/90 text-white"
+                                    : "bg-amber-500/90 text-white"
+                              }`}
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                              {row.meta}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Bottom-Left Badge: Day / Space Type / Barcode */}
+                        {tab === "spaces" && (row.day || row.spaceType) ? (
+                          <div className="absolute bottom-2 left-2">
+                            <span className="inline-flex items-center rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-xs">
+                              {row.day || row.spaceType}
+                            </span>
+                          </div>
+                        ) : tab === "products" && row.code ? (
+                          <div className="absolute bottom-2 left-2">
+                            <span className="inline-flex max-w-[100px] truncate items-center rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-xs">
+                              {row.code}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Content Area */}
+                      <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-3">
+                        <div>
+                          {/* Category + Secondary Info */}
+                          <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-medium text-slate-500">
+                            <span className="truncate">
+                              {row.subtitle ||
+                                (tab === "products" ? "Product" : "Space")}
+                            </span>
+                            {tab === "spaces" && row.capacity ? (
+                              <span className="shrink-0 text-slate-400">
+                                Cap: {row.capacity}
+                              </span>
+                            ) : tab === "products" &&
+                              row.stockQty !== undefined &&
+                              row.stockQty > 0 ? (
+                              <span className="shrink-0 text-slate-400">
+                                Stock: {row.stockQty}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {/* Title / Name */}
+                          <h4
+                            className="mt-1 min-h-[2rem] text-xs font-bold leading-snug text-slate-900 line-clamp-2 transition group-hover:text-blue-600 sm:text-sm"
+                            title={row.title}
+                          >
+                            {row.title}
+                          </h4>
+                        </div>
+
+                        {/* Footer: Price + Arrow */}
+                        <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
+                          <div>
+                            <span className="text-xs font-extrabold text-slate-900 sm:text-sm">
+                              {row.amount || "₹0"}
+                            </span>
+                            {tab === "spaces" ? (
+                              <span className="ml-0.5 text-[10px] font-normal text-slate-400">
+                                / day
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-blue-600 group-hover:text-white">
+                            <ChevronRight size={13} />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         ) : (
           <div className="overflow-x-auto">
             {tab === "customers" ? (
@@ -2554,7 +3222,7 @@ export default function HomeScreen() {
         <div className="hidden flex-col gap-3 border-t border-gray-100 px-4 py-3 md:flex md:flex-row md:items-center md:justify-between">
           <p className="text-xs text-gray-500">
             Showing {tableTotal === 0 ? 0 : start + 1} to{" "}
-            {Math.min(start + PAGE_SIZE, tableTotal)} of {tableTotal}{" "}
+            {Math.min(start + pageSize, tableTotal)} of {tableTotal}{" "}
             {tab === "bills" ? "bills" : tab}
           </p>
           <div className="flex items-center gap-1">
@@ -2724,6 +3392,446 @@ export default function HomeScreen() {
           void loadDashboardData();
         }}
       />
+
+      {/* Product Details Modal */}
+      {viewProduct && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setViewProduct(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <Package size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Product Details
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {viewProduct.subtitle || viewProduct.raw?.category || "General"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewProduct(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-y-auto p-5 space-y-4">
+              {/* Product Image preview */}
+              {viewProduct.imageUrl ? (
+                <div className="relative aspect-16/9 w-full overflow-hidden rounded-2xl bg-slate-100 border border-slate-200/80">
+                  <img
+                    src={viewProduct.imageUrl}
+                    alt={viewProduct.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+
+              {/* Title & Status Card */}
+              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Product Name
+                    </span>
+                    <h4 className="text-lg font-bold text-slate-900 mt-0.5">
+                      {viewProduct.title || viewProduct.raw?.productName}
+                    </h4>
+                    {viewProduct.raw?.description && (
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                        {String(viewProduct.raw.description)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                        (viewProduct.stockQty ?? 0) <= 0
+                          ? "bg-rose-100 text-rose-800"
+                          : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      {(viewProduct.stockQty ?? 0) <= 0
+                        ? "Out of Stock"
+                        : "In Stock"}
+                    </span>
+                    {viewProduct.raw?.isCsp && (
+                      <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                        {String(viewProduct.raw?.cspLabel || "CSP")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Metric Tiles */}
+                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-200/60 pt-3 text-center">
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Selling Price
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      {viewProduct.amount || `₹${Number(viewProduct.raw?.sellingPrice || 0).toLocaleString("en-IN")}`}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Cost Price
+                    </span>
+                    <span className="text-sm font-bold text-slate-600">
+                      ₹{Number(viewProduct.raw?.purchasePrice || 0).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Stock Qty
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      {Number(viewProduct.stockQty ?? viewProduct.raw?.stockQty ?? 0)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Specs List */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-2.5 text-xs">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Category</span>
+                  <span className="font-semibold text-slate-800">
+                    {viewProduct.subtitle || viewProduct.raw?.category || "—"}
+                  </span>
+                </div>
+                {viewProduct.raw?.subCategory && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Sub Category</span>
+                    <span className="font-semibold text-slate-800">
+                      {String(viewProduct.raw.subCategory)}
+                    </span>
+                  </div>
+                )}
+                {(viewProduct.code || viewProduct.raw?.barCode || viewProduct.raw?.barcode) && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Barcode</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {viewProduct.code || viewProduct.raw?.barCode || viewProduct.raw?.barcode}
+                    </span>
+                  </div>
+                )}
+                {viewProduct.raw?.itemCode && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Item Code</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {String(viewProduct.raw.itemCode)}
+                    </span>
+                  </div>
+                )}
+                {viewProduct.raw?.primaryUnit && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Unit</span>
+                    <span className="font-semibold text-slate-800">
+                      {String(viewProduct.raw.primaryUnit)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer with Edit, Delete & Close */}
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              {/* Delete Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const prodId = viewProduct.raw?._id || viewProduct.id;
+                  if (prodId) {
+                    handleDeleteProductDashboard(prodId);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewProduct(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Close
+                </button>
+
+                {/* Edit Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prod = viewProduct.raw || viewProduct;
+                    setViewProduct(null);
+                    setEditProduct(prod);
+                    setShowCreateProductModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer shadow-xs"
+                >
+                  <SquarePen size={14} />
+                  Edit Product
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Product Modal */}
+      {showCreateProductModal && (
+        <CreateProductModal
+          onClose={() => {
+            setShowCreateProductModal(false);
+            setEditProduct(null);
+          }}
+          onSubmit={handleSubmitProductDashboard}
+          loading={productModalLoading}
+          initialData={
+            editProduct
+              ? {
+                  ...editProduct,
+                  type: "product",
+                  barcode: editProduct.barCode || editProduct.barcode || "",
+                  category: String(editProduct.category || editProduct.subtitle || ""),
+                  categoryId: String(editProduct.categoryId || ""),
+                  subCategory: String(editProduct.subCategory || ""),
+                  subCategoryId: String(editProduct.subCategoryId || ""),
+                  images: Array.isArray(editProduct.images)
+                    ? editProduct.images
+                    : [],
+                }
+              : undefined
+          }
+        />
+      )}
+
+      {/* Space Details Modal */}
+      {viewSpace && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setViewSpace(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <MapPin size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Space Details
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {viewSpace.spaceType || (viewSpace.raw as any)?.spaceType || viewSpace.subtitle || "Space"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewSpace(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-y-auto p-5 space-y-4">
+              {/* Space Image preview */}
+              {viewSpace.imageUrl ? (
+                <div className="relative aspect-16/9 w-full overflow-hidden rounded-2xl bg-slate-100 border border-slate-200/80">
+                  <img
+                    src={viewSpace.imageUrl}
+                    alt={viewSpace.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+
+              {/* Title & Status Card */}
+              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Space Name
+                    </span>
+                    <h4 className="text-lg font-bold text-slate-900 mt-0.5">
+                      {viewSpace.title || (viewSpace.raw as any)?.name}
+                    </h4>
+                    {(viewSpace.raw as any)?.description && (
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                        {String((viewSpace.raw as any).description)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                        viewSpace.meta === "Available"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : viewSpace.meta === "Booked"
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      {viewSpace.meta}
+                    </span>
+                    {(viewSpace.code || (viewSpace.raw as any)?.spaceCode) && (
+                      <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-700 border border-slate-200">
+                        {viewSpace.code || (viewSpace.raw as any)?.spaceCode}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Metric Tiles */}
+                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-200/60 pt-3 text-center">
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Price / Day
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      {viewSpace.amount || `₹${Number((viewSpace.raw as any)?.price || 0).toLocaleString("en-IN")}`}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Space Type
+                    </span>
+                    <span className="text-sm font-bold text-slate-900 truncate block">
+                      {viewSpace.spaceType || (viewSpace.raw as any)?.spaceType || "Exclusive"}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Capacity
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      {viewSpace.capacity || (viewSpace.raw as any)?.capacity
+                        ? `${viewSpace.capacity || (viewSpace.raw as any)?.capacity} pax`
+                        : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Specs List */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-2.5 text-xs">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Category</span>
+                  <span className="font-semibold text-slate-800">
+                    {viewSpace.subtitle || (viewSpace.raw as any)?.category || "—"}
+                  </span>
+                </div>
+                {(viewSpace.day || (viewSpace.raw as any)?.day) && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Pricing Day</span>
+                    <span className="font-semibold text-slate-800">
+                      {viewSpace.day || (viewSpace.raw as any)?.day}
+                    </span>
+                  </div>
+                )}
+                {(viewSpace.code || (viewSpace.raw as any)?.spaceCode) && (
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Space Code</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {viewSpace.code || (viewSpace.raw as any)?.spaceCode}
+                    </span>
+                  </div>
+                )}
+                {(viewSpace.raw as any)?.description && (
+                  <div className="pt-1">
+                    <span className="text-slate-500 block mb-1">Description</span>
+                    <p className="text-slate-700 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100 whitespace-pre-wrap">
+                      {String((viewSpace.raw as any).description)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer with Edit, Delete & Close */}
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              {/* Delete Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const spaceId = (viewSpace.raw as any)?._id || viewSpace.id;
+                  if (spaceId) {
+                    handleDeleteSpaceDashboard(spaceId, viewSpace.title);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewSpace(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Close
+                </button>
+
+                {/* Edit / Update Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sp = (viewSpace.raw as any) || viewSpace;
+                    setViewSpace(null);
+                    setEditingSpace(sp);
+                    setOpenSpaceModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer shadow-xs"
+                >
+                  <SquarePen size={14} />
+                  Edit Space
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Space Edit / Create Modal */}
+      {openSpaceModal && (
+        <AddSpaceModal
+          open={openSpaceModal}
+          onClose={() => {
+            setOpenSpaceModal(false);
+            setEditingSpace(null);
+          }}
+          onSubmit={handleSubmitSpaceDashboard}
+          loading={spaceModalSaving}
+          initialSpace={editingSpace}
+        />
+      )}
     </div>
   );
 }
