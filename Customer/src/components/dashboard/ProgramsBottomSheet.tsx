@@ -171,6 +171,86 @@ function CspStatusNotice({
   );
 }
 
+function HapMemberDashboard({
+  networkSize,
+  profession,
+  presence,
+}: {
+  networkSize: number;
+  profession: string;
+  presence: string;
+}) {
+  const size = Number(networkSize) > 0 ? Number(networkSize).toLocaleString("en-IN") : "0";
+  const kpis = [
+    { label: "Network Size", value: size, icon: Users, tone: "bg-[#F5F3FF] text-[#7C3AED]" },
+    { label: "Total Earnings", value: "₹0", icon: IndianRupee, tone: "bg-[#FFF8F2] text-[#EA580C]" },
+    { label: "Pending Payout", value: "₹0", icon: Wallet, tone: "bg-[#EFF6FF] text-[#2563EB]" },
+    { label: "Referrals", value: "0", icon: Target, tone: "bg-[#F0FDF4] text-[#16A34A]" },
+  ];
+
+  return (
+    <div className="space-y-4 px-5 pb-2 text-left">
+      <div className="grid grid-cols-2 gap-2">
+        {kpis.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div
+              key={item.label}
+              className="rounded-2xl border border-slate-100 bg-white p-3 shadow-xs"
+            >
+              <div className={`mb-2 flex h-7 w-7 items-center justify-center rounded-full ${item.tone}`}>
+                <Icon className="h-3.5 w-3.5" strokeWidth={2.25} />
+              </div>
+              <p className="text-[15px] font-black leading-none text-slate-900">{item.value}</p>
+              <p className="mt-1 text-[10px] font-bold text-slate-500">{item.label}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <section className="rounded-2xl border border-slate-100 bg-[#FAFBFD] p-3.5">
+        <h4 className="text-[13px] font-black text-slate-900">Affiliate Profile</h4>
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-bold text-slate-500">Profession</p>
+            <p className="truncate text-[12px] font-black text-slate-900">{profession || "—"}</p>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-bold text-slate-500">Website / social</p>
+            <p className="max-w-[60%] truncate text-right text-[12px] font-black text-slate-900">
+              {presence || "—"}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-100 bg-white p-3.5">
+        <h4 className="text-[13px] font-black text-slate-900">Payout Summary</h4>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-[#EFF6FF] px-3 py-2">
+            <p className="text-[10px] font-bold text-slate-500">Pending</p>
+            <p className="mt-1 text-[14px] font-black text-slate-900">₹0</p>
+          </div>
+          <div className="rounded-xl bg-[#F0FDF4] px-3 py-2">
+            <p className="text-[10px] font-bold text-slate-500">Completed</p>
+            <p className="mt-1 text-[14px] font-black text-slate-900">₹0</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-100 bg-white p-3.5">
+        <div className="flex items-center gap-2">
+          <Clock className="h-3.5 w-3.5 text-slate-400" />
+          <h4 className="text-[13px] font-black text-slate-900">Recent Activity</h4>
+        </div>
+        <p className="mt-2 text-[12px] font-semibold leading-relaxed text-slate-500">
+          No referrals or payouts yet.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 function CspMemberDashboard({
   products,
   loading,
@@ -598,6 +678,12 @@ export function ProgramsBottomSheet({
               <div className="flex-1 overflow-y-auto pb-6">
                 {activeTab === "csp" && enrolled ? (
                   <CspMemberDashboard products={cspProducts} loading={cspProductsLoading} />
+                ) : activeTab === "hap" && hapApproved && hapApplication ? (
+                  <HapMemberDashboard
+                    networkSize={hapApplication.networkSize}
+                    profession={hapApplication.profession}
+                    presence={hapApplication.presence}
+                  />
                 ) : (
                 <>
                 {activeTab === "csp" &&
@@ -610,31 +696,22 @@ export function ProgramsBottomSheet({
                 ) : null}
                 {activeTab === "hap" &&
                 (hapApplication?.status === "under_review" ||
-                  hapApplication?.status === "rejected" ||
-                  hapApplication?.status === "approved") ? (
+                  hapApplication?.status === "rejected") ? (
                   <div
                     className={`mx-5 mb-4 rounded-2xl border px-3.5 py-3 text-left ${
                       hapApplication.status === "rejected"
                         ? "border-rose-200 bg-rose-50"
-                        : hapApplication.status === "approved"
-                          ? "border-violet-200 bg-violet-50"
-                          : "border-amber-200 bg-amber-50"
+                        : "border-amber-200 bg-amber-50"
                     }`}
                   >
                     <span className="inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-700">
-                      {hapApplication.status === "rejected"
-                        ? "Rejected"
-                        : hapApplication.status === "approved"
-                          ? "Approved"
-                          : "Waiting for approval"}
+                      {hapApplication.status === "rejected" ? "Rejected" : "Waiting for approval"}
                     </span>
                     <p className="mt-2 text-[12px] font-semibold leading-relaxed text-slate-700">
                       {hapApplication.status === "rejected"
                         ? hapApplication.rejectionReason?.trim() ||
                           "No reason was provided. You can apply again."
-                        : hapApplication.status === "approved"
-                          ? "You are a House Affiliate. Commission appears after real activity."
-                          : "Your HAP application is under review. Please wait for approval."}
+                        : "Your HAP application is under review. Please wait for approval."}
                     </p>
                   </div>
                 ) : null}
