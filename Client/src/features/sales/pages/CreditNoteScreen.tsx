@@ -43,6 +43,7 @@ import {
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
 import CreateSalesReturnScreen from "./CreateSalesReturnScreen";
+import SalesHeaderNav from "../components/SalesHeaderNav";
 
 type CreditNoteStatus = "Final" | "Draft" | "Cancelled";
 
@@ -783,46 +784,11 @@ export default function CreditNoteScreen() {
       {/* Matches user reference image from POS/Invoice section          */}
       {/* ============================================================== */}
       <div className="block md:hidden space-y-3 pb-24">
-        {/* A. Top Navigation Tabs */}
-        <div className="-mx-1 border-b border-slate-200 bg-white px-2">
-          <div className="hide-scrollbar flex items-center gap-6 overflow-x-auto pt-1">
-            <button
-              type="button"
-              onClick={() => navigate("/pos")}
-              className="relative shrink-0 pb-2.5 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
-            >
-              Sales
-            </button>
-            <button
-              type="button"
-              className="relative shrink-0 pb-2.5 pt-1 text-sm font-bold text-blue-600 transition"
-            >
-              Credit Notes
-              <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-blue-600" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/quotations")}
-              className="relative shrink-0 pb-2.5 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
-            >
-              Quotations
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/subscriptions")}
-              className="relative shrink-0 pb-2.5 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
-            >
-              Subscriptions
-            </button>
-            <button
-              type="button"
-              onClick={() => setMoreMenuOpen(true)}
-              className="relative shrink-0 pb-2.5 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
-            >
-              More
-            </button>
-          </div>
-        </div>
+        {/* A. Top Navigation Tabs with Sales Subcategories */}
+        <SalesHeaderNav
+          activeSubcategory="creditnotes"
+          onOpenMore={() => setMoreMenuOpen(true)}
+        />
 
         {/* B. Summary Card: Date filter above Total Amount & Final Returns box */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs">

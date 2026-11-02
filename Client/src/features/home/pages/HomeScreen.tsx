@@ -1481,8 +1481,9 @@ export default function HomeScreen() {
               placeholder={searchPlaceholder}
               className="w-full min-w-0 bg-transparent text-sm text-gray-800 outline-none placeholder:text-gray-400"
             />
+            
           </div>
-          {tab === "bills" ? (
+           {tab === "bills" ? (
             <div className="relative shrink-0" ref={filterRef}>
               <button
                 type="button"
@@ -1518,29 +1519,16 @@ export default function HomeScreen() {
               ) : null}
             </div>
           ) : null}
-        </div>
-
-        <div className="flex items-end justify-between px-4 pb-3">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">
-              {TABS.find((t) => t.key === tab)?.label}
-            </h2>
-            <p className="text-xs text-gray-500">
-              {tab === "bills"
-                ? " "
-                : tab === "subscriptions"
-                  ? "Recent membership subscriptions from this dashboard."
-                  : `Browse ${TABS.find((t) => t.key === tab)?.label ?? tab} from this dashboard.`}
-            </p>
-          </div>
           <button
             type="button"
             onClick={() => navigate(tabRoutes[tab])}
-            className="text-sm font-semibold text-blue-600 hover:underline"
+            className="shrink-0 whitespace-nowrap px-1 text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
           >
             View all
           </button>
         </div>
+
+     
 
         {tab === "bills" ? (
           <>
