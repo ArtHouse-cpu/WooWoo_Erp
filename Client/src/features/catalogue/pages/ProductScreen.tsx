@@ -18,6 +18,7 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Boxes,
+  Package,
   LayoutList,
   Search,
   ShoppingBasket,
@@ -32,6 +33,7 @@ import {
   handleDeleteProduct,
   handleBulkUploadProducts,
   handleCreateCategories,
+  handleGetCategories,
 } from "@/services/apiClient";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
 import UploadBulkProductModal, {
@@ -100,6 +102,50 @@ export default function ProductScreen() {
   const [bulkImporting, setBulkImporting] = useState(false);
   const [editProduct, setEditProduct] = useState<any | null>(null);
   const [viewProduct, setViewProduct] = useState<any | null>(null);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [categories, setCategories] = useState<{ _id?: string; name?: string }[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+
+  useEffect(() => {
+    handleGetCategories()
+      .then((res) => {
+        const list = Array.isArray(res?.categories)
+          ? res.categories
+          : Array.isArray(res)
+            ? res
+            : [];
+        setCategories(list);
+      })
+      .catch((err) => console.error("Error fetching categories:", err));
+  }, []);
+
+  const categoriesList = useMemo(() => {
+    const fromApi = categories
+      .map((c) => String(c?.name || "").trim())
+      .filter(Boolean);
+    const fromProducts = products
+      .map((p) => String(p?.category || "").trim())
+      .filter(Boolean);
+    return Array.from(new Set([...fromApi, ...fromProducts]));
+  }, [categories, products]);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of products) {
+      const cat = String(p.category || "General").trim().toLowerCase();
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+    return counts;
+  }, [products]);
+
+  const displayedMobileProducts = useMemo(() => {
+    if (selectedCategory === "all") return products;
+    return products.filter(
+      (p) =>
+        String(p.category || "").trim().toLowerCase() ===
+        selectedCategory.toLowerCase(),
+    );
+  }, [products, selectedCategory]);
   const [globalFilter, setGlobalFilter] = useState("");
   const search = String(globalFilter ?? "").trim();
   const [sorting, setSorting] = useState<MRT_SortingState>([]);
@@ -843,7 +889,60 @@ export default function ProductScreen() {
         ))}
       </div>
       {/* Desktop Table View */}
-      <div className="hidden md:block">
+      <div className="hidden md:block space-y-3">
+        {categoriesList.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCategory("all");
+                table.getColumn("category")?.setFilterValue(undefined);
+              }}
+              className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
+                selectedCategory === "all"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              All
+              {selectedCategory === "all" && products.length > 0 && (
+                <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
+                  {products.length}
+                </span>
+              )}
+            </button>
+            {categoriesList.map((catName) => {
+              const isSelected =
+                selectedCategory.toLowerCase() === catName.toLowerCase();
+              const count = categoryCounts[catName.toLowerCase()] || 0;
+              return (
+                <button
+                  key={catName}
+                  type="button"
+                  onClick={() => {
+                    const next = isSelected ? "all" : catName;
+                    setSelectedCategory(next);
+                    table
+                      .getColumn("category")
+                      ?.setFilterValue(next === "all" ? undefined : next);
+                  }}
+                  className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
+                    isSelected
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {catName}
+                  {isSelected && (
+                    <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
         <MaterialReactTable table={table} />
       </div>
 
@@ -860,132 +959,169 @@ export default function ProductScreen() {
           />
         </div>
 
+        {/* Category Pills Below Search Bar */}
+        {categoriesList.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <button
+              type="button"
+              onClick={() => setSelectedCategory("all")}
+              className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-semibold transition active:scale-95 cursor-pointer ${
+                selectedCategory === "all"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              All
+              {selectedCategory === "all" && products.length > 0 && (
+                <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-blue-600">
+                  {products.length}
+                </span>
+              )}
+            </button>
+            {categoriesList.map((catName) => {
+              const isSelected =
+                selectedCategory.toLowerCase() === catName.toLowerCase();
+              const count = categoryCounts[catName.toLowerCase()] || 0;
+              return (
+                <button
+                  key={catName}
+                  type="button"
+                  onClick={() =>
+                    setSelectedCategory(isSelected ? "all" : catName)
+                  }
+                  className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-semibold transition active:scale-95 cursor-pointer ${
+                    isSelected
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {catName}
+                  {isSelected && (
+                    <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-blue-600">
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {loading && products.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
             Loading products...
           </div>
-        ) : products.length === 0 ? (
+        ) : displayedMobileProducts.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
             No products found
           </div>
         ) : (
-          products.map((p, idx) => {
-            const variantNames = getVariantNames(p);
-            const variantLabel =
-              variantNames.length > 0 ? ` (${variantNames.join(", ")})` : "";
-            const stock = Number(p.stockQty ?? 0);
-            const isOutOfStock = stock <= 0;
+          <div className="grid grid-cols-2 gap-3">
+            {displayedMobileProducts.map((p, idx) => {
+              const stock = Number(p.stockQty ?? 0);
+              const isOutOfStock = stock <= 0;
+              const img =
+                (typeof p.imageUrl === "string" && p.imageUrl.trim()
+                  ? p.imageUrl.trim()
+                  : null) ||
+                (Array.isArray((p as any).images) &&
+                (p as any).images.length > 0 &&
+                typeof (p as any).images[0] === "string" &&
+                (p as any).images[0].trim()
+                  ? (p as any).images[0].trim()
+                  : null) ||
+                (typeof (p as any).image === "string" && (p as any).image.trim()
+                  ? (p as any).image.trim()
+                  : null) ||
+                null;
 
-            return (
-              <div
-                key={p._id || idx}
-                onClick={() => setViewProduct(p)}
-                className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-bold text-slate-900">
-                        {p.productName || "Unnamed Product"}
-                      </span>
-                      {variantLabel && (
-                        <span className="text-xs font-normal text-slate-500">
-                          {variantLabel}
-                        </span>
-                      )}
-                      {p.isCsp && (
-                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                          {p.cspLabel || "CSP"}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span className="font-medium text-slate-600">
-                        {p.category || "Uncategorized"}
-                      </span>
-                      {p.subCategory && (
-                        <>
-                          <span>•</span>
-                          <span>{p.subCategory}</span>
-                        </>
-                      )}
-                      {(p.barCode || p.barcode) && (
-                        <>
-                          <span>•</span>
-                          <span className="font-mono text-[11px] text-slate-400">
-                            {p.barCode || p.barcode}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                      isOutOfStock
-                        ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200/60"
-                        : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60"
-                    }`}
-                  >
-                    {isOutOfStock ? "Out of Stock" : `Stock: ${stock}`}
-                  </span>
-                </div>
+              return (
+                <div
+                  key={p._id || idx}
+                  onClick={() => setViewProduct(p)}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs transition hover:border-slate-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
+                >
+                  {/* Image Container */}
+                  <div className="relative aspect-4/3 w-full bg-slate-100 overflow-hidden">
+                    {img && !imageErrors[p._id || String(idx)] ? (
+                      <img
+                        src={img}
+                        alt={p.productName || "Product"}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={() =>
+                          setImageErrors((prev) => ({
+                            ...prev,
+                            [p._id || String(idx)]: true,
+                          }))
+                        }
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-slate-50 text-slate-300">
+                        <Package size={28} className="stroke-[1.5]" />
+                      </div>
+                    )}
 
-                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                  <div className="flex items-center gap-4 text-xs">
-                    <div>
-                      <span className="block text-[10px] font-medium uppercase text-slate-400">
-                        Selling
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        ₹{Number(p.sellingPrice || 0).toLocaleString("en-IN")}
+                    {/* Stock Status Tag */}
+                    <div className="absolute top-2 right-2">
+                      <span
+                        className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[9px] font-bold shadow-xs ${
+                          isOutOfStock
+                            ? "bg-rose-500 text-white"
+                            : "bg-emerald-600 text-white"
+                        }`}
+                      >
+                        {isOutOfStock ? "Out of stock" : `Stock: ${stock}`}
                       </span>
                     </div>
-                    {p.purchasePrice !== undefined && (
-                      <div>
-                        <span className="block text-[10px] font-medium uppercase text-slate-400">
-                          Cost
-                        </span>
-                        <span className="text-xs font-medium text-slate-600">
-                          ₹{Number(p.purchasePrice || 0).toLocaleString("en-IN")}
+
+                    {/* Barcode Tag */}
+                    {(p.barCode || p.barcode) && (
+                      <div className="absolute bottom-2 left-2">
+                        <span className="inline-flex max-w-[100px] truncate items-center rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-xs">
+                          {p.barCode || p.barcode}
                         </span>
                       </div>
                     )}
                   </div>
 
-                  <div
-                    className="flex items-center gap-1.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Can permission={PERMISSIONS.PRODUCT_UPDATE}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditProduct(p);
-                          setShowCreateModal(true);
-                        }}
-                        className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"
-                        title="Edit product"
+                  {/* Content Area */}
+                  <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-3">
+                    <div>
+                      {/* Category & Stock */}
+                      <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-medium text-slate-500">
+                        <span className="truncate">
+                          {p.category || "General"}
+                        </span>
+                        {stock > 0 && (
+                          <span className="shrink-0 text-slate-400">
+                            Stock: {stock}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Product Name */}
+                      <h4
+                        className="mt-1 min-h-[2rem] text-xs font-bold leading-snug text-slate-900 line-clamp-2 transition group-hover:text-blue-600 sm:text-sm"
+                        title={p.productName}
                       >
-                        <SquarePen size={15} />
-                      </button>
-                    </Can>
-                    <Can permission={PERMISSIONS.PRODUCT_DELETE}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (p._id) void handleDeleteProductClick(p._id);
-                        }}
-                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
-                        title="Delete product"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </Can>
+                        {p.productName}
+                      </h4>
+                    </div>
+
+                    {/* Footer: Price */}
+                    <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-medium">Price</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900">
+                          ₹{Number(p.sellingPrice || 0).toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
 
         {hasMore && (
@@ -1044,6 +1180,33 @@ export default function ProductScreen() {
 
             {/* Modal Body */}
             <div className="overflow-y-auto p-5 space-y-4">
+              {/* Product Image preview */}
+              {(() => {
+                const prodImg =
+                  (typeof viewProduct.imageUrl === "string" && viewProduct.imageUrl.trim()
+                    ? viewProduct.imageUrl.trim()
+                    : null) ||
+                  (Array.isArray(viewProduct.images) &&
+                  viewProduct.images.length > 0 &&
+                  typeof viewProduct.images[0] === "string" &&
+                  viewProduct.images[0].trim()
+                    ? viewProduct.images[0].trim()
+                    : null) ||
+                  (typeof viewProduct.image === "string" && viewProduct.image.trim()
+                    ? viewProduct.image.trim()
+                    : null) ||
+                  null;
+                return prodImg ? (
+                  <div className="relative aspect-16/9 w-full overflow-hidden rounded-2xl bg-slate-100 border border-slate-200/80">
+                    <img
+                      src={prodImg}
+                      alt={viewProduct.productName}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : null;
+              })()}
+
               <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -1144,28 +1307,46 @@ export default function ProductScreen() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/50">
-              <button
-                type="button"
-                onClick={() => setViewProduct(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
-              >
-                Close
-              </button>
-              <Can permission={PERMISSIONS.PRODUCT_UPDATE}>
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              <Can permission={PERMISSIONS.PRODUCT_DELETE}>
                 <button
                   type="button"
                   onClick={() => {
-                    const prod = viewProduct;
+                    const id = viewProduct._id;
                     setViewProduct(null);
-                    setEditProduct(prod);
-                    setShowCreateModal(true);
+                    if (id) handleDeleteProductClick(id);
                   }}
-                  className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/90 transition"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
                 >
-                  Edit Product
+                  <Trash2 size={14} />
+                  Delete
                 </button>
               </Can>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewProduct(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Close
+                </button>
+                <Can permission={PERMISSIONS.PRODUCT_UPDATE}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const p = viewProduct;
+                      setViewProduct(null);
+                      setEditProduct(p);
+                      setShowCreateModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/90 transition cursor-pointer"
+                  >
+                    <SquarePen size={14} />
+                    Edit Product
+                  </button>
+                </Can>
+              </div>
             </div>
           </div>
         </div>
