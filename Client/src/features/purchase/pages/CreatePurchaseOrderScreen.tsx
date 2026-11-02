@@ -26,7 +26,7 @@ import type { InvoiceItem } from "@/features/sales/components/invoice/types";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
 import DocumentFormModal from "@/components/DocumentFormModal";
 import FileAttachmentSection from "../components/FileAttachmentSection";
-import { useAutosaveFormDraft } from "@/features/sales/utils/formDraft";
+import { clearFormDraft, useAutosaveFormDraft } from "@/features/sales/utils/formDraft";
 
 const today = new Date().toISOString().split("T")[0];
 const PURCHASE_SEQ_KEY = "wooerp-purchase-seq";
@@ -531,11 +531,30 @@ export default function CreatePurchaseOrderScreen({
     else navigate(-1);
   };
 
+  const handleClear = () => {
+    clearFormDraft("purchase-order");
+    setVendor("");
+    setPhone("");
+    setNotes("");
+    setItems([]);
+    setDraftName("");
+    setDraftQty("1");
+    setDraftPrice("0");
+    setDraftDiscount("0");
+    setDraftImage("");
+    setManualDiscount(0);
+    setManualDiscountType("flat");
+    setAttachments([]);
+    setOpenCheckout(false);
+    setVendorDropdownOpen(false);
+  };
+
   const content = (
     <div className="min-w-0 space-y-4 p-1 sm:p-2">
       <CreatePurchaseOrderHeader
         purchaseOrderNo={purchaseOrderNo}
         onBack={handleBack}
+        onClear={handleClear}
         onSaveDraft={() => void handleSaveDraft()}
         onSavePrint={() => void handleSavePrint()}
         onSave={() => {

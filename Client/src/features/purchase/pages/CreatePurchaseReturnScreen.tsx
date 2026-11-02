@@ -20,7 +20,7 @@ import type { InvoiceItem } from "../components/types";
 import { useAppSelector } from "@/store/hooks";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
 import DocumentFormModal from "@/components/DocumentFormModal";
-import { useAutosaveFormDraft } from "@/features/sales/utils/formDraft";
+import { clearFormDraft, useAutosaveFormDraft } from "@/features/sales/utils/formDraft";
 
 const today = new Date().toISOString().split("T")[0];
 const PURCHASE_RETURN_SEQ_KEY = "wooerp-purchase-return-seq";
@@ -489,11 +489,28 @@ export default function CreatePurchaseReturnScreen({
     else navigate(-1);
   };
 
+  const handleClear = () => {
+    clearFormDraft("debit-note");
+    setVendor("");
+    setPhone("");
+    setNotes("");
+    setBillBy("");
+    setItems([]);
+    setDraftName("");
+    setDraftQty("1");
+    setDraftPrice("0");
+    setDraftDiscount("0");
+    setDraftImage("");
+    setOpenCheckout(false);
+    setVendorDropdownOpen(false);
+  };
+
   const content = (
     <div className="min-w-0 space-y-4 p-1 sm:p-2">
       <CreatePurchaseReturnHeader
         purchaseNumber={purchaseReturnNo}
         onBack={handleBack}
+        onClear={handleClear}
         onSaveDraft={handleSaveDraft}
         onSavePrint={handleSavePrint}
         onSave={() => {

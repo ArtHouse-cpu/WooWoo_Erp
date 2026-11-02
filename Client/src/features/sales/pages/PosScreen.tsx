@@ -1278,7 +1278,7 @@ export default function PosScreen() {
                   </div>
                   {segmentsBreakdown.General > 0 && (
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-600">General</span>
+                      <span className="text-slate-600">Store</span>
                       <span className="font-semibold text-slate-800">
                         {formatCompactCurrency(segmentsBreakdown.General)}
                       </span>

@@ -1284,20 +1284,20 @@ export default function CreatePosScreen({
                       )}
                   </div>
 
-                  <div className="grid min-w-0 grid-cols-2 gap-2 lg:w-[19.5rem] lg:shrink-0">
+                  <div className="grid min-w-0 grid-cols-2 gap-1.5 lg:w-[19.5rem] lg:shrink-0 lg:gap-2">
                     <div className="min-w-0">
-                      <label className="mb-1 block truncate text-[11px] font-semibold leading-none text-slate-600">
+                      <label className="mb-0.5 block truncate text-[10px] font-semibold leading-none text-slate-600 lg:mb-1 lg:text-[11px]">
                         Invoice Date
                       </label>
                       <input
                         type="date"
                         value={invoiceDate}
                         onChange={(e) => setInvoiceDate(e.target.value)}
-                        className="box-border h-10 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-2 text-[13px] text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:scale-90 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
+                        className="box-border h-8 w-full min-w-0 max-w-full rounded-md border border-slate-200 bg-white px-1.5 text-[11px] text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 lg:h-10 lg:rounded-lg lg:px-2 lg:text-[13px] [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:scale-75 lg:[&::-webkit-calendar-picker-indicator]:scale-90 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                       />
                     </div>
                     <div className="min-w-0">
-                      <label className="mb-1 block truncate text-[11px] font-semibold leading-none text-slate-600">
+                      <label className="mb-0.5 block truncate text-[10px] font-semibold leading-none text-slate-600 lg:mb-1 lg:text-[11px]">
                         Due Date
                       </label>
                       <input
@@ -1305,7 +1305,7 @@ export default function CreatePosScreen({
                         value={dueDate}
                         min={invoiceDate || undefined}
                         onChange={(e) => setDueDate(e.target.value)}
-                        className="box-border h-10 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-2 text-[13px] text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:scale-90 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
+                        className="box-border h-8 w-full min-w-0 max-w-full rounded-md border border-slate-200 bg-white px-1.5 text-[11px] text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 lg:h-10 lg:rounded-lg lg:px-2 lg:text-[13px] [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:scale-75 lg:[&::-webkit-calendar-picker-indicator]:scale-90 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                       />
                     </div>
                   </div>
