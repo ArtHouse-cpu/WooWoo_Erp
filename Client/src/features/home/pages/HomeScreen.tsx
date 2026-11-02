@@ -493,6 +493,13 @@ export default function HomeScreen() {
   );
   const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [isMobile, setIsMobile] = useState(
+    () => window.matchMedia("(max-width: 767px)").matches,
+  );
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const loadingMoreRef = useRef(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const kpiRef = useRef<HTMLDivElement>(null);
@@ -546,7 +553,16 @@ export default function HomeScreen() {
 
   useEffect(() => {
     setPage(1);
+    setVisibleCount(PAGE_SIZE);
   }, [tab, search, dateFilter, statusFilter]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const sync = () => setIsMobile(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
 
   const loadDashboardData = useCallback(async () => {
     setKpisLoading(true);
@@ -1022,10 +1038,37 @@ export default function HomeScreen() {
         : filteredGeneric.length;
   const pageCount = Math.max(1, Math.ceil(tableTotal / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
-  const start = (safePage - 1) * PAGE_SIZE;
-  const pageBills = filteredBills.slice(start, start + PAGE_SIZE);
-  const pageCustomers = filteredCustomers.slice(start, start + PAGE_SIZE);
-  const pageGeneric = filteredGeneric.slice(start, start + PAGE_SIZE);
+  const start = isMobile ? 0 : (safePage - 1) * PAGE_SIZE;
+  const rowCount = isMobile ? visibleCount : PAGE_SIZE;
+  const pageBills = filteredBills.slice(start, start + rowCount);
+  const pageCustomers = filteredCustomers.slice(start, start + rowCount);
+  const pageGeneric = filteredGeneric.slice(start, start + rowCount);
+  const hasMore = isMobile && visibleCount < tableTotal;
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasMore) return;
+    let timer = 0;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        if (loadingMoreRef.current) return;
+        loadingMoreRef.current = true;
+        setLoadingMore(true);
+        timer = window.setTimeout(() => {
+          setVisibleCount((current) => current + PAGE_SIZE);
+          setLoadingMore(false);
+          loadingMoreRef.current = false;
+        }, 250);
+      },
+      { rootMargin: "240px" },
+    );
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, [hasMore, tab, visibleCount]);
 
   const searchPlaceholder =
     tab === "bills"
@@ -2435,7 +2478,20 @@ export default function HomeScreen() {
         </div>
       )}
 
-        <div className="flex flex-col gap-3 border-t border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        {hasMore ? (
+          <div
+            ref={loadMoreRef}
+            className="flex items-center justify-center py-4 md:hidden"
+          >
+            {loadingMore ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            ) : (
+              <span className="h-4" />
+            )}
+          </div>
+        ) : null}
+
+        <div className="hidden flex-col gap-3 border-t border-gray-100 px-4 py-3 md:flex md:flex-row md:items-center md:justify-between">
           <p className="text-xs text-gray-500">
             Showing {tableTotal === 0 ? 0 : start + 1} to{" "}
             {Math.min(start + PAGE_SIZE, tableTotal)} of {tableTotal}{" "}
