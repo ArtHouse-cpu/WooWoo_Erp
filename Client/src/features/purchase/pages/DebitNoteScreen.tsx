@@ -663,13 +663,6 @@ export default function DebitNoteScreen() {
               Debit Notes
               <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-blue-600" />
             </button>
-            <button
-              type="button"
-              onClick={() => setMoreMenuOpen(true)}
-              className="relative shrink-0 pb-2.5 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
-            >
-              More
-            </button>
           </div>
         </div>
 

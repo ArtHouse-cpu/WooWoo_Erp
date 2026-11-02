@@ -1014,13 +1014,6 @@ export default function PurchaseOrderScreen() {
             >
               Debit Notes
             </button>
-            <button
-              type="button"
-              onClick={() => setMoreMenuOpen(true)}
-              className="relative shrink-0 pb-2.5 pt-1 text-sm font-medium text-slate-500 transition hover:text-slate-800"
-            >
-              More
-            </button>
           </div>
         </div>
 
