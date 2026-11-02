@@ -26,11 +26,7 @@ JHA SONS AND ARRAY LLP
 
 Office:
 
-\#20, Commercial Complex,
-
-Nehru Nagar East,
-
-Bhilai – 490020,
+House of Creatives | A44 B, Central Avenue, Smriti Nagar, Bhilai, CG 490020 India
 
 Chhattisgarh, India
 
@@ -369,11 +365,7 @@ WOOWOO ART HOUSE®
 
 A venture of JHA SONS AND ARRAY LLP
 
-\#20, Commercial Complex,
-
-Nehru Nagar East,
-
-Bhilai – 490020,
+House of Creatives | A44 B, Central Avenue, Smriti Nagar, Bhilai, CG 490020 India
 
 Chhattisgarh, India
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, type ChangeEvent, type FormEvent } from "react";
-import { ImagePlus, Loader2, X, Sparkles, Calendar } from "lucide-react";
+import { ImagePlus, Loader2, X, Sparkles, Calendar, Video } from "lucide-react";
 import type { SpacePayload } from "@/services/apiClient";
 import { closeIfConfirmed } from "@/utils/confirmClose";
 
@@ -25,10 +25,23 @@ export type SpaceFormPayload = {
   status?: SpaceStatus;
 };
 
+export type SpaceMediaSelection = {
+  imageFiles: File[];
+  existingImages: string[];
+  videoFile: File | null;
+  removeVideo: boolean;
+};
+
+type SpaceImageItem = {
+  id: string;
+  url: string;
+  file?: File;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSubmit: (payload: SpaceFormPayload, imageFile: File | null) => Promise<void>;
+  onSubmit: (payload: SpaceFormPayload, media: SpaceMediaSelection) => Promise<void>;
   loading?: boolean;
   initialSpace?: SpacePayload | null;
   existingSpaces?: SpacePayload[];
@@ -93,8 +106,10 @@ export default function AddSpaceModal({
   const [category, setCategory] = useState("Studio");
   const [capacity, setCapacity] = useState<number>(1);
   const [description, setDescription] = useState("");
-  const [preview, setPreview] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [images, setImages] = useState<SpaceImageItem[]>([]);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [removeVideo, setRemoveVideo] = useState(false);
 
   // Day selection mode: "Weekday" | "Weekend" | "Both"
   const [dayMode, setDayMode] = useState<DayOption>("Weekday");
@@ -165,8 +180,15 @@ export default function AddSpaceModal({
       );
       setCapacity(Number(initialSpace.capacity || 1));
       setDescription(String(initialSpace.description || ""));
-      setPreview(initialSpace.imageUrl || null);
-      setImageFile(null);
+      const savedImages = Array.isArray(initialSpace.images) && initialSpace.images.length
+        ? initialSpace.images
+        : initialSpace.imageUrl
+          ? [initialSpace.imageUrl]
+          : [];
+      setImages(savedImages.filter(Boolean).map((url) => ({ id: url, url })));
+      setVideoFile(null);
+      setVideoPreview(initialSpace.videoUrl || null);
+      setRemoveVideo(false);
 
       const d = normalizeDay(initialSpace.day);
       setDayMode(d);
@@ -179,8 +201,10 @@ export default function AddSpaceModal({
       setCategory("Studio");
       setCapacity(1);
       setDescription("");
-      setPreview(null);
-      setImageFile(null);
+      setImages([]);
+      setVideoFile(null);
+      setVideoPreview(null);
+      setRemoveVideo(false);
 
       setDayMode("Weekday");
       setPrice(0);
@@ -205,11 +229,56 @@ export default function AddSpaceModal({
     }
   };
 
-  const handleImage = (e: ChangeEvent<HTMLInputElement>) => {
+  const mediaSelection = (): SpaceMediaSelection => ({
+    imageFiles: images.flatMap((item) => (item.file ? [item.file] : [])),
+    existingImages: images
+      .filter((item) => !item.file && /^https?:\/\//i.test(item.url))
+      .map((item) => item.url),
+    videoFile,
+    removeVideo,
+  });
+
+  const handleImages = (e: ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files || []).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+    if (!picked.length) return;
+    setImages((current) =>
+      [
+        ...current,
+        ...picked.map((file) => ({
+          id: `${file.name}-${file.lastModified}-${Math.random()}`,
+          url: URL.createObjectURL(file),
+          file,
+        })),
+      ].slice(0, 8),
+    );
+    e.target.value = "";
+  };
+
+  const removeImage = (id: string) => {
+    setImages((current) => {
+      const target = current.find((item) => item.id === id);
+      if (target?.url.startsWith("blob:")) URL.revokeObjectURL(target.url);
+      return current.filter((item) => item.id !== id);
+    });
+  };
+
+  const handleVideo = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setImageFile(file);
-    setPreview(URL.createObjectURL(file));
+    if (videoPreview?.startsWith("blob:")) URL.revokeObjectURL(videoPreview);
+    setVideoFile(file);
+    setVideoPreview(URL.createObjectURL(file));
+    setRemoveVideo(false);
+    e.target.value = "";
+  };
+
+  const clearVideo = () => {
+    if (videoPreview?.startsWith("blob:")) URL.revokeObjectURL(videoPreview);
+    setVideoFile(null);
+    setVideoPreview(null);
+    setRemoveVideo(true);
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -231,7 +300,7 @@ export default function AddSpaceModal({
           weekendPrice: Number(weekendPrice || 0),
           weekendStatus,
         },
-        imageFile,
+        mediaSelection(),
       );
       return;
     }
@@ -249,7 +318,7 @@ export default function AddSpaceModal({
         price: Number(price || 0),
         status,
       },
-      imageFile,
+      mediaSelection(),
     );
   };
 
@@ -563,37 +632,100 @@ export default function AddSpaceModal({
             />
           </div>
 
-          {/* Space Image */}
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Space Image
+              Space images
             </label>
             <label
-              htmlFor="space-image"
+              htmlFor="space-images"
               className="flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-400 p-4 transition hover:bg-gray-50"
             >
-              {preview ? (
-                <img
-                  src={preview}
-                  alt="Space preview"
-                  className="h-28 w-28 rounded-lg object-cover"
-                />
-              ) : (
-                <>
-                  <ImagePlus size={36} className="mb-2 text-gray-500" />
-                  <p className="text-sm text-gray-500">
-                    Click to upload space image
-                  </p>
-                </>
-              )}
+              <ImagePlus size={36} className="mb-2 text-gray-500" />
+              <p className="text-sm text-gray-500">
+                Upload up to 8 photos
+              </p>
               <input
-                id="space-image"
+                id="space-images"
                 type="file"
-                accept="image/*"
-                onChange={handleImage}
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                onChange={handleImages}
                 className="hidden"
               />
             </label>
+            {images.length > 0 ? (
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {images.map((item, index) => (
+                  <div key={item.id} className="relative">
+                    <img
+                      src={item.url}
+                      alt=""
+                      className="h-16 w-full rounded-lg object-cover"
+                    />
+                    {index === 0 ? (
+                      <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1 text-[9px] font-semibold text-white">
+                        Cover
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => removeImage(item.id)}
+                      className="absolute right-1 top-1 rounded-full bg-white p-0.5 text-gray-700 shadow"
+                      aria-label="Remove image"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Space video
+            </label>
+            {videoPreview ? (
+              <video
+                src={videoPreview}
+                controls
+                className="max-h-40 w-full rounded-lg border border-gray-200"
+              />
+            ) : (
+              <label
+                htmlFor="space-video"
+                className="flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-400 p-4 transition hover:bg-gray-50"
+              >
+                <Video size={36} className="mb-2 text-gray-500" />
+                <p className="text-sm text-gray-500">
+                  Upload one mp4, webm, or mov
+                </p>
+              </label>
+            )}
+            <input
+              id="space-video"
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime"
+              onChange={handleVideo}
+              className="hidden"
+            />
+            {videoPreview ? (
+              <div className="mt-2 flex gap-3">
+                <label
+                  htmlFor="space-video"
+                  className="cursor-pointer text-xs font-semibold text-slate-700"
+                >
+                  Replace video
+                </label>
+                <button
+                  type="button"
+                  onClick={clearVideo}
+                  className="text-xs font-semibold text-rose-600"
+                >
+                  Remove video
+                </button>
+              </div>
+            ) : null}
           </div>
 
           {/* Actions */}

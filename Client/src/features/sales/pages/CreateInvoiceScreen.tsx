@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import CreateInvoiceHeader from "../components/invoice/CreateInvoiceHeader";
@@ -60,6 +60,19 @@ const getNextInvoiceNumber = (): string => {
 
 type Mode = "create" | "edit" | "view";
 
+function readInvoiceDocumentId(invoice: unknown): string | null {
+  if (!invoice || typeof invoice !== "object") return null;
+  const record = invoice as {_id?: unknown; id?: unknown};
+  const raw = record._id ?? record.id;
+  const value =
+    raw && typeof raw === "object" && raw !== null && "$oid" in raw
+      ? String((raw as {$oid?: unknown}).$oid ?? "")
+      : raw != null
+        ? String(raw)
+        : "";
+  return /^[a-f\d]{24}$/i.test(value) ? value : null;
+}
+
 type CreateInvoiceScreenProps = {
   onClose?: () => void;
   initialData?: any;
@@ -73,8 +86,29 @@ export default function CreateInvoiceScreen({
 }: CreateInvoiceScreenProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [mode, setMode] = useState<Mode>(initialMode || "create");
-  const [invoiceId, setInvoiceId] = useState<string | null>(null);
+  const routeDoc = location.state as {
+    invoice?: unknown;
+    mode?: Mode;
+    openCheckout?: boolean;
+  } | null;
+  const seededInvoiceId =
+    readInvoiceDocumentId(initialData) ||
+    (routeDoc?.mode === "edit" || routeDoc?.openCheckout
+      ? readInvoiceDocumentId(routeDoc?.invoice)
+      : null);
+  const [mode, setMode] = useState<Mode>(
+    initialMode ||
+      (routeDoc?.invoice && routeDoc.mode ? routeDoc.mode : "create"),
+  );
+  const [invoiceId, setInvoiceId] = useState<string | null>(seededInvoiceId);
+  const invoiceIdRef = useRef<string | null>(seededInvoiceId);
+  const savingRef = useRef(false);
+  const rememberInvoiceId = (id: unknown) => {
+    const value = readInvoiceDocumentId({_id: id});
+    if (!value) return;
+    invoiceIdRef.current = value;
+    setInvoiceId(value);
+  };
   const [invoiceNo, setInvoiceNo] = useState(getNextInvoiceNumber());
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
@@ -111,7 +145,6 @@ export default function CreateInvoiceScreen({
   const [draftCashback, setDraftCashback] = useState("");
   const [draftIsCsp, setDraftIsCsp] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
-  const routeDoc = location.state as { invoice?: unknown; mode?: Mode } | null;
   const freshCreate =
     (initialMode ?? "create") === "create" &&
     !initialData &&
@@ -213,7 +246,7 @@ export default function CreateInvoiceScreen({
   useEffect(() => {
     const applyInvoice = (inv: any, nextMode: Mode) => {
       setMode(nextMode);
-      setInvoiceId(inv._id);
+      rememberInvoiceId(inv._id ?? inv.id);
       if (inv.invoiceCode) setInvoiceNo(inv.invoiceCode);
       setCustomer(inv.customerName || "");
       setPhone(inv.customerPhone || "");
@@ -327,16 +360,23 @@ export default function CreateInvoiceScreen({
         return;
       }
 
-      const state = location.state as { invoice?: any; mode?: Mode } | null;
+      const state = location.state as {
+        invoice?: any;
+        mode?: Mode;
+        openCheckout?: boolean;
+      } | null;
       if (state?.mode && state?.invoice) {
         applyInvoice(state.invoice, state.mode);
-        if (state.mode === "view" && state.invoice._id) {
+        if (state.invoice._id && (state.mode === "view" || state.openCheckout)) {
           try {
             const res = await handleGetInvoice(String(state.invoice._id));
-            if (!cancelled && res?.invoice) applyInvoice(res.invoice, "view");
+            if (!cancelled && res?.invoice) applyInvoice(res.invoice, state.mode);
           } catch {
             /* keep navigation snapshot */
           }
+        }
+        if (!cancelled && state.openCheckout && state.mode === "edit") {
+          setOpenCheckout(true);
         }
       }
     };
@@ -657,6 +697,7 @@ export default function CreateInvoiceScreen({
 
 
   const handleSaveDraft = async () => {
+    if (savingRef.current) return;
     if (!customer.trim()) {
       Swal.fire("Customer required", "Please select or enter customer.", "warning");
       return;
@@ -671,6 +712,7 @@ export default function CreateInvoiceScreen({
     }
 
     try {
+      savingRef.current = true;
       setSaving(true);
       const draftPayload = {
         customerName: customer.trim(),
@@ -706,8 +748,9 @@ export default function CreateInvoiceScreen({
         },
       };
 
-      if (invoiceId) {
-        await handleUpdateInvoice(invoiceId, draftPayload);
+      const existingId = invoiceIdRef.current;
+      if (existingId) {
+        await handleUpdateInvoice(existingId, draftPayload);
       } else {
         const response = await handleCreateInvoice({
           ...draftPayload,
@@ -717,9 +760,8 @@ export default function CreateInvoiceScreen({
             m_staff_email: staff.m_staff_email,
           },
       });
-        const createdId = String(response?.invoice?._id ?? "");
+        rememberInvoiceId(response?.invoice?._id);
         const createdCode = String(response?.invoice?.invoiceCode ?? "");
-        if (createdId) setInvoiceId(createdId);
         if (createdCode) setInvoiceNo(createdCode);
       }
 
@@ -735,6 +777,7 @@ export default function CreateInvoiceScreen({
         "error",
       );
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -800,7 +843,9 @@ export default function CreateInvoiceScreen({
     } | null;
     verifiedAt?: string | null;
   }) => {
+    if (savingRef.current) return;
     try {
+      savingRef.current = true;
       setSaving(true);
       const waiveMembership = Boolean(payment.waiveMembershipForCoupon);
       const lineItems = items.map((item) => {
@@ -829,8 +874,9 @@ export default function CreateInvoiceScreen({
         (sum, item) => sum + Number(item.discount || 0),
         0,
       );
-      if (mode === "edit" && invoiceId) {
-        await handleUpdateInvoice(invoiceId, {
+      const existingId = invoiceIdRef.current;
+      if (existingId) {
+        await handleUpdateInvoice(existingId, {
           customerName: customer.trim(),
           customerPhone: phone.trim(),
           customerId: payment.customerId || customerId || undefined,
@@ -876,6 +922,7 @@ export default function CreateInvoiceScreen({
           payment.customerId,
         );
 
+        clearInvoiceDraft();
         Swal.fire("Invoice Updated", "Invoice updated successfully.", "success").then(() => navigate(-1));
       } else {
         const response = await handleCreateInvoice({
@@ -922,6 +969,7 @@ export default function CreateInvoiceScreen({
           },
         });
 
+        rememberInvoiceId(response?.invoice?._id);
         const savedCode = response?.invoice?.invoiceCode || invoiceNo;
 
         await creditCashbackForInvoice(
@@ -947,6 +995,7 @@ export default function CreateInvoiceScreen({
         "error",
       );
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -1386,7 +1435,11 @@ export default function CreateInvoiceScreen({
           extraCharges={extraCharges}
           membershipPlans={membershipPlans}
           onClose={() => setOpenCheckout(false)}
+          existingInvoiceId={invoiceId}
           onSavedAndNew={() => {
+            invoiceIdRef.current = null;
+            setInvoiceId(null);
+            setMode("create");
             setItems([]);
             setCustomer("");
             setPhone("");

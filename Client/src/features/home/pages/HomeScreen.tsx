@@ -1123,6 +1123,13 @@ export default function HomeScreen() {
     navigate("/create-invoice", { state: { invoice: bill.raw, mode: "view" } });
   };
 
+  const continueDraft = (invoice: any) => {
+    const raw = invoice?.raw ?? invoice;
+    navigate("/create-invoice", {
+      state: { invoice: raw, mode: "edit", openCheckout: true },
+    });
+  };
+
   const handleMobileBillClick = async (bill: RecentBill) => {
     setMobileDetailsInvoice(bill.raw || bill);
     setMobileDetailsOpen(true);
@@ -1873,6 +1880,58 @@ export default function HomeScreen() {
                                 className="absolute right-4 z-20 mt-1 w-36 overflow-hidden rounded-xl border border-gray-100 bg-white py-1 text-left shadow-lg"
                                 onMouseDown={(e) => e.stopPropagation()}
                               >
+                                {bill.status === "Draft" ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setMenuId(null);
+                                        continueDraft(bill.raw || bill);
+                                      }}
+                                      className="block w-full px-3 py-2 text-left text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                                    >
+                                      Continue
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setMenuId(null);
+                                        void (async () => {
+                                          const invoiceId = String(
+                                            (bill.raw as { _id?: string } | undefined)?._id ||
+                                              bill.id,
+                                          );
+                                          const confirm = await Swal.fire({
+                                            title: "Delete Invoice?",
+                                            text: "This action cannot be undone.",
+                                            icon: "error",
+                                            showCancelButton: true,
+                                            confirmButtonText: "Yes, Delete",
+                                          });
+                                          if (!confirm.isConfirmed) return;
+                                          try {
+                                            await handleDeleteInvoice(invoiceId);
+                                            Swal.fire(
+                                              "Deleted",
+                                              "Invoice deleted successfully.",
+                                              "success",
+                                            );
+                                            void loadDashboardData();
+                                          } catch {
+                                            Swal.fire(
+                                              "Error",
+                                              "Could not delete invoice.",
+                                              "error",
+                                            );
+                                          }
+                                        })();
+                                      }}
+                                      className="block w-full px-3 py-2 text-left text-sm text-rose-600 hover:bg-rose-50"
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
+                                ) : (
                                 <button
                                   type="button"
                                   onClick={() => openBill(bill)}
@@ -1880,6 +1939,7 @@ export default function HomeScreen() {
                                 >
                                   View bill
                                 </button>
+                                )}
                               </div>
                             ) : null}
                           </td>
@@ -2619,6 +2679,10 @@ export default function HomeScreen() {
           setReturnIntent("cancel");
           setReturnInvoice(raw);
           setReturnModalOpen(true);
+        }}
+        onContinue={(inv) => {
+          setMobileDetailsOpen(false);
+          continueDraft(inv);
         }}
         onDeleteInvoice={async (inv) => {
           const raw = inv.raw ?? inv;

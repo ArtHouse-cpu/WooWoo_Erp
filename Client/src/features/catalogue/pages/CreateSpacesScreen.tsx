@@ -361,10 +361,18 @@ export default function CreateSpacesScreen() {
     }
   };
 
-  const handleSubmit = async (payload: SpaceFormPayload, imageFile: File | null) => {
+  const handleSubmit = async (
+    payload: SpaceFormPayload,
+    media: {
+      imageFiles: File[];
+      existingImages: string[];
+      videoFile: File | null;
+      removeVideo: boolean;
+    },
+  ) => {
     try {
       setSaving(true);
-      const formData = spacePayloadToFormData(payload, imageFile);
+      const formData = spacePayloadToFormData(payload, media);
 
       if (editing?._id) {
         await handleUpdateSpace(editing._id, formData);
@@ -392,8 +400,17 @@ export default function CreateSpacesScreen() {
               capacity: payload.capacity,
               description: payload.description,
               imageUrl: createdWeekday?.imageUrl || null,
+              images: createdWeekday?.images,
+              videoUrl: createdWeekday?.videoUrl,
             },
-            null,
+            {
+              existingImages:
+                createdWeekday?.images?.length
+                  ? createdWeekday.images
+                  : createdWeekday?.imageUrl
+                    ? [createdWeekday.imageUrl]
+                    : [],
+            },
           );
           await handleCreateSpace(weekendFormData);
         }

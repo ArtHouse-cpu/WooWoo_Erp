@@ -40,7 +40,7 @@ const FONT = 'Arial, Helvetica, "Segoe UI", Roboto, "Noto Sans", sans-serif';
 const STORE = {
   name: "WOOWOO ART HOUSE",
   addressLines: [
-    "#20, Commercial Complex, Nehru Nagar East,",
+    "House of Creatives | A44 B, Central Avenue, Smriti Nagar, Bhilai, CG 490020 India,",
     "Bhilai, Durg, CHHATTISGARH, 490020",
   ],
   mobile: "+91 8073988123",

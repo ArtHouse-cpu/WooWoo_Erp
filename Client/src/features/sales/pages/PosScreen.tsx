@@ -13,6 +13,7 @@ import {
   Ellipsis,
   Calendar,
   ChevronDown,
+  ChevronRight,
   SlidersHorizontal,
   ArrowUpDown,
   Home,
@@ -246,7 +247,7 @@ export default function PosScreen() {
   }, [searchParams, setSearchParams]);
 
   const handleAction = async (
-    action: "view" | "edit" | "cancel" | "delete" | "Credit Note",
+    action: "view" | "edit" | "cancel" | "delete" | "Credit Note" | "continue",
   ) => {
     if (!selectedActionRow) return;
     const { _id, raw, status } = selectedActionRow;
@@ -282,6 +283,10 @@ export default function PosScreen() {
         return;
       }
       navigate("/create-invoice", { state: { invoice: raw, mode: "edit" } });
+    } else if (action === "continue") {
+      navigate("/create-invoice", {
+        state: { invoice: raw, mode: "edit", openCheckout: true },
+      });
     } else if (action === "cancel") {
       if (status === "Cancelled") {
         Swal.fire(
@@ -1975,6 +1980,23 @@ export default function PosScreen() {
               </button>
             </div>
             <div className="space-y-3 p-5">
+              {selectedActionRow.status === "Draft" ? (
+                <button
+                  onClick={() => handleAction("continue")}
+                  className="flex w-full items-center gap-3 rounded-lg border border-gray-900 bg-gray-900 p-3 text-left text-white transition-colors hover:bg-black"
+                >
+                  <div className="rounded-full bg-white/15 p-2">
+                    <ChevronRight size={18} />
+                  </div>
+                  <div>
+                    <div className="font-semibold">Continue</div>
+                    <div className="text-xs text-white/70">
+                      Open checkout and finish this draft
+                    </div>
+                  </div>
+                </button>
+              ) : (
+              <>
               <button
                 onClick={() => handleAction("view")}
                 className="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50"
@@ -2052,6 +2074,8 @@ export default function PosScreen() {
                   </div>
                 </button>
               </Can>
+              </>
+              )}
               <Can permission={PERMISSIONS.INVOICE_DELETE}>
                 <button
                   onClick={() => handleAction("delete")}
@@ -2143,6 +2167,13 @@ export default function PosScreen() {
           setReturnIntent("cancel");
           setReturnInvoice(raw);
           setReturnModalOpen(true);
+        }}
+        onContinue={(inv) => {
+          setMobileDetailsOpen(false);
+          const raw = inv.raw ?? inv;
+          navigate("/create-invoice", {
+            state: { invoice: raw, mode: "edit", openCheckout: true },
+          });
         }}
         onDeleteInvoice={async (inv) => {
           const raw = inv.raw ?? inv;

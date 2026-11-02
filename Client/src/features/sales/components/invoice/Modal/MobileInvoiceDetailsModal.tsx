@@ -30,6 +30,7 @@ export type MobileInvoiceDetailsModalProps = {
   onConvert: (invoice: any) => void;
   onCancelInvoice: (invoice: any) => void;
   onDeleteInvoice: (invoice: any) => void;
+  onContinue?: (invoice: any) => void;
   onWhatsAppShare?: (invoice: any) => void;
   onDownloadPdf?: (invoice: any) => void;
   onMoreActions?: (invoice: any) => void;
@@ -117,6 +118,7 @@ export default function MobileInvoiceDetailsModal({
   onConvert,
   onCancelInvoice,
   onDeleteInvoice,
+  onContinue,
   onWhatsAppShare,
   onDownloadPdf,
   onMoreActions,
@@ -694,8 +696,18 @@ export default function MobileInvoiceDetailsModal({
         {/* Top subtle drag pill */}
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-slate-300" />
 
-       <div className="grid w-full grid-cols-3 gap-2">
-  {/* Convert Button */}
+       <div className={`grid w-full gap-2 ${isDraft ? "grid-cols-2" : "grid-cols-3"}`}>
+  {isDraft ? (
+    <button
+      type="button"
+      onClick={() => onContinue?.(raw)}
+      className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full bg-[#111111] px-2 py-2.5 text-xs font-semibold text-white transition hover:bg-black active:scale-95"
+    >
+      <ChevronRight size={13} className="shrink-0" />
+      <span className="truncate">Continue</span>
+    </button>
+  ) : (
+    <>
   <button
     type="button"
     disabled={isCancelled}
@@ -706,7 +718,6 @@ export default function MobileInvoiceDetailsModal({
     <span className="truncate">Convert</span>
   </button>
 
-  {/* Cancel Invoice Button */}
   <button
     type="button"
     disabled={isCancelled}
@@ -716,8 +727,9 @@ export default function MobileInvoiceDetailsModal({
     <XCircle size={13} className="shrink-0 text-amber-600" />
     <span className="truncate">Cancel Invoice</span>
   </button>
+    </>
+  )}
 
-  {/* Delete Invoice Button */}
   <button
     type="button"
     onClick={() => onDeleteInvoice(raw)}

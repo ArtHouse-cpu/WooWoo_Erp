@@ -141,6 +141,8 @@ export type CreateInvoicePayload = {
   customerPhone: string;
   /** Exact CRM customer linked to this invoice (preferred over name search). */
   customerId?: string | null;
+  /** When set, the server updates this invoice instead of inserting another. */
+  invoiceId?: string | null;
   invoiceDate: string;
   dueDate: string;
   salesPersonName: string;
@@ -2082,6 +2084,7 @@ export type SpacePayload = {
   description?: string;
   imageUrl?: string | null;
   images?: string[];
+  videoUrl?: string | null;
   createdAt?: string;
   updatedAt?: string;
   /** Legacy expanded list markers (from old dual-price docs) */
@@ -2119,9 +2122,16 @@ export const handleGetSpaceById = async (id: string, signal?: AbortSignal) => {
   return response.data;
 };
 
+export type SpaceMediaUpload = {
+  imageFiles?: File[];
+  existingImages?: string[];
+  videoFile?: File | null;
+  removeVideo?: boolean;
+};
+
 export const spacePayloadToFormData = (
   payload: SpacePayload | Partial<SpacePayload> | Record<string, any>,
-  imageFile?: File | null,
+  media?: SpaceMediaUpload | File | null,
 ) => {
   const fd = new FormData();
   if (payload.name !== undefined) fd.append("name", String(payload.name));
@@ -2154,7 +2164,18 @@ export const spacePayloadToFormData = (
   if ((payload as any).weekendStatus !== undefined) {
     fd.append("weekendStatus", String((payload as any).weekendStatus));
   }
-  if (imageFile) fd.append("image", imageFile);
+  const imageFiles =
+    media instanceof File ? [media] : media?.imageFiles || [];
+  for (const file of imageFiles) fd.append("images", file);
+  if (media && !(media instanceof File) && media.videoFile) {
+    fd.append("video", media.videoFile);
+  }
+  if (media && !(media instanceof File) && media.existingImages) {
+    fd.append("existingImages", media.existingImages.join(","));
+  }
+  if (media && !(media instanceof File) && media.removeVideo) {
+    fd.append("removeVideo", "true");
+  }
   return fd;
 };
 

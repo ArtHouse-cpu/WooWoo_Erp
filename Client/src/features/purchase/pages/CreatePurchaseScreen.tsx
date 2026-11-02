@@ -26,6 +26,7 @@ import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutMod
 import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
 import DocumentFormModal from "@/components/DocumentFormModal";
 import FileAttachmentSection from "../components/FileAttachmentSection";
+import { useAutosaveFormDraft } from "@/features/sales/utils/formDraft";
 
 const today = new Date().toISOString().split("T")[0];
 const PURCHASE_SEQ_KEY = "wooerp-purchase-seq";
@@ -98,6 +99,67 @@ export default function CreatePurchaseScreen({
     paidAmount?: number;
     dueAmount?: number;
   } | null>(null);
+
+  const routeDoc = location.state as {
+    purchase?: unknown;
+    mode?: Mode;
+  } | null;
+  const freshCreate =
+    (initialMode ?? "create") === "create" &&
+    !initialData &&
+    !(routeDoc?.purchase && routeDoc.mode && routeDoc.mode !== "create");
+  const purchaseDraft = {
+    purchaseNumber,
+    vendor,
+    phone,
+    purchaseDate,
+    notes,
+    billBy,
+    items,
+    draftName,
+    draftQty,
+    draftPrice,
+    draftDiscount,
+    draftImage,
+    manualDiscount,
+    manualDiscountType,
+  };
+  const { clearDraft: clearPurchaseDraft } = useAutosaveFormDraft({
+    storageKey: "purchase",
+    enabled: freshCreate && mode === "create" && !purchaseId,
+    snapshot: purchaseDraft,
+    hasContent: (data) =>
+      Boolean(
+        data.vendor.trim() ||
+          data.phone.trim() ||
+          data.notes.trim() ||
+          data.billBy.trim() ||
+          (data.items?.length ?? 0) ||
+          data.draftName.trim() ||
+          data.draftPrice.trim() ||
+          data.draftDiscount.trim() ||
+          data.manualDiscount > 0,
+      ),
+    restore: (data) => {
+      setPurchaseNumber(data.purchaseNumber || getNextPurchaseNumber());
+      setVendor(data.vendor || "");
+      setPhone(data.phone || "");
+      setPurchaseDate(data.purchaseDate || today);
+      setNotes(data.notes || "");
+      setBillBy(data.billBy || "");
+      setItems(Array.isArray(data.items) ? data.items : []);
+      setDraftName(data.draftName || "");
+      setDraftQty(data.draftQty || "1");
+      setDraftPrice(data.draftPrice || "0");
+      setDraftDiscount(data.draftDiscount || "0");
+      setDraftImage(data.draftImage || "");
+      setManualDiscount(Math.max(0, Number(data.manualDiscount) || 0));
+      setManualDiscountType(
+        data.manualDiscountType === "percentage" ? "percentage" : "flat",
+      );
+      if (data.vendor.trim()) setVendorDropdownOpen(false);
+    },
+  });
 
   useEffect(() => {
     const applyPurchase = (purchase: any, nextMode: Mode) => {
@@ -413,6 +475,7 @@ export default function CreatePurchaseScreen({
 
       if (mode === "edit" && purchaseId) {
         await handleUpdatePurchase(purchaseId, finalPayload as any);
+        clearPurchaseDraft();
         Swal.fire("Purchase Updated", "Purchase updated successfully.", "success").then(() =>
           navigate(-1),
         );
@@ -420,6 +483,7 @@ export default function CreatePurchaseScreen({
       }
 
       await handleCreatePurchase(finalPayload);
+      clearPurchaseDraft();
       Swal.fire("Purchase Saved", "Purchase saved successfully.", "success").then(() =>
         navigate(-1),
       );

@@ -69,7 +69,7 @@ export default function CreateInvoiceHeader({
 
         {mode !== "view" && (
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end lg:shrink-0">
-            {mode === "create" && onSaveDraft && (
+            {mode !== "view" && onSaveDraft && (
               <button
                 type="button"
                 onClick={onSaveDraft}

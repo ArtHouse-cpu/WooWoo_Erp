@@ -20,6 +20,7 @@ import type { InvoiceItem } from "../components/types";
 import { useAppSelector } from "@/store/hooks";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
 import DocumentFormModal from "@/components/DocumentFormModal";
+import { useAutosaveFormDraft } from "@/features/sales/utils/formDraft";
 
 const today = new Date().toISOString().split("T")[0];
 const PURCHASE_RETURN_SEQ_KEY = "wooerp-purchase-return-seq";
@@ -78,6 +79,65 @@ export default function CreatePurchaseReturnScreen({
   const [draftDiscount, setDraftDiscount] = useState("0");
   const [draftImage, setDraftImage] = useState("");
   const [items, setItems] = useState<InvoiceItem[]>([]);
+
+  const routeDoc = location.state as {
+    mode?: Mode;
+    purchaseReturn?: unknown;
+    purchase?: unknown;
+  } | null;
+  const editingExisting = Boolean(
+    initialData || routeDoc?.purchaseReturn || routeDoc?.purchase,
+  );
+  const freshCreate =
+    (initialMode ?? "create") === "create" &&
+    !editingExisting &&
+    routeDoc?.mode !== "edit" &&
+    routeDoc?.mode !== "view";
+  const debitNoteDraft = {
+    purchaseReturnNo,
+    vendor,
+    phone,
+    returnDate,
+    billBy,
+    notes,
+    items,
+    draftName,
+    draftQty,
+    draftPrice,
+    draftDiscount,
+    draftImage,
+  };
+  const { clearDraft: clearDebitNoteDraft } = useAutosaveFormDraft({
+    storageKey: "debit-note",
+    enabled: freshCreate && mode === "create" && !purchaseReturnId,
+    snapshot: debitNoteDraft,
+    hasContent: (data) =>
+      Boolean(
+        data.vendor.trim() ||
+          data.phone.trim() ||
+          data.notes.trim() ||
+          data.billBy.trim() ||
+          (data.items?.length ?? 0) ||
+          data.draftName.trim() ||
+          data.draftPrice.trim() ||
+          data.draftDiscount.trim(),
+      ),
+    restore: (data) => {
+      setPurchaseReturnNo(data.purchaseReturnNo || getNextReturnNumber());
+      setVendor(data.vendor || "");
+      setPhone(data.phone || "");
+      setReturnDate(data.returnDate || today);
+      setBillBy(data.billBy || "");
+      setNotes(data.notes || "");
+      setItems(Array.isArray(data.items) ? data.items : []);
+      setDraftName(data.draftName || "");
+      setDraftQty(data.draftQty || "1");
+      setDraftPrice(data.draftPrice || "0");
+      setDraftDiscount(data.draftDiscount || "0");
+      setDraftImage(data.draftImage || "");
+      if (data.vendor.trim()) setVendorDropdownOpen(false);
+    },
+  });
 
   useEffect(() => {
     type Line = {
@@ -250,9 +310,11 @@ export default function CreatePurchaseReturnScreen({
       setSaving(true);
       if (mode === "edit" && purchaseReturnId) {
         await handleUpdatePurchaseReturn(purchaseReturnId, buildPayload("draft"));
+        clearDebitNoteDraft();
         Swal.fire("Draft saved", "Purchase return draft updated.", "success");
       } else {
         await handleCreatePurchaseReturn(buildPayload("draft"));
+        clearDebitNoteDraft();
         Swal.fire("Draft saved", "Purchase return saved as draft.", "success").then(() =>
           navigate(-1),
         );
@@ -321,11 +383,13 @@ export default function CreatePurchaseReturnScreen({
       });
       if (mode === "edit" && purchaseReturnId) {
         await handleUpdatePurchaseReturn(purchaseReturnId, payload);
+        clearDebitNoteDraft();
         Swal.fire("Return Updated", "Purchase return updated successfully.", "success").then(
           () => navigate(-1),
         );
       } else {
         const response = await handleCreatePurchaseReturn(payload);
+        clearDebitNoteDraft();
 
         const savedCode = response?.purchaseReturn?.invoiceNumber;
         Swal.fire(

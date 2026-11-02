@@ -18,6 +18,7 @@ import {
   handleCatalogueLookup,
   handleCreateCustomer,
   handleCreateInvoice,
+  handleUpdateInvoice,
   handleGetCustomers,
   handleGetMemberships,
   type CustomerPayload,
@@ -49,7 +50,7 @@ import {
 } from "../utils/catalogueLineKey";
 import { filterCatalogueRowsForPos } from "../utils/cataloguePosFilter";
 import { useNavigate } from "react-router-dom";
-import { readFormDraft, useAutosaveFormDraft } from "../utils/formDraft";
+import { clearFormDraft, readFormDraft, useAutosaveFormDraft } from "../utils/formDraft";
 
 
 const todayStr = new Date().toISOString().split("T")[0];
@@ -114,9 +115,20 @@ export default function CreatePosScreen({
   } | null;
 }) {
   const navigate = useNavigate();
+  const draftInvoiceIdRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
+  const [draftInvoiceId, setDraftInvoiceId] = useState<string | null>(null);
+  const rememberDraftInvoiceId = (id: unknown) => {
+    const value = id != null ? String(id) : "";
+    if (!/^[a-f\d]{24}$/i.test(value)) return;
+    draftInvoiceIdRef.current = value;
+    setDraftInvoiceId(value);
+  };
   const [internalOpen, setInternalOpen] = useState(true);
   const isOpen = open ?? internalOpen;
   const requestClose = () => {
+    draftInvoiceIdRef.current = null;
+    setDraftInvoiceId(null);
     if (onClose) onClose();
     else setInternalOpen(false);
   };
@@ -647,8 +659,9 @@ export default function CreatePosScreen({
   };
 
   const handleSave = async (payment: any) => {
-    if (saving) return;
+    if (savingRef.current) return;
     try {
+      savingRef.current = true;
       setSaving(true);
       const waiveMembership = Boolean(payment.waiveMembershipForCoupon);
       const lineItems = items.map((item) => {
@@ -677,7 +690,49 @@ export default function CreatePosScreen({
         (sum, item) => sum + Number(item.discount || 0),
         0,
       );
-      const response = await handleCreateInvoice({
+      const existingId = draftInvoiceIdRef.current;
+      const response = existingId
+        ? await handleUpdateInvoice(existingId, {
+            customerName: customer.trim() || "Walk-in Customer",
+            customerPhone: phone.trim(),
+            customerId: payment.customerId || customerId || undefined,
+            invoiceId: existingId,
+            invoiceDate: invoiceDate || todayStr,
+            dueDate: dueDate || invoiceDate || todayStr,
+            salesPersonName:
+              payment.invoiceBy?.staffName?.trim() ||
+              staff.m_staff_name ||
+              "POS",
+            invoiceBy: payment.invoiceBy
+              ? {
+                  staffId: payment.invoiceBy.staffId,
+                  staffName: payment.invoiceBy.staffName,
+                  employeeId: payment.invoiceBy.employeeId,
+                  email: payment.invoiceBy.email,
+                }
+              : null,
+            verifiedAt: payment.verifiedAt || null,
+            notes: "POS Transaction",
+            items: lineItems,
+            subTotal,
+            discountTotal:
+              lineDiscountTotal +
+              Number(payment.coupon?.discountAmount ?? 0) +
+              Number(payment.referral?.discountAmount ?? 0),
+            extraCharges,
+            grandTotal: payment.finalAmount,
+            coupon: payment.coupon ?? null,
+            referral: payment.referral ?? null,
+            status: "final",
+            mode: payment.mode,
+            paymentStatus: payment.paymentStatus,
+            paymentBreakdown: payment.paymentBreakdown,
+            pendingAmount: payment.paymentBreakdown.dueAmount,
+            cashbackTotal: payment.cashbackTotal,
+            membershipDiscount: payment.membershipDiscount,
+            membershipType: membership || undefined,
+          })
+        : await handleCreateInvoice({
         customerName: customer.trim() || "Walk-in Customer",
         customerPhone: phone.trim(),
         customerId: payment.customerId || customerId || undefined,
@@ -740,6 +795,7 @@ export default function CreatePosScreen({
     } catch (error: any) {
       Swal.fire("Error", "Could not complete transaction.", "error");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -747,7 +803,7 @@ export default function CreatePosScreen({
     staff: VerifiedStaff;
     verifiedAt: string;
   }) => {
-    if (saving) return;
+    if (savingRef.current) return;
     if (!items.length) {
       Swal.fire("Empty cart", "Add at least one item before saving a draft.", "warning");
       return;
@@ -766,11 +822,13 @@ export default function CreatePosScreen({
       "POS";
 
     try {
+      savingRef.current = true;
       setSaving(true);
-      await handleCreateInvoice({
+      const draftBody = {
         customerName: customer.trim() || "Walk-in Customer",
         customerPhone: phone.trim(),
         customerId: customerId || undefined,
+        invoiceId: draftInvoiceIdRef.current || undefined,
         invoiceDate: invoiceDate || todayStr,
         dueDate: dueDate || invoiceDate || todayStr,
         salesPersonName,
@@ -815,7 +873,12 @@ export default function CreatePosScreen({
           m_staff_email:
             verifiedStaff.email || staff.m_staff_email || null,
         },
-      });
+      };
+      const existingId = draftInvoiceIdRef.current;
+      const response = existingId
+        ? await handleUpdateInvoice(existingId, draftBody)
+        : await handleCreateInvoice(draftBody);
+      rememberDraftInvoiceId(response?.invoice?._id || existingId);
 
       clearPosDraft();
       notifyInvoiceSaved();
@@ -834,6 +897,7 @@ export default function CreatePosScreen({
         "error",
       );
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -950,6 +1014,18 @@ export default function CreatePosScreen({
     return () => controller.abort();
   }, [debouncedSearchText, isDesktopLayout]);
 
+  const handleClearBill = () => {
+    clearFormDraft("pos");
+    draftInvoiceIdRef.current = null;
+    setDraftInvoiceId(null);
+    resetPosBill();
+    setCustomer("");
+    setPhone("");
+    setMembership("none");
+    setMembershipPlanId(null);
+    setCustomerId(null);
+  };
+
   const handleRequestClose = async () => {
     const result = await Swal.fire({
       title: "Do you really want to close?",
@@ -1003,13 +1079,22 @@ export default function CreatePosScreen({
                 <span className="hidden sm:inline"> · By {staffName}</span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleRequestClose}
-              className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-            >
-              <X size={18} />
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handleClearBill}
+                className="inline-flex h-9 items-center rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={handleRequestClose}
+                className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
 
@@ -1055,48 +1140,65 @@ export default function CreatePosScreen({
           <div className="mt-3 grid min-w-0 grid-cols-1 gap-4 lg:mt-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-5">
             <div className="min-w-0 space-y-3 sm:space-y-4">
               {/* Customer + dates — single card */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-                <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-12">
-                  <div className="relative col-span-1 min-w-0 lg:col-span-4">
-                    <div className="mb-1.5">
-                      <label className="text-xs font-semibold text-slate-600">
-                        Select Customer
-                      </label>
-                    </div>
-                    <div className="relative">
-                      <User className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        value={customer}
-                        onChange={(e) => {
-                          setCustomer(e.target.value);
-                          setCustomerDropdownOpen(true);
-                          // Typing again unlocks phone (no longer a picked CRM customer)
-                          if (customerId) setCustomerId(null);
-                          if (!e.target.value) {
-                            setPhone("");
-                            setMembership("none");
-                            setMembershipPlanId(null);
-                            setCustomerId(null);
+              <div className="rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm sm:p-3">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:gap-3">
+                  <div className="relative min-w-0 flex-1">
+                    <label className="mb-1 block text-xs font-semibold text-slate-600">
+                      Select Customer
+                    </label>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <div className="relative min-w-[10.5rem] flex-1">
+                        <User className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          value={customer}
+                          onChange={(e) => {
+                            setCustomer(e.target.value);
+                            setCustomerDropdownOpen(true);
+                            if (customerId) setCustomerId(null);
+                            if (!e.target.value) {
+                              setPhone("");
+                              setMembership("none");
+                              setMembershipPlanId(null);
+                              setCustomerId(null);
+                            }
+                          }}
+                          onFocus={() => setCustomerDropdownOpen(true)}
+                          onBlur={() =>
+                            window.setTimeout(
+                              () => setCustomerDropdownOpen(false),
+                              150,
+                            )
                           }
-                        }}
-                        onFocus={() => setCustomerDropdownOpen(true)}
-                        onBlur={() =>
-                          window.setTimeout(
-                            () => setCustomerDropdownOpen(false),
-                            150,
-                          )
-                        }
-                        placeholder="Search customer…"
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-[4.25rem] text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowCreateCustomerModal(true)}
-                        className="absolute right-1.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-0.5 rounded-lg bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-100 transition hover:bg-violet-100"
-                      >
-                        <UserPlus size={11} />
-                        Add
-                      </button>
+                          placeholder="Search customer…"
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-[4.25rem] text-sm font-medium text-slate-900 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateCustomerModal(true)}
+                          className="absolute right-1.5 top-1/2 inline-flex -translate-y-1/2 items-center gap-0.5 rounded-lg bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-100 transition hover:bg-violet-100"
+                        >
+                          <UserPlus size={11} />
+                          Add
+                        </button>
+                      </div>
+                      {customerId && phone.trim() ? (
+                        <span className="inline-flex max-w-full min-w-0 items-center gap-1 text-[12px] leading-none text-slate-500 sm:text-[13px]">
+                          <Phone
+                            className="h-3.5 w-3.5 shrink-0 text-slate-400"
+                            aria-hidden
+                          />
+                          <span className="truncate">{phone.trim()}</span>
+                        </span>
+                      ) : null}
+                      {membership && membership !== "none" ? (
+                        <div className="origin-left scale-90">
+                          <MembershipBadge
+                            membershipType={membership}
+                            membershipPlanId={membershipPlanId}
+                            membershipPlans={membershipPlans}
+                          />
+                        </div>
+                      ) : null}
                     </div>
                     {customerDropdownOpen &&
                       (loadingCustomers || customers.length > 0) && (
@@ -1182,57 +1284,30 @@ export default function CreatePosScreen({
                       )}
                   </div>
 
-                  <div className="col-span-1 min-w-0 lg:col-span-3">
-                    <div className="mb-1.5 flex items-center justify-between gap-1">
-                      <label className="text-xs font-semibold text-slate-600">
-                        Phone
+                  <div className="grid min-w-0 grid-cols-2 gap-2 lg:w-[19.5rem] lg:shrink-0">
+                    <div className="min-w-0">
+                      <label className="mb-1 block truncate text-[11px] font-semibold leading-none text-slate-600">
+                        Invoice Date
                       </label>
-                      {membership && membership !== "none" ? (
-                        <div className="origin-right scale-90">
-                          <MembershipBadge
-                            membershipType={membership}
-                            membershipPlanId={membershipPlanId}
-                            membershipPlans={membershipPlans}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="relative">
-                      <Phone className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        disabled={Boolean(customerId)}
-                        placeholder="Phone"
-                        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+                        type="date"
+                        value={invoiceDate}
+                        onChange={(e) => setInvoiceDate(e.target.value)}
+                        className="box-border h-10 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-2 text-[13px] text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:scale-90 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
                       />
                     </div>
-                  </div>
-
-                  <div className="col-span-1 min-w-0 lg:col-span-2">
-                    <label className="mb-1 block truncate text-[10px] font-semibold text-slate-600 sm:mb-1.5 sm:text-xs">
-                      Invoice Date
-                    </label>
-                    <input
-                      type="date"
-                      value={invoiceDate}
-                      onChange={(e) => setInvoiceDate(e.target.value)}
-                      className="box-border h-9 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-1 text-[11px] outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 sm:h-11 sm:rounded-xl sm:px-3 sm:text-sm [&::-webkit-calendar-picker-indicator]:scale-75 sm:[&::-webkit-calendar-picker-indicator]:scale-100 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
-                    />
-                  </div>
-
-                  <div className="col-span-1 min-w-0 lg:col-span-3">
-                    <label className="mb-1 block truncate text-[10px] font-semibold text-slate-600 sm:mb-1.5 sm:text-xs">
-                      Due Date
-                    </label>
-                    <input
-                      type="date"
-                      value={dueDate}
-                      min={invoiceDate || undefined}
-                      onChange={(e) => setDueDate(e.target.value)}
-                      className="box-border h-9 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-1 text-[11px] outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 sm:h-11 sm:rounded-xl sm:px-3 sm:text-sm [&::-webkit-calendar-picker-indicator]:scale-75 sm:[&::-webkit-calendar-picker-indicator]:scale-100 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
-                    />
+                    <div className="min-w-0">
+                      <label className="mb-1 block truncate text-[11px] font-semibold leading-none text-slate-600">
+                        Due Date
+                      </label>
+                      <input
+                        type="date"
+                        value={dueDate}
+                        min={invoiceDate || undefined}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        className="box-border h-10 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-2 text-[13px] text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 [&::-webkit-calendar-picker-indicator]:ml-0 [&::-webkit-calendar-picker-indicator]:scale-90 [&::-webkit-datetime-edit]:min-w-0 [&::-webkit-datetime-edit-fields-wrapper]:p-0"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1873,8 +1948,11 @@ export default function CreatePosScreen({
             allowPartialPayment={false}
             extraCharges={extraCharges}
             membershipPlans={membershipPlans}
+            existingInvoiceId={draftInvoiceId}
             onClose={() => setOpenCheckout(false)}
             onSavedAndNew={() => {
+              draftInvoiceIdRef.current = null;
+              setDraftInvoiceId(null);
               setItems([]);
               setCustomer("");
               setPhone("");

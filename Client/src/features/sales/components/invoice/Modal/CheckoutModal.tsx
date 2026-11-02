@@ -23,6 +23,7 @@ import {
 } from "@/features/BookingOverview/paymentRule";
 import {
   handleCreateInvoice,
+  handleUpdateInvoice,
   handleGetCustomers,
   handleGetWallets,
   handleGetWalletById,
@@ -204,6 +205,8 @@ type Props = {
   }) => Promise<void>;
   /** After draft save from Save & New — reset parent form (e.g. clear cart). */
   onSavedAndNew?: () => void;
+  /** Existing draft or invoice. Save and payment update this document. */
+  existingInvoiceId?: string | null;
 };
 
 const EXPENSE_CATEGORIES = [
@@ -353,16 +356,18 @@ function SectionCard({
   children,
   className = "",
   headerAction,
+  compact = false,
 }: {
   title: string;
   icon?: any;
   children: ReactNode;
   className?: string;
   headerAction?: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <section className={`rounded-xl border border-slate-200 bg-white p-5 ${className}`}>
-      <div className="mb-4 flex items-center justify-between">
+    <section className={`rounded-xl border border-slate-200 bg-white ${compact ? "p-2.5" : "p-5"} ${className}`}>
+      <div className={`${compact ? "mb-1.5" : "mb-4"} flex items-center justify-between`}>
         <div className="flex items-center gap-2">
           {Icon && <Icon className="h-4 w-4 text-slate-400" />}
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -467,10 +472,11 @@ export default function CheckoutModal({
   bookingPaymentRule = null,
   onConfirmPayment,
   onSavedAndNew,
+  existingInvoiceId,
 }: Props) {
   const isPurchaseCheckout = checkoutContext === "purchase";
   const isExpenseCheckout = checkoutContext === "expense";
-  const [paymentMode, setPaymentMode] = useState("Cash");
+  const [paymentMode, setPaymentMode] = useState<string | null>(null);
   const [cashGiven, setCashGiven] = useState(0);
   const [paymentStatus, setPaymentStatus] = useState<
     "full" | "partial" | "due"
@@ -668,7 +674,7 @@ export default function CheckoutModal({
             : Number(itemsProp[0]?.price) || "",
         ),
       );
-      setPaymentMode("Cash");
+      setPaymentMode(null);
       setReverifyRequested(false);
       if (initialVerifiedStaff?.staffId) {
         setVerifiedStaff(initialVerifiedStaff);
@@ -1277,6 +1283,7 @@ export default function CheckoutModal({
 
   useEffect(() => {
     if (!open) return;
+    setPaymentMode(null);
     setPaymentStatus("full");
     setIsMultiMode(false);
   }, [open]);
@@ -1500,7 +1507,9 @@ export default function CheckoutModal({
         splitPayments.upi +
         splitPayments.card +
         splitPayments.wallet
-      : cashGiven;
+      : paymentMode
+        ? cashGiven
+        : 0;
   const change = isDuePayment
     ? 0
     : Math.max(0, totalPaid - finalPayable);
@@ -1569,6 +1578,7 @@ export default function CheckoutModal({
   };
 
   const handleSaveAndNew = async () => {
+    if (saving) return;
     if (isExpenseCheckout || isPurchaseCheckout) return;
 
     if (!items.length) {
@@ -1669,6 +1679,7 @@ export default function CheckoutModal({
         return activeType && activeType !== "none" ? activeType : undefined;
       })(),
       activityType: "Invoice",
+      invoiceId: existingInvoiceId || undefined,
       createdBy: {
         m_staff_id:
           billedStaff.m_staff_id ||
@@ -1681,10 +1692,16 @@ export default function CheckoutModal({
 
     try {
       setSaving(true);
-      await handleCreateInvoice(draftPayload);
+      if (existingInvoiceId) {
+        await handleUpdateInvoice(existingInvoiceId, draftPayload);
+      } else {
+        await handleCreateInvoice(draftPayload);
+      }
       await Swal.fire(
         "Saved",
-        `Draft saved by ${salesPersonName}. Start a new bill.`,
+        existingInvoiceId
+          ? "Draft updated."
+          : `Draft saved by ${salesPersonName}. Start a new bill.`,
         "success",
       );
       onSavedAndNew?.();
@@ -1703,6 +1720,7 @@ export default function CheckoutModal({
   };
 
   const handleComplete = async () => {
+    if (saving) return;
     if (isExpenseCheckout) {
       if (!items.length || grandTotal <= 0) {
         Swal.fire("Invalid amount", "Enter a valid expense amount.", "warning");
@@ -1725,6 +1743,14 @@ export default function CheckoutModal({
         Swal.fire("No items", "Please add at least one item.", "warning");
         return;
       }
+    }
+    if (!isDuePayment && !isMultiMode && !paymentMode) {
+      Swal.fire(
+        "Payment mode required",
+        "Select a payment mode before completing checkout.",
+        "warning",
+      );
+      return;
     }
     if (!billedStaff?.staffId || !(billedStaff.staffName || billedStaff.name)) {
       Swal.fire(
@@ -1908,6 +1934,7 @@ export default function CheckoutModal({
       customerName: customerName.trim(),
       customerPhone: customerSearch.trim(),
       customerId: selectedCustomer?._id ?? initialCustomerId ?? undefined,
+      invoiceId: existingInvoiceId || undefined,
       invoiceDate: today,
       dueDate: today,
       salesPersonName:
@@ -2093,7 +2120,12 @@ export default function CheckoutModal({
 
       let response: Awaited<ReturnType<typeof handleCreateInvoice>>;
       try {
-        response = await handleCreateInvoice(payload);
+        response = existingInvoiceId
+          ? await handleUpdateInvoice(existingInvoiceId, {
+              ...payload,
+              invoiceId: existingInvoiceId,
+            })
+          : await handleCreateInvoice(payload);
       } catch (error) {
         await reverseGiftCardRedemption();
         throw error;
@@ -2383,8 +2415,9 @@ export default function CheckoutModal({
           <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 [scrollbar-width:thin]">
             <div className="mx-auto max-w-3xl space-y-6">
               <SectionCard
-                title={isExpenseCheckout ? "Expense Details" : "Customer Information"}
+                title={isExpenseCheckout ? "Expense Details" : "Customer"}
                 icon={User}
+                compact={!isExpenseCheckout}
               >
                 {isExpenseCheckout ? (
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -2415,14 +2448,14 @@ export default function CheckoutModal({
                   </div>
                 ) : (
                 <>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="relative" ref={searchRef}>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">
-                      Mobile Number
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div className="relative min-w-0" ref={searchRef}>
+                    <label className="mb-0.5 block text-[10px] font-medium leading-none text-slate-400">
+                      Mobile
                     </label>
                     <input
-                      placeholder="Search or enter mobile..."
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                      placeholder="Mobile"
+                      className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs font-medium outline-none transition-all focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
                       autoComplete="tel"
                       value={customerSearch}
                       onChange={(e) => {
@@ -2460,20 +2493,20 @@ export default function CheckoutModal({
                     )}
                   </div>
 
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">
-                      Customer Name
+                  <div className="min-w-0">
+                    <label className="mb-0.5 block text-[10px] font-medium leading-none text-slate-400">
+                      Name
                     </label>
                     <input
-                      placeholder="Enter billing name"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                      placeholder="Name"
+                      className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs font-medium outline-none transition-all focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                     />
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-50 pt-4">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {(() => {
                     const currentMType = selectedCustomer
                       ? billingMembershipFromCustomer(selectedCustomer)
@@ -2492,8 +2525,8 @@ export default function CheckoutModal({
                     const hasM =
                       currentMType && currentMType !== "none" && label !== "NONE";
                     return (
-                      <Badge variant={hasM ? "indigo" : "default"}>
-                        {hasM ? `${label} Member` : "General Customer"}
+                      <Badge variant={hasM ? "indigo" : "default"} className="px-1.5 py-0 text-[10px]">
+                        {hasM ? `${label} Member` : "General"}
                       </Badge>
                     );
                   })()}
@@ -2512,9 +2545,9 @@ export default function CheckoutModal({
                       Coupon chosen instead of membership
                     </span>
                   )}
-                  <div className="ml-auto flex items-center gap-2 text-xs font-semibold text-amber-600">
-                    <WalletIcon className="h-4 w-4" />
-                    <span>Balance: {formatInr(walletBalance)}</span>
+                  <div className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-amber-600">
+                    <WalletIcon className="h-3 w-3" />
+                    <span>{formatInr(walletBalance)}</span>
                   </div>
                 </div>
                 </>
@@ -2799,7 +2832,7 @@ export default function CheckoutModal({
                       {paymentMethodOptions.map(({ value, label, Icon }) => (
                         <PaymentModeButton
                           key={value}
-                          active={paymentMode === value}
+                          active={paymentMode === value && paymentMode !== null}
                           onClick={() => setPaymentMode(value)}
                           icon={Icon}
                           label={label}
