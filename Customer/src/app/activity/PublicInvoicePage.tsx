@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {useParams} from 'react-router-dom';
+import {useNavigate, useParams} from 'react-router-dom';
 import axios from 'axios';
 import {Download} from 'lucide-react';
 import {ThermalPrint, type ThermalPrintProps} from '../../thermalPrint/ThermalPrint';
@@ -16,15 +16,33 @@ type PublicInvoice = ActivityInvoiceDetail & {
   membershipType?: string;
 };
 
+function readInvoiceId(raw: string | undefined) {
+  const text = String(raw || '').trim();
+  let value = text;
+  try {
+    value = decodeURIComponent(text);
+  } catch {
+    value = text;
+  }
+  return value.match(/[a-f\d]{24}/i)?.[0] || '';
+}
+
 export default function PublicInvoicePage() {
+  const navigate = useNavigate();
   const {invoiceId} = useParams();
+  const id = readInvoiceId(invoiceId);
   const [bill, setBill] = useState<ThermalPrintProps | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    const id = String(invoiceId || '').trim();
+    if (id && invoiceId && invoiceId !== id) {
+      navigate(`/activities/${id}`, {replace: true});
+    }
+  }, [id, invoiceId, navigate]);
+
+  useEffect(() => {
     if (!id) {
       setError('This bill link is not valid.');
       setLoading(false);
@@ -73,7 +91,7 @@ export default function PublicInvoicePage() {
     return () => {
       cancelled = true;
     };
-  }, [invoiceId]);
+  }, [id]);
 
   const downloadAgain = async () => {
     if (!bill) return;
