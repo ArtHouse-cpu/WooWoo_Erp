@@ -191,8 +191,10 @@ const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
 const KPI_PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
   { value: "today", label: "Today" },
   { value: "yesterday", label: "Yesterday" },
+  { value: "this_week", label: "This Week" },
   { value: "this_month", label: "This Month" },
   { value: "last_month", label: "Last Month" },
+  { value: "custom", label: "Custom Range" },
   { value: "lifetime", label: "Lifetime" },
 ];
 
@@ -224,6 +226,12 @@ function kpiPeriodBounds(period: DashboardPeriod): {
       toDate: yesterdayDate,
     };
     }
+  if (period === "this_week") {
+    const day = today.getDay() || 7;
+    const start = new Date(today);
+    start.setDate(today.getDate() - (day - 1));
+    return { fromDate: toYmd(start), toDate: to };
+  }
   if (period === "this_month") {
     return {
       fromDate: toYmd(new Date(today.getFullYear(), today.getMonth(), 1)),
@@ -233,6 +241,20 @@ function kpiPeriodBounds(period: DashboardPeriod): {
   const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   const last = new Date(today.getFullYear(), today.getMonth(), 0);
   return { fromDate: toYmd(first), toDate: toYmd(last) };
+}
+
+/** Date window shared by the dashboard cards and the four list tabs. */
+function dashboardListBounds(
+  period: DashboardPeriod,
+  customFrom: string,
+  customTo: string,
+): { fromDate?: string; toDate?: string; ready: boolean } {
+  if (period === "lifetime") return { ready: true };
+  if (period === "custom") {
+    if (!customFrom || !customTo || customTo < customFrom) return { ready: false };
+    return { fromDate: customFrom, toDate: customTo, ready: true };
+  }
+  return { ...kpiPeriodBounds(period), ready: true };
 }
 
 const MEMBERSHIP_BREAKDOWN_COLORS = [
@@ -540,6 +562,12 @@ export default function HomeScreen() {
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   /** KPI cards period — drives /dashboard/summary */
   const [kpiPeriod, setKpiPeriod] = useState<DashboardPeriod>("today");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const listBounds = useMemo(
+    () => dashboardListBounds(kpiPeriod, customFrom, customTo),
+    [kpiPeriod, customFrom, customTo],
+  );
   const [kpiOpen, setKpiOpen] = useState(false);
   const [dashboardSummary, setDashboardSummary] =
     useState<DashboardSummaryData | null>(null);
@@ -639,7 +667,7 @@ export default function HomeScreen() {
     if (tab !== "spaces") {
       setSelectedSpaceType("all");
     }
-  }, [tab, search, dateFilter, statusFilter]);
+  }, [tab, search, dateFilter, statusFilter, listBounds.fromDate, listBounds.toDate, listBounds.ready]);
 
   useEffect(() => {
     setPage(1);
@@ -655,6 +683,7 @@ export default function HomeScreen() {
   }, []);
 
   const loadDashboardData = useCallback(async () => {
+    if (!listBounds.ready) return;
     setKpisLoading(true);
     setBillsLoading(true);
     try {
@@ -663,10 +692,24 @@ export default function HomeScreen() {
         customerRes,
         membershipRes,
       ] = await Promise.allSettled([
-        // Home KPIs: load sales even if menu path checks are narrow
-        handleGetInvoices("", undefined, 2000),
+        // Sales bills only. Booking invoices are loaded with the Bookings tab.
+        handleGetInvoices(
+          "",
+          undefined,
+          2000,
+          listBounds.fromDate || "",
+          listBounds.toDate || "",
+          "sales",
+        ),
         canPath("/customers")
-          ? handleGetCustomers("", undefined, 2000, 1)
+          ? handleGetCustomers(
+              "",
+              undefined,
+              2000,
+              1,
+              listBounds.fromDate || "",
+              listBounds.toDate || "",
+            )
           : Promise.resolve(null),
         canPath("/membership") || canPath("/manage-plans")
           ? handleGetMemberships({ status: "Active" })
@@ -757,7 +800,7 @@ export default function HomeScreen() {
       setKpisLoading(false);
       setBillsLoading(false);
     }
-  }, [canPath]);
+  }, [canPath, listBounds.fromDate, listBounds.ready, listBounds.toDate]);
 
   useEffect(() => {
     let alive = true;
@@ -777,13 +820,14 @@ export default function HomeScreen() {
     let alive = true;
     const controller = new AbortController();
     const loadCards = async () => {
+      if (!listBounds.ready) return;
       setCardsLoading(true);
       try {
-        const bounds = kpiPeriodBounds(kpiPeriod);
         const response = await handleGetDashboardSummary(
           {
-            period: kpiPeriod,
-            ...bounds,
+            period: kpiPeriod === "custom" ? "lifetime" : kpiPeriod,
+            ...(listBounds.fromDate ? { fromDate: listBounds.fromDate } : {}),
+            ...(listBounds.toDate ? { toDate: listBounds.toDate } : {}),
           },
           controller.signal,
         );
@@ -825,7 +869,7 @@ export default function HomeScreen() {
       alive = false;
       controller.abort();
     };
-  }, [kpiPeriod]);
+  }, [kpiPeriod, listBounds.fromDate, listBounds.ready, listBounds.toDate]);
 
   useEffect(() => {
     if (
@@ -839,12 +883,27 @@ export default function HomeScreen() {
     const load = async () => {
       setTabLoading(true);
       try {
-        if (tab === "bookings" && bookings.length === 0) {
-          const res = await handleGetAllBookings({ page: 1, limit: 100 });
+        if (tab === "bookings") {
+          if (!listBounds.ready) return;
+          const [res, invoiceRes] = await Promise.all([
+            handleGetAllBookings({
+              page: 1,
+              limit: 100,
+              fromDate: listBounds.fromDate,
+              toDate: listBounds.toDate,
+            }),
+            handleGetInvoices(
+              "",
+              undefined,
+              500,
+              listBounds.fromDate || "",
+              listBounds.toDate || "",
+              "booking",
+            ),
+          ]);
           if (!alive) return;
           const list = Array.isArray(res?.bookings) ? res.bookings : [];
-          setBookings(
-            list.map((b: AllBookingRow, i: number) => {
+          const bookingRows: GenericRow[] = list.map((b: AllBookingRow, i: number) => {
               const customerName = b.customerName || b.customer?.name || "Customer";
               const code = b.bookingCode || `BK-${i + 1}`;
               const space = b.spaceName || b.spaceType || "";
@@ -873,11 +932,63 @@ export default function HomeScreen() {
                 badge: b.membershipType || b.customer?.membershipType || "",
                 raw: b as unknown as Record<string, unknown>,
               };
-            }),
+            });
+          const linkedCodes = new Set(
+            bookingRows
+              .map((row) => String(row.raw?.invoiceCode || "").trim().toLowerCase())
+              .filter(Boolean),
+          );
+          const bookingInvoices = Array.isArray(invoiceRes?.invoices)
+            ? invoiceRes.invoices
+            : [];
+          const invoiceRows: GenericRow[] = bookingInvoices
+            .filter((invoice: Record<string, unknown>) => {
+              const code = String(invoice?.invoiceCode || "").trim().toLowerCase();
+              return !code || !linkedCodes.has(code);
+            })
+            .map((invoice: Record<string, unknown>, i: number) => {
+              const code = String(invoice?.invoiceCode || `INV-${i + 1}`);
+              const due = Number(
+                invoice?.pendingAmount ??
+                  (invoice?.paymentBreakdown as { dueAmount?: number } | undefined)
+                    ?.dueAmount ??
+                  0,
+              );
+              return {
+                id: `invoice-${String(invoice?._id ?? i)}`,
+                title: String(invoice?.customerName || "Customer"),
+                subtitle: `Booking invoice · ${code}`,
+                meta: String(invoice?.status || "final"),
+                amount: formatMoney(Number(invoice?.grandTotal ?? 0)),
+                numAmount: Number(invoice?.grandTotal ?? 0),
+                dueAmount: due,
+                createdAt:
+                  parseDate(invoice?.invoiceDate) || parseDate(invoice?.createdAt),
+                phone: String(invoice?.customerPhone || ""),
+                code,
+                paymentType: formatPaymentType(invoice?.mode),
+                inclusions: ["Invoice"],
+                raw: invoice,
+              };
+            });
+          setBookings(
+            [...bookingRows, ...invoiceRows].sort(
+              (a, b) =>
+                (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
+            ),
           );
         }
-        if (tab === "subscriptions" && subscriptions.length === 0) {
-          const res = await handleGetSubscriptions("", 100);
+        if (tab === "subscriptions") {
+          if (!listBounds.ready) return;
+          const res = await handleGetSubscriptions(
+            "",
+            100,
+            undefined,
+            1,
+            listBounds.fromDate,
+            listBounds.toDate,
+            "createdAt",
+          );
           if (!alive) return;
           const list = Array.isArray(res?.subscriptions)
             ? res.subscriptions
@@ -1087,7 +1198,9 @@ export default function HomeScreen() {
     spaces.length,
     services.length,
     foods.length,
-    subscriptions.length,
+    listBounds.fromDate,
+    listBounds.ready,
+    listBounds.toDate,
   ]);
 
   const kpiPeriodLabel =
@@ -1111,7 +1224,6 @@ export default function HomeScreen() {
   const filteredBills = useMemo(() => {
     const term = search.trim().toLowerCase();
     return bills.filter((bill) => {
-      if (!inDateRange(bill.createdAt, dateFilter)) return false;
       if (statusFilter === "Paid" && bill.status !== "Paid") return false;
       if (
         statusFilter === "Pending" &&
@@ -1127,12 +1239,11 @@ export default function HomeScreen() {
         bill.phone.toLowerCase().includes(term)
       );
     });
-  }, [bills, search, dateFilter, statusFilter]);
+  }, [bills, search, statusFilter]);
 
   const filteredCustomers = useMemo(() => {
     const term = search.trim().toLowerCase();
     return customers.filter((c) => {
-      if (!inDateRange(c.createdAt, dateFilter)) return false;
       if (!term) return true;
       return (
         c.name.toLowerCase().includes(term) ||
@@ -1140,7 +1251,7 @@ export default function HomeScreen() {
         c.membership.toLowerCase().includes(term)
       );
     });
-  }, [customers, search, dateFilter]);
+  }, [customers, search]);
 
   const membershipRows: GenericRow[] = useMemo(
     () =>
@@ -1210,7 +1321,12 @@ export default function HomeScreen() {
   const filteredGeneric = useMemo(() => {
     const term = search.trim().toLowerCase();
     const filtered = genericRows.filter((row) => {
-      if (row.createdAt !== undefined && !inDateRange(row.createdAt ?? null, dateFilter)) {
+      if (
+        tab !== "bookings" &&
+        tab !== "subscriptions" &&
+        row.createdAt !== undefined &&
+        !inDateRange(row.createdAt ?? null, dateFilter)
+      ) {
         return false;
       }
       if (tab === "products" && selectedProductCategory !== "all") {
@@ -1878,7 +1994,11 @@ export default function HomeScreen() {
     }
   };
 
-  const handleMobileBookingClick = (_b: GenericRow) => {
+  const handleMobileBookingClick = (row: GenericRow) => {
+    if (row.id.startsWith("invoice-") && row.raw) {
+      navigate("/create-invoice", { state: { invoice: row.raw, mode: "view" } });
+      return;
+    }
     navigate("/allBookings");
   };
 
@@ -1910,6 +2030,25 @@ export default function HomeScreen() {
                 className={`shrink-0 text-gray-400 transition ${kpiOpen ? "rotate-180" : ""}`}
               />
             </button>
+            {kpiPeriod === "custom" ? (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(event) => setCustomFrom(event.target.value)}
+                  className="h-9 rounded-xl border border-gray-200 bg-white px-2 text-xs text-gray-700 sm:h-10"
+                  aria-label="From date"
+                />
+                <input
+                  type="date"
+                  value={customTo}
+                  min={customFrom || undefined}
+                  onChange={(event) => setCustomTo(event.target.value)}
+                  className="h-9 rounded-xl border border-gray-200 bg-white px-2 text-xs text-gray-700 sm:h-10"
+                  aria-label="To date"
+                />
+              </div>
+            ) : null}
             {kpiOpen ? (
               <div
                 role="listbox"

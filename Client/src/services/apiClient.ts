@@ -330,6 +330,7 @@ export const handleGetInvoices = async (
   limit = 2000,
   fromDate = "",
   toDate = "",
+  billScope: "" | "sales" | "booking" = "",
 ) => {
   try {
     const response = await axiosInstance.get("/invoice", {
@@ -338,6 +339,7 @@ export const handleGetInvoices = async (
         limit,
         ...(fromDate ? { fromDate } : {}),
         ...(toDate ? { toDate } : {}),
+        ...(billScope ? { billScope } : {}),
       },
       signal,
     });
@@ -1198,6 +1200,7 @@ export const handleGetSubscriptions = async (
   page = 1,
   fromDate?: string,
   toDate?: string,
+  dateField?: "invoiceDate" | "createdAt",
 ) => {
   const response = await axiosInstance.get("/subscriptions", {
     params: {
@@ -1206,6 +1209,7 @@ export const handleGetSubscriptions = async (
       page,
       ...(fromDate?.trim() ? { fromDate: fromDate.trim() } : {}),
       ...(toDate?.trim() ? { toDate: toDate.trim() } : {}),
+      ...(dateField === "createdAt" ? { dateField: "createdAt" } : {}),
     },
     signal,
   });
@@ -1386,6 +1390,8 @@ export const handleGetCustomers = async (
   signal?: AbortSignal,
   limit = 50,
   page = 1,
+  fromDate = "",
+  toDate = "",
 ) => {
   try {
     const response = await axiosInstance.get("/customer", {
@@ -1393,6 +1399,8 @@ export const handleGetCustomers = async (
         search: search.trim(),
         limit,
         page,
+        ...(fromDate ? { fromDate } : {}),
+        ...(toDate ? { toDate } : {}),
       },
       signal,
     });
@@ -4549,8 +4557,11 @@ export const handleDeleteAccessStaff = async (staffId: string) => {
 
 export type DashboardPeriod =
   | "today"
+  | "yesterday"
+  | "this_week"
   | "this_month"
   | "last_month"
+  | "custom"
   | "lifetime";
 
 export type DashboardSummaryData = {

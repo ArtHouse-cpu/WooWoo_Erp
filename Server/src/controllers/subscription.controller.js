@@ -711,7 +711,11 @@ export const getSubscriptions = async (req, res) => {
       if (!Number.isNaN(to.getTime())) dateFilter.$lte = to;
     }
     if (Object.keys(dateFilter).length) {
-      query.invoiceDate = dateFilter;
+      const dateField =
+        String(req.query.dateField ?? '').trim() === 'createdAt'
+          ? 'createdAt'
+          : 'invoiceDate';
+      query[dateField] = dateFilter;
     }
 
     if (search) {
