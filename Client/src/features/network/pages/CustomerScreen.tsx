@@ -7,7 +7,7 @@ import {
   type MRT_PaginationState,
   type MRT_Row,
 } from "material-react-table";
-import { Eye, FileSpreadsheet, Loader2, Search, SquarePen, Trash2, X } from "lucide-react";
+import { Eye, FileSpreadsheet, Loader2, MoreVertical, Phone, Search, SquarePen, Trash2, X } from "lucide-react";
 import Swal from "sweetalert2";
 import LedgerModal from "@/features/network/components/LedgerModal";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
@@ -54,6 +54,40 @@ type CustomerRow = {
   profileImage?: string;
   dueAmount?: number;
 };
+
+const AVATAR_TONES = [
+  { bg: "bg-blue-100", text: "text-blue-700" },
+  { bg: "bg-purple-100", text: "text-purple-700" },
+  { bg: "bg-emerald-100", text: "text-emerald-700" },
+  { bg: "bg-amber-100", text: "text-amber-800" },
+  { bg: "bg-rose-100", text: "text-rose-700" },
+  { bg: "bg-indigo-100", text: "text-indigo-700" },
+];
+
+function initials(name?: string) {
+  const cleaned = String(name ?? "").trim();
+  if (!cleaned) return "C";
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? "C";
+  const second = parts.length > 1 ? parts[parts.length - 1]?.[0] : "";
+  return (first + second).toUpperCase();
+}
+
+function formatJoinedDate(dateStr?: string) {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "";
+  }
+}
+
 export default function CustomerScreen() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [openCreateCustomerModal, setOpenCreateCustomerModal] = useState(false);
@@ -82,6 +116,7 @@ export default function CustomerScreen() {
     null,
   );
   const [customer360, setCustomer360] = useState<CustomerRow | null>(null);
+  const [actionMenuCustomerId, setActionMenuCustomerId] = useState<string | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -448,11 +483,11 @@ export default function CustomerScreen() {
           </div>
         </div>
 
-        <div className="flex w-full flex-col gap-2 sm:flex-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-1 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
           <Can permission={PERMISSIONS.CUSTOMER_CREATE}>
             <button
               type="button"
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 sm:w-auto"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 sm:flex-initial sm:px-4 sm:py-2.5 sm:text-sm"
               onClick={() => setOpenImportModal(true)}
             >
               <FileSpreadsheet size={16} />
@@ -460,7 +495,7 @@ export default function CustomerScreen() {
             </button>
             <button
               type="button"
-              className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:w-auto"
+              className="inline-flex flex-1 items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:flex-initial sm:px-4 sm:py-2.5 sm:text-sm"
               onClick={() => setOpenCreateCustomerModal(true)}
             >
               + New Customer
@@ -497,141 +532,149 @@ export default function CustomerScreen() {
           </div>
         ) : (
           customers.map((customer, idx) => {
-            const hasMembership = Boolean(customer.membershipType && customer.membershipType !== "None");
+            const tone = AVATAR_TONES[idx % AVATAR_TONES.length];
+            const membershipLabel =
+              billingMembershipFromCustomer(customer) ||
+              customer.membershipType ||
+              "Visitor";
+            const joined = formatJoinedDate(customer.createdAt);
+            const phoneNum = String(customer.mobile || customer.whatsappNumber || "").trim();
+            const hasPhone = Boolean(phoneNum && phoneNum !== "—" && phoneNum !== "-");
+            const customerKey = customer._id || String(idx);
 
             return (
               <div
-                key={customer._id || idx}
-                className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs"
+                key={customerKey}
+                onClick={() => {
+                  setDetailsCustomer(customer);
+                  setDetailsOpen(true);
+                }}
+                className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-blue-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
               >
-                <div className="flex items-start justify-between gap-2">
+                {/* Left: Avatar + Name + Membership + Joined Date */}
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${tone.bg} ${tone.text}`}
+                  >
+                    {initials(customer.name)}
+                  </span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-bold text-slate-900">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4
+                        className="text-sm font-bold text-slate-900 truncate transition group-hover:text-blue-600"
+                        title={customer.name}
+                      >
                         {customer.name || "Unnamed Customer"}
+                      </h4>
+                      <span className="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-200/70">
+                        {membershipLabel}
                       </span>
-                      {hasMembership && (
-                        <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.2 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-200/60">
-                          {customer.membershipType}
-                        </span>
-                      )}
                     </div>
-                    {customer.companyName && (
-                      <p className="mt-0.5 text-xs font-medium text-slate-600 truncate">
-                        {customer.companyName}
+                    {joined && (
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        Joined {joined}
                       </p>
                     )}
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      {customer.mobile && (
-                        <span className="font-medium text-slate-700">
-                          {customer.mobile}
-                        </span>
-                      )}
-                      {customer.city && (
-                        <>
-                          <span>•</span>
-                          <span>{customer.city}</span>
-                        </>
-                      )}
-                      {customer.email && (
-                        <>
-                          <span>•</span>
-                          <span className="truncate max-w-[140px]">
-                            {customer.email}
-                          </span>
-                        </>
-                      )}
-                    </div>
                   </div>
-                  {customer.dueAmount !== undefined && Number(customer.dueAmount) > 0 ? (
-                    <span className="shrink-0 rounded-full bg-rose-50 px-2.5 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200/60">
-                      Due: ₹{Number(customer.dueAmount).toLocaleString("en-IN")}
-                    </span>
-                  ) : (
-                    <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200/60">
-                      Clear
-                    </span>
-                  )}
                 </div>
 
-                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                  <div className="flex items-center gap-4 text-xs">
-                    <div>
-                      <span className="block text-[10px] font-medium uppercase text-slate-400">
-                        Wallet
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        ₹{Number(customer.walletAmount || 0).toLocaleString("en-IN")}
-                      </span>
-                    </div>
-                  </div>
+                {/* Right: Phone Direct Contact + 3 Dots Action Menu */}
+                <div
+                  className="flex items-center justify-between sm:justify-end gap-2 border-t border-slate-100 sm:border-0 pt-2.5 sm:pt-0 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {hasPhone ? (
+                    <a
+                      href={`tel:${phoneNum.replace(/[^0-9+]/g, "")}`}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
+                      title={`Call ${phoneNum}`}
+                    >
+                      <Phone size={13} className="shrink-0 fill-emerald-600/20 text-emerald-600" />
+                      <span>{phoneNum}</span>
+                    </a>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                      <Phone size={12} className="text-slate-300" />
+                      <span>No phone</span>
+                    </span>
+                  )}
 
-                  <div
-                    className="flex items-center gap-1.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  {/* 3-Dots Action Menu */}
+                  <div className="relative shrink-0">
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedCustomer(customer);
-                        setOpenLedgerModal(true);
-                      }}
-                      className="cursor-pointer rounded-lg bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100"
-                      title="View Ledger"
+                      onClick={() =>
+                        setActionMenuCustomerId(
+                          actionMenuCustomerId === customerKey ? null : customerKey
+                        )
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition active:scale-95 cursor-pointer"
+                      aria-label="Customer actions"
                     >
-                      <Eye size={15} />
+                      <MoreVertical size={16} />
                     </button>
-                    <Can permission={PERMISSIONS.CUSTOMER_UPDATE}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          setEditOpen(true);
-                        }}
-                        className="cursor-pointer rounded-lg bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100"
-                        title="Edit Customer"
-                      >
-                        <SquarePen size={15} />
-                      </button>
-                    </Can>
-                    <Can permission={PERMISSIONS.CUSTOMER_DELETE}>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!customer._id) return;
-                          const res = await Swal.fire({
-                            title: "Delete customer?",
-                            text: "This action cannot be undone.",
-                            icon: "warning",
-                            showCancelButton: true,
-                            confirmButtonText: "Delete",
-                            confirmButtonColor: "#dc2626",
-                          });
-                          if (!res.isConfirmed) return;
-                          try {
-                            await handleDeleteCustomer(customer._id);
-                            await fetchCustomers();
-                            Swal.fire({
-                              title: "Deleted",
-                              text: "Customer removed.",
-                              icon: "success",
-                              timer: 1400,
-                              showConfirmButton: false,
-                            });
-                          } catch (err: any) {
-                            Swal.fire(
-                              "Error",
-                              err?.response?.data?.message ?? "Failed to delete customer.",
-                              "error",
-                            );
-                          }
-                        }}
-                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
-                        title="Delete Customer"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </Can>
+
+                    {actionMenuCustomerId === customerKey && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-30"
+                          onClick={() => setActionMenuCustomerId(null)}
+                        />
+                        <div className="absolute right-0 top-full z-40 mt-1.5 w-38 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActionMenuCustomerId(null);
+                              setDetailsCustomer(customer);
+                              setDetailsOpen(true);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                          >
+                            <Eye size={14} className="text-slate-400" />
+                            <span>View Details</span>
+                          </button>
+                          <Can permission={PERMISSIONS.CUSTOMER_UPDATE}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActionMenuCustomerId(null);
+                                setSelectedCustomer(customer);
+                                setEditOpen(true);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                            >
+                              <SquarePen size={14} className="text-slate-400" />
+                              <span>Edit Customer</span>
+                            </button>
+                          </Can>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActionMenuCustomerId(null);
+                              setSelectedCustomer(customer);
+                              setOpenLedgerModal(true);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                          >
+                            <FileSpreadsheet size={14} className="text-slate-400" />
+                            <span>View Ledger</span>
+                          </button>
+                          <Can permission={PERMISSIONS.CUSTOMER_DELETE}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActionMenuCustomerId(null);
+                                if (customer._id) void handleDelete(customer._id);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer"
+                            >
+                              <Trash2 size={14} className="text-rose-500" />
+                              <span>Delete Customer</span>
+                            </button>
+                          </Can>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

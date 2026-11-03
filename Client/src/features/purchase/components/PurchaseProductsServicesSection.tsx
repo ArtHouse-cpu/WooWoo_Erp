@@ -615,7 +615,7 @@ export default function ProductsServicesSection({
               : "Search or add products to start creating purchase."}
           </div>
         ) : (
-          items.map((item) => {
+          items.map((item, index) => {
             const lineTotal =
               item.qty * item.unitPrice - Number(item.discount || 0);
             const imageKey = `row-${item.id}`;
@@ -626,20 +626,26 @@ export default function ProductsServicesSection({
                 className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
               >
                 <div className="flex items-start gap-3">
-                  {hasImage ? (
-                    <img
-                      src={item.image}
-                      alt={item.productName}
-                      onError={() => handleImageError(imageKey)}
-                      className="h-12 w-12 shrink-0 rounded-lg border border-gray-100 object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-100 bg-gradient-to-br from-blue-50 to-indigo-50 text-sm font-bold uppercase text-blue-500">
-                      {(item.productName || "P").charAt(0)}
-                    </div>
-                  )}
+                  <div className="relative shrink-0">
+                    {hasImage ? (
+                      <img
+                        src={item.image}
+                        alt={item.productName}
+                        onError={() => handleImageError(imageKey)}
+                        className="h-12 w-12 rounded-lg border border-gray-100 object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-gray-100 bg-gradient-to-br from-blue-50 to-indigo-50 text-sm font-bold uppercase text-blue-500">
+                        {(item.productName || "P").charAt(0)}
+                      </div>
+                    )}
+                    <span className="absolute -top-1.5 -left-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-800 px-1 text-[9px] font-bold text-white shadow-xs">
+                      {index + 1}
+                    </span>
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold leading-snug text-gray-900">
+                      <span className="mr-1.5 font-bold text-slate-500">#{index + 1}</span>
                       {item.productName}
                     </p>
                     <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-gray-600">
@@ -722,6 +728,7 @@ export default function ProductsServicesSection({
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
             <tr>
+              <th className="w-14 px-3 py-2 text-center font-bold">S.No.</th>
               <th className="px-3 py-2 text-left">Product Name</th>
               <th className="px-3 py-2 text-center">Qty</th>
               <th className="px-3 py-2 text-right">Purchase Price</th>
@@ -736,7 +743,7 @@ export default function ProductsServicesSection({
             {items.length === 0 ? (
               <tr>
                 <td
-                  colSpan={readOnly ? 5 : 6}
+                  colSpan={readOnly ? 6 : 7}
                   className="px-3 py-10 text-center text-gray-500"
                 >
                   {readOnly
@@ -745,7 +752,7 @@ export default function ProductsServicesSection({
                 </td>
               </tr>
             ) : (
-              items.map((item) => {
+              items.map((item, index) => {
                 const lineTotal =
                   item.qty * item.unitPrice - Number(item.discount || 0);
                 const imageKey = `row-${item.id}`;
@@ -753,6 +760,9 @@ export default function ProductsServicesSection({
                   Boolean(item.image) && !imageErrors[imageKey];
                 return (
                   <tr key={item.id} className="border-t border-gray-100">
+                    <td className="w-12 px-3 py-2 text-center text-xs font-semibold text-gray-500">
+                      {index + 1}
+                    </td>
                     <td className="px-3 py-2 font-medium text-gray-800">
                       <div className="flex items-center gap-3">
                         {hasImage ? (

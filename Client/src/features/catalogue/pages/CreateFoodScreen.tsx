@@ -15,6 +15,8 @@ import {
   Trash2,
   X,
   UtensilsCrossed,
+  Eye,
+  MoreVertical,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import AddFoodModal, {
@@ -42,6 +44,8 @@ export default function CreateFoodScreen() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [actionMenuFoodId, setActionMenuFoodId] = useState<string | null>(null);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   const filteredFoods = useMemo(() => {
     if (!searchQuery.trim()) return foods;
@@ -372,101 +376,182 @@ export default function CreateFoodScreen() {
             No foods found
           </div>
         ) : (
-          filteredFoods.map((food, idx) => {
-            const available = String(food.status || "Active") !== "Inactive";
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+            {filteredFoods.map((food, idx) => {
+              const available = String(food.status || "Active") !== "Inactive";
+              const isVeg = food.isVeg !== false;
+              const foodId = food._id || String(idx);
+              const isMenuOpen = actionMenuFoodId === foodId;
+              const img = food.imageUrl && !imageErrors[foodId] ? food.imageUrl : null;
 
-            return (
-              <div
-                key={food._id || idx}
-                onClick={() => setViewFood(food)}
-                className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-bold text-slate-900">
-                        {food.name}
-                      </span>
+              return (
+                <div
+                  key={foodId}
+                  onClick={() => setViewFood(food)}
+                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs transition hover:border-slate-300 hover:shadow-md cursor-pointer active:scale-[0.98]"
+                >
+                  {/* Image Container */}
+                  <div className="relative aspect-4/3 w-full bg-slate-100 overflow-hidden">
+                    {img ? (
+                      <img
+                        src={img}
+                        alt={food.name || "Food"}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={() =>
+                          setImageErrors((prev) => ({
+                            ...prev,
+                            [foodId]: true,
+                          }))
+                        }
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-50 to-orange-50 text-orange-400">
+                        <UtensilsCrossed size={28} className="stroke-[1.5]" />
+                      </div>
+                    )}
+
+                    {/* Top-Left: Veg / Non-Veg Tag */}
+                    <div className="absolute top-2 left-2 z-10">
                       <span
-                        className={`inline-flex rounded-full px-2 py-0.2 text-[10px] font-semibold ${
-                          food.isVeg !== false
-                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60"
-                            : "bg-orange-50 text-orange-700 ring-1 ring-orange-200/60"
+                        className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-bold shadow-xs backdrop-blur-xs ${
+                          isVeg
+                            ? "bg-emerald-600 text-white"
+                            : "bg-orange-600 text-white"
                         }`}
                       >
-                        {food.isVeg !== false ? "Veg" : "Non-Veg"}
+                        {isVeg ? "Veg" : "Non-Veg"}
                       </span>
-                      {food.isPackaged && (
-                        <span className="inline-flex rounded-full bg-orange-100 px-2 py-0.2 text-[10px] font-semibold text-orange-700">
+                    </div>
+
+                    {/* Top-Right: Available / Not Available Status */}
+                    <div className="absolute top-2 right-2 z-10">
+                      <span
+                        className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-bold shadow-xs backdrop-blur-xs ${
+                          available
+                            ? "bg-emerald-600/90 text-white"
+                            : "bg-rose-600/90 text-white"
+                        }`}
+                      >
+                        {available ? "Available" : "Not Available"}
+                      </span>
+                    </div>
+
+                    {/* Bottom-Left: Packaged Badge */}
+                    {food.isPackaged && (
+                      <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
+                        <span className="inline-flex items-center rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-xs">
                           Packaged
                         </span>
-                      )}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span className="font-medium text-slate-600">
-                        {food.category || "General"}
-                      </span>
-                      {food.unit && (
-                        <>
-                          <span>•</span>
-                          <span>Unit: {food.unit}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                      available
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-rose-100 text-rose-700"
-                    }`}
-                  >
-                    {available ? "Available" : "Not Available"}
-                  </span>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                  <div>
-                    <span className="block text-[10px] font-medium uppercase text-slate-400">
-                      Price
-                    </span>
-                    <span className="text-sm font-bold text-slate-900">
-                      ₹{Number(food.price || 0).toLocaleString("en-IN")}
-                    </span>
+                      </div>
+                    )}
                   </div>
 
-                  <div
-                    className="flex items-center gap-1.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Can permission={PERMISSIONS.FOOD_UPDATE}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditing(food);
-                          setOpenModal(true);
-                        }}
-                        className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"
-                        title="Edit food"
+                  {/* Content Area */}
+                  <div className="flex flex-1 flex-col justify-between p-2.5 sm:p-3">
+                    <div>
+                      {/* Category & Unit */}
+                      <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-medium text-slate-500">
+                        <span className="truncate">
+                          {food.category || "General"}
+                        </span>
+                        {food.unit && (
+                          <span className="shrink-0 text-slate-400 truncate">
+                            {food.unit}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Food Name */}
+                      <h4
+                        className="mt-1 min-h-[2rem] text-xs font-bold leading-snug text-slate-900 line-clamp-2 transition group-hover:text-blue-600 sm:text-sm"
+                        title={food.name}
                       >
-                        <SquarePen size={15} />
-                      </button>
-                    </Can>
-                    <Can permission={PERMISSIONS.FOOD_DELETE}>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(food)}
-                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
-                        title="Delete food"
+                        {food.name}
+                      </h4>
+                    </div>
+
+                    {/* Footer: Price (left) + 3 Dots Menu (right corner bottom) */}
+                    <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block font-medium">Price</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900">
+                          ₹{Number(food.price || 0).toLocaleString("en-IN")}
+                        </span>
+                      </div>
+
+                      {/* 3 Dots Menu Button at right corner bottom */}
+                      <div
+                        className="relative shrink-0"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <Trash2 size={15} />
-                      </button>
-                    </Can>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActionMenuFoodId(isMenuOpen ? null : foodId)
+                          }
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition active:scale-95 cursor-pointer"
+                          aria-label="Food actions"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+
+                        {isMenuOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-30"
+                              onClick={() => setActionMenuFoodId(null)}
+                            />
+                            <div className="absolute right-0 bottom-full z-40 mb-1.5 w-36 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                              <Can permission={PERMISSIONS.FOOD_READ}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuFoodId(null);
+                                    setViewFood(food);
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                >
+                                  <Eye size={14} className="text-slate-400" />
+                                  <span>View Details</span>
+                                </button>
+                              </Can>
+                              <Can permission={PERMISSIONS.FOOD_UPDATE}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuFoodId(null);
+                                    setEditing(food);
+                                    setOpenModal(true);
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                >
+                                  <SquarePen size={14} className="text-slate-400" />
+                                  <span>Edit Food</span>
+                                </button>
+                              </Can>
+                              <Can permission={PERMISSIONS.FOOD_DELETE}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuFoodId(null);
+                                    void handleDelete(food);
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                >
+                                  <Trash2 size={14} className="text-rose-500" />
+                                  <span>Delete Food</span>
+                                </button>
+                              </Can>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
       {/* Food View Details Modal */}
@@ -505,6 +590,17 @@ export default function CreateFoodScreen() {
 
             {/* Modal Body */}
             <div className="overflow-y-auto p-5 space-y-4">
+              {/* Food Image preview */}
+              {viewFood.imageUrl ? (
+                <div className="relative aspect-16/9 w-full overflow-hidden rounded-2xl bg-slate-100 border border-slate-200/80">
+                  <img
+                    src={viewFood.imageUrl}
+                    alt={viewFood.name}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+
               <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -586,28 +682,46 @@ export default function CreateFoodScreen() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/50">
-              <button
-                type="button"
-                onClick={() => setViewFood(null)}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
-              >
-                Close
-              </button>
-              <Can permission={PERMISSIONS.FOOD_UPDATE}>
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              <Can permission={PERMISSIONS.FOOD_DELETE}>
                 <button
                   type="button"
                   onClick={() => {
                     const fd = viewFood;
                     setViewFood(null);
-                    setEditing(fd);
-                    setOpenModal(true);
+                    void handleDelete(fd);
                   }}
-                  className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/90 transition"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
                 >
-                  Edit Food
+                  <Trash2 size={14} />
+                  Delete
                 </button>
               </Can>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewFood(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Close
+                </button>
+                <Can permission={PERMISSIONS.FOOD_UPDATE}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const fd = viewFood;
+                      setViewFood(null);
+                      setEditing(fd);
+                      setOpenModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/90 transition cursor-pointer"
+                  >
+                    <SquarePen size={14} />
+                    Edit Food
+                  </button>
+                </Can>
+              </div>
             </div>
           </div>
         </div>
