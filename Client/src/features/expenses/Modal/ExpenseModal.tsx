@@ -353,7 +353,7 @@ function toForm(initial?: ExpenseModalValues | null) {
     paidByEmail: String(initial.paidBy?.m_staff_email ?? "").trim(),
     mode: initial.status === "Pending" ? "Due" : initial.mode || "",
     status: initial.status || "Paid",
-    date: initial.date || "",
+    date: initial.date ? (initial.date.includes("T") ? initial.date.split("T")[0] : initial.date.slice(0, 10)) : "",
     receipt: null,
     receiptUrl: initial.receiptUrl || "",
   };

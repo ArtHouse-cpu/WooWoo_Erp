@@ -24,6 +24,8 @@ import {
   Check,
   X,
   CreditCard,
+  Receipt,
+  Tag,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
@@ -769,6 +771,28 @@ export default function ExpenseScreen() {
   const [fromDate, setFromDate] = useState(() => rangeForPreset("month").from);
   const [toDate, setToDate] = useState(() => rangeForPreset("month").to);
 
+  const mobileDateDropdownRef = useRef<HTMLDivElement | null>(null);
+  const mobileSearchRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        mobileDateDropdownRef.current &&
+        !mobileDateDropdownRef.current.contains(e.target as Node)
+      ) {
+        setShowDateDropdown(false);
+      }
+      if (
+        mobileSearchRef.current &&
+        !mobileSearchRef.current.contains(e.target as Node)
+      ) {
+        setShowStatusDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Sorting
   const [sortBy, setSortBy] = useState<string>("date-desc");
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -795,6 +819,9 @@ export default function ExpenseScreen() {
   const [receivePaymentOpen, setReceivePaymentOpen] = useState(false);
   const [receivePaymentTarget, setReceivePaymentTarget] = useState<ExpensePaymentTarget | null>(null);
   // const [selectedActionRow, setSelectedActionRow] = useState<ExpenseRow | null>(null);
+
+  // Mobile View Details Modal
+  const [viewingMobileExpense, setViewingMobileExpense] = useState<ExpenseRow | null>(null);
 
   const actionMenuRef = useRef<HTMLDivElement>(null);
 
@@ -1160,25 +1187,74 @@ export default function ExpenseScreen() {
   return (
     <div className="min-w-0 space-y-5 p-2 sm:p-4 md:p-6 bg-[#fcfdfe] min-h-screen text-slate-800">
       {/* ── 1. Top Header ────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
           Expenses
         </h1>
 
-        <Can permission={PERMISSIONS.EXPENSE_CREATE}>
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-all cursor-pointer active:scale-98 sm:text-sm"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Expense</span>
-          </button>
-        </Can>
+        <div className="flex items-center gap-2">
+          {/* Mobile Date Filter Button adjacent to +Add button (Mobile only) */}
+          <div className="relative block md:hidden" ref={mobileDateDropdownRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowDateDropdown((prev) => !prev);
+                setShowStatusDropdown(false);
+              }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition cursor-pointer"
+            >
+              <Calendar className="h-3.5 w-3.5 text-slate-500" />
+              <span>
+                {DATE_PRESET_OPTIONS.find((p) => p.value === datePreset)?.label || "This Month"}
+              </span>
+              <ChevronDown className="h-3 w-3 text-slate-400" />
+            </button>
+
+            {showDateDropdown && (
+              <div className="absolute right-0 top-full z-50 mt-1.5 w-44 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl">
+                {DATE_PRESET_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      const preset = opt.value as DatePreset;
+                      setDatePreset(preset);
+                      if (preset !== "custom") {
+                        const range = rangeForPreset(preset);
+                        setFromDate(range.from);
+                        setToDate(range.to);
+                      }
+                      setShowDateDropdown(false);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-left transition-colors ${
+                      datePreset === opt.value
+                        ? "bg-blue-50 text-blue-600 font-semibold"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {opt.label}
+                    {datePreset === opt.value && <Check className="h-3.5 w-3.5 text-blue-600" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Can permission={PERMISSIONS.EXPENSE_CREATE}>
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 sm:px-4 sm:py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-700 transition-all cursor-pointer active:scale-98 sm:text-sm"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add</span>
+            </button>
+          </Can>
+        </div>
       </div>
 
-      {/* ── 3. Category / Segment Tabs Bar ─────────────────────────── */}
-      <div className="hide-scrollbar flex items-center gap-2 overflow-x-auto border-b border-slate-200 pb-2.5 pt-2">
+      {/* ── 3. Category / Segment Tabs Bar (Desktop only) ─────────── */}
+      <div className="hidden md:flex hide-scrollbar items-center gap-2 overflow-x-auto border-b border-slate-200 pb-2.5 pt-2">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = selectedTab.toLowerCase() === tab.id.toLowerCase();
@@ -1210,8 +1286,301 @@ export default function ExpenseScreen() {
         })}
       </div>
 
-      {/* ── 4. Toolbar: Search, Date Filter, Status Filter, Export ──── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* ── Mobile UI Flow: Horizontally Scrolling Cards -> Search Bar with Payment Modes -> Categories -> Cards ── */}
+      <div className="block md:hidden space-y-3">
+        {/* 1. Horizontally Scrolling Analytics Cards: Pie Chart Card ⟷ Expense Status Card */}
+        <div className="flex overflow-x-auto gap-3 snap-x snap-mandatory hide-scrollbar pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {/* Card 1: Pie / Donut Chart with proper mention of all categories */}
+          <div className="w-[88vw] shrink-0 snap-center rounded-2xl border border-slate-100 bg-white p-4 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs sm:text-sm">
+                  <Sparkles className="h-4 w-4 text-blue-600" />
+                  <span>Expense Breakdown</span>
+                </div>
+                <span className="text-[11px] font-bold text-slate-900 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full">
+                  Total ₹{totalExpenseAmount.toLocaleString("en-IN")}
+                </span>
+              </div>
+
+              <div className="mt-3 flex items-center gap-3">
+                {/* SVG Donut Chart */}
+                <div className="relative h-24 w-24 shrink-0 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="38"
+                      stroke="#f1f5f9"
+                      strokeWidth="13"
+                      fill="transparent"
+                    />
+                    {(() => {
+                      let cumulativePercent = 0;
+                      const circumference = 2 * Math.PI * 38;
+                      return breakdownData.map((slice) => {
+                        const strokeDasharray = `${(slice.pct / 100) * circumference} ${circumference}`;
+                        const strokeDashoffset = -((cumulativePercent / 100) * circumference);
+                        cumulativePercent += slice.pct;
+                        return (
+                          <circle
+                            key={slice.name}
+                            cx="50"
+                            cy="50"
+                            r="38"
+                            stroke={slice.color}
+                            strokeWidth="13"
+                            strokeDasharray={strokeDasharray}
+                            strokeDashoffset={strokeDashoffset}
+                            fill="transparent"
+                            className="transition-all duration-500"
+                          />
+                        );
+                      });
+                    })()}
+                  </svg>
+                  {/* Center Text */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-1">
+                    <span className="text-[11px] font-bold text-slate-900 leading-tight">
+                      ₹{totalExpenseAmount >= 1000000 ? `${(totalExpenseAmount / 1000).toFixed(0)}k` : totalExpenseAmount.toLocaleString("en-IN")}
+                    </span>
+                    <span className="text-[8px] text-slate-400 font-medium">Total</span>
+                  </div>
+                </div>
+
+                {/* Proper breakdown mention: color dot, category name, amount & percentage */}
+                <div className="flex-1 min-w-0 space-y-1.5 max-h-32 overflow-y-auto pr-0.5">
+                  {breakdownData.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 py-3 text-center">No expenses for this filter.</p>
+                  ) : (
+                    breakdownData.map((slice) => (
+                      <div
+                        key={slice.name}
+                        className="flex items-center justify-between text-[11px] py-0.5 px-1 rounded-md bg-slate-50/70"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span
+                            className="h-2 w-2 rounded-full shrink-0"
+                            style={{ backgroundColor: slice.color }}
+                          />
+                          <span className="font-semibold text-slate-700 truncate">{slice.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-bold text-slate-900">
+                            ₹{slice.amount.toLocaleString("en-IN")}
+                          </span>
+                          <span className="text-slate-400 font-medium w-7 text-right">
+                            {slice.pct}%
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+              <span>● Expense Breakdown</span>
+              <span className="flex items-center gap-0.5 font-medium text-blue-600">
+                Swipe for status →
+              </span>
+            </div>
+          </div>
+
+          {/* Card 2: Horizontally scrollable Expense Status Card */}
+          <div className="w-[88vw] shrink-0 snap-center rounded-2xl border border-slate-100 bg-white p-4 shadow-xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs sm:text-sm">
+                  <CreditCard className="h-4 w-4 text-emerald-600" />
+                  <span>Expense Status</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-semibold">
+                  <span className="flex items-center gap-1 text-emerald-700">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    Paid
+                  </span>
+                  <span className="flex items-center gap-1 text-rose-600">
+                    <span className="h-2 w-2 rounded-full bg-rose-400" />
+                    Pending
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-2.5 flex items-baseline justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Amount</span>
+                  <span className="text-xl font-bold text-slate-900 tracking-tight">
+                    ₹{totalExpenseAmount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                  {totalExpenseAmount > 0 ? "100%" : "0%"}
+                </span>
+              </div>
+
+              {/* Status Progress Bar */}
+              <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-100 flex p-0.5">
+                <div
+                  style={{ width: `${paidPercentage}%` }}
+                  className="h-full bg-emerald-500 transition-all duration-300 rounded-full"
+                />
+                {pendingPercentage > 0 && (
+                  <div
+                    style={{ width: `${pendingPercentage}%` }}
+                    className="h-full bg-rose-400 transition-all duration-300 rounded-full -ml-1"
+                  />
+                )}
+              </div>
+
+              {/* Paid vs Pending Breakdown Tiles */}
+              <div className="mt-2.5 grid grid-cols-2 gap-2 text-center">
+                <div className="rounded-xl bg-emerald-50/70 p-2 border border-emerald-100/70">
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-emerald-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span>Paid ({paidPercentage}%)</span>
+                  </div>
+                  <div className="mt-0.5 text-sm font-bold text-emerald-900">
+                    ₹{paidExpenseAmount.toLocaleString("en-IN")}
+                  </div>
+                  <div className="text-[10px] text-emerald-600/80 mt-0.5">
+                    {paidCount} expense(s)
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-rose-50/70 p-2 border border-rose-100/70">
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-semibold text-rose-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                    <span>Pending ({pendingPercentage}%)</span>
+                  </div>
+                  <div className="mt-0.5 text-sm font-bold text-rose-900">
+                    ₹{pendingExpenseAmount.toLocaleString("en-IN")}
+                  </div>
+                  <div className="text-[10px] text-rose-600/80 mt-0.5">
+                    {pendingCount} expense(s)
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+              <span className="flex items-center gap-0.5 font-medium text-slate-500">
+                ← Swipe for pie chart
+              </span>
+              <span>● Status Details</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Search Bar with Payment Modes below the charts */}
+        <div ref={mobileSearchRef} className="relative flex items-center rounded-full border border-slate-200/90 bg-white shadow-xs px-2.5 py-1">
+          {/* Search Input */}
+          <div className="flex flex-1 items-center gap-2 min-w-0 pl-1 pr-2">
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search expenses..."
+              className="w-full bg-transparent text-xs text-slate-800 placeholder:text-slate-400 outline-none"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="text-slate-400 hover:text-slate-600 shrink-0 p-0.5"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="h-4 w-px bg-slate-200 shrink-0" />
+
+          {/* Payment Modes Filter Trigger */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setShowStatusDropdown((prev) => !prev);
+                setShowDateDropdown(false);
+              }}
+              className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 text-xs font-semibold text-slate-700 hover:text-slate-900 cursor-pointer whitespace-nowrap"
+            >
+              <CreditCard className="h-3.5 w-3.5 text-slate-500" />
+              <span className="max-w-[90px] truncate">
+                {statusFilter === "All" ? "All Payments" : statusFilter}
+              </span>
+              <ChevronDown className="h-3 w-3 text-slate-400" />
+            </button>
+
+            {showStatusDropdown && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-40 rounded-xl border border-slate-100 bg-white p-1.5 shadow-xl">
+                {["All", "Paid", "Pending"].map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => {
+                      setStatusFilter(st as any);
+                      setShowStatusDropdown(false);
+                      setCurrentPage(1);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-left transition-colors ${
+                      statusFilter === st
+                        ? "bg-blue-50 text-blue-600 font-semibold"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {st === "All" ? "All Payments" : st}
+                    {statusFilter === st && <Check className="h-3.5 w-3.5 text-blue-600" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 3. Categories / Segment Tabs (all, store, cafe, etc.) below the search bar */}
+        <div className="hide-scrollbar flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = selectedTab.toLowerCase() === tab.id.toLowerCase();
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setSelectedTab(tab.id);
+                  setCurrentPage(1);
+                }}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer shrink-0 ${
+                  isActive
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{tab.label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    isActive ? "bg-white text-blue-600" : "bg-slate-200 text-slate-600"
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── 4. Toolbar: Search, Date Filter, Status Filter, Export (Desktop only) ──── */}
+      <div className="hidden md:flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Search */}
         <div className="relative w-full sm:max-w-md">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -1341,8 +1710,8 @@ export default function ExpenseScreen() {
       </div>
 
 
-      {/* ── 2. Top Analytics Cards Grid (Donut & Status Cards) ───── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* ── 2. Top Analytics Cards Grid (Donut & Status Cards) (Desktop only) ───── */}
+      <div className="hidden md:grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Card 1: Expense Breakdown Donut & Legend Table */}
         <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs flex flex-col justify-between">
           <div className="flex items-center gap-1.5 text-slate-900 font-bold text-sm">
@@ -1543,7 +1912,8 @@ export default function ExpenseScreen() {
               return (
                 <div
                   key={row._id}
-                  className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs"
+                  onClick={() => setViewingMobileExpense(row)}
+                  className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs cursor-pointer active:scale-[0.99] transition hover:border-slate-300"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -1610,13 +1980,13 @@ export default function ExpenseScreen() {
                         {row.paidTo ? ` • ${row.paidTo}` : ""}
                       </span>
                     </div>
-                    <div className="relative shrink-0">
+                    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         onClick={() =>
                           setActionMenuRowId(isMenuOpen ? null : row._id)
                         }
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer"
                         aria-label="Expense actions"
                       >
                         <MoreHorizontal className="h-4 w-4" />
@@ -1630,8 +2000,11 @@ export default function ExpenseScreen() {
                             <Can permission={PERMISSIONS.EXPENSE_UPDATE}>
                               <button
                                 type="button"
-                                onClick={() => openReceivePaymentModal(row)}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50"
+                                onClick={() => {
+                                  setActionMenuRowId(null);
+                                  openReceivePaymentModal(row);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 cursor-pointer"
                               >
                                 <IndianRupee className="h-3.5 w-3.5" />
                                 <span>Receive Payment</span>
@@ -1641,8 +2014,11 @@ export default function ExpenseScreen() {
                           <Can permission={PERMISSIONS.EXPENSE_READ}>
                             <button
                               type="button"
-                              onClick={() => openViewModal(row)}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                              onClick={() => {
+                                setActionMenuRowId(null);
+                                setViewingMobileExpense(row);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
                             >
                               <Eye className="h-3.5 w-3.5 text-slate-400" />
                               <span>View Details</span>
@@ -1651,8 +2027,11 @@ export default function ExpenseScreen() {
                           <Can permission={PERMISSIONS.EXPENSE_UPDATE}>
                             <button
                               type="button"
-                              onClick={() => openEditModal(row)}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                              onClick={() => {
+                                setActionMenuRowId(null);
+                                openEditModal(row);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
                             >
                               <SquarePen className="h-3.5 w-3.5 text-slate-400" />
                               <span>Edit Expense</span>
@@ -1661,8 +2040,11 @@ export default function ExpenseScreen() {
                           <Can permission={PERMISSIONS.EXPENSE_DELETE}>
                             <button
                               type="button"
-                              onClick={() => handleDeleteExpense(row)}
-                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                              onClick={() => {
+                                setActionMenuRowId(null);
+                                handleDeleteExpense(row);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer"
                             >
                               <Trash2 className="h-3.5 w-3.5 text-rose-500" />
                               <span>Delete Expense</span>
@@ -1914,6 +2296,259 @@ export default function ExpenseScreen() {
           </div>
         </div>
       </div>
+
+      {/* ── Mobile Expense View Details Modal ────────────────────────────── */}
+      {viewingMobileExpense && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setViewingMobileExpense(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-white shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <Receipt size={18} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Expense Details
+                  </h3>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="font-mono text-xs font-semibold text-slate-500">
+                      {viewingMobileExpense.expenseCode}
+                    </span>
+                    <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.2 text-[10px] font-semibold text-slate-600">
+                      {viewingMobileExpense.segment || "General"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingMobileExpense(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-y-auto p-4 sm:p-5 space-y-4">
+              {/* Receipt Image Preview Banner if available */}
+              {viewingMobileExpense.receiptUrl && (
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50 group">
+                  <img
+                    src={viewingMobileExpense.receiptUrl}
+                    alt="Receipt"
+                    className="max-h-48 w-full object-contain bg-slate-900/5"
+                  />
+                  <a
+                    href={viewingMobileExpense.receiptUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="absolute bottom-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-lg bg-black/60 backdrop-blur-md px-2.5 py-1 text-xs font-medium text-white shadow-xs hover:bg-black/80 transition"
+                  >
+                    <Eye size={13} />
+                    <span>View Receipt</span>
+                  </a>
+                </div>
+              )}
+
+              {/* Amount & Status Hero Card */}
+              <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50 to-blue-50/30 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Total Amount
+                    </span>
+                    <div className="mt-0.5 text-2xl font-black text-slate-900">
+                      ₹
+                      {viewingMobileExpense.amount.toLocaleString("en-IN", {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })}
+                    </div>
+                    {viewingMobileExpense.title && (
+                      <h4 className="mt-1 font-semibold text-slate-800 text-sm">
+                        {viewingMobileExpense.title}
+                      </h4>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+                        viewingMobileExpense.status === "Paid"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : viewingMobileExpense.status === "Pending"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          viewingMobileExpense.status === "Paid"
+                            ? "bg-emerald-500"
+                            : viewingMobileExpense.status === "Pending"
+                              ? "bg-amber-500"
+                              : "bg-slate-400"
+                        }`}
+                      />
+                      {viewingMobileExpense.status}
+                    </span>
+                    {viewingMobileExpense.dueAmount > 0 && (
+                      <span className="inline-flex rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                        Due: ₹{viewingMobileExpense.dueAmount.toLocaleString("en-IN")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sub-pills: Segment, Category, Mode, Date */}
+                <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-200/60 pt-3 text-xs">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 font-semibold text-slate-700 border border-slate-200/70 shadow-2xs">
+                    <Tag size={12} className="text-slate-400" />
+                    {viewingMobileExpense.category || "General"}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 font-semibold text-slate-700 border border-slate-200/70 shadow-2xs">
+                    <CreditCard size={12} className="text-slate-400" />
+                    {viewingMobileExpense.mode || "Payment Mode"}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 font-semibold text-slate-700 border border-slate-200/70 shadow-2xs">
+                    <Calendar size={12} className="text-slate-400" />
+                    {formatDisplayDate(viewingMobileExpense.date)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Breakdown Details List */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Paid To (Vendor)</span>
+                  <span className="font-semibold text-slate-800 text-right">
+                    {viewingMobileExpense.paidTo || "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Paid By (Staff)</span>
+                  <span className="font-semibold text-slate-800 text-right">
+                    {viewingMobileExpense.paidBy?.m_staff_name || "—"}
+                    {viewingMobileExpense.paidBy?.m_staff_id
+                      ? ` (${viewingMobileExpense.paidBy.m_staff_id})`
+                      : ""}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Segment</span>
+                  <span className="font-semibold text-slate-800">
+                    {viewingMobileExpense.segment || "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Category</span>
+                  <span className="font-semibold text-slate-800">
+                    {viewingMobileExpense.category || "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Payment Mode</span>
+                  <span className="font-semibold text-slate-800">
+                    {viewingMobileExpense.mode || "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Date</span>
+                  <span className="font-semibold text-slate-800">
+                    {formatDisplayDate(viewingMobileExpense.date)}
+                  </span>
+                </div>
+                {(viewingMobileExpense.addedBy || viewingMobileExpense.createdBy) && (
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Added By</span>
+                    <span className="font-semibold text-slate-800">
+                      {viewingMobileExpense.addedBy || viewingMobileExpense.createdBy}
+                    </span>
+                  </div>
+                )}
+                {(viewingMobileExpense.notes || viewingMobileExpense.description) && (
+                  <div className="pt-1">
+                    <span className="text-slate-500 block mb-1">Notes / Description</span>
+                    <p className="rounded-xl bg-slate-50 p-2.5 text-slate-700 leading-relaxed">
+                      {viewingMobileExpense.notes || viewingMobileExpense.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer with Actions: Delete, Close, Receive Payment (if due), Edit */}
+            <div className="flex items-center justify-between border-t border-slate-100 px-4 sm:px-5 py-3 bg-slate-50/70 shrink-0 gap-2">
+              {/* Delete Button */}
+              <Can permission={PERMISSIONS.EXPENSE_DELETE}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const row = viewingMobileExpense;
+                    setViewingMobileExpense(null);
+                    handleDeleteExpense(row);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+                >
+                  <Trash2 size={14} />
+                  <span>Delete</span>
+                </button>
+              </Can>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingMobileExpense(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Close
+                </button>
+
+                {/* If Pending & dueAmount > 0: Receive Payment */}
+                {viewingMobileExpense.status === "Pending" && viewingMobileExpense.dueAmount > 0 && (
+                  <Can permission={PERMISSIONS.EXPENSE_UPDATE}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const row = viewingMobileExpense;
+                        setViewingMobileExpense(null);
+                        openReceivePaymentModal(row);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-600 transition cursor-pointer shadow-xs"
+                    >
+                      <IndianRupee size={14} />
+                      <span>Receive</span>
+                    </button>
+                  </Can>
+                )}
+
+                {/* Edit Button */}
+                <Can permission={PERMISSIONS.EXPENSE_UPDATE}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const row = viewingMobileExpense;
+                      setViewingMobileExpense(null);
+                      openEditModal(row);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer shadow-xs"
+                  >
+                    <SquarePen size={14} />
+                    <span>Edit Expense</span>
+                  </button>
+                </Can>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 7. Existing Modals & Workflows (100% Preserved) ─────────── */}
       <ExpenseModal

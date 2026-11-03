@@ -1282,9 +1282,7 @@ export default function CspScreen() {
               </svg>
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Manage your CSP partners, track their sales, products and earnings.
-          </p>
+        
         </div>
 
         <div className="flex items-center gap-3 self-start sm:self-auto">

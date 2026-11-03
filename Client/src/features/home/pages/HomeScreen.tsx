@@ -9,12 +9,14 @@ import {
   ChevronRight,
   Crown,
   Ellipsis,
+  Eye,
   FileText,
   Filter,
   MapPin,
   Monitor,
   MoreVertical,
   Package,
+  Phone,
   Search,
   ShoppingCart,
   SquarePen,
@@ -30,12 +32,19 @@ import {
 import {
   customerPayloadToFormData,
   handleCreateCustomer,
+  handleUpdateCustomer,
+  handleDeleteCustomer,
   handleDeleteInvoice,
   handleGetAllBookings,
   handleGetCategories,
   handleGetCustomers,
   handleGetDashboardSummary,
   handleGetFoods,
+  handleCreateFood,
+  handleUpdateFood,
+  handleDeleteFood,
+  foodPayloadToFormData,
+  type FoodPayload,
   handleGetInvoice,
   handleGetInvoices,
   handleGetMemberships,
@@ -66,6 +75,9 @@ import CreateProductModal from "@/features/sales/components/invoice/Modal/Create
 import AddSpaceModal, {
   type SpaceFormPayload,
 } from "@/features/catalogue/components/AddSpaceModal";
+import AddFoodModal, {
+  type FoodFormPayload,
+} from "@/features/catalogue/components/AddFoodModal";
 import CreatePosScreen, {
   INVOICE_SAVED_EVENT,
 } from "@/features/sales/pages/CreatePosScreen";
@@ -96,9 +108,9 @@ type TabKey =
   | "services"
   | "food";
 
-type DateFilter = "today" | "week" | "month" | "year" | "all";
+type DateFilter = "today" | "yesterday" | "week" | "month" | "year" | "all";
 
-type BillCategory = "Store" | "Space" | "Services" | "Food" | "Membership";
+type BillCategory = "Store" | "Space" | "Food" | "Membership";
 
 type RecentBill = {
   id: string;
@@ -159,7 +171,7 @@ const AVATAR_TONES = [
 const CATEGORY_PILL: Record<BillCategory, string> = {
   Store: "bg-blue-50 text-blue-700",
   Space: "bg-emerald-50 text-emerald-700",
-  Services: "bg-violet-50 text-violet-700",
+ 
   Food: "bg-rose-50 text-rose-700",
   Membership: "bg-indigo-50 text-indigo-700",
 };
@@ -172,12 +184,13 @@ const TABS: { key: TabKey; label: string; icon: LucideIcon }[] = [
   { key: "memberships", label: "Memberships", icon: Crown },
   { key: "products", label: "Products", icon: Package },
   { key: "spaces", label: "Spaces", icon: MapPin },
-  { key: "services", label: "Services", icon: Briefcase },
+
   { key: "food", label: "Food", icon: Utensils },
 ];
 
 const KPI_PERIOD_OPTIONS: { value: DashboardPeriod; label: string }[] = [
   { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
   { value: "this_month", label: "This Month" },
   { value: "last_month", label: "Last Month" },
   { value: "lifetime", label: "Lifetime" },
@@ -199,6 +212,18 @@ function kpiPeriodBounds(period: DashboardPeriod): {
   };
   const to = toYmd(today);
   if (period === "today") return { fromDate: to, toDate: to };
+  
+  if(period === "yesterday")
+    { 
+      const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+         const yesterdayDate = toYmd(yesterday);
+
+    return {
+      fromDate: yesterdayDate,
+      toDate: yesterdayDate,
+    };
+    }
   if (period === "this_month") {
     return {
       fromDate: toYmd(new Date(today.getFullYear(), today.getMonth(), 1)),
@@ -279,6 +304,16 @@ function inDateRange(date: Date | null, filter: DateFilter) {
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   if (filter === "today") return date >= start;
+
+  if (filter === "yesterday") {  
+   
+   const yesterdayStart = new Date(start);
+   yesterdayStart.setDate(yesterdayStart.getDate) - 1
+    return date >= yesterdayStart && date < start;
+  }
+    
+   
+
   if (filter === "week") {
     const day = start.getDay() || 7;
     start.setDate(start.getDate() - (day - 1));
@@ -314,7 +349,7 @@ function emptyRevenueBuckets(): Record<BillCategory, number> {
   return {
     Store: 0,
     Space: 0,
-    Services: 0,
+    
     Food: 0,
     Membership: 0,
   };
@@ -333,7 +368,7 @@ function categoryFromLine(rec: Record<string, unknown>): BillCategory {
   }
   const lineType = normalizeLineType(rawType);
   if (lineType === "space") return "Space";
-  if (lineType === "service") return "Services";
+
   if (lineType === "food") return "Food";
   return "Store";
 }
@@ -561,6 +596,17 @@ export default function HomeScreen() {
   const [editingSpace, setEditingSpace] = useState<any | null>(null);
   const [openSpaceModal, setOpenSpaceModal] = useState(false);
   const [spaceModalSaving, setSpaceModalSaving] = useState(false);
+  const [viewFood, setViewFood] = useState<any | null>(null);
+  const [editFood, setEditFood] = useState<any | null>(null);
+  const [showAddFoodModal, setShowAddFoodModal] = useState(false);
+  const [foodModalLoading, setFoodModalLoading] = useState(false);
+  const [actionMenuFoodId, setActionMenuFoodId] = useState<string | null>(null);
+  const [viewCustomer, setViewCustomer] = useState<any | null>(null);
+  const [editCustomer, setEditCustomer] = useState<any | null>(null);
+  const [showEditCustomerModal, setShowEditCustomerModal] = useState(false);
+  const [showViewCustomerModal, setShowViewCustomerModal] = useState(false);
+  const [customerModalLoading, setCustomerModalLoading] = useState(false);
+  const [actionMenuCustomerId, setActionMenuCustomerId] = useState<string | null>(null);
   const [tabLoading, setTabLoading] = useState(false);
   const [invoiceRefresh, setInvoiceRefresh] = useState(0);
 
@@ -586,7 +632,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     setPage(1);
-    setVisibleCount(tab === "products" || tab === "spaces" ? 6 : PAGE_SIZE);
+    setVisibleCount(tab === "products" || tab === "spaces" || tab === "food" ? 6 : PAGE_SIZE);
     if (tab !== "products") {
       setSelectedProductCategory("all");
     }
@@ -597,7 +643,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     setPage(1);
-    setVisibleCount(tab === "products" || tab === "spaces" ? 6 : PAGE_SIZE);
+    setVisibleCount(tab === "products" || tab === "spaces" || tab === "food" ? 6 : PAGE_SIZE);
   }, [selectedProductCategory, selectedSpaceType]);
 
   useEffect(() => {
@@ -701,6 +747,7 @@ export default function HomeScreen() {
                 );
           })(),
           createdAt: parseDate(c?.createdAt),
+          raw: c,
         })),
       );
     } catch {
@@ -996,13 +1043,31 @@ export default function HomeScreen() {
           if (!alive) return;
           setFoods(
             (Array.isArray(res?.foods) ? res.foods : []).map(
-              (f: Record<string, unknown>, i: number) => ({
-                id: String(f?._id ?? i),
-                title: String(f?.name || "Food"),
-                subtitle: String(f?.category || "Food"),
-                meta: String(f?.status || "Active"),
-                amount: formatMoney(Number(f?.price ?? 0)),
-              }),
+              (f: Record<string, unknown>, i: number) => {
+                const img =
+                  (typeof f?.imageUrl === "string" && f.imageUrl.trim()
+                    ? f.imageUrl.trim()
+                    : null) ||
+                  (Array.isArray(f?.images) &&
+                  f.images.length > 0 &&
+                  typeof f.images[0] === "string" &&
+                  f.images[0].trim()
+                    ? f.images[0].trim()
+                    : null) ||
+                  (typeof f?.image === "string" && f.image.trim()
+                    ? f.image.trim()
+                    : null) ||
+                  null;
+                return {
+                  id: String(f?._id ?? i),
+                  title: String(f?.name || "Food"),
+                  subtitle: String(f?.category || "Food"),
+                  meta: String(f?.status || "Active"),
+                  amount: formatMoney(Number(f?.price ?? 0)),
+                  imageUrl: img,
+                  raw: f,
+                };
+              },
             ),
           );
         }
@@ -1187,7 +1252,7 @@ export default function HomeScreen() {
     return filtered;
   }, [genericRows, search, dateFilter, tab, selectedProductCategory, selectedSpaceType]);
 
-  const pageSize = tab === "products" || tab === "spaces" ? 6 : PAGE_SIZE;
+  const pageSize = tab === "products" || tab === "spaces" || tab === "food" ? 6 : PAGE_SIZE;
   const tableTotal =
     tab === "bills"
       ? filteredBills.length
@@ -1578,6 +1643,154 @@ export default function HomeScreen() {
       );
     } catch (e) {
       console.error("Failed to refresh spaces:", e);
+    }
+  };
+
+  const refreshFoods = async () => {
+    try {
+      const res = await handleGetFoods();
+      setFoods(
+        (Array.isArray(res?.foods) ? res.foods : []).map(
+          (f: Record<string, unknown>, i: number) => {
+            const img =
+              (typeof f?.imageUrl === "string" && f.imageUrl.trim()
+                ? f.imageUrl.trim()
+                : null) ||
+              (Array.isArray(f?.images) &&
+              f.images.length > 0 &&
+              typeof f.images[0] === "string" &&
+              f.images[0].trim()
+                ? f.images[0].trim()
+                : null) ||
+              (typeof f?.image === "string" && f.image.trim()
+                ? f.image.trim()
+                : null) ||
+              null;
+            return {
+              id: String(f?._id ?? i),
+              title: String(f?.name || "Food"),
+              subtitle: String(f?.category || "Food"),
+              meta: String(f?.status || "Active"),
+              amount: formatMoney(Number(f?.price ?? 0)),
+              imageUrl: img,
+              raw: f,
+            };
+          },
+        ),
+      );
+    } catch {
+      /* ignore */
+    }
+  };
+
+  
+  
+  const handleDeleteCustomerDashboard = async (customerId: string, customerName?: string) => {
+    if (!customerId) return;
+    const result = await Swal.fire({
+      title: "Delete Customer?",
+      text: `Are you sure you want to delete ${customerName || "this customer"}? This action cannot be undone.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      await handleDeleteCustomer(customerId);
+      setCustomers((prev) => prev.filter((c) => c.id !== customerId && (c.raw as any)?._id !== customerId));
+      await Swal.fire({
+        icon: "success",
+        title: "Deleted",
+        text: "Customer deleted successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      await loadDashboardData();
+    } catch (err: any) {
+      await Swal.fire(
+        "Delete failed",
+        err?.response?.data?.message || "Could not delete customer.",
+        "error",
+      );
+    }
+  };
+
+  const handleDeleteFoodDashboard = async (foodId: string, foodName?: string) => {
+    if (!foodId) return;
+    const result = await Swal.fire({
+      title: "Delete Food Item?",
+      text: `Are you sure you want to delete ${foodName || "this food item"}? This action cannot be undone.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      await handleDeleteFood(foodId);
+      setViewFood(null);
+      setFoods((prev) => prev.filter((f) => f.id !== foodId && (f.raw as any)?._id !== foodId));
+      await Swal.fire({
+        icon: "success",
+        title: "Deleted",
+        text: "Food item deleted successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      await refreshFoods();
+    } catch (err: any) {
+      await Swal.fire(
+        "Delete failed",
+        err?.response?.data?.message || "Could not delete food item.",
+        "error",
+      );
+    }
+  };
+
+  const handleSaveFoodDashboard = async (
+    payload: FoodFormPayload,
+    imageFile: File | null,
+  ) => {
+    try {
+      setFoodModalLoading(true);
+      const formData = foodPayloadToFormData(payload, imageFile);
+      const foodId = editFood?._id || editFood?.id;
+
+      if (foodId) {
+        await handleUpdateFood(foodId, formData);
+        await Swal.fire({
+          icon: "success",
+          title: "Food updated",
+          timer: 1400,
+          showConfirmButton: false,
+        });
+      } else {
+        await handleCreateFood(formData);
+        await Swal.fire({
+          icon: "success",
+          title: "Food created",
+          timer: 1400,
+          showConfirmButton: false,
+        });
+      }
+
+      setShowAddFoodModal(false);
+      setEditFood(null);
+      await refreshFoods();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Save failed",
+        err?.response?.data?.message || "Could not save food.",
+        "error",
+      );
+    } finally {
+      setFoodModalLoading(false);
     }
   };
 
@@ -2869,7 +3082,7 @@ export default function HomeScreen() {
               </table>
             </div>
           </>
-        ) : tab === "products" || tab === "spaces" ? (
+        ) : tab === "products" || tab === "spaces" || tab === "food" ? (
           <>
             {tabLoading ? (
               <div className="grid grid-cols-2 gap-2.5 p-3 sm:gap-3.5 sm:p-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -2895,11 +3108,13 @@ export default function HomeScreen() {
                 <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
                   {tab === "products" ? (
                     <Package className="mx-auto h-8 w-8 text-slate-300" />
-                  ) : (
+                  ) : tab === "spaces" ? (
                     <MapPin className="mx-auto h-8 w-8 text-slate-300" />
+                  ) : (
+                    <Utensils className="mx-auto h-8 w-8 text-slate-300" />
                   )}
                   <h4 className="mt-3 text-sm font-semibold text-slate-800">
-                    No {tab} found
+                    No {tab === "products" ? "products" : tab === "spaces" ? "spaces" : "food items"} found
                   </h4>
                   <p className="mt-1 text-xs text-slate-500">
                     {search
@@ -2920,9 +3135,11 @@ export default function HomeScreen() {
                           setViewProduct(row);
                         } else if (tab === "spaces") {
                           setViewSpace(row);
+                        } else if (tab === "food") {
+                          setViewFood(row);
                         } else {
                           navigate(
-                            tabRoutes[tab] || "/spaces",
+                            tabRoutes[tab] || "/foods",
                           );
                         }
                       }}
@@ -2950,18 +3167,49 @@ export default function HomeScreen() {
                                 size={28}
                                 className="text-slate-300 transition group-hover:text-blue-400"
                               />
-                            ) : (
+                            ) : tab === "spaces" ? (
                               <MapPin
                                 size={28}
                                 className="text-slate-300 transition group-hover:text-blue-400"
+                              />
+                            ) : (
+                              <Utensils
+                                size={28}
+                                className="text-slate-300 transition group-hover:text-orange-400"
                               />
                             )}
                           </div>
                         )}
 
-                        {/* Top-Right Badge: Stock / Status */}
+                        {/* Top-Left: Veg/Non-Veg for food */}
+                        {tab === "food" ? (
+                          <div className="absolute top-2 left-2 z-10">
+                            <span
+                              className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-bold shadow-xs backdrop-blur-xs ${
+                                (row.raw as any)?.isVeg !== false
+                                  ? "bg-emerald-600 text-white"
+                                  : "bg-orange-600 text-white"
+                              }`}
+                            >
+                              {(row.raw as any)?.isVeg !== false ? "Veg" : "Non-Veg"}
+                            </span>
+                          </div>
+                        ) : null}
+
+                        {/* Top-Right Badge: Available/Status for food, products, spaces */}
                         <div className="absolute right-2 top-2">
-                          {tab === "products" ? (
+                          {tab === "food" ? (
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-xs backdrop-blur-xs ${
+                                (row.raw as any)?.status !== "Inactive"
+                                  ? "bg-emerald-500/90 text-white"
+                                  : "bg-rose-500/90 text-white"
+                              }`}
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                              {(row.raw as any)?.status !== "Inactive" ? "Available" : "Not Available"}
+                            </span>
+                          ) : tab === "products" ? (
                             <span
                               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-xs backdrop-blur-xs ${
                                 (row.stockQty ?? 0) > 0 ||
@@ -2991,8 +3239,7 @@ export default function HomeScreen() {
                             </span>
                           )}
                         </div>
-
-                        {/* Bottom-Left Badge: Day / Space Type / Barcode */}
+                        {/* Bottom-Left Badge: Day / Space Type / Barcode / Packaged */}
                         {tab === "spaces" && (row.day || row.spaceType) ? (
                           <div className="absolute bottom-2 left-2">
                             <span className="inline-flex items-center rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-xs">
@@ -3005,6 +3252,12 @@ export default function HomeScreen() {
                               {row.code}
                             </span>
                           </div>
+                        ) : tab === "food" && (row.raw as any)?.isPackaged ? (
+                          <div className="absolute bottom-2 left-2">
+                            <span className="inline-flex items-center rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-medium text-white backdrop-blur-xs">
+                              Packaged
+                            </span>
+                          </div>
                         ) : null}
                       </div>
 
@@ -3015,7 +3268,11 @@ export default function HomeScreen() {
                           <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-medium text-slate-500">
                             <span className="truncate">
                               {row.subtitle ||
-                                (tab === "products" ? "Product" : "Space")}
+                                (tab === "products"
+                                  ? "Product"
+                                  : tab === "spaces"
+                                    ? "Space"
+                                    : "Food")}
                             </span>
                             {tab === "spaces" && row.capacity ? (
                               <span className="shrink-0 text-slate-400">
@@ -3026,6 +3283,10 @@ export default function HomeScreen() {
                               row.stockQty > 0 ? (
                               <span className="shrink-0 text-slate-400">
                                 Stock: {row.stockQty}
+                              </span>
+                            ) : tab === "food" && (row.raw as any)?.unit ? (
+                              <span className="shrink-0 text-slate-400">
+                                {(row.raw as any).unit}
                               </span>
                             ) : null}
                           </div>
@@ -3039,7 +3300,7 @@ export default function HomeScreen() {
                           </h4>
                         </div>
 
-                        {/* Footer: Price + Arrow */}
+                        {/* Footer: Price + 3 dots (food) / arrow (products, spaces) */}
                         <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
                           <div>
                             <span className="text-xs font-extrabold text-slate-900 sm:text-sm">
@@ -3052,9 +3313,225 @@ export default function HomeScreen() {
                             ) : null}
                           </div>
 
-                          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-blue-600 group-hover:text-white">
-                            <ChevronRight size={13} />
+                          {tab === "food" ? (
+                            <div
+                              className="relative shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setActionMenuFoodId(actionMenuFoodId === row.id ? null : row.id)
+                                }
+                                className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition active:scale-95 cursor-pointer"
+                                aria-label="Food actions"
+                              >
+                                <MoreVertical size={14} />
+                              </button>
+
+                              {actionMenuFoodId === row.id && (
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-30"
+                                    onClick={() => setActionMenuFoodId(null)}
+                                  />
+                                  <div className="absolute right-0 bottom-full z-40 mb-1.5 w-36 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActionMenuFoodId(null);
+                                        setViewFood(row);
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                    >
+                                      <Eye size={14} className="text-slate-400" />
+                                      <span>View Details</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActionMenuFoodId(null);
+                                        const rawFood = (row.raw as any) || row;
+                                        setEditFood(rawFood);
+                                        setShowAddFoodModal(true);
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                    >
+                                      <SquarePen size={14} className="text-slate-400" />
+                                      <span>Edit Food</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActionMenuFoodId(null);
+                                        handleDeleteFoodDashboard(row.id, row.title);
+                                      }}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                    >
+                                      <Trash2 size={14} className="text-rose-500" />
+                                      <span>Delete Food</span>
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-blue-600 group-hover:text-white">
+                              <ChevronRight size={13} />
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        ) : tab === "customers" ? (
+          <>
+            {kpisLoading ? (
+              <div className="space-y-2.5 p-3 sm:p-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-20 animate-pulse rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-xs"
+                  />
+                ))}
+              </div>
+            ) : pageCustomers.length === 0 ? (
+              <div className="p-4 sm:p-6">
+                <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
+                  <Users className="mx-auto h-8 w-8 text-slate-300" />
+                  <h4 className="mt-3 text-sm font-semibold text-slate-800">
+                    No customers found
+                  </h4>
+                  <p className="mt-1 text-xs text-slate-500">
+                    No customers found for this search or filter.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2.5 p-3 sm:p-4">
+                {pageCustomers.map((c, index) => {
+                  const tone = AVATAR_TONES[index % AVATAR_TONES.length];
+                  const when = formatBillDate(c.createdAt);
+                  const rawCust = (c.raw as any) || c;
+                  const customerId = String(rawCust?._id || c.id);
+                  const phoneNum = String(rawCust?.mobile || c.phone || "").trim();
+                  const hasPhone = Boolean(phoneNum && phoneNum !== "—" && phoneNum !== "-");
+                  return (
+                    <div
+                      key={c.id || index}
+                      onClick={() => navigate("/customers")}
+                      className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-blue-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
+                    >
+                      {/* Left: Avatar + Name + Membership + Joined Date */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${tone.bg} ${tone.text}`}
+                        >
+                          {initials(c.name)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4
+                              className="text-sm font-bold text-slate-900 truncate transition group-hover:text-blue-600"
+                              title={c.name}
+                            >
+                              {c.name}
+                            </h4>
+                            <span className="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-200/70">
+                              {c.membership}
+                            </span>
+                          </div>
+                          {when.day && (
+                            <p className="mt-0.5 text-xs text-slate-400">
+                              Joined {when.day}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right: Phone Direct Contact + 3 Dots Action Menu */}
+                      <div
+                        className="flex items-center justify-between sm:justify-end gap-2 border-t border-slate-100 sm:border-0 pt-2.5 sm:pt-0 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {hasPhone ? (
+                          <a
+                            href={`tel:${phoneNum.replace(/[^0-9+]/g, "")}`}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
+                            title={`Call ${phoneNum}`}
+                          >
+                            <Phone size={13} className="shrink-0 fill-emerald-600/20 text-emerald-600" />
+                            <span>{phoneNum}</span>
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                            <Phone size={12} className="text-slate-300" />
+                            <span>No phone</span>
                           </span>
+                        )}
+
+                        {/* 3-Dots Action Menu */}
+                        <div className="relative shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setActionMenuCustomerId(
+                                actionMenuCustomerId === c.id ? null : c.id
+                              )
+                            }
+                            className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition active:scale-95 cursor-pointer"
+                            aria-label="Customer actions"
+                          >
+                            <MoreVertical size={16} />
+                          </button>
+
+                          {actionMenuCustomerId === c.id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => setActionMenuCustomerId(null)}
+                              />
+                              <div className="absolute right-0 top-full z-40 mt-1.5 w-38 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuCustomerId(null);
+                                    navigate("/customers");
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                >
+                                  <Eye size={14} className="text-slate-400" />
+                                  <span>View Details</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuCustomerId(null);
+                                    navigate("/customers");
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                                >
+                                  <SquarePen size={14} className="text-slate-400" />
+                                  <span>Edit Customer</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuCustomerId(null);
+                                    handleDeleteCustomerDashboard(customerId, c.name);
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                >
+                                  <Trash2 size={14} className="text-rose-500" />
+                                  <span>Delete Customer</span>
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -3065,66 +3542,6 @@ export default function HomeScreen() {
           </>
         ) : (
           <div className="overflow-x-auto">
-            {tab === "customers" ? (
-            <table className="min-w-[640px] w-full text-sm">
-              <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Membership</th>
-                  <th className="px-4 py-3">Joined</th>
-                </tr>
-              </thead>
-              <tbody>
-                {kpisLoading ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <tr key={i} className="border-t border-gray-50">
-                      <td colSpan={4} className="px-4 py-3">
-                        <div className="h-10 animate-pulse rounded-lg bg-gray-100" />
-                      </td>
-                    </tr>
-                  ))
-                ) : pageCustomers.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={4}
-                      className="px-4 py-12 text-center text-gray-500"
-                    >
-                      No customers found.
-                    </td>
-                  </tr>
-                ) : (
-                  pageCustomers.map((c, index) => {
-                    const tone = AVATAR_TONES[index % AVATAR_TONES.length];
-                    const when = formatBillDate(c.createdAt);
-                    return (
-                      <tr key={c.id} className="border-t border-gray-50">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${tone.bg} ${tone.text}`}
-                            >
-                              {initials(c.name)}
-                            </span>
-                            <span className="font-medium text-gray-900">
-                              {c.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">{c.phone}</td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
-                            {c.membership}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">{when.day}</td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          ) : (
             <table className="min-w-[640px] w-full text-sm">
               <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                 <tr>
@@ -3202,7 +3619,6 @@ export default function HomeScreen() {
                 )}
               </tbody>
             </table>
-          )}
         </div>
       )}
 
@@ -3274,6 +3690,34 @@ export default function HomeScreen() {
           loading={creatingCustomer}
         />
       ) : null}
+
+      {/* Customer View Details Modal */}
+      {showViewCustomerModal && (
+        <CustomerDetailsModal
+          open={showViewCustomerModal}
+          customer={viewCustomer}
+          onClose={() => {
+            }}
+          onUpdated={async () => {
+            await loadDashboardData();
+          }}
+        />
+      )}
+
+      {/* Customer Edit Modal */}
+      {showEditCustomerModal && (
+        <UpdateCustomerModal
+          open={showEditCustomerModal}
+          customer={editCustomer}
+          onClose={() => {
+            setShowEditCustomerModal(false);
+            setEditCustomer(null);
+          }}
+          onUpdate={handleUpdateCustomerSubmit}
+          loading={customerModalLoading}
+        />
+      )}
+
 
       {openCreateSubscriptionModal ? (
         <CreateSubscriptionScreen
@@ -3830,6 +4274,197 @@ export default function HomeScreen() {
           onSubmit={handleSubmitSpaceDashboard}
           loading={spaceModalSaving}
           initialSpace={editingSpace}
+        />
+      )}
+
+      {/* Food Details Modal */}
+      {viewFood && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setViewFood(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
+                  <Utensils size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Food Item Details
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {viewFood.subtitle || (viewFood.raw as any)?.category || "Food"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewFood(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-y-auto p-5 space-y-4">
+              {/* Food Image preview */}
+              {(viewFood.imageUrl || (viewFood.raw as any)?.imageUrl) ? (
+                <div className="relative aspect-16/9 w-full overflow-hidden rounded-2xl bg-slate-100 border border-slate-200/80">
+                  <img
+                    src={viewFood.imageUrl || (viewFood.raw as any)?.imageUrl}
+                    alt={viewFood.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              ) : null}
+
+              {/* Title & Status Card */}
+              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Food Name
+                    </span>
+                    <h4 className="text-lg font-bold text-slate-900 mt-0.5">
+                      {viewFood.title || (viewFood.raw as any)?.name}
+                    </h4>
+                    {(viewFood.raw as any)?.description && (
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                        {String((viewFood.raw as any).description)}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span
+                      className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                        (viewFood.raw as any)?.status !== "Inactive"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-rose-100 text-rose-800"
+                      }`}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                      {(viewFood.raw as any)?.status !== "Inactive" ? "Available" : "Not Available"}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.2 text-[10px] font-semibold ${
+                        (viewFood.raw as any)?.isVeg !== false
+                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60"
+                          : "bg-orange-50 text-orange-700 ring-1 ring-orange-200/60"
+                      }`}
+                    >
+                      {(viewFood.raw as any)?.isVeg !== false ? "Veg" : "Non-Veg"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Metric Tiles */}
+                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-200/60 pt-3 text-center">
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Price
+                    </span>
+                    <span className="text-sm font-bold text-slate-900">
+                      {viewFood.amount || `₹${Number((viewFood.raw as any)?.price || 0).toLocaleString("en-IN")}`}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Unit
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700">
+                      {(viewFood.raw as any)?.unit || "—"}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Type
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700">
+                      {(viewFood.raw as any)?.isPackaged ? "Packaged" : "Fresh"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Specs List */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-2.5 text-xs">
+                <div className="flex justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-500">Category</span>
+                  <span className="font-semibold text-slate-800">
+                    {viewFood.subtitle || (viewFood.raw as any)?.category || "—"}
+                  </span>
+                </div>
+                {(viewFood.raw as any)?.description && (
+                  <div className="pt-1">
+                    <span className="text-slate-500 block mb-1">Description</span>
+                    <p className="rounded-xl bg-slate-50 p-2.5 text-slate-700 leading-relaxed">
+                      {String((viewFood.raw as any).description)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer with Delete, Close & Edit */}
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => {
+                  const foodId = (viewFood.raw as any)?._id || viewFood.id;
+                  handleDeleteFoodDashboard(foodId, viewFood.title);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewFood(null)}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Close
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fd = (viewFood.raw as any) || viewFood;
+                    setViewFood(null);
+                    setEditFood(fd);
+                    setShowAddFoodModal(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/90 transition cursor-pointer"
+                >
+                  <SquarePen size={14} />
+                  Edit Food
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Food Modal */}
+      {showAddFoodModal && (
+        <AddFoodModal
+          open={showAddFoodModal}
+          onClose={() => {
+            if (foodModalLoading) return;
+            setShowAddFoodModal(false);
+            setEditFood(null);
+          }}
+          onSubmit={handleSaveFoodDashboard}
+          loading={foodModalLoading}
+          initialFood={editFood}
         />
       )}
     </div>

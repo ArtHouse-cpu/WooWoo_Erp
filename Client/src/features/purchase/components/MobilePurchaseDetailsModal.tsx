@@ -390,6 +390,7 @@ export default function MobilePurchaseDetailsModal({
                         >
                           <div className="min-w-0 flex-1">
                             <div className="text-xs font-bold text-slate-900">
+                              <span className="mr-1.5 font-bold text-slate-400">#{idx + 1}</span>
                               {itemName}
                             </div>
                             <div className="mt-0.5 text-[11px] text-slate-500">
