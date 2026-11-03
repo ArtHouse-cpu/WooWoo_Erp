@@ -2261,6 +2261,7 @@ export default function CheckoutModal({
                       <div className="flex justify-between gap-2">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-slate-900">
+                            <span className="mr-1.5 font-semibold text-slate-400">{i + 1}.</span>
                             {item.name}
                           </p>
                           <p className="text-xs text-slate-500">

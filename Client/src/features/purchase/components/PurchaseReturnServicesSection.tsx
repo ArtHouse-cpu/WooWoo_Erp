@@ -274,6 +274,7 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
             <tr>
+              <th className="w-14 px-3 py-2 text-center font-bold">S.No.</th>
               <th className="px-3 py-2 text-left">Product Name</th>
               <th className="px-3 py-2 text-right">Qty</th>
               <th className="px-3 py-2 text-right">Unit Price</th>
@@ -285,15 +286,18 @@ const fetchProducts = async (searchText = "", signal?: AbortSignal) => {
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-10 text-center text-gray-500">
+                <td colSpan={7} className="px-3 py-10 text-center text-gray-500">
                   Search or add products to start creating return.
                 </td>
               </tr>
             ) : (
-              items.map((item) => {
+              items.map((item, index) => {
                 const lineTotal = item.qty * item.unitPrice - item.discount;
                 return (
                   <tr key={item.id} className="border-t border-gray-100">
+                    <td className="w-12 px-3 py-2 text-center text-xs font-semibold text-gray-500">
+                      {index + 1}
+                    </td>
                     <td className="px-3 py-2 font-medium text-gray-800">{item.productName}</td>
                     <td className="px-3 py-2 text-right">{item.qty}</td>
                     <td className="px-3 py-2 text-right">₹ {item.unitPrice.toFixed(2)}</td>

@@ -161,6 +161,7 @@ export const getDashboardSummary = async (req, res) => {
       req.query.fromDate,
       req.query.toDate,
     );
+    // console.log(range)
     const {from, to, period, fromDate, toDate} = range;
 
     const invoiceDateFilter = orDateQuery(['invoiceDate', 'createdAt'], from, to);
