@@ -56,6 +56,23 @@ import { clearFormDraft, readFormDraft, useAutosaveFormDraft } from "../utils/fo
 const todayStr = new Date().toISOString().split("T")[0];
 const INVOICE_SEQ_KEY = "wooerp-invoice-seq";
 
+type ManualDiscountType = "flat" | "percentage";
+
+/** Bill-level discount in rupees, capped so the total cannot go below zero. */
+function manualDiscountRupees(
+  base: number,
+  value: number,
+  type: ManualDiscountType,
+) {
+  const remaining = Math.max(0, roundToPaise(base));
+  const safe = Math.max(0, Number(value) || 0);
+  if (type === "percentage") {
+    const pct = Math.min(100, safe);
+    return Math.min(remaining, roundToPaise((remaining * pct) / 100));
+  }
+  return Math.min(remaining, roundToPaise(safe));
+}
+
 const getNextInvoiceNumber = (): string => {
   const fallback = 10975;
   try {
@@ -161,6 +178,9 @@ export default function CreatePosScreen({
   const [invoiceDate, setInvoiceDate] = useState(todayStr);
   const [dueDate, setDueDate] = useState(todayStr);
   const [extraCharges, setExtraCharges] = useState<Array<{ label: string; amount: number }>>([]);
+  const [manualDiscount, setManualDiscount] = useState(0);
+  const [manualDiscountType, setManualDiscountType] =
+    useState<ManualDiscountType>("flat");
   const staffName = staff.m_staff_name || "Staff";
 
   const [items, setItems] = useState<PosItem[]>([]);
@@ -174,6 +194,8 @@ export default function CreatePosScreen({
     membershipPlanId,
     customerId,
     extraCharges,
+    manualDiscount,
+    manualDiscountType,
     items,
   };
   const posDraftHasContent = (data: typeof posDraft) =>
@@ -181,7 +203,8 @@ export default function CreatePosScreen({
       String(data.customer || "").trim() ||
         String(data.phone || "").trim() ||
         (data.items?.length ?? 0) ||
-        (data.extraCharges?.length ?? 0),
+        (data.extraCharges?.length ?? 0) ||
+        Number(data.manualDiscount) > 0,
     );
   const { clearDraft: clearPosDraft } = useAutosaveFormDraft({
     storageKey: "pos",
@@ -198,6 +221,10 @@ export default function CreatePosScreen({
       setMembershipPlanId(data.membershipPlanId ?? null);
       setCustomerId(data.customerId ?? null);
       setExtraCharges(Array.isArray(data.extraCharges) ? data.extraCharges : []);
+      setManualDiscount(Math.max(0, Number(data.manualDiscount) || 0));
+      setManualDiscountType(
+        data.manualDiscountType === "percentage" ? "percentage" : "flat",
+      );
       setItems(Array.isArray(data.items) ? data.items : []);
     },
   });
@@ -227,6 +254,8 @@ export default function CreatePosScreen({
     setSelectedProduct(null);
     setDraftQty("1");
     setExtraCharges([]);
+    setManualDiscount(0);
+    setManualDiscountType("flat");
     setOpenCheckout(false);
     setOpenDraftPin(false);
     setShowCreateModal(false);
@@ -614,7 +643,7 @@ export default function CreatePosScreen({
     [extraCharges],
   );
 
-  /** Net bill before nearest-rupee round-off (source for checkout + coupons). */
+  /** Bill after line discounts and extra charges, before the manual discount. */
   const totalBeforeRound = useMemo(
     () =>
       roundToPaise(
@@ -623,15 +652,42 @@ export default function CreatePosScreen({
     [subTotal, discountTotal, extraChargesTotal],
   );
 
+  const manualDiscountAmount = useMemo(
+    () =>
+      manualDiscountRupees(
+        totalBeforeRound,
+        manualDiscount,
+        manualDiscountType,
+      ),
+    [totalBeforeRound, manualDiscount, manualDiscountType],
+  );
+
+  const netBeforeRound = useMemo(
+    () => roundToPaise(Math.max(0, totalBeforeRound - manualDiscountAmount)),
+    [totalBeforeRound, manualDiscountAmount],
+  );
+
   /** Round-off applies only on the final total amount (not per line). */
   const {
     payable: grandTotal,
     roundOff,
     preRound: billTotalBeforeRoundOff,
   } = useMemo(
-    () => roundPayable(totalBeforeRound),
-    [totalBeforeRound],
+    () => roundPayable(netBeforeRound),
+    [netBeforeRound],
   );
+
+  const manualDiscountPayload =
+    manualDiscountAmount > 0
+      ? {
+          type: manualDiscountType,
+          value:
+            manualDiscountType === "percentage"
+              ? Math.min(100, Math.max(0, Number(manualDiscount) || 0))
+              : Math.max(0, Number(manualDiscount) || 0),
+          discountAmount: manualDiscountAmount,
+        }
+      : null;
 
   const creditCashbackForInvoice = async (
     amount: number,
@@ -718,11 +774,13 @@ export default function CreatePosScreen({
             discountTotal:
               lineDiscountTotal +
               Number(payment.coupon?.discountAmount ?? 0) +
-              Number(payment.referral?.discountAmount ?? 0),
+              Number(payment.referral?.discountAmount ?? 0) +
+              Number(payment.manualDiscount?.discountAmount ?? manualDiscountAmount),
             extraCharges,
             grandTotal: payment.finalAmount,
             coupon: payment.coupon ?? null,
             referral: payment.referral ?? null,
+            manualDiscount: payment.manualDiscount ?? manualDiscountPayload,
             status: "final",
             mode: payment.mode,
             paymentStatus: payment.paymentStatus,
@@ -757,11 +815,13 @@ export default function CreatePosScreen({
         discountTotal:
           lineDiscountTotal +
           Number(payment.coupon?.discountAmount ?? 0) +
-          Number(payment.referral?.discountAmount ?? 0),
+          Number(payment.referral?.discountAmount ?? 0) +
+          Number(payment.manualDiscount?.discountAmount ?? manualDiscountAmount),
         extraCharges,
         grandTotal: payment.finalAmount,
         coupon: payment.coupon ?? null,
         referral: payment.referral ?? null,
+        manualDiscount: payment.manualDiscount ?? manualDiscountPayload,
         status: "final",
         mode: payment.mode,
         paymentStatus: payment.paymentStatus,
@@ -848,9 +908,10 @@ export default function CreatePosScreen({
           category: item.category || "General",
         })),
         subTotal,
-        discountTotal,
+        discountTotal: discountTotal + manualDiscountAmount,
         extraCharges,
         grandTotal,
+        manualDiscount: manualDiscountPayload,
         status: "draft",
         mode: "Draft",
         paymentStatus: "partial",
@@ -1376,8 +1437,15 @@ export default function CreatePosScreen({
                           className="flex w-full flex-col gap-0.5 border-b border-slate-100 px-3 py-2.5 text-left hover:bg-slate-50"
                         >
                           <span className="flex items-center justify-between gap-2 text-sm font-medium text-slate-800">
-                            <span className="truncate">
-                              {p.productName ?? p.name}
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <span className="truncate">
+                                {p.productName ?? p.name}
+                              </span>
+                              {p.isCsp ? (
+                                <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                                  {p.cspLabel || "CSP"}
+                                </span>
+                              ) : null}
                             </span>
                             <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
                               {p.sourceType || "product"}
@@ -1769,6 +1837,68 @@ export default function CreatePosScreen({
                         </span>
                       </div>
                     )}
+                    <div className="rounded-lg border border-dashed border-violet-200 bg-violet-50/70 px-2 py-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-violet-700">
+                        Manual Discount
+                      </span>
+                      <div className="mt-1 grid grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setManualDiscountType("flat")}
+                          className={`rounded-md px-2 py-1 text-[11px] font-semibold ${
+                            manualDiscountType === "flat"
+                              ? "bg-violet-600 text-white"
+                              : "bg-white text-slate-600 ring-1 ring-violet-200"
+                          }`}
+                        >
+                          Manual
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualDiscountType("percentage");
+                            setManualDiscount((current) => Math.min(100, current));
+                          }}
+                          className={`rounded-md px-2 py-1 text-[11px] font-semibold ${
+                            manualDiscountType === "percentage"
+                              ? "bg-violet-600 text-white"
+                              : "bg-white text-slate-600 ring-1 ring-violet-200"
+                          }`}
+                        >
+                          Percentage
+                        </button>
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <span className="w-3 shrink-0 text-xs font-semibold text-slate-500">
+                          {manualDiscountType === "percentage" ? "%" : "₹"}
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={manualDiscountType === "percentage" ? 100 : undefined}
+                          step="0.01"
+                          inputMode="decimal"
+                          value={manualDiscount === 0 ? "" : manualDiscount}
+                          placeholder="0"
+                          onChange={(e) => {
+                            let next = Math.max(0, Number(e.target.value) || 0);
+                            if (manualDiscountType === "percentage") {
+                              next = Math.min(100, next);
+                            }
+                            setManualDiscount(next);
+                          }}
+                          className="h-8 w-full min-w-0 rounded-md border border-violet-200 bg-white px-2 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500"
+                        />
+                      </div>
+                      {manualDiscountAmount > 0 ? (
+                        <p className="mt-1 text-[11px] font-semibold text-rose-600">
+                          Applied − ₹
+                          {manualDiscountAmount.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </p>
+                      ) : null}
+                    </div>
                     <div className="flex items-center justify-between rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-inset ring-slate-200">
                       <span className="text-sm font-semibold text-slate-900">
                         Grand Total
@@ -1928,6 +2058,7 @@ export default function CreatePosScreen({
           <CheckoutModal
             open={openCheckout}
             grandTotal={totalBeforeRound}
+            initialManualDiscount={manualDiscountPayload}
             items={items.map((it) => ({
               ...it,
               productName: it.name,
@@ -1962,6 +2093,8 @@ export default function CreatePosScreen({
               setCustomers([]);
               setCustomerDropdownOpen(false);
               setExtraCharges([]);
+              setManualDiscount(0);
+              setManualDiscountType("flat");
               setSearchText("");
               setProducts([]);
               setSelectedProduct(null);

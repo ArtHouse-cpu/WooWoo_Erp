@@ -69,10 +69,35 @@ app.use(
     crossOriginResourcePolicy: {policy: 'cross-origin'},
   }),
 );
+const allowedOrigins = [
+  "https://www.woowooarthouse.in",
+  "https://woowooarthouse.in",
+  "https://admin.woowooarthouse.in",
+  "https://api.woowooarthouse.in",
+  "https://woo-woo-erp.vercel.app",
+  "https://woo-woo-erp-5iyu.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  ...String(process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+];
+
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+      // Allow requests without an Origin header, such as server-to-server calls.
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
   }),
 );
 app.use(cookieParser());
@@ -95,6 +120,23 @@ app.use((req, _res, next) => {
   };
   if (req.body) stripKeys(req.body);
   next();
+});
+
+// Queries use bufferCommands: false, so a request must wait for MongoDB.
+app.use(async (req, res, next) => {
+  if (req.path === '/' && req.method === 'GET') return next();
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error('MongoDB not ready:', error?.message || error);
+    if (!res.headersSent) {
+      res.status(503).json({
+        success: false,
+        message: 'Database is not ready. Please try again.',
+      });
+    }
+  }
 });
 
 // Admin / existing ERP APIs 
@@ -157,8 +199,8 @@ app.get("/", (req, res) => {
   res.send("🚀 Server is live and running...");
 });
 
-// Ensure MongoDB is connected before any API route executes.
-connectDB();
+// Warm the connection on boot. Requests still await connectDB() above.
+void connectDB().catch(() => {});
 app.use(customerErrorHandler);
 
 app.listen(PORT, async () => {

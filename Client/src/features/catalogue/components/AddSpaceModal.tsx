@@ -28,6 +28,8 @@ export type SpaceFormPayload = {
 export type SpaceMediaSelection = {
   imageFiles: File[];
   existingImages: string[];
+  videoFiles: File[];
+  existingVideos: string[];
   videoFile: File | null;
   removeVideo: boolean;
 };
@@ -37,6 +39,14 @@ type SpaceImageItem = {
   url: string;
   file?: File;
 };
+
+type SpaceVideoItem = {
+  id: string;
+  url: string;
+  file?: File;
+};
+
+const MAX_SPACE_VIDEOS = 4;
 
 type Props = {
   open: boolean;
@@ -107,9 +117,7 @@ export default function AddSpaceModal({
   const [capacity, setCapacity] = useState<number>(1);
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<SpaceImageItem[]>([]);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoPreview, setVideoPreview] = useState<string | null>(null);
-  const [removeVideo, setRemoveVideo] = useState(false);
+  const [videos, setVideos] = useState<SpaceVideoItem[]>([]);
 
   // Day selection mode: "Weekday" | "Weekend" | "Both"
   const [dayMode, setDayMode] = useState<DayOption>("Weekday");
@@ -186,9 +194,13 @@ export default function AddSpaceModal({
           ? [initialSpace.imageUrl]
           : [];
       setImages(savedImages.filter(Boolean).map((url) => ({ id: url, url })));
-      setVideoFile(null);
-      setVideoPreview(initialSpace.videoUrl || null);
-      setRemoveVideo(false);
+      const savedVideos =
+        Array.isArray(initialSpace.videos) && initialSpace.videos.length
+          ? initialSpace.videos
+          : initialSpace.videoUrl
+            ? [initialSpace.videoUrl]
+            : [];
+      setVideos(savedVideos.filter(Boolean).map((url) => ({ id: url, url })));
 
       const d = normalizeDay(initialSpace.day);
       setDayMode(d);
@@ -202,9 +214,7 @@ export default function AddSpaceModal({
       setCapacity(1);
       setDescription("");
       setImages([]);
-      setVideoFile(null);
-      setVideoPreview(null);
-      setRemoveVideo(false);
+      setVideos([]);
 
       setDayMode("Weekday");
       setPrice(0);
@@ -229,14 +239,22 @@ export default function AddSpaceModal({
     }
   };
 
-  const mediaSelection = (): SpaceMediaSelection => ({
-    imageFiles: images.flatMap((item) => (item.file ? [item.file] : [])),
-    existingImages: images
+  const mediaSelection = (): SpaceMediaSelection => {
+    const videoFiles = videos.flatMap((item) => (item.file ? [item.file] : []));
+    const existingVideos = videos
       .filter((item) => !item.file && /^https?:\/\//i.test(item.url))
-      .map((item) => item.url),
-    videoFile,
-    removeVideo,
-  });
+      .map((item) => item.url);
+    return {
+      imageFiles: images.flatMap((item) => (item.file ? [item.file] : [])),
+      existingImages: images
+        .filter((item) => !item.file && /^https?:\/\//i.test(item.url))
+        .map((item) => item.url),
+      videoFiles,
+      existingVideos,
+      videoFile: videoFiles[0] ?? null,
+      removeVideo: videoFiles.length === 0 && existingVideos.length === 0,
+    };
+  };
 
   const handleImages = (e: ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files || []).filter((file) =>
@@ -264,21 +282,30 @@ export default function AddSpaceModal({
     });
   };
 
-  const handleVideo = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (videoPreview?.startsWith("blob:")) URL.revokeObjectURL(videoPreview);
-    setVideoFile(file);
-    setVideoPreview(URL.createObjectURL(file));
-    setRemoveVideo(false);
+  const handleVideos = (e: ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files || []).filter((file) =>
+      file.type.startsWith("video/"),
+    );
+    if (!picked.length) return;
+    setVideos((current) =>
+      [
+        ...current,
+        ...picked.map((file) => ({
+          id: `${file.name}-${file.lastModified}-${Math.random()}`,
+          url: URL.createObjectURL(file),
+          file,
+        })),
+      ].slice(0, MAX_SPACE_VIDEOS),
+    );
     e.target.value = "";
   };
 
-  const clearVideo = () => {
-    if (videoPreview?.startsWith("blob:")) URL.revokeObjectURL(videoPreview);
-    setVideoFile(null);
-    setVideoPreview(null);
-    setRemoveVideo(true);
+  const removeVideoItem = (id: string) => {
+    setVideos((current) => {
+      const target = current.find((item) => item.id === id);
+      if (target?.url.startsWith("blob:")) URL.revokeObjectURL(target.url);
+      return current.filter((item) => item.id !== id);
+    });
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -683,47 +710,47 @@ export default function AddSpaceModal({
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              Space video
+              Space videos
             </label>
-            {videoPreview ? (
-              <video
-                src={videoPreview}
-                controls
-                className="max-h-40 w-full rounded-lg border border-gray-200"
-              />
-            ) : (
+            <p className="mb-2 text-xs text-gray-500">
+              Up to {MAX_SPACE_VIDEOS} mp4, webm, or mov files.
+            </p>
+            {videos.length < MAX_SPACE_VIDEOS ? (
               <label
                 htmlFor="space-video"
                 className="flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-400 p-4 transition hover:bg-gray-50"
               >
                 <Video size={36} className="mb-2 text-gray-500" />
-                <p className="text-sm text-gray-500">
-                  Upload one mp4, webm, or mov
-                </p>
+                <p className="text-sm text-gray-500">Add videos</p>
               </label>
-            )}
+            ) : null}
             <input
               id="space-video"
               type="file"
+              multiple
               accept="video/mp4,video/webm,video/quicktime"
-              onChange={handleVideo}
+              onChange={handleVideos}
               className="hidden"
             />
-            {videoPreview ? (
-              <div className="mt-2 flex gap-3">
-                <label
-                  htmlFor="space-video"
-                  className="cursor-pointer text-xs font-semibold text-slate-700"
-                >
-                  Replace video
-                </label>
-                <button
-                  type="button"
-                  onClick={clearVideo}
-                  className="text-xs font-semibold text-rose-600"
-                >
-                  Remove video
-                </button>
+            {videos.length > 0 ? (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {videos.map((item) => (
+                  <div key={item.id} className="relative">
+                    <video
+                      src={item.url}
+                      controls
+                      className="max-h-32 w-full rounded-lg border border-gray-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeVideoItem(item.id)}
+                      className="absolute right-1 top-1 rounded-full bg-white p-0.5 text-gray-700 shadow"
+                      aria-label="Remove video"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : null}
           </div>

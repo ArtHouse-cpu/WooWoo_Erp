@@ -417,7 +417,14 @@ export default function ProductsServicesSection({
                         className="cursor-pointer px-3 py-2.5 text-sm hover:bg-slate-50"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <CatalogueItemLabel item={p} className="min-w-0 flex-1" />
+                          <div className="min-w-0 flex-1">
+                            <CatalogueItemLabel item={p} className="min-w-0" />
+                            {p.isCsp ? (
+                              <span className="mt-0.5 inline-flex rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-amber-800">
+                                {p.cspLabel || "CSP"}
+                              </span>
+                            ) : null}
+                          </div>
                           <span
                             className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                               p.variantName

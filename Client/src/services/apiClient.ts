@@ -183,6 +183,12 @@ export type CreateInvoicePayload = {
     inviterName?: string;
     label?: string;
   } | null;
+  /** Bill-level discount. Flat is rupees; percentage is the entered percent. */
+  manualDiscount?: {
+    type: "flat" | "percentage";
+    value: number;
+    discountAmount: number;
+  } | null;
   /** Membership cashback to show on WhatsApp activityupdate (and client wallet credit) */
   cashbackTotal?: number;
   /** Membership discount amount for WhatsApp activityupdate */
@@ -2085,6 +2091,7 @@ export type SpacePayload = {
   imageUrl?: string | null;
   images?: string[];
   videoUrl?: string | null;
+  videos?: string[];
   createdAt?: string;
   updatedAt?: string;
   /** Legacy expanded list markers (from old dual-price docs) */
@@ -2125,6 +2132,8 @@ export const handleGetSpaceById = async (id: string, signal?: AbortSignal) => {
 export type SpaceMediaUpload = {
   imageFiles?: File[];
   existingImages?: string[];
+  videoFiles?: File[];
+  existingVideos?: string[];
   videoFile?: File | null;
   removeVideo?: boolean;
 };
@@ -2167,11 +2176,20 @@ export const spacePayloadToFormData = (
   const imageFiles =
     media instanceof File ? [media] : media?.imageFiles || [];
   for (const file of imageFiles) fd.append("images", file);
-  if (media && !(media instanceof File) && media.videoFile) {
-    fd.append("video", media.videoFile);
-  }
+  const videoFiles =
+    media && !(media instanceof File)
+      ? media.videoFiles?.length
+        ? media.videoFiles
+        : media.videoFile
+          ? [media.videoFile]
+          : []
+      : [];
+  for (const file of videoFiles) fd.append("video", file);
   if (media && !(media instanceof File) && media.existingImages) {
     fd.append("existingImages", media.existingImages.join(","));
+  }
+  if (media && !(media instanceof File) && media.existingVideos) {
+    fd.append("existingVideos", media.existingVideos.join(","));
   }
   if (media && !(media instanceof File) && media.removeVideo) {
     fd.append("removeVideo", "true");

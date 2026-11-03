@@ -124,7 +124,7 @@ type Props = {
   /**
    * "purchase" adjusts confirm labels and sets purchaseType cash|credit.
    * "expense" collects title/category/paid-to/amount and skips customer/promo.
-   * Full / Partial / Due toggle is always shown; Due = full amount outstanding.
+   * Purchase and expense checkouts show Due. Due = full amount outstanding.
    */
   checkoutContext?: "sale" | "purchase" | "expense";
   /**
@@ -207,6 +207,12 @@ type Props = {
   onSavedAndNew?: () => void;
   /** Existing draft or invoice. Save and payment update this document. */
   existingInvoiceId?: string | null;
+  /** Bill-level discount already chosen on POS. Subtracted from the payable total. */
+  initialManualDiscount?: {
+    type: "flat" | "percentage";
+    value: number;
+    discountAmount: number;
+  } | null;
 };
 
 const EXPENSE_CATEGORIES = [
@@ -473,6 +479,7 @@ export default function CheckoutModal({
   onConfirmPayment,
   onSavedAndNew,
   existingInvoiceId,
+  initialManualDiscount = null,
 }: Props) {
   const isPurchaseCheckout = checkoutContext === "purchase";
   const isExpenseCheckout = checkoutContext === "expense";
@@ -1279,7 +1286,21 @@ export default function CheckoutModal({
     [items],
   );
 
-  const manualDiscountAmount = 0;
+  const manualDiscountAmount = Math.max(
+    0,
+    Number(initialManualDiscount?.discountAmount) || 0,
+  );
+  const manualDiscountPayload =
+    initialManualDiscount && manualDiscountAmount > 0
+      ? {
+          type:
+            initialManualDiscount.type === "percentage"
+              ? ("percentage" as const)
+              : ("flat" as const),
+          value: Math.max(0, Number(initialManualDiscount.value) || 0),
+          discountAmount: manualDiscountAmount,
+        }
+      : null;
 
   useEffect(() => {
     if (!open) return;
@@ -1648,7 +1669,7 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
-      manualDiscount: null,
+      manualDiscount: manualDiscountPayload,
       giftCard:
         giftCardCode.trim() && giftCardDiscount > 0
           ? {
@@ -1744,7 +1765,8 @@ export default function CheckoutModal({
         return;
       }
     }
-    if (!isDuePayment && !isMultiMode && !paymentMode) {
+    const nothingToPay = finalPayable <= 0.009;
+    if (!nothingToPay && !isDuePayment && !isMultiMode && !paymentMode) {
       Swal.fire(
         "Payment mode required",
         "Select a payment mode before completing checkout.",
@@ -1835,11 +1857,13 @@ export default function CheckoutModal({
     }
 
     const today = new Date().toISOString().split("T")[0];
-    const normalizedMode = isDuePayment
-      ? "CREDIT"
-      : isMultiMode
-        ? "MULTI"
-        : paymentMode.toUpperCase();
+    const normalizedMode = nothingToPay
+      ? "COUPON"
+      : isDuePayment
+        ? "CREDIT"
+        : isMultiMode
+          ? "MULTI"
+          : paymentMode.toUpperCase();
     const paymentPayload = {
       mode: normalizedMode,
       paymentStatus: isDuePayment
@@ -1905,7 +1929,7 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
-      manualDiscount: null,
+      manualDiscount: manualDiscountPayload,
       manualDiscountAmount,
       customerName: customerName.trim(),
       customerPhone: customerSearch.trim(),
@@ -1989,7 +2013,7 @@ export default function CheckoutModal({
             label: referralLabel,
           }
         : null,
-      manualDiscount: null,
+      manualDiscount: manualDiscountPayload,
       giftCard:
         giftCardCode.trim() && giftCardDiscount > 0
           ? {
@@ -2355,6 +2379,17 @@ export default function CheckoutModal({
                   <SummaryLine
                     label={`Gift Card (${giftCardCode})`}
                     value={`− ${formatInr(giftCardDiscount)}`}
+                    tone="discount"
+                  />
+                )}
+                {manualDiscountAmount > 0 && (
+                  <SummaryLine
+                    label={
+                      manualDiscountPayload?.type === "percentage"
+                        ? `Manual Discount (${manualDiscountPayload.value}%)`
+                        : "Manual Discount"
+                    }
+                    value={`− ${formatInr(manualDiscountAmount)}`}
                     tone="discount"
                   />
                 )}
@@ -2783,7 +2818,7 @@ export default function CheckoutModal({
                         Partial
                       </button>
                       ) : null}
-                      {isPurchaseCheckout && !enforcesBookingMinimum ? (
+                      {(isPurchaseCheckout || isExpenseCheckout) && !enforcesBookingMinimum ? (
                       <button
                         type="button"
                         onClick={() => setPaymentStatus("due")}
@@ -2818,7 +2853,14 @@ export default function CheckoutModal({
                     {activeRule.paymentInstructions ? ` ${activeRule.paymentInstructions}` : ""}
                   </p>
                 ) : null}
-                {isDuePayment ? (
+                {finalPayable <= 0.009 ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                    <p className="font-semibold">Nothing to collect</p>
+                    <p className="mt-1 text-xs text-emerald-800/90">
+                      This coupon covers the full amount. No payment mode is needed.
+                    </p>
+                  </div>
+                ) : isDuePayment ? (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                     <p className="font-semibold">Due — full amount outstanding</p>
                     <p className="mt-1 text-xs text-amber-800/90">

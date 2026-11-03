@@ -696,49 +696,55 @@ export default function MobileInvoiceDetailsModal({
         {/* Top subtle drag pill */}
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-slate-300" />
 
-       <div className={`grid w-full gap-2 ${isDraft ? "grid-cols-2" : "grid-cols-3"}`}>
-  {isDraft ? (
-    <button
-      type="button"
-      onClick={() => onContinue?.(raw)}
-      className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full bg-[#111111] px-2 py-2.5 text-xs font-semibold text-white transition hover:bg-black active:scale-95"
-    >
-      <ChevronRight size={13} className="shrink-0" />
-      <span className="truncate">Continue</span>
-    </button>
-  ) : (
-    <>
-  <button
-    type="button"
-    disabled={isCancelled}
-    onClick={() => onConvert(raw)}
-    className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full border border-blue-200/80 bg-blue-50/80 px-2 py-2.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-  >
-    <ArrowLeftRight size={13} className="shrink-0 text-blue-600" />
-    <span className="truncate">Convert</span>
-  </button>
-
-  <button
-    type="button"
-    disabled={isCancelled}
-    onClick={() => onCancelInvoice(raw)}
-    className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/80 px-2 py-2.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-  >
-    <XCircle size={13} className="shrink-0 text-amber-600" />
-    <span className="truncate">Cancel Invoice</span>
-  </button>
-    </>
-  )}
-
-  <button
-    type="button"
-    onClick={() => onDeleteInvoice(raw)}
-    className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full border border-rose-200/80 bg-rose-50/80 px-2 py-2.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 active:scale-95"
-  >
-    <Trash2 size={13} className="shrink-0 text-rose-600" />
-    <span className="truncate">Delete</span>
-  </button>
-</div>
+        {isDraft ? (
+          <div className="grid w-full grid-cols-[3fr_7fr] gap-2">
+            <button
+              type="button"
+              onClick={() => onDeleteInvoice(raw)}
+              className="flex min-w-0 items-center justify-center gap-1 rounded-full border border-rose-200/80 bg-rose-50/80 px-2 py-2.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 active:scale-95"
+            >
+              <Trash2 size={13} className="shrink-0 text-rose-600" />
+              <span className="truncate">Delete</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onContinue?.(raw)}
+              className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-[#111111] px-2 py-2.5 text-xs font-semibold text-white transition hover:bg-black active:scale-95"
+            >
+              <ChevronRight size={13} className="shrink-0" />
+              <span className="truncate">Continue</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid w-full grid-cols-3 gap-2">
+            <button
+              type="button"
+              disabled={isCancelled}
+              onClick={() => onConvert(raw)}
+              className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full border border-blue-200/80 bg-blue-50/80 px-2 py-2.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ArrowLeftRight size={13} className="shrink-0 text-blue-600" />
+              <span className="truncate">Convert</span>
+            </button>
+            <button
+              type="button"
+              disabled={isCancelled}
+              onClick={() => onCancelInvoice(raw)}
+              className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/80 px-2 py-2.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <XCircle size={13} className="shrink-0 text-amber-600" />
+              <span className="truncate">Cancel Invoice</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onDeleteInvoice(raw)}
+              className="flex w-full min-w-0 items-center justify-center gap-1 rounded-full border border-rose-200/80 bg-rose-50/80 px-2 py-2.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 active:scale-95"
+            >
+              <Trash2 size={13} className="shrink-0 text-rose-600" />
+              <span className="truncate">Delete</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

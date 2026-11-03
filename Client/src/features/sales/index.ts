@@ -7,3 +7,4 @@ export { default as CreatePosScreen } from "./pages/CreatePosScreen";
 export { default as CreateInvoiceScreen } from "./pages/CreateInvoiceScreen";
 export { default as CreateSalesReturnScreen } from "./pages/CreateSalesReturnScreen";
 export { default as CouponsScreen } from "./pages/CouponsScreen";
+export { default as BuyOneGetOneScreen } from "./pages/BuyOneGetOneScreen";

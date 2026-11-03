@@ -60,6 +60,7 @@ export type MobileUpdateInvoiceViewProps = {
   onRemoveItem: (id: number) => void;
   onAddDirectItem?: (item: Omit<InvoiceItem, "id">) => void;
   onInvoiceDateChange: (val: string) => void;
+  onDueDateChange?: (val: string) => void;
   onInvoiceNoChange?: (val: string) => void;
   onNotesChange: (val: string) => void;
   onExtraChargesChange: (
@@ -80,6 +81,7 @@ function formatCardDate(val?: string | Date): string {
 export default function MobileUpdateInvoiceView({
   invoiceNo,
   invoiceDate,
+  dueDate = "",
   customer,
   phone,
   membership = "none",
@@ -101,6 +103,7 @@ export default function MobileUpdateInvoiceView({
   onRemoveItem,
   onAddDirectItem,
   onInvoiceDateChange,
+  onDueDateChange,
   onInvoiceNoChange,
   onNotesChange,
   onExtraChargesChange,
@@ -135,6 +138,7 @@ export default function MobileUpdateInvoiceView({
 
   // Date edit modal temp states
   const [tempDate, setTempDate] = useState(invoiceDate);
+  const [tempDueDate, setTempDueDate] = useState(dueDate);
   const [tempInvoiceNo, setTempInvoiceNo] = useState(invoiceNo);
 
   // Customer search states with debouncing
@@ -337,7 +341,12 @@ export default function MobileUpdateInvoiceView({
           {/* Document Settings Icon */}
           <button
             type="button"
-            onClick={() => setShowEditDateModal(true)}
+            onClick={() => {
+              setTempDate(invoiceDate);
+              setTempDueDate(dueDate);
+              setTempInvoiceNo(invoiceNo);
+              setShowEditDateModal(true);
+            }}
             className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-xs transition hover:bg-slate-50 active:scale-95"
             aria-label="Document settings"
           >
@@ -356,12 +365,14 @@ export default function MobileUpdateInvoiceView({
               </div>
               <div className="mt-0.5 text-xs font-medium text-slate-500">
                 {formatCardDate(invoiceDate)}
+                {dueDate ? ` · Due ${formatCardDate(dueDate)}` : ""}
               </div>
             </div>
             <button
               type="button"
               onClick={() => {
                 setTempDate(invoiceDate);
+                setTempDueDate(dueDate);
                 setTempInvoiceNo(invoiceNo);
                 setShowEditDateModal(true);
               }}
@@ -739,6 +750,16 @@ export default function MobileUpdateInvoiceView({
                   className="w-full h-10 rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-blue-500"
                 />
               </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Due Date</label>
+                <input
+                  type="date"
+                  value={tempDueDate}
+                  onChange={(e) => setTempDueDate(e.target.value)}
+                  className="w-full h-10 rounded-xl border border-slate-200 px-3 text-xs outline-none focus:border-blue-500"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -753,6 +774,7 @@ export default function MobileUpdateInvoiceView({
                 type="button"
                 onClick={() => {
                   onInvoiceDateChange(tempDate);
+                  onDueDateChange?.(tempDueDate);
                   if (onInvoiceNoChange) onInvoiceNoChange(tempInvoiceNo);
                   setShowEditDateModal(false);
                 }}
@@ -968,8 +990,15 @@ export default function MobileUpdateInvoiceView({
                         className="w-full flex items-center justify-between p-2.5 rounded-xl border border-slate-100 hover:bg-blue-50/50 text-left transition"
                       >
                         <div className="min-w-0 pr-2">
-                          <div className="text-xs font-bold text-slate-800 truncate">
-                            {item.name}
+                          <div className="flex items-center gap-1.5">
+                            <div className="min-w-0 truncate text-xs font-bold text-slate-800">
+                              {item.name}
+                            </div>
+                            {item.isCsp ? (
+                              <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] font-bold uppercase text-amber-800">
+                                {item.cspLabel || "CSP"}
+                              </span>
+                            ) : null}
                           </div>
                           <div className="text-[11px] text-slate-500">
                             {item.sourceType ? item.sourceType.toUpperCase() : "PRODUCT"}

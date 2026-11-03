@@ -430,6 +430,7 @@ export default function CreateSpacesScreen() {
               imageUrl: createdWeekday?.imageUrl || null,
               images: createdWeekday?.images,
               videoUrl: createdWeekday?.videoUrl,
+              videos: createdWeekday?.videos,
             },
             {
               existingImages:
@@ -437,6 +438,12 @@ export default function CreateSpacesScreen() {
                   ? createdWeekday.images
                   : createdWeekday?.imageUrl
                     ? [createdWeekday.imageUrl]
+                    : [],
+              existingVideos:
+                createdWeekday?.videos?.length
+                  ? createdWeekday.videos
+                  : createdWeekday?.videoUrl
+                    ? [createdWeekday.videoUrl]
                     : [],
             },
           );

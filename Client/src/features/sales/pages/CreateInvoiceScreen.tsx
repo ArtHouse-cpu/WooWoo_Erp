@@ -43,6 +43,16 @@ import { creditWalletCashback } from "../utils/walletCashback";
 import { useAutosaveFormDraft } from "../utils/formDraft";
 
 const today = new Date().toISOString().split("T")[0];
+
+/** Calendar day in local time, so a stored timestamp does not shift to the previous day. */
+function toDateInputValue(value: unknown): string {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value as string);
+  if (Number.isNaN(date.getTime())) return "";
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
 const INVOICE_SEQ_KEY = "wooerp-invoice-seq";
 
 const getNextInvoiceNumber = (): string => {
@@ -259,10 +269,10 @@ export default function CreateInvoiceScreen({
       setCustomerDropdownOpen(false);
       setCustomers([]);
       if (inv.invoiceDate) {
-        setInvoiceDate(new Date(inv.invoiceDate).toISOString().split("T")[0]);
+        setInvoiceDate(toDateInputValue(inv.invoiceDate));
       }
       if (inv.dueDate) {
-        setDueDate(new Date(inv.dueDate).toISOString().split("T")[0]);
+        setDueDate(toDateInputValue(inv.dueDate));
       }
       setNotes(inv.notes || "");
       setCreatedByDisplay(resolveCreatedByName(inv, salesPerson));
@@ -795,7 +805,12 @@ export default function CreateInvoiceScreen({
       Swal.fire("Phone required", "Please enter customer phone number.", "warning");
       return false;
     }
-    if (dueDate < today) {
+    if (!dueDate) {
+      Swal.fire("Invalid due date", "Enter a due date.", "warning");
+      return false;
+    }
+    // Existing invoices keep their original due date, even when it is already past.
+    if (!invoiceIdRef.current && dueDate < today) {
       Swal.fire("Invalid due date", "Due date cannot be before today.", "warning");
       return false;
     }
@@ -1147,6 +1162,7 @@ export default function CreateInvoiceScreen({
               });
             }}
             onInvoiceDateChange={setInvoiceDate}
+            onDueDateChange={setDueDate}
             onInvoiceNoChange={setInvoiceNo}
             onNotesChange={setNotes}
             onExtraChargesChange={setExtraCharges}
@@ -1183,7 +1199,7 @@ export default function CreateInvoiceScreen({
             customerDropdownOpen={mode !== "view" && customerDropdownOpen}
             invoiceDate={invoiceDate}
             dueDate={dueDate}
-            dueDateMin={today}
+            dueDateMin={mode === "edit" ? undefined : today}
             salesPerson={
               mode === "view" || mode === "edit" ? createdByDisplay : salesPerson
             }

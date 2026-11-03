@@ -374,6 +374,11 @@ function ProductSidebar({
                         )}
                       </div>
                       <CatalogueItemLabel item={item} compact />
+                      {item.isCsp ? (
+                        <span className="mt-0.5 inline-flex rounded bg-amber-100 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-800">
+                          {item.cspLabel || "CSP"}
+                        </span>
+                      ) : null}
                       <div className="mt-0.5">
                         <CataloguePrice item={item} />
                       </div>
@@ -464,7 +469,14 @@ function ProductSidebar({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <CatalogueItemLabel item={item} compact />
+                    <div className="flex flex-wrap items-center gap-1">
+                      <CatalogueItemLabel item={item} compact className="min-w-0" />
+                      {item.isCsp ? (
+                        <span className="rounded bg-amber-100 px-1 py-0.5 text-[8px] font-extrabold uppercase tracking-wide text-amber-800">
+                          {item.cspLabel || "CSP"}
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                       <CataloguePrice item={item} />
                       {nameParts.variantName ? (
@@ -486,11 +498,6 @@ function ProductSidebar({
                         </span>
                       )}
                     </div>
-                    {item.isCsp && (
-                      <span className="mt-0.5 inline-block rounded bg-amber-100 px-1 text-[8px] font-extrabold uppercase tracking-wide text-amber-800">
-                        {item.cspLabel || "CSP"}
-                      </span>
-                    )}
                   </div>
 
                   <div className="shrink-0">

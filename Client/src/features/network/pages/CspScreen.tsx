@@ -139,6 +139,13 @@ function mapApplication(row: CspApplicationRecord, index: number): ApplicationRo
   };
 }
 
+function formatApplicantPhone(raw: string) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  const local = digits.length > 10 ? digits.slice(-10) : digits;
+  if (local.length !== 10) return String(raw || "").trim();
+  return `+91 ${local.slice(0, 5)} ${local.slice(5)}`;
+}
+
 function getAvatar(name: string, index: number) {
   const clean = (name || "Partner").trim();
   const parts = clean.split(/\s+/).filter(Boolean);
@@ -1530,7 +1537,7 @@ export default function CspScreen() {
                 ? "Search by partner name, brand name or products..."
                 : "Search by name, brand name, phone number or Prosite URL..."
             }
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-9 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#ff5a36] focus:outline-none focus:ring-1 focus:ring-[#ff5a36] transition-all"
+            className="w-full rounded-full border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-9 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#ff5a36] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#ff5a36] md:rounded-xl md:bg-white md:py-2 md:text-sm"
           />
           {searchQuery && (
             <button
@@ -1554,15 +1561,15 @@ export default function CspScreen() {
                 setShowFilterDropdown(!showFilterDropdown);
                 setShowSortDropdown(false);
               }}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs sm:text-sm font-medium shadow-xs transition-colors cursor-pointer ${
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-xs transition-colors cursor-pointer md:h-auto md:w-auto md:gap-1.5 md:rounded-xl md:px-3 md:py-2 ${
                 filterBalanceOnly && activeTab === "active"
                   ? "border-orange-300 bg-orange-50 text-orange-600"
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >
-              <Filter className="h-3.5 w-3.5 text-slate-500" />
-              <span>Filter</span>
-              <ChevronDown className="h-3 w-3 text-slate-400" />
+              <Filter className="h-4 w-4 text-slate-500" />
+              <span className="hidden text-sm font-medium md:inline">Filter</span>
+              <ChevronDown className="hidden h-3 w-3 text-slate-400 md:block" />
             </button>
 
             {showFilterDropdown && (
@@ -1614,11 +1621,11 @@ export default function CspScreen() {
                 setShowSortDropdown(!showSortDropdown);
                 setShowFilterDropdown(false);
               }}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 transition-colors cursor-pointer"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-xs transition-colors hover:bg-slate-50 cursor-pointer md:h-auto md:w-auto md:gap-1.5 md:rounded-xl md:px-3 md:py-2"
             >
-              <ArrowUpDown className="h-3.5 w-3.5 text-slate-500" />
-              <span>Sort by</span>
-              <ChevronDown className="h-3 w-3 text-slate-400" />
+              <ArrowUpDown className="h-4 w-4 text-slate-500" />
+              <span className="hidden text-sm font-medium md:inline">Sort by</span>
+              <ChevronDown className="hidden h-3 w-3 text-slate-400 md:block" />
             </button>
 
             {showSortDropdown && (
@@ -1666,7 +1673,7 @@ export default function CspScreen() {
             type="button"
             onClick={handleExport}
             title="Export as Excel"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 transition-colors cursor-pointer active:scale-98"
+            className="hidden items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-xs transition-colors hover:bg-slate-50 cursor-pointer active:scale-98 md:inline-flex"
           >
             <Download className="h-3.5 w-3.5 text-slate-500" />
             <span>Export</span>
@@ -2023,7 +2030,7 @@ export default function CspScreen() {
         </div>
 
         {/* Mobile Card List View - Only on mobile */}
-        <div className="block md:hidden p-3 space-y-3">
+        <div className={activeTab === "active" ? "block space-y-3 p-3 md:hidden" : "block md:hidden"}>
           {activeTab === "active" ? (
             loading ? (
               <div className="py-12 text-center text-slate-400">
@@ -2237,99 +2244,63 @@ export default function CspScreen() {
                 </p>
               </div>
             ) : (
-              paginatedApplications.map((app, idx) => {
-                const globalIdx = (currentAppPage - 1) * applicationsPageSize + idx;
+              paginatedApplications.map((app) => {
+                const phone = formatApplicantPhone(app.phoneNumber);
+                const site = String(app.prositeUrl || "")
+                  .replace(/^https?:\/\//i, "")
+                  .replace(/\/$/, "");
 
                 return (
                   <div
-                    key={app.id || idx}
-                    onClick={() => {
-                      setApproveTarget(app);
-                      setOpenApproveModal(true);
-                    }}
-                    className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                    key={app.id}
+                    className="flex items-start gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0"
                   >
-                    {/* Header: Avatar, Name, Brand, Index, Status */}
-                    <div className="flex items-start justify-between gap-2.5">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${app.avatarBg} ${app.avatarText} ${app.avatarBorder}`}
-                        >
-                          {app.avatarInitials}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="truncate text-sm font-bold text-slate-900 block">
-                              {app.name}
-                            </span>
-                            <span className="shrink-0 text-[10px] font-mono text-slate-400">
-                              #{globalIdx + 1}
-                            </span>
-                          </div>
-                          <span className="text-xs text-slate-500 font-medium truncate block mt-0.5">
-                            {app.brandName}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200/60 capitalize">
-                        {app.status || "Pending"}
-                      </span>
-                    </div>
-
-                    {/* Contact & Link Details */}
-                    <div className="mt-3 space-y-1.5 text-xs text-slate-600 border-t border-slate-100 pt-2.5">
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        {app.phoneNumber && (
-                          <div className="flex items-center gap-1 text-slate-700 font-medium">
-                            <Phone size={12} className="text-slate-400 shrink-0" />
-                            <span>{app.phoneNumber}</span>
-                          </div>
-                        )}
-                        {app.phoneNumber && app.email && <span>•</span>}
-                        {app.email && (
-                          <span className="truncate text-slate-500">{app.email}</span>
-                        )}
-                      </div>
-                      {app.prositeUrl && (
-                        <div className="pt-0.5">
-                          <a
-                            href={`https://${app.prositeUrl}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-blue-600 hover:underline inline-flex items-center gap-1 text-xs font-medium"
-                          >
-                            <Link2 size={12} />
-                            <span>{app.prositeUrl}</span>
-                          </a>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Actions: Approve / Reject */}
                     <div
-                      className="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-2.5"
-                      onClick={(e) => e.stopPropagation()}
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-bold ${app.avatarBg} ${app.avatarText}`}
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleOpenRejectModal(app)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 border border-rose-200/50 hover:bg-rose-100 transition-colors cursor-pointer shadow-2xs"
-                      >
-                        <XCircle className="h-3.5 w-3.5 text-rose-500 shrink-0" />
-                        <span>Reject</span>
-                      </button>
-
+                      {app.avatarInitials}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-slate-900">{app.name}</p>
+                      {app.brandName ? (
+                        <p className="truncate text-xs text-slate-500">{app.brandName}</p>
+                      ) : null}
+                      {phone ? (
+                        <p className="mt-1 flex items-center gap-1 text-xs text-slate-600">
+                          <Phone size={12} className="shrink-0 text-slate-400" />
+                          <span>{phone}</span>
+                        </p>
+                      ) : null}
+                      {site ? (
+                        <a
+                          href={`https://${site}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-0.5 block truncate text-xs font-medium text-blue-600"
+                        >
+                          {site}
+                        </a>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 flex-col gap-1.5">
                       <button
                         type="button"
                         onClick={() => {
                           setApproveTarget(app);
                           setOpenApproveModal(true);
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-200/50 hover:bg-emerald-100 transition-colors cursor-pointer shadow-2xs"
+                        className="inline-flex items-center justify-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-600"
                       >
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                        <span>Approve</span>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRejectModal(app)}
+                        className="inline-flex items-center justify-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-500"
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                        Reject
                       </button>
                     </div>
                   </div>

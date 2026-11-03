@@ -320,7 +320,14 @@ export default function ProductsServicesSection({
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <CatalogueItemLabel item={p} />
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <CatalogueItemLabel item={p} />
+                            {p.isCsp ? (
+                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-amber-800">
+                                {p.cspLabel || "CSP"}
+                              </span>
+                            ) : null}
+                          </div>
                           <div className="mt-0.5 text-xs text-gray-500">
                             <span className="font-medium text-gray-700">
                               Purchase ₹{formatPrice(resolvePurchaseUnitPrice(p))}
