@@ -161,165 +161,12 @@ function getAvatar(name: string, index: number) {
   return { initials, palette };
 }
 
-// Fallback benchmark reference data for Active Partners
-const BENCHMARK_ROWS: CspEnrollment[] = [
-  {
-    _id: "bm-1",
-    displayName: "Aarav Sharma",
-    mobile: "9876543210",
-    customer: { _id: "c1", name: "Aarav Sharma", mobile: "9876543210" },
-    vendor: { _id: "v1", name: "KalaKart", companyName: "KalaKart" },
-    label: "CSP · Aarav Sharma",
-    withdrawable: 13258,
-    withdrawableBalance: 13258,
-    status: "active",
-    sailorSharePercent: 70,
-    updatedAt: "2026-10-21T14:15:00Z",
-  },
-  {
-    _id: "bm-2",
-    displayName: "Priya Verma",
-    mobile: "9876543211",
-    customer: { _id: "c2", name: "Priya Verma", mobile: "9876543211" },
-    vendor: { _id: "v2", name: "CraftNest", companyName: "CraftNest" },
-    label: "CSP · Priya Verma",
-    withdrawable: 10024,
-    withdrawableBalance: 10024,
-    status: "active",
-    sailorSharePercent: 70,
-    updatedAt: "2026-10-20T18:40:00Z",
-  },
-  {
-    _id: "bm-3",
-    displayName: "Rohit Kumar",
-    mobile: "9876543212",
-    customer: { _id: "c3", name: "Rohit Kumar", mobile: "9876543212" },
-    vendor: { _id: "v3", name: "The Art Studio", companyName: "The Art Studio" },
-    label: "CSP · Rohit Kumar",
-    withdrawable: 8750,
-    withdrawableBalance: 8750,
-    status: "active",
-    sailorSharePercent: 70,
-    updatedAt: "2026-10-20T13:22:00Z",
-  },
-  {
-    _id: "bm-4",
-    displayName: "Creative Corner",
-    mobile: "9876543213",
-    customer: { _id: "c4", name: "Creative Corner", mobile: "9876543213" },
-    vendor: { _id: "v4", name: "Creative Corner", companyName: "Creative Corner" },
-    label: "CSP · Creative Corner",
-    withdrawable: 7686,
-    withdrawableBalance: 7686,
-    status: "active",
-    sailorSharePercent: 70,
-    updatedAt: "2026-10-19T17:10:00Z",
-  },
-  {
-    _id: "bm-5",
-    displayName: "Neha Singh",
-    mobile: "9876543214",
-    customer: { _id: "c5", name: "Neha Singh", mobile: "9876543214" },
-    vendor: { _id: "v5", name: "Brush & Beyond", companyName: "Brush & Beyond" },
-    label: "CSP · Neha Singh",
-    withdrawable: 6734,
-    withdrawableBalance: 6734,
-    status: "active",
-    sailorSharePercent: 70,
-    updatedAt: "2026-10-18T11:05:00Z",
-  },
-  {
-    _id: "bm-6",
-    displayName: "Ink & Impressions",
-    mobile: "9876543215",
-    customer: { _id: "c6", name: "Ink & Impressions", mobile: "9876543215" },
-    vendor: { _id: "v6", name: "Ink & Impressions", companyName: "Ink & Impressions" },
-    label: "CSP · Ink & Impressions",
-    withdrawable: 5208,
-    withdrawableBalance: 5208,
-    status: "active",
-    sailorSharePercent: 70,
-    updatedAt: "2026-10-18T15:48:00Z",
-  },
-  {
-    _id: "bm-7",
-    displayName: "Vikram Sahu",
-    mobile: "9876543216",
-    customer: { _id: "c7", name: "Vikram Sahu", mobile: "9876543216" },
-    vendor: { _id: "v7", name: "Studio 22", companyName: "Studio 22" },
-    label: "CSP · Vikram Sahu",
-    withdrawable: 4886,
-    withdrawableBalance: 4886,
-    status: "active",
-    sailorSharePercent: 70,
-    updatedAt: "2026-10-17T18:12:00Z",
-  },
-  {
-    _id: "bm-8",
-    displayName: "Artify Co.",
-    mobile: "9876543217",
-    customer: { _id: "c8", name: "Artify Co.", mobile: "9876543217" },
-    vendor: { _id: "v8", name: "Artify Co.", companyName: "Artify Co." },
-    label: "CSP · Artify Co.",
-    withdrawable: 4102,
-    withdrawableBalance: 4102,
-    status: "active",
-    sailorSharePercent: 70,
-    updatedAt: "2026-10-17T14:30:00Z",
-  },
-  {
-    _id: "bm-9",
-    displayName: "Meera Patel",
-    mobile: "9876543218",
-    customer: { _id: "c9", name: "Meera Patel", mobile: "9876543218" },
-    vendor: { _id: "v9", name: "Palette People", companyName: "Palette People" },
-    label: "CSP · Meera Patel",
-    withdrawable: 3304,
-    withdrawableBalance: 3304,
-    status: "active",
-    sailorSharePercent: 70,
-    updatedAt: "2026-10-16T16:22:00Z",
-  },
-  {
-    _id: "bm-10",
-    displayName: "Sneha Das",
-    mobile: "9876543219",
-    customer: { _id: "c10", name: "Sneha Das", mobile: "9876543219" },
-    vendor: { _id: "v10", name: "The Handmade Store", companyName: "The Handmade Store" },
-    label: "CSP · Sneha Das",
-    withdrawable: 2926,
-    withdrawableBalance: 2926,
-    status: "active",
-    sailorSharePercent: 70,
-    updatedAt: "2026-10-16T11:18:00Z",
-  },
-];
-
-const BENCHMARK_PRODUCT_COUNTS: Record<string, number> = {
-  "bm-1": 24,
-  "bm-2": 18,
-  "bm-3": 16,
-  "bm-4": 11,
-  "bm-5": 14,
-  "bm-6": 9,
-  "bm-7": 8,
-  "bm-8": 6,
-  "bm-9": 7,
-  "bm-10": 5,
-};
-
-const BENCHMARK_SALES: Record<string, number> = {
-  "bm-1": 18940,
-  "bm-2": 14320,
-  "bm-3": 12500,
-  "bm-4": 10980,
-  "bm-5": 9620,
-  "bm-6": 7440,
-  "bm-7": 6980,
-  "bm-8": 5860,
-  "bm-9": 4720,
-  "bm-10": 4180,
-};
+function partnerEarnings(row: CspEnrollment) {
+  const value = Number(
+    row.withdrawable ?? row.withdrawableBalance ?? row.affiliateBalance ?? 0,
+  );
+  return Number.isFinite(value) ? value : 0;
+}
 
 
 const REJECTION_REASONS = [
@@ -874,62 +721,27 @@ export default function CspScreen() {
     }
   };
 
-  // Determine active rows: prioritize real live rows if available, fallback gracefully
-  const hasLiveRecords = liveRows.length > 0;
-  const sourceRows = hasLiveRecords ? liveRows : BENCHMARK_ROWS;
+  const sourceRows = liveRows;
 
   // Counts for tabs
-  const activeCount = useMemo(() => {
-    if (hasLiveRecords) {
-      return liveRows.filter((r) => (r.status || "active") === "active").length;
-    }
-    return 32;
-  }, [hasLiveRecords, liveRows]);
+  const activeCount = useMemo(
+    () => liveRows.filter((r) => (r.status || "active") === "active").length,
+    [liveRows],
+  );
 
   const inactiveCount = applications.length;
 
-  // Compute stats for top KPI cards
-  const totalPartnersStat = hasLiveRecords ? liveRows.length : 48;
+  const totalPartnersStat = liveRows.length;
 
-  const totalEarningsStat = useMemo(() => {
-    if (hasLiveRecords) {
-      const sum = liveRows.reduce((acc, r) => {
-        const val = Number(
-          r.withdrawable ?? r.withdrawableBalance ?? r.affiliateBalance ?? 0,
-        );
-        return acc + (isNaN(val) ? 0 : val);
-      }, 0);
-      return sum > 0 ? sum : 87200;
-    }
-    return 87200;
-  }, [hasLiveRecords, liveRows]);
+  const totalEarningsStat = useMemo(
+    () => liveRows.reduce((sum, row) => sum + partnerEarnings(row), 0),
+    [liveRows],
+  );
 
-  const totalSalesStat = useMemo(() => {
-    if (hasLiveRecords) {
-      const sumEarnings = liveRows.reduce((acc, r) => {
-        const val = Number(
-          r.withdrawable ?? r.withdrawableBalance ?? r.affiliateBalance ?? 0,
-        );
-        return acc + (isNaN(val) ? 0 : val);
-      }, 0);
-      if (sumEarnings > 0) {
-        return Math.round(sumEarnings / 0.7);
-      }
-      return 124580;
-    }
-    return 124580;
-  }, [hasLiveRecords, liveRows]);
-
-  const totalDisplayedProducts = useMemo(() => {
-    if (hasLiveRecords) {
-      const sum = Object.values(productCounts).reduce(
-        (a, b) => a + (b || 0),
-        0,
-      );
-      return sum > 0 ? sum : 24;
-    }
-    return 24;
-  }, [hasLiveRecords, productCounts]);
+  const totalDisplayedProducts = useMemo(
+    () => Object.values(productCounts).reduce((sum, count) => sum + (count || 0), 0),
+    [productCounts],
+  );
 
   const activeDateRange = useMemo(
     () => presetRange(datePreset, fromDate, toDate),
@@ -1010,34 +822,10 @@ export default function CspScreen() {
           a.customer?.name || a.displayName || "",
         ),
       );
-    } else if (sortBy === "sales-desc") {
-      list.sort((a, b) => {
-        const sa =
-          BENCHMARK_SALES[a._id] ??
-          Math.round(Number(a.withdrawable || 0) / 0.7);
-        const sb =
-          BENCHMARK_SALES[b._id] ??
-          Math.round(Number(b.withdrawable || 0) / 0.7);
-        return sb - sa;
-      });
-    } else if (sortBy === "sales-asc") {
-      list.sort((a, b) => {
-        const sa =
-          BENCHMARK_SALES[a._id] ??
-          Math.round(Number(a.withdrawable || 0) / 0.7);
-        const sb =
-          BENCHMARK_SALES[b._id] ??
-          Math.round(Number(b.withdrawable || 0) / 0.7);
-        return sa - sb;
-      });
     } else if (sortBy === "earnings-desc") {
-      list.sort(
-        (a, b) => Number(b.withdrawable || 0) - Number(a.withdrawable || 0),
-      );
+      list.sort((a, b) => partnerEarnings(b) - partnerEarnings(a));
     } else if (sortBy === "earnings-asc") {
-      list.sort(
-        (a, b) => Number(a.withdrawable || 0) - Number(b.withdrawable || 0),
-      );
+      list.sort((a, b) => partnerEarnings(a) - partnerEarnings(b));
     }
     return list;
   }, [filteredActiveRows, sortBy]);
@@ -1191,21 +979,15 @@ export default function CspScreen() {
         const partnerName = r.customer?.name || r.displayName || "—";
         const brandName =
           r.vendor?.companyName || r.vendor?.name || r.label || "—";
-        const earnings = Number(
-          r.withdrawable ?? r.withdrawableBalance ?? 0,
-        );
-        const sales =
-          BENCHMARK_SALES[r._id] ??
-          (earnings > 0 ? Math.round(earnings / 0.7) : 0);
-        const productsCount =
-          productCounts[r._id] ?? BENCHMARK_PRODUCT_COUNTS[r._id] ?? 0;
+        const earnings = partnerEarnings(r);
+        const productsCount = productCounts[r._id] ?? 0;
 
         return {
           "#": idx + 1,
           Partner: partnerName,
           "Brand Name": brandName,
           "Mobile Number": r.mobile || r.customer?.mobile || "—",
-          "Sales (₹)": sales,
+          "Sales (₹)": 0,
           "Products (count)": productsCount,
           "Earnings (₹)": earnings,
           "Last Sale": formatLastSaleDate(r.updatedAt || r.createdAt),
@@ -1258,47 +1040,32 @@ export default function CspScreen() {
           return (
     <div className="min-w-0 space-y-5 p-2 sm:p-4 md:p-6 bg-[#fcfdfe] min-h-screen text-slate-800">
       {/* ── 1. Top Header ────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+      <div className="flex flex-row items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1">
+            <h1 className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-2xl">
               CSP Partners
             </h1>
-            {/* Playful orange decorative accent lines matching screenshot */}
-            <span
-              className="inline-flex items-center -mt-2 ml-0.5 select-none"
-              aria-hidden="true"
-            >
-              <svg
-                className="w-5 h-5 text-orange-500"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-              >
-                <line x1="8" y1="18" x2="15" y2="6" />
-                <line x1="14" y1="18" x2="21" y2="6" />
-              </svg>
-            </span>
           </div>
         
         </div>
 
-        <div className="flex items-center gap-3 self-start sm:self-auto">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           {/* Date Range Selector */}
           <div className="relative" ref={dateMenuRef}>
             <button
               type="button"
               onClick={() => setShowDateDropdown(!showDateDropdown)}
-              className="inline-flex max-w-[16rem] items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50 focus:outline-none transition-colors"
+              className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs font-medium text-slate-700 shadow-xs hover:bg-slate-50 focus:outline-none transition-colors sm:gap-2 sm:px-3.5 sm:text-sm"
             >
               <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
-              <span className="truncate">{dateFilterLabel}</span>
-              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+              <span>{dateFilterLabel}</span>
+              <ChevronDown
+                className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition ${showDateDropdown ? "rotate-180" : ""}`}
+              />
             </button>
             {showDateDropdown && (
-              <div className="absolute right-0 z-40 mt-1.5 w-56 rounded-xl border border-slate-100 bg-white p-1.5 shadow-lg">
+              <div className={`absolute right-0 z-50 mt-1 max-h-[16rem] overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-md ${datePreset === "custom" ? "w-44" : "w-36"}`}>
                 {DATE_PRESETS.map((item) => (
                   <button
                     key={item.id}
@@ -1307,20 +1074,20 @@ export default function CspScreen() {
                       setDatePreset(item.id);
                       if (item.id !== "custom") setShowDateDropdown(false);
                     }}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium text-left transition-colors ${
+                    className={`flex w-full items-center justify-between gap-2 px-2.5 py-1 text-left text-[11px] leading-4 transition-colors ${
                       datePreset === item.id
-                        ? "bg-orange-50 text-orange-600 font-semibold"
-                        : "text-slate-600 hover:bg-slate-50"
+                        ? "bg-orange-50 font-semibold text-orange-600"
+                        : "font-medium text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    {item.label}
+                    <span className="truncate">{item.label}</span>
                     {datePreset === item.id && (
-                      <Check className="h-3.5 w-3.5 text-orange-600" />
+                      <Check className="h-3 w-3 shrink-0 text-orange-600" />
                     )}
                   </button>
                 ))}
                 {datePreset === "custom" && (
-                  <div className="mt-1 space-y-2 border-t border-slate-100 px-2 py-2">
+                  <div className="mt-1 space-y-1.5 border-t border-slate-100 px-2 py-1.5">
                     <label className="block text-[11px] font-medium text-slate-500">
                       From
                       <input
@@ -1352,9 +1119,9 @@ export default function CspScreen() {
             <button
               type="button"
               onClick={() => setShowEnroll(true)}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#ff5a36] px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-xs hover:bg-[#ea4824] transition-all cursor-pointer active:scale-98"
+              className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl bg-[#ff5a36] px-2.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#ea4824] transition-all cursor-pointer active:scale-98 sm:gap-2 sm:px-4 sm:text-sm"
             >
-              <PlusCircle className="h-4 w-4" />
+              <PlusCircle className="h-4 w-4 shrink-0" />
               <span>Add Partner</span>
             </button>
           </Can>
@@ -1377,10 +1144,6 @@ export default function CspScreen() {
             <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
               {totalPartnersStat}
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
-              <span>↗ +12%</span>
-              <span className="font-normal text-slate-400">vs last month</span>
-            </div>
           </div>
         </div>
 
@@ -1396,7 +1159,7 @@ export default function CspScreen() {
           </div>
           <div className="mt-3">
             <div className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              ₹{totalSalesStat.toLocaleString("en-IN")}
+              ₹0
             </div>
             <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
               <div>
@@ -1404,14 +1167,8 @@ export default function CspScreen() {
                   ₹{totalEarningsStat.toLocaleString("en-IN")}
                 </div>
                 <div className="text-[10px] text-slate-400">
-                  Partners' Earnings (70%)
+                  Partners' Earnings
                 </div>
-              </div>
-              <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                <span>↗ +28%</span>
-                <span className="font-normal text-slate-400 hidden xl:inline">
-                  vs last month
-            </span>
               </div>
             </div>
           </div>
@@ -1433,18 +1190,12 @@ export default function CspScreen() {
                 {totalDisplayedProducts}
               </div>
               <div className="text-[11px] text-slate-400 font-medium">Displayed</div>
-              <div className="mt-1 text-xs font-semibold text-emerald-600">
-                ↗ +6%
-              </div>
             </div>
             <div className="pl-3">
               <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                312
+                0
               </div>
               <div className="text-[11px] text-slate-400 font-medium">Units Sold</div>
-              <div className="mt-1 text-xs font-semibold text-emerald-600">
-                ↗ +33%
-              </div>
             </div>
           </div>
         </div>
@@ -1462,22 +1213,15 @@ export default function CspScreen() {
           <div className="mt-4 grid grid-cols-2 gap-3 divide-x divide-slate-100">
             <div>
               <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                ₹62,400
+                ₹0
               </div>
               <div className="text-[11px] text-slate-400 font-medium">Completed</div>
-              <div className="mt-1 text-xs font-semibold text-emerald-600">
-                ↗ +22%
-              </div>
             </div>
             <div className="pl-3">
               <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                ₹24,800
+                ₹0
               </div>
               <div className="text-[11px] text-slate-400 font-medium">Pending</div>
-              <div className="mt-1 flex items-center gap-1 text-xs font-medium text-orange-600">
-                <Clock className="h-3.5 w-3.5 text-orange-500 shrink-0" />
-                <span>8 pending</span>
-              </div>
             </div>
           </div>
         </div>
@@ -1518,9 +1262,9 @@ export default function CspScreen() {
       </div>
 
       {/* ── 4. Toolbar: Search, Filter, Sort, Export ─────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-row items-center gap-2">
         {/* Dynamic Search Input based on Active Tab */}
-        <div className="relative w-full sm:max-w-md">
+        <div className="relative min-w-0 flex-1 sm:max-w-md">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -1550,7 +1294,7 @@ export default function CspScreen() {
         </div>
 
         {/* Right Tools */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="flex shrink-0 items-center gap-2">
           {/* Filter Dropdown */}
           <div className="relative">
             <button
@@ -1741,23 +1485,9 @@ export default function CspScreen() {
                       "";
                     const { initials, palette } = getAvatar(partnerName, globalIdx);
 
-                    const withdrawableAmt = Number(
-                      row.withdrawable ??
-                        row.withdrawableBalance ??
-                        row.affiliateBalance ??
-                        0,
-                    );
-
-                    const salesAmt =
-                      BENCHMARK_SALES[row._id] ??
-                      (withdrawableAmt > 0
-                        ? Math.round(withdrawableAmt / 0.7)
-                        : 0);
-
-                    const prodCount =
-                      productCounts[row._id] ??
-                      BENCHMARK_PRODUCT_COUNTS[row._id] ??
-                      0;
+                    const withdrawableAmt = partnerEarnings(row);
+                    const salesAmt = 0;
+                    const prodCount = productCounts[row._id] ?? 0;
 
                     const lastSaleDate = formatLastSaleDate(
                       row.updatedAt || row.createdAt,
@@ -2064,23 +1794,9 @@ export default function CspScreen() {
                   "";
                 const { initials, palette } = getAvatar(partnerName, globalIdx);
 
-                const withdrawableAmt = Number(
-                  row.withdrawable ??
-                    row.withdrawableBalance ??
-                    row.affiliateBalance ??
-                    0,
-                );
-
-                const salesAmt =
-                  BENCHMARK_SALES[row._id] ??
-                  (withdrawableAmt > 0
-                    ? Math.round(withdrawableAmt / 0.7)
-                    : 0);
-
-                const prodCount =
-                  productCounts[row._id] ??
-                  BENCHMARK_PRODUCT_COUNTS[row._id] ??
-                  0;
+                const withdrawableAmt = partnerEarnings(row);
+                const salesAmt = 0;
+                const prodCount = productCounts[row._id] ?? 0;
 
                 const lastSaleDate = formatLastSaleDate(
                   row.updatedAt || row.createdAt,
