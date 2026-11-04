@@ -8,6 +8,7 @@ import Product from '../models/product.model.js';
 import Wallet from '../models/wallet.model.js';
 import WalletWithdrawal from '../models/walletWithdrawal.model.js';
 import {resolveTwoBuckets} from '../utils/walletBuckets.js';
+import {attachMembershipExpiry} from '../services/membershipEligibility.service.js';
 
 const getsailorSharePercent = () => {
   const n = Number(process.env.CSP_sailor_SHARE_PERCENT ?? 70);
@@ -813,6 +814,8 @@ const collectCspPartnerDetails = async (enrollment, {activityLimit = 8} = {}) =>
           ? application.categories.filter(Boolean)
           : [],
         membershipType: textOrEmpty(dto.customer?.membershipType),
+        membershipEndDate: dto.customer?.membershipEndDate || null,
+        membershipExpired: Boolean(dto.customer?.membershipExpired),
         sailorSharePercent:
           dto.sailorSharePercent == null ? null : Number(dto.sailorSharePercent),
         platformSharePercent:
