@@ -50,6 +50,7 @@ import {
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 
 type SubscriptionStatus =
   | "active"
@@ -257,9 +258,14 @@ export default function SubscriptionScreen() {
   >([]);
   const [subscriptionTypeFilter, setSubscriptionTypeFilter] = useState("all");
   const [expiryFilter, setExpiryFilter] = useState("all");
-  const [datePreset, setDatePreset] = useState<DatePreset>("all");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter("subscription", "all", DATE_PRESET_OPTIONS.map((opt) => opt.value), rangeForPreset);
   const [data, setData] = useState<SubscriptionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedActionRow, setSelectedActionRow] =

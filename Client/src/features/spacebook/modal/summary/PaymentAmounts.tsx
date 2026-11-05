@@ -26,7 +26,7 @@ export default function PaymentAmounts({
         <span>Paid price</span>
         <span className="font-semibold text-emerald-700">{inr(paidPrice)}</span>
       </div>
-      {pendingPrice > 0 ? (
+      {pendingPrice >= 1 ? (
         <div className="flex items-center justify-between border-t border-slate-200 pt-1.5 font-semibold text-amber-700">
           <span>Pending price</span>
           <span>{inr(pendingPrice)}</span>

@@ -31,10 +31,10 @@ import {
 } from "@/services/apiClient";
 import {
   SALES_DATE_PRESET_OPTIONS,
-  getTodayYmd,
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import SalesHeaderNav from "../components/SalesHeaderNav";
 import CreatePosScreen, { INVOICE_SAVED_EVENT } from "./CreatePosScreen";
 import CreateInvoiceScreen from "./CreateInvoiceScreen";
@@ -190,9 +190,14 @@ export default function PosScreen() {
     searchParams.get("tab")?.toLowerCase() === "draft" ? "Draft" : "All",
   );
   const [search, setSearch] = useState("");
-  const [datePreset, setDatePreset] = useState<DatePreset>("today");
-  const [fromDate, setFromDate] = useState(getTodayYmd);
-  const [toDate, setToDate] = useState(getTodayYmd);
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter("pos", "today", SALES_DATE_PRESET_OPTIONS.map((opt) => opt.value), rangeForPreset);
   const [data, setData] = useState<PosRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedActionRow, setSelectedActionRow] = useState<PosRow | null>(

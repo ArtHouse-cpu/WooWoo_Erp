@@ -4,6 +4,7 @@ import {
   handleGetInvoices,
   handleGetPurchases,
 } from "@/services/apiClient";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import {
   CreditCard,
   ArrowUpRight,
@@ -109,11 +110,27 @@ const InventorypaymentsScreen = () => {
   const [statusFilter, setStatusFilter] = useState<
     "ALL" | "Paid" | "Partial" | "Pending" | "Cancelled"
   >("ALL");
-  const [timeRange, setTimeRange] = useState("lifetime");
-  const [dateRange, setDateRange] = useState({
-    start: "",
-    end: "",
-  });
+  const {
+    datePreset: timeRange,
+    setDatePreset: setTimeRange,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter(
+    "inventory-payments",
+    "lifetime",
+    ["lifetime", "today", "yesterday", "this_week", "this_month", "last_month", "this_year"] as const,
+    (preset) => {
+      const range = getPeriodRange(preset);
+      return { from: range.start, to: range.end };
+    },
+  );
+  const dateRange = { start: fromDate, end: toDate };
+  const setDateRange = (range: { start: string; end: string }) => {
+    setFromDate(range.start);
+    setToDate(range.end);
+  };
   const [selectedPayment, setSelectedPayment] = useState<PaymentEntry | null>(null);
 
   const handleTimeRangeChange = (period: string) => {

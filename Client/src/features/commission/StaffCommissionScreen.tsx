@@ -22,6 +22,7 @@ import {
   DATE_PRESET_OPTIONS,
   rangeForPreset,
 } from "../../utils/datePresets";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { handleGetStaffCommission ,handleGetSubscriptions} from "@/services/apiClient";
 import SetCommissionRuleModal from "./Modal/SetCommissionRuleModal";
 
@@ -30,14 +31,15 @@ const StaffCommissionScreen = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
-  const [datePreset, setDatePreset] = useState<DatePreset>("month");
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter("staff-commission", "month", DATE_PRESET_OPTIONS.map((opt) => opt.value), rangeForPreset);
   const [subscriptions, setSubscriptions] = useState<any[]>([]);
-  const [fromDate, setFromDate] = useState<string>(
-    () => rangeForPreset("month").from
-  );
-  const [toDate, setToDate] = useState<string>(
-    () => rangeForPreset("month").to
-  );
   const [isCommissionModalOpen, setIsCommissionModalOpen] = useState(false);
 
   useEffect(() => {

@@ -34,10 +34,10 @@ import {
 } from "@/services/apiClient";
 import {
   DATE_PRESET_OPTIONS,
-  getTodayYmd,
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { useNavigate } from "react-router-dom";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import Can from "@/components/rbac/Can";
@@ -188,9 +188,14 @@ export default function PurchaseOrderScreen() {
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
   const [activeTab, setActiveTab] = useState<POTabStatus | "All">("All");
   const [search, setSearch] = useState("");
-  const [datePreset, setDatePreset] = useState<DatePreset>("today");
-  const [fromDate, setFromDate] = useState(getTodayYmd);
-  const [toDate, setToDate] = useState(getTodayYmd);
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter("purchase-order", "today", DATE_PRESET_OPTIONS.map((opt) => opt.value), rangeForPreset);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<PurchaseOrderListRow[]>([]);
   const [selectedActionRow, setSelectedActionRow] =

@@ -30,10 +30,10 @@ import {
 } from "@/services/apiClient";
 import {
   DATE_PRESET_OPTIONS,
-  getTodayYmd,
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
   buildWoowooInvoiceWhatsAppMessage,
@@ -164,9 +164,14 @@ export default function CreditNoteScreen() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<CreditNoteStatus | "All">("All");
   const [search, setSearch] = useState("");
-  const [datePreset, setDatePreset] = useState<DatePreset>("today");
-  const [fromDate, setFromDate] = useState(getTodayYmd);
-  const [toDate, setToDate] = useState(getTodayYmd);
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter("credit-note", "today", DATE_PRESET_OPTIONS.map((opt) => opt.value), rangeForPreset);
   const [data, setData] = useState<CreditNoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);

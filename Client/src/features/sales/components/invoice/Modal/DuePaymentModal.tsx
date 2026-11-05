@@ -13,11 +13,13 @@ import {
   handleGetWalletById,
   handleGetWallets,
   handleUpdateInvoice,
+  type VerifiedStaff,
 } from "@/services/apiClient";
 import { useAppSelector } from "@/store/hooks";
 import { resolveWalletBalance } from "@/utils/resolveWalletBalance";
 import { nearestRupee, roundPayable } from "@/features/sales/utils/paymentRoundOff";
 import { closeIfConfirmed } from "@/utils/confirmClose";
+import StaffVerifyModal from "./StaffVerifyModal";
 
 type SplitKey = "cash" | "upi" | "card" | "wallet";
 
@@ -51,6 +53,8 @@ type Props = {
   onSuccess: () => void;
   /** When set, record against this document instead of an invoice. */
   onRecordPayment?: (payload: DuePaymentPayload) => Promise<void>;
+  /** Ask for the staff PIN before the payment is saved. */
+  verifyPin?: boolean;
 };
 
 const EMPTY_SPLIT: SplitPayments = {
@@ -73,12 +77,14 @@ export default function DuePaymentModal({
   invoice,
   onSuccess,
   onRecordPayment,
+  verifyPin = false,
 }: Props) {
   const [payAmount, setPayAmount] = useState(0);
   const [paymentMode, setPaymentMode] = useState("Cash");
   const [isMultiMode, setIsMultiMode] = useState(false);
   const [splitPayments, setSplitPayments] = useState<SplitPayments>(EMPTY_SPLIT);
   const [loading, setLoading] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
   const staff = useAppSelector((state) => state.user);
 
   const dueAmount = nearestRupee(Number(invoice?.dueAmount ?? 0));
@@ -93,6 +99,7 @@ export default function DuePaymentModal({
     setIsMultiMode(false);
     setSplitPayments(EMPTY_SPLIT);
     setLoading(false);
+    setPinOpen(false);
   }, [open, invoice]);
 
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
@@ -179,7 +186,7 @@ export default function DuePaymentModal({
     });
   };
 
-  const handlePay = async () => {
+  const handlePay = async (verified?: VerifiedStaff) => {
     if (thisPaymentAmount <= 0) {
       Swal.fire(
         "Invalid amount",
@@ -194,6 +201,11 @@ export default function DuePaymentModal({
         `Payment cannot exceed due amount (₹${dueAmount})`,
         "warning",
       );
+      return;
+    }
+
+    if (verifyPin && !verified) {
+      setPinOpen(true);
       return;
     }
 
@@ -233,10 +245,11 @@ export default function DuePaymentModal({
 
       const newPaidAmount =
         (Number(currentBreakdown.paidAmount) || 0) + thisPaymentAmount;
-      const newDueAmount = Math.max(
+      const rawDueLeft = Math.max(
         0,
         (Number(currentBreakdown.dueAmount) || dueAmount) - thisPaymentAmount,
       );
+      const newDueAmount = rawDueLeft < 1 ? 0 : rawDueLeft;
 
       const nextCash = (Number(currentBreakdown.cash) || 0) + addCash;
       const nextUpi = (Number(currentBreakdown.upi) || 0) + addUpi;
@@ -277,7 +290,7 @@ export default function DuePaymentModal({
           date: new Date().toISOString(),
           amount: thisPaymentAmount,
           mode: historyMode,
-          receivedBy: staff?.m_staff_name || "Unknown",
+          receivedBy: verified?.name || verified?.staffName || staff?.m_staff_name || "Unknown",
         },
       };
 
@@ -687,6 +700,14 @@ export default function DuePaymentModal({
           </button>
         </div>
       </div>
+      <StaffVerifyModal
+        open={pinOpen}
+        onClose={() => setPinOpen(false)}
+        onVerified={({ staff: verified }) => {
+          setPinOpen(false);
+          void handlePay(verified);
+        }}
+      />
     </div>
   );
 }

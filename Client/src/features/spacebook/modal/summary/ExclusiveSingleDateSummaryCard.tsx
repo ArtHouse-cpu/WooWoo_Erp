@@ -11,15 +11,13 @@ import {
 } from "lucide-react";
 
 import type { SpacePayload } from "@/services/apiClient";
+import SpaceMediaCarousel from "../SpaceMediaCarousel";
 import type { SelectedServiceItem, SummaryFoodItem } from "./CoworkingSummaryCard";
 import PaymentAmounts from "./PaymentAmounts";
 import SelectedSpacesSummary, {
   SpaceChargeBreakdown,
   type SummaryBookedSpace,
 } from "./SelectedSpacesSummary";
-
-const FALLBACK_SPACE_IMAGE =
-  "https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=400&q=80";
 
 export type ExclusiveSingleDateSummaryCardProps = {
   space: SpacePayload | null;
@@ -105,30 +103,14 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   const totalPrice = storedSubTotal > 0 ? storedSubTotal : subTotal;
   const payPrice = storedGrandTotal > 0 ? storedGrandTotal : grandTotal;
   const paidPrice = Math.max(0, Number(paidAmount) || 0);
+  const pendingFromPaid = Math.max(0, payPrice - paidPrice);
+  const pendingFromDue =
+    dueAmount == null ? pendingFromPaid : Math.max(0, Number(dueAmount) || 0);
   const pendingPrice =
-    dueAmount == null
-      ? Math.max(0, payPrice - paidPrice)
-      : Math.max(0, Number(dueAmount) || 0);
+    Math.min(pendingFromPaid, pendingFromDue) < 1
+      ? 0
+      : Math.min(pendingFromPaid, pendingFromDue);
 
-  /* --------------------------------
-     Space image
-  -------------------------------- */
-
-  const spaceImg =
-    space?.images?.[0] ||
-    space?.imageUrl ||
-    (space as any)?.image ||
-    FALLBACK_SPACE_IMAGE;
-
-  /* --------------------------------
-     Image fallback
-  -------------------------------- */
-
-  const handleImageError = (
-    event: React.SyntheticEvent<HTMLImageElement>,
-  ) => {
-    event.currentTarget.src = FALLBACK_SPACE_IMAGE;
-  };
 
   return (
     <div className="flex h-full flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5">
@@ -157,11 +139,10 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
         <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5">
 
           {/* Space Image */}
-          <img
-            src={spaceImg}
+          <SpaceMediaCarousel
+            space={space}
             alt={space?.name || "Space"}
-            className="h-13 w-13 shrink-0 rounded-lg border border-slate-200/80 object-cover"
-            onError={handleImageError}
+            className="h-13 w-13 shrink-0 rounded-lg border border-slate-200/80"
           />
 
           {/* Space Information */}

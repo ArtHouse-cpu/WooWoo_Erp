@@ -29,10 +29,10 @@ import { useNavigate } from "react-router-dom";
 import { handleGetPurchaseReturns } from "@/services/apiClient";
 import {
   DATE_PRESET_OPTIONS,
-  getTodayYmd,
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import Swal from "sweetalert2";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
@@ -110,9 +110,14 @@ export default function DebitNoteScreen() {
   const [activeTab, setActiveTab] = useState<string>("All");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
-  const [datePreset, setDatePreset] = useState<DatePreset>("today");
-  const [fromDate, setFromDate] = useState(getTodayYmd);
-  const [toDate, setToDate] = useState(getTodayYmd);
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter("debit-note", "today", DATE_PRESET_OPTIONS.map((opt) => opt.value), rangeForPreset);
   const [selectedActionRow, setSelectedActionRow] = useState<DebitNoteRow | null>(
     null,
   );

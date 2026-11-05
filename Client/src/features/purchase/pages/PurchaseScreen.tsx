@@ -35,10 +35,10 @@ import {
 } from "@/services/apiClient";
 import {
   DATE_PRESET_OPTIONS,
-  getTodayYmd,
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { useAppSelector } from "@/store/hooks";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import Can from "@/components/rbac/Can";
@@ -209,9 +209,14 @@ export default function PurchaseScreen() {
   const [activeTab, setActiveTab] = useState<PurchaseTabStatus | "All">("All");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
-  const [datePreset, setDatePreset] = useState<DatePreset>("today");
-  const [fromDate, setFromDate] = useState(getTodayYmd);
-  const [toDate, setToDate] = useState(getTodayYmd);
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter("purchase", "today", DATE_PRESET_OPTIONS.map((opt) => opt.value), rangeForPreset);
 
   const [data, setData] = useState<PurchaseListRow[]>([]);
   const [selectedActionRow, setSelectedActionRow] =

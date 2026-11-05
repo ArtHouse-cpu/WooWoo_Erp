@@ -2308,6 +2308,30 @@ export type SpaceBookingPayload = {
   dueAmount?: number;
   paymentStatus?: "full" | "partial" | "";
   paymentMode?: string;
+  originalAmount?: number;
+  payments?: Array<{
+    kind: "payment" | "refund";
+    amount: number;
+    mode?: string;
+    walletType?: string;
+    note?: string;
+    createdAt?: string;
+  }>;
+  reschedules?: Array<{
+    previousDate?: string;
+    newDate?: string;
+    previousStart?: string;
+    previousEnd?: string;
+    newStart?: string;
+    newEnd?: string;
+    previousDay?: string;
+    newDay?: string;
+    previousAmount?: number;
+    newAmount?: number;
+    difference?: number;
+    refundMode?: string;
+    createdAt?: string;
+  }>;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -2446,6 +2470,18 @@ export const handleUpdateAllBooking = async (
   payload: AllBookingWritePayload,
 ) => {
   const response = await axiosInstance.patch(`/all-booking/${id}`, payload);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    booking?: AllBookingRow;
+  };
+};
+
+export const handleReceiveAllBookingPayment = async (
+  id: string,
+  payload: { amount: number; mode: string; walletAmount?: number },
+) => {
+  const response = await axiosInstance.post(`/all-booking/${id}/payments`, payload);
   return response.data as {
     success: boolean;
     message?: string;
@@ -2716,6 +2752,89 @@ export const handleUpdateSpaceBooking = async (
   payload: Partial<SpaceBookingPayload>,
 ) => {
   const response = await axiosInstance.patch(`/space-bookings/${id}`, payload);
+  return response.data as {
+    success: boolean;
+    message?: string;
+    booking?: SpaceBookingPayload;
+  };
+};
+
+export type SpaceRescheduleQuote = {
+  bookingId: string;
+  customerName: string;
+  customerPhone?: string;
+  customerId?: string;
+  membershipType?: string;
+  membershipLabel?: string;
+  membershipPlanId?: string;
+  membershipPercent?: number;
+  membershipDiscount?: number;
+  spaceName: string;
+  currentDate?: string;
+  currentStart?: string;
+  currentEnd?: string;
+  currentDay?: string;
+  previousAmount: number;
+  paidAmount: number;
+  newDate: string;
+  newStart: string;
+  newEnd: string;
+  newDay: string;
+  hourlyRate: number;
+  hours: number;
+  newAmount: number;
+  difference: number;
+  additionalDue: number;
+  pendingAfter: number;
+  refundable: number;
+  spaceId: string;
+};
+
+export const handleQuoteSpaceReschedule = async (
+  id: string,
+  params: { bookingDate: string; startTime: string; endTime: string; dayType?: string },
+) => {
+  const response = await axiosInstance.get(
+    `/space-bookings/${id}/reschedule-quote`,
+    { params },
+  );
+  return response.data as {
+    success: boolean;
+    message?: string;
+    quote?: SpaceRescheduleQuote;
+  };
+};
+
+export const handleRescheduleSpaceBooking = async (
+  id: string,
+  payload: {
+    bookingDate: string;
+    startTime: string;
+    endTime: string;
+    dayType?: string;
+    payment?: { mode: string; amount: number; walletType?: string } | null;
+    refund?: { mode: string; walletType?: string } | null;
+  },
+) => {
+  const response = await axiosInstance.post(
+    `/space-bookings/${id}/reschedule`,
+    payload,
+  );
+  return response.data as {
+    success: boolean;
+    message?: string;
+    booking?: SpaceBookingPayload;
+  };
+};
+
+export const handleReceiveSpaceBookingPayment = async (
+  id: string,
+  payload: { amount: number; mode: string; walletType?: string },
+) => {
+  const response = await axiosInstance.post(
+    `/space-bookings/${id}/payments`,
+    payload,
+  );
   return response.data as {
     success: boolean;
     message?: string;

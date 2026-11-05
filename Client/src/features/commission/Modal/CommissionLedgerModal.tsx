@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import {
   X,
   Search,
@@ -105,15 +106,19 @@ const CommissionLedgerModal = ({
 }: CommissionLedgerModalProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("All");
-  const [timeRange, setTimeRange] = useState<string>("this_month");
-  const [customFromDate, setCustomFromDate] = useState<string>("");
-  const [customToDate, setCustomToDate] = useState<string>("");
-
-  useEffect(() => {
-    if (isOpen) {
-      setTimeRange("this_month");
-    }
-  }, [isOpen, staff]);
+  const {
+    datePreset: timeRange,
+    setDatePreset: setTimeRange,
+    fromDate: customFromDate,
+    setFromDate: setCustomFromDate,
+    toDate: customToDate,
+    setToDate: setCustomToDate,
+  } = usePersistedDateFilter(
+    "commission-ledger",
+    "this_month",
+    ["lifetime", "today", "this_week", "this_month", "last_month", "this_year", "last_year", "custom"],
+    () => ({ from: "", to: "" }),
+  );
 
   const invoices = useMemo(() => staff?.invoices || [], [staff]);
 

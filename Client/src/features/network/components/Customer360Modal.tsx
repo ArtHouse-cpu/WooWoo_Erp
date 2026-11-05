@@ -14,6 +14,7 @@ import {
   type Customer360WalletTx,
 } from "@/services/apiClient";
 import { closeIfConfirmed } from "@/utils/confirmClose";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 
 type Tab = "overview" | "purchases" | "program" | "bookings" | "memberships" | "wallet" | "timeline";
 type ProgramTab = "csp" | "hap";
@@ -129,7 +130,13 @@ export default function Customer360Modal({
   const { canPath } = usePermission();
   const [tab, setTab] = useState<Tab>("overview");
   const [sort, setSort] = useState<CreatedSort>("newest");
-  const [dateRange, setDateRange] = useState<DateRange>("");
+  const { datePreset: dateRange, setDatePreset: setDateRange } =
+    usePersistedDateFilter<DateRange>(
+      "customer-360",
+      "",
+      ["", "today", "this-week", "this-month", "last-month", "this-year", "last-year"],
+      () => ({ from: "", to: "" }),
+    );
   const [sale, setSale] = useState<Customer360Purchase | null>(null);
   const [data, setData] = useState<Customer360Response | null>(null);
   const [loading, setLoading] = useState(true);

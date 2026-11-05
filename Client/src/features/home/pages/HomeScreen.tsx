@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
@@ -36,6 +36,7 @@ import {
   handleDeleteCustomer,
   handleDeleteInvoice,
   handleGetAllBookings,
+  handleReceiveAllBookingPayment,
   handleGetCategories,
   handleGetCustomers,
   handleGetDashboardSummary,
@@ -66,6 +67,7 @@ import {
   type DashboardSummaryData,
   type MembershipPlanPayload,
 } from "@/services/apiClient";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { usePermission } from "@/hooks/usePermission";
 import { useAppSelector } from "@/store/hooks";
 import RevenueCard from "@/features/home/components/RevenueCard";
@@ -81,6 +83,7 @@ import AddFoodModal, {
 import CreatePosScreen, {
   INVOICE_SAVED_EVENT,
 } from "@/features/sales/pages/CreatePosScreen";
+import DuePaymentModal from "@/features/sales/components/invoice/Modal/DuePaymentModal";
 import MobileInvoiceDetailsModal from "@/features/sales/components/invoice/Modal/MobileInvoiceDetailsModal";
 import SalesReturnFlowModal from "@/features/sales/components/invoice/Modal/SalesReturnFlowModal";
 import { currentInvoiceTotal } from "@/features/sales/utils/salesReturn";
@@ -156,6 +159,47 @@ type GenericRow = {
   day?: string;
   raw?: Record<string, unknown>;
 };
+
+function bookingDueInvoice(row: GenericRow) {
+  const raw = row.raw || {};
+  const due = Number(row.dueAmount || 0);
+  const total = Number(row.numAmount || raw.grandTotal || 0);
+  const paid = Math.max(0, total - due);
+  const storedItems = Array.isArray(raw.items) ? raw.items : [];
+  const items = storedItems.length
+    ? storedItems
+    : [
+        {
+          productName: String(raw.spaceName || row.subtitle || "Booking"),
+          qty: Number(raw.durationHours || raw.spaceQty || 1) || 1,
+          unitPrice: Number(raw.unitPrice || total),
+          lineTotal: total,
+        },
+      ];
+  const breakdown = (raw.paymentBreakdown || {}) as Record<string, number>;
+  return {
+    _id: row.id.startsWith("invoice-") ? row.id.slice("invoice-".length) : row.id,
+    bill: row.code || "Booking",
+    customer: row.title,
+    amount: total,
+    dueAmount: due,
+    customerPhone: row.phone || "",
+    raw: {
+      ...raw,
+      customerPhone: raw.customerPhone || row.phone || "",
+      items,
+      paymentBreakdown: {
+        cash: Number(breakdown.cash || 0),
+        upi: Number(breakdown.upi || 0),
+        card: Number(breakdown.card || 0),
+        wallet: Number(breakdown.wallet || 0),
+        paidAmount: Number(breakdown.paidAmount ?? paid),
+        dueAmount: Number(breakdown.dueAmount ?? due),
+        changeAmount: Number(breakdown.changeAmount || 0),
+      },
+    },
+  };
+}
 
 const PAGE_SIZE = 5;
 
@@ -558,12 +602,24 @@ export default function HomeScreen() {
 
   const [tab, setTab] = useState<TabKey>("bills");
   const [search, setSearch] = useState("");
+  const [listTick, setListTick] = useState(0);
+  const [duePay, setDuePay] = useState<GenericRow | null>(null);
   /** Bills / customers table filter (independent of KPI dropdown). */
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
-  /** KPI cards period — drives /dashboard/summary */
-  const [kpiPeriod, setKpiPeriod] = useState<DashboardPeriod>("today");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
+  /** KPI cards period — drives /dashboard/summary and the list tabs. */
+  const {
+    datePreset: kpiPeriod,
+    setDatePreset: setKpiPeriod,
+    fromDate: customFrom,
+    setFromDate: setCustomFrom,
+    toDate: customTo,
+    setToDate: setCustomTo,
+  } = usePersistedDateFilter<DashboardPeriod>(
+    "dashboard",
+    "today",
+    KPI_PERIOD_OPTIONS.map((opt) => opt.value),
+    () => ({ from: "", to: "" }),
+  );
   const listBounds = useMemo(
     () => dashboardListBounds(kpiPeriod, customFrom, customTo),
     [kpiPeriod, customFrom, customTo],
@@ -923,11 +979,12 @@ export default function HomeScreen() {
                 meta: String(b.status || "Upcoming"),
                 amount: formatMoney(Number(b.grandTotal ?? 0)),
                 numAmount: Number(b.grandTotal ?? 0),
-                dueAmount: Number(b.dueAmount ?? 0),
+                dueAmount: Number(b.dueAmount ?? 0) < 1 ? 0 : Number(b.dueAmount ?? 0),
                 createdAt: dateObj,
                 phone: b.customerPhone || b.customer?.phone || "",
                 code,
-                paymentType: b.paymentStatus || "—",
+                paymentType:
+                  Number(b.dueAmount ?? 0) < 1 ? "full" : b.paymentStatus || "—",
                 inclusions,
                 badge: b.membershipType || b.customer?.membershipType || "",
                 raw: b as unknown as Record<string, unknown>,
@@ -961,7 +1018,7 @@ export default function HomeScreen() {
                 meta: String(invoice?.status || "final"),
                 amount: formatMoney(Number(invoice?.grandTotal ?? 0)),
                 numAmount: Number(invoice?.grandTotal ?? 0),
-                dueAmount: due,
+                dueAmount: due > 0 && due < 1 ? 0 : due,
                 createdAt:
                   parseDate(invoice?.invoiceDate) || parseDate(invoice?.createdAt),
                 phone: String(invoice?.customerPhone || ""),
@@ -1201,6 +1258,7 @@ export default function HomeScreen() {
     listBounds.fromDate,
     listBounds.ready,
     listBounds.toDate,
+    listTick,
   ]);
 
   const kpiPeriodLabel =
@@ -2001,6 +2059,11 @@ export default function HomeScreen() {
     }
     navigate("/allBookings");
   };
+
+  const openDuePay = (row: GenericRow) => {
+    setDuePay(row);
+  };
+
 
   return (
     <div className="mx-auto w-full max-w-[1400px] space-y-5 font-sans">
@@ -2901,6 +2964,15 @@ export default function HomeScreen() {
                           className="flex shrink-0 items-center gap-1.5"
                           onClick={(e) => e.stopPropagation()}
                         >
+                          {(row.dueAmount ?? 0) > 0.009 ? (
+                            <button
+                              type="button"
+                              onClick={() => openDuePay(row)}
+                              className="rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700"
+                            >
+                              Due pay
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             onClick={() => handleMobileBookingClick(row)}
@@ -3012,8 +3084,20 @@ export default function HomeScreen() {
                           <td className="px-4 py-3 text-gray-600">
                             {row.paymentType || "—"}
                           </td>
-                          <td className="px-4 py-3 text-right font-semibold text-gray-900">
-                            {row.amount}
+                          <td className="px-4 py-3 text-right">
+                            <p className="font-semibold text-gray-900">{row.amount}</p>
+                            {(row.dueAmount ?? 0) > 0.009 ? (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openDuePay(row);
+                                }}
+                                className="mt-1 text-[11px] font-semibold text-amber-700 hover:underline"
+                              >
+                                Due {formatMoney(row.dueAmount || 0)} · Pay
+                              </button>
+                            ) : null}
                           </td>
                         </tr>
                       );
@@ -4593,6 +4677,28 @@ export default function HomeScreen() {
       )}
 
       {/* Edit Food Modal */}
+      <DuePaymentModal
+        open={Boolean(duePay)}
+        onClose={() => setDuePay(null)}
+        invoice={duePay ? bookingDueInvoice(duePay) : null}
+        verifyPin
+        onSuccess={() => setListTick((tick) => tick + 1)}
+        onRecordPayment={
+          duePay && !duePay.id.startsWith("invoice-")
+            ? async (payload) => {
+                const previousWallet = Number(
+                  (duePay.raw?.paymentBreakdown as { wallet?: number } | undefined)?.wallet || 0,
+                );
+                await handleReceiveAllBookingPayment(duePay.id, {
+                  amount: payload.newPayment.amount,
+                  mode: payload.newPayment.mode,
+                  walletAmount: Math.max(0, Number(payload.paymentBreakdown.wallet || 0) - previousWallet),
+                });
+              }
+            : undefined
+        }
+      />
+
       {showAddFoodModal && (
         <AddFoodModal
           open={showAddFoodModal}

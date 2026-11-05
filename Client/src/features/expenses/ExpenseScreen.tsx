@@ -51,6 +51,7 @@ import {
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
 
@@ -766,10 +767,15 @@ export default function ExpenseScreen() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | "Paid" | "Pending">("All");
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  const [datePreset, setDatePreset] = useState<DatePreset>("month");
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter("expense", "month", DATE_PRESET_OPTIONS.map((opt) => opt.value), rangeForPreset);
   const [showDateDropdown, setShowDateDropdown] = useState(false);
-  const [fromDate, setFromDate] = useState(() => rangeForPreset("month").from);
-  const [toDate, setToDate] = useState(() => rangeForPreset("month").to);
 
   const mobileDateDropdownRef = useRef<HTMLDivElement | null>(null);
   const mobileSearchRef = useRef<HTMLDivElement | null>(null);
@@ -2007,7 +2013,7 @@ export default function ExpenseScreen() {
                                 className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 cursor-pointer"
                               >
                                 <IndianRupee className="h-3.5 w-3.5" />
-                                <span>Receive Payment</span>
+                                <span>Expense</span>
                               </button>
                             </Can>
                           ) : null}
@@ -2197,7 +2203,7 @@ export default function ExpenseScreen() {
                                   className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 cursor-pointer"
                                 >
                                   <IndianRupee className="h-3.5 w-3.5" />
-                                  <span>Receive Payment</span>
+                                  <span>Expense</span>
                                 </button>
                               </Can>
                             )}

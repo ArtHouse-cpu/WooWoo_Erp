@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { useSearchParams } from "react-router-dom";
 import {
   Calendar,
@@ -372,9 +373,19 @@ export default function CspScreen() {
 
   // Search & Filtering
   const [searchQuery, setSearchQuery] = useState("");
-  const [datePreset, setDatePreset] = useState<DatePreset>("this-month");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter<DatePreset>(
+    "csp",
+    "this-month",
+    DATE_PRESETS.map((item) => item.id),
+    () => ({ from: "", to: "" }),
+  );
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [filterBalanceOnly, setFilterBalanceOnly] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);

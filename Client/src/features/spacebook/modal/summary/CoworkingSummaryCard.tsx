@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import type { SpacePayload } from "@/services/apiClient";
+import SpaceMediaCarousel from "../SpaceMediaCarousel";
 import PaymentAmounts from "./PaymentAmounts";
 import SelectedSpacesSummary, {
   SpaceChargeBreakdown,
@@ -57,13 +58,6 @@ export type CoworkingSummaryCardProps = {
   storedGrandTotal?: number;
   storedSubTotal?: number;
 };
-
-/* ----------------------------------
-   Constants
----------------------------------- */
-
-const FALLBACK_SPACE_IMAGE =
-  "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=400&q=80";
 
 /* ----------------------------------
    Component
@@ -125,16 +119,6 @@ export const CoworkingSummaryCard: React.FC<
   );
 
   /* ----------------------------------
-     Space image
-  ---------------------------------- */
-
-  const spaceImg =
-    space?.images?.[0] ||
-    space?.imageUrl ||
-    (space as any)?.image ||
-    FALLBACK_SPACE_IMAGE;
-
-  /* ----------------------------------
      Package multiplier
   ---------------------------------- */
 
@@ -184,10 +168,13 @@ export const CoworkingSummaryCard: React.FC<
   const totalPrice = storedSubTotal > 0 ? storedSubTotal : subTotal;
   const payPrice = storedGrandTotal > 0 ? storedGrandTotal : grandTotal;
   const paidPrice = Math.max(0, Number(paidAmount) || 0);
+  const pendingFromPaid = Math.max(0, payPrice - paidPrice);
+  const pendingFromDue =
+    dueAmount == null ? pendingFromPaid : Math.max(0, Number(dueAmount) || 0);
   const pendingPrice =
-    dueAmount == null
-      ? Math.max(0, payPrice - paidPrice)
-      : Math.max(0, Number(dueAmount) || 0);
+    Math.min(pendingFromPaid, pendingFromDue) < 1
+      ? 0
+      : Math.min(pendingFromPaid, pendingFromDue);
 
   /* ----------------------------------
      Duration label
@@ -197,16 +184,6 @@ export const CoworkingSummaryCard: React.FC<
     safeCount === 1
       ? durationUnitSingular
       : durationUnitPlural;
-
-  /* ----------------------------------
-     Image fallback handler
-  ---------------------------------- */
-
-  const handleImageError = (
-    event: React.SyntheticEvent<HTMLImageElement>,
-  ) => {
-    event.currentTarget.src = FALLBACK_SPACE_IMAGE;
-  };
 
   /* ----------------------------------
      Render
@@ -243,11 +220,10 @@ export const CoworkingSummaryCard: React.FC<
 
           {/* Image */}
 
-          <img
-            src={spaceImg}
+          <SpaceMediaCarousel
+            space={space}
             alt={space?.name || "Space"}
-            className="h-13 w-13 shrink-0 rounded-lg border border-slate-200/80 object-cover"
-            onError={handleImageError}
+            className="h-13 w-13 shrink-0 rounded-lg border border-slate-200/80"
           />
 
           {/* Space Information */}

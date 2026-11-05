@@ -44,12 +44,14 @@ import {
   getBusinessToday,
 } from "./utils/bookingAvailability";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
+import RescheduleBookingModal from "./modal/RescheduleBookingModal";
 import {
   handleCreateInvoice,
   handleCreateSpaceBooking,
   handleDeleteSpaceBooking,
   handleGetSpaceBookings,
   handleGetBookingPaymentSettings,
+  handleRescheduleSpaceBooking,
   handleUpdateSpaceBooking,
   type BookingPaymentSettings,
   type SpaceBookingPayload,
@@ -305,6 +307,10 @@ const SpaceBook = () => {
     useState<SpaceBookingPayload | null>(null);
   const [deleteBooking, setDeleteBooking] =
     useState<SpaceBookingPayload | null>(null);
+  const [bookingAction, setBookingAction] = useState<{
+    booking: SpaceBookingPayload;
+    view: "reschedule" | "payment" | "history";
+  } | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -349,6 +355,13 @@ const SpaceBook = () => {
   const [pendingCheckout, setPendingCheckout] =
     useState<BookingFormPayload | null>(null);
   const [openCheckout, setOpenCheckout] = useState(false);
+  const [reschedulePay, setReschedulePay] = useState<{
+    bookingId: string;
+    bookingDate: string;
+    startTime: string;
+    endTime: string;
+    dayType: string;
+  } | null>(null);
   const [paymentRule, setPaymentRule] = useState<BookingPaymentSettings | null>(null);
 
   useEffect(() => {
@@ -613,6 +626,41 @@ const SpaceBook = () => {
     } | null;
     verifiedAt?: string | null;
   }) => {
+    if (reschedulePay) {
+      setSaving(true);
+      try {
+        const rawMode = String(payment.mode || "").toUpperCase();
+        const mode = rawMode.includes("CASH")
+          ? "Cash"
+          : rawMode.includes("WALLET")
+            ? "Wallet"
+            : rawMode.includes("CARD")
+              ? "Card"
+              : "UPI";
+        await handleRescheduleSpaceBooking(reschedulePay.bookingId, {
+          bookingDate: reschedulePay.bookingDate,
+          startTime: reschedulePay.startTime,
+          endTime: reschedulePay.endTime,
+          dayType: reschedulePay.dayType,
+          payment: {
+            mode,
+            amount: Number(payment.paidAmount || payment.finalAmount || 0),
+          },
+        });
+        toast.success("Reschedule payment received.");
+        setOpenCheckout(false);
+        setPendingCheckout(null);
+        setReschedulePay(null);
+        await fetchBookings();
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { message?: string } } };
+        toast.error(err?.response?.data?.message || "Could not collect the reschedule payment.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     if (!pendingCheckout) {
       toast.error("Booking details were lost. Please try again.");
       return;
@@ -1123,14 +1171,14 @@ const SpaceBook = () => {
               ) : b.paymentStatus ? (
                 <span
                   className={`text-[10px] font-semibold uppercase tracking-wider ${
-                    b.paymentStatus === "full"
+                    (Number(b.dueAmount || 0) < 1 ? "full" : b.paymentStatus) === "full"
                       ? "text-emerald-600"
                       : b.paymentStatus === "partial"
                         ? "text-blue-600"
                         : "text-amber-600"
                   }`}
                 >
-                  {b.paymentStatus}
+                  {Number(b.dueAmount || 0) < 1 ? "full" : b.paymentStatus}
                 </span>
               ) : null}
             </div>
@@ -1245,6 +1293,18 @@ const SpaceBook = () => {
           >
             <Pencil size={15} />
           </button>
+          {row.original.status !== "Cancelled" && row.original.status !== "Draft" ? (
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-600 shadow-2xs transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 active:scale-95"
+              title="Reschedule"
+              onClick={() =>
+                setBookingAction({ booking: row.original, view: "reschedule" })
+              }
+            >
+              <Calendar size={15} />
+            </button>
+          ) : null}
         </Can>
 
         <Can permission={PERMISSIONS.SPACE_BOOKING_DELETE}>
@@ -1731,6 +1791,65 @@ const SpaceBook = () => {
                 </div>
               </div>
 
+              <div className="rounded-xl border border-slate-100 bg-white p-3.5 text-xs text-slate-600">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Billing
+                </p>
+                <p>Original amount: ₹{Number(selectedBooking.originalAmount || selectedBooking.grandTotal || 0).toLocaleString("en-IN")}</p>
+                <p>Rescheduled amount: ₹{Number(selectedBooking.grandTotal || 0).toLocaleString("en-IN")}</p>
+                <p>Amount paid: ₹{Number(selectedBooking.paidAmount || 0).toLocaleString("en-IN")}</p>
+                <p>
+                  Refund / wallet adjustment: ₹
+                  {(selectedBooking.payments || [])
+                    .filter((row) => row.kind === "refund")
+                    .reduce((sum, row) => sum + Number(row.amount || 0), 0)
+                    .toLocaleString("en-IN")}
+                </p>
+                <p>Pending amount: ₹{(Number(selectedBooking.dueAmount || 0) < 1 ? 0 : Number(selectedBooking.dueAmount || 0)).toLocaleString("en-IN")}</p>
+                <p>
+                  Payment status:{" "}
+                  {Number(selectedBooking.dueAmount || 0) < 1
+                    ? "Paid"
+                    : Number(selectedBooking.paidAmount || 0) > 0
+                      ? "Partially Paid"
+                      : "Pending"}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookingAction({ booking: selectedBooking, view: "reschedule" });
+                      setSelectedBooking(null);
+                    }}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700"
+                  >
+                    Reschedule Booking
+                  </button>
+                  {Number(selectedBooking.dueAmount || 0) >= 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBookingAction({ booking: selectedBooking, view: "payment" });
+                        setSelectedBooking(null);
+                      }}
+                      className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-800"
+                    >
+                      Receive Pending Payment
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookingAction({ booking: selectedBooking, view: "history" });
+                      setSelectedBooking(null);
+                    }}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700"
+                  >
+                    View Payment History
+                  </button>
+                </div>
+              </div>
+
               {selectedBooking.notes && (
                 <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5">
                   <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-slate-400">
@@ -1790,6 +1909,53 @@ const SpaceBook = () => {
           </div>
         </div>
       )}
+
+      {bookingAction ? (
+        <RescheduleBookingModal
+          booking={bookingAction.booking}
+          view={bookingAction.view}
+          onClose={() => setBookingAction(null)}
+          onSaved={() => {
+            setBookingAction(null);
+            void fetchBookings();
+          }}
+          onPay={(quote) => {
+            const source = bookingAction.booking;
+            setBookingAction(null);
+            setReschedulePay({
+              bookingId: String(source._id || source.id || ""),
+              bookingDate: quote.newDate,
+              startTime: quote.newStart,
+              endTime: quote.newEnd,
+              dayType: quote.newDay,
+            });
+            setPendingCheckout({
+              customerName: quote.customerName || source.customerName,
+              customerPhone: quote.customerPhone || source.customerPhone,
+              customerEmail: source.customerEmail,
+              customerId: quote.customerId || undefined,
+              membershipType: quote.membershipType || undefined,
+              membershipPlanId: quote.membershipPlanId || undefined,
+              spaceId: quote.spaceId || String(source.spaceId),
+              bookingDate: quote.newDate,
+              startTime: quote.newStart,
+              endTime: quote.newEnd,
+              status: (source.status || "Upcoming") as SpaceBookingStatus,
+              spaceName: `${source.spaceName || "Space"} reschedule`,
+              spaceDay: quote.newDay,
+              unitPrice: quote.additionalDue,
+              durationHours: quote.hours || 1,
+              lineTotal: quote.additionalDue,
+              subTotal: quote.additionalDue,
+              spaceQty: 1,
+              selectedServices: [],
+              summarySnapshot: { spaceCharges: quote.additionalDue },
+              notes: `Reschedule difference · ${quote.hours}h · ${quote.newDay}${quote.membershipLabel ? ` · ${quote.membershipLabel}` : ""}`,
+            });
+            setOpenCheckout(true);
+          }}
+        />
+      ) : null}
 
       {deleteBooking && (
         <div
@@ -1885,6 +2051,11 @@ const SpaceBook = () => {
         onClose={() => {
           if (saving) return;
           setOpenCheckout(false);
+          if (reschedulePay) {
+            setReschedulePay(null);
+            setPendingCheckout(null);
+            return;
+          }
           // Return user to booking details if they cancel checkout
           if (pendingCheckout) {
             const originalDraftId = (pendingCheckout as any)?._originalBookingId;

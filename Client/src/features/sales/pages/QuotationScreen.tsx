@@ -28,10 +28,10 @@ import Swal from "sweetalert2";
 import { handleGetQuotations, handleDeleteQuotation, handleUpdateQuotationStatus } from "@/services/apiClient";
 import {
   DATE_PRESET_OPTIONS,
-  getTodayYmd,
   rangeForPreset,
   type DatePreset,
 } from "@/utils/datePresets";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import {
   toQuotationPdfRecord,
@@ -138,9 +138,14 @@ export default function QuotationScreen() {
   const navigate = useNavigate();
   const [data, setData] = useState<QuotationRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [datePreset, setDatePreset] = useState<DatePreset>("today");
-  const [fromDate, setFromDate] = useState(getTodayYmd);
-  const [toDate, setToDate] = useState(getTodayYmd);
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter("quotation", "today", DATE_PRESET_OPTIONS.map((opt) => opt.value), rangeForPreset);
   const [selectedActionRow, setSelectedActionRow] = useState<QuotationRow | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewData, setViewData] = useState<any>(null);

@@ -72,6 +72,7 @@ import {
   ExclusiveMultipleDatesSummaryCard,
   type SelectedServiceItem,
 } from "./summary";
+import SpaceMediaCarousel from "./SpaceMediaCarousel";
 import {
   useBusinessNow,
   useSpaceAvailability,
@@ -3016,12 +3017,6 @@ const CreateBookingDetailsModal = ({
                           const spaceKey = String(space._id);
                           const isSelected = selectedSpaceIds.includes(spaceKey);
                           const code = getSpaceCode(space);
-                          const img =
-                            space.imageUrl ||
-                            (space as any).image ||
-                            (Array.isArray((space as any).images)
-                              ? (space as any).images[0]
-                              : null);
 
                           return (
                             <div
@@ -3058,17 +3053,10 @@ const CreateBookingDetailsModal = ({
                             >
                               {/* Image Box */}
                               <div className="relative h-28 w-full overflow-hidden bg-slate-100">
-                                <img
-                                  src={
-                                    img ||
-                                    "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=400&q=80"
-                                  }
+                                <SpaceMediaCarousel
+                                  space={space}
                                   alt={space.name}
-                                  onError={(e) => {
-                                    (e.currentTarget as HTMLImageElement).src =
-                                      "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=400&q=80";
-                                  }}
-                                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                  className="h-28 w-full"
                                 />
 
                                 {/* Top-Left: Code Badge */}

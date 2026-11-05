@@ -26,7 +26,7 @@ import {
   type VerifiedStaff,
 } from "@/services/apiClient";
 import { type DatePreset, rangeForPreset } from "@/utils/datePresets";
-import { UNSAFE_RSCDefaultRootErrorBoundary } from "react-router-dom";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 
 const DATE_PRESET_OPTIONS: { value: DatePreset; label: string }[] = [
   { value: "all", label: "All Dates" },
@@ -153,13 +153,14 @@ const LeadScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Date filter state (default: this month)
-  const [datePreset, setDatePreset] = useState<DatePreset>("month");
-  const [fromDate, setFromDate] = useState<string>(
-    () => rangeForPreset("month").from,
-  );
-  const [toDate, setToDate] = useState<string>(
-    () => rangeForPreset("month").to,
-  );
+  const {
+    datePreset,
+    setDatePreset,
+    fromDate,
+    setFromDate,
+    toDate,
+    setToDate,
+  } = usePersistedDateFilter("leads", "month", DATE_PRESET_OPTIONS.map((opt) => opt.value), rangeForPreset);
   const [selectedPurpose, setSelectedPurpose] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedSource, setSelectedSource] = useState<string>("all");

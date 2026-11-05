@@ -33,6 +33,7 @@ import {
   type VendorPaymentRow,
   type VendorTimelineItem,
 } from "@/services/apiClient";
+import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import type { VendorDetails } from "./VendorDetailsModal";
 import { closeIfConfirmed } from "@/utils/confirmClose";
 
@@ -264,7 +265,13 @@ export default function Vendor360Modal({
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
-  const [dateRange, setDateRange] = useState<DateRange>("");
+  const { datePreset: dateRange, setDatePreset: setDateRange } =
+    usePersistedDateFilter<DateRange>(
+      "vendor-360",
+      "",
+      ["", "today", "yesterday", "month", "last-month", "year", "last-year"],
+      () => ({ from: "", to: "" }),
+    );
   const [createdSort, setCreatedSort] = useState<CreatedSort>("newest");
   const [payOpen, setPayOpen] = useState(false);
   const [payDoc, setPayDoc] = useState("");
