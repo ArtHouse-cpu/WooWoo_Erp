@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   XCircle,
   Link2,
+  Crown,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
@@ -51,6 +52,8 @@ type CustomerOption = {
   mobile?: string;
   email?: string;
   membershipType?: string;
+  membershipEndDate?: string | null;
+  membershipExpired?: boolean;
 };
 
 type ProductRow = {
@@ -180,6 +183,89 @@ const REJECTION_REASONS = [
   "Other",
 ];
 
+export type MembershipExpiryBadge = {
+  dateText: string;
+  daysText: string;
+  isExpired: boolean;
+  badgeColor: string;
+  pillColor: string;
+};
+
+export function formatMembershipExpiryInfo(
+  endDateStr?: string | Date | null,
+  isExpired?: boolean,
+): MembershipExpiryBadge {
+  if (!endDateStr) {
+    return {
+      dateText: "Lifetime",
+      daysText: "No Expiry",
+      isExpired: false,
+      badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      pillColor: "text-emerald-700",
+    };
+  }
+
+  const end = new Date(endDateStr);
+  if (Number.isNaN(end.getTime())) {
+    return {
+      dateText: "N/A",
+      daysText: "N/A",
+      isExpired: false,
+      badgeColor: "bg-slate-50 text-slate-600 border-slate-200",
+      pillColor: "text-slate-500",
+    };
+  }
+
+  const now = new Date();
+  const diffTime = end.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  const formattedDate = end.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+  if (diffDays < 0 || isExpired) {
+    const expiredAgo = Math.abs(diffDays);
+    return {
+      dateText: formattedDate,
+      daysText: expiredAgo === 0 ? "Expired today" : `${expiredAgo}d expired`,
+      isExpired: true,
+      badgeColor: "bg-rose-50 text-rose-700 border-rose-200",
+      pillColor: "text-rose-600 font-semibold",
+    };
+  }
+
+  if (diffDays === 0) {
+    return {
+      dateText: formattedDate,
+      daysText: "Expires today",
+      isExpired: false,
+      badgeColor: "bg-amber-50 text-amber-700 border-amber-200",
+      pillColor: "text-amber-600 font-semibold",
+    };
+  }
+
+  if (diffDays <= 7) {
+    return {
+      dateText: formattedDate,
+      daysText: `${diffDays}d left`,
+      isExpired: false,
+      badgeColor: "bg-amber-50 text-amber-700 border-amber-200",
+      pillColor: "text-amber-600 font-semibold",
+    };
+  }
+
+  return {
+    dateText: formattedDate,
+    daysText: `${diffDays}d left`,
+    isExpired: false,
+    badgeColor: "bg-violet-50 text-violet-700 border-violet-200",
+    pillColor: "text-violet-700",
+  };
+}
+
 function formatLastSaleDate(dateStr?: string | Date | null) {
   if (!dateStr) return "—";
   try {
@@ -210,6 +296,7 @@ type DatePreset =
   | "last-month"
   | "this-year"
   | "last-year"
+  | "lifetime"
   | "custom";
 
 const DATE_PRESETS: { id: DatePreset; label: string }[] = [
@@ -221,6 +308,7 @@ const DATE_PRESETS: { id: DatePreset; label: string }[] = [
   { id: "last-month", label: "Last Month" },
   { id: "this-year", label: "This Year" },
   { id: "last-year", label: "Last Year" },
+  { id: "lifetime", label: "Lifetime" },
   { id: "custom", label: "Custom" },
 ];
 
@@ -273,6 +361,9 @@ function partnerDate(row: CspEnrollment) {
 }
 
 function presetRange(preset: DatePreset, fromDate: string, toDate: string) {
+  if (preset === "lifetime") {
+    return null;
+  }
   const now = new Date();
   if (preset === "today") {
     return { start: startOfDay(now), end: endOfDay(now) };
@@ -373,19 +464,9 @@ export default function CspScreen() {
 
   // Search & Filtering
   const [searchQuery, setSearchQuery] = useState("");
-  const {
-    datePreset,
-    setDatePreset,
-    fromDate,
-    setFromDate,
-    toDate,
-    setToDate,
-  } = usePersistedDateFilter<DatePreset>(
-    "csp",
-    "this-month",
-    DATE_PRESETS.map((item) => item.id),
-    () => ({ from: "", to: "" }),
-  );
+  const [datePreset, setDatePreset] = useState<DatePreset>("lifetime");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [filterBalanceOnly, setFilterBalanceOnly] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -410,6 +491,16 @@ export default function CspScreen() {
   const [openApproveModal, setOpenApproveModal] = useState(false);
   const [approveTarget, setApproveTarget] = useState<ApplicationRow | null>(null);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [customerExpiryMap, setCustomerExpiryMap] = useState<
+    Map<
+      string,
+      {
+        membershipType?: string;
+        membershipEndDate?: string | null;
+        membershipExpired?: boolean;
+      }
+    >
+  >(new Map());
   const [enrolledCustomerIds, setEnrolledCustomerIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -561,6 +652,27 @@ export default function CspScreen() {
         const list = Array.isArray(customerRes?.customers)
           ? customerRes.customers
           : [];
+        const expMap = new Map<
+          string,
+          {
+            membershipType?: string;
+            membershipEndDate?: string | null;
+            membershipExpired?: boolean;
+          }
+        >();
+        list.forEach((c: any) => {
+          const item = {
+            membershipType: c.membershipType,
+            membershipEndDate: c.membershipEndDate || null,
+            membershipExpired: Boolean(c.membershipExpired),
+          };
+          if (c._id) expMap.set(String(c._id), item);
+          const digits = String(c.mobile || "").replace(/\D/g, "");
+          const ten = digits.length >= 10 ? digits.slice(-10) : digits;
+          if (ten) expMap.set(`m_${ten}`, item);
+        });
+        setCustomerExpiryMap(expMap);
+
         setCustomers(
           list
             .filter(
@@ -575,6 +687,8 @@ export default function CspScreen() {
               mobile: c.mobile,
               email: c.email,
               membershipType: c.membershipType,
+              membershipEndDate: c.membershipEndDate || null,
+              membershipExpired: Boolean(c.membershipExpired),
             })),
         );
       } catch (error) {
@@ -732,6 +846,27 @@ export default function CspScreen() {
     }
   };
 
+  const getRowMembershipExpiry = (row: CspEnrollment) => {
+    const cId = enrollmentCustomerId(row);
+    let info = cId ? customerExpiryMap.get(cId) : null;
+    if (!info) {
+      const mob = String(
+        row.mobile || row.customer?.mobile || row.vendor?.mobile || "",
+      ).replace(/\D/g, "");
+      const ten = mob.length >= 10 ? mob.slice(-10) : mob;
+      if (ten) info = customerExpiryMap.get(`m_${ten}`);
+    }
+    const endDate =
+      info?.membershipEndDate ||
+      (row.customer as any)?.membershipEndDate ||
+      null;
+    const isExpired =
+      info?.membershipExpired ??
+      (row.customer as any)?.membershipExpired ??
+      false;
+    return formatMembershipExpiryInfo(endDate, isExpired);
+  };
+
   const sourceRows = liveRows;
 
   // Counts for tabs
@@ -761,7 +896,7 @@ export default function CspScreen() {
 
   const dateFilterLabel = useMemo(() => {
     if (datePreset !== "custom") {
-      return DATE_PRESETS.find((item) => item.id === datePreset)?.label || "This Month";
+      return DATE_PRESETS.find((item) => item.id === datePreset)?.label || "Lifetime";
     }
     if (fromDate && toDate) {
       return `${formatInputDate(fromDate)} – ${formatInputDate(toDate)}`;
@@ -1001,7 +1136,12 @@ export default function CspScreen() {
           "Sales (₹)": 0,
           "Products (count)": productsCount,
           "Earnings (₹)": earnings,
-          "Last Sale": formatLastSaleDate(r.updatedAt || r.createdAt),
+          "Premium Expiry": (() => {
+            const exp = getRowMembershipExpiry(r);
+            return exp.dateText === "Lifetime"
+              ? "Lifetime (No Expiry)"
+              : `${exp.dateText} (${exp.daysText})`;
+          })(),
           Status: r.status || "active",
         };
       });
@@ -1076,7 +1216,7 @@ export default function CspScreen() {
               />
             </button>
             {showDateDropdown && (
-              <div className={`absolute right-0 z-50 mt-1 max-h-[16rem] overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-md ${datePreset === "custom" ? "w-44" : "w-36"}`}>
+              <div className={`absolute right-0 z-50 mt-1 max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-md ${datePreset === "custom" ? "w-44" : "w-36"}`}>
                 {DATE_PRESETS.map((item) => (
                   <button
                     key={item.id}
@@ -1451,7 +1591,7 @@ export default function CspScreen() {
                     Products (count)
                   </th>
                   <th className="py-3.5 px-4 font-semibold text-slate-700">Earnings (₹)</th>
-                  <th className="py-3.5 px-4 font-semibold text-slate-700">Last Sale</th>
+                  <th className="py-3.5 px-4 font-semibold text-slate-700">Premium Expiry</th>
                   <th className="w-16 py-3.5 px-4 font-semibold text-slate-700 text-center">
                     Actions
                   </th>
@@ -1568,9 +1708,24 @@ export default function CspScreen() {
                           ₹{withdrawableAmt.toLocaleString("en-IN")}
                         </td>
 
-                        {/* Last Sale */}
-                        <td className="py-3 px-4 text-xs text-slate-600">
-                          {lastSaleDate}
+                        {/* Premium Membership Expiry */}
+                        <td className="py-3 px-4 text-xs">
+                          {(() => {
+                            const exp = getRowMembershipExpiry(row);
+                            return (
+                              <div className="flex items-center gap-1.5">
+                                <Crown size={13} className="text-amber-500 shrink-0" />
+                                <span className="font-medium text-slate-800">
+                                  {exp.dateText}
+                                </span>
+                                <span
+                                  className={`inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold border ${exp.badgeColor}`}
+                                >
+                                  {exp.daysText}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* Actions */}
@@ -1886,17 +2041,29 @@ export default function CspScreen() {
                       </div>
                     </div>
 
-                    {/* Meta Details: Mobile & Last Sale */}
-                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                      <div className="flex items-center gap-1.5">
-                        <Phone size={12} className="text-slate-400 shrink-0" />
-                        <span>{mobile || "No phone"}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                        <Clock size={11} className="shrink-0" />
-                        <span>Last sale: {lastSaleDate}</span>
-                      </div>
-                    </div>
+                    {/* Meta Details: Mobile & Premium Membership Expiry */}
+                    {(() => {
+                      const exp = getRowMembershipExpiry(row);
+                      return (
+                        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                          <div className="flex items-center gap-1.5">
+                            <Phone size={12} className="text-slate-400 shrink-0" />
+                            <span>{mobile || "No phone"}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11px]">
+                            <Crown size={12} className="text-amber-500 shrink-0" />
+                            <span className="text-slate-600 font-medium">
+                              Exp: {exp.dateText}
+                            </span>
+                            <span
+                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold border ${exp.badgeColor}`}
+                            >
+                              {exp.daysText}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()} 
 
                     {/* Action Buttons Row */}
                     <div

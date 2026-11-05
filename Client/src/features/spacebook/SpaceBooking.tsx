@@ -25,6 +25,10 @@ import {
   Loader2,
   FileText,
   CreditCard,
+  CalendarDays,
+  MoreVertical,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
@@ -64,6 +68,97 @@ import { printThermalReceipt } from "@/utils/printUtils";
 import { roundPayable } from "@/features/sales/utils/paymentRoundOff";
 
 type BookingStatusFilter = "All" | SpaceBookingStatus;
+type DatePresetType =
+  | "today"
+  | "yesterday"
+  | "this_week"
+  | "last_week"
+  | "this_month"
+  | "last_month"
+  | "this_year"
+  | "lifetime"
+  | "custom";
+
+const DATE_PRESETS: { key: DatePresetType; label: string }[] = [
+  { key: "today", label: "Today" },
+  { key: "yesterday", label: "Yesterday" },
+  { key: "this_week", label: "This Week" },
+  { key: "last_week", label: "Last Week" },
+  { key: "this_month", label: "This Month" },
+  { key: "last_month", label: "Last Month" },
+  { key: "this_year", label: "This Year" },
+  { key: "lifetime", label: "Lifetime" },
+  { key: "custom", label: "Custom Range" },
+];
+
+const formatYmd = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const toLocalYmd = (value?: string | Date | null): string => {
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10);
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const getRangeForPreset = (preset: DatePresetType): { from: string; to: string } => {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  if (preset === "today") {
+    const ymd = formatYmd(now);
+    return { from: ymd, to: ymd };
+  }
+  if (preset === "yesterday") {
+    const y = new Date(now);
+    y.setDate(y.getDate() - 1);
+    const ymd = formatYmd(y);
+    return { from: ymd, to: ymd };
+  }
+  if (preset === "this_week") {
+    const day = now.getDay() || 7;
+    const start = new Date(now);
+    start.setDate(now.getDate() - (day - 1));
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { from: formatYmd(start), to: formatYmd(end) };
+  }
+  if (preset === "last_week") {
+    const day = now.getDay() || 7;
+    const start = new Date(now);
+    start.setDate(now.getDate() - (day - 1) - 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { from: formatYmd(start), to: formatYmd(end) };
+  }
+  if (preset === "this_month") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { from: formatYmd(start), to: formatYmd(end) };
+  }
+  if (preset === "last_month") {
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { from: formatYmd(start), to: formatYmd(end) };
+  }
+  if (preset === "this_year") {
+    const start = new Date(now.getFullYear(), 0, 1);
+    const end = new Date(now.getFullYear(), 11, 31);
+    return { from: formatYmd(start), to: formatYmd(end) };
+  }
+  return { from: "", to: "" };
+};
+
 
 const AVATAR_COLORS = [
   "bg-violet-100 text-violet-700 border-violet-200",
@@ -300,6 +395,21 @@ const SpaceBook = () => {
   const [statusFilter, setStatusFilter] =
     useState<BookingStatusFilter>("All");
   const [spaceFilter, setSpaceFilter] = useState<string>("All");
+  const [datePreset, setDatePreset] = useState<DatePresetType>("lifetime");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [actionMenuRowId, setActionMenuRowId] = useState<string | null>(null);
+  const [isSpaceDropdownOpen, setIsSpaceDropdownOpen] = useState(false);
+
+  const handlePresetSelect = (preset: DatePresetType) => {
+    setDatePreset(preset);
+    if (preset === "custom") {
+      return;
+    }
+    const range = getRangeForPreset(preset);
+    setFromDate(range.from);
+    setToDate(range.to);
+  };
 
   const [selectedBooking, setSelectedBooking] =
     useState<SpaceBookingPayload | null>(null);
@@ -447,6 +557,13 @@ const SpaceBook = () => {
     return Array.from(map.entries()).map(([id, label]) => ({ id, label }));
   }, [data]);
 
+  const selectedSpaceLabel = useMemo(() => {
+    if (spaceFilter === "All") return "All Spaces";
+    return (
+      uniqueSpaces.find((s) => s.id === spaceFilter)?.label || "All Spaces"
+    );
+  }, [spaceFilter, uniqueSpaces]);
+
   const filteredData = useMemo(() => {
     return data.filter((b) => {
       if (statusFilter !== "All" && b.status !== statusFilter) return false;
@@ -480,6 +597,7 @@ const SpaceBook = () => {
     setStatusFilter("All");
     setSpaceFilter("All");
     setSearch("");
+    setIsSpaceDropdownOpen(false);
   };
 
   const handleCreate = async (payload: BookingFormPayload) => {
@@ -1423,36 +1541,60 @@ const SpaceBook = () => {
 
   return (
     <div className="w-full space-y-5 p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-600">
-            <Building2 size={14} />
-            <span>Workspace & Facility Management</span>
-          </div>
-          <div className="mt-1 flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-              Space Bookings
-            </h1>
-            <span className="rounded-full border border-indigo-200/60 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
-              {data.length} Total
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-            Manage reservations linked directly to catalogue spaces.
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
+        <h1 className="text-base font-bold tracking-tight text-slate-900 sm:text-2xl truncate shrink-0">
+          Space Bookings
+        </h1>
 
+        {/* Date Filter Dropdown (without icon) */}
+        <select
+          value={datePreset}
+          onChange={(e) => handlePresetSelect(e.target.value as DatePresetType)}
+          className="h-6 w-24 rounded-lg border border-slate-200 bg-white px-1  text-[10px]  font-semibold text-slate-700 shadow-2xs outline-none focus:border-indigo-500 shrink-0"
+        >
+          {DATE_PRESETS.map((preset) => (
+            <option key={preset.key} value={preset.key}>
+              {preset.label}
+            </option>
+          ))}
+        </select>
+
+        {/* + Add Space Button */}
         <Can permission={PERMISSIONS.SPACE_BOOKING_CREATE}>
           <button
             type="button"
             onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-100 transition hover:from-indigo-700 hover:to-violet-700 active:scale-[0.98] sm:self-center"
+            className="inline-flex items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-2.5 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold text-white shadow-md shadow-indigo-100 transition hover:from-indigo-700 hover:to-violet-700 active:scale-[0.98] shrink-0"
           >
-            <Plus size={18} strokeWidth={2.5} />
-            <span>Add Booking</span>
+            <Plus size={15} strokeWidth={2.5} />
+            <span>Add </span>
           </button>
         </Can>
       </div>
+
+      {/* Custom Date Pickers when Custom Range is active */}
+      {datePreset === "custom" && (
+        <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs">
+          <div>
+            <span className="text-[10px] font-semibold text-slate-500 block mb-1">From Date</span>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-2 text-xs text-slate-700 outline-none focus:border-indigo-500"
+            />
+          </div>
+          <div>
+            <span className="text-[10px] font-semibold text-slate-500 block mb-1">To Date</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-2 text-xs text-slate-700 outline-none focus:border-indigo-500"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
         <button
@@ -1563,8 +1705,115 @@ const SpaceBook = () => {
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+      <div className="flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-xs">
+        {/* Row 1: Search bar and all spaces categories in one row */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search customer or space…"
+              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-9 pr-8 text-xs outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsSpaceDropdownOpen((prev) => !prev)}
+              className="flex h-9 items-center justify-between gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 px-2.5 text-xs font-medium text-slate-700 outline-none transition hover:bg-white focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 max-w-[130px] sm:max-w-[180px] cursor-pointer"
+            >
+              <span className="truncate">{selectedSpaceLabel}</span>
+              <ChevronDown
+                size={14}
+                className={`shrink-0 text-slate-400 transition-transform ${
+                  isSpaceDropdownOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {isSpaceDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsSpaceDropdownOpen(false)}
+                />
+                <div className="absolute right-0 top-full mt-1.5 z-50 w-60 max-w-[calc(100vw-2.5rem)] rounded-xl border border-slate-100 bg-white py-1 shadow-xl max-h-64 overflow-y-auto text-left">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSpaceFilter("All");
+                      setIsSpaceDropdownOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-xs transition cursor-pointer ${
+                      spaceFilter === "All"
+                        ? "bg-indigo-50 font-semibold text-indigo-600"
+                        : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>All Spaces</span>
+                    {spaceFilter === "All" && (
+                      <Check size={14} className="text-indigo-600 shrink-0" />
+                    )}
+                  </button>
+
+                  {uniqueSpaces.map((s) => {
+                    const isSelected = spaceFilter === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setSpaceFilter(s.id);
+                          setIsSpaceDropdownOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-xs transition cursor-pointer ${
+                          isSelected
+                            ? "bg-indigo-50 font-semibold text-indigo-600"
+                            : "text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="truncate pr-2">{s.label}</span>
+                        {isSelected && (
+                          <Check size={14} className="text-indigo-600 shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              title="Reset all filters"
+              className="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              <RotateCcw size={13} />
+              <span className="hidden sm:inline">Reset</span>
+            </button>
+          )}
+        </div>
+
+        {/* Row 2: Status segments / categories below */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 pt-1 border-t border-slate-100 scrollbar-none">
           {(
             ["All", "Ongoing", "Upcoming", "Draft", "Expired", "Cancelled"] as const
           ).map((tab) => {
@@ -1607,59 +1856,10 @@ const SpaceBook = () => {
             );
           })}
         </div>
-
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <div className="relative w-full sm:w-64">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search customer or space…"
-              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/60 pl-9 pr-8 text-xs outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          <select
-            value={spaceFilter}
-            onChange={(e) => setSpaceFilter(e.target.value)}
-            className="h-9 rounded-xl border border-slate-200 bg-slate-50/60 px-3 text-xs font-medium text-slate-700 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100"
-          >
-            <option value="All">All Spaces</option>
-            {uniqueSpaces.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              title="Reset all filters"
-              className="flex h-9 items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
-            >
-              <RotateCcw size={13} />
-              <span className="hidden sm:inline">Reset</span>
-            </button>
-          )}
-        </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
         <div className="flex flex-col justify-between gap-2 border-b border-slate-100 bg-slate-50/50 px-5 py-3 text-xs text-slate-500 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-700">
@@ -1673,6 +1873,260 @@ const SpaceBook = () => {
           </div>
         </div>
         <MaterialReactTable table={table} />
+      </div>
+
+      {/* Mobile Card View (2-2 cards in one row) */}
+      <div className="block md:hidden space-y-3">
+        <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+          <span className="font-semibold text-slate-700">
+            Showing {filteredData.length} of {data.length} reservations
+          </span>
+          {hasActiveFilters && (
+            <span className="inline-flex items-center rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
+              Filtered
+            </span>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center">
+            <Loader2 className="mb-2 h-6 w-6 animate-spin text-indigo-500" />
+            <p className="text-xs text-slate-500">Loading bookings…</p>
+          </div>
+        ) : filteredData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center">
+            <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 text-indigo-500">
+              <Calendar size={22} />
+            </div>
+            <h4 className="text-sm font-bold text-slate-800">No bookings found</h4>
+            <p className="mt-1 text-xs text-slate-500">
+              {hasActiveFilters
+                ? "No space bookings match your filters."
+                : "No space bookings yet. Click Add Space to create one."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2.5">
+            {filteredData.map((b) => {
+              const id = bookingId(b);
+              const isMenuOpen = actionMenuRowId === id;
+              const rawB = b as SpaceBookingPayload & {
+                imageUrl?: string;
+                spaceImageUrl?: string;
+                image?: string;
+              };
+              const img =
+                b.space?.imageUrl ||
+                rawB.imageUrl ||
+                rawB.spaceImageUrl ||
+                (b.space as { image?: string } | undefined)?.image;
+              const isDraft = b.status === "Draft";
+              const amount = Number(b.grandTotal ?? b.paidAmount ?? 0);
+
+              return (
+                <article
+                  key={id}
+                  className={`group relative flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white shadow-2xs transition hover:border-slate-300 hover:shadow-xs ${
+                    isMenuOpen ? "z-30 ring-1 ring-indigo-200" : "z-0"
+                  }`}
+                >
+                  {/* Image Area */}
+                  <div className="relative aspect-4/3 w-full overflow-hidden rounded-t-xl bg-gradient-to-br from-indigo-50/80 via-slate-50 to-blue-50/60 border-b border-slate-100">
+                    {img ? (
+                      <img
+                        src={img}
+                        alt={spaceDisplayName(b)}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center p-2 text-center">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-100/80 text-indigo-600 shadow-2xs">
+                          <Building2 size={16} />
+                        </div>
+                        <span className="mt-1 line-clamp-1 text-[10px] font-semibold text-slate-700 px-1">
+                          {spaceDisplayName(b)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Top-Left: Booking Code */}
+                    <div className="absolute top-1.5 left-1.5 z-10">
+                      <span className="inline-flex items-center rounded-md bg-slate-900/80 px-1.5 py-0.5 text-[9px] font-bold text-white shadow-2xs backdrop-blur-xs">
+                        #{id.slice(-6).toUpperCase()}
+                      </span>
+                    </div>
+
+                    {/* Top-Right: Status Badge */}
+                    <div className="absolute top-1.5 right-1.5 z-10">
+                      <span
+                        className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[8px] font-bold shadow-2xs backdrop-blur-xs ${
+                          b.status === "Ongoing"
+                            ? "bg-emerald-600/90 text-white"
+                            : b.status === "Upcoming"
+                              ? "bg-blue-600/90 text-white"
+                              : b.status === "Draft"
+                                ? "bg-amber-600/90 text-white"
+                                : b.status === "Cancelled"
+                                  ? "bg-rose-600/90 text-white"
+                                  : "bg-slate-700/90 text-white"
+                        }`}
+                      >
+                        {b.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="flex flex-1 flex-col justify-between p-2 space-y-1.5">
+                    <div className="space-y-1">
+                      <h4
+                        className="truncate text-xs font-bold text-slate-900 leading-snug"
+                        title={b.customerName || "Walk-in Guest"}
+                      >
+                        {b.customerName || "Walk-in Guest"}
+                      </h4>
+
+                      <p
+                        className="truncate text-[10px] font-medium text-slate-500"
+                        title={spaceDisplayName(b)}
+                      >
+                        {spaceDisplayName(b)}
+                      </p>
+
+                      <div className="space-y-0.5 text-[10px] text-slate-500">
+                        <div className="flex items-center gap-1 truncate">
+                          <Calendar size={10} className="shrink-0 text-slate-400" />
+                          <span className="truncate">{formatDateDisplay(b.bookingDate)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 truncate">
+                          <Clock size={10} className="shrink-0 text-slate-400" />
+                          <span className="truncate">
+                            {b.bookingTime || `${b.startTime || ""} - ${b.endTime || ""}`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Payment Status Badge */}
+                      <div className="pt-0.5">
+                        {isDraft ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700">
+                            Draft Bill
+                          </span>
+                        ) : b.paymentStatus ? (
+                          <span
+                            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
+                              b.paymentStatus === "full"
+                                ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                                : b.paymentStatus === "partial"
+                                  ? "bg-blue-50 border border-blue-200 text-blue-700"
+                                  : "bg-amber-50 border border-amber-200 text-amber-700"
+                            }`}
+                          >
+                            {b.paymentStatus}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Card Footer: Amount on Left, 3 Dots Action Menu on Right Bottom Corner */}
+                    <div className="flex items-end justify-between border-t border-slate-100 pt-1.5">
+                      <div className="min-w-0 pr-1">
+                        <span className="block text-[8px] uppercase font-semibold text-slate-400">Total</span>
+                        <span className="block truncate text-xs font-bold text-slate-900 leading-tight">
+                          ₹{amount.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+
+                      {/* 3 Dots at Right Bottom Corner */}
+                      <div
+                        className="relative shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setActionMenuRowId(isMenuOpen ? null : id)}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition active:scale-95 cursor-pointer"
+                          aria-label="Actions"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+
+                        {isMenuOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-30"
+                              onClick={() => setActionMenuRowId(null)}
+                            />
+                            <div className="absolute right-0 bottom-full z-40 mb-1.5 w-32 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActionMenuRowId(null);
+                                  setSelectedBooking(b);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                              >
+                                <Eye size={13} className="text-slate-400" />
+                                <span>View</span>
+                              </button>
+
+                              <Can permission={PERMISSIONS.SPACE_BOOKING_UPDATE}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuRowId(null);
+                                    setEditingBooking(b);
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 cursor-pointer"
+                                >
+                                  <Pencil size={13} className="text-blue-500" />
+                                  <span>Edit</span>
+                                </button>
+                              </Can>
+
+                              {isDraft && (
+                                <Can permission={PERMISSIONS.SPACE_BOOKING_UPDATE}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActionMenuRowId(null);
+                                      setEditingBooking(b);
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 cursor-pointer"
+                                  >
+                                    <CreditCard size={13} className="text-amber-500" />
+                                    <span>Pay</span>
+                                  </button>
+                                </Can>
+                              )}
+
+                              <Can permission={PERMISSIONS.SPACE_BOOKING_DELETE}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActionMenuRowId(null);
+                                    setDeleteBooking(b);
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer border-t border-slate-100"
+                                >
+                                  <Trash2 size={13} className="text-rose-500" />
+                                  <span>Delete</span>
+                                </button>
+                              </Can>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {selectedBooking && (

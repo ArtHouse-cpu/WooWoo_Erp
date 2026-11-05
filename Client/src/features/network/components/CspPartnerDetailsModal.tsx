@@ -482,6 +482,19 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
                   <Info label="Brand" value={textOrNA(brand)} />
                   <Info label="Membership" value={textOrNA(profile?.membershipType)} />
                   <Info
+                    label="Membership Expiry"
+                    value={(() => {
+                      if (!profile?.membershipEndDate) return "Lifetime (No Expiry)";
+                      const end = new Date(profile.membershipEndDate);
+                      if (Number.isNaN(end.getTime())) return "N/A";
+                      const diffDays = Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                      const dateStr = end.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                      if (diffDays < 0 || profile.membershipExpired) return `${dateStr} (${Math.abs(diffDays)}d expired)`;
+                      if (diffDays === 0) return `${dateStr} (Expires today)`;
+                      return `${dateStr} (${diffDays} days left)`;
+                    })()}
+                  />
+                  <Info
                     label="Sailor share"
                     value={
                       profile?.sailorSharePercent == null

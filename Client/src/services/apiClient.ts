@@ -3529,6 +3529,8 @@ export type CspEnrollment = {
     mobile?: string;
     email?: string;
     membershipType?: string;
+    membershipEndDate?: string;
+    membershipExpired?: boolean;
   };
   vendor?: {
     _id?: string;
@@ -3700,6 +3702,8 @@ export type CspPartnerDetails = {
     brandName: string;
     categories: string[];
     membershipType: string;
+    membershipEndDate?: string | null;
+    membershipExpired?: boolean;
     sailorSharePercent: number | null;
     platformSharePercent: number | null;
   };
