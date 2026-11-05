@@ -6,6 +6,10 @@ import {
   type MRT_ColumnDef,
 } from "material-react-table";
 import {
+  BadgeIndianRupee,
+  Building2,
+  Calendar,
+  CheckCircle2,
   ClipboardList,
   Clock,
   Eye,
@@ -16,6 +20,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import BookingDateFilter, {
+  type BookingDatePreset,
+} from "@/features/spacebook/BookingDateFilter";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import { closeIfConfirmed } from "@/utils/confirmClose";
@@ -90,6 +97,14 @@ const apiErrorMessage = (err: unknown, fallback: string) => {
   }
   if (err instanceof Error && err.message) return err.message;
   return fallback;
+};
+
+const shortInr = (value: number) => {
+  const amount = Math.max(0, Number(value) || 0);
+  if (amount >= 10000000) return `₹${+(amount / 10000000).toFixed(1)}Cr`;
+  if (amount >= 100000) return `₹${+(amount / 100000).toFixed(1)}L`;
+  if (amount >= 1000) return `₹${+(amount / 1000).toFixed(1)}k`;
+  return `₹${Math.round(amount).toLocaleString("en-IN")}`;
 };
 
 const statusBadge = (status?: string) => {
@@ -183,6 +198,17 @@ export default function AllBookings() {
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_OPTIONS)[number]>("All");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [datePreset, setDatePreset] = useState<BookingDatePreset>("lifetime");
+  const [summary, setSummary] = useState({
+    total: 0,
+    ongoing: 0,
+    upcoming: 0,
+    draft: 0,
+    expired: 0,
+    cancelled: 0,
+    paid: 0,
+    pending: 0,
+  });
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [reloadKey, setReloadKey] = useState(0);
   const searchRef = useRef("");
@@ -268,6 +294,16 @@ export default function AllBookings() {
       .then((res) => {
         setRows(Array.isArray(res?.bookings) ? res.bookings : []);
         setTotal(Number(res?.pagination?.total) || 0);
+        setSummary({
+          total: Number(res?.summary?.total) || 0,
+          ongoing: Number(res?.summary?.ongoing) || 0,
+          upcoming: Number(res?.summary?.upcoming) || 0,
+          draft: Number(res?.summary?.draft) || 0,
+          expired: Number(res?.summary?.expired) || 0,
+          cancelled: Number(res?.summary?.cancelled) || 0,
+          paid: Number(res?.summary?.paid) || 0,
+          pending: Number(res?.summary?.pending) || 0,
+        });
       })
       .catch((err: unknown) => {
         if (
@@ -833,42 +869,132 @@ const persistBooking = async (
 
   return (
     <div className="w-full space-y-5 p-4 sm:p-6 lg:p-8">
-      <div>
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-600">
-          <ClipboardList size={14} />
-          <span>Booking</span>
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-600">
+            <ClipboardList size={14} />
+            <span>Booking</span>
+          </div>
+          <h1 className="truncate text-base font-bold tracking-tight text-slate-900 sm:text-2xl">
             Full Bookings
           </h1>
-          <span className="rounded-full border border-indigo-200/60 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700">
-            {total} Total
-          </span>
         </div>
-        <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-          Combined bookings. Space, services, and food can each be left out.
-        </p>
+        <div className="flex items-center gap-2">
+          <BookingDateFilter
+            preset={datePreset}
+            fromDate={fromDate}
+            toDate={toDate}
+            onChange={(preset, from, to) => {
+              setDatePreset(preset);
+              setFromDate(from);
+              setToDate(to);
+              resetPage();
+            }}
+          />
+          <Can permission={PERMISSIONS.SPACE_BOOKING_CREATE}>
+            <button
+              type="button"
+              onClick={() => {
+                setPendingCheckout(null);
+                setCheckoutSourceId(null);
+                setEditor(null);
+              }}
+              className="inline-flex items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-md shadow-indigo-100 sm:px-3.5 sm:py-2"
+            >
+              <Plus size={15} strokeWidth={2.5} />
+              <span>Add</span>
+            </button>
+          </Can>
+        </div>
       </div>
-      <div className="flex justify-end">
-        <Can permission={PERMISSIONS.SPACE_BOOKING_CREATE}>
+
+      {datePreset === "custom" ? (
+        <div className="hidden grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs md:grid">
+          <label className="text-[10px] font-semibold text-slate-500">
+            From Date
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(event) => {
+                setFromDate(event.target.value);
+                resetPage();
+              }}
+              className="mt-1 h-8 w-full rounded-lg border border-slate-200 px-2 text-xs"
+            />
+          </label>
+          <label className="text-[10px] font-semibold text-slate-500">
+            To Date
+            <input
+              type="date"
+              value={toDate}
+              onChange={(event) => {
+                setToDate(event.target.value);
+                resetPage();
+              }}
+              className="mt-1 h-8 w-full rounded-lg border border-slate-200 px-2 text-xs"
+            />
+          </label>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 lg:gap-4">
+        {(
+          [
+            ["All", "Total Reservations", summary.total, "text-slate-900", "bg-indigo-50 text-indigo-600"],
+            ["Ongoing", "Ongoing Now", summary.ongoing, "text-emerald-700", "bg-emerald-50 text-emerald-600"],
+            ["Upcoming", "Upcoming", summary.upcoming, "text-blue-700", "bg-blue-50 text-blue-600"],
+            ["Draft", "Draft", summary.draft, "text-amber-700", "bg-amber-50 text-amber-600"],
+            ["Expired", "Completed / Expired", summary.expired, "text-slate-700", "bg-slate-100 text-slate-600"],
+          ] as const
+        ).map(([status, label, count, valueClass, iconClass]) => (
           <button
+            key={status}
             type="button"
             onClick={() => {
-              setPendingCheckout(null);
-              setCheckoutSourceId(null);
-              setEditor(null);
+              setStatusFilter(status);
+              resetPage();
             }}
-            className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-violet-700"
+            className={`flex items-start justify-between rounded-2xl border p-4 text-left ${
+              statusFilter === status
+                ? "border-indigo-400 bg-indigo-50/50 shadow-sm ring-2 ring-indigo-500/20"
+                : "border-slate-200 bg-white"
+            }`}
           >
-            <Plus size={16} />
-            Create Bookings
+            <div>
+              <span className="text-xs font-medium text-slate-500">{label}</span>
+              <div className={`mt-1 text-2xl font-bold tabular-nums ${valueClass}`}>{count}</div>
+            </div>
+            <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}>
+              {status === "Ongoing" ? (
+                <Clock size={20} />
+              ) : status === "Upcoming" ? (
+                <Calendar size={20} />
+              ) : status === "Expired" ? (
+                <CheckCircle2 size={20} />
+              ) : (
+                <Building2 size={20} />
+              )}
+            </span>
           </button>
-        </Can>
+        ))}
+        <div className="flex items-start justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left">
+          <div className="min-w-0">
+            <span className="text-xs font-medium text-slate-500">Revenue</span>
+            <div className="mt-1 text-sm font-bold leading-5 text-emerald-700">
+              Paid {shortInr(summary.paid)}
+            </div>
+            <div className="text-sm font-bold leading-5 text-amber-700">
+              Pending {shortInr(summary.pending)}
+            </div>
+          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+            <BadgeIndianRupee size={20} />
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="flex items-center gap-2">
           <label className="relative min-w-0 flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -878,7 +1004,23 @@ const persistBooking = async (
               className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-indigo-400"
             />
           </label>
-          <div className="flex flex-wrap gap-2">
+          <select
+            aria-label="Status"
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value as (typeof STATUS_OPTIONS)[number]);
+              resetPage();
+            }}
+            className="h-[42px] w-[108px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-800 sm:w-36"
+          >
+            {STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-wrap gap-2">
             {(["All", "Space", "Services", "Food"] as const).map((type) => (
               <button
                 key={type}
@@ -896,58 +1038,55 @@ const persistBooking = async (
                 {type}
               </button>
             ))}
-          </div>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-          <label className="text-left text-xs font-semibold text-slate-500">
-            Status
-            <select
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value as (typeof STATUS_OPTIONS)[number]);
-                resetPage();
-              }}
-              className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 sm:w-44"
-            >
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-left text-xs font-semibold text-slate-500">
-            From
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(event) => {
-                setFromDate(event.target.value);
-                resetPage();
-              }}
-              className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 sm:w-40"
-            />
-          </label>
-          <label className="text-left text-xs font-semibold text-slate-500">
-            To
-            <input
-              type="date"
-              value={toDate}
-              onChange={(event) => {
-                setToDate(event.target.value);
-                resetPage();
-              }}
-              className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 sm:w-40"
-            />
-          </label>
         </div>
         {error ? (
           <p className="text-left text-sm font-semibold text-rose-600">{error}</p>
         ) : null}
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
         <MaterialReactTable table={table} />
+      </div>
+
+      <div className="space-y-3 md:hidden">
+        {loading ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500">
+            Loading bookings…
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+            <h4 className="text-sm font-bold text-slate-800">No bookings found</h4>
+            <p className="mt-1 text-xs text-slate-500">
+              {error || "No full bookings match this date filter."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2.5">
+            {rows.map((booking) => (
+              <article
+                key={booking.id}
+                onClick={() => setSelected(booking)}
+                className="cursor-pointer rounded-xl border border-slate-200 bg-white p-3 shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="truncate text-sm font-bold text-slate-900">{booking.customerName}</p>
+                  <span className="shrink-0 rounded-md bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                    {booking.status || "—"}
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-[11px] text-slate-500">
+                  {booking.spaceName || booking.spaceDetails || booking.bookingCode}
+                </p>
+                <p className="mt-2 text-[11px] font-medium text-slate-600">
+                  {formatDate(booking.bookingDate)}
+                </p>
+                <p className="mt-1 text-sm font-bold text-indigo-700">
+                  ₹{Number(booking.grandTotal || 0).toLocaleString("en-IN")}
+                </p>
+              </article>
+            ))}
+          </div>
+        )}
       </div>
 
       {selected ? (

@@ -2,14 +2,15 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Calendar,
-  Clock,
   FilePlus2,
+  FileText,
   Globe,
   IndianRupee,
   Loader2,
   Mail,
   Package,
   Phone,
+  Search,
   ShoppingBag,
   ShoppingCart,
   User,
@@ -30,7 +31,7 @@ type Props = {
   onClose: () => void;
 };
 
-type Tab = "overview" | "details";
+type Tab = "overview" | "products" | "sales" | "timeline";
 
 const textOrNA = (value?: string | number | null) => {
   const text = String(value ?? "").trim();
@@ -40,6 +41,17 @@ const textOrNA = (value?: string | number | null) => {
 const money = (value?: number | null) => {
   if (value == null || Number.isNaN(Number(value))) return "N/A";
   return `₹${Number(value).toLocaleString("en-IN")}`;
+};
+
+const membershipLabel = (value?: string | null) => {
+  const raw = String(value || "Premium").trim();
+  if (!raw || ["none", "guest", "new"].includes(raw.toLowerCase())) return "Premium";
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+};
+
+const membershipExpiryDate = (value?: string | Date | null) => {
+  if (!value) return "Lifetime";
+  return formatDate(value);
 };
 
 const formatDate = (value?: string | Date | null) => {
@@ -138,6 +150,7 @@ function WebsiteValue({ value }: { value?: string }) {
 export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("overview");
+  const [productQuery, setProductQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [details, setDetails] = useState<CspPartnerDetails | null>(null);
@@ -160,6 +173,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
   useEffect(() => {
     if (!partner) return;
     setTab("overview");
+    setProductQuery("");
     setDetails(null);
     setError("");
     setPayoutOpen(false);
@@ -229,6 +243,17 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
     performance?.availableBalance ??
     Number(partner.withdrawable ?? partner.withdrawableBalance ?? 0);
   const customerId = linkedCustomerId(partner);
+  const products = details?.products || [];
+  const activity = details?.activity || [];
+  const sales = activity.filter((item) => item.kind === "sale");
+  const paidPayouts = (details?.payouts || []).filter(
+    (item) => String(item.status || "").toLowerCase() === "paid",
+  ).length;
+  const shownProducts = products.filter((product) => {
+    const query = productQuery.trim().toLowerCase();
+    if (!query) return true;
+    return `${product.name} ${product.category}`.toLowerCase().includes(query);
+  });
 
   const openPurchase = (path: "/create-purchase" | "/create-purchase-order") => {
     const vendor = linkedVendor(partner);
@@ -292,27 +317,38 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 p-0 backdrop-blur-xs sm:items-center sm:p-4"
       onClick={() => void closeIfConfirmed(onClose)}
     >
       <div
-        className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-        style={{ maxHeight: "88vh" }}
+        className="flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5 sm:py-4">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              CSP Partner
+              CSP Program
             </p>
-            <h2 className="mt-0.5 truncate text-lg font-semibold text-slate-900">
-              {fullName}
-            </h2>
-            <div className="mt-2">
+            <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5">
+              <h2 className="truncate text-lg font-black text-slate-900 sm:text-2xl">
+                {fullName}
+              </h2>
+              <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">
+                {membershipLabel(profile?.membershipType)}
+              </span>
+            </div>
+            <p className="text-[11px] font-semibold text-slate-400 sm:text-sm">
+              Creative Seller Partner
+              {brand ? ` · ${brand}` : ""}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <span
                 className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusClass(status)}`}
               >
                 {statusLabel(status)}
+              </span>
+              <span className="text-[11px] font-medium text-slate-500">
+                Expiry {membershipExpiryDate(profile?.membershipEndDate)}
               </span>
             </div>
           </div>
@@ -326,11 +362,11 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-3">
+        <div className="flex gap-2 overflow-x-auto border-b border-slate-100 px-4 py-3 sm:flex-wrap sm:px-5">
           <button
             type="button"
             onClick={() => openPurchase("/create-purchase")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
           >
             <ShoppingCart className="h-3.5 w-3.5" />
             Create Purchase
@@ -338,7 +374,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
           <button
             type="button"
             onClick={() => openPurchase("/create-purchase-order")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
           >
             <FilePlus2 className="h-3.5 w-3.5" />
             Create Purchase Order
@@ -350,7 +386,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
               setPayoutError("");
               setPayoutDone("");
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#ff5a36] px-3 py-2 text-xs font-semibold text-white hover:bg-[#e64e2d]"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#ff5a36] px-3 py-2 text-xs font-semibold text-white hover:bg-[#e64e2d]"
           >
             <Wallet className="h-3.5 w-3.5" />
             Payout
@@ -404,21 +440,23 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
           </div>
         ) : null}
 
-        <div className="flex gap-1 border-b border-slate-100 px-5">
+        <div className="flex gap-5 overflow-x-auto border-b border-slate-100 px-4 sm:gap-8 sm:px-5">
           {(
             [
               ["overview", "Overview"],
-              ["details", "CSP Details"],
+              ["products", "Products"],
+              ["sales", "Sales"],
+              ["timeline", "Timeline"],
             ] as const
           ).map(([id, label]) => (
             <button
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`-mb-px border-b-2 px-3 py-2.5 text-sm font-semibold cursor-pointer ${
+              className={`-mb-px shrink-0 border-b-2 py-3 text-sm font-bold cursor-pointer ${
                 tab === id
                   ? "border-[#ff5a36] text-[#ff5a36]"
-                  : "border-transparent text-slate-500 hover:text-slate-800"
+                  : "border-transparent text-slate-400 hover:text-slate-700"
               }`}
             >
               {label}
@@ -426,236 +464,140 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
           ))}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {tab === "overview" ? (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field icon={User} label="Full Name">
-                {textOrNA(fullName === "N/A" ? "" : fullName)}
-              </Field>
-              <Field icon={Mail} label="Email Address">
-                {textOrNA(email)}
-              </Field>
-              <Field icon={Phone} label="Phone Number">
-                {textOrNA(phone)}
-              </Field>
-              <Field icon={Globe} label="Profile / Website">
-                <WebsiteValue value={website || profile?.prositeUrl} />
-              </Field>
-              <Field icon={User} label="Enrollment Status">
-                {statusLabel(status)}
-              </Field>
-              <Field icon={Calendar} label="Join Date">
-                {formatDate(joinDate)}
-              </Field>
-            </div>
-          ) : loading ? (
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5 sm:py-4">
+          {loading && tab !== "overview" ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
               <Loader2 className="h-7 w-7 animate-spin text-orange-500" />
               <p className="mt-3 text-sm">Loading CSP details…</p>
             </div>
-          ) : (
+          ) : tab === "overview" ? (
             <div className="space-y-4">
-              {error ? (
-                <p className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                  {error}
-                </p>
-              ) : null}
-
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <Kpi icon={ShoppingBag} label="Products Sold" value={performance ? String(performance.productsSold) : "N/A"} />
-                <Kpi icon={IndianRupee} label="Total Earnings" value={performance ? money(performance.totalEarnings) : "N/A"} />
-                <Kpi icon={Wallet} label="Pending Payout" value={performance ? money(performance.pendingPayout) : "N/A"} />
-                <Kpi
+              <div className="grid grid-cols-3 gap-1.5 lg:grid-cols-6 lg:gap-3">
+                <StatCard
+                  icon={Package}
+                  label="Products Displayed"
+                  value={loading ? "—" : String(products.length)}
+                  tone="orange"
+                />
+                <StatCard
+                  icon={ShoppingBag}
+                  label="Products Sold"
+                  value={performance ? String(performance.productsSold) : loading ? "—" : "0"}
+                  tone="green"
+                />
+                <StatCard
+                  icon={IndianRupee}
+                  label="Earnings"
+                  value={performance ? money(performance.totalEarnings) : loading ? "—" : "₹0"}
+                  tone="amber"
+                />
+                <StatCard
+                  icon={Wallet}
+                  label="Payouts"
+                  value={performance ? money(performance.completedPayout) : loading ? "—" : "₹0"}
+                  hint={performance ? `${paidPayouts} completed` : undefined}
+                  tone="blue"
+                />
+                <StatCard
                   icon={Users}
-                  label="Total Leads"
+                  label="Leads"
                   value={
                     performance?.totalLeads == null
-                      ? "N/A"
+                      ? loading
+                        ? "—"
+                        : "0"
                       : String(performance.totalLeads)
                   }
+                  tone="rose"
+                />
+                <StatCard
+                  icon={FileText}
+                  label="History"
+                  value={loading ? "—" : String(activity.length)}
+                  hint="Total activities"
+                  tone="slate"
                 />
               </div>
 
-              <section className="rounded-xl border border-slate-100 p-3.5">
-                <h3 className="text-sm font-semibold text-slate-900">Enrollment</h3>
-                <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Info label="Brand" value={textOrNA(brand)} />
-                  <Info label="Membership" value={textOrNA(profile?.membershipType)} />
-                  <Info
-                    label="Membership Expiry"
-                    value={(() => {
-                      if (!profile?.membershipEndDate) return "Lifetime (No Expiry)";
-                      const end = new Date(profile.membershipEndDate);
-                      if (Number.isNaN(end.getTime())) return "N/A";
-                      const diffDays = Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-                      const dateStr = end.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-                      if (diffDays < 0 || profile.membershipExpired) return `${dateStr} (${Math.abs(diffDays)}d expired)`;
-                      if (diffDays === 0) return `${dateStr} (Expires today)`;
-                      return `${dateStr} (${diffDays} days left)`;
-                    })()}
-                  />
-                  <Info
-                    label="Sailor share"
-                    value={
-                      profile?.sailorSharePercent == null
-                        ? "N/A"
-                        : `${profile.sailorSharePercent}%`
-                    }
-                  />
-                  <Info
-                    label="Platform share"
-                    value={
-                      profile?.platformSharePercent == null
-                        ? "N/A"
-                        : `${profile.platformSharePercent}%`
-                    }
-                  />
-                  <Info
-                    label="Categories"
-                    value={
-                      profile?.categories?.length
-                        ? profile.categories.join(", ")
-                        : "N/A"
-                    }
-                  />
-                  <Info label="Prosite" value={textOrNA(profile?.prositeUrl)} />
-                </dl>
-              </section>
-
-              <section className="rounded-xl border border-slate-100 p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-slate-900">Products</h3>
-                  <span className="text-xs font-medium text-slate-400">
-                    {details ? `${details.products.length} listed` : "N/A"}
-                  </span>
-                </div>
-                {!details || details.products.length === 0 ? (
-                  <p className="mt-3 text-sm text-slate-400">
-                    {details ? "No products added." : "N/A"}
-                  </p>
-                ) : (
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-100 text-xs text-slate-500">
-                          <th className="pb-2 pr-3 font-semibold">Product</th>
-                          <th className="pb-2 pr-3 font-semibold">Category</th>
-                          <th className="pb-2 pr-3 text-right font-semibold">Price</th>
-                          <th className="pb-2 pr-3 text-right font-semibold">Sold</th>
-                          <th className="pb-2 text-right font-semibold">Sales</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {details.products.map((product) => (
-                          <tr key={product.id}>
-                            <td className="py-2 pr-3 font-medium text-slate-800">
-                              {textOrNA(product.name)}
-                            </td>
-                            <td className="py-2 pr-3 text-slate-600">
-                              {textOrNA(product.category)}
-                            </td>
-                            <td className="py-2 pr-3 text-right text-slate-700">
-                              {money(product.price)}
-                            </td>
-                            <td className="py-2 pr-3 text-right text-slate-700">
-                              {product.sold}
-                            </td>
-                            <td className="py-2 text-right font-medium text-slate-800">
-                              {money(product.sales)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-
-              <section className="rounded-xl border border-slate-100 p-3.5">
-                <h3 className="text-sm font-semibold text-slate-900">Payouts</h3>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                  <Info
-                    label="Available balance"
-                    value={performance ? money(performance.availableBalance) : "N/A"}
-                  />
-                  <Info
-                    label="Pending"
-                    value={performance ? money(performance.pendingPayout) : "N/A"}
-                  />
-                  <Info
-                    label="Completed"
-                    value={performance ? money(performance.completedPayout) : "N/A"}
-                  />
-                </div>
-                {details && details.payouts.length > 0 ? (
-                  <ul className="mt-3 divide-y divide-slate-50">
-                    {details.payouts.map((payout) => (
-                      <li
-                        key={payout.id}
-                        className="flex items-center justify-between gap-3 py-2 text-sm"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-800">
-                            {money(payout.amount)}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {formatDate(payout.at)}
-                            {payout.method ? ` · ${payout.method.toUpperCase()}` : ""}
-                          </p>
-                        </div>
-                        <span
-                          className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusClass(payout.status)}`}
-                        >
-                          {statusLabel(payout.status)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-3 text-sm text-slate-400">
-                    {details ? "No payout requests yet." : "N/A"}
-                  </p>
-                )}
-              </section>
-
-              <section className="rounded-xl border border-slate-100 p-3.5">
-                <h3 className="text-sm font-semibold text-slate-900">Recent activity</h3>
-                {!details || details.activity.length === 0 ? (
-                  <p className="mt-3 text-sm text-slate-400">
-                    {details ? "No sales, leads, or payouts yet." : "N/A"}
-                  </p>
-                ) : (
-                  <ul className="mt-3 space-y-2">
-                    {details.activity.map((item, index) => (
-                      <li
-                        key={`${item.kind}-${item.at}-${index}`}
-                        className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2"
-                      >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-slate-500">
-                          {item.kind === "sale" ? (
-                            <Package className="h-4 w-4" />
-                          ) : (
-                            <Clock className="h-4 w-4" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-800">
-                            {item.title}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {formatDate(item.at)}
-                            {item.detail ? ` · ${item.detail}` : ""}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-sm font-semibold text-slate-800">
-                          {money(item.amount)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <Field icon={User} label="Full Name">
+                  {textOrNA(fullName === "N/A" ? "" : fullName)}
+                </Field>
+                <Field icon={Mail} label="Email Address">
+                  {textOrNA(email)}
+                </Field>
+                <Field icon={Phone} label="Phone Number">
+                  {textOrNA(phone)}
+                </Field>
+                <Field icon={Globe} label="Profile / Website">
+                  <WebsiteValue value={website || profile?.prositeUrl} />
+                </Field>
+                <Field icon={Calendar} label="Join Date">
+                  {formatDate(joinDate)}
+                </Field>
+                <Field icon={User} label="Enrollment Status">
+                  {statusLabel(status)}
+                </Field>
+              </div>
             </div>
+          ) : tab === "products" ? (
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={productQuery}
+                  onChange={(event) => setProductQuery(event.target.value)}
+                  placeholder="Search products by name or category..."
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-orange-300"
+                />
+              </div>
+              {shownProducts.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-slate-200 px-3 py-8 text-center text-sm text-slate-400">
+                  {products.length === 0 ? "No products added." : "No products match that search."}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {shownProducts.map((product) => (
+                    <div
+                      key={product.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-3"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-400">
+                          <Package className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-slate-900">
+                            {textOrNA(product.name)}
+                          </p>
+                          <p className="truncate text-xs text-slate-400">
+                            {textOrNA(product.category)}
+                          </p>
+                          <p className="mt-0.5 text-sm font-bold text-emerald-600">
+                            {money(product.price)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right text-xs text-slate-500">
+                        <p className="font-semibold text-slate-700">In stock</p>
+                        <p className="text-base font-bold text-emerald-600">{product.stock}</p>
+                        <p className="mt-1">Sold {product.sold}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : tab === "sales" ? (
+            <ActivityList
+              empty="No sales yet."
+              items={sales}
+            />
+          ) : (
+            <ActivityList
+              empty="No sales, leads, or payouts yet."
+              items={activity}
+            />
           )}
         </div>
       </div>
@@ -663,35 +605,83 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
   );
 }
 
-function Kpi({
+const STAT_TONES = {
+  orange: "border-[#FFEADA] bg-[#FFF9F5] text-orange-600",
+  green: "border-[#E1F4E7] bg-[#F3FAF5] text-emerald-600",
+  amber: "border-[#F6EED8] bg-[#FCFAF2] text-amber-700",
+  blue: "border-[#E2EEFB] bg-[#F4F8FC] text-blue-600",
+  rose: "border-[#FBE0E3] bg-[#FCF4F5] text-rose-500",
+  slate: "border-[#E9EBEF] bg-[#F6F7F9] text-slate-700",
+} as const;
+
+function StatCard({
   icon: Icon,
   label,
   value,
+  hint,
+  tone,
 }: {
   icon: typeof ShoppingBag;
   label: string;
   value: string;
+  hint?: string;
+  tone: keyof typeof STAT_TONES;
 }) {
+  const toneClass = STAT_TONES[tone];
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-3">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
-        <Icon className="h-3.5 w-3.5" />
-        <span className="truncate">{label}</span>
+    <div className={`flex min-h-[72px] flex-col justify-between rounded-xl border p-2 sm:min-h-[92px] sm:rounded-2xl sm:p-3.5 ${toneClass}`}>
+      <div className="flex items-start gap-1 sm:gap-2">
+        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-white/80 sm:h-8 sm:w-8 sm:rounded-xl">
+          <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
+        </div>
+        <span className="text-[9px] font-semibold leading-tight text-slate-600 sm:text-xs">
+          {label}
+        </span>
       </div>
-      <p className="mt-1 text-base font-bold text-slate-900">{value}</p>
+      <div className="mt-1.5">
+        <p className="text-sm font-black leading-none text-slate-900 sm:text-xl">{value}</p>
+        {hint ? (
+          <p className="mt-1 text-[9px] font-medium leading-tight text-slate-400 sm:text-[11px]">{hint}</p>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function ActivityList({
+  items,
+  empty,
+}: {
+  items: CspPartnerDetails["activity"];
+  empty: string;
+}) {
+  if (items.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed border-slate-200 px-3 py-8 text-center text-sm text-slate-400">
+        {empty}
+      </p>
+    );
+  }
   return (
-    <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-        {label}
-      </dt>
-      <dd className="mt-0.5 text-sm font-medium text-slate-800 break-words">
-        {value}
-      </dd>
-    </div>
+    <ul className="space-y-2">
+      {items.map((item, index) => (
+        <li
+          key={`${item.kind}-${item.at}-${index}`}
+          className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5"
+        >
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-50 text-slate-500">
+            {item.kind === "sale" ? <Package className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-slate-800">{item.title}</p>
+            <p className="text-xs text-slate-400">
+              {formatDate(item.at)}
+              {item.detail ? ` · ${item.detail}` : ""}
+            </p>
+          </div>
+          <span className="shrink-0 text-sm font-semibold text-slate-800">{money(item.amount)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

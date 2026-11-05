@@ -1479,6 +1479,16 @@ export default function ExpenseScreen() {
           </div>
         </div>
 
+        <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-3.5 py-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+              <Users className="h-4 w-4" />
+            </div>
+            <span className="text-xs font-medium text-slate-600">Total Vendors</span>
+          </div>
+          <span className="text-xl font-bold text-slate-900">{totalVendorsCount}</span>
+        </div>
+
         {/* 2. Search Bar with Payment Modes below the charts */}
         <div ref={mobileSearchRef} className="relative flex items-center rounded-full border border-slate-200/90 bg-white shadow-xs px-2.5 py-1">
           {/* Search Input */}

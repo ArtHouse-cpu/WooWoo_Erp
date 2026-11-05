@@ -71,6 +71,7 @@ import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { usePermission } from "@/hooks/usePermission";
 import { useAppSelector } from "@/store/hooks";
 import RevenueCard from "@/features/home/components/RevenueCard";
+import DashboardMembershipCards from "@/features/home/components/DashboardMembershipCards";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
 import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
@@ -1319,6 +1320,7 @@ export default function HomeScreen() {
         subtitle: p.planType || "Plan",
         meta: p.status || "Active",
         amount: formatMoney(Number(p.pricing?.amount ?? 0)),
+        raw: p as unknown as Record<string, unknown>,
       })),
     [membershipPlans],
   );
@@ -3763,6 +3765,13 @@ export default function HomeScreen() {
               </div>
             )}
           </>
+        ) : tab === "memberships" ? (
+          <DashboardMembershipCards
+            loading={kpisLoading && membershipPlans.length === 0}
+            plans={pageGeneric
+              .map((row) => row.raw as MembershipPlanPayload | undefined)
+              .filter((plan): plan is MembershipPlanPayload => Boolean(plan))}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-[640px] w-full text-sm">

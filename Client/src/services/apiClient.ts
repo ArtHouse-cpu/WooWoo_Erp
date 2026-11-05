@@ -2435,6 +2435,16 @@ export const handleGetAllBookings = async (
     success: boolean;
     message?: string;
     bookings?: AllBookingRow[];
+    summary?: {
+      total: number;
+      ongoing: number;
+      upcoming: number;
+      draft: number;
+      expired: number;
+      cancelled: number;
+      paid?: number;
+      pending?: number;
+    };
     pagination?: {
       page: number;
       limit: number;
@@ -3541,6 +3551,10 @@ export type CspEnrollment = {
     website?: string;
     businessEmail?: string;
   };
+  /** Settled product sales for this partner */
+  salesAmount?: number;
+  /** Paid payouts for this partner */
+  payoutAmount?: number;
   /** CSP earnings eligible for withdrawal (wallet withdrawable bucket) */
   withdrawable?: number;
   withdrawableBalance?: number;

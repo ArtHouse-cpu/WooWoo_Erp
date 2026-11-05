@@ -24,6 +24,7 @@ import {
   MailCheck,
   Loader2,
   FileText,
+  BadgeIndianRupee,
   CreditCard,
   CalendarDays,
   MoreVertical,
@@ -48,6 +49,9 @@ import {
   getBusinessToday,
 } from "./utils/bookingAvailability";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
+import BookingDateFilter, {
+  type BookingDatePreset,
+} from "@/features/spacebook/BookingDateFilter";
 import RescheduleBookingModal from "./modal/RescheduleBookingModal";
 import {
   handleCreateInvoice,
@@ -68,35 +72,6 @@ import { printThermalReceipt } from "@/utils/printUtils";
 import { roundPayable } from "@/features/sales/utils/paymentRoundOff";
 
 type BookingStatusFilter = "All" | SpaceBookingStatus;
-type DatePresetType =
-  | "today"
-  | "yesterday"
-  | "this_week"
-  | "last_week"
-  | "this_month"
-  | "last_month"
-  | "this_year"
-  | "lifetime"
-  | "custom";
-
-const DATE_PRESETS: { key: DatePresetType; label: string }[] = [
-  { key: "today", label: "Today" },
-  { key: "yesterday", label: "Yesterday" },
-  { key: "this_week", label: "This Week" },
-  { key: "last_week", label: "Last Week" },
-  { key: "this_month", label: "This Month" },
-  { key: "last_month", label: "Last Month" },
-  { key: "this_year", label: "This Year" },
-  { key: "lifetime", label: "Lifetime" },
-  { key: "custom", label: "Custom Range" },
-];
-
-const formatYmd = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
 
 const toLocalYmd = (value?: string | Date | null): string => {
   if (!value) return "";
@@ -110,55 +85,6 @@ const toLocalYmd = (value?: string | Date | null): string => {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 };
-
-const getRangeForPreset = (preset: DatePresetType): { from: string; to: string } => {
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
-  if (preset === "today") {
-    const ymd = formatYmd(now);
-    return { from: ymd, to: ymd };
-  }
-  if (preset === "yesterday") {
-    const y = new Date(now);
-    y.setDate(y.getDate() - 1);
-    const ymd = formatYmd(y);
-    return { from: ymd, to: ymd };
-  }
-  if (preset === "this_week") {
-    const day = now.getDay() || 7;
-    const start = new Date(now);
-    start.setDate(now.getDate() - (day - 1));
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return { from: formatYmd(start), to: formatYmd(end) };
-  }
-  if (preset === "last_week") {
-    const day = now.getDay() || 7;
-    const start = new Date(now);
-    start.setDate(now.getDate() - (day - 1) - 7);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return { from: formatYmd(start), to: formatYmd(end) };
-  }
-  if (preset === "this_month") {
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return { from: formatYmd(start), to: formatYmd(end) };
-  }
-  if (preset === "last_month") {
-    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const end = new Date(now.getFullYear(), now.getMonth(), 0);
-    return { from: formatYmd(start), to: formatYmd(end) };
-  }
-  if (preset === "this_year") {
-    const start = new Date(now.getFullYear(), 0, 1);
-    const end = new Date(now.getFullYear(), 11, 31);
-    return { from: formatYmd(start), to: formatYmd(end) };
-  }
-  return { from: "", to: "" };
-};
-
 
 const AVATAR_COLORS = [
   "bg-violet-100 text-violet-700 border-violet-200",
@@ -220,6 +146,14 @@ const apiErrorMessage = (err: unknown, fallback: string) => {
   }
   if (err instanceof Error && err.message) return err.message;
   return fallback;
+};
+
+const shortInr = (value: number) => {
+  const amount = Math.max(0, Number(value) || 0);
+  if (amount >= 10000000) return `₹${+(amount / 10000000).toFixed(1)}Cr`;
+  if (amount >= 100000) return `₹${+(amount / 100000).toFixed(1)}L`;
+  if (amount >= 1000) return `₹${+(amount / 1000).toFixed(1)}k`;
+  return `₹${Math.round(amount).toLocaleString("en-IN")}`;
 };
 
 const toDateInput = (value?: string | Date | null) => {
@@ -395,21 +329,11 @@ const SpaceBook = () => {
   const [statusFilter, setStatusFilter] =
     useState<BookingStatusFilter>("All");
   const [spaceFilter, setSpaceFilter] = useState<string>("All");
-  const [datePreset, setDatePreset] = useState<DatePresetType>("lifetime");
+  const [datePreset, setDatePreset] = useState<BookingDatePreset>("lifetime");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [actionMenuRowId, setActionMenuRowId] = useState<string | null>(null);
   const [isSpaceDropdownOpen, setIsSpaceDropdownOpen] = useState(false);
-
-  const handlePresetSelect = (preset: DatePresetType) => {
-    setDatePreset(preset);
-    if (preset === "custom") {
-      return;
-    }
-    const range = getRangeForPreset(preset);
-    setFromDate(range.from);
-    setToDate(range.to);
-  };
 
   const [selectedBooking, setSelectedBooking] =
     useState<SpaceBookingPayload | null>(null);
@@ -537,15 +461,34 @@ const SpaceBook = () => {
     toast.error("That space booking could not be opened for editing.");
   }, [searchParams, bookingsLoaded, loading, data, setSearchParams]);
 
+  const datedData = useMemo(() => {
+    return data.filter((booking) => {
+      if (!fromDate && !toDate) return true;
+      const day = toLocalYmd(booking.bookingDate);
+      if (!day) return false;
+      if (fromDate && day < fromDate) return false;
+      if (toDate && day > toDate) return false;
+      return true;
+    });
+  }, [data, fromDate, toDate]);
+
   const metrics = useMemo(() => {
-    const total = data.length;
-    const ongoing = data.filter((b) => b.status === "Ongoing").length;
-    const upcoming = data.filter((b) => b.status === "Upcoming").length;
-    const draft = data.filter((b) => b.status === "Draft").length;
-    const expired = data.filter((b) => b.status === "Expired").length;
-    const cancelled = data.filter((b) => b.status === "Cancelled").length;
-    return { total, ongoing, upcoming, draft, expired, cancelled };
-  }, [data]);
+    const total = datedData.length;
+    const ongoing = datedData.filter((b) => b.status === "Ongoing").length;
+    const upcoming = datedData.filter((b) => b.status === "Upcoming").length;
+    const draft = datedData.filter((b) => b.status === "Draft").length;
+    const expired = datedData.filter((b) => b.status === "Expired").length;
+    const cancelled = datedData.filter((b) => b.status === "Cancelled").length;
+    let paid = 0;
+    let pending = 0;
+    datedData.forEach((booking) => {
+      if (booking.status === "Cancelled") return;
+      paid += Math.max(0, Number(booking.paidAmount) || 0);
+      const due = Number(booking.dueAmount) || 0;
+      pending += due < 1 ? 0 : due;
+    });
+    return { total, ongoing, upcoming, draft, expired, cancelled, paid, pending };
+  }, [datedData]);
 
   const uniqueSpaces = useMemo(() => {
     const map = new Map<string, string>();
@@ -565,7 +508,7 @@ const SpaceBook = () => {
   }, [spaceFilter, uniqueSpaces]);
 
   const filteredData = useMemo(() => {
-    return data.filter((b) => {
+    return datedData.filter((b) => {
       if (statusFilter !== "All" && b.status !== statusFilter) return false;
       if (spaceFilter !== "All" && String(b.spaceId) !== spaceFilter)
         return false;
@@ -586,11 +529,12 @@ const SpaceBook = () => {
       }
       return true;
     });
-  }, [data, search, statusFilter, spaceFilter]);
+  }, [datedData, search, statusFilter, spaceFilter]);
 
   const hasActiveFilters =
     statusFilter !== "All" ||
     spaceFilter !== "All" ||
+    datePreset !== "lifetime" ||
     Boolean(search.trim());
 
   const handleResetFilters = () => {
@@ -1546,18 +1490,17 @@ const SpaceBook = () => {
           Space Bookings
         </h1>
 
-        {/* Date Filter Dropdown (without icon) */}
-        <select
-          value={datePreset}
-          onChange={(e) => handlePresetSelect(e.target.value as DatePresetType)}
-          className="h-6 w-24 rounded-lg border border-slate-200 bg-white px-1  text-[10px]  font-semibold text-slate-700 shadow-2xs outline-none focus:border-indigo-500 shrink-0"
-        >
-          {DATE_PRESETS.map((preset) => (
-            <option key={preset.key} value={preset.key}>
-              {preset.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+        <BookingDateFilter
+          preset={datePreset}
+          fromDate={fromDate}
+          toDate={toDate}
+          onChange={(preset, from, to) => {
+            setDatePreset(preset);
+            setFromDate(from);
+            setToDate(to);
+          }}
+        />
 
         {/* + Add Space Button */}
         <Can permission={PERMISSIONS.SPACE_BOOKING_CREATE}>
@@ -1570,11 +1513,12 @@ const SpaceBook = () => {
             <span>Add </span>
           </button>
         </Can>
+        </div>
       </div>
 
       {/* Custom Date Pickers when Custom Range is active */}
       {datePreset === "custom" && (
-        <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs">
+        <div className="hidden grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs md:grid">
           <div>
             <span className="text-[10px] font-semibold text-slate-500 block mb-1">From Date</span>
             <input
@@ -1596,7 +1540,7 @@ const SpaceBook = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 lg:gap-4">
         <button
           type="button"
           onClick={() => setStatusFilter("All")}
@@ -1703,6 +1647,21 @@ const SpaceBook = () => {
             <CheckCircle2 size={20} />
           </span>
         </button>
+
+        <div className="flex items-start justify-between rounded-2xl border border-slate-200 bg-white p-4 text-left">
+          <div className="min-w-0">
+            <span className="text-xs font-medium text-slate-500">Revenue</span>
+            <div className="mt-1 text-sm font-bold leading-5 text-emerald-700">
+              Paid {shortInr(metrics.paid)}
+            </div>
+            <div className="text-sm font-bold leading-5 text-amber-700">
+              Pending {shortInr(metrics.pending)}
+            </div>
+          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+            <BadgeIndianRupee size={20} />
+          </span>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-white p-3 sm:p-3.5 shadow-xs">

@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Download,
   Eye,
   Filter,
@@ -26,7 +25,6 @@ import {
   CheckCircle2,
   XCircle,
   Link2,
-  Crown,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
@@ -165,11 +163,23 @@ function getAvatar(name: string, index: number) {
   return { initials, palette };
 }
 
+function partnerMoney(value: unknown) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
 function partnerEarnings(row: CspEnrollment) {
-  const value = Number(
+  return partnerMoney(
     row.withdrawable ?? row.withdrawableBalance ?? row.affiliateBalance ?? 0,
   );
-  return Number.isFinite(value) ? value : 0;
+}
+
+function partnerSales(row: CspEnrollment) {
+  return partnerMoney(row.salesAmount);
+}
+
+function partnerPayouts(row: CspEnrollment) {
+  return partnerMoney(row.payoutAmount);
 }
 
 
@@ -264,27 +274,6 @@ export function formatMembershipExpiryInfo(
     badgeColor: "bg-violet-50 text-violet-700 border-violet-200",
     pillColor: "text-violet-700",
   };
-}
-
-function formatLastSaleDate(dateStr?: string | Date | null) {
-  if (!dateStr) return "—";
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "—";
-    const dateFormatted = d.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-    const timeFormatted = d.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-    return `${dateFormatted}, ${timeFormatted}`;
-  } catch {
-    return "—";
-  }
 }
 
 type DatePreset =
@@ -867,6 +856,25 @@ export default function CspScreen() {
     return formatMembershipExpiryInfo(endDate, isExpired);
   };
 
+  const getRowMembershipLabel = (row: CspEnrollment) => {
+    const cId = enrollmentCustomerId(row);
+    let info = cId ? customerExpiryMap.get(cId) : null;
+    if (!info) {
+      const mob = String(
+        row.mobile || row.customer?.mobile || row.vendor?.mobile || "",
+      ).replace(/\D/g, "");
+      const ten = mob.length >= 10 ? mob.slice(-10) : mob;
+      if (ten) info = customerExpiryMap.get(`m_${ten}`);
+    }
+    const raw = String(
+      info?.membershipType || row.customer?.membershipType || "Premium",
+    ).trim();
+    if (!raw || ["none", "guest", "new"].includes(raw.toLowerCase())) {
+      return "Premium";
+    }
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  };
+
   const sourceRows = liveRows;
 
   // Counts for tabs
@@ -1133,14 +1141,13 @@ export default function CspScreen() {
           Partner: partnerName,
           "Brand Name": brandName,
           "Mobile Number": r.mobile || r.customer?.mobile || "—",
-          "Sales (₹)": 0,
-          "Products (count)": productsCount,
+          "Sales (₹)": partnerSales(r),
           "Earnings (₹)": earnings,
+          "Payouts (₹)": partnerPayouts(r),
+          "Products (count)": productsCount,
           "Premium Expiry": (() => {
             const exp = getRowMembershipExpiry(r);
-            return exp.dateText === "Lifetime"
-              ? "Lifetime (No Expiry)"
-              : `${exp.dateText} (${exp.daysText})`;
+            return exp.dateText;
           })(),
           Status: r.status || "active",
         };
@@ -1587,10 +1594,8 @@ export default function CspScreen() {
                   <th className="py-3.5 px-4 font-semibold text-slate-700">Partner</th>
                   <th className="py-3.5 px-4 font-semibold text-slate-700">Brand Name</th>
                   <th className="py-3.5 px-4 font-semibold text-slate-700">Sales (₹)</th>
-                  <th className="py-3.5 px-4 font-semibold text-slate-700 text-center">
-                    Products (count)
-                  </th>
                   <th className="py-3.5 px-4 font-semibold text-slate-700">Earnings (₹)</th>
+                  <th className="py-3.5 px-4 font-semibold text-slate-700">Payouts (₹)</th>
                   <th className="py-3.5 px-4 font-semibold text-slate-700">Premium Expiry</th>
                   <th className="w-16 py-3.5 px-4 font-semibold text-slate-700 text-center">
                     Actions
@@ -1637,12 +1642,8 @@ export default function CspScreen() {
                     const { initials, palette } = getAvatar(partnerName, globalIdx);
 
                     const withdrawableAmt = partnerEarnings(row);
-                    const salesAmt = 0;
-                    const prodCount = productCounts[row._id] ?? 0;
-
-                    const lastSaleDate = formatLastSaleDate(
-                      row.updatedAt || row.createdAt,
-                    );
+                    const salesAmt = partnerSales(row);
+                    const payoutAmt = partnerPayouts(row);
 
                     const isMenuOpen = actionMenuId === row._id;
 
@@ -1668,9 +1669,12 @@ export default function CspScreen() {
             <button
               type="button"
                                 onClick={() => openPartnerDetails(row)}
-                                className="text-left text-sm font-semibold text-slate-900 hover:text-[#ff5a36] hover:underline cursor-pointer"
+                                className="inline-flex max-w-full items-center gap-1.5 text-left text-sm font-semibold text-slate-900 hover:text-[#ff5a36] hover:underline cursor-pointer"
             >
-                                {partnerName}
+                                <span className="truncate">{partnerName}</span>
+                                <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-700 no-underline">
+                                  {getRowMembershipLabel(row)}
+                                </span>
             </button>
                               <div className="text-xs text-slate-400">
                                 {brandName !== "—"
@@ -1691,21 +1695,14 @@ export default function CspScreen() {
                           ₹{salesAmt.toLocaleString("en-IN")}
                         </td>
 
-                        {/* Products (count) */}
-                        <td className="py-3 px-4 text-center">
-              <button
-                type="button"
-                            onClick={() => openProductsModal(row)}
-                            title="Click to view assigned products"
-                            className="inline-flex items-center justify-center rounded-lg px-2.5 py-1 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
-                          >
-                            {prodCount}
-                          </button>
+                        {/* Earnings (₹) */}
+                        <td className="py-3 px-4 font-bold text-emerald-700 text-sm">
+                          ₹{withdrawableAmt.toLocaleString("en-IN")}
                         </td>
 
-                        {/* Earnings (₹) */}
+                        {/* Payouts (₹) */}
                         <td className="py-3 px-4 font-bold text-slate-900 text-sm">
-                          ₹{withdrawableAmt.toLocaleString("en-IN")}
+                          ₹{payoutAmt.toLocaleString("en-IN")}
                         </td>
 
                         {/* Premium Membership Expiry */}
@@ -1714,14 +1711,9 @@ export default function CspScreen() {
                             const exp = getRowMembershipExpiry(row);
                             return (
                               <div className="flex items-center gap-1.5">
-                                <Crown size={13} className="text-amber-500 shrink-0" />
+                                <span className="font-medium text-slate-500">Expire on</span>
                                 <span className="font-medium text-slate-800">
                                   {exp.dateText}
-                                </span>
-                                <span
-                                  className={`inline-flex rounded-md px-1.5 py-0.5 text-[10px] font-semibold border ${exp.badgeColor}`}
-                                >
-                                  {exp.daysText}
                                 </span>
                               </div>
                             );
@@ -1961,12 +1953,9 @@ export default function CspScreen() {
                 const { initials, palette } = getAvatar(partnerName, globalIdx);
 
                 const withdrawableAmt = partnerEarnings(row);
-                const salesAmt = 0;
+                const salesAmt = partnerSales(row);
+                const payoutAmt = partnerPayouts(row);
                 const prodCount = productCounts[row._id] ?? 0;
-
-                const lastSaleDate = formatLastSaleDate(
-                  row.updatedAt || row.createdAt,
-                );
 
                 return (
                   <div
@@ -1983,9 +1972,12 @@ export default function CspScreen() {
                           {initials}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="truncate text-sm font-bold text-slate-900 block">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <span className="truncate text-sm font-bold text-slate-900">
                               {partnerName}
+                            </span>
+                            <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-700">
+                              {getRowMembershipLabel(row)}
                             </span>
                             <span className="shrink-0 text-[10px] font-mono text-slate-400">
                               #{globalIdx + 1}
@@ -2007,7 +1999,7 @@ export default function CspScreen() {
                       </span>
                     </div>
 
-                    {/* Metrics Grid: Sales, Products, Earnings */}
+                    {/* Metrics Grid: Sales, Earnings, Payouts */}
                     <div className="mt-3.5 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center text-xs">
                       <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100/80">
                         <span className="block text-[10px] uppercase font-bold text-slate-400">
@@ -2017,26 +2009,20 @@ export default function CspScreen() {
                           ₹{salesAmt.toLocaleString("en-IN")}
                         </span>
                       </div>
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openProductsModal(row);
-                        }}
-                        className="rounded-xl bg-slate-50 p-2.5 border border-slate-100/80 hover:bg-blue-50 transition cursor-pointer"
-                      >
-                        <span className="block text-[10px] uppercase font-bold text-slate-400">
-                          Products
-                        </span>
-                        <span className="text-xs font-bold text-blue-600 mt-0.5 block">
-                          {prodCount}
-                        </span>
-                      </div>
                       <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100/80">
                         <span className="block text-[10px] uppercase font-bold text-slate-400">
                           Earnings
                         </span>
                         <span className="text-xs font-bold text-emerald-700 mt-0.5 block">
                           ₹{withdrawableAmt.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100/80">
+                        <span className="block text-[10px] uppercase font-bold text-slate-400">
+                          Payouts
+                        </span>
+                        <span className="text-xs font-bold text-slate-900 mt-0.5 block">
+                          ₹{payoutAmt.toLocaleString("en-IN")}
                         </span>
                       </div>
                     </div>
@@ -2051,14 +2037,9 @@ export default function CspScreen() {
                             <span>{mobile || "No phone"}</span>
                           </div>
                           <div className="flex items-center gap-1.5 text-[11px]">
-                            <Crown size={12} className="text-amber-500 shrink-0" />
+                            <span className="text-slate-500 font-medium">Expire on</span>
                             <span className="text-slate-600 font-medium">
-                              Exp: {exp.dateText}
-                            </span>
-                            <span
-                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold border ${exp.badgeColor}`}
-                            >
-                              {exp.daysText}
+                              {exp.dateText}
                             </span>
                           </div>
                         </div>

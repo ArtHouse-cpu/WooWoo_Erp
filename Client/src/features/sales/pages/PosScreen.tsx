@@ -1275,12 +1275,6 @@ export default function PosScreen() {
                       {formatCompactCurrency(segmentsBreakdown.Service)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-600">Membership</span>
-                    <span className="font-semibold text-slate-800">
-                      {formatCompactCurrency(segmentsBreakdown.Membership)}
-                    </span>
-                  </div>
                   {segmentsBreakdown.General > 0 && (
                     <div className="flex items-center justify-between">
                       <span className="text-slate-600">Store</span>

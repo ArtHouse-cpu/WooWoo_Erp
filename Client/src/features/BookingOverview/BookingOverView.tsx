@@ -5,7 +5,6 @@ import {
   Calendar,
   CalendarCheck,
   CalendarClock,
-  CalendarDays,
   CircleX,
   Clock,
   Edit3,
@@ -836,54 +835,6 @@ export default function BookingOverView() {
           {/* MOBILE VIEW (block md:hidden): Date Filter, 6 Light Pastel Cards, Search, 3 Dropdowns, Image Cards */}
           {/* ========================================================================= */}
           <div className="block md:hidden space-y-3">
-            {/* 1. Date Filter Dropdown on Right Top above top 6 cards */}
-            <div className="flex items-center justify-end">
-              <div className="flex items-center gap-1.5">
-                <CalendarDays size={14} className="text-indigo-600 shrink-0" />
-                <select
-                  value={datePreset}
-                  onChange={(e) => handlePresetSelect(e.target.value as DatePresetType)}
-                  className="h-8.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 shadow-2xs outline-none focus:border-indigo-500"
-                >
-                  {DATE_PRESETS.map((preset) => (
-                    <option key={preset.key} value={preset.key}>
-                      {preset.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Custom Date Pickers when Custom Range is active */}
-            {datePreset === "custom" && (
-              <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs">
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-500 block mb-1">From Date</span>
-                  <input
-                    type="date"
-                    value={from}
-                    onChange={(e) => {
-                      setFrom(e.target.value);
-                      setPage(1);
-                    }}
-                    className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-2 text-xs text-slate-700 outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-500 block mb-1">To Date</span>
-                  <input
-                    type="date"
-                    value={to}
-                    onChange={(e) => {
-                      setTo(e.target.value);
-                      setPage(1);
-                    }}
-                    className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-2 text-xs text-slate-700 outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-            )}
-
             {/* 2. Top 6 KPI Cards (Different Light Pastel Colors) */}
             <div className="grid grid-cols-2 gap-2">
               {cards.map((card) => (
@@ -913,35 +864,77 @@ export default function BookingOverView() {
               ))}
             </div>
 
-            {/* 3. Search Bar */}
-            <div className="relative">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="search"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="Search bookings, customers, spaces..."
-                className="h-9 w-full rounded-xl border border-slate-200 bg-white pr-8 pl-8.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-2xs"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearch("");
+            {/* 3. Search and date filter on one line */}
+            <div className="flex items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
                     setPage(1);
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X size={13} />
-                </button>
-              )}
+                  placeholder="Search bookings, customers, spaces..."
+                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pr-8 pl-8.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 shadow-2xs"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setPage(1);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+              <select
+                aria-label="Date filter"
+                value={datePreset}
+                onChange={(e) => handlePresetSelect(e.target.value as DatePresetType)}
+                className="h-9 w-[108px] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 shadow-2xs outline-none focus:border-indigo-500"
+              >
+                {DATE_PRESETS.map((preset) => (
+                  <option key={preset.key} value={preset.key}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
             </div>
+            {datePreset === "custom" && (
+              <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs">
+                <div>
+                  <span className="text-[10px] font-semibold text-slate-500 block mb-1">From Date</span>
+                  <input
+                    type="date"
+                    value={from}
+                    onChange={(e) => {
+                      setFrom(e.target.value);
+                      setPage(1);
+                    }}
+                    className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-2 text-xs text-slate-700 outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <span className="text-[10px] font-semibold text-slate-500 block mb-1">To Date</span>
+                  <input
+                    type="date"
+                    value={to}
+                    onChange={(e) => {
+                      setTo(e.target.value);
+                      setPage(1);
+                    }}
+                    className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/50 px-2 text-xs text-slate-700 outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* 4. Three Dropdowns */}
             <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
