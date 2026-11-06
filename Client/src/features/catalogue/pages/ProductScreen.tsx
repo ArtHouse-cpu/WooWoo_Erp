@@ -18,6 +18,7 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Boxes,
+  ChevronDown,
   Package,
   LayoutList,
   Search,
@@ -138,14 +139,23 @@ export default function ProductScreen() {
     return counts;
   }, [products]);
 
+  const [stockFilter, setStockFilter] = useState<"all" | "in_stock" | "out_of_stock">("all");
+
   const displayedMobileProducts = useMemo(() => {
-    if (selectedCategory === "all") return products;
-    return products.filter(
-      (p) =>
-        String(p.category || "").trim().toLowerCase() ===
-        selectedCategory.toLowerCase(),
-    );
-  }, [products, selectedCategory]);
+    return products.filter((p) => {
+      if (
+        selectedCategory !== "all" &&
+        String(p.category || "").trim().toLowerCase() !== selectedCategory.toLowerCase()
+      ) {
+        return false;
+      }
+      const stock = Number(p.stockQty ?? 0);
+      const isOut = stock < 3;
+      if (stockFilter === "in_stock" && isOut) return false;
+      if (stockFilter === "out_of_stock" && !isOut) return false;
+      return true;
+    });
+  }, [products, selectedCategory, stockFilter]);
   const [globalFilter, setGlobalFilter] = useState("");
   const search = String(globalFilter ?? "").trim();
   const [sorting, setSorting] = useState<MRT_SortingState>([]);
@@ -630,7 +640,25 @@ export default function ProductScreen() {
           return <span>₹ {val.toLocaleString("en-IN")}</span>;
         },
       },
-      { accessorKey: "stockQty", header: "Stock" },
+      {
+        accessorKey: "stockQty",
+        header: "Stock",
+        Cell: ({ cell }: { cell: any }) => {
+          const qty = Number(cell.getValue() ?? 0);
+          const isOut = qty < 3;
+          return (
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                isOut
+                  ? "bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-200"
+                  : "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
+              }`}
+            >
+              {qty} {isOut ? "(Out of stock)" : ""}
+            </span>
+          );
+        },
+      },
       {
         header: "Actions",
         accessorKey: "actions",
@@ -738,36 +766,66 @@ export default function ProductScreen() {
     },
   });
 
+  const inStockComputed = useMemo(() => {
+    if (stats.inStockCount > 0) return stats.inStockCount;
+    return products.filter((p) => Number(p.stockQty ?? 0) >= 3).length;
+  }, [stats.inStockCount, products]);
+
+  const outOfStockComputed = useMemo(() => {
+    if (stats.outOfStockCount > 0) return stats.outOfStockCount;
+    return products.filter((p) => Number(p.stockQty ?? 0) < 3).length;
+  }, [stats.outOfStockCount, products]);
+
   const cards = [
     {
       title: "Total Products",
       short: "Products",
       value: stats.totalProducts || totalRowCount,
       Icon: ShoppingBasket,
+      bgClass: "bg-blue-50/80 border-blue-200/80 hover:border-blue-300",
+      iconWrapClass: "bg-blue-500 text-white shadow-xs shadow-blue-500/20",
+      titleClass: "text-blue-900",
+      valueClass: "text-blue-950",
     },
     {
       title: "Products In Stock",
       short: "Stock",
       value: stats.totalStockQty,
       Icon: Boxes,
+      bgClass: "bg-teal-50/80 border-teal-200/80 hover:border-teal-300",
+      iconWrapClass: "bg-teal-500 text-white shadow-xs shadow-teal-500/20",
+      titleClass: "text-teal-900",
+      valueClass: "text-teal-950",
     },
     {
       title: "No of Categories",
       short: "Categories",
       value: stats.categoryCount,
       Icon: LayoutList,
+      bgClass: "bg-purple-50/80 border-purple-200/80 hover:border-purple-300",
+      iconWrapClass: "bg-purple-500 text-white shadow-xs shadow-purple-500/20",
+      titleClass: "text-purple-900",
+      valueClass: "text-purple-950",
     },
     {
       title: "Products In",
       short: "In",
-      value: stats.inStockCount,
+      value: inStockComputed,
       Icon: ArrowDownCircle,
+      bgClass: "bg-emerald-50/80 border-emerald-200/80 hover:border-emerald-300",
+      iconWrapClass: "bg-emerald-500 text-white shadow-xs shadow-emerald-500/20",
+      titleClass: "text-emerald-900",
+      valueClass: "text-emerald-950",
     },
     {
       title: "Products Out",
       short: "Out",
-      value: stats.outOfStockCount,
+      value: outOfStockComputed,
       Icon: ArrowUpCircle,
+      bgClass: "bg-rose-50/80 border-rose-200/80 hover:border-rose-300",
+      iconWrapClass: "bg-rose-500 text-white shadow-xs shadow-rose-500/20",
+      titleClass: "text-rose-900",
+      valueClass: "text-rose-950",
     },
   ];
 
@@ -786,18 +844,6 @@ export default function ProductScreen() {
             >
               <span className="sm:hidden">+ Add</span>
               <span className="hidden sm:inline">+ Add Product</span>
-            </button>
-          </Can>
-          <Can
-            anyOf={[PERMISSIONS.PRODUCT_CREATE, PERMISSIONS.PRODUCT_BULK_CREATE]}
-          >
-            <button
-              type="button"
-              onClick={() => setBulkCreateModal(true)}
-              className="cursor-pointer rounded bg-black px-2 py-1 text-xs font-semibold text-white transition sm:px-3 sm:py-2 sm:text-[14px]"
-            >
-              <span className="sm:hidden">+ Bulk</span>
-              <span className="hidden sm:inline">+ Bulk Upload</span>
             </button>
           </Can>
 
@@ -872,17 +918,25 @@ export default function ProductScreen() {
         {cards.map((item, index) => (
           <div
             key={item.title}
-            className={`min-w-0 rounded-xl border border-gray-200 bg-white p-2.5 sm:p-4 transition duration-300 hover:shadow-sm ${
+            className={`min-w-0 rounded-2xl border p-2.5 sm:p-4 shadow-xs transition duration-300 hover:shadow-md ${item.bgClass} ${
               index === 4 ? "col-span-2 sm:col-span-1" : ""
             }`}
           >
-            <div className="flex min-w-0 items-center gap-1.5 text-gray-600 sm:gap-2">
-              <item.Icon className="h-4 w-4 shrink-0 text-gray-500 sm:h-[22px] sm:w-[22px]" />
-              <span className="min-w-0 truncate text-xs font-medium sm:text-base">
+            <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+              <div
+                className={`flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl shadow-xs ${item.iconWrapClass}`}
+              >
+                <item.Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span
+                className={`min-w-0 truncate text-xs font-semibold sm:text-sm ${item.titleClass}`}
+              >
                 {item.title}
               </span>
             </div>
-            <div className="mt-1 truncate text-base font-semibold sm:mt-3 sm:text-2xl">
+            <div
+              className={`mt-1.5 sm:mt-2.5 truncate text-lg font-bold sm:text-2xl ${item.valueClass}`}
+            >
               {item.value}
             </div>
           </div>
@@ -948,15 +1002,49 @@ export default function ProductScreen() {
 
       {/* Mobile Card List View */}
       <div className="block md:hidden space-y-2.5">
-        <div className="relative mb-2">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input
-            type="text"
-            value={globalFilter ?? ""}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            placeholder="Search products..."
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-slate-400"
-          />
+        {/* Search Bar + Stock Filter Dropdown in Same Row */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="relative min-w-0 flex-1">
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              size={15}
+            />
+            <input
+              type="text"
+              value={globalFilter ?? ""}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              placeholder="Search products..."
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-3 text-xs outline-none focus:border-slate-400 placeholder:text-slate-400 shadow-xs"
+            />
+          </div>
+
+          {/* In Stock / Out of Stock Dropdown */}
+          <div className="relative shrink-0">
+            <select
+              value={stockFilter}
+              onChange={(e) =>
+                setStockFilter(
+                  e.target.value as "all" | "in_stock" | "out_of_stock",
+                )
+              }
+              aria-label="Filter by stock status"
+              className={`h-[35px] rounded-xl border px-2.5 pr-7 text-xs font-semibold outline-none shadow-xs appearance-none cursor-pointer transition ${
+                stockFilter === "in_stock"
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                  : stockFilter === "out_of_stock"
+                    ? "border-rose-300 bg-rose-50 text-rose-800"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <option value="all">All Stock</option>
+              <option value="in_stock">In Stock</option>
+              <option value="out_of_stock">Out of Stock</option>
+            </select>
+            <ChevronDown
+              size={13}
+              className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+          </div>
         </div>
 
         {/* Category Pills Below Search Bar */}
@@ -972,9 +1060,9 @@ export default function ProductScreen() {
               }`}
             >
               All
-              {selectedCategory === "all" && products.length > 0 && (
+              {selectedCategory === "all" && displayedMobileProducts.length > 0 && (
                 <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-blue-600">
-                  {products.length}
+                  {displayedMobileProducts.length}
                 </span>
               )}
             </button>
@@ -1019,7 +1107,7 @@ export default function ProductScreen() {
           <div className="grid grid-cols-2 gap-3">
             {displayedMobileProducts.map((p, idx) => {
               const stock = Number(p.stockQty ?? 0);
-              const isOutOfStock = stock <= 0;
+              const isOutOfStock = stock < 3;
               const img =
                 (typeof p.imageUrl === "string" && p.imageUrl.trim()
                   ? p.imageUrl.trim()
@@ -1225,12 +1313,12 @@ export default function ProductScreen() {
                   <div className="flex flex-col items-end gap-1">
                     <span
                       className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        Number(viewProduct.stockQty ?? 0) <= 0
+                        Number(viewProduct.stockQty ?? 0) < 3
                           ? "bg-rose-100 text-rose-800"
                           : "bg-emerald-100 text-emerald-800"
                       }`}
                     >
-                      {Number(viewProduct.stockQty ?? 0) <= 0
+                      {Number(viewProduct.stockQty ?? 0) < 3
                         ? "Out of Stock"
                         : "In Stock"}
                     </span>

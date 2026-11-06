@@ -1147,12 +1147,12 @@ export const getProducts = async (req, res) => {
                     totalStockQty: {$sum: {$ifNull: ['$stockQty', 0]}},
                     inStockCount: {
                       $sum: {
-                        $cond: [{$gt: [{$ifNull: ['$stockQty', 0]}, 0]}, 1, 0],
+                        $cond: [{$gte: [{$ifNull: ['$stockQty', 0]}, 3]}, 1, 0],
                       },
                     },
                     outOfStockCount: {
                       $sum: {
-                        $cond: [{$lte: [{$ifNull: ['$stockQty', 0]}, 0]}, 1, 0],
+                        $cond: [{$lt: [{$ifNull: ['$stockQty', 0]}, 3]}, 1, 0],
                       },
                     },
                     categories: {$addToSet: '$category'},
@@ -1185,7 +1185,7 @@ export const getProducts = async (req, res) => {
       return {
         ...product,
         stockQty: liveStockQty,
-        stockStatus: liveStockQty > 0 ? 'in_stock' : 'out_of_stock',
+        stockStatus: liveStockQty >= 3 ? 'in_stock' : 'out_of_stock',
       };
     });
 
@@ -1402,7 +1402,7 @@ export const getProductsById = async (req, res) => {
       ...product,
       stockQty: liveStockQty,
       stockStatus:
-        liveStockQty > 0 ? "in_stock" : "out_of_stock",
+        liveStockQty >= 3 ? "in_stock" : "out_of_stock",
     };
 
     const [productWithCsp] = await withCspLabel([

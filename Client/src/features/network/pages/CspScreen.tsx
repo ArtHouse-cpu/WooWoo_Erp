@@ -2426,15 +2426,15 @@ export default function CspScreen() {
 
       {/* ── 8. Assigned Products Modal ───────────────────────────────── */}
       {productsModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-3 sm:p-4 backdrop-blur-xs">
           <div
             className="flex w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl overflow-hidden"
             style={{ maxHeight: "88vh" }}
           >
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4">
+            <div className="flex items-start justify-between border-b border-slate-100 px-4 py-3.5 sm:px-6 sm:py-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900">
                   Assigned Products
                 </h2>
                 {productsModal.csp && (
@@ -2447,7 +2447,7 @@ export default function CspScreen() {
                     </span>
                     {(productsModal.csp.mobile ||
                       productsModal.csp.customer?.mobile) && (
-                      <span className="ml-2 text-slate-400">
+                      <span className="ml-1 text-slate-400">
                         ({productsModal.csp.mobile ||
                           productsModal.csp.customer?.mobile})
                       </span>
@@ -2458,14 +2458,14 @@ export default function CspScreen() {
               <button
                 type="button"
                 onClick={closeProductsModal}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             {/* Body */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5 sm:px-6 sm:py-4">
               {productsModal.loading ? (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                   <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
@@ -2482,98 +2482,200 @@ export default function CspScreen() {
                   </p>
                 </div>
               ) : (
-                <table className="w-full text-left text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-xs text-slate-500">
-                      <th className="pb-2.5 pr-4 font-semibold">#</th>
-                      <th className="pb-2.5 pr-4 font-semibold">Product Name</th>
-                      <th className="pb-2.5 pr-4 font-semibold">Type</th>
-                      <th className="pb-2.5 pr-4 font-semibold">Category</th>
-                      <th className="pb-2.5 pr-4 text-right font-semibold">
-                        Selling Price
-                      </th>
-                      <th className="pb-2.5 pr-4 text-right font-semibold">
-                        Purchase Price
-                      </th>
-                      <th className="pb-2.5 text-right font-semibold">Discount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
+                <>
+                  {/* Mobile Card List View */}
+                  <div className="space-y-3 block md:hidden">
                     {productsModal.products.map((p, idx) => {
                       const name = p.productName || p.serviceName || "—";
                       const itemType = p.itemType || p.type || "product";
                       const discountLabel =
                         p.discountValue && p.discountValue > 0
                           ? p.discountType === "percentage"
-                            ? `${p.discountValue}%`
-                            : `₹${p.discountValue}`
-                          : "—";
+                            ? `${p.discountValue}% off`
+                            : `₹${p.discountValue} off`
+                          : null;
+                      const hasVariants =
+                        Array.isArray(p.variants) && p.variants.length > 0;
+
                       return (
-                        <tr key={p._id} className="hover:bg-slate-50/70">
-                          <td className="py-2.5 pr-4 text-xs text-slate-400">
-                            {idx + 1}
-                          </td>
-                          <td className="py-2.5 pr-4 font-medium text-slate-800">
-                            {name}
-                            {Array.isArray(p.variants) &&
-                              p.variants.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {p.variants.map((v, vi) => (
-                                  <span
-                                    key={vi}
-                                      className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
-                                  >
-                                    {v.name} · ₹{v.sellingPrice}
+                        <div
+                          key={p._id || idx}
+                          className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5"
+                        >
+                          {/* Top header row: Name + Price */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">
+                                  {idx + 1}
+                                </span>
+                                <h4 className="text-sm font-bold text-slate-900 truncate">
+                                  {name}
+                                </h4>
+                              </div>
+
+                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                <span
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${
+                                    itemType === "service"
+                                      ? "bg-purple-100 text-purple-700"
+                                      : "bg-blue-100 text-blue-700"
+                                  }`}
+                                >
+                                  {itemType}
+                                </span>
+                                {p.category && (
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                                    {p.category}
                                   </span>
+                                )}
+                                {discountLabel && (
+                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200/60">
+                                    {discountLabel}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0">
+                              <span className="block text-sm font-extrabold text-emerald-600">
+                                ₹{Number(p.sellingPrice ?? 0).toLocaleString("en-IN")}
+                              </span>
+                              {p.purchasePrice !== undefined && Number(p.purchasePrice) > 0 && (
+                                <span className="block text-[10px] text-slate-400 font-medium">
+                                  Cost: ₹{Number(p.purchasePrice).toLocaleString("en-IN")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Variants Section */}
+                          {hasVariants && (
+                            <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                  Variants ({p.variants!.length})
+                                </span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {p.variants!.map((v, vi) => (
+                                  <div
+                                    key={vi}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2 py-1 text-xs text-slate-700 border border-slate-200/80 shadow-2xs"
+                                  >
+                                    <span className="font-medium text-slate-800">{v.name}</span>
+                                    <span className="text-slate-300">•</span>
+                                    <span className="font-bold text-emerald-600">
+                                      ₹{Number(v.sellingPrice ?? 0).toLocaleString("en-IN")}
+                                    </span>
+                                  </div>
                                 ))}
                               </div>
-                            )}
-                          </td>
-                          <td className="py-2.5 pr-4">
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                                itemType === "service"
-                                  ? "bg-purple-50 text-purple-700"
-                                  : "bg-blue-50 text-blue-700"
-                              }`}
-                            >
-                              {itemType}
-                            </span>
-                          </td>
-                          <td className="py-2.5 pr-4 text-slate-500 text-xs">
-                            {p.category || "—"}
-                          </td>
-                          <td className="py-2.5 pr-4 text-right font-semibold text-slate-800">
-                            ₹{Number(p.sellingPrice ?? 0).toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-2.5 pr-4 text-right text-slate-500">
-                            ₹{Number(p.purchasePrice ?? 0).toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-2.5 text-right text-slate-500 text-xs">
-                            {discountLabel}
-                          </td>
-                        </tr>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse min-w-[650px]">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/70 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="py-2.5 px-3">#</th>
+                          <th className="py-2.5 px-3">Product Name</th>
+                          <th className="py-2.5 px-3">Type</th>
+                          <th className="py-2.5 px-3">Category</th>
+                          <th className="py-2.5 px-3 text-right">Selling Price</th>
+                          <th className="py-2.5 px-3 text-right">Purchase Price</th>
+                          <th className="py-2.5 px-3 text-right">Discount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {productsModal.products.map((p, idx) => {
+                          const name = p.productName || p.serviceName || "—";
+                          const itemType = p.itemType || p.type || "product";
+                          const discountLabel =
+                            p.discountValue && p.discountValue > 0
+                              ? p.discountType === "percentage"
+                                ? `${p.discountValue}%`
+                                : `₹${p.discountValue}`
+                              : "—";
+                          return (
+                            <tr key={p._id || idx} className="hover:bg-slate-50/70 transition">
+                              <td className="py-3 px-3 text-xs text-slate-400">
+                                {idx + 1}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className="font-semibold text-slate-900 block">{name}</span>
+                                {Array.isArray(p.variants) && p.variants.length > 0 && (
+                                  <div className="mt-1.5 flex flex-wrap gap-1 max-w-sm">
+                                    {p.variants.map((v, vi) => (
+                                      <span
+                                        key={vi}
+                                        className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-700 border border-slate-200/60"
+                                      >
+                                        <span>{v.name}</span>
+                                        <span className="font-bold text-emerald-600">₹{v.sellingPrice}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${
+                                    itemType === "service"
+                                      ? "bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-200/60"
+                                      : "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200/60"
+                                  }`}
+                                >
+                                  {itemType}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-slate-600 text-xs">
+                                {p.category ? (
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                                    {p.category}
+                                  </span>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
+                              <td className="py-3 px-3 text-right font-bold text-emerald-600">
+                                ₹{Number(p.sellingPrice ?? 0).toLocaleString("en-IN")}
+                              </td>
+                              <td className="py-3 px-3 text-right text-slate-500 font-medium">
+                                ₹{Number(p.purchasePrice ?? 0).toLocaleString("en-IN")}
+                              </td>
+                              <td className="py-3 px-3 text-right text-slate-500 text-xs">
+                                {discountLabel}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3 bg-slate-50/50">
-                <p className="text-xs text-slate-400">
-                  {productsModal.products.length} product
+            <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 sm:px-6 sm:py-3 bg-slate-50/50">
+              <p className="text-xs font-medium text-slate-500">
+                {productsModal.products.length} product
                 {productsModal.products.length !== 1 ? "s" : ""} added
-                </p>
-                <button
-                  type="button"
-                  onClick={closeProductsModal}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50"
-                >
-                  Close
-                </button>
-              </div>
+              </p>
+              <button
+                type="button"
+                onClick={closeProductsModal}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

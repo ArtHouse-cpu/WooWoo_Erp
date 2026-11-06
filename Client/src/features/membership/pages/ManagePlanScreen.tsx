@@ -330,9 +330,7 @@ export default function ManagePlanScreen() {
             <div className="text-xl font-semibold text-slate-900">
               Manage Plans
             </div>
-            <div className="text-sm text-slate-500">
-              Create and manage membership plans
-            </div>
+           
           </div>
         </div>
         <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
@@ -342,7 +340,7 @@ export default function ManagePlanScreen() {
             className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
           >
             <Plus size={16} />
-            Add New Plan
+            Add
           </button>
         </Can>
       </div>
