@@ -61,6 +61,7 @@ export default function ProductForm() {
   const discountType = watch("discountType");
   const discountValue = watch("discountValue");
   const isCsp = watch("isCsp");
+  const applyMembershipDiscount = watch("applyMembershipDiscount");
   const categoryId = watch("categoryId");
   const categoryName = watch("category");
   const subCategoryId = watch("subCategoryId");
@@ -306,6 +307,37 @@ export default function ProductForm() {
               </button>
             </div>
           </div>
+        </div>
+      </Section>
+
+      <Section title="Membership">
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div>
+            <p className="text-sm font-medium text-slate-800">Membership discount</p>
+            <p className="text-xs text-slate-500">
+              {applyMembershipDiscount !== false
+                ? "On. Checkout applies the customer membership discount."
+                : "Off. Checkout charges this product at full price."}
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-pressed={applyMembershipDiscount !== false}
+            onClick={() =>
+              setValue("applyMembershipDiscount", applyMembershipDiscount === false, {
+                shouldValidate: true,
+              })
+            }
+            className={`relative h-8 w-14 shrink-0 rounded-full transition ${
+              applyMembershipDiscount !== false ? "bg-blue-600" : "bg-slate-300"
+            }`}
+          >
+            <span
+              className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${
+                applyMembershipDiscount !== false ? "left-7" : "left-1"
+              }`}
+            />
+          </button>
         </div>
       </Section>
 

@@ -25,6 +25,8 @@ export type InvoiceItem = {
   returnedQty?: number;
   lineTotal?: number;
   isGift?: boolean;
+  /** Inventory-managed food keeps its price; membership discount is not applied. */
+  skipMembershipDiscount?: boolean;
 };
 
 /** API / POS raw invoice shape used by PDF and print templates */

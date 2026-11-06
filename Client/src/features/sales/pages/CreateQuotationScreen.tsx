@@ -394,6 +394,7 @@ export default function CreateQuotationScreen({
           discountType: item.productDiscountType,
           discountValue: item.productDiscountValue,
           isCsp: Boolean(item.isCsp),
+          skipMembershipDiscount: item.skipMembershipDiscount,
         });
         return {
           ...item,
@@ -739,6 +740,7 @@ export default function CreateQuotationScreen({
                     discountType: item.productDiscountType,
                     discountValue: item.productDiscountValue,
                     isCsp: Boolean(item.isCsp),
+                    skipMembershipDiscount: item.skipMembershipDiscount,
                   });
                   return {
                     ...item,

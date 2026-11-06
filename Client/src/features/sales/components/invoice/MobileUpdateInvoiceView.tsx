@@ -28,6 +28,7 @@ import {
   type CatalogueLookupItem,
 } from "@/services/apiClient";
 import Swal from "sweetalert2";
+import { filterCatalogueRowsForPos } from "@/features/sales/utils/cataloguePosFilter";
 import { useDebounce } from "@/hooks/useDebounce";
 
 export type MobileUpdateInvoiceViewProps = {
@@ -183,7 +184,9 @@ export default function MobileUpdateInvoiceView({
           { page: 1, limit: 30 },
         );
         if (!controller.signal.aborted) {
-          setItemResults(Array.isArray(res?.items) ? res.items : []);
+          setItemResults(
+            filterCatalogueRowsForPos(Array.isArray(res?.items) ? res.items : []),
+          );
         }
       } catch {
         if (!controller.signal.aborted) {

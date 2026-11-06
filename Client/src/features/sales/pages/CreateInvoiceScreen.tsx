@@ -572,6 +572,7 @@ export default function CreateInvoiceScreen({
           discountType: item.productDiscountType,
           discountValue: item.productDiscountValue,
           isCsp: Boolean(item.isCsp),
+          skipMembershipDiscount: item.skipMembershipDiscount,
         });
         return {
           ...item,
@@ -673,9 +674,11 @@ export default function CreateInvoiceScreen({
         category: item.category,
         isCsp: Boolean(item.isCsp),
         productDiscountAmount: Number(item.productDiscountAmount ?? 0),
-        membershipDiscountAmount: item.isCsp
-          ? 0
-          : Number(item.membershipDiscountAmount ?? 0),
+        membershipDiscountAmount:
+          item.isCsp || item.skipMembershipDiscount
+            ? 0
+            : Number(item.membershipDiscountAmount ?? 0),
+        skipMembershipDiscount: Boolean(item.skipMembershipDiscount),
       })),
     [items],
   );
@@ -1249,6 +1252,7 @@ export default function CreateInvoiceScreen({
                     discountType: item.productDiscountType,
                     discountValue: item.productDiscountValue,
                     isCsp: Boolean(item.isCsp),
+                    skipMembershipDiscount: item.skipMembershipDiscount,
                   });
                   return {
                     ...item,

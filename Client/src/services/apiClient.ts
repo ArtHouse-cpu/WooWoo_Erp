@@ -2865,6 +2865,8 @@ export type FoodPayload = {
   stock?: number;
   unit?: string;
   isPackaged?: boolean;
+  manageInventory?: boolean;
+  availableStock?: number | null;
   description?: string;
   isVeg?: boolean;
   status?: "Active" | "Inactive";
@@ -2934,6 +2936,9 @@ export const foodPayloadToFormData = (
   if (payload.unit !== undefined) fd.append("unit", String(payload.unit));
   if (payload.isPackaged !== undefined) {
     fd.append("isPackaged", String(Boolean(payload.isPackaged)));
+  }
+  if (payload.manageInventory !== undefined) {
+    fd.append("manageInventory", String(Boolean(payload.manageInventory)));
   }
   if (payload.description !== undefined) {
     fd.append("description", String(payload.description));
@@ -4052,6 +4057,8 @@ export type CatalogueLookupItem = {
   isVeg?: boolean;
   isCsp?: boolean;
   cspLabel?: string | null;
+  manageInventory?: boolean;
+  skipMembershipDiscount?: boolean;
   barcode?: string;
 };
 

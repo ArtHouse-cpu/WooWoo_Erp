@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -778,20 +778,20 @@ export default function ExpenseScreen() {
   const [showDateDropdown, setShowDateDropdown] = useState(false);
 
   const mobileDateDropdownRef = useRef<HTMLDivElement | null>(null);
+  const desktopDateDropdownRef = useRef<HTMLDivElement | null>(null);
   const mobileSearchRef = useRef<HTMLDivElement | null>(null);
+  const desktopStatusDropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        mobileDateDropdownRef.current &&
-        !mobileDateDropdownRef.current.contains(e.target as Node)
-      ) {
+    const inside = (
+      event: MouseEvent,
+      refs: Array<RefObject<HTMLDivElement | null>>,
+    ) => refs.some((ref) => ref.current?.contains(event.target as Node));
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!inside(event, [mobileDateDropdownRef, desktopDateDropdownRef])) {
         setShowDateDropdown(false);
       }
-      if (
-        mobileSearchRef.current &&
-        !mobileSearchRef.current.contains(e.target as Node)
-      ) {
+      if (!inside(event, [mobileSearchRef, desktopStatusDropdownRef])) {
         setShowStatusDropdown(false);
       }
     };
@@ -1624,7 +1624,7 @@ export default function ExpenseScreen() {
         {/* Right Action Tools */}
         <div className="flex items-center gap-2 self-end sm:self-auto">
           {/* Date Range Selector */}
-          <div className="relative">
+          <div className="relative" ref={desktopDateDropdownRef}>
             <button
               type="button"
               onClick={() => {
@@ -1672,7 +1672,7 @@ export default function ExpenseScreen() {
           </div>
 
           {/* Payment Status Dropdown */}
-          <div className="relative">
+          <div className="relative" ref={desktopStatusDropdownRef}>
             <button
               type="button"
               onClick={() => {
@@ -2023,7 +2023,7 @@ export default function ExpenseScreen() {
                                 className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 cursor-pointer"
                               >
                                 <IndianRupee className="h-3.5 w-3.5" />
-                                <span>Expense</span>
+                                <span>Record Payment</span>
                               </button>
                             </Can>
                           ) : null}
@@ -2213,7 +2213,7 @@ export default function ExpenseScreen() {
                                   className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 cursor-pointer"
                                 >
                                   <IndianRupee className="h-3.5 w-3.5" />
-                                  <span>Expense</span>
+                                  <span>Record Payment</span>
                                 </button>
                               </Can>
                             )}
@@ -2540,7 +2540,7 @@ export default function ExpenseScreen() {
                       className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-600 transition cursor-pointer shadow-xs"
                     >
                       <IndianRupee size={14} />
-                      <span>Receive</span>
+                      <span>Record Payment</span>
                     </button>
                   </Can>
                 )}

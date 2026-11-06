@@ -103,6 +103,14 @@ export default function CreateFoodScreen() {
      
       { accessorKey: "unit", header: "Unit" },
       {
+        accessorKey: "availableStock",
+        header: "Stock",
+        Cell: ({ row }: { row: { original: FoodRow } }) =>
+          row.original.manageInventory
+            ? Number(row.original.availableStock || 0)
+            : "—",
+      },
+      {
         accessorKey: "isPackaged",
         header: "Label",
         Cell: ({ cell }: { cell: { getValue: () => unknown } }) => {
@@ -657,6 +665,16 @@ export default function CreateFoodScreen() {
                     </span>
                     <span className="text-sm font-semibold text-slate-700">
                       {viewFood.isPackaged ? "Packaged" : "Fresh"}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
+                    <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      Inventory
+                    </span>
+                    <span className="text-sm font-semibold text-slate-700">
+                      {viewFood.manageInventory
+                        ? `Yes · ${Number(viewFood.availableStock || 0)} in stock`
+                        : "No"}
                     </span>
                   </div>
                 </div>

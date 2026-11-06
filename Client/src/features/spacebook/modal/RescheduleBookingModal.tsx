@@ -1,5 +1,19 @@
 import { useEffect, useState } from "react";
-import { CalendarClock, Loader2, X } from "lucide-react";
+import {
+  BadgeCheck,
+  Building2,
+  Calendar,
+  CalendarClock,
+  Check,
+  Clock,
+  Crown,
+  Hash,
+  IndianRupee,
+  Info,
+  Loader2,
+  User,
+  X,
+} from "lucide-react";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import {
@@ -226,45 +240,57 @@ export default function RescheduleBookingModal({
           ? "Partially Paid"
           : "Pending";
 
+  const sameSchedule =
+    Boolean(quote) && quote!.difference === 0 && quote!.currentDay === quote!.newDay;
+  const customerLine = `${quote?.customerName || booking.customerName || "Customer"}${
+    quote?.customerPhone || booking.customerPhone
+      ? ` – ${quote?.customerPhone || booking.customerPhone}`
+      : ""
+  }`;
+  const membershipLine = `${quote?.membershipLabel || quote?.membershipType || "General"}${
+    quote?.membershipPercent ? ` – ${quote.membershipPercent}% space` : ""
+  }`;
+  const timeLabel = (from?: string, to?: string) =>
+    from && to ? `${from} – ${to}` : "—";
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4">
-      <div className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <CalendarClock className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-sm font-bold text-slate-900">
-              {view === "payment"
-                ? "Receive pending payment"
-                : view === "history"
-                  ? "Payment history"
-                  : "Reschedule booking"}
-            </h2>
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">
+      <div
+        className={`flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl ${
+          view === "reschedule" ? "max-w-5xl" : "max-w-lg"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3 px-4 py-4 sm:px-6">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-600">
+              <CalendarClock className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                {view === "payment"
+                  ? "Receive pending payment"
+                  : view === "history"
+                    ? "Payment history"
+                    : "Reschedule Booking"}
+              </h2>
+              {view === "reschedule" ? (
+                <p className="text-sm text-slate-500">
+                  Change the date, time, or duration for this booking
+                </p>
+              ) : null}
+            </div>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
-            <X className="h-4 w-4" />
+          <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="space-y-3 overflow-y-auto px-4 py-3 text-sm">
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <Info label="Booking ID" value={id.slice(-6).toUpperCase()} />
-            <Info label="Customer" value={booking.customerName} />
-            <Info label="Space" value={booking.spaceName || "Space"} />
-            <Info label="Status" value={statusLabel} />
-          </div>
-
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs">
-            <p>Original amount: <b>{inr(original)}</b></p>
-            <p>Current amount: <b>{inr(total)}</b></p>
-            <p>Paid: <b>{inr(paid)}</b></p>
-            <p>Refund / wallet adjustment: <b>{inr(refunded)}</b></p>
-            <p>Pending: <b>{inr(due)}</b></p>
-          </div>
-
+        <div className="space-y-4 overflow-y-auto px-4 pb-4 sm:px-6">
           {view === "history" ? (
             <History booking={booking} />
           ) : view === "payment" ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <MoneyCard original={original} total={total} paid={paid} refunded={refunded} due={due} />
               <label className="block text-xs font-medium text-slate-600">
                 Amount
                 <input
@@ -273,152 +299,242 @@ export default function RescheduleBookingModal({
                   step="0.01"
                   value={pendingAmount}
                   onChange={(event) => setPendingAmount(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
                 />
               </label>
               <PayModes mode={payMode} setMode={setPayMode} walletType={walletType} setWalletType={setWalletType} />
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
-                <p>Current date: {displayDate(booking.bookingDate)}</p>
-                <p>Current time: {booking.startTime}–{booking.endTime}</p>
-                <p>Current type: {booking.spaceDay || "—"}</p>
-                <p>Current price: {inr(total)}</p>
+              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 p-3 sm:grid-cols-4">
+                <Meta icon={Hash} label="Booking ID" value={id.slice(-6).toUpperCase()} />
+                <Meta icon={User} label="Customer" value={booking.customerName || "—"} />
+                <Meta icon={Building2} label="Space" value={booking.spaceName || "Space"} />
+                <Meta icon={BadgeCheck} label="Status" value={statusLabel} accent={statusLabel === "Paid"} />
               </div>
-              <label className="block text-xs font-medium text-slate-600">
-                New date
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(event) => {
-                    const next = event.target.value;
-                    setDate(next);
-                    const parsed = new Date(`${next}T12:00:00`);
-                    const weekend = parsed.getDay() === 0 || parsed.getDay() === 6;
-                    setDayType(weekend ? "Weekend" : "Weekday");
-                  }}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2"
-                />
-              </label>
-              <div>
-                <p className="text-xs font-medium text-slate-600">Type for this space</p>
-                <div className="mt-1 flex gap-2">
-                  {(["Weekday", "Weekend"] as const).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setDayType(type)}
-                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${dayType === type ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-200"}`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
+
+              <div className="grid gap-3 lg:grid-cols-2">
+                <section className="rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <IndianRupee className="h-4 w-4 text-violet-600" />
+                    Payment Details
+                  </h3>
+                  <MoneyRows original={original} total={total} paid={paid} refunded={refunded} due={due} />
+                </section>
+                <section className="rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
+                    <Calendar className="h-4 w-4 text-violet-600" />
+                    Current Booking
+                  </h3>
+                  <div className="space-y-2.5 text-sm">
+                    <Fact icon={Calendar} label="Date" value={displayDate(booking.bookingDate)} />
+                    <Fact icon={Clock} label="Time" value={timeLabel(booking.startTime, booking.endTime)} />
+                    <Fact icon={Calendar} label="Type" value={booking.spaceDay || "—"} />
+                    <Fact icon={IndianRupee} label="Price" value={inr(total)} />
+                  </div>
+                </section>
               </div>
-              <label className="block text-xs font-medium text-slate-600">
-                Hours
-                <select
-                  value={duration}
-                  onChange={(event) => setDuration(Number(event.target.value))}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2"
-                >
-                  {[1, 2, 3, 4, 5, 6].map((hour) => (
-                    <option key={hour} value={hour}>{hour} hour{hour > 1 ? "s" : ""}</option>
-                  ))}
-                </select>
-              </label>
-              <div>
-                <p className="text-xs font-medium text-slate-600">Available time</p>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {availability.loading ? (
-                    <p className="text-xs text-slate-400">Checking availability…</p>
-                  ) : openSlots.filter((slot) => slot.status === "available").length === 0 ? (
-                    <p className="text-xs text-slate-500">No open slot for these hours.</p>
-                  ) : (
-                    openSlots.map((slot) => (
-                      <button
-                        key={slot.slotStart}
-                        type="button"
-                        disabled={slot.status !== "available"}
-                        onClick={() => setStart(slot.slotStart)}
-                        className={`rounded-lg border px-2 py-1 text-[11px] font-semibold ${
-                          start === slot.slotStart && slot.status === "available"
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : slot.status === "available"
-                              ? "border-slate-200 text-slate-700"
-                              : "cursor-not-allowed border-slate-100 text-slate-300"
-                        }`}
-                      >
-                        {slot.slotStart}–{slot.slotEnd}
-                        {slot.status === "booked" ? " booked" : ""}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-              {quoting ? (
-                <p className="text-xs text-slate-400">Calculating price…</p>
-              ) : quote ? (
-                <div className={`rounded-xl border p-3 text-xs ${quote.additionalDue > 0 ? "border-amber-200 bg-amber-50" : quote.difference < 0 ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}>
-                  <p>
-                    {quote.difference === 0 && quote.currentDay === quote.newDay
-                      ? <>Same {quote.newDay} and {quote.hours}h. Price stays <b>{inr(quote.previousAmount)}</b>.</>
-                      : <>New type: <b>{quote.newDay}</b> · {quote.hours}h × {inr(quote.hourlyRate)}</>}
-                  </p>
-                  <p>Customer: <b>{quote.customerName || booking.customerName}</b>{quote.customerPhone || booking.customerPhone ? ` · ${quote.customerPhone || booking.customerPhone}` : ""}</p>
-                  <p>Membership: <b>{quote.membershipLabel || quote.membershipType || "General"}</b>{quote.membershipPercent ? ` · ${quote.membershipPercent}% space` : ""}</p>
-                  <p>Original booking amount: <b>{inr(quote.previousAmount)}</b></p>
-                  {quote.membershipDiscount ? (
-                    <p>Membership discount on the new price: <b>{inr(quote.membershipDiscount)}</b></p>
-                  ) : null}
-                  <p>New booking amount: <b>{inr(quote.newAmount)}</b></p>
-                  {quote.additionalDue > 0 ? (
-                    <p>Extra to collect at checkout: <b>{inr(quote.additionalDue)}</b></p>
-                  ) : quote.refundable > 0 ? (
-                    <p>Amount to settle: <b>{inr(quote.refundable)}</b></p>
-                  ) : (
-                    <p>No additional amount. This booking can be rescheduled directly.</p>
-                  )}
-                </div>
-              ) : null}
-              {quote && quote.additionalDue > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => onPay?.(quote)}
-                  className="w-full rounded-xl bg-[#ff5a36] px-3 py-2 text-xs font-semibold text-white"
-                >
-                  Pay {inr(quote.additionalDue)}
-                </button>
-              ) : null}
-              {quote && quote.refundable > 0 ? (
-                <label className="block text-xs font-medium text-slate-600">
-                  Amount settlement
-                  <select
-                    value={refundMode}
-                    onChange={(event) => setRefundMode(event.target.value)}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-2"
-                  >
-                    <option value="Wallet">Wallet</option>
-                    <option value="UPI">UPI</option>
-                    <option value="Cash">Cash</option>
-                  </select>
-                  <p className="mt-1 text-[11px] text-slate-500">
-                    Settle {inr(quote.refundable)} by {refundMode}.
-                  </p>
-                  {refundMode === "Wallet" ? (
-                    <div className="mt-2">
-                      <WalletSelect value={walletType} onChange={setWalletType} />
+
+              <section className="rounded-2xl border border-slate-200 p-4">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                    <Calendar className="h-3.5 w-3.5" />
+                  </span>
+                  Select New Schedule
+                </h3>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <label className="block text-sm font-semibold text-slate-800">
+                    New Date <span className="text-rose-500">*</span>
+                    <span className="relative mt-2 block">
+                      <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="date"
+                        value={date}
+                        onChange={(event) => {
+                          const next = event.target.value;
+                          setDate(next);
+                          const parsed = new Date(`${next}T12:00:00`);
+                          const weekend = parsed.getDay() === 0 || parsed.getDay() === 6;
+                          setDayType(weekend ? "Weekend" : "Weekday");
+                        }}
+                        className="h-11 w-full rounded-xl border border-slate-200 pl-10 pr-3 text-sm outline-none focus:border-violet-500"
+                      />
+                    </span>
+                  </label>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Type for this Space</p>
+                    <div className="mt-2 flex gap-2">
+                      {(["Weekday", "Weekend"] as const).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setDayType(type)}
+                          className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-semibold ${
+                            dayType === type
+                              ? "border-violet-600 bg-violet-600 text-white"
+                              : "border-slate-200 bg-white text-slate-700"
+                          }`}
+                        >
+                          <Calendar className="h-4 w-4" />
+                          {type}
+                        </button>
+                      ))}
                     </div>
-                  ) : null}
+                  </div>
+                </div>
+
+                <label className="mt-4 block text-sm font-semibold text-slate-800">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-slate-500" />
+                    Hours (Duration)
+                  </span>
+                  <select
+                    value={duration}
+                    onChange={(event) => setDuration(Number(event.target.value))}
+                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500 lg:max-w-md"
+                  >
+                    {[1, 2, 3, 4, 5, 6].map((hour) => (
+                      <option key={hour} value={hour}>{hour} hour{hour > 1 ? "s" : ""}</option>
+                    ))}
+                  </select>
                 </label>
-              ) : null}
+
+                <div className="mt-4">
+                  <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                    <Clock className="h-4 w-4 text-slate-500" />
+                    Available Time Slots
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                    {availability.loading ? (
+                      <p className="col-span-full text-xs text-slate-400">Checking availability…</p>
+                    ) : (
+                      openSlots.map((slot) => {
+                        const selected = start === slot.slotStart && slot.status === "available";
+                        return (
+                          <button
+                            key={slot.slotStart}
+                            type="button"
+                            disabled={slot.status !== "available"}
+                            onClick={() => setStart(slot.slotStart)}
+                            className={`inline-flex items-center justify-center gap-1 rounded-xl border px-2 py-2 text-xs font-semibold ${
+                              selected
+                                ? "border-violet-600 bg-violet-50 text-violet-700"
+                                : slot.status === "available"
+                                  ? "border-slate-200 bg-white text-slate-700"
+                                  : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
+                            }`}
+                          >
+                            {timeLabel(slot.slotStart, slot.slotEnd)}
+                            {selected ? <Check className="h-3.5 w-3.5" /> : null}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                  {!availability.loading && openSlots.every((slot) => slot.status !== "available") ? (
+                    <p className="mt-2 text-xs text-slate-500">No open slot for these hours.</p>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-violet-700">
+                  <Info className="h-4 w-4" />
+                  Reschedule Summary
+                </h3>
+                {quoting ? (
+                  <p className="text-sm text-slate-500">Calculating price…</p>
+                ) : quote ? (
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="space-y-2 text-sm text-slate-700">
+                      <p className="flex items-start gap-2">
+                        <User className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
+                        Customer: {customerLine}
+                      </p>
+                      <p className="flex items-start gap-2">
+                        <Crown className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
+                        Membership: {membershipLine}
+                      </p>
+                      {quote.membershipDiscount ? (
+                        <p className="flex items-start gap-2">
+                          <IndianRupee className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
+                          Membership discount: {inr(quote.membershipDiscount)}
+                        </p>
+                      ) : null}
+                      <p className="flex items-start gap-2">
+                        <IndianRupee className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
+                        Price: {inr(quote.newAmount)}
+                        {sameSchedule ? " (same as original)" : ""}
+                      </p>
+                      <p className="flex items-start gap-2 font-semibold text-slate-900">
+                        <IndianRupee className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
+                        New Booking Amount: {inr(quote.newAmount)}
+                      </p>
+                    </div>
+                    <div className="space-y-2 text-sm text-slate-700">
+                      <CheckLine
+                        text={
+                          sameSchedule
+                            ? `Same ${quote.newDay} and ${quote.hours} hour${quote.hours > 1 ? "s" : ""} duration`
+                            : `${quote.newDay} · ${quote.hours}h × ${inr(quote.hourlyRate)}`
+                        }
+                      />
+                      {quote.additionalDue > 0 ? (
+                        <CheckLine text={`Extra to collect: ${inr(quote.additionalDue)}`} warn />
+                      ) : quote.refundable > 0 ? (
+                        <CheckLine text={`Amount to settle: ${inr(quote.refundable)}`} />
+                      ) : (
+                        <CheckLine text="No additional amount will be charged" />
+                      )}
+                      {quote.additionalDue > 0 ? (
+                        <CheckLine text="Collect the extra amount before confirming" warn />
+                      ) : (
+                        <CheckLine text="This booking can be rescheduled directly" />
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">Choose a date and an open time slot.</p>
+                )}
+
+                {quote && quote.additionalDue > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => onPay?.(quote)}
+                    className="mt-4 w-full rounded-xl bg-[#ff5a36] px-3 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Pay {inr(quote.additionalDue)}
+                  </button>
+                ) : null}
+                {quote && quote.refundable > 0 ? (
+                  <label className="mt-4 block text-sm font-medium text-slate-700">
+                    Amount settlement
+                    <select
+                      value={refundMode}
+                      onChange={(event) => setRefundMode(event.target.value)}
+                      className="mt-1 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
+                    >
+                      <option value="Wallet">Wallet</option>
+                      <option value="UPI">UPI</option>
+                      <option value="Cash">Cash</option>
+                    </select>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Settle {inr(quote.refundable)} by {refundMode}.
+                    </p>
+                    {refundMode === "Wallet" ? (
+                      <div className="mt-2">
+                        <WalletSelect value={walletType} onChange={setWalletType} />
+                      </div>
+                    ) : null}
+                  </label>
+                ) : null}
+              </section>
             </>
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 px-4 py-3">
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600">
+        <div className="flex justify-end gap-2 border-t border-slate-100 px-4 py-3 sm:px-6">
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600">
             Close
           </button>
           {view === "reschedule" ? (
@@ -426,10 +542,10 @@ export default function RescheduleBookingModal({
               type="button"
               disabled={!quote || quoting || saving || quote.additionalDue > 0}
               onClick={() => void confirmReschedule()}
-              className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              Confirm reschedule
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
+              Confirm Reschedule
             </button>
           ) : null}
           {view === "payment" ? (
@@ -437,9 +553,9 @@ export default function RescheduleBookingModal({
               type="button"
               disabled={saving || due <= 0}
               onClick={() => void confirmPayment()}
-              className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Receive payment
             </button>
           ) : null}
@@ -449,12 +565,102 @@ export default function RescheduleBookingModal({
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Meta({
+  icon: Icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: typeof Hash;
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="rounded-lg border border-slate-100 px-2 py-1.5">
-      <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="truncate font-semibold text-slate-800">{value}</p>
+    <div className="flex min-w-0 items-center gap-2">
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${accent ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"}`}>
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[11px] text-slate-400">{label}</p>
+        <p className={`truncate text-sm font-bold ${accent ? "text-emerald-600" : "text-slate-900"}`}>{value}</p>
+      </div>
     </div>
+  );
+}
+
+function MoneyRows({
+  original,
+  total,
+  paid,
+  refunded,
+  due,
+}: {
+  original: number;
+  total: number;
+  paid: number;
+  refunded: number;
+  due: number;
+}) {
+  const rows = [
+    ["Original amount", inr(original), ""],
+    ["Current amount", inr(total), ""],
+    ["Paid", inr(paid), "text-emerald-600"],
+    ["Refund / wallet adjustment", inr(refunded), ""],
+    ["Pending", inr(due), ""],
+  ] as const;
+  return (
+    <div className="space-y-2 text-sm">
+      {rows.map(([label, value, tone]) => (
+        <div key={label} className="flex items-center justify-between gap-3">
+          <span className="text-slate-600">{label}</span>
+          <span className={`font-semibold text-slate-900 ${tone}`}>{value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MoneyCard(props: {
+  original: number;
+  total: number;
+  paid: number;
+  refunded: number;
+  due: number;
+}) {
+  return (
+    <div className="rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
+      <MoneyRows {...props} />
+    </div>
+  );
+}
+
+function Fact({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Calendar;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="inline-flex items-center gap-2 text-slate-600">
+        <Icon className="h-4 w-4 text-slate-400" />
+        {label}
+      </span>
+      <span className="font-semibold text-slate-900">{value}</span>
+    </div>
+  );
+}
+
+function CheckLine({ text, warn }: { text: string; warn?: boolean }) {
+  return (
+    <p className={`flex items-start gap-2 ${warn ? "text-amber-700" : "text-slate-700"}`}>
+      <Check className={`mt-0.5 h-4 w-4 shrink-0 ${warn ? "text-amber-500" : "text-emerald-500"}`} />
+      {text}
+    </p>
   );
 }
 

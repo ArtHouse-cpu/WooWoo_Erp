@@ -66,6 +66,8 @@ type CheckoutItem = {
   isCsp?: boolean;
   productDiscountAmount?: number;
   membershipDiscountAmount?: number;
+  /** Inventory-managed food is not eligible for a membership discount. */
+  skipMembershipDiscount?: boolean;
 };
 
 /** Map cart line types → coupon applicableOn scopes (store = products). */
@@ -1165,6 +1167,7 @@ export default function CheckoutModal({
         discount: Number(item.discount ?? 0),
         cashback: Number(item.cashback ?? 0),
         isCsp: Boolean(item.isCsp),
+        skipMembershipDiscount: Boolean(item.skipMembershipDiscount),
       })),
     );
   }, [
@@ -1199,7 +1202,9 @@ export default function CheckoutModal({
       items.reduce(
         (sum, item) =>
           sum +
-          (item.isCsp ? 0 : Number(item.membershipDiscountAmount ?? 0)),
+          (item.isCsp || item.skipMembershipDiscount
+            ? 0
+            : Number(item.membershipDiscountAmount ?? 0)),
         0,
       ),
     [items],

@@ -9,6 +9,7 @@ export type FoodFormPayload = {
   price: number;
   unit: string;
   isPackaged: boolean;
+  manageInventory: boolean;
   description: string;
   isVeg: boolean;
   /** Available = Active, Not Available = Inactive */
@@ -42,6 +43,7 @@ const emptyForm: FoodFormPayload = {
   price: 0,
   unit: "Plate",
   isPackaged: false,
+  manageInventory: false,
   description: "",
   isVeg: true,
   status: "Active",
@@ -67,6 +69,7 @@ export default function AddFoodModal({
         price: Number(initialFood.price || 0),
         unit: String(initialFood.unit || "Plate"),
         isPackaged: initialFood.isPackaged === true,
+        manageInventory: initialFood.manageInventory === true,
         description: String(initialFood.description || ""),
         isVeg: initialFood.isVeg !== false,
         status: initialFood.status === "Inactive" ? "Inactive" : "Active",
@@ -239,6 +242,39 @@ export default function AddFoodModal({
                 placeholder="Short description of the food item"
                 className="w-full resize-none rounded-lg border border-gray-300 p-3 outline-none transition focus:ring-2 focus:ring-black disabled:opacity-60"
               />
+            </div>
+
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 md:col-span-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Manage Inventory</p>
+                  <p className="text-xs text-gray-500">
+                    {form.manageInventory
+                      ? "This food is added to the product list. Sell it only after a purchase adds stock."
+                      : "No inventory tracking. This food can be sold as it is today."}
+                  </p>
+                </div>
+                <div className="flex shrink-0 rounded-lg bg-white p-1">
+                  {([
+                    [true, "Yes"],
+                    [false, "No"],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setForm((p) => ({ ...p, manageInventory: value }))}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                        form.manageInventory === value
+                          ? "bg-black text-white"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 md:col-span-2">

@@ -36,6 +36,7 @@ const baseSchema = z.object({
   variants: z.array(variantSchema).default([]),
   images: z.array(z.instanceof(File)).default([]),
   isCsp: z.enum(["yes", "no"]).default("no"),
+  applyMembershipDiscount: z.boolean().default(true),
   cspEnrollmentId: z.string().optional().default(""),
 });
 
@@ -196,6 +197,11 @@ const buildDefaultValues = (
       (initialData as any)?.isCsp === true
         ? "yes"
         : "no",
+    applyMembershipDiscount:
+      (initialData as any)?.applyMembershipDiscount === false ||
+      (initialData as any)?.applyMembershipDiscount === "false"
+        ? false
+        : true,
     cspEnrollmentId,
   };
 };
@@ -227,11 +233,14 @@ export default function AddItemModal({
 
   const itemType = watch("type");
 
-  // Re-apply saved product values when opening edit modal
+  // Re-apply saved product values when opening edit modal.
+  // Compare contents so a parent re-render does not flip the toggle back on.
+  const initialDataKey = JSON.stringify(initialData ?? null);
   useEffect(() => {
     if (!initialData && !lockType) return;
     reset(buildDefaultValues(initialData, lockType));
-  }, [initialData, lockType, reset]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDataKey, lockType, reset]);
 
   useEffect(() => {
     if (lockType && itemType !== lockType) {
@@ -309,6 +318,12 @@ export default function AddItemModal({
     payload.append("discountType", values.discountType);
     payload.append("discountValue", String(values.discountValue));
     payload.append("variants", JSON.stringify(normalizedVariants));
+    payload.append(
+      "applyMembershipDiscount",
+      resolvedType === "product" && values.applyMembershipDiscount === false
+        ? "false"
+        : "true",
+    );
     payload.append(
       "isCsp",
       resolvedType === "product" && values.isCsp === "yes" ? "true" : "false",

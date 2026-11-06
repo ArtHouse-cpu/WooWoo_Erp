@@ -271,7 +271,7 @@ export function membershipBenefitsForLine(
   qty: number,
   category: string,
   plan: MembershipPlanPayload | undefined,
-  options?: { isCsp?: boolean },
+  options?: { isCsp?: boolean; skipMembershipDiscount?: boolean },
 ): { discount: number; cashback: number } {
   // CSP products and membership plan purchases do not receive a membership discount.
   // Plan cashback for a new subscription is stored on the subscription itself.
@@ -290,9 +290,11 @@ export function membershipBenefitsForLine(
   }
 
   const discount =
-    discountPercent > 0
-      ? Math.round(((lineTotal * discountPercent) / 100) * 100) / 100
-      : 0;
+    options?.skipMembershipDiscount
+      ? 0
+      : discountPercent > 0
+        ? Math.round(((lineTotal * discountPercent) / 100) * 100) / 100
+        : 0;
   const cashback =
     cashbackPercent > 0
       ? Math.round(((lineTotal * cashbackPercent) / 100) * 100) / 100
@@ -312,6 +314,7 @@ export function calcStackedLineBenefits(params: {
   discountType?: string | null;
   discountValue?: number | null;
   isCsp?: boolean;
+  skipMembershipDiscount?: boolean;
 }): {
   productDiscount: number;
   membershipDiscount: number;
@@ -342,7 +345,7 @@ export function calcStackedLineBenefits(params: {
     qty,
     params.category,
     params.plan,
-    { isCsp: false },
+    { isCsp: false, skipMembershipDiscount: params.skipMembershipDiscount },
   );
 
   const membershipDiscount = Number(membership.discount) || 0;
@@ -464,6 +467,7 @@ export function summarizeMembershipForCart(
     discount?: number;
     cashback?: number;
     isCsp?: boolean;
+    skipMembershipDiscount?: boolean;
   }>,
 ) {
   const plan = resolveMembershipPlan(plans, membershipType, membershipPlanId);
@@ -477,6 +481,7 @@ export function summarizeMembershipForCart(
       item.qty,
       cat,
       plan,
+      { skipMembershipDiscount: item.skipMembershipDiscount },
     );
     membershipDiscount += fromPlan.discount;
     cashbackTotal += fromPlan.cashback;

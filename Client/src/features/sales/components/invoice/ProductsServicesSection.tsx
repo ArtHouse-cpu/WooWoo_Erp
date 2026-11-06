@@ -13,6 +13,7 @@ import {
 import {resolveInvoiceLineCategory} from "../../utils/itemClassification";
 import CreateProductModal from "./Modal/CreateProductModal";
 import CatalogueItemLabel from "@/features/sales/components/CatalogueItemLabel";
+import { filterCatalogueRowsForPos } from "@/features/sales/utils/cataloguePosFilter";
 import Swal from "sweetalert2";
 import { useDebounce } from "@/hooks/useDebounce";
 
@@ -113,7 +114,9 @@ export default function ProductsServicesSection({
           page: 1,
           limit: 48,
         });
-        setGridItems(Array.isArray(response?.items) ? response.items : []);
+        setGridItems(
+          filterCatalogueRowsForPos(Array.isArray(response?.items) ? response.items : []),
+        );
       } catch (error) {
         if (!isAbortError(error)) setGridItems([]);
       } finally {
@@ -142,6 +145,9 @@ export default function ProductsServicesSection({
       discountType: item.discountType,
       discountValue: item.discountValue,
       isCsp: Boolean(item.isCsp),
+      skipMembershipDiscount:
+        Boolean(item.skipMembershipDiscount) ||
+        (item.sourceType === "food" && item.manageInventory === true),
     });
 
     return {
@@ -186,6 +192,9 @@ export default function ProductsServicesSection({
         productDiscountValue: Number(item.discountValue ?? 0),
         productDiscountAmount,
         membershipDiscountAmount,
+        skipMembershipDiscount:
+          Boolean(item.skipMembershipDiscount) ||
+        (item.sourceType === "food" && item.manageInventory === true),
       });
     }
   };
@@ -227,7 +236,9 @@ export default function ProductsServicesSection({
         page: 1,
         limit: 48,
       });
-      setCatalogueItems(Array.isArray(response?.items) ? response.items : []);
+      setCatalogueItems(
+        filterCatalogueRowsForPos(Array.isArray(response?.items) ? response.items : []),
+      );
     } catch (error) {
       if (!isAbortError(error)) setCatalogueItems([]);
     } finally {
@@ -260,6 +271,9 @@ export default function ProductsServicesSection({
       discountType: item.discountType,
       discountValue: item.discountValue,
       isCsp,
+      skipMembershipDiscount:
+        Boolean(item.skipMembershipDiscount) ||
+        (item.sourceType === "food" && item.manageInventory === true),
     });
 
     const displayName = item.productName || item.name || "";

@@ -64,21 +64,58 @@ export function sortCatalogueRowsForPos(
   });
 }
 
+const rowNameKey = (item: CatalogueLookupItem) =>
+  String(item.productName || item.name || "").trim().toLowerCase();
+
+/**
+ * Food added with Manage Inventory is one catalogue row: Food, with purchase stock.
+ * Hide the linked product row so POS search does not list the same item twice.
+ */
+function collapseManagedFoodRows(
+  items: CatalogueLookupItem[],
+): CatalogueLookupItem[] {
+  const managedFoodNames = new Set(
+    items
+      .filter((item) => item.sourceType === "food" && item.manageInventory)
+      .map(rowNameKey)
+      .filter(Boolean),
+  );
+  if (!managedFoodNames.size) return items;
+
+  const stockFromProduct = new Map<string, number>();
+  for (const item of items) {
+    if (item.sourceType !== "product" || !managedFoodNames.has(rowNameKey(item))) continue;
+    if (item.stockQty != null) stockFromProduct.set(rowNameKey(item), Number(item.stockQty) || 0);
+  }
+
+  return items
+    .filter((item) => !(item.sourceType === "product" && managedFoodNames.has(rowNameKey(item))))
+    .map((item) => {
+      if (item.sourceType !== "food" || !item.manageInventory) return item;
+      const qty =
+        item.stockQty != null
+          ? Number(item.stockQty) || 0
+          : stockFromProduct.get(rowNameKey(item)) ?? 0;
+      return { ...item, trackStock: true, stockQty: qty };
+    });
+}
+
 /** Same row filter as POS catalogue sidebar (hide empty parent when variants exist). */
 export function filterCatalogueRowsForPos(
   items: CatalogueLookupItem[],
 ): CatalogueLookupItem[] {
+  const collapsed = collapseManagedFoodRows(items);
   const parentsWithVariants = new Set<string>();
-  for (const item of items) {
+  for (const item of collapsed) {
     const parts = getCatalogueNameParts(item);
     if (parts.variantName) {
       parentsWithVariants.add(parts.parentName.trim().toLowerCase());
     }
   }
-  if (!parentsWithVariants.size) return sortCatalogueRowsForPos(items);
+  if (!parentsWithVariants.size) return sortCatalogueRowsForPos(collapsed);
 
   return sortCatalogueRowsForPos(
-    items.filter((item) => {
+    collapsed.filter((item) => {
       const parts = getCatalogueNameParts(item);
       if (parts.variantName) return true;
       return !parentsWithVariants.has(parts.parentName.trim().toLowerCase());

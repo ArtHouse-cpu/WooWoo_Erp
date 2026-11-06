@@ -307,6 +307,7 @@ export default function CreatePosScreen({
       isCsp?: boolean,
       discountType?: string,
       discountValue?: number,
+      skipMembershipDiscount?: boolean,
     ) => {
       const plan = resolveMembershipPlan(membershipPlans, mType, mId);
       return calcStackedLineBenefits({
@@ -317,6 +318,7 @@ export default function CreatePosScreen({
         discountType,
         discountValue,
         isCsp,
+        skipMembershipDiscount,
       });
     },
     [membershipPlans],
@@ -361,6 +363,7 @@ export default function CreatePosScreen({
               Boolean(updated.isCsp),
               updated.productDiscountType,
               updated.productDiscountValue,
+              updated.skipMembershipDiscount,
             );
             return {
               ...updated,
@@ -432,6 +435,9 @@ export default function CreatePosScreen({
       isCsp,
       productDiscountType,
       productDiscountValue,
+      Boolean(selectedProduct?.skipMembershipDiscount) ||
+        (selectedProduct?.sourceType === "food" &&
+          selectedProduct?.manageInventory === true),
     );
 
     setItems((prev) => [
@@ -461,6 +467,10 @@ export default function CreatePosScreen({
         productDiscountValue,
         productDiscountAmount: stacked.productDiscount,
         membershipDiscountAmount: stacked.membershipDiscount,
+        skipMembershipDiscount:
+          Boolean(selectedProduct?.skipMembershipDiscount) ||
+          (selectedProduct?.sourceType === "food" &&
+            selectedProduct?.manageInventory === true),
       },
     ]);
 
@@ -516,6 +526,8 @@ export default function CreatePosScreen({
           isCsp,
           productDiscountType,
           productDiscountValue,
+          Boolean(p.skipMembershipDiscount) ||
+            (p.sourceType === "food" && p.manageInventory === true),
         );
 
         setItems((prev) => [
@@ -539,6 +551,9 @@ export default function CreatePosScreen({
             productDiscountValue,
             productDiscountAmount: stacked.productDiscount,
             membershipDiscountAmount: stacked.membershipDiscount,
+            skipMembershipDiscount:
+              Boolean(p.skipMembershipDiscount) ||
+              (p.sourceType === "food" && p.manageInventory === true),
           },
         ]);
       }
@@ -619,7 +634,9 @@ export default function CreatePosScreen({
       items.reduce(
         (sum, item) =>
           sum +
-          (item.isCsp ? 0 : Number(item.membershipDiscountAmount ?? 0)),
+          (item.isCsp || item.skipMembershipDiscount
+            ? 0
+            : Number(item.membershipDiscountAmount ?? 0)),
         0,
       ),
     [items],
@@ -722,10 +739,11 @@ export default function CreatePosScreen({
       const waiveMembership = Boolean(payment.waiveMembershipForCoupon);
       const lineItems = items.map((item) => {
         const productOnly = Number(item.productDiscountAmount ?? 0);
-        const membershipOnly = item.isCsp
-          ? 0
-          : Number(item.membershipDiscountAmount ?? 0);
-        const discount = waiveMembership
+        const membershipOnly =
+          item.isCsp || item.skipMembershipDiscount
+            ? 0
+            : Number(item.membershipDiscountAmount ?? 0);
+        const discount = waiveMembership || item.skipMembershipDiscount
           ? productOnly > 0
             ? productOnly
             : Math.max(0, Number(item.discount || 0) - membershipOnly)
@@ -1297,6 +1315,7 @@ export default function CreatePosScreen({
                                         Boolean(item.isCsp),
                                         item.productDiscountType,
                                         item.productDiscountValue,
+                                        item.skipMembershipDiscount,
                                       );
                                       return {
                                         ...item,
@@ -2064,9 +2083,11 @@ export default function CreatePosScreen({
               productName: it.name,
               unitPrice: it.price,
               productDiscountAmount: Number(it.productDiscountAmount ?? 0),
-              membershipDiscountAmount: it.isCsp
-                ? 0
-                : Number(it.membershipDiscountAmount ?? 0),
+              membershipDiscountAmount:
+                it.isCsp || it.skipMembershipDiscount
+                  ? 0
+                  : Number(it.membershipDiscountAmount ?? 0),
+              skipMembershipDiscount: Boolean(it.skipMembershipDiscount),
             }))}
             initialCustomerName={customer}
             initialCustomerPhone={phone}

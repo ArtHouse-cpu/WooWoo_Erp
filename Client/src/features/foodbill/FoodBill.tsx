@@ -114,6 +114,8 @@ interface FoodItem {
   image: string;
   imageUrl?: string | null;
   status?: "Active" | "Inactive";
+  manageInventory?: boolean;
+  availableStock?: number | null;
 }
 
 function normalizeCategoryKey(category: string) {
@@ -153,7 +155,30 @@ function mapApiFood(raw: any): FoodItem | null {
     image: imageUrl || PLACEHOLDER_FOOD_IMAGE,
     imageUrl: imageUrl || null,
     status: raw?.status === "Inactive" ? "Inactive" : "Active",
+    manageInventory: raw?.manageInventory === true || raw?.manageInventory === "true",
+    availableStock:
+      raw?.availableStock == null ? null : Math.max(0, Number(raw.availableStock) || 0),
   };
+}
+
+const STOCK_MESSAGE =
+  "Insufficient stock. Please create a purchase for this item before selling.";
+
+function stockBlockMessage(lines: { item: FoodItem; quantity: number }[]) {
+  const needed = new Map<string, { name: string; qty: number; stock: number }>();
+  for (const line of lines) {
+    if (!line.item.manageInventory) continue;
+    const current = needed.get(line.item.id) || {
+      name: line.item.name,
+      qty: 0,
+      stock: Math.max(0, Number(line.item.availableStock) || 0),
+    };
+    current.qty += line.quantity;
+    needed.set(line.item.id, current);
+  }
+  const blocked = [...needed.values()].filter((row) => row.qty > row.stock);
+  if (!blocked.length) return "";
+  return `${STOCK_MESSAGE} ${blocked.map((row) => row.name).join(", ")}.`;
 }
 
 function foodItemToPayload(food: FoodItem): FoodPayload {
@@ -166,6 +191,7 @@ function foodItemToPayload(food: FoodItem): FoodPayload {
     isPackaged: food.isPackaged === true,
     description: food.description || "",
     isVeg: food.isVeg,
+    manageInventory: food.manageInventory === true,
     status: food.status === "Inactive" ? "Inactive" : "Active",
     imageUrl: food.imageUrl || null,
   };
@@ -926,7 +952,13 @@ export default function FoodBill() {
               : i,
           )
         : [...prev, { item, quantity: 1 }];
-      return reconcileCart(manual);
+      const next = reconcileCart(manual);
+      const blocked = stockBlockMessage(next);
+      if (blocked) {
+        void Swal.fire({ icon: "warning", title: "Insufficient stock", text: blocked });
+        return prev;
+      }
+      return next;
     });
   };
 
@@ -981,14 +1013,23 @@ export default function FoodBill() {
 
   const updateQuantity = (lineKey: string, change: number) => {
     setCart((prev) => {
-      const next = prev
-        .map((i) => {
-          if (i.promo || offerLineKey(i) !== lineKey) return i;
-          const newQty = i.quantity + change;
-          return { ...i, quantity: newQty > 0 ? newQty : 1 };
-        })
-        .filter((i) => i.quantity > 0);
-      return reconcileCart(next);
+      const next = reconcileCart(
+        prev
+          .map((i) => {
+            if (i.promo || offerLineKey(i) !== lineKey) return i;
+            const newQty = i.quantity + change;
+            return { ...i, quantity: newQty > 0 ? newQty : 1 };
+          })
+          .filter((i) => i.quantity > 0),
+      );
+      if (change > 0) {
+        const blocked = stockBlockMessage(next);
+        if (blocked) {
+          void Swal.fire({ icon: "warning", title: "Insufficient stock", text: blocked });
+          return prev;
+        }
+      }
+      return next;
     });
   };
 
@@ -1037,6 +1078,7 @@ export default function FoodBill() {
         qty: line.quantity,
         // Use Food so plan usageLimits.Food applies (also matches food item categories)
         category: "Food",
+        skipMembershipDiscount: line.item.manageInventory === true,
       })),
     );
   }, [
@@ -1554,6 +1596,11 @@ export default function FoodBill() {
     verifiedStaff: VerifiedStaff,
     verifiedAt: string,
   ) => {
+    const blocked = stockBlockMessage(cart);
+    if (blocked) {
+      void Swal.fire({ icon: "warning", title: "Insufficient stock", text: blocked });
+      return;
+    }
     const nowStr = new Date().toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
@@ -1716,6 +1763,7 @@ export default function FoodBill() {
             line.quantity,
             "Food",
             membershipPlan,
+            { skipMembershipDiscount: line.item.manageInventory === true },
           );
           return {
             productName: line.item.name,
@@ -1725,6 +1773,7 @@ export default function FoodBill() {
             category: "Food" as const,
             lineGross: line.item.price * line.quantity,
             promo: false as const,
+            allowMembershipDiscount: line.item.manageInventory !== true,
           };
         });
         const rawSum = lines.reduce(
@@ -1733,7 +1782,9 @@ export default function FoodBill() {
         );
         const target = membershipDiscountForInvoice;
         const delta = Math.round((target - rawSum) * 100) / 100;
-        const adjustable = lines.filter((line) => !line.promo);
+        const adjustable = lines.filter(
+          (line) => !line.promo && line.allowMembershipDiscount !== false,
+        );
         if (adjustable.length > 0 && Math.abs(delta) >= 0.01) {
           // Adjust last paid line so invoice grand total matches Food Bill UI (incl. round off)
           const last = adjustable[adjustable.length - 1];
@@ -1744,7 +1795,7 @@ export default function FoodBill() {
           // Cap so line discount never exceeds line gross
           last.discount = Math.min(last.discount, last.lineGross);
         }
-        return lines.map(({ lineGross: _g, promo: _promo, ...item }) => ({
+        return lines.map(({ lineGross: _g, promo: _promo, allowMembershipDiscount: _allow, ...item }) => ({
           ...item,
           productDiscountAmount: item.productDiscountAmount || 0,
           membershipDiscountAmount:
