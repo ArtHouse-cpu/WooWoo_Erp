@@ -2,16 +2,23 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ChevronRight,
+  Clock,
   Crown,
   FileText,
   GraduationCap,
   IndianRupee,
+  Pencil,
   Percent,
   Star,
   User,
   X,
 } from "lucide-react";
-import type { MembershipPlanPayload } from "@/services/apiClient";
+import {
+  handleUpdateMembership,
+  type MembershipPlanPayload,
+} from "@/services/apiClient";
+import AddnewPlansModal from "@/features/membership/components/AddnewPlansModal";
+import { toast } from "react-toastify";
 
 type Theme = {
   borderSelected: string;
@@ -199,9 +206,11 @@ function planPrice(plan: MembershipPlanPayload) {
 export default function DashboardMembershipCards({
   plans,
   loading,
+  onPlanUpdated,
 }: {
   plans: MembershipPlanPayload[];
   loading: boolean;
+  onPlanUpdated?: () => void;
 }) {
   const ordered = useMemo(
     () =>
@@ -213,6 +222,30 @@ export default function DashboardMembershipCards({
     [plans],
   );
   const [benefits, setBenefits] = useState<MembershipPlanPayload | null>(null);
+  const [editingPlan, setEditingPlan] = useState<MembershipPlanPayload | null>(null);
+  const [savingPlan, setSavingPlan] = useState(false);
+
+  const activeId = ordered.some((plan) => String(plan._id || plan.planId) === selectedId)
+    ? selectedId
+    : String(ordered[0]?._id || ordered[0]?.planId || "");
+
+  const handleSavePlan = async (payload: MembershipPlanPayload) => {
+    if (!editingPlan?._id) return;
+    try {
+      setSavingPlan(true);
+      await handleUpdateMembership(editingPlan._id, payload);
+      toast.success("Membership plan updated successfully");
+      setEditingPlan(null);
+      onPlanUpdated?.();
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Failed to update membership plan";
+      toast.error(message);
+    } finally {
+      setSavingPlan(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -238,12 +271,16 @@ export default function DashboardMembershipCards({
           const theme = themeFor(plan);
           const Icon = iconFor(plan);
           const stats = planStats(plan);
-          const price = planPrice(plan);
+          const selling = Number(plan.pricing?.amount ?? 0);
+          const gross = Number(plan.pricing?.grossAmount ?? 0);
+          const period = plan.pricing?.period || "";
+
           return (
             <div
               key={id}
               className="flex min-h-[250px] flex-col rounded-[22px] border border-[#E8EEF5] bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-5"
             >
+              {/* Header: Icon + Title + Badge + Edit Button + Radio */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <Icon className={`h-5 w-5 shrink-0 ${theme.iconText}`} strokeWidth={2.2} />
@@ -254,15 +291,59 @@ export default function DashboardMembershipCards({
                     {stats.badge}
                   </span>
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-[16px] font-extrabold text-[#0F172A]">{price.label}</p>
-                  {price.grossLabel ? (
-                    <p className="text-[11px] font-semibold text-[#94A3B8] line-through">{price.grossLabel}</p>
-                  ) : null}
+                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => setEditingPlan(plan)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition cursor-pointer"
+                    title="Edit plan"
+                    aria-label="Edit plan"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
+                      selected ? theme.radio : "border-slate-300 text-transparent"
+                    }`}
+                  >
+                    <span className={`h-2.5 w-2.5 rounded-full ${selected ? "bg-current" : ""}`} />
+                  </span>
                 </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-2 divide-x divide-[#E8EEF5] border-t border-[#E8EEF5] pt-4">
+              {/* Price & Plan Duration (Visible and clear on mobile and desktop) */}
+              <div className="mt-3 flex items-baseline justify-between gap-2 border-b border-[#E8EEF5] pb-3">
+                <div>
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Price
+                  </span>
+                  <div className="mt-0.5 flex items-baseline gap-1.5">
+                    <span className="text-xl font-extrabold text-[#0F172A] sm:text-2xl">
+                      ₹{selling.toLocaleString("en-IN")}
+                    </span>
+                    {gross > selling && (
+                      <span className="text-xs font-semibold text-slate-400 line-through">
+                        ₹{gross.toLocaleString("en-IN")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {period && (
+                  <div className="text-right">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Duration
+                    </span>
+                    <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
+                      <Clock size={11} className="text-slate-400" />
+                      <span>{period}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Discounts & Cashback */}
+              <div className="mt-3.5 grid grid-cols-2 divide-x divide-[#E8EEF5]">
                 <div className="pr-3">
                   <div className="flex items-center gap-1 text-[12px] font-semibold text-[#64748B]">
                     <Percent className={`h-4 w-4 ${theme.iconText}`} strokeWidth={2.4} />
@@ -279,6 +360,7 @@ export default function DashboardMembershipCards({
                 </div>
               </div>
 
+              {/* Programs */}
               <div className="mt-4">
                 <p className="text-[12px] font-semibold text-[#64748B]">Programs</p>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -297,6 +379,7 @@ export default function DashboardMembershipCards({
                 </div>
               </div>
 
+              {/* Footer: Benefits */}
               <div className="mt-auto flex items-center justify-between pt-4">
                 <button
                   type="button"
@@ -304,7 +387,7 @@ export default function DashboardMembershipCards({
                     event.stopPropagation();
                     setBenefits(plan);
                   }}
-                  className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#64748B]"
+                  className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#64748B] hover:text-slate-900 transition"
                 >
                   <FileText className="h-4 w-4" />
                   See all benefits
@@ -316,7 +399,7 @@ export default function DashboardMembershipCards({
                     event.stopPropagation();
                     setBenefits(plan);
                   }}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-[#E2E8F0] bg-white text-[#64748B]"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-[#E2E8F0] bg-white text-[#64748B] hover:bg-slate-50 transition"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -325,12 +408,27 @@ export default function DashboardMembershipCards({
           );
         })}
       </div>
+
       {benefits
         ? createPortal(
-            <BenefitsDialog plan={benefits} onClose={() => setBenefits(null)} />,
+            <BenefitsDialog
+              plan={benefits}
+              onClose={() => setBenefits(null)}
+              onEdit={(p) => setEditingPlan(p)}
+            />,
             document.body,
           )
         : null}
+
+      {editingPlan && (
+        <AddnewPlansModal
+          open={Boolean(editingPlan)}
+          onClose={() => setEditingPlan(null)}
+          onSubmit={handleSavePlan}
+          loading={savingPlan}
+          initialPlan={editingPlan}
+        />
+      )}
     </>
   );
 }
@@ -338,15 +436,20 @@ export default function DashboardMembershipCards({
 function BenefitsDialog({
   plan,
   onClose,
+  onEdit,
 }: {
   plan: MembershipPlanPayload;
   onClose: () => void;
+  onEdit: (plan: MembershipPlanPayload) => void;
 }) {
   const theme = themeFor(plan);
   const Icon = iconFor(plan);
   const stats = planStats(plan);
   const price = planPrice(plan);
   const features = plan.customerDisplay?.features || [];
+  const selling = Number(plan.pricing?.amount ?? 0);
+  const gross = Number(plan.pricing?.grossAmount ?? 0);
+  const period = plan.pricing?.period || "";
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center" onClick={onClose}>
@@ -378,14 +481,47 @@ function BenefitsDialog({
                 ) : null}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563]"
-              aria-label="Close benefits"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onEdit(plan);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition cursor-pointer"
+                title="Edit Plan"
+              >
+                <Pencil size={12} />
+                <span>Edit</span>
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563]"
+                aria-label="Close benefits"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Price & Duration banner in Dialog */}
+          <div className="mt-4 flex items-baseline justify-between rounded-xl bg-slate-50 p-3">
+            <div>
+              <span className="text-[10px] font-bold uppercase text-slate-400">Price</span>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-lg font-extrabold text-slate-900">₹{selling.toLocaleString("en-IN")}</span>
+                {gross > selling && (
+                  <span className="text-xs text-slate-400 line-through">₹{gross.toLocaleString("en-IN")}</span>
+                )}
+              </div>
+            </div>
+            {period && (
+              <div className="text-right">
+                <span className="text-[10px] font-bold uppercase text-slate-400">Duration</span>
+                <span className="block mt-0.5 text-xs font-bold text-slate-700">{period}</span>
+              </div>
+            )}
           </div>
 
           <h3 className="mt-5 text-sm font-bold text-[#0F172A]">Discount & Cashback</h3>

@@ -318,8 +318,8 @@ export default function ServiceScreen() {
         header: "Category",
         size: 140,
         Cell: ({ cell }: { cell: { getValue: () => unknown } }) => (
-          <span className="text-slate-700">
-            {String(cell.getValue() || "—")}
+          <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200/60">
+            {String(cell.getValue() || "General")}
           </span>
         ),
       },
@@ -328,7 +328,11 @@ export default function ServiceScreen() {
         header: "Selling Price",
         Cell: ({ cell }: { cell: { getValue: () => unknown } }) => {
           const val = Number(cell.getValue() || 0);
-          return <span>₹ {val.toLocaleString("en-IN")}</span>;
+          return (
+            <span className="font-bold text-emerald-600">
+              ₹ {val.toLocaleString("en-IN")}
+            </span>
+          );
         },
       },
       {
@@ -608,17 +612,29 @@ export default function ServiceScreen() {
         {
           title: "Total Services",
           value: services.length,
-          icon: <Briefcase size={22} className="text-gray-500" />,
+          Icon: Briefcase,
+          bgClass: "bg-blue-50/80 border-blue-200/80 hover:border-blue-300",
+          iconWrapClass: "bg-blue-500 text-white shadow-xs shadow-blue-500/20",
+          titleClass: "text-blue-900",
+          valueClass: "text-blue-950",
         },
         {
           title: "Service Categories",
           value: uniqueCategories,
-          icon: <LayoutList size={22} className="text-gray-500" />,
+          Icon: LayoutList,
+          bgClass: "bg-purple-50/80 border-purple-200/80 hover:border-purple-300",
+          iconWrapClass: "bg-purple-500 text-white shadow-xs shadow-purple-500/20",
+          titleClass: "text-purple-900",
+          valueClass: "text-purple-950",
         },
         {
           title: "Active Services",
           value: services.length,
-          icon: <Boxes size={22} className="text-gray-500" />,
+          Icon: Boxes,
+          bgClass: "bg-emerald-50/80 border-emerald-200/80 hover:border-emerald-300",
+          iconWrapClass: "bg-emerald-500 text-white shadow-xs shadow-emerald-500/20",
+          titleClass: "text-emerald-900",
+          valueClass: "text-emerald-950",
         },
       ];
     }
@@ -626,21 +642,33 @@ export default function ServiceScreen() {
       {
         title: "Total Additional Services",
         value: additionalServices.length,
-        icon: <Briefcase size={22} className="text-gray-500" />,
+        Icon: Briefcase,
+        bgClass: "bg-blue-50/80 border-blue-200/80 hover:border-blue-300",
+        iconWrapClass: "bg-blue-500 text-white shadow-xs shadow-blue-500/20",
+        titleClass: "text-blue-900",
+        valueClass: "text-blue-950",
       },
       {
         title: "Coworking Amenities",
         value: additionalServices.filter(
           (s) => s.spaceType === "all" || s.spaceType === "coworking",
         ).length,
-        icon: <LayoutList size={22} className="text-gray-500" />,
+        Icon: LayoutList,
+        bgClass: "bg-purple-50/80 border-purple-200/80 hover:border-purple-300",
+        iconWrapClass: "bg-purple-500 text-white shadow-xs shadow-purple-500/20",
+        titleClass: "text-purple-900",
+        valueClass: "text-purple-950",
       },
       {
         title: "Exclusive Amenities",
         value: additionalServices.filter(
           (s) => s.spaceType === "all" || s.spaceType === "exclusive",
         ).length,
-        icon: <Boxes size={22} className="text-gray-500" />,
+        Icon: Boxes,
+        bgClass: "bg-amber-50/80 border-amber-200/80 hover:border-amber-300",
+        iconWrapClass: "bg-amber-500 text-white shadow-xs shadow-amber-500/20",
+        titleClass: "text-amber-900",
+        valueClass: "text-amber-950",
       },
     ];
   }, [
@@ -662,23 +690,23 @@ export default function ServiceScreen() {
           </h1>
 
           {/* Toggle between Current MRT Table and Additional Service MRT Table */}
-          <div className="inline-flex rounded-lg border border-gray-200 bg-gray-100 p-1">
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100/90 p-1 shadow-2xs">
             <button
               type="button"
               onClick={() => setActiveTable("services")}
-              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1 text-xs sm:text-sm font-semibold transition ${
+              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1 text-xs sm:text-sm font-semibold transition ${
                 activeTable === "services"
-                  ? "bg-white text-black shadow-sm"
-                  : "text-gray-500 hover:text-black"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <Briefcase size={15} />
+              <Briefcase size={14} />
               <span>Services</span>
               <span
-                className={`ml-1 rounded-full px-1.5 py-0.2 text-[11px] font-semibold ${
+                className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
                   activeTable === "services"
-                    ? "bg-black text-white"
-                    : "bg-gray-200 text-gray-700"
+                    ? "bg-white/20 text-white"
+                    : "bg-slate-200 text-slate-700"
                 }`}
               >
                 {services.length}
@@ -688,19 +716,19 @@ export default function ServiceScreen() {
             <button
               type="button"
               onClick={() => setActiveTable("additional")}
-              className={`flex items-center gap-1.5 rounded-md px-3.5 py-1 text-xs sm:text-sm font-semibold transition ${
+              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1 text-xs sm:text-sm font-semibold transition ${
                 activeTable === "additional"
-                  ? "bg-white text-black shadow-sm"
-                  : "text-gray-500 hover:text-black"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <Boxes size={15} />
+              <Boxes size={14} />
               <span>Additional Services</span>
               <span
-                className={`ml-1 rounded-full px-1.5 py-0.2 text-[11px] font-semibold ${
+                className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
                   activeTable === "additional"
-                    ? "bg-black text-white"
-                    : "bg-gray-200 text-gray-700"
+                    ? "bg-white/20 text-white"
+                    : "bg-slate-200 text-slate-700"
                 }`}
               >
                 {additionalServices.length}
@@ -717,7 +745,7 @@ export default function ServiceScreen() {
                 setEditAdditionalService(null);
                 setShowAdditionalModal(true);
               }}
-              className="flex-1 cursor-pointer rounded bg-black px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-black/90 sm:flex-none sm:px-4 sm:py-2 sm:text-[14px] whitespace-nowrap text-center"
+              className="flex-1 cursor-pointer rounded-xl bg-slate-900 px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 shadow-xs sm:flex-none sm:px-4 sm:py-2 sm:text-[14px] whitespace-nowrap text-center"
             >
               + Additional Services
             </button>
@@ -729,7 +757,7 @@ export default function ServiceScreen() {
                 setActiveTable("services");
                 setShowCreateModal(true);
               }}
-              className="flex-1 cursor-pointer rounded bg-black px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-black/90 sm:flex-none sm:px-4 sm:py-2 sm:text-[14px] whitespace-nowrap text-center"
+              className="flex-1 cursor-pointer rounded-xl bg-blue-600 px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 shadow-xs sm:flex-none sm:px-4 sm:py-2 sm:text-[14px] whitespace-nowrap text-center"
             >
               + Create Service
             </button>
@@ -737,19 +765,27 @@ export default function ServiceScreen() {
         </Can>
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
         {cards.map((item, index) => (
           <div
             key={item.title}
-            className={`cursor-pointer rounded-xl border border-gray-200 bg-white p-2.5 sm:p-4 transition duration-300 hover:shadow-sm ${
+            className={`min-w-0 rounded-2xl border p-2.5 sm:p-4 shadow-xs transition duration-300 hover:shadow-md ${item.bgClass} ${
               index === 2 ? "col-span-2 sm:col-span-1" : ""
             }`}
           >
-            <div className="flex items-center gap-1.5 sm:gap-2 text-gray-600">
-              {item.icon}
-              <span className="text-xs font-medium sm:text-base truncate">{item.title}</span>
+            <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+              <div
+                className={`flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl shadow-xs ${item.iconWrapClass}`}
+              >
+                <item.Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span className={`min-w-0 truncate text-xs font-semibold sm:text-sm ${item.titleClass}`}>
+                {item.title}
+              </span>
             </div>
-            <div className="mt-1 text-base sm:mt-3 sm:text-2xl font-semibold">{item.value}</div>
+            <div className={`mt-1.5 text-lg font-bold sm:mt-3 sm:text-2xl ${item.valueClass}`}>
+              {item.value}
+            </div>
           </div>
         ))}
       </div>
@@ -797,22 +833,23 @@ export default function ServiceScreen() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <span className="truncate text-sm font-bold text-slate-900 block">
-                        {name}
-                      </span>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                        <span className="font-medium text-slate-600">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="truncate text-sm font-bold text-slate-900">
+                          {name}
+                        </span>
+                        <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 ring-1 ring-inset ring-blue-200/60">
                           {service.category || "General"}
                         </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                         {service.primaryUnit && (
-                          <>
-                            <span>•</span>
-                            <span>Unit: {service.primaryUnit}</span>
-                          </>
+                          <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                            Unit: {service.primaryUnit}
+                          </span>
                         )}
                         {(service.barcode || service.barCode || service.itemCode) && (
                           <>
-                            <span>•</span>
+                            <span className="text-slate-300">•</span>
                             <span className="font-mono text-[11px] text-slate-400">
                               {service.barcode || service.barCode || service.itemCode}
                             </span>
@@ -825,16 +862,16 @@ export default function ServiceScreen() {
                   <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
                     <div className="flex items-center gap-4 text-xs">
                       <div>
-                        <span className="block text-[10px] font-medium uppercase text-slate-400">
+                        <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                           Selling Price
                         </span>
-                        <span className="text-sm font-bold text-slate-900">
+                        <span className="text-sm font-bold text-emerald-600">
                           ₹{Number(service.sellingPrice || 0).toLocaleString("en-IN")}
                         </span>
                       </div>
                       {service.purchasePrice !== undefined && (
                         <div>
-                          <span className="block text-[10px] font-medium uppercase text-slate-400">
+                          <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                             Cost
                           </span>
                           <span className="text-xs font-medium text-slate-600">
@@ -893,6 +930,7 @@ export default function ServiceScreen() {
               const IconComp = getIconComponent(item.icon);
               const title = item.title || item.name || "Unnamed Service";
               const amount = Number(item.amount ?? item.price ?? 0);
+              const spaceType = item.spaceType || "all";
 
               return (
                 <div
@@ -902,29 +940,47 @@ export default function ServiceScreen() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1 flex items-center gap-2.5">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-                        <IconComp size={18} />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 text-indigo-600 shadow-2xs">
+                        <IconComp size={19} />
                       </div>
                       <div className="min-w-0">
                         <span className="truncate text-sm font-bold text-slate-900 block">
                           {title}
                         </span>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                          <span className="rounded-full bg-slate-100 px-2 py-0.2 text-[10px] font-semibold capitalize text-slate-600">
-                            {item.spaceType || "All"}
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              spaceType === "coworking"
+                                ? "bg-purple-100 text-purple-700"
+                                : spaceType === "exclusive"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : "bg-emerald-100 text-emerald-700"
+                            }`}
+                          >
+                            {spaceType === "coworking"
+                              ? "Coworking"
+                              : spaceType === "exclusive"
+                                ? "Exclusive"
+                                : "All Spaces"}
                           </span>
                           {item.unit && (
-                            <>
-                              <span>•</span>
-                              <span>{item.unit}</span>
-                            </>
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                              {item.unit}
+                            </span>
                           )}
                         </div>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-slate-900">
-                      ₹{amount.toLocaleString("en-IN")}
-                    </span>
+                    <div className="text-right shrink-0">
+                      <span className="text-sm font-bold text-emerald-600 block">
+                        ₹{amount.toLocaleString("en-IN")}
+                      </span>
+                      {item.priceLabel && (
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {item.priceLabel}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {typeof (item as any).description === "string" && (item as any).description ? (

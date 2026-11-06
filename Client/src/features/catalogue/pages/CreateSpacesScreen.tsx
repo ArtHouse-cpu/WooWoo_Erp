@@ -335,27 +335,47 @@ export default function CreateSpacesScreen() {
     {
       title: "Total Spaces",
       value: spaces.length,
-      icon: <Building2 size={22} className="text-gray-500" />,
+      Icon: Building2,
+      bgClass: "bg-blue-50/80 border-blue-200/80 hover:border-blue-300",
+      iconWrapClass: "bg-blue-500 text-white shadow-xs shadow-blue-500/20",
+      titleClass: "text-blue-900",
+      valueClass: "text-blue-950",
     },
     {
       title: "Available",
       value: spaces.filter((s) => s.status === "Available").length,
-      icon: <Boxes size={22} className="text-gray-500" />,
+      Icon: Boxes,
+      bgClass: "bg-emerald-50/80 border-emerald-200/80 hover:border-emerald-300",
+      iconWrapClass: "bg-emerald-500 text-white shadow-xs shadow-emerald-500/20",
+      titleClass: "text-emerald-900",
+      valueClass: "text-emerald-950",
     },
     {
       title: "Space Categories",
       value: new Set(spaces.map((s) => s.category || "")).size,
-      icon: <LayoutList size={22} className="text-gray-500" />,
+      Icon: LayoutList,
+      bgClass: "bg-purple-50/80 border-purple-200/80 hover:border-purple-300",
+      iconWrapClass: "bg-purple-500 text-white shadow-xs shadow-purple-500/20",
+      titleClass: "text-purple-900",
+      valueClass: "text-purple-950",
     },
     {
       title: "Booked",
       value: spaces.filter((s) => s.status === "Booked").length,
-      icon: <ArrowDownCircle size={22} className="text-gray-500" />,
+      Icon: ArrowDownCircle,
+      bgClass: "bg-amber-50/80 border-amber-200/80 hover:border-amber-300",
+      iconWrapClass: "bg-amber-500 text-white shadow-xs shadow-amber-500/20",
+      titleClass: "text-amber-900",
+      valueClass: "text-amber-950",
     },
     {
       title: "Total Capacity",
       value: spaces.reduce((sum, s) => sum + Number(s.capacity || 0), 0),
-      icon: <Users size={22} className="text-gray-500" />,
+      Icon: Users,
+      bgClass: "bg-indigo-50/80 border-indigo-200/80 hover:border-indigo-300",
+      iconWrapClass: "bg-indigo-500 text-white shadow-xs shadow-indigo-500/20",
+      titleClass: "text-indigo-900",
+      valueClass: "text-indigo-950",
     },
   ];
 
@@ -478,9 +498,11 @@ export default function CreateSpacesScreen() {
 
   return (
     <div className="min-w-0 p-1">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold">Spaces List</h1>
-        <div className="flex gap-3">
+      <div className="mb-2 flex items-center justify-between gap-2 sm:mb-4">
+        <h1 className="min-w-0 truncate text-base font-semibold sm:text-xl">
+          Spaces List
+        </h1>
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <Can permission={PERMISSIONS.SPACE_CREATE}>
             <button
               type="button"
@@ -488,28 +510,43 @@ export default function CreateSpacesScreen() {
                 setEditing(null);
                 setOpenModal(true);
               }}
-              className="w-full cursor-pointer rounded bg-black px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-gray-900 sm:w-auto"
+              className="cursor-pointer rounded-lg bg-black px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-gray-900 sm:px-3 sm:py-1.5 sm:text-xs"
             >
-              Add Space
+              <span className="sm:hidden">+ Add</span>
+              <span className="hidden sm:inline">+ Add Space</span>
             </button>
           </Can>
         </div>
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-5">
         {cards.map((item, index) => (
           <div
-            key={index}
-            className={`cursor-pointer rounded-xl border border-gray-200 bg-white p-2.5 sm:p-4 transition duration-300 hover:shadow-sm ${
+            key={item.title || index}
+            className={`min-w-0 rounded-2xl border p-2.5 sm:p-4 shadow-xs transition duration-300 hover:shadow-md ${item.bgClass} ${
               index === 4 ? "col-span-2 sm:col-span-1" : ""
             }`}
           >
-            <div className="flex items-center gap-1.5 sm:gap-2 text-gray-600">
-              {item.icon}
-              <span className="text-xs font-medium sm:text-sm truncate">{item.title}</span>
+            <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+              <div
+                className={`flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl shadow-xs ${item.iconWrapClass}`}
+              >
+                <item.Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <span
+                className={`min-w-0 truncate text-xs font-semibold sm:text-sm ${item.titleClass}`}
+              >
+                {item.title}
+              </span>
             </div>
-            <div className="mt-1 text-base sm:mt-3 sm:text-2xl font-semibold">
-              {loading ? <Loader2 size={22} className="animate-spin text-gray-400" /> : item.value}
+            <div
+              className={`mt-1.5 sm:mt-2.5 truncate text-lg font-bold sm:text-2xl ${item.valueClass}`}
+            >
+              {loading ? (
+                <Loader2 size={20} className="animate-spin opacity-50" />
+              ) : (
+                item.value
+              )}
             </div>
           </div>
         ))}

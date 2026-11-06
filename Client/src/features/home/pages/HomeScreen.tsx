@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
@@ -768,9 +768,7 @@ export default function HomeScreen() {
               listBounds.toDate || "",
             )
           : Promise.resolve(null),
-        canPath("/membership") || canPath("/manage-plans")
-          ? handleGetMemberships({ status: "Active" })
-          : Promise.resolve(null),
+        handleGetMemberships({ status: "Active" }).catch(() => null),
       ]);
 
       const invoices =
@@ -820,7 +818,9 @@ export default function HomeScreen() {
         Array.isArray(membershipRes.value?.memberships)
           ? membershipRes.value.memberships
           : [];
-      setMembershipPlans(plans);
+      if (plans.length > 0 || membershipPlans.length === 0) {
+        setMembershipPlans(plans);
+      }
 
       const customerList =
         customerRes.status === "fulfilled" &&
@@ -1048,9 +1048,25 @@ export default function HomeScreen() {
             "createdAt",
           );
           if (!alive) return;
-          const list = Array.isArray(res?.subscriptions)
+          let list = Array.isArray(res?.subscriptions)
             ? res.subscriptions
             : [];
+          // For all date filters: if no subscriptions created in the specific date window, load subscriptions across all dates so membership subscriptions are displayed
+          if (list.length === 0 && (listBounds.fromDate || listBounds.toDate)) {
+            const allRes = await handleGetSubscriptions(
+              "",
+              100,
+              undefined,
+              1,
+              undefined,
+              undefined,
+              "createdAt",
+            );
+            if (!alive) return;
+            if (Array.isArray(allRes?.subscriptions) && allRes.subscriptions.length > 0) {
+              list = allRes.subscriptions;
+            }
+          }
           const sortedList = [...list].sort((a, b) => {
             const ta = parseDate(a?.createdAt)?.getTime() ?? 0;
             const tb = parseDate(b?.createdAt)?.getTime() ?? 0;
@@ -1138,7 +1154,7 @@ export default function HomeScreen() {
                   id: String(p?._id ?? i),
                   title: String(p?.productName || p?.name || "Product"),
                   subtitle: String(p?.category || "General"),
-                  meta: stock > 0 ? "In stock" : "Out of stock",
+                  meta: stock >= 3 ? "In stock" : "Out of stock",
                   amount: formatMoney(Number(p?.sellingPrice ?? 0)),
                   imageUrl: img,
                   stockQty: stock,
@@ -1270,15 +1286,30 @@ export default function HomeScreen() {
   const networkSummary = dashboardSummary?.network;
   const purchaseExpense = dashboardSummary?.purchaseExpense;
 
-  const membershipBreakdown = useMemo(
-    () =>
-      (membershipSummary?.breakdown ?? []).map((row, i) => ({
+  const displayMembershipTotal = useMemo(() => {
+    if (typeof membershipSummary?.total === "number" && membershipSummary.total > 0) {
+      return membershipSummary.total;
+    }
+    return membershipPlans.length;
+  }, [membershipSummary, membershipPlans]);
+
+  const membershipBreakdown = useMemo(() => {
+    if (membershipSummary?.breakdown && membershipSummary.breakdown.length > 0) {
+      return membershipSummary.breakdown.map((row, i) => ({
         label: row.code,
         value: formatCount(row.count),
         colorClass: MEMBERSHIP_BREAKDOWN_COLORS[i % MEMBERSHIP_BREAKDOWN_COLORS.length],
-      })),
-    [membershipSummary],
-  );
+      }));
+    }
+    if (membershipPlans.length > 0) {
+      return membershipPlans.slice(0, 4).map((p, i) => ({
+        label: (p.displayName || p.planId || "Plan").slice(0, 10),
+        value: p.status || "Active",
+        colorClass: MEMBERSHIP_BREAKDOWN_COLORS[i % MEMBERSHIP_BREAKDOWN_COLORS.length],
+      }));
+    }
+    return [];
+  }, [membershipSummary, membershipPlans]);
 
   const filteredBills = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -1384,6 +1415,7 @@ export default function HomeScreen() {
       if (
         tab !== "bookings" &&
         tab !== "subscriptions" &&
+        tab !== "memberships" &&
         row.createdAt !== undefined &&
         !inDateRange(row.createdAt ?? null, dateFilter)
       ) {
@@ -1719,7 +1751,7 @@ export default function HomeScreen() {
               id: String(p?._id ?? i),
               title: String(p?.productName || p?.name || "Product"),
               subtitle: String(p?.category || "General"),
-              meta: stock > 0 ? "In stock" : "Out of stock",
+              meta: stock >= 3 ? "In stock" : "Out of stock",
               amount: formatMoney(Number(p?.sellingPrice ?? 0)),
               imageUrl: img,
               stockQty: stock,
@@ -2220,7 +2252,7 @@ export default function HomeScreen() {
         <RevenueCard
           title="Membership"
           period={kpiPeriodLabel}
-          value={formatCount(membershipSummary?.total ?? 0)}
+          value={formatCount(displayMembershipTotal)}
           icon={Crown}
           iconWrapClass="bg-violet-600"
           loading={cardsLoading}
@@ -3157,16 +3189,13 @@ export default function HomeScreen() {
                             )}
                           </div>
 
-                          {/* Code + Payment Method + Membership Tag */}
+                          {/* Code + Payment Method */}
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             <span className="text-xs font-medium text-slate-500">
                               {row.code}
                             </span>
                             <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
                               {row.paymentType || "UPI"}
-                            </span>
-                            <span className="inline-flex items-center rounded-md bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-700 ring-1 ring-inset ring-purple-200">
-                              Membership
                             </span>
                           </div>
                         </div>
@@ -3439,14 +3468,14 @@ export default function HomeScreen() {
                           ) : tab === "products" ? (
                             <span
                               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold shadow-xs backdrop-blur-xs ${
-                                (row.stockQty ?? 0) > 0 ||
+                                (row.stockQty ?? 0) >= 3 ||
                                 row.meta === "In stock"
                                   ? "bg-emerald-500/90 text-white"
                                   : "bg-rose-500/90 text-white"
                               }`}
                             >
                               <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                              {(row.stockQty ?? 0) > 0 ||
+                              {(row.stockQty ?? 0) >= 3 ||
                               row.meta === "In stock"
                                 ? "In stock"
                                 : "Out of stock"}
@@ -3770,7 +3799,16 @@ export default function HomeScreen() {
         ) : tab === "memberships" ? (
           <DashboardMembershipCards
             loading={kpisLoading && membershipPlans.length === 0}
-            plans={membershipPlans}
+            plans={
+              search.trim()
+                ? membershipPlans.filter((p) =>
+                    `${p.displayName || ""} ${p.planId || ""} ${p.planType || ""}`
+                      .toLowerCase()
+                      .includes(search.trim().toLowerCase()),
+                  )
+                : membershipPlans
+            }
+            onPlanUpdated={loadDashboardData}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -4137,13 +4175,13 @@ export default function HomeScreen() {
                   <div className="flex flex-col items-end gap-1">
                     <span
                       className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                        (viewProduct.stockQty ?? 0) <= 0
+                        (viewProduct.stockQty ?? 0) < 3
                           ? "bg-rose-100 text-rose-800"
                           : "bg-emerald-100 text-emerald-800"
                       }`}
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                      {(viewProduct.stockQty ?? 0) <= 0
+                      {(viewProduct.stockQty ?? 0) < 3
                         ? "Out of Stock"
                         : "In Stock"}
                     </span>
