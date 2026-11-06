@@ -185,6 +185,17 @@ function upto(value: number) {
   return `Upto ${rounded}%`;
 }
 
+function planPrice(plan: MembershipPlanPayload) {
+  const amount = Number(plan.pricing?.amount ?? 0);
+  const gross = Number(plan.pricing?.grossAmount ?? 0);
+  return {
+    amount,
+    gross: gross > amount ? gross : 0,
+    label: `₹${amount.toLocaleString("en-IN")}`,
+    grossLabel: gross > amount ? `₹${gross.toLocaleString("en-IN")}` : "",
+  };
+}
+
 export default function DashboardMembershipCards({
   plans,
   loading,
@@ -201,11 +212,7 @@ export default function DashboardMembershipCards({
       ),
     [plans],
   );
-  const [selectedId, setSelectedId] = useState("");
   const [benefits, setBenefits] = useState<MembershipPlanPayload | null>(null);
-  const activeId = ordered.some((plan) => String(plan._id || plan.planId) === selectedId)
-    ? selectedId
-    : String(ordered[0]?._id || ordered[0]?.planId || "");
 
   if (loading) {
     return (
@@ -228,25 +235,14 @@ export default function DashboardMembershipCards({
       <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:gap-4 sm:p-4">
         {ordered.map((plan) => {
           const id = String(plan._id || plan.planId);
-          const selected = id === activeId;
           const theme = themeFor(plan);
           const Icon = iconFor(plan);
           const stats = planStats(plan);
+          const price = planPrice(plan);
           return (
             <div
               key={id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setSelectedId(id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setSelectedId(id);
-                }
-              }}
-              className={`flex min-h-[250px] cursor-pointer flex-col rounded-[22px] border-2 bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:shadow-md sm:p-5 ${
-                selected ? theme.borderSelected : "border-[#E8EEF5]"
-              }`}
+              className="flex min-h-[250px] flex-col rounded-[22px] border border-[#E8EEF5] bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-5"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
@@ -258,13 +254,12 @@ export default function DashboardMembershipCards({
                     {stats.badge}
                   </span>
                 </div>
-                <span
-                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-                    selected ? theme.radio : "border-slate-300 text-transparent"
-                  }`}
-                >
-                  <span className={`h-2.5 w-2.5 rounded-full ${selected ? "bg-current" : ""}`} />
-                </span>
+                <div className="shrink-0 text-right">
+                  <p className="text-[16px] font-extrabold text-[#0F172A]">{price.label}</p>
+                  {price.grossLabel ? (
+                    <p className="text-[11px] font-semibold text-[#94A3B8] line-through">{price.grossLabel}</p>
+                  ) : null}
+                </div>
               </div>
 
               <div className="mt-5 grid grid-cols-2 divide-x divide-[#E8EEF5] border-t border-[#E8EEF5] pt-4">
@@ -350,6 +345,7 @@ function BenefitsDialog({
   const theme = themeFor(plan);
   const Icon = iconFor(plan);
   const stats = planStats(plan);
+  const price = planPrice(plan);
   const features = plan.customerDisplay?.features || [];
 
   return (
@@ -372,6 +368,10 @@ function BenefitsDialog({
                   <span className="rounded-full bg-[#F1F5F9] px-2 py-0.5 text-[10px] font-bold uppercase text-[#334155]">
                     {stats.badge}
                   </span>
+                  <span className="text-[13px] font-extrabold text-[#0F172A]">{price.label}</span>
+                  {price.grossLabel ? (
+                    <span className="text-[11px] font-semibold text-[#94A3B8] line-through">{price.grossLabel}</span>
+                  ) : null}
                 </div>
                 {plan.description ? (
                   <p className="mt-0.5 text-[12px] text-[#6B7280]">{plan.description}</p>

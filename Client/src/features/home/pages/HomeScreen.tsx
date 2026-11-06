@@ -2298,6 +2298,7 @@ export default function HomeScreen() {
           </div>
         </div>
 
+        {tab === "memberships" ? null : (
         <div className="flex items-center gap-2 p-3 sm:p-4">
           <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
             <Search size={16} className="shrink-0 text-gray-400" />
@@ -2354,6 +2355,7 @@ export default function HomeScreen() {
             View all
           </button>
         </div>
+        )}
 
         {/* Category Pills Bar (for Products tab) */}
         {tab === "products" && (categoriesList.length > 0 || productCategories.length > 0) && (
@@ -3768,9 +3770,7 @@ export default function HomeScreen() {
         ) : tab === "memberships" ? (
           <DashboardMembershipCards
             loading={kpisLoading && membershipPlans.length === 0}
-            plans={pageGeneric
-              .map((row) => row.raw as MembershipPlanPayload | undefined)
-              .filter((plan): plan is MembershipPlanPayload => Boolean(plan))}
+            plans={membershipPlans}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -3854,7 +3854,7 @@ export default function HomeScreen() {
         </div>
       )}
 
-        {hasMore ? (
+        {tab !== "memberships" && hasMore ? (
           <div
             ref={loadMoreRef}
             className="flex items-center justify-center py-4 md:hidden"
@@ -3867,6 +3867,7 @@ export default function HomeScreen() {
           </div>
         ) : null}
 
+        {tab === "memberships" ? null : (
         <div className="hidden flex-col gap-3 border-t border-gray-100 px-4 py-3 md:flex md:flex-row md:items-center md:justify-between">
           <p className="text-xs text-gray-500">
             Showing {tableTotal === 0 ? 0 : start + 1} to{" "}
@@ -3913,6 +3914,7 @@ export default function HomeScreen() {
             </button>
           </div>
         </div>
+        )}
       </section>
 
       {openCreateCustomerModal ? (
