@@ -225,10 +225,6 @@ export default function DashboardMembershipCards({
   const [editingPlan, setEditingPlan] = useState<MembershipPlanPayload | null>(null);
   const [savingPlan, setSavingPlan] = useState(false);
 
-  const activeId = ordered.some((plan) => String(plan._id || plan.planId) === selectedId)
-    ? selectedId
-    : String(ordered[0]?._id || ordered[0]?.planId || "");
-
   const handleSavePlan = async (payload: MembershipPlanPayload) => {
     if (!editingPlan?._id) return;
     try {
@@ -280,7 +276,6 @@ export default function DashboardMembershipCards({
               key={id}
               className="flex min-h-[250px] flex-col rounded-[22px] border border-[#E8EEF5] bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:p-5"
             >
-              {/* Header: Icon + Title + Badge + Edit Button + Radio */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <Icon className={`h-5 w-5 shrink-0 ${theme.iconText}`} strokeWidth={2.2} />
@@ -291,24 +286,15 @@ export default function DashboardMembershipCards({
                     {stats.badge}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    onClick={() => setEditingPlan(plan)}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition cursor-pointer"
-                    title="Edit plan"
-                    aria-label="Edit plan"
-                  >
-                    <Pencil size={13} />
-                  </button>
-                  <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
-                      selected ? theme.radio : "border-slate-300 text-transparent"
-                    }`}
-                  >
-                    <span className={`h-2.5 w-2.5 rounded-full ${selected ? "bg-current" : ""}`} />
-                  </span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingPlan(plan)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition cursor-pointer"
+                  title="Edit plan"
+                  aria-label="Edit plan"
+                >
+                  <Pencil size={13} />
+                </button>
               </div>
 
               {/* Price & Plan Duration (Visible and clear on mobile and desktop) */}

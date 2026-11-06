@@ -118,13 +118,12 @@ export default function CustomerDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-      <div className="relative max-h-full w-full max-w-3xl overflow-hidden rounded-2xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/5">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="h-16 w-16 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 ring-2 ring-white shadow-sm">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 sm:items-center sm:p-4">
+      <div className="relative flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden bg-slate-50 shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5">
+        <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-5">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+            <div className="relative shrink-0">
+              <div className="h-12 w-12 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 shadow-sm ring-2 ring-white sm:h-16 sm:w-16">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
@@ -132,7 +131,7 @@ export default function CustomerDetailsModal({
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-lg font-semibold text-white">
+                  <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white sm:text-lg">
                     {initials}
                   </div>
                 )}
@@ -141,10 +140,10 @@ export default function CustomerDetailsModal({
                 type="button"
                 disabled={uploading}
                 onClick={() => fileRef.current?.click()}
-                className="absolute -bottom-2 -right-2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-700 shadow-md ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="absolute -bottom-1.5 -right-1.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white text-slate-700 shadow-md ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:-bottom-2 sm:-right-2 sm:h-9 sm:w-9"
                 title="Upload profile photo"
               >
-                <Camera size={18} />
+                <Camera size={14} className="sm:h-[18px] sm:w-[18px]" />
               </button>
               <input
                 ref={fileRef}
@@ -158,21 +157,19 @@ export default function CustomerDetailsModal({
               />
             </div>
 
-            <div>
-              <div className="text-lg font-bold text-slate-900">{customer.name || "-"}</div>
-              <div className="text-sm text-slate-500">Created At:
-                {
-                  customer.createdAt
-                    ? new Date(customer.createdAt).toLocaleString("en-IN", {
+            <div className="min-w-0">
+              <div className="truncate text-base font-bold text-slate-900 sm:text-lg">{customer.name || "-"}</div>
+              <div className="truncate text-xs text-slate-500 sm:text-sm">
+                {customer.createdAt
+                  ? `Created ${new Date(customer.createdAt).toLocaleString("en-IN", {
                       day: "2-digit",
                       month: "short",
                       year: "numeric",
                       hour: "2-digit",
                       minute: "2-digit",
                       hour12: true,
-                    })
-                    : ""
-                }
+                    })}`
+                  : "Customer details"}
               </div>
             </div>
           </div>
@@ -180,39 +177,39 @@ export default function CustomerDetailsModal({
           <button
             type="button"
             onClick={() => void closeIfConfirmed(onClose)}
-            className="rounded-full p-2.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            className="shrink-0 rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            aria-label="Close customer details"
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="max-h-[75vh] overflow-y-auto px-6 py-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
             <div className="lg:col-span-7">
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-3 text-sm font-semibold text-slate-800">Contact</div>
                 <div className="space-y-3 text-sm">
                   <div className="flex items-center gap-2 text-slate-700">
-                    <Phone size={16} className="text-slate-400" />
-                    <div className="font-medium">{customer.mobile || "-"}</div>
+                    <Phone size={16} className="shrink-0 text-slate-400" />
+                    <div className="min-w-0 break-all font-medium">{customer.mobile || "-"}</div>
                   </div>
                   <div className="flex items-center gap-2 text-slate-700">
-                    <Mail size={16} className="text-slate-400" />
-                    <div className="truncate">{customer.email?.trim() ? customer.email : "-"}</div>
+                    <Mail size={16} className="shrink-0 text-slate-400" />
+                    <div className="min-w-0 break-all">{customer.email?.trim() ? customer.email : "-"}</div>
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="lg:col-span-5">
-              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-3 text-sm font-semibold text-slate-800">Location</div>
                 <div className="space-y-2 text-sm text-slate-700">
                   <div className="flex items-start gap-2">
-                    <MapPin size={16} className="mt-0.5 text-slate-400" />
+                    <MapPin size={16} className="mt-0.5 shrink-0 text-slate-400" />
                     <div className="min-w-0">
-                      <div className="truncate">
+                      <div className="break-words">
                         {customer.address?.trim() ? customer.address : "-"}
                       </div>
                       <div className="text-slate-500">
@@ -228,7 +225,7 @@ export default function CustomerDetailsModal({
             </div>
 
             <div className="lg:col-span-12">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
 
                 {/* Heading */}
                 <div className="mb-5">
@@ -240,12 +237,12 @@ export default function CustomerDetailsModal({
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 
                   {/* Wallet Card */}
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
                     <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                       Wallet Balance
                     </p>
 
-                    <h3 className="mt-3 text-3xl font-bold text-slate-800">
+                    <h3 className="mt-3 text-2xl font-bold text-slate-800 sm:text-3xl">
                       ₹{" "}
                       {Number(
                         customer.walletAmount ?? customer.closingBalance ?? 0
@@ -254,10 +251,10 @@ export default function CustomerDetailsModal({
                   </div>
 
                   {/* Membership Card */}
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
 
                     {/* Top */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                         Membership
                       </p>
@@ -288,7 +285,7 @@ export default function CustomerDetailsModal({
                     </div>
 
                     {/* Membership Name */}
-                    <h3 className="mt-3 text-xl font-semibold text-slate-800 capitalize">
+                    <h3 className="mt-3 break-words text-lg font-semibold capitalize text-slate-800 sm:text-xl">
                       {customer.membershipType?.trim() || "No Membership"}
                     </h3>
 
@@ -334,21 +331,20 @@ export default function CustomerDetailsModal({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-slate-200 bg-white px-6 py-5">
-          <button
-            type="button"
-            onClick={() => setEditOpen(true)}
-            className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
-          >
-            Edit
-          </button>
+        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-6 sm:py-4">
           <button
             type="button"
             onClick={() => void closeIfConfirmed(onClose)}
-            className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 sm:w-auto sm:rounded-lg sm:py-2.5"
           >
             Close
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditOpen(true)}
+            className="w-full rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 sm:w-auto sm:rounded-lg sm:py-2.5"
+          >
+            Edit customer
           </button>
         </div>
         <UpdateCustomerModal

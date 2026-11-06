@@ -812,7 +812,7 @@ export default function Vendor360Modal({
                   <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
                     <Building2 size={16} /> Profile
                   </h3>
-                  <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                  <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
                     <Field label="Phone" value={profile?.mobile} />
                     <Field label="WhatsApp" value={profile?.whatsappNumber} />
                     <Field label="Email" value={profile?.email} />
@@ -823,7 +823,7 @@ export default function Vendor360Modal({
                     <Field label="Udyam Number" value={profile?.udyamNumber} />
                     <Field label="CIN Number" value={profile?.cinNumber} />
                     {profile?.documents?.length ? (
-                      <div className="sm:col-span-2">
+                      <div className="col-span-2">
                         <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                           Documents
                         </p>

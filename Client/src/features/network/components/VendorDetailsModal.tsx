@@ -111,18 +111,18 @@ export default function VendorDetailsModal({ open, vendor, onClose }: Props) {
   const uniqueAddress = [...new Set(addressLines)];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-      <div className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/5">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-6 py-5">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-lg font-semibold text-white shadow-sm ring-2 ring-white">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 sm:items-center sm:p-4">
+      <div className="relative flex h-[100dvh] w-full max-w-3xl flex-col overflow-hidden bg-slate-50 shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5">
+        <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-5">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-sm font-semibold text-white shadow-sm ring-2 ring-white sm:h-16 sm:w-16 sm:text-lg">
               {initials}
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-bold text-slate-900 sm:text-lg">
                 {details.name || details.companyName || "Vendor"}
               </h2>
-              <p className="text-sm text-slate-500">
+              <p className="truncate text-xs text-slate-500 sm:text-sm">
                 {details.companyName && details.companyName !== details.name
                   ? details.companyName
                   : "Vendor details"}
@@ -146,13 +146,14 @@ export default function VendorDetailsModal({ open, vendor, onClose }: Props) {
           <button
             type="button"
             onClick={() => void closeIfConfirmed(onClose)}
-            className="rounded-full p-2.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="shrink-0 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Close vendor details"
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="overflow-y-auto px-6 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:col-span-1">
               <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
@@ -161,12 +162,12 @@ export default function VendorDetailsModal({ open, vendor, onClose }: Props) {
               </div>
               <div className="space-y-2 text-sm text-slate-700">
                 <div className="flex items-center gap-2">
-                  <Phone size={14} className="text-slate-400" />
-                  {details.mobile || "—"}
+                  <Phone size={14} className="shrink-0 text-slate-400" />
+                  <span className="min-w-0 break-all">{details.mobile || "—"}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Mail size={14} className="text-slate-400" />
-                  <span className="truncate">{details.email || "—"}</span>
+                  <Mail size={14} className="shrink-0 text-slate-400" />
+                  <span className="min-w-0 break-all">{details.email || "—"}</span>
                 </div>
                 {details.whatsappNumber ? (
                   <div className="text-slate-500">
@@ -243,7 +244,7 @@ export default function VendorDetailsModal({ open, vendor, onClose }: Props) {
               <Building2 size={16} className="text-slate-400" />
               Business & Identity
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
               <Field label="Company" value={details.companyName} />
               <Field label="GSTIN" value={details.gstin} />
               <Field label="PAN" value={details.panNumber} />
@@ -251,7 +252,7 @@ export default function VendorDetailsModal({ open, vendor, onClose }: Props) {
               <Field label="Udyam Number" value={details.udyamNumber} />
               <Field label="CIN Number" value={details.cinNumber} />
               {details.documents?.length ? (
-                <div className="sm:col-span-2 lg:col-span-3">
+                <div className="col-span-2 lg:col-span-3">
                   <div className="rounded-lg border border-slate-100 bg-slate-50/80 px-3 py-2.5">
                     <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
                       Documents
@@ -286,25 +287,25 @@ export default function VendorDetailsModal({ open, vendor, onClose }: Props) {
               <FileText size={16} className="text-slate-400" />
               Bank & Notes
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
               <Field label="Bank Name" value={details.bankName} />
               <Field label="Branch" value={details.branchName} />
               <Field label="Account Holder" value={details.accountHolderName} />
               <Field label="Account Number" value={details.accountNumber} />
               <Field label="IFSC" value={details.IFSCcode} />
               <Field label="UPI ID" value={details.UPIID} />
-              <div className="sm:col-span-2 lg:col-span-3">
+              <div className="col-span-2 lg:col-span-3">
                 <Field label="Notes" value={details.notes} />
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end border-t border-slate-200 bg-white px-6 py-3">
+        <div className="flex shrink-0 border-t border-slate-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:justify-end sm:px-6">
           <button
             type="button"
             onClick={() => void closeIfConfirmed(onClose)}
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 sm:w-auto sm:rounded-lg sm:py-2"
           >
             Close
           </button>

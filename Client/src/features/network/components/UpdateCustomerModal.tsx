@@ -72,7 +72,7 @@ function InputField({
     <div>
       <label
         htmlFor={keyName}
-        className="mb-1.5 block text-sm font-medium text-slate-700"
+        className="mb-1 block text-xs font-medium text-slate-700 sm:mb-1.5 sm:text-sm"
       >
         {label} {required && <span className="text-red-500">*</span>}
       </label>
@@ -86,7 +86,7 @@ function InputField({
         required={required}
         maxLength={maxLength}
         autoComplete="off"
-        className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+        className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-2.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:rounded-lg sm:px-2.5"
       />
     </div>
   );
@@ -260,22 +260,27 @@ export default function UpdateCustomerModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm transition-opacity">
-      <div className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/5 transition-all">
-        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-4 sm:px-6 sm:py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-600">
-              <UserRound size={20} />
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-900/60 sm:items-center sm:p-4">
+      <div className="relative flex h-[100dvh] w-full max-w-4xl flex-col overflow-hidden bg-slate-50 shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-600 sm:h-10 sm:w-10">
+              <UserRound size={18} />
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Update Customer Details
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-bold text-slate-900 sm:text-lg">
+                Edit customer
               </h2>
+              <p className="truncate text-xs text-slate-500">
+                {form.name.trim() || "Update contact, bank, and address"}
+              </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={() => void closeIfConfirmed(onClose)}
-            className="rounded-full p-2.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            className="shrink-0 rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            aria-label="Close edit customer"
           >
             <X size={20} />
           </button>
@@ -286,14 +291,13 @@ export default function UpdateCustomerModal({
             e.preventDefault();
             void handleSubmit();
           }}
-          className="contents"
+          className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
-            <div className="space-y-8">
-              {/* Profile Photo */}
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6">
+            <div className="space-y-4 sm:space-y-6">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                     <div className="relative">
                       <div className="h-16 w-16 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 ring-2 ring-white shadow-sm">
                         {previewUrl ? (
@@ -328,53 +332,52 @@ export default function UpdateCustomerModal({
                         }}
                       />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-sm font-semibold text-slate-800">
                         Profile photo
                       </div>
-                      <div className="text-sm text-slate-500">
-                        Upload JPG/PNG/WebP (max 2MB).
+                      <div className="text-xs text-slate-500 sm:text-sm">
+                        JPG, PNG, or WebP. Max 2MB.
                       </div>
                     </div>
                   </div>
 
-                  {profileImageFile && (
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => {
-                        setProfileImageFile(null);
-                        if (fileRef.current) fileRef.current.value = "";
-                      }}
-                      className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Remove
-                    </button>
-                  )}
-
-                  <div className="ml-auto">
-                    <div className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-bold transition-all ${form.membershipType
-                        ? "border-amber-200 bg-amber-50 text-amber-700 shadow-sm shadow-amber-100"
+                  <div className="flex flex-wrap items-center gap-2">
+                    {profileImageFile ? (
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => {
+                          setProfileImageFile(null);
+                          if (fileRef.current) fileRef.current.value = "";
+                        }}
+                        className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Remove photo
+                      </button>
+                    ) : null}
+                    <div className={`flex min-w-0 max-w-full items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${form.membershipType
+                        ? "border-amber-200 bg-amber-50 text-amber-700"
                         : "border-slate-200 bg-slate-50 text-slate-500"
                       }`}>
-                      <Award size={18} className={form.membershipType ? "text-amber-500" : "text-slate-400"} />
-                      <div className="flex flex-col leading-tight">
-                        <span className="text-[10px] uppercase tracking-wider opacity-60">Membership</span>
-                        <span>{form.membershipType}</span>
+                      <Award size={16} className={`shrink-0 ${form.membershipType ? "text-amber-500" : "text-slate-400"}`} />
+                      <div className="min-w-0 leading-tight">
+                        <span className="block text-[10px] uppercase tracking-wider opacity-60">Membership</span>
+                        <span className="block truncate">{form.membershipType || "None"}</span>
                       </div>
                     </div>
                   </div>
                 </div>
               </section>
 
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Contact2 size={18} className="text-slate-400" />
                   <h3 className="text-base font-semibold text-slate-800">
                     Contact Information
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-3">
                   <InputField
                     label="Name"
                     value={form.name}
@@ -425,14 +428,14 @@ export default function UpdateCustomerModal({
                   />
 
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                    <label className="mb-1 block text-xs font-medium text-slate-700 sm:mb-1.5 sm:text-sm">
                       Gender{" "}
                       <span className="font-normal text-slate-400">(optional)</span>
                     </label>
                     <select
                       value={String(form.gender || "").toLowerCase() === "not specified" ? "" : String(form.gender || "").toLowerCase()}
                       onChange={(e) => update("gender", e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                      className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-2.5 py-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:rounded-lg"
                     >
                       <option value="">Not Specified</option>
                       <option value="male">Male</option>
@@ -469,14 +472,14 @@ export default function UpdateCustomerModal({
                 </div>
               </section>
 
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Building2 size={18} className="text-slate-400" />
                   <h3 className="text-base font-semibold text-slate-800">
                     Identity & Business
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-3">
                   <InputField
                     label="Pan Number"
                     value={form.panNumber}
@@ -500,7 +503,7 @@ export default function UpdateCustomerModal({
                     onValueChange={update}
                     placeholder="GST Number"
                   />
-                  <div className="md:col-span-2 lg:col-span-3">
+                  <div className="col-span-2 lg:col-span-3">
                     <InputField
                       label="Company Name"
                       value={form.companyName}
@@ -512,14 +515,14 @@ export default function UpdateCustomerModal({
                 </div>
               </section>
 
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Wallet size={18} className="text-slate-400" />
                   <h3 className="text-base font-semibold text-slate-800">
                     Bank Details
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-3">
                   <InputField
                     label="Account Holder Name"
                     value={form.accountHolderName}
@@ -567,15 +570,15 @@ export default function UpdateCustomerModal({
                 </div>
               </section>
 
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <MapPin size={18} className="text-slate-400" />
                   <h3 className="text-base font-semibold text-slate-800">
                     Location
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                  <div className="md:col-span-2 lg:col-span-3">
+                <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-3">
+                  <div className="col-span-2 lg:col-span-3">
                     <InputField
                       label="Full Address"
                       value={form.address}
@@ -618,21 +621,21 @@ export default function UpdateCustomerModal({
             </div>
           </div>
 
-          <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-white px-6 py-5">
+          <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-6 sm:py-4">
             <button
               type="button"
               onClick={() => void closeIfConfirmed(onClose)}
               disabled={loading}
-              className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:rounded-lg sm:py-2.5"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !form.name.trim() || !form.mobile.trim()}
-              className="flex items-center justify-center rounded-lg bg-green-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center rounded-xl bg-green-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:rounded-lg sm:py-2.5"
             >
-              {loading ? "Updating..." : "Update Customer"}
+              {loading ? "Updating..." : "Save changes"}
             </button>
           </div>
         </form>

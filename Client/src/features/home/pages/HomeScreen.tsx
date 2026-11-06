@@ -1550,6 +1550,42 @@ export default function HomeScreen() {
     }
   };
 
+  const handleUpdateCustomerSubmit = async (args: {
+    payload: CustomerPayload;
+    profileImageFile?: File | null;
+  }) => {
+    const id = String(editCustomer?._id || "");
+    if (!id) {
+      await Swal.fire("Update failed", "Customer id not found.", "error");
+      return;
+    }
+    try {
+      setCustomerModalLoading(true);
+      const formData = customerPayloadToFormData(args.payload, args.profileImageFile);
+      await handleUpdateCustomer(id, formData);
+      setShowEditCustomerModal(false);
+      setEditCustomer(null);
+      await loadDashboardData();
+      await Swal.fire({
+        icon: "success",
+        title: "Updated",
+        text: "Customer information updated successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      await Swal.fire(
+        "Update failed",
+        err?.response?.data?.message ?? "Could not update customer. Try again.",
+        "error",
+      );
+      throw error;
+    } finally {
+      setCustomerModalLoading(false);
+    }
+  };
+
   const openBill = (bill: RecentBill) => {
     navigate("/create-invoice", { state: { invoice: bill.raw, mode: "view" } });
   };
@@ -3767,7 +3803,8 @@ export default function HomeScreen() {
                                   type="button"
                                   onClick={() => {
                                     setActionMenuCustomerId(null);
-                                    navigate("/customers");
+                                    setEditCustomer(rawCust);
+                                    setShowEditCustomerModal(true);
                                   }}
                                   className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
                                 >

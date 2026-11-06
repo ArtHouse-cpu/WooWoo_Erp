@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BadgeCheck,
   Building2,
@@ -79,6 +79,156 @@ function displayDate(value?: string) {
     month: "short",
     year: "numeric",
   });
+}
+
+function ymd(value: Date) {
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${value.getFullYear()}-${month}-${day}`;
+}
+
+function parseYmd(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, 12);
+}
+
+function isWeekendDate(value: string) {
+  const day = parseYmd(value).getDay();
+  return day === 0 || day === 6;
+}
+
+function matchesDayType(value: string, type: "Weekday" | "Weekend") {
+  if (!value) return false;
+  return type === "Weekend" ? isWeekendDate(value) : !isWeekendDate(value);
+}
+
+function nearestUpcoming(type: "Weekday" | "Weekend") {
+  const cursor = new Date();
+  cursor.setHours(12, 0, 0, 0);
+  for (let step = 0; step < 14; step += 1) {
+    const key = ymd(cursor);
+    if (matchesDayType(key, type)) return key;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return ymd(cursor);
+}
+
+const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+function ScheduleDateField({
+  value,
+  dayType,
+  onChange,
+}: {
+  value: string;
+  dayType: "Weekday" | "Weekend";
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const selected = value ? parseYmd(value) : new Date();
+  const [cursor, setCursor] = useState(
+    () => new Date(selected.getFullYear(), selected.getMonth(), 1),
+  );
+
+  useEffect(() => {
+    if (!open || !value) return;
+    const parsed = parseYmd(value);
+    setCursor(new Date(parsed.getFullYear(), parsed.getMonth(), 1));
+  }, [open, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!boxRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const lead = new Date(year, month, 1).getDay();
+  const days = new Date(year, month + 1, 0).getDate();
+  const cells = [
+    ...Array.from({ length: lead }, () => ""),
+    ...Array.from({ length: days }, (_, index) =>
+      ymd(new Date(year, month, index + 1, 12)),
+    ),
+  ];
+
+  return (
+    <div ref={boxRef} className="relative mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex h-11 w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-800 outline-none focus:border-violet-500"
+      >
+        <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
+        <span className="min-w-0 flex-1 truncate">{displayDate(value)}</span>
+      </button>
+      <p className="mt-1 text-[11px] font-medium text-slate-400">
+        {dayType === "Weekend" ? "Saturday and Sunday only" : "Monday to Friday only"}
+      </p>
+      {open ? (
+        <div className="absolute z-30 mt-1 w-[17.5rem] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+          <div className="mb-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setCursor(new Date(year, month - 1, 1))}
+              className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+              aria-label="Previous month"
+            >
+              ‹
+            </button>
+            <p className="text-sm font-semibold text-slate-800">
+              {cursor.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+            </p>
+            <button
+              type="button"
+              onClick={() => setCursor(new Date(year, month + 1, 1))}
+              className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+              aria-label="Next month"
+            >
+              ›
+            </button>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-400">
+            {WEEKDAYS.map((label) => (
+              <span key={label} className="py-1">{label}</span>
+            ))}
+          </div>
+          <div className="mt-1 grid grid-cols-7 gap-1">
+            {cells.map((key, index) => {
+              if (!key) return <span key={`empty-${index}`} />;
+              const allowed = matchesDayType(key, dayType);
+              const active = key === value;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  disabled={!allowed}
+                  onClick={() => {
+                    onChange(key);
+                    setOpen(false);
+                  }}
+                  className={`h-8 rounded-lg text-xs font-semibold ${
+                    active
+                      ? "bg-violet-600 text-white"
+                      : allowed
+                        ? "text-slate-700 hover:bg-violet-50"
+                        : "cursor-not-allowed text-slate-300"
+                  }`}
+                >
+                  {Number(key.slice(-2))}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 const WALLET_TYPES = [
@@ -343,24 +493,6 @@ export default function RescheduleBookingModal({
                   Select New Schedule
                 </h3>
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <label className="block text-sm font-semibold text-slate-800">
-                    New Date <span className="text-rose-500">*</span>
-                    <span className="relative mt-2 block">
-                      <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="date"
-                        value={date}
-                        onChange={(event) => {
-                          const next = event.target.value;
-                          setDate(next);
-                          const parsed = new Date(`${next}T12:00:00`);
-                          const weekend = parsed.getDay() === 0 || parsed.getDay() === 6;
-                          setDayType(weekend ? "Weekend" : "Weekday");
-                        }}
-                        className="h-11 w-full rounded-xl border border-slate-200 pl-10 pr-3 text-sm outline-none focus:border-violet-500"
-                      />
-                    </span>
-                  </label>
                   <div>
                     <p className="text-sm font-semibold text-slate-800">Type for this Space</p>
                     <div className="mt-2 flex gap-2">
@@ -368,7 +500,12 @@ export default function RescheduleBookingModal({
                         <button
                           key={type}
                           type="button"
-                          onClick={() => setDayType(type)}
+                          onClick={() => {
+                            setDayType(type);
+                            setDate((current) =>
+                              matchesDayType(current, type) ? current : nearestUpcoming(type),
+                            );
+                          }}
                           className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-semibold ${
                             dayType === type
                               ? "border-violet-600 bg-violet-600 text-white"
@@ -381,9 +518,13 @@ export default function RescheduleBookingModal({
                       ))}
                     </div>
                   </div>
+                  <label className="block text-sm font-semibold text-slate-800">
+                    New Date <span className="text-rose-500">*</span>
+                    <ScheduleDateField value={date} dayType={dayType} onChange={setDate} />
+                  </label>
                 </div>
 
-                <label className="mt-4 block text-sm font-semibold text-slate-800">
+                <label className="mt-4 flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-800">
                   <span className="inline-flex items-center gap-1.5">
                     <Clock className="h-4 w-4 text-slate-500" />
                     Hours (Duration)
@@ -391,7 +532,7 @@ export default function RescheduleBookingModal({
                   <select
                     value={duration}
                     onChange={(event) => setDuration(Number(event.target.value))}
-                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-violet-500 lg:max-w-md"
+                    className="h-9 w-32 rounded-xl border border-slate-200 px-2 text-sm font-medium outline-none focus:border-violet-500"
                   >
                     {[1, 2, 3, 4, 5, 6].map((hour) => (
                       <option key={hour} value={hour}>{hour} hour{hour > 1 ? "s" : ""}</option>

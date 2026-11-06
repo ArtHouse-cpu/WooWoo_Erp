@@ -91,7 +91,7 @@ function ContactInput({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-slate-700">{label}</label>
+      <label className="mb-1 block text-xs font-medium text-slate-700 sm:mb-1.5 sm:text-sm">{label}</label>
       <input
         value={value}
         onChange={event => onChange(event.target.value)}
@@ -99,7 +99,7 @@ function ContactInput({
         placeholder={placeholder}
         maxLength={maxLength}
         autoComplete="off"
-        className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+        className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-2.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:rounded-lg"
       />
     </div>
   );
@@ -119,7 +119,7 @@ function InputField({
     <div>
       <label
         htmlFor={keyName}
-        className="mb-1.5 block text-sm font-medium text-slate-700"
+        className="mb-1 block text-xs font-medium text-slate-700 sm:mb-1.5 sm:text-sm"
       >
         {label} {required && <span className="text-red-500">*</span>}
       </label>
@@ -133,7 +133,7 @@ function InputField({
         required={required}
         maxLength={maxLength}
         autoComplete="off"
-        className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+        className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-2.5 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:rounded-lg"
       />
     </div>
   );
@@ -446,18 +446,18 @@ export default function AddVendorModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm transition-opacity">
-      <div className="relative flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-2xl ring-1 ring-slate-900/5 transition-all">
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-              <UserRound size={20} />
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 sm:items-center sm:p-4">
+      <div className="relative flex h-[100dvh] w-full max-w-4xl flex-col overflow-hidden bg-slate-50 shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:ring-1 sm:ring-slate-900/5">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:py-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 sm:h-10 sm:w-10">
+              <UserRound size={18} />
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                {isEdit ? "Edit Vendor" : "Create New Vendor"}
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-bold text-slate-900 sm:text-lg">
+                {isEdit ? "Edit vendor" : "New vendor"}
               </h2>
-              <p className="text-sm text-slate-500">
+              <p className="truncate text-xs text-slate-500 sm:text-sm">
                 {isEdit
                   ? "Update vendor details and save changes."
                   : "Add a new vendor to your database."}
@@ -465,8 +465,10 @@ export default function AddVendorModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={() => void closeIfConfirmed(onClose)}
-            className="rounded-full p-2.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            className="shrink-0 rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            aria-label="Close vendor form"
           >
             <X size={20} />
           </button>
@@ -477,13 +479,13 @@ export default function AddVendorModal({
             e.preventDefault();
             void submit();
           }}
-          className="contents"
+          className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
-            <div className="space-y-8">
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6">
+            <div className="space-y-4 sm:space-y-6">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                     <div className="relative">
                       <div className="h-16 w-16 overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 ring-2 ring-white shadow-sm">
                         {previewUrl ? (
@@ -518,12 +520,12 @@ export default function AddVendorModal({
                         }}
                       />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-sm font-semibold text-slate-800">
                         Profile photo
                       </div>
-                      <div className="text-sm text-slate-500">
-                        Upload JPG/PNG/WebP (max 2MB).
+                      <div className="text-xs text-slate-500 sm:text-sm">
+                        JPG, PNG, or WebP. Max 2MB.
                       </div>
                     </div>
                   </div>
@@ -544,7 +546,7 @@ export default function AddVendorModal({
                   )}
                 </div>
               </section>
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Building2 size={18} className="text-slate-400" />
                   <h3 className="text-base font-semibold text-slate-800">
@@ -554,7 +556,7 @@ export default function AddVendorModal({
                 <p className="mb-4 text-sm text-slate-500">
                   The vendor name is taken from the point of contact.
                 </p>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-3">
                   <InputField
                     label="Company Name"
                     value={form.companyName}
@@ -669,7 +671,7 @@ export default function AddVendorModal({
                 />
               </section>
 
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Contact2 size={18} className="text-slate-400" />
@@ -704,7 +706,7 @@ export default function AddVendorModal({
                           </button>
                         ) : null}
                       </div>
-                      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                      <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-3">
                         <ContactInput label="Vendor Name" value={contact.name} onChange={value => updateContact(index, "name", value)} placeholder="Full name" />
                         <ContactInput label="Department" value={contact.department} onChange={value => updateContact(index, "department", value)} placeholder="Department" />
                         <ContactInput label="Designation" value={contact.designation} onChange={value => updateContact(index, "designation", value)} placeholder="Designation" />
@@ -714,11 +716,11 @@ export default function AddVendorModal({
                         <ContactInput label="Alternate Mobile" value={contact.alternateMobile} onChange={value => updateContact(index, "alternateMobile", value)} placeholder="Backup contact" maxLength={10} />
                         <ContactInput label="Date of Birth" value={contact.dob} onChange={value => updateContact(index, "dob", value)} type="date" />
                         <div>
-                          <label className="mb-1.5 block text-sm font-medium text-slate-700">Gender</label>
+                          <label className="mb-1 block text-xs font-medium text-slate-700 sm:mb-1.5 sm:text-sm">Gender</label>
                           <select
                             value={contact.gender}
                             onChange={event => updateContact(index, "gender", event.target.value)}
-                            className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                            className="w-full min-w-0 rounded-xl border border-slate-300 bg-white px-2.5 py-2.5 text-sm outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:rounded-lg"
                           >
                             <option value="">Not Specified</option>
                             <option value="Male">Male</option>
@@ -732,14 +734,14 @@ export default function AddVendorModal({
                 </div>
               </section>
 
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Wallet size={18} className="text-slate-400" />
                   <h3 className="text-base font-semibold text-slate-800">
                     Bank Details
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-3">
                   <InputField
                     label="Account Holder Name"
                     value={form.accountHolderName}
@@ -787,15 +789,15 @@ export default function AddVendorModal({
                 </div>
               </section>
 
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <MapPin size={18} className="text-slate-400" />
                   <h3 className="text-base font-semibold text-slate-800">
                     Location
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                  <div className="md:col-span-2 lg:col-span-3">
+                <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-3">
+                  <div className="col-span-2 lg:col-span-3">
                     <InputField
                       label="Full Address"
                       value={form.address}
@@ -838,20 +840,21 @@ export default function AddVendorModal({
             </div>
           </div>
 
-          <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-slate-200 bg-white px-6 py-5">
-            {formError ? <p className="mr-auto text-sm font-medium text-rose-600">{formError}</p> : null}
+          <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+            {formError ? <p className="mb-2 text-sm font-medium text-rose-600">{formError}</p> : null}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={() => void closeIfConfirmed(onClose)}
               disabled={loading}
-              className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:rounded-lg sm:py-2.5"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || uploadingDocs || !canSave}
-              className="flex items-center justify-center rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:rounded-lg sm:py-2.5"
             >
               {loading
                 ? isEdit
@@ -861,6 +864,7 @@ export default function AddVendorModal({
                   ? "Update Vendor"
                   : "Create Vendor"}
             </button>
+            </div>
           </div>
         </form>
       </div>
