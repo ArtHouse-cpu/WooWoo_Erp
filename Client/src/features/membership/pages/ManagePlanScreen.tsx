@@ -5,11 +5,25 @@ import {
   type MRT_ColumnDef,
   type MRT_Row,
 } from "material-react-table";
-import { Pencil, Power, Plus, Search, Trash2, X } from "lucide-react";
+import {
+  Pencil,
+  Power,
+  Plus,
+  Search,
+  Trash2,
+  X,
+  Package,
+  CheckCircle2,
+  Crown,
+  Briefcase,
+  User,
+  Sparkles,
+  Layers,
+} from "lucide-react";
 import Swal from "sweetalert2";
 import AddnewPlansModal from "@/features/membership/components/AddnewPlansModal";
-import { useDebounce } from "@/hooks/useDebounce";
 import {
+  clearMembershipCache,
   handleCreateMembership,
   handleDeleteMembership,
   handleGetMemberships,
@@ -65,6 +79,42 @@ function TypePill({ type }: { type?: string }) {
   );
 }
 
+function getPlanTheme(plan: PlanRow) {
+  const type = String(plan.planType || "").toLowerCase();
+  const name = String(plan.displayName || "").toLowerCase();
+
+  if (name.includes("premium") || name.includes("gold") || type === "business") {
+    return {
+      cardBg: "bg-gradient-to-br from-amber-50/70 via-white to-orange-50/30 border-amber-200/90 hover:border-amber-300",
+      iconBg: "bg-amber-500 text-white shadow-xs shadow-amber-500/20",
+      priceText: "text-amber-600",
+      Icon: Crown,
+    };
+  }
+  if (name.includes("special") || type === "professional") {
+    return {
+      cardBg: "bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/30 border-purple-200/90 hover:border-purple-300",
+      iconBg: "bg-purple-500 text-white shadow-xs shadow-purple-500/20",
+      priceText: "text-purple-600",
+      Icon: Sparkles,
+    };
+  }
+  if (name.includes("junior") || type === "personal") {
+    return {
+      cardBg: "bg-gradient-to-br from-sky-50/70 via-white to-blue-50/30 border-sky-200/90 hover:border-sky-300",
+      iconBg: "bg-sky-500 text-white shadow-xs shadow-sky-500/20",
+      priceText: "text-sky-600",
+      Icon: User,
+    };
+  }
+  return {
+    cardBg: "bg-gradient-to-br from-indigo-50/70 via-white to-blue-50/30 border-indigo-200/90 hover:border-indigo-300",
+    iconBg: "bg-indigo-500 text-white shadow-xs shadow-indigo-500/20",
+    priceText: "text-emerald-600",
+    Icon: Layers,
+  };
+}
+
 export default function ManagePlanScreen() {
   const staff = useAppSelector((s) => s.user);
   const [openModal, setOpenModal] = useState(false);
@@ -73,34 +123,47 @@ export default function ManagePlanScreen() {
   const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebounce(search.trim(), 250);
   const [planType, setPlanType] = useState<(typeof planTypes)[number]>("All");
   const [status, setStatus] = useState<(typeof statuses)[number]>("All");
 
-  const [plans, setPlans] = useState<PlanRow[]>([]);
+  const [allPlans, setAllPlans] = useState<PlanRow[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchPlans = async (signal?: AbortSignal) => {
+  const fetchPlans = async () => {
     try {
       setLoading(true);
-      const res = await handleGetMemberships(
-        { search: debouncedSearch, planType, status },
-        signal,
-      );
-      setPlans(Array.isArray(res?.memberships) ? res.memberships : []);
+      clearMembershipCache();
+      const res = await handleGetMemberships({ search: "", planType: "All", status: "All" });
+      const list = Array.isArray(res?.memberships) ? res.memberships : [];
+      setAllPlans(list);
     } catch {
-      setPlans([]);
+      setAllPlans([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetchPlans(controller.signal);
-    return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, planType, status]);
+    void fetchPlans();
+  }, []);
+
+  const filteredPlans = useMemo(() => {
+    return allPlans.filter((plan) => {
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const matchesName = (plan.displayName || "").toLowerCase().includes(q);
+        const matchesId = (plan.planId || "").toLowerCase().includes(q);
+        if (!matchesName && !matchesId) return false;
+      }
+      if (planType !== "All") {
+        if (plan.planType !== planType) return false;
+      }
+      if (status !== "All") {
+        if (plan.status !== status) return false;
+      }
+      return true;
+    });
+  }, [allPlans, search, planType, status]);
 
   const openCreate = () => {
     setEditing(null);
@@ -131,6 +194,7 @@ export default function ManagePlanScreen() {
 
       setOpenModal(false);
       setEditing(null);
+      clearMembershipCache();
       await fetchPlans();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -156,6 +220,7 @@ export default function ManagePlanScreen() {
     if (!result.isConfirmed) return;
 
     try {
+      clearMembershipCache();
       await handleDeleteMembership(id);
       Swal.fire("Deleted", "Plan deleted.", "success");
       await fetchPlans();
@@ -172,9 +237,15 @@ export default function ManagePlanScreen() {
   const toggleStatus = async (row: PlanRow) => {
     try {
       const next = row.status === "Active" ? "Inactive" : "Active";
+      // Optimistic update so UI reflects immediately
+      setAllPlans((prev) =>
+        prev.map((p) => (p._id === row._id ? { ...p, status: next } : p))
+      );
+      clearMembershipCache();
       await handleUpdateMembership(row._id, { status: next });
       await fetchPlans();
     } catch (error: unknown) {
+      await fetchPlans();
       const err = error as { response?: { data?: { message?: string } } };
       Swal.fire(
         "Update failed",
@@ -189,17 +260,28 @@ export default function ManagePlanScreen() {
       {
         header: "Display Name",
         accessorKey: "displayName",
-        size: 220,
-        Cell: ({ row }: { row: MRT_Row<PlanRow> }) => (
-          <div className="flex flex-col">
-            <span className="font-semibold text-slate-900">
-              {row.original.displayName}
-            </span>
-            <span className="text-xs text-slate-500">
-              {row.original.planId}
-            </span>
-          </div>
-        ),
+        size: 240,
+        Cell: ({ row }: { row: MRT_Row<PlanRow> }) => {
+          const theme = getPlanTheme(row.original);
+          const IconComp = theme.Icon;
+          return (
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${theme.iconBg}`}
+              >
+                <IconComp size={16} />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="font-semibold text-slate-900 truncate">
+                  {row.original.displayName}
+                </span>
+                <span className="font-mono text-[11px] text-slate-400">
+                  {row.original.planId}
+                </span>
+              </div>
+            </div>
+          );
+        },
       },
       {
         header: "Type",
@@ -219,7 +301,7 @@ export default function ManagePlanScreen() {
           const gross = Number(row.original.pricing?.grossAmount ?? 0);
           return (
             <div className="flex flex-col">
-              <span className="font-semibold tabular-nums text-slate-900">
+              <span className="font-bold tabular-nums text-emerald-600">
                 ₹ {selling.toLocaleString("en-IN")}
               </span>
               {gross > selling ? (
@@ -294,13 +376,69 @@ export default function ManagePlanScreen() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [plans],
+    [filteredPlans],
+  );
+
+  const cards = useMemo(
+    () => [
+      {
+        title: "Total Plans",
+        value: allPlans.length,
+        Icon: Package,
+        bgClass: "bg-blue-50/80 border-blue-200/80 hover:border-blue-300",
+        iconWrapClass: "bg-blue-500 text-white shadow-xs shadow-blue-500/20",
+        titleClass: "text-blue-900",
+        valueClass: "text-blue-950",
+      },
+      {
+        title: "Active Plans",
+        value: allPlans.filter((p) => p.status === "Active").length,
+        Icon: CheckCircle2,
+        bgClass: "bg-emerald-50/80 border-emerald-200/80 hover:border-emerald-300",
+        iconWrapClass: "bg-emerald-500 text-white shadow-xs shadow-emerald-500/20",
+        titleClass: "text-emerald-900",
+        valueClass: "text-emerald-950",
+      },
+      {
+        title: "Professional",
+        value: allPlans.filter((p) => p.planType === "Professional").length,
+        Icon: Crown,
+        bgClass: "bg-purple-50/80 border-purple-200/80 hover:border-purple-300",
+        iconWrapClass: "bg-purple-500 text-white shadow-xs shadow-purple-500/20",
+        titleClass: "text-purple-900",
+        valueClass: "text-purple-950",
+      },
+      {
+        title: "Business",
+        value: allPlans.filter((p) => p.planType === "Business").length,
+        Icon: Briefcase,
+        bgClass: "bg-amber-50/80 border-amber-200/80 hover:border-amber-300",
+        iconWrapClass: "bg-amber-500 text-white shadow-xs shadow-amber-500/20",
+        titleClass: "text-amber-900",
+        valueClass: "text-amber-950",
+      },
+      {
+        title: "Personal",
+        value: allPlans.filter((p) => p.planType === "Personal").length,
+        Icon: User,
+        bgClass: "bg-sky-50/80 border-sky-200/80 hover:border-sky-300",
+        iconWrapClass: "bg-sky-500 text-white shadow-xs shadow-sky-500/20",
+        titleClass: "text-sky-900",
+        valueClass: "text-sky-950",
+      },
+    ],
+    [allPlans],
   );
 
   const table = useMaterialReactTable<PlanRow>({
     columns,
-    data: plans,
+    data: filteredPlans,
     state: { isLoading: loading },
+    enablePagination: false,
+    enableTopToolbar: false,
+    enableBottomToolbar: false,
+    enableDensityToggle: false,
+    initialState: { density: "compact" },
     muiTablePaperProps: {
       elevation: 0,
       style: {
@@ -321,23 +459,22 @@ export default function ManagePlanScreen() {
 
   return (
     <div className="p-3">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+          <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
             <Plus size={18} />
           </div>
           <div>
-            <div className="text-xl font-semibold text-slate-900">
+            <div className="text-lg sm:text-xl font-semibold text-slate-900">
               Manage Plans
             </div>
-           
           </div>
         </div>
         <Can permission={PERMISSIONS.MEMBERSHIP_PLAN_MANAGE}>
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs sm:px-4 sm:py-2.5 sm:text-sm font-semibold text-white shadow-xs transition hover:bg-blue-700"
           >
             <Plus size={16} />
             Add
@@ -345,70 +482,100 @@ export default function ManagePlanScreen() {
         </Can>
       </div>
 
-      <div className="mb-5 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <Search size={16} className="text-slate-400" />
-          Filters
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div>
-            <div className="mb-1 text-xs font-semibold text-slate-500">
-              Search
-            </div>
-            <div className="relative">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search plans..."
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-              />
-              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">
-                <Search size={16} />
+      {/* Top Colorful Stat Cards */}
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-5">
+        {cards.map((item, index) => (
+          <div
+            key={item.title || index}
+            className={`min-w-0 rounded-2xl border p-2.5 sm:p-4 shadow-xs transition duration-300 hover:shadow-md ${item.bgClass} ${
+              index === 4 ? "col-span-2 sm:col-span-1" : ""
+            }`}
+          >
+            <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+              <div
+                className={`flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl shadow-xs ${item.iconWrapClass}`}
+              >
+                <item.Icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
+              <span
+                className={`min-w-0 truncate text-xs font-semibold sm:text-sm ${item.titleClass}`}
+              >
+                {item.title}
+              </span>
             </div>
-          </div>
-
-          <div>
-            <div className="mb-1 text-xs font-semibold text-slate-500">
-              Plan Type
-            </div>
-            <select
-              value={planType}
-              onChange={(e) =>
-                setPlanType(e.target.value as (typeof planTypes)[number])
-              }
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+            <div
+              className={`mt-1.5 text-lg font-bold sm:mt-3 sm:text-2xl ${item.valueClass}`}
             >
-              {planTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t === "All" ? "All Types" : t}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <div className="mb-1 text-xs font-semibold text-slate-500">
-              Status
+              {item.value}
             </div>
-            <select
-              value={status}
-              onChange={(e) =>
-                setStatus(e.target.value as (typeof statuses)[number])
-              }
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-            >
-              {statuses.map((s) => (
-                <option key={s} value={s}>
-                  {s === "All" ? "All Status" : s}
-                </option>
-              ))}
-            </select>
           </div>
+        ))}
+      </div>
+
+      {/* Row 1: Search Bar (on its own row) */}
+      <div className="mb-2.5">
+        <div className="relative w-full">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search plans by name or ID..."
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-8 text-xs sm:text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 placeholder:text-slate-400 shadow-2xs"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              title="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
       </div>
 
-  
+      {/* Row 2: Two Filters Below Search Bar */}
+      <div className="mb-4 flex items-center gap-2 sm:gap-3">
+        {/* Plan Type Filter */}
+        <div className="relative flex-1 sm:flex-initial sm:w-48">
+          <select
+            value={planType}
+            onChange={(e) =>
+              setPlanType(e.target.value as (typeof planTypes)[number])
+            }
+            aria-label="Filter by plan type"
+            className="w-full h-[36px] sm:h-[38px] rounded-xl border border-slate-200 bg-white px-2.5 sm:px-3 text-xs sm:text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-500 shadow-2xs cursor-pointer hover:bg-slate-50"
+          >
+            {planTypes.map((t) => (
+              <option key={t} value={t}>
+                {t === "All" ? "All Plan Types" : t}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* All Status Filter */}
+        <div className="relative flex-1 sm:flex-initial sm:w-48">
+          <select
+            value={status}
+            onChange={(e) =>
+              setStatus(e.target.value as (typeof statuses)[number])
+            }
+            aria-label="Filter by status"
+            className="w-full h-[36px] sm:h-[38px] rounded-xl border border-slate-200 bg-white px-2.5 sm:px-3 text-xs sm:text-sm font-semibold text-slate-700 outline-none transition focus:border-blue-500 shadow-2xs cursor-pointer hover:bg-slate-50"
+          >
+            {statuses.map((s) => (
+              <option key={s} value={s}>
+                {s === "All" ? "All Statuses" : s}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Desktop Table View */}
       <div className="hidden md:block">
@@ -417,61 +584,67 @@ export default function ManagePlanScreen() {
 
       {/* Mobile Card List View */}
       <div className="block md:hidden space-y-2.5">
-        {loading && plans.length === 0 ? (
+        {loading && allPlans.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
             Loading plans...
           </div>
-        ) : plans.length === 0 ? (
+        ) : filteredPlans.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
             No plans found
           </div>
         ) : (
-          plans.map((plan, idx) => {
+          filteredPlans.map((plan, idx) => {
             const selling = Number(plan.pricing?.amount ?? 0);
             const gross = Number(plan.pricing?.grossAmount ?? 0);
+            const theme = getPlanTheme(plan);
+            const PlanIcon = theme.Icon;
 
             return (
               <div
                 key={plan._id || idx}
                 onClick={() => setViewPlan(plan)}
-                className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                className={`cursor-pointer rounded-2xl border p-3.5 shadow-xs transition duration-200 hover:shadow-md active:scale-[0.99] ${theme.cardBg}`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-bold text-slate-900">
-                        {plan.displayName}
-                      </span>
-                      <TypePill type={plan.planType} />
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${theme.iconBg}`}
+                    >
+                      <PlanIcon size={18} />
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span className="font-mono text-[11px] text-slate-400">
-                        {plan.planId}
-                      </span>
-                      {plan.pricing?.period && (
-                        <>
-                          <span>•</span>
-                          <span className="font-medium text-slate-600">
-                            Period: {plan.pricing.period}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="truncate text-sm font-bold text-slate-900">
+                          {plan.displayName}
+                        </span>
+                        <TypePill type={plan.planType} />
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <span className="inline-flex items-center rounded-md bg-white/80 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600 border border-slate-200/60">
+                          {plan.planId}
+                        </span>
+                        {plan.pricing?.period && (
+                          <span className="inline-flex items-center rounded-md bg-white/80 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 border border-slate-200/60">
+                            {plan.pricing.period}
                           </span>
-                        </>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                   <StatusPill status={plan.status} />
                 </div>
 
-                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                <div className="mt-3 flex items-center justify-between border-t border-slate-200/60 pt-2.5">
                   <div className="flex flex-col">
-                    <span className="block text-[10px] font-medium uppercase text-slate-400">
+                    <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                       Selling Price
                     </span>
                     <div className="flex items-baseline gap-1.5">
-                      <span className="text-sm font-bold text-slate-900">
+                      <span className="text-base font-extrabold text-emerald-600">
                         ₹ {selling.toLocaleString("en-IN")}
                       </span>
                       {gross > selling && (
-                        <span className="text-[11px] text-slate-400 line-through">
+                        <span className="text-xs text-slate-400 line-through">
                           ₹ {gross.toLocaleString("en-IN")}
                         </span>
                       )}
@@ -486,7 +659,7 @@ export default function ManagePlanScreen() {
                       <button
                         type="button"
                         onClick={() => openEdit(plan)}
-                        className="cursor-pointer rounded-lg bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100"
+                        className="cursor-pointer rounded-lg bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100 transition shadow-2xs"
                         title="Edit plan"
                       >
                         <Pencil size={15} />
@@ -496,7 +669,7 @@ export default function ManagePlanScreen() {
                       <button
                         type="button"
                         onClick={() => void toggleStatus(plan)}
-                        className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"
+                        className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100 transition shadow-2xs"
                         title="Toggle status"
                       >
                         <Power size={15} />
@@ -506,7 +679,7 @@ export default function ManagePlanScreen() {
                       <button
                         type="button"
                         onClick={() => void confirmDelete(plan._id)}
-                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100 transition shadow-2xs"
                         title="Delete plan"
                       >
                         <Trash2 size={15} />

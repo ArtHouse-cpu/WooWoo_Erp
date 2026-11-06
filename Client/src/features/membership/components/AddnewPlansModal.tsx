@@ -88,8 +88,11 @@ function InputField({
   rightElement,
 }: InputFieldProps) {
   return (
-    <div>
-      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+    <div className="min-w-0">
+      <label
+        className="mb-1 block text-xs sm:text-sm font-medium text-slate-700 truncate"
+        title={label}
+      >
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <div className="relative">
@@ -100,10 +103,12 @@ function InputField({
           placeholder={placeholder}
           required={required}
           autoComplete="off"
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+          className={`w-full rounded-xl border border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 ${
+            rightElement ? "pr-7 sm:pr-9" : ""
+          }`}
         />
         {rightElement ? (
-          <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">
+          <div className="pointer-events-none absolute inset-y-0 right-2 sm:right-3 flex items-center text-slate-400">
             {rightElement}
           </div>
         ) : null}
@@ -552,22 +557,22 @@ export default function AddnewPlansModal({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-2 sm:p-4 backdrop-blur-sm"
       onMouseDown={(e) => {
         if (e.currentTarget === e.target) void closeIfConfirmed(onClose);
       }}
     >
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-900/10">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+      <div className="flex max-h-[95vh] sm:max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-2xl ring-1 ring-slate-900/10">
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-5">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600">
               <Plus size={18} />
             </div>
             <div>
-              <div className="text-xl font-semibold text-slate-900">
+              <div className="text-base sm:text-xl font-semibold text-slate-900">
                 {isEdit ? "Update Plan" : "Create New Plan"}
               </div>
-              <div className="text-sm text-slate-500">
+              <div className="text-xs sm:text-sm text-slate-500">
                 {isEdit
                   ? "Edit membership plan details."
                   : "Create a new membership plan."}
@@ -577,7 +582,7 @@ export default function AddnewPlansModal({
           <button
             type="button"
             onClick={() => void closeIfConfirmed(onClose)}
-            className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-full p-1.5 sm:p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             aria-label="Close"
           >
             <X size={20} />
@@ -589,18 +594,18 @@ export default function AddnewPlansModal({
             e.preventDefault();
             void submit();
           }}
-          className="contents"
+          className="flex flex-1 flex-col overflow-hidden"
         >
-          <div className="max-h-[calc(92vh-150px)] overflow-y-auto px-6 py-6">
-            <div className="space-y-6">
-              <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
+          <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-3.5 sm:py-6">
+            <div className="space-y-4 sm:space-y-6">
+              <section className="rounded-xl sm:rounded-2xl border border-slate-100 bg-white p-3.5 sm:p-6 shadow-sm">
+                <div className="mb-3 sm:mb-4 flex items-center gap-2">
                   <Layers3 size={18} className="text-slate-400" />
-                  <div className="text-base font-semibold text-slate-900">
+                  <div className="text-sm sm:text-base font-semibold text-slate-900">
                     Basic Information
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
                   <InputField
                     label="Plan ID"
                     value={form.planId}
@@ -617,6 +622,22 @@ export default function AddnewPlansModal({
                     placeholder="e.g., Professional Basic"
                     required
                   />
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs sm:text-sm font-medium text-slate-700 truncate">
+                      Plan Type
+                    </label>
+                    <select
+                      value={form.planType}
+                      onChange={(e) =>
+                        setForm((p) => ({ ...p, planType: e.target.value }))
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    >
+                      <option value="Professional">Professional</option>
+                      <option value="Business">Business</option>
+                      <option value="Personal">Personal</option>
+                    </select>
+                  </div>
                   <InputField
                     label="Priority"
                     value={String(form.priority)}
@@ -626,22 +647,22 @@ export default function AddnewPlansModal({
                     type="number"
                     placeholder="0"
                   />
-                    <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4">
+                  <div className="col-span-2 md:col-span-4 rounded-xl sm:rounded-2xl border border-indigo-100 bg-indigo-50/70 px-3.5 py-2.5 sm:px-5 sm:py-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-semibold text-slate-900">
+                        <div className="text-xs sm:text-sm font-semibold text-slate-900">
                           Plan Status
                         </div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-[11px] sm:text-xs text-slate-500">
                           Enable or disable this membership plan
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 sm:gap-3">
                         <div
                           className={
                             form.status === "Active"
-                              ? "text-sm font-semibold text-emerald-700"
-                              : "text-sm font-semibold text-slate-500"
+                              ? "text-xs sm:text-sm font-semibold text-emerald-700"
+                              : "text-xs sm:text-sm font-semibold text-slate-500"
                           }
                         >
                           {form.status}
@@ -654,7 +675,7 @@ export default function AddnewPlansModal({
                               status: p.status === "Active" ? "Inactive" : "Active",
                             }))
                           }
-                          className={`relative h-8 w-14 rounded-full transition ${
+                          className={`relative h-7 w-12 sm:h-8 sm:w-14 rounded-full transition ${
                             form.status === "Active"
                               ? "bg-emerald-500"
                               : "bg-slate-300"
@@ -662,8 +683,8 @@ export default function AddnewPlansModal({
                           aria-label="Toggle status"
                         >
                           <span
-                            className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${
-                              form.status === "Active" ? "left-7" : "left-1"
+                            className={`absolute top-0.5 sm:top-1 h-6 w-6 rounded-full bg-white shadow transition ${
+                              form.status === "Active" ? "left-5 sm:left-7" : "left-0.5 sm:left-1"
                             }`}
                           />
                         </button>
@@ -672,17 +693,18 @@ export default function AddnewPlansModal({
                   </div>
                 </div>
               </section>
-              <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
+
+              <section className="rounded-xl sm:rounded-2xl border border-slate-100 bg-white p-3.5 sm:p-6 shadow-sm">
+                <div className="mb-3 sm:mb-4 flex items-center gap-2">
                   <DollarSign size={18} className="text-slate-400" />
-                  <div className="text-base font-semibold text-slate-900">
+                  <div className="text-sm sm:text-base font-semibold text-slate-900">
                     Pricing Details
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-3">
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs sm:text-sm font-medium text-slate-700 truncate">
                       Period
                     </label>
                     <select
@@ -693,7 +715,7 @@ export default function AddnewPlansModal({
                           pricing: { ...p.pricing, period: e.target.value },
                         }))
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                     >
                       {periods.map((p) => (
                         <option key={p} value={p}>
@@ -719,6 +741,7 @@ export default function AddnewPlansModal({
                     placeholder="0"
                     rightElement={<span className="text-xs">₹</span>}
                   />
+
                   <InputField
                     label="Tax (%)"
                     value={String(form.pricing.taxPercent)}
@@ -732,19 +755,8 @@ export default function AddnewPlansModal({
                     placeholder="0"
                     rightElement={<span className="text-xs">%</span>}
                   />
-                </div>
-
-                <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-slate-700">
-                  <span className="font-semibold">Calculated:</span>{" "}
-                  <span className="text-slate-600">
-                    Base Amount (Excl. GST): ₹{computed.baseAmount.toFixed(2)} | GST Portion: ₹
-                    {computed.taxAmount.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs sm:text-sm font-medium text-slate-700 truncate">
                       Discount Type
                     </label>
                     <select
@@ -758,7 +770,7 @@ export default function AddnewPlansModal({
                           },
                         }))
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                     >
                       {discountTypes.map((d) => (
                         <option key={d} value={d}>
@@ -767,6 +779,7 @@ export default function AddnewPlansModal({
                       ))}
                     </select>
                   </div>
+
                   <InputField
                     label={form.pricing.discountType === "Percentage" ? "Discount (%)" : "Discount (₹)"}
                     value={String(form.pricing.discountPercent)}
@@ -783,30 +796,14 @@ export default function AddnewPlansModal({
                     placeholder="0"
                     rightElement={
                       form.pricing.discountType === "Percentage" ? (
-                        <BadgePercent size={16} />
+                        <BadgePercent size={15} />
                       ) : (
                         <span className="text-xs">₹</span>
                       )
                     }
                   />
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm">
-                    <div className="text-emerald-700/80">Selling Price</div>
-                    <div className="mt-1 text-lg font-semibold text-emerald-800 tabular-nums">
-                      ₹{computed.sellingPrice.toLocaleString("en-IN")}
-                    </div>
-                    <div className="mt-2 text-xs text-slate-500">
-                      Gross (original): ₹
-                      {computed.grossAmount.toLocaleString("en-IN")}
-                      {computed.discountAmount > 0
-                        ? ` − discount ₹${computed.discountAmount.toLocaleString("en-IN")}`
-                        : ""}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
                   <InputField
-                    label="Wallet Cashback on Purchase (₹)"
+                    label="Wallet Cashback (₹)"
                     value={String(form.walletCashback.amount)}
                     onChange={(v) =>
                       setForm((p) => ({
@@ -820,24 +817,51 @@ export default function AddnewPlansModal({
                     placeholder="e.g. 50"
                     rightElement={<span className="text-xs">₹</span>}
                   />
-                  <div className="md:col-span-2 flex items-end">
-                    <p className="text-xs text-slate-500 pb-2">
-                      Fixed amount credited to the member wallet when this plan
-                      is purchased. Leave 0 if no purchase cashback.
+
+                  <div className="col-span-2 md:col-span-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-4 mt-1">
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 sm:p-4 text-xs sm:text-sm text-slate-700">
+                      <span className="font-semibold text-blue-900">GST Breakdown</span>
+                      <div className="mt-1 flex items-baseline justify-between text-xs sm:text-sm text-slate-600">
+                        <span>Base (Excl. GST):</span>
+                        <span className="font-semibold text-slate-900">₹{computed.baseAmount.toFixed(2)}</span>
+                      </div>
+                      <div className="mt-0.5 flex items-baseline justify-between text-xs sm:text-sm text-slate-600">
+                        <span>GST ({form.pricing.taxPercent}%):</span>
+                        <span className="font-semibold text-slate-900">₹{computed.taxAmount.toFixed(2)}</span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 sm:p-4">
+                      <div className="text-xs font-medium text-emerald-800">Selling Price</div>
+                      <div className="mt-1 text-base sm:text-lg font-bold text-emerald-900 tabular-nums">
+                        ₹{computed.sellingPrice.toLocaleString("en-IN")}
+                      </div>
+                      <div className="mt-1 text-[11px] sm:text-xs text-slate-500">
+                        Gross (original): ₹{computed.grossAmount.toLocaleString("en-IN")}
+                        {computed.discountAmount > 0
+                          ? ` − discount ₹${computed.discountAmount.toLocaleString("en-IN")}`
+                          : ""}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-span-2 md:col-span-3">
+                    <p className="text-[11px] sm:text-xs text-slate-500">
+                      Fixed cashback credited to member wallet when plan is purchased. Leave 0 if none.
                     </p>
                   </div>
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-orange-100 bg-orange-50/40 p-6 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
+              <section className="rounded-xl sm:rounded-2xl border border-orange-100 bg-orange-50/40 p-3.5 sm:p-6 shadow-sm">
+                <div className="mb-3 sm:mb-4 flex items-center gap-2">
                   <Boxes size={18} className="text-orange-500" />
-                  <div className="text-base font-semibold text-slate-900">
+                  <div className="text-sm sm:text-base font-semibold text-slate-900">
                     Usage Limits
                   </div>
                 </div>
 
-                <p className="mb-4 text-xs text-slate-500">
+                <p className="mb-3 sm:mb-4 text-xs text-slate-500">
                   Set membership Discount % and Cashback % for these 4 areas
                   only.{" "}
                   <span className="font-semibold text-orange-700">Products</span>{" "}
@@ -849,7 +873,7 @@ export default function AddnewPlansModal({
                   likewise. Catalogue product discounts can still stack on top.
                 </p>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
                   {usageLimitCategories.map((category) => {
                     const key = category.name; // Use name as key to match usage check
                     const title = category.name;
@@ -864,19 +888,19 @@ export default function AddnewPlansModal({
                     return (
                       <div
                         key={key}
-                        className="rounded-2xl border border-orange-200 bg-orange-50 p-4"
+                        className="rounded-xl sm:rounded-2xl border border-orange-200 bg-orange-50/70 p-2.5 sm:p-4"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-700 font-semibold">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-orange-100 text-xs sm:text-sm font-bold text-orange-700">
                             {short}
                           </div>
-                          <div className="text-sm font-semibold text-slate-900">
+                          <div className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
                             {title}
                           </div>
                         </div>
-                        <div className="mt-4 grid grid-cols-2 gap-3">
-                          <div>
-                            <div className="text-xs text-slate-500">Discount (%)</div>
+                        <div className="mt-2.5 sm:mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                          <div className="min-w-0">
+                            <div className="text-[10px] sm:text-xs text-slate-500 truncate">Discount (%)</div>
                             <input
                               type="number"
                               value={limit.discount || 0}
@@ -887,11 +911,11 @@ export default function AddnewPlansModal({
                                   Number(e.target.value || 0),
                                 )
                               }
-                              className="mt-1 w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-orange-200/50"
+                              className="mt-0.5 sm:mt-1 w-full rounded-lg sm:rounded-xl border border-orange-200 bg-white px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-orange-200"
                             />
                           </div>
-                          <div>
-                            <div className="text-xs text-slate-500">Cashback (%)</div>
+                          <div className="min-w-0">
+                            <div className="text-[10px] sm:text-xs text-slate-500 truncate">Cashback (%)</div>
                             <input
                               type="number"
                               value={limit.cashback || 0}
@@ -902,7 +926,7 @@ export default function AddnewPlansModal({
                                   Number(e.target.value || 0),
                                 )
                               }
-                              className="mt-1 w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:ring-4 focus:ring-orange-200/50"
+                              className="mt-0.5 sm:mt-1 w-full rounded-lg sm:rounded-xl border border-orange-200 bg-white px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm outline-none focus:ring-2 focus:ring-orange-200"
                             />
                           </div>
                         </div>
@@ -912,19 +936,19 @@ export default function AddnewPlansModal({
                 </div>
               </section>
 
-              <section className="rounded-2xl border border-violet-100 bg-violet-50/40 p-6 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
+              <section className="rounded-xl sm:rounded-2xl border border-violet-100 bg-violet-50/40 p-3.5 sm:p-6 shadow-sm">
+                <div className="mb-3 sm:mb-4 flex items-center gap-2">
                   <ShieldCheck size={18} className="text-violet-500" />
-                  <div className="text-base font-semibold text-slate-900">
+                  <div className="text-sm sm:text-base font-semibold text-slate-900">
                     Customer App Display
                   </div>
                 </div>
-                <p className="mb-4 text-xs text-slate-500">
+                <p className="mb-3 sm:mb-4 text-xs text-slate-500">
                   These fields control what customers see on the Membership onboarding screen. Plan ID should match values like general, special, junior, premium.
                 </p>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <InputField
-                    label="Badge Label (membership type)"
+                    label="Badge Label"
                     value={form.customerDisplay.badgeLabel}
                     onChange={(v) =>
                       setForm((p) => ({
@@ -938,8 +962,8 @@ export default function AddnewPlansModal({
                       "e.g. Premium"
                     }
                   />
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Theme Color</label>
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs sm:text-sm font-medium text-slate-700 truncate">Theme Color</label>
                     <select
                       value={form.customerDisplay.themeKey}
                       onChange={(e) =>
@@ -951,15 +975,15 @@ export default function AddnewPlansModal({
                           },
                         }))
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                     >
                       {themeKeys.map((key) => (
                         <option key={key} value={key}>{key}</option>
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Card Icon</label>
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs sm:text-sm font-medium text-slate-700 truncate">Card Icon</label>
                     <select
                       value={form.customerDisplay.iconKey}
                       onChange={(e) =>
@@ -971,15 +995,52 @@ export default function AddnewPlansModal({
                           },
                         }))
                       }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                     >
                       {iconKeys.map((key) => (
                         <option key={key} value={key}>{key}</option>
                       ))}
                     </select>
                   </div>
+                  <div className="min-w-0 rounded-xl border border-indigo-100 bg-indigo-50/70 p-2 sm:p-2.5 flex flex-col justify-between">
+                    <div>
+                      <div className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
+                        Show in App
+                      </div>
+                      <div className="text-[10px] sm:text-xs text-slate-500 truncate">
+                        Display on mobile app
+                      </div>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-[11px] sm:text-xs font-medium text-slate-600">
+                        {form.customerDisplay.showInApp ? "Visible" : "Hidden"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((p) => ({
+                            ...p,
+                            customerDisplay: {
+                              ...p.customerDisplay,
+                              showInApp: !p.customerDisplay.showInApp,
+                            },
+                          }))
+                        }
+                        className={`relative h-6 w-11 sm:h-7 sm:w-12 rounded-full transition ${
+                          form.customerDisplay.showInApp ? "bg-emerald-500" : "bg-slate-300"
+                        }`}
+                        aria-label="Toggle show in app"
+                      >
+                        <span
+                          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                            form.customerDisplay.showInApp ? "left-5 sm:left-6" : "left-0.5"
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
                   <InputField
-                    label="Store / Products Discount (%)"
+                    label="Store / Products Disc (%)"
                     value={String(form.customerDisplay.storeDiscountPercent)}
                     onChange={(v) =>
                       setForm((p) => ({
@@ -1004,7 +1065,7 @@ export default function AddnewPlansModal({
                     placeholder="5"
                   />
                   <InputField
-                    label="Store / Products Cashback (%)"
+                    label="Store / Products Cash (%)"
                     value={String(form.customerDisplay.storeCashbackPercent)}
                     onChange={(v) =>
                       setForm((p) => ({
@@ -1052,6 +1113,31 @@ export default function AddnewPlansModal({
                     }
                     type="number"
                     placeholder="10"
+                  />
+                  <InputField
+                    label="Food Cashback (%)"
+                    value={String(form.customerDisplay.cashbackPercent)}
+                    onChange={(v) =>
+                      setForm((p) => ({
+                        ...p,
+                        customerDisplay: {
+                          ...p.customerDisplay,
+                          cashbackPercent: Math.max(0, Number(v || 0)),
+                        },
+                        usageLimits: {
+                          ...p.usageLimits,
+                          Food: {
+                            ...(p.usageLimits.Food || {
+                              discount: 0,
+                              cashback: 0,
+                            }),
+                            cashback: Math.max(0, Number(v || 0)),
+                          },
+                        },
+                      }))
+                    }
+                    type="number"
+                    placeholder="1"
                   />
                   <InputField
                     label="Services Discount (%)"
@@ -1103,64 +1189,39 @@ export default function AddnewPlansModal({
                     type="number"
                     placeholder="10"
                   />
-                  <InputField
-                    label="Food Cashback (%) — display badge"
-                    value={String(form.customerDisplay.cashbackPercent)}
-                    onChange={(v) =>
-                      setForm((p) => ({
-                        ...p,
-                        customerDisplay: {
-                          ...p.customerDisplay,
-                          cashbackPercent: Math.max(0, Number(v || 0)),
-                        },
-                        usageLimits: {
-                          ...p.usageLimits,
-                          Food: {
-                            ...(p.usageLimits.Food || {
-                              discount: 0,
-                              cashback: 0,
-                            }),
-                            cashback: Math.max(0, Number(v || 0)),
-                          },
-                        },
-                      }))
-                    }
-                    type="number"
-                    placeholder="1"
-                  />
                 </div>
 
-                <div className="mt-5 rounded-2xl border border-violet-200 bg-white p-4">
+                <div className="mt-4 sm:mt-5 rounded-xl sm:rounded-2xl border border-violet-200 bg-white p-3 sm:p-4">
                   <div className="mb-3 flex items-center justify-between">
-                    <div className="text-sm font-semibold text-slate-900">Feature Bullets</div>
+                    <div className="text-xs sm:text-sm font-semibold text-slate-900">Feature Bullets</div>
                     <button
                       type="button"
                       onClick={addFeature}
-                      className="rounded-lg border border-violet-200 px-3 py-1.5 text-xs font-semibold text-violet-700"
+                      className="rounded-lg border border-violet-200 px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50"
                     >
-                      Add Feature
+                      + Add Feature
                     </button>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-2.5 sm:space-y-3">
                     {form.customerDisplay.features.map((feature, index) => (
-                      <div key={index} className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_140px_auto]">
+                      <div key={index} className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-[1fr_140px_auto]">
                         <input
                           value={feature.label}
                           onChange={(e) => setFeature(index, "label", e.target.value)}
                           placeholder="Feature description"
-                          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                          className="col-span-2 md:col-span-1 w-full rounded-xl border border-slate-200 px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm outline-none focus:border-blue-500"
                         />
                         <input
                           value={String(feature.was || 0)}
                           onChange={(e) => setFeature(index, "was", e.target.value)}
                           type="number"
                           placeholder="Was price"
-                          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500"
+                          className="col-span-1 w-full rounded-xl border border-slate-200 px-3 py-2 sm:px-4 sm:py-2.5 text-xs sm:text-sm outline-none focus:border-blue-500"
                         />
                         <button
                           type="button"
                           onClick={() => removeFeature(index)}
-                          className="rounded-xl border border-red-200 px-3 py-3 text-sm text-red-600"
+                          className="col-span-1 md:col-span-1 rounded-xl border border-red-200 px-3 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-red-600 hover:bg-red-50"
                         >
                           Remove
                         </button>
@@ -1168,45 +1229,16 @@ export default function AddnewPlansModal({
                     ))}
                   </div>
                 </div>
-
-                <div className="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">Show in Customer App</div>
-                      <div className="text-xs text-slate-500">Display this plan on the customer membership screen</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setForm((p) => ({
-                          ...p,
-                          customerDisplay: {
-                            ...p.customerDisplay,
-                            showInApp: !p.customerDisplay.showInApp,
-                          },
-                        }))
-                      }
-                      className={`relative h-8 w-14 rounded-full transition ${
-                        form.customerDisplay.showInApp ? "bg-emerald-500" : "bg-slate-300"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${
-                          form.customerDisplay.showInApp ? "left-7" : "left-1"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                </div>
               </section>
-              <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-                <div className="mb-4 flex items-center gap-2">
+
+              <section className="rounded-xl sm:rounded-2xl border border-slate-100 bg-white p-3.5 sm:p-6 shadow-sm">
+                <div className="mb-3 sm:mb-4 flex items-center gap-2">
                   <ClipboardList size={18} className="text-slate-400" />
-                  <div className="text-base font-semibold text-slate-900">
+                  <div className="text-sm sm:text-base font-semibold text-slate-900">
                     Admin Notes
                   </div>
                 </div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <label className="mb-1 block text-xs sm:text-sm font-medium text-slate-700">
                   Internal Notes
                 </label>
                 <textarea
@@ -1215,25 +1247,25 @@ export default function AddnewPlansModal({
                     setForm((p) => ({ ...p, internalNotes: e.target.value }))
                   }
                   placeholder="Add internal notes, reminders, or special instructions for this plan..."
-                  className="min-h-[90px] w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  className="min-h-[80px] sm:min-h-[90px] w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 sm:px-4 sm:py-3 text-xs sm:text-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                 />
               </section>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-white px-6 py-5">
+          <div className="flex items-center justify-end gap-2.5 sm:gap-3 border-t border-slate-100 bg-white px-4 py-3 sm:px-6 sm:py-4">
             <button
               type="button"
               onClick={() => void closeIfConfirmed(onClose)}
               disabled={loading}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex-1 sm:flex-none rounded-xl border border-slate-200 bg-white px-4 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading || !form.planId.trim() || !form.displayName.trim()}
-              className="rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+              className="flex-1 sm:flex-none rounded-xl bg-blue-600 px-5 py-2 sm:px-6 sm:py-2.5 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
             >
               {loading ? (isEdit ? "Updating..." : "Creating...") : isEdit ? "Update Plan" : "Create Plan"}
             </button>
@@ -1243,4 +1275,3 @@ export default function AddnewPlansModal({
     </div>
   );
 }
-
