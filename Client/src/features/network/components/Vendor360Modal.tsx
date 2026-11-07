@@ -35,7 +35,6 @@ import {
   User,
   Wallet,
   X,
-  MoreVertical,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import Can from "@/components/rbac/Can";
