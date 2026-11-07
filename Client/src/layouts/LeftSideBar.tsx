@@ -253,6 +253,12 @@ const MENU_GROUPS: MenuGroup[] = [
         path: "/coupons",
       },
       {
+        name: "setOffers",
+        label: "Set Offers",
+        icon: Gift,
+        path: "/set-offers",
+      },
+      {
         name: "buyOneGetOne",
         label: "Buy 1 Get 1",
         icon: Gift,

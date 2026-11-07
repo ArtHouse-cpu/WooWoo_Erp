@@ -10,6 +10,7 @@ export type FoodFormPayload = {
   unit: string;
   isPackaged: boolean;
   manageInventory: boolean;
+  applyMembershipDiscount: boolean;
   description: string;
   isVeg: boolean;
   /** Available = Active, Not Available = Inactive */
@@ -44,6 +45,7 @@ const emptyForm: FoodFormPayload = {
   unit: "Plate",
   isPackaged: false,
   manageInventory: false,
+  applyMembershipDiscount: true,
   description: "",
   isVeg: true,
   status: "Active",
@@ -70,6 +72,7 @@ export default function AddFoodModal({
         unit: String(initialFood.unit || "Plate"),
         isPackaged: initialFood.isPackaged === true,
         manageInventory: initialFood.manageInventory === true,
+        applyMembershipDiscount: initialFood.applyMembershipDiscount !== false,
         description: String(initialFood.description || ""),
         isVeg: initialFood.isVeg !== false,
         status: initialFood.status === "Inactive" ? "Inactive" : "Active",
@@ -244,36 +247,63 @@ export default function AddFoodModal({
               />
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 md:col-span-2">
-              <div className="flex items-center justify-between gap-3">
-                <div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2">
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-800">Manage Inventory</p>
                   <p className="text-xs text-gray-500">
                     {form.manageInventory
-                      ? "This food is added to the product list. Sell it only after a purchase adds stock."
-                      : "No inventory tracking. This food can be sold as it is today."}
+                      ? "Stock is tracked. Sell this food only after a purchase adds quantity."
+                      : "Off. No stock tracking. This food can be sold as it is today."}
                   </p>
                 </div>
-                <div className="flex shrink-0 rounded-lg bg-white p-1">
-                  {([
-                    [true, "Yes"],
-                    [false, "No"],
-                  ] as const).map(([value, label]) => (
-                    <button
-                      key={label}
-                      type="button"
-                      disabled={loading}
-                      onClick={() => setForm((p) => ({ ...p, manageInventory: value }))}
-                      className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                        form.manageInventory === value
-                          ? "bg-black text-white"
-                          : "text-gray-600"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                <button
+                  type="button"
+                  disabled={loading}
+                  aria-pressed={form.manageInventory}
+                  onClick={() =>
+                    setForm((p) => ({ ...p, manageInventory: !p.manageInventory }))
+                  }
+                  className={`relative h-8 w-14 shrink-0 rounded-full transition ${
+                    form.manageInventory ? "bg-black" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${
+                      form.manageInventory ? "left-7" : "left-1"
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800">Membership Discount</p>
+                  <p className="text-xs text-gray-500">
+                    {form.applyMembershipDiscount
+                      ? "On. The customer's membership discount applies at checkout."
+                      : "Off. Checkout charges the full price for this food."}
+                  </p>
                 </div>
+                <button
+                  type="button"
+                  disabled={loading}
+                  aria-pressed={form.applyMembershipDiscount}
+                  onClick={() =>
+                    setForm((p) => ({
+                      ...p,
+                      applyMembershipDiscount: !p.applyMembershipDiscount,
+                    }))
+                  }
+                  className={`relative h-8 w-14 shrink-0 rounded-full transition ${
+                    form.applyMembershipDiscount ? "bg-blue-600" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${
+                      form.applyMembershipDiscount ? "left-7" : "left-1"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
 

@@ -37,6 +37,7 @@ const baseSchema = z.object({
   images: z.array(z.instanceof(File)).default([]),
   isCsp: z.enum(["yes", "no"]).default("no"),
   applyMembershipDiscount: z.boolean().default(true),
+  lowStockAlertLevel: z.number().min(0, "Low stock alert cannot be negative").nullable().default(null),
   cspEnrollmentId: z.string().optional().default(""),
 });
 
@@ -202,6 +203,11 @@ const buildDefaultValues = (
       (initialData as any)?.applyMembershipDiscount === "false"
         ? false
         : true,
+    lowStockAlertLevel:
+      (initialData as any)?.lowStockAlertLevel == null ||
+      (initialData as any)?.lowStockAlertLevel === ""
+        ? null
+        : Number((initialData as any).lowStockAlertLevel),
     cspEnrollmentId,
   };
 };
@@ -318,6 +324,14 @@ export default function AddItemModal({
     payload.append("discountType", values.discountType);
     payload.append("discountValue", String(values.discountValue));
     payload.append("variants", JSON.stringify(normalizedVariants));
+    payload.append(
+      "lowStockAlertLevel",
+      resolvedType === "product" &&
+        values.lowStockAlertLevel != null &&
+        !Number.isNaN(values.lowStockAlertLevel)
+        ? String(values.lowStockAlertLevel)
+        : "",
+    );
     payload.append(
       "applyMembershipDiscount",
       resolvedType === "product" && values.applyMembershipDiscount === false

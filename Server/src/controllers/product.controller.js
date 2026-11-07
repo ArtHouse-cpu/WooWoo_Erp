@@ -16,6 +16,20 @@ import {
 const escapeRegex = (value) =>
   String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const readLowStockAlertLevel = (value) => {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return {ok: true, value: null};
+  }
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) {
+    return {
+      ok: false,
+      message: 'Low stock alert level must be a non-negative number.',
+    };
+  }
+  return {ok: true, value: num};
+};
+
 const namedVariantsOf = (product) =>
   (Array.isArray(product?.variants) ? product.variants : []).filter((v) =>
     String(v?.name ?? '').trim(),
@@ -258,11 +272,16 @@ export const createProduct = async (req, res) => {
       isCsp,
       cspEnrollmentId,
       applyMembershipDiscount,
+      lowStockAlertLevel,
     } = req.body;
     console.log("product controller",req.body);
     const membershipDiscountOn = !['false', '0', 'no', 'off'].includes(
       String(applyMembershipDiscount ?? 'true').trim().toLowerCase(),
     );
+    const alertLevel = readLowStockAlertLevel(lowStockAlertLevel);
+    if (!alertLevel.ok) {
+      return res.status(400).json({success: false, message: alertLevel.message});
+    }
 
     // Product routes always create products; Services routes set forceItemType='service'
     const forcedType = String(req.forceItemType || '').trim().toLowerCase();
@@ -453,6 +472,7 @@ export const createProduct = async (req, res) => {
       discountType: discountType || "flat",
       discountValue: parsedDiscountValue,
       applyMembershipDiscount: itemType === 'product' ? membershipDiscountOn : true,
+      lowStockAlertLevel: itemType === 'product' ? alertLevel.value : null,
       variants: itemType === "product" ? parsedVariants : [],
       images: imageUrls,
       imageUrl: imageUrls[0] || null,
@@ -1019,6 +1039,7 @@ const PRODUCT_LIST_SELECT = [
   'isCsp',
   'cspEnrollmentId',
   'applyMembershipDiscount',
+  'lowStockAlertLevel',
   'createdAt',
   'updatedAt',
 ].join(' ');
@@ -1457,6 +1478,7 @@ export const updateProduct = async (req, res) => {
       isCsp,
       cspEnrollmentId,
       applyMembershipDiscount,
+      lowStockAlertLevel,
     } = req.body;
 
     // find existing product
@@ -1557,6 +1579,13 @@ export const updateProduct = async (req, res) => {
     existingProduct.discountType = discountType ?? existingProduct.discountType;
     existingProduct.discountValue =
       discountValue !== undefined ? Number(discountValue) : existingProduct.discountValue;
+    if (lowStockAlertLevel !== undefined && nextType !== 'service') {
+      const alertLevel = readLowStockAlertLevel(lowStockAlertLevel);
+      if (!alertLevel.ok) {
+        return res.status(400).json({success: false, message: alertLevel.message});
+      }
+      existingProduct.lowStockAlertLevel = alertLevel.value;
+    }
     if (applyMembershipDiscount !== undefined && nextType !== 'service') {
       existingProduct.applyMembershipDiscount = !['false', '0', 'no', 'off'].includes(
         String(applyMembershipDiscount).trim().toLowerCase(),

@@ -435,9 +435,7 @@ export default function CreatePosScreen({
       isCsp,
       productDiscountType,
       productDiscountValue,
-      Boolean(selectedProduct?.skipMembershipDiscount) ||
-        (selectedProduct?.sourceType === "food" &&
-          selectedProduct?.manageInventory === true),
+      Boolean(selectedProduct?.skipMembershipDiscount),
     );
 
     setItems((prev) => [
@@ -467,10 +465,7 @@ export default function CreatePosScreen({
         productDiscountValue,
         productDiscountAmount: stacked.productDiscount,
         membershipDiscountAmount: stacked.membershipDiscount,
-        skipMembershipDiscount:
-          Boolean(selectedProduct?.skipMembershipDiscount) ||
-          (selectedProduct?.sourceType === "food" &&
-            selectedProduct?.manageInventory === true),
+        skipMembershipDiscount: Boolean(selectedProduct?.skipMembershipDiscount),
       },
     ]);
 
@@ -526,8 +521,7 @@ export default function CreatePosScreen({
           isCsp,
           productDiscountType,
           productDiscountValue,
-          Boolean(p.skipMembershipDiscount) ||
-            (p.sourceType === "food" && p.manageInventory === true),
+          Boolean(p.skipMembershipDiscount),
         );
 
         setItems((prev) => [
@@ -551,9 +545,7 @@ export default function CreatePosScreen({
             productDiscountValue,
             productDiscountAmount: stacked.productDiscount,
             membershipDiscountAmount: stacked.membershipDiscount,
-            skipMembershipDiscount:
-              Boolean(p.skipMembershipDiscount) ||
-              (p.sourceType === "food" && p.manageInventory === true),
+            skipMembershipDiscount: Boolean(p.skipMembershipDiscount),
           },
         ]);
       }
