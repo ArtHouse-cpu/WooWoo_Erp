@@ -207,14 +207,18 @@ export type MembershipExpiryBadge = {
 export function formatMembershipExpiryInfo(
   endDateStr?: string | Date | null,
   isExpired?: boolean,
+  membershipType?: string | null,
 ): MembershipExpiryBadge {
+  const isLifetime = String(membershipType || "").toLowerCase().includes("lifetime");
   if (!endDateStr) {
     return {
-      dateText: "Lifetime",
-      daysText: "No Expiry",
+      dateText: isLifetime ? "Lifetime" : "N/A",
+      daysText: isLifetime ? "Lifetime" : "No Expiry",
       isExpired: false,
-      badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      pillColor: "text-emerald-700",
+      badgeColor: isLifetime
+        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+        : "bg-slate-50 text-slate-600 border-slate-200",
+      pillColor: isLifetime ? "text-emerald-700" : "text-slate-500",
     };
   }
 
@@ -529,7 +533,31 @@ export default function CspScreen() {
 
   const openPartnerDetails = (row: CspEnrollment) => {
     setActionMenuId(null);
-    setDetailsPartner(row);
+    const cId = enrollmentCustomerId(row);
+    let info = cId ? customerExpiryMap.get(cId) : null;
+    if (!info) {
+      const mob = String(
+        row.mobile || row.customer?.mobile || row.vendor?.mobile || "",
+      ).replace(/\D/g, "");
+      const ten = mob.length >= 10 ? mob.slice(-10) : mob;
+      if (ten) info = customerExpiryMap.get(`m_${ten}`);
+    }
+    const enrichedRow = {
+      ...row,
+      customer: {
+        ...(row.customer || {}),
+        membershipType: info?.membershipType || row.customer?.membershipType,
+        membershipEndDate:
+          info?.membershipEndDate ||
+          (row.customer as any)?.membershipEndDate ||
+          null,
+        membershipExpired:
+          info?.membershipExpired ??
+          (row.customer as any)?.membershipExpired ??
+          false,
+      },
+    } as CspEnrollment;
+    setDetailsPartner(enrichedRow);
   };
 
   const openProductsModal = async (csp: CspEnrollment) => {
@@ -861,7 +889,11 @@ export default function CspScreen() {
       info?.membershipExpired ??
       (row.customer as any)?.membershipExpired ??
       false;
-    return formatMembershipExpiryInfo(endDate, isExpired);
+    const membershipType =
+      info?.membershipType ||
+      row.customer?.membershipType ||
+      null;
+    return formatMembershipExpiryInfo(endDate, isExpired, membershipType);
   };
 
   const getRowMembershipLabel = (row: CspEnrollment) => {
