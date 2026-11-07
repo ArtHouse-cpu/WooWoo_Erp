@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -276,8 +276,6 @@ export default function Vendor360Modal({
   const navigate = useNavigate();
   const { can } = usePermission();
   const canSeeBank = can(PERMISSIONS.VENDOR_UPDATE);
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const actionsRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [period, setPeriod] = useState<Period>("all");
   const [data, setData] = useState<Vendor360Response | null>(null);
@@ -356,15 +354,6 @@ export default function Vendor360Modal({
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!actionsOpen) return;
-    const close = (event: MouseEvent) => {
-      if (!actionsRef.current?.contains(event.target as Node)) setActionsOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [actionsOpen]);
 
   useEffect(() => {
     setBill(null);
@@ -754,7 +743,7 @@ export default function Vendor360Modal({
 
             {/* Close Button & Mobile 3-dot */}
             <div className="flex items-center gap-1.5 shrink-0">
-              <div className="relative sm:hidden">
+              <div className="relative">
                 <button
                   type="button"
                   onClick={() => setMobileActionsOpen((prev) => !prev)}
@@ -838,77 +827,6 @@ export default function Vendor360Modal({
               >
                 <X size={14} className="text-rose-600" /> Close
               </button>
-            </div>
-          </div>
-
-          {/* Action buttons row: scrollable on mobile, flex on desktop */}
-          <div className="mt-2.5 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar sm:mt-3 sm:flex-wrap sm:overflow-visible">
-            <Can permission={PERMISSIONS.VENDOR_UPDATE}>
-            <div ref={actionsRef} className="relative flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                aria-label="More actions"
-                aria-expanded={actionsOpen}
-                onClick={() => setActionsOpen((open) => !open)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
-              >
-                <MoreVertical size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => void closeIfConfirmed(onClose)}
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
-              >
-                <X size={14} /> Close
-              </button>
-              {actionsOpen ? (
-                <div className="absolute right-0 top-10 z-30 flex w-48 flex-col gap-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
-                  <Can permission={PERMISSIONS.VENDOR_UPDATE}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActionsOpen(false);
-                        setPayOpen(true);
-                      }}
-                      className="inline-flex h-7 w-full items-center gap-1 rounded-md bg-violet-600 px-2 text-[11px] font-semibold text-white transition hover:bg-violet-700"
-                    >
-                      Record Payment
-                    </button>
-                  </Can>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActionsOpen(false);
-                      openWithVendor(
-                        `/expenses?create=1&vendorId=${vendor._id}&vendorName=${encodeURIComponent(profile?.name || vendor.name)}`,
-                      );
-                    }}
-                    className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-800 transition hover:bg-slate-50"
-                  >
-                    <Receipt size={12} /> Add Expense
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActionsOpen(false);
-                      openWithVendor("/create-purchase", vendorState);
-                    }}
-                    className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-800 transition hover:bg-slate-50"
-                  >
-                    <ShoppingCart size={12} /> Create Purchase
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActionsOpen(false);
-                      openWithVendor("/create-purchase-order", vendorState);
-                    }}
-                    className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-800 transition hover:bg-slate-50"
-                  >
-                    <FilePlus2 size={12} /> Create Purchase Order
-                  </button>
-                </div>
-              ) : null}
             </div>
           </div>
         </header>
