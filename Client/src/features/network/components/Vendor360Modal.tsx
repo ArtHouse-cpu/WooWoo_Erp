@@ -1,21 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Activity,
   ArrowDownLeft,
   ArrowUpRight,
   Building2,
+  Calendar,
+  ChevronRight,
+  Coins,
+  CreditCard,
   Download,
   FilePlus2,
   FileText,
+  Hash,
+  History,
+  IndianRupee,
+  Landmark,
+  LayoutDashboard,
   Mail,
   MessageCircle,
   Phone,
   Receipt,
+  RotateCcw,
   Scale,
   Search,
+  Send,
+  Settings,
+  ShoppingBag,
   ShoppingCart,
+  Star,
   Trash2,
   UploadCloud,
+  User,
   Wallet,
   X,
 } from "lucide-react";
@@ -606,6 +622,11 @@ export default function Vendor360Modal({
       label: "Total Purchase",
       value: money(summary?.purchaseTotal),
       hint: "Confirmed purchases",
+      icon: ShoppingBag,
+      bg: "bg-gradient-to-br from-blue-50/90 via-sky-50/50 to-white border-blue-200/80",
+      iconBg: "bg-blue-100/90",
+      iconColor: "text-blue-600",
+      textColor: "text-blue-950",
     },
     {
       label: "Purchase Frequency",
@@ -616,26 +637,51 @@ export default function Vendor360Modal({
           : period === "month"
             ? "This month"
             : "This year",
+      icon: Activity,
+      bg: "bg-gradient-to-br from-purple-50/90 via-violet-50/50 to-white border-purple-200/80",
+      iconBg: "bg-purple-100/90",
+      iconColor: "text-purple-600",
+      textColor: "text-purple-950",
     },
     {
       label: "Total Paid",
       value: money(summary?.totalPaid ?? summary?.paidOnBills),
       hint: "Paid on purchase bills",
+      icon: Wallet,
+      bg: "bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-white border-emerald-200/80",
+      iconBg: "bg-emerald-100/90",
+      iconColor: "text-emerald-600",
+      textColor: "text-emerald-950",
     },
     {
       label: "Outstanding Amount",
       value: money(summary?.outstanding),
       hint: "Still payable",
+      icon: Scale,
+      bg: "bg-gradient-to-br from-rose-50/90 via-pink-50/50 to-white border-rose-200/80",
+      iconBg: "bg-rose-100/90",
+      iconColor: "text-rose-600",
+      textColor: "text-rose-950",
     },
     {
       label: "Last Purchase",
       value: whenStamp(summary?.lastPurchaseDate, summary?.lastPurchaseCreatedAt),
       hint: "Most recent bill",
+      icon: Calendar,
+      bg: "bg-gradient-to-br from-amber-50/90 via-orange-50/50 to-white border-amber-200/80",
+      iconBg: "bg-amber-100/90",
+      iconColor: "text-amber-600",
+      textColor: "text-amber-950",
     },
     {
       label: "Total Purchase Orders",
       value: String(summary?.orderCount || 0),
       hint: money(summary?.orderTotal),
+      icon: FileText,
+      bg: "bg-gradient-to-br from-indigo-50/90 via-blue-50/50 to-white border-indigo-200/80",
+      iconBg: "bg-indigo-100/90",
+      iconColor: "text-indigo-600",
+      textColor: "text-indigo-950",
     },
   ];
 
@@ -666,17 +712,17 @@ export default function Vendor360Modal({
                 {phoneLink(profile?.mobile || vendor.mobile) ? (
                   <a
                     href={phoneLink(profile?.mobile || vendor.mobile)}
-                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition"
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 shadow-2xs active:scale-95 transition"
                   >
-                    <Phone size={11} /> Call
+                    <Phone size={11} className="text-emerald-600" /> Call
                   </a>
                 ) : null}
                 {mailLink(profile?.email) ? (
                   <a
                     href={mailLink(profile?.email)}
-                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition"
+                    className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200/80 px-2 py-0.5 text-[11px] font-bold text-sky-700 hover:bg-sky-100 shadow-2xs active:scale-95 transition"
                   >
-                    <Mail size={11} /> Email
+                    <Mail size={11} className="text-sky-600" /> Email
                   </a>
                 ) : null}
                 {whatsAppLink(profile?.whatsappNumber) ? (
@@ -684,9 +730,9 @@ export default function Vendor360Modal({
                     href={whatsAppLink(profile?.whatsappNumber)}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+                    className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200/80 px-2 py-0.5 text-[11px] font-bold text-teal-700 hover:bg-teal-100 shadow-2xs active:scale-95 transition"
                   >
-                    <MessageCircle size={11} /> WhatsApp
+                    <MessageCircle size={11} className="text-teal-600" /> WhatsApp
                   </a>
                 ) : null}
               </div>
@@ -696,9 +742,9 @@ export default function Vendor360Modal({
             <button
               type="button"
               onClick={() => void closeIfConfirmed(onClose)}
-              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white hover:bg-slate-800 transition"
+              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-rose-50 border border-rose-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
             >
-              <X size={14} /> Close
+              <X size={14} className="text-rose-600" /> Close
             </button>
           </div>
 
@@ -708,9 +754,9 @@ export default function Vendor360Modal({
               <button
                 type="button"
                 onClick={() => setPayOpen(true)}
-                className="shrink-0 rounded-xl bg-violet-600 px-3 py-1.5 sm:py-2 text-xs font-bold text-white shadow-xs hover:bg-violet-700 transition"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-purple-50 border border-purple-200/90 px-3 py-1.5 sm:py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
               >
-                Record Payment
+                <Wallet size={13} className="text-purple-600" /> Record Payment
               </button>
             </Can>
             <button
@@ -720,57 +766,117 @@ export default function Vendor360Modal({
                   `/expenses?create=1&vendorId=${vendor._id}&vendorName=${encodeURIComponent(profile?.name || vendor.name)}`,
                 )
               }
-              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 transition"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
             >
-              <Receipt size={13} /> Add Expense
+              <Receipt size={13} className="text-amber-600" /> Add Expense
             </button>
             <button
               type="button"
               onClick={() => openWithVendor("/create-purchase", vendorState)}
-              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 transition"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
             >
-              <ShoppingCart size={13} /> Create Purchase
+              <ShoppingCart size={13} className="text-emerald-600" /> Create Purchase
             </button>
             <button
               type="button"
               onClick={() =>
                 openWithVendor("/create-purchase-order", vendorState)
               }
-              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 transition"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
             >
-              <FilePlus2 size={13} /> Create Purchase Order
+              <FilePlus2 size={13} className="text-blue-600" /> Create Purchase Order
             </button>
           </div>
         </header>
 
-        <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2">
+        <div className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-3 py-2 scrollbar-none">
           {(
             [
-              ["overview", "Overview"],
-              ["timeline", "Timeline"],
-              ["purchases", "Purchases"],
-              ["orders", "Orders"],
-              ["payments", "Payments"],
+              {
+                id: "overview",
+                label: "Overview",
+                Icon: LayoutDashboard,
+                activeClass:
+                  "bg-sky-100 text-sky-800 border-2 border-sky-400/80 shadow-xs ring-1 ring-sky-200",
+                inactiveClass:
+                  "bg-sky-50/70 text-sky-700/80 border border-sky-200/70 hover:bg-sky-100/70",
+                badge: null,
+              },
+              {
+                id: "timeline",
+                label: "Timeline",
+                Icon: History,
+                activeClass:
+                  "bg-orange-100 text-orange-800 border-2 border-orange-400/80 shadow-xs ring-1 ring-orange-200",
+                inactiveClass:
+                  "bg-orange-50/70 text-orange-700/80 border border-orange-200/70 hover:bg-orange-100/70",
+                badge: data?.timeline?.length || null,
+              },
+              {
+                id: "purchases",
+                label: "Purchases",
+                Icon: ShoppingCart,
+                activeClass:
+                  "bg-emerald-100 text-emerald-800 border-2 border-emerald-400/80 shadow-xs ring-1 ring-emerald-200",
+                inactiveClass:
+                  "bg-emerald-50/70 text-emerald-700/80 border border-emerald-200/70 hover:bg-emerald-100/70",
+                badge: data?.purchases?.length || null,
+              },
+              {
+                id: "orders",
+                label: "Orders",
+                Icon: FileText,
+                activeClass:
+                  "bg-indigo-100 text-indigo-800 border-2 border-indigo-400/80 shadow-xs ring-1 ring-indigo-200",
+                inactiveClass:
+                  "bg-indigo-50/70 text-indigo-700/80 border border-indigo-200/70 hover:bg-indigo-100/70",
+                badge: data?.orders?.length || null,
+              },
+              {
+                id: "payments",
+                label: "Payments",
+                Icon: Wallet,
+                activeClass:
+                  "bg-purple-100 text-purple-800 border-2 border-purple-400/80 shadow-xs ring-1 ring-purple-200",
+                inactiveClass:
+                  "bg-purple-50/70 text-purple-700/80 border border-purple-200/70 hover:bg-purple-100/70",
+                badge: data?.payments?.length || null,
+              },
             ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => {
-                setTab(key);
-                setSearch("");
-                setStatus("");
-                setDateRange("");
-              }}
-              className={`shrink-0 rounded-xl px-3 py-2 text-xs font-bold ${
-                tab === key
-                  ? "bg-slate-900 text-white"
-                  : "bg-slate-100 text-slate-600"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          ).map((item) => {
+            const isActive = tab === item.id;
+            const Icon = item.Icon;
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setTab(item.id);
+                  setSearch("");
+                  setStatus("");
+                  setDateRange("");
+                }}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap active:scale-95 ${
+                  isActive ? item.activeClass : item.inactiveClass
+                }`}
+              >
+                <Icon size={14} className="shrink-0" />
+                <span>{item.label}</span>
+                {item.badge != null && (
+                  <span
+                    className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-black leading-none ${
+                      isActive
+                        ? "bg-white text-slate-800 shadow-2xs"
+                        : "bg-white/80 text-slate-600 border border-slate-200/60"
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
@@ -792,39 +898,170 @@ export default function Vendor360Modal({
                 </select>
               </div> */}
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
-                {cards.map((card) => (
-                  <article
-                    key={card.label}
-                    className="rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs transition hover:border-slate-300"
-                  >
-                    <p className="truncate text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      {card.label}
-                    </p>
-                    <p className="mt-1 truncate text-base sm:text-xl font-bold text-slate-900">
-                      {card.value}
-                    </p>
-                    <p className="mt-0.5 truncate text-[11px] sm:text-xs text-slate-500">{card.hint}</p>
-                  </article>
-                ))}
+                {cards.map((card) => {
+                  const Icon = card.icon;
+                  return (
+                    <article
+                      key={card.label}
+                      className={`relative overflow-hidden rounded-2xl border p-3 sm:p-4 shadow-2xs transition hover:shadow-xs ${card.bg}`}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <p className="truncate text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">
+                          {card.label}
+                        </p>
+                        <span
+                          className={`flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-lg ${card.iconBg}`}
+                        >
+                          <Icon size={14} className={card.iconColor} />
+                        </span>
+                      </div>
+                      <p
+                        className={`mt-1.5 truncate text-base sm:text-xl font-black ${card.textColor}`}
+                      >
+                        {card.value}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] sm:text-xs font-medium text-slate-500">
+                        {card.hint}
+                      </p>
+                    </article>
+                  );
+                })}
               </div>
+
               <div className="grid gap-3 lg:grid-cols-2">
-                <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                    <Building2 size={16} /> Profile
-                  </h3>
-                  <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                    <Field label="Phone" value={profile?.mobile} />
-                    <Field label="WhatsApp" value={profile?.whatsappNumber} />
-                    <Field label="Email" value={profile?.email} />
-                    <Field label="GSTIN" value={profile?.gstin} />
-                    <Field label="PAN" value={profile?.panNumber} />
-                    <Field label="Company" value={profile?.companyName} />
-                    <Field label="MSME" value={profile?.msme} />
-                    <Field label="Udyam Number" value={profile?.udyamNumber} />
-                    <Field label="CIN Number" value={profile?.cinNumber} />
+                {/* Profile Card */}
+                <article className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
+                      <User size={18} />
+                    </div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Profile
+                    </h3>
+                  </div>
+
+                  <div className="mt-3.5 grid grid-cols-2 gap-2 text-sm">
+                    {[
+                      {
+                        label: "PHONE",
+                        value: profile?.mobile || vendor.mobile,
+                        Icon: Phone,
+                        iconBg: "bg-purple-100/80",
+                        iconColor: "text-purple-600",
+                      },
+                      {
+                        label: "WHATSAPP",
+                        value: profile?.whatsappNumber,
+                        Icon: MessageCircle,
+                        iconBg: "bg-teal-100/80",
+                        iconColor: "text-teal-600",
+                      },
+                      {
+                        label: "EMAIL",
+                        value: profile?.email,
+                        Icon: Mail,
+                        iconBg: "bg-blue-100/80",
+                        iconColor: "text-blue-600",
+                      },
+                      {
+                        label: "GSTIN",
+                        value: profile?.gstin,
+                        Icon: Star,
+                        iconBg: "bg-indigo-100/80",
+                        iconColor: "text-indigo-600",
+                      },
+                      {
+                        label: "PAN",
+                        value: profile?.panNumber,
+                        Icon: CreditCard,
+                        iconBg: "bg-sky-100/80",
+                        iconColor: "text-sky-600",
+                      },
+                      {
+                        label: "COMPANY",
+                        value: profile?.companyName || vendor.companyName,
+                        Icon: Building2,
+                        iconBg: "bg-violet-100/80",
+                        iconColor: "text-violet-600",
+                      },
+                      {
+                        label: "MSME",
+                        value: profile?.msme,
+                        Icon: FileText,
+                        iconBg: "bg-amber-100/80",
+                        iconColor: "text-amber-600",
+                      },
+                      {
+                        label: "UDYAM NUMBER",
+                        value: profile?.udyamNumber,
+                        Icon: Hash,
+                        iconBg: "bg-indigo-100/80",
+                        iconColor: "text-indigo-600",
+                      },
+                      {
+                        label: "CIN NUMBER",
+                        value: profile?.cinNumber,
+                        Icon: CreditCard,
+                        iconBg: "bg-blue-100/80",
+                        iconColor: "text-blue-600",
+                      },
+                      {
+                        label: "BANK",
+                        value: profile?.bankName,
+                        Icon: Landmark,
+                        iconBg: "bg-sky-100/80",
+                        iconColor: "text-sky-600",
+                      },
+                      {
+                        label: "ACCOUNT",
+                        value: canSeeBank
+                          ? profile?.accountNumber
+                          : maskAccount(profile?.accountNumber),
+                        Icon: User,
+                        iconBg: "bg-purple-100/80",
+                        iconColor: "text-purple-600",
+                      },
+                      {
+                        label: "IFSC",
+                        value: profile?.IFSCcode,
+                        Icon: Settings,
+                        iconBg: "bg-violet-100/80",
+                        iconColor: "text-violet-600",
+                      },
+                      {
+                        label: "UPI",
+                        value: profile?.UPIID,
+                        Icon: Send,
+                        iconBg: "bg-pink-100/80",
+                        iconColor: "text-pink-600",
+                      },
+                    ].map((item) => {
+                      const Icon = item.Icon;
+                      return (
+                        <div
+                          key={item.label}
+                          className="flex items-center gap-2 rounded-2xl bg-slate-50/80 border border-slate-100/90 p-2 sm:p-2.5 transition hover:bg-slate-50"
+                        >
+                          <div
+                            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${item.iconBg} ${item.iconColor}`}
+                          >
+                            <Icon size={14} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                              {item.label}
+                            </p>
+                            <p className="truncate text-xs font-bold text-slate-900">
+                              {item.value || "—"}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+
                     {profile?.documents?.length ? (
-                      <div className="col-span-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      <div className="col-span-2 rounded-2xl bg-blue-50/50 border border-blue-100/80 p-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
                           Documents
                         </p>
                         <div className="mt-1 flex flex-col gap-1">
@@ -834,7 +1071,7 @@ export default function Vendor360Modal({
                               href={document.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="truncate text-sm font-medium text-blue-700 hover:underline"
+                              className="truncate text-xs font-semibold text-blue-700 hover:underline"
                             >
                               {document.name || "Document"}
                             </a>
@@ -842,82 +1079,129 @@ export default function Vendor360Modal({
                         </div>
                       </div>
                     ) : null}
-                    <Field label="Bank" value={profile?.bankName} />
-                    <Field
-                      label="Account"
-                      value={
-                        canSeeBank
-                          ? profile?.accountNumber
-                          : maskAccount(profile?.accountNumber)
-                      }
-                    />
-                    <Field label="IFSC" value={profile?.IFSCcode} />
-                    <Field label="UPI" value={profile?.UPIID} />
-                  </dl>
-                  <p className="mt-3 flex items-start gap-2 text-sm text-slate-600">
-                    <Phone
-                      size={14}
-                      className="mt-0.5 shrink-0 text-slate-400"
-                    />
-                    {[
-                      profile?.billingAddress1,
-                      profile?.address,
-                      profile?.pincode,
-                    ]
-                      .filter(Boolean)
-                      .join(", ") || "No address"}
-                  </p>
+
+                    {/* Address Full Width Row */}
+                    <div className="col-span-2 flex items-center justify-between gap-2 rounded-2xl bg-indigo-50/40 border border-indigo-100/70 p-2.5 transition hover:bg-indigo-50/70">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100/80 text-indigo-600">
+                          <Phone size={14} />
+                        </div>
+                        <p className="truncate text-xs font-semibold text-slate-700">
+                          {[
+                            profile?.billingAddress1,
+                            profile?.address,
+                            profile?.pincode,
+                          ]
+                            .filter(Boolean)
+                            .join(", ") || "No address"}
+                        </p>
+                      </div>
+                      <ChevronRight
+                        size={16}
+                        className="text-slate-400 shrink-0"
+                      />
+                    </div>
+                  </div>
                 </article>
-                <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                    <Wallet size={16} /> Balance
-                  </h3>
-                  <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                    <li className="flex justify-between">
-                      <span>Opening balance</span>
-                      <span className="font-semibold">
-                        {money(summary?.openingBalance)}
-                      </span>
-                    </li>
-                    <li className="flex justify-between">
-                      <span>Purchases</span>
-                      <span className="font-semibold">
-                        {money(summary?.purchaseTotal)}
-                      </span>
-                    </li>
-                    <li className="flex justify-between">
-                      <span>Returns</span>
-                      <span className="font-semibold">
-                        {money(summary?.returnTotal)}
-                      </span>
-                    </li>
-                    <li className="flex justify-between">
-                      <span>Paid on bills</span>
-                      <span className="font-semibold">
-                        {money(summary?.paidOnBills)}
-                      </span>
-                    </li>
-                    <li className="flex justify-between">
-                      <span>Advance paid</span>
-                      <span className="font-semibold">
-                        {money(summary?.advance)}
-                      </span>
-                    </li>
-                    <li className="flex justify-between">
-                      <span>Pay-in received</span>
-                      <span className="font-semibold">
-                        {money(summary?.payIn)}
-                      </span>
-                    </li>
-                    <li className="flex justify-between border-t border-slate-100 pt-2  text-red-600">
-                      <span className="flex items-center gap-1">
-                        <Scale size={14} /> Outstanding
-                      </span>
-                      <span className="font-bold ">
-                        {money(summary?.outstanding)}
-                      </span>
-                    </li>
+
+                {/* Balance Card */}
+                <article className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
+                        <Wallet size={18} />
+                      </div>
+                      <h3 className="text-base font-bold text-slate-900">
+                        Balance
+                      </h3>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200/60">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Active
+                    </span>
+                  </div>
+
+                  <ul className="mt-3.5 space-y-2.5">
+                    {[
+                      {
+                        label: "Opening balance",
+                        value: money(summary?.openingBalance),
+                        Icon: ArrowDownLeft,
+                        iconBg: "bg-emerald-100/80",
+                        iconColor: "text-emerald-600",
+                      },
+                      {
+                        label: "Purchases",
+                        value: money(summary?.purchaseTotal),
+                        Icon: ShoppingBag,
+                        iconBg: "bg-sky-100/80",
+                        iconColor: "text-sky-600",
+                      },
+                      {
+                        label: "Returns",
+                        value: money(summary?.returnTotal),
+                        Icon: RotateCcw,
+                        iconBg: "bg-emerald-100/80",
+                        iconColor: "text-emerald-600",
+                      },
+                      {
+                        label: "Paid on bills",
+                        value: money(summary?.paidOnBills),
+                        Icon: Receipt,
+                        iconBg: "bg-amber-100/80",
+                        iconColor: "text-amber-600",
+                      },
+                      {
+                        label: "Advance paid",
+                        value: money(summary?.advance),
+                        Icon: Wallet,
+                        iconBg: "bg-purple-100/80",
+                        iconColor: "text-purple-600",
+                      },
+                      {
+                        label: "Pay-in received",
+                        value: money(summary?.payIn),
+                        Icon: Coins,
+                        iconBg: "bg-rose-100/80",
+                        iconColor: "text-rose-600",
+                      },
+                    ].map((item) => {
+                      const Icon = item.Icon;
+                      return (
+                        <li
+                          key={item.label}
+                          className="flex items-center justify-between py-0.5"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${item.iconBg} ${item.iconColor}`}
+                            >
+                              <Icon size={15} />
+                            </div>
+                            <span className="truncate text-xs sm:text-sm font-semibold text-slate-700">
+                              {item.label}
+                            </span>
+                          </div>
+                          <span className="text-xs sm:text-sm font-bold text-slate-900 shrink-0">
+                            {item.value}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
+
+                  {/* Outstanding Full Width Row */}
+                  <div className="mt-3 flex items-center justify-between rounded-2xl bg-rose-50/90 border border-rose-100/90 px-3.5 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <Scale size={16} className="text-rose-600" />
+                      <span className="text-xs sm:text-sm font-bold text-rose-700">
+                        Outstanding
+                      </span>
+                    </div>
+                    <span className="text-xs sm:text-sm font-black text-rose-700">
+                      {money(summary?.outstanding)}
+                    </span>
+                  </div>
                 </article>
               </div>
             </div>
@@ -1059,9 +1343,9 @@ export default function Vendor360Modal({
                         onClick={() =>
                           downloadReceipt(profile?.name || vendor.name, payment)
                         }
-                        className="inline-flex items-center gap-1 self-start rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700"
+                        className="inline-flex items-center gap-1.5 self-start rounded-xl bg-blue-50 border border-blue-200/90 hover:bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700 shadow-2xs active:scale-95 transition-all cursor-pointer"
                       >
-                        <Download size={13} /> Receipt
+                        <Download size={13} className="text-blue-600" /> Receipt
                       </button>
                     </li>
                   ))}
@@ -1175,9 +1459,9 @@ export default function Vendor360Modal({
                     setDocIndex(0);
                     setDocOpen(true);
                   }}
-                  className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200/90 px-3 py-2 text-sm font-bold text-blue-700 hover:bg-blue-100 shadow-2xs active:scale-95 transition-all cursor-pointer"
                 >
-                  <FileText size={14} />
+                  <FileText size={14} className="text-blue-600" />
                   {billDocs.length > 1
                     ? `View uploaded files (${billDocs.length})`
                     : "View uploaded file"}
@@ -1186,7 +1470,7 @@ export default function Vendor360Modal({
               <button
                 type="button"
                 onClick={() => void closeIfConfirmed(() => setBill(null))}
-                className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-600"
+                className="rounded-xl bg-slate-100 border border-slate-200/80 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 shadow-2xs active:scale-95 transition-all cursor-pointer"
               >
                 Close
               </button>
@@ -1195,8 +1479,9 @@ export default function Vendor360Modal({
                   <button
                     type="button"
                     onClick={() => payBill(bill)}
-                    className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-bold text-white"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200/90 px-3.5 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 shadow-2xs active:scale-95 transition-all cursor-pointer"
                   >
+                    <IndianRupee size={14} className="text-emerald-600" />
                     Select and pay {money(bill.dueAmount)}
                   </button>
                 </Can>
@@ -1282,25 +1567,52 @@ export default function Vendor360Modal({
             </p>
             <div className="mt-4 grid gap-3">
               <div className="grid grid-cols-3 gap-2">
-                {(["pay-out", "pay-in", "adjustment"] as const).map(
-                  (direction) => (
-                    <button
-                      key={direction}
-                      type="button"
-                      onClick={() =>
-                        setForm((current) => ({
-                          ...current,
-                          direction,
-                          purchaseIds:
-                            direction === "pay-out" ? current.purchaseIds : [],
-                        }))
-                      }
-                      className={`rounded-xl px-2 py-2 text-xs font-bold ${form.direction === direction ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-600"}`}
-                    >
-                      {direction}
-                    </button>
-                  ),
-                )}
+                {(
+                  [
+                    {
+                      key: "pay-out",
+                      label: "Pay-out",
+                      active:
+                        "bg-purple-100 text-purple-800 border-2 border-purple-400/80 shadow-xs",
+                      inactive:
+                        "bg-purple-50/60 text-purple-700/80 border border-purple-200/60 hover:bg-purple-100/70",
+                    },
+                    {
+                      key: "pay-in",
+                      label: "Pay-in",
+                      active:
+                        "bg-emerald-100 text-emerald-800 border-2 border-emerald-400/80 shadow-xs",
+                      inactive:
+                        "bg-emerald-50/60 text-emerald-700/80 border border-emerald-200/60 hover:bg-emerald-100/70",
+                    },
+                    {
+                      key: "adjustment",
+                      label: "Adjustment",
+                      active:
+                        "bg-amber-100 text-amber-800 border-2 border-amber-400/80 shadow-xs",
+                      inactive:
+                        "bg-amber-50/60 text-amber-700/80 border border-amber-200/60 hover:bg-amber-100/70",
+                    },
+                  ] as const
+                ).map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() =>
+                      setForm((current) => ({
+                        ...current,
+                        direction: item.key,
+                        purchaseIds:
+                          item.key === "pay-out" ? current.purchaseIds : [],
+                      }))
+                    }
+                    className={`rounded-xl px-2 py-2 text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer ${
+                      form.direction === item.key ? item.active : item.inactive
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
               {form.direction === "adjustment" ? (
                 <select
@@ -1443,7 +1755,7 @@ export default function Vendor360Modal({
                   setPayOpen(false);
                   setPayDoc("");
                 }}
-                className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-600"
+                className="rounded-xl bg-slate-100 border border-slate-200/80 px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 shadow-2xs active:scale-95 transition-all cursor-pointer"
               >
                 Cancel
               </button>
@@ -1451,7 +1763,7 @@ export default function Vendor360Modal({
                 type="button"
                 disabled={saving}
                 onClick={() => void submitPayment()}
-                className="rounded-xl bg-violet-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                className="rounded-xl bg-purple-50 border border-purple-200/90 px-4 py-2 text-sm font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-300 shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-60"
               >
                 {saving ? "Saving…" : "Confirm"}
               </button>
@@ -1826,9 +2138,9 @@ function BillTable({
                             event.stopPropagation();
                             onPay(row);
                           }}
-                          className="rounded-lg bg-violet-600 px-2 py-1 text-xs font-bold text-white"
+                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200/90 hover:bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700 shadow-2xs active:scale-95 transition-all cursor-pointer"
                         >
-                          Pay {money(row.dueAmount)}
+                          <IndianRupee size={12} className="text-emerald-600" /> Pay {money(row.dueAmount)}
                         </button>
                       ) : (
                         <span className="text-xs text-slate-400">Settled</span>
@@ -1879,9 +2191,9 @@ function BillTable({
                       e.stopPropagation();
                       onPay(row);
                     }}
-                    className="rounded-lg bg-violet-600 px-2 py-1 text-[11px] font-bold text-white shadow-xs"
+                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200/90 hover:bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700 shadow-2xs active:scale-95 transition-all cursor-pointer"
                   >
-                    Pay
+                    <IndianRupee size={11} className="text-emerald-600" /> Pay
                   </button>
                 ) : null}
               </div>

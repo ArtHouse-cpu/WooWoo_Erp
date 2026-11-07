@@ -5,7 +5,9 @@ import {
   FilePlus2,
   FileText,
   Globe,
+  History,
   IndianRupee,
+  LayoutDashboard,
   Loader2,
   Mail,
   Package,
@@ -13,6 +15,7 @@ import {
   Search,
   ShoppingBag,
   ShoppingCart,
+  TrendingUp,
   User,
   Users,
   Wallet,
@@ -440,28 +443,79 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
           </div>
         ) : null}
 
-        <div className="flex shrink-0 gap-5 overflow-x-auto border-b border-slate-100 px-4 sm:gap-8 sm:px-5">
+        <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-slate-100 bg-slate-50/50 px-4 py-2.5 sm:px-5 scrollbar-none">
           {(
             [
-              ["overview", "Overview"],
-              ["products", "Products"],
-              ["sales", "Sales"],
-              ["timeline", "Timeline"],
+              {
+                id: "overview",
+                label: "Overview",
+                Icon: LayoutDashboard,
+                activeClass:
+                  "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 ring-1 ring-blue-600",
+                inactiveClass:
+                  "bg-blue-50/70 text-blue-700 hover:bg-blue-100/90 border border-blue-200/70",
+                badge: null,
+              },
+              {
+                id: "products",
+                label: "Products",
+                Icon: Package,
+                activeClass:
+                  "bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-md shadow-purple-500/25 ring-1 ring-purple-600",
+                inactiveClass:
+                  "bg-purple-50/70 text-purple-700 hover:bg-purple-100/90 border border-purple-200/70",
+                badge: products.length,
+              },
+              {
+                id: "sales",
+                label: "Sales",
+                Icon: TrendingUp,
+                activeClass:
+                  "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/25 ring-1 ring-emerald-600",
+                inactiveClass:
+                  "bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100/90 border border-emerald-200/70",
+                badge: sales.length,
+              },
+              {
+                id: "timeline",
+                label: "Timeline",
+                Icon: History,
+                activeClass:
+                  "bg-gradient-to-r from-amber-500 to-[#ff5a36] text-white shadow-md shadow-orange-500/25 ring-1 ring-[#ff5a36]",
+                inactiveClass:
+                  "bg-orange-50/70 text-orange-700 hover:bg-orange-100/90 border border-orange-200/70",
+                badge: null,
+              },
             ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`-mb-px shrink-0 border-b-2 py-3 text-sm font-bold cursor-pointer ${
-                tab === id
-                  ? "border-[#ff5a36] text-[#ff5a36]"
-                  : "border-transparent text-slate-400 hover:text-slate-700"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          ).map((item) => {
+            const isActive = tab === item.id;
+            const Icon = item.Icon;
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer whitespace-nowrap active:scale-95 ${
+                  isActive ? item.activeClass : item.inactiveClass
+                }`}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span>{item.label}</span>
+                {item.badge != null && (
+                  <span
+                    className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none ${
+                      isActive
+                        ? "bg-white text-purple-900 shadow-xs"
+                        : "bg-white/90 text-slate-700 border border-slate-200/70"
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] px-3 py-3 sm:px-5 sm:py-4">
