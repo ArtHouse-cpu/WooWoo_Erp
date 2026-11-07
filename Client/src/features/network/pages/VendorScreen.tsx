@@ -626,28 +626,28 @@ Cell: ({ row }) => (
 
   return (
     <div className="p-1">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Vendors List</h1>
-          <p className="text-sm text-slate-500">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="truncate text-base font-semibold text-slate-900 sm:text-xl">Vendors List</h1>
+          <p className="text-xs text-slate-500 sm:text-sm">
             {loadingVendors
               ? "Loading..."
               : `${vendors.length.toLocaleString("en-IN")} vendors`}
           </p>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <Can permission={PERMISSIONS.VENDOR_CREATE}>
             <button
               type="button"
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 sm:w-auto"
+              className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2 text-[11px] font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 sm:gap-1.5 sm:px-4 sm:py-2.5 sm:text-sm"
               onClick={() => setOpenImportVendorModal(true)}
             >
-              <FileSpreadsheet size={16} />
+              <FileSpreadsheet size={14} className="shrink-0" />
               Excel Import
             </button>
             <button
               type="button"
-              className="w-full rounded-lg bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-900 sm:w-auto"
+              className="whitespace-nowrap rounded-lg bg-black px-2 py-2 text-[11px] font-semibold text-white transition hover:bg-neutral-900 sm:px-4 sm:py-2.5 sm:text-sm"
               onClick={() => {
                 setEditingVendor(null);
                 setOpenCreateVendorModal(true);

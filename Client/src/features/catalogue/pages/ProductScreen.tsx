@@ -15,12 +15,14 @@ import {
   type MRT_SortingState,
 } from "material-react-table";
 import {
+  AlertTriangle,
   ArrowDownCircle,
   ArrowUpCircle,
   Boxes,
   ChevronDown,
   Package,
   LayoutList,
+  Plus,
   Search,
   ShoppingBasket,
   SquarePen,
@@ -70,6 +72,7 @@ type ProductStats = {
   totalStockQty: number;
   inStockCount: number;
   outOfStockCount: number;
+  lowStockCount: number;
   categoryCount: number;
 };
 
@@ -167,6 +170,7 @@ export default function ProductScreen() {
     totalStockQty: 0,
     inStockCount: 0,
     outOfStockCount: 0,
+    lowStockCount: 0,
     categoryCount: 0,
   });
 
@@ -260,6 +264,7 @@ export default function ProductScreen() {
             totalStockQty: Number(prodRes.stats.totalStockQty ?? 0),
             inStockCount: Number(prodRes.stats.inStockCount ?? 0),
             outOfStockCount: Number(prodRes.stats.outOfStockCount ?? 0),
+            lowStockCount: Number(prodRes.stats.lowStockCount ?? 0),
             categoryCount: Number(prodRes.stats.categoryCount ?? 0),
           });
         } else if (!append) {
@@ -312,28 +317,48 @@ export default function ProductScreen() {
     return () => controller.abort();
   }, [reloadFromStart]);
 
+  const loadNextPage = useCallback(() => {
+    if (products.length === 0 || fetchLockRef.current || loading || isFetchingMore || !hasMore) return;
+    fetchLockRef.current = true;
+    void fetchPage({
+      pageToLoad: page + 1,
+      append: true,
+      withStats: false,
+    });
+  }, [fetchPage, hasMore, isFetchingMore, loading, page, products.length]);
+
   const fetchMoreOnBottomReached = useCallback(
     (container?: HTMLDivElement | null) => {
-      if (!container || fetchLockRef.current || loading || isFetchingMore) {
-        return;
-      }
-      if (!hasMore) return;
+      if (!container || container.clientHeight < 80) return;
       const { scrollHeight, scrollTop, clientHeight } = container;
-      if (scrollHeight - scrollTop - clientHeight < 400) {
-        fetchLockRef.current = true;
-        void fetchPage({
-          pageToLoad: page + 1,
-          append: true,
-          withStats: false,
-        });
-      }
+      if (scrollHeight <= clientHeight) return;
+      if (scrollHeight - scrollTop - clientHeight < 400) loadNextPage();
     },
-    [fetchPage, hasMore, isFetchingMore, loading, page],
+    [loadNextPage],
   );
 
   useEffect(() => {
-    fetchMoreOnBottomReached(tableContainerRef.current);
-  }, [fetchMoreOnBottomReached, products.length]);
+    const container = tableContainerRef.current;
+    if (!container || container.clientHeight < 80 || !hasMore || loading || isFetchingMore) {
+      return;
+    }
+    if (container.scrollHeight <= container.clientHeight + 8) loadNextPage();
+  }, [products.length, hasMore, loading, isFetchingMore, loadNextPage]);
+
+  const mobileSentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const node = mobileSentinelRef.current;
+    if (!node || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadNextPage();
+      },
+      { rootMargin: "280px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, loadNextPage, products.length]);
 
   const handleSubmitProduct = async (formData: FormData) => {
     try {
@@ -818,7 +843,7 @@ export default function ProductScreen() {
       valueClass: "text-emerald-950",
     },
     {
-      title: "Products Out",
+      title: "Out of Stock",
       short: "Out",
       value: outOfStockComputed,
       Icon: ArrowUpCircle,
@@ -827,23 +852,36 @@ export default function ProductScreen() {
       titleClass: "text-rose-900",
       valueClass: "text-rose-950",
     },
+    {
+      title: "Low Stock",
+      short: "Low",
+      value: stats.lowStockCount,
+      Icon: AlertTriangle,
+      bgClass: "bg-amber-50/80 border-amber-200/80 hover:border-amber-300",
+      iconWrapClass: "bg-amber-500 text-white shadow-xs shadow-amber-500/20",
+      titleClass: "text-amber-900",
+      valueClass: "text-amber-950",
+    },
   ];
 
   return (
     <div className="min-w-0 p-1">
-      <div className="mb-2 flex items-center justify-between gap-2 sm:mb-4">
-        <h1 className="min-w-0 truncate text-base font-semibold sm:text-xl">
+      <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
+        <h1 className="min-w-0 truncate text-lg font-semibold text-slate-900 sm:text-xl">
           Products List
         </h1>
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+        <div className="flex shrink-0 items-center">
           <Can permission={PERMISSIONS.PRODUCT_CREATE}>
             <button
               type="button"
-              onClick={() => setShowCreateModal(true)}
-              className="cursor-pointer rounded bg-black px-2 py-1 text-xs font-semibold text-white transition sm:px-3 sm:py-2 sm:text-[14px]"
+              onClick={() => {
+                setEditProduct(null);
+                setShowCreateModal(true);
+              }}
+              className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.99] sm:min-h-11 sm:gap-2 sm:px-4 sm:py-2.5"
             >
-              <span className="sm:hidden">+ Add</span>
-              <span className="hidden sm:inline">+ Add Product</span>
+              <Plus size={16} strokeWidth={2.5} />
+              Add Product
             </button>
           </Can>
 
@@ -914,13 +952,11 @@ export default function ProductScreen() {
           )}
         </div>
       </div>
-      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-5">
-        {cards.map((item, index) => (
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
+        {cards.map((item) => (
           <div
             key={item.title}
-            className={`min-w-0 rounded-2xl border p-2.5 sm:p-4 shadow-xs transition duration-300 hover:shadow-md ${item.bgClass} ${
-              index === 4 ? "col-span-2 sm:col-span-1" : ""
-            }`}
+            className={`min-w-0 rounded-2xl border p-2.5 sm:p-4 shadow-xs transition duration-300 hover:shadow-md ${item.bgClass}`}
           >
             <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
               <div
@@ -1212,24 +1248,15 @@ export default function ProductScreen() {
           </div>
         )}
 
-        {hasMore && (
-          <div className="pt-2 text-center">
-            <button
-              type="button"
-              disabled={isFetchingMore}
-              onClick={() =>
-                void fetchPage({
-                  pageToLoad: page + 1,
-                  append: true,
-                  withStats: false,
-                })
-              }
-              className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-50"
-            >
-              {isFetchingMore ? "Loading more..." : "Load More Products"}
-            </button>
-          </div>
-        )}
+        <div ref={mobileSentinelRef} className="h-6" />
+        {isFetchingMore ? (
+          <p className="pb-2 text-center text-xs font-medium text-slate-500">
+            Loading more products...
+          </p>
+        ) : null}
+        {!hasMore && products.length > 0 ? (
+          <p className="pb-2 text-center text-xs text-slate-400">End of list</p>
+        ) : null}
       </div>
 
       {/* Product View Details Modal */}
