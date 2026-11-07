@@ -1,11 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
-import { Boxes, Search, Briefcase, LayoutList, SquarePen, Trash2, X } from "lucide-react";
+import {
+  Boxes,
+  Search,
+  Briefcase,
+  LayoutList,
+  SquarePen,
+  Trash2,
+  X,
+  Plus,
+  ChevronDown,
+  Armchair,
+  Crown,
+  ShoppingBag,
+} from "lucide-react";
 import {
   handleGetServices,
   handleCreateService,
@@ -65,6 +78,27 @@ export default function ServiceScreen() {
   const [editAdditionalService, setEditAdditionalService] =
     useState<AdditionalServiceItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Top right Add button dropdown
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        addMenuRef.current &&
+        !addMenuRef.current.contains(event.target as Node)
+      ) {
+        setAddMenuOpen(false);
+      }
+    };
+    if (addMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [addMenuOpen]);
 
   const filteredServices = useMemo(() => {
     if (!searchQuery.trim()) return services;
@@ -613,28 +647,34 @@ export default function ServiceScreen() {
           title: "Total Services",
           value: services.length,
           Icon: Briefcase,
-          bgClass: "bg-blue-50/80 border-blue-200/80 hover:border-blue-300",
-          iconWrapClass: "bg-blue-500 text-white shadow-xs shadow-blue-500/20",
-          titleClass: "text-blue-900",
-          valueClass: "text-blue-950",
+          WatermarkIcon: ShoppingBag,
+          bgClass: "bg-blue-50/60 border-blue-100/90 hover:border-blue-200",
+          iconWrapClass: "bg-blue-600 text-white shadow-xs shadow-blue-500/20",
+          watermarkClass: "text-blue-200/50",
+          titleClass: "text-slate-900",
+          valueClass: "text-slate-900",
         },
         {
           title: "Service Categories",
           value: uniqueCategories,
-          Icon: LayoutList,
-          bgClass: "bg-purple-50/80 border-purple-200/80 hover:border-purple-300",
-          iconWrapClass: "bg-purple-500 text-white shadow-xs shadow-purple-500/20",
-          titleClass: "text-purple-900",
-          valueClass: "text-purple-950",
+          Icon: Armchair,
+          WatermarkIcon: Armchair,
+          bgClass: "bg-purple-50/60 border-purple-100/90 hover:border-purple-200",
+          iconWrapClass: "bg-purple-600 text-white shadow-xs shadow-purple-500/20",
+          watermarkClass: "text-purple-200/50",
+          titleClass: "text-slate-900",
+          valueClass: "text-slate-900",
         },
         {
           title: "Active Services",
           value: services.length,
           Icon: Boxes,
-          bgClass: "bg-emerald-50/80 border-emerald-200/80 hover:border-emerald-300",
-          iconWrapClass: "bg-emerald-500 text-white shadow-xs shadow-emerald-500/20",
-          titleClass: "text-emerald-900",
-          valueClass: "text-emerald-950",
+          WatermarkIcon: Crown,
+          bgClass: "bg-amber-50/60 border-amber-100/90 hover:border-amber-200",
+          iconWrapClass: "bg-amber-500 text-white shadow-xs shadow-amber-500/20",
+          watermarkClass: "text-amber-200/50",
+          titleClass: "text-amber-950",
+          valueClass: "text-slate-900",
         },
       ];
     }
@@ -643,21 +683,25 @@ export default function ServiceScreen() {
         title: "Total Additional Services",
         value: additionalServices.length,
         Icon: Briefcase,
-        bgClass: "bg-blue-50/80 border-blue-200/80 hover:border-blue-300",
-        iconWrapClass: "bg-blue-500 text-white shadow-xs shadow-blue-500/20",
-        titleClass: "text-blue-900",
-        valueClass: "text-blue-950",
+        WatermarkIcon: ShoppingBag,
+        bgClass: "bg-blue-50/60 border-blue-100/90 hover:border-blue-200",
+        iconWrapClass: "bg-blue-600 text-white shadow-xs shadow-blue-500/20",
+        watermarkClass: "text-blue-200/50",
+        titleClass: "text-slate-900",
+        valueClass: "text-slate-900",
       },
       {
         title: "Coworking Amenities",
         value: additionalServices.filter(
           (s) => s.spaceType === "all" || s.spaceType === "coworking",
         ).length,
-        Icon: LayoutList,
-        bgClass: "bg-purple-50/80 border-purple-200/80 hover:border-purple-300",
-        iconWrapClass: "bg-purple-500 text-white shadow-xs shadow-purple-500/20",
-        titleClass: "text-purple-900",
-        valueClass: "text-purple-950",
+        Icon: Armchair,
+        WatermarkIcon: Armchair,
+        bgClass: "bg-purple-50/60 border-purple-100/90 hover:border-purple-200",
+        iconWrapClass: "bg-purple-600 text-white shadow-xs shadow-purple-500/20",
+        watermarkClass: "text-purple-200/50",
+        titleClass: "text-slate-900",
+        valueClass: "text-slate-900",
       },
       {
         title: "Exclusive Amenities",
@@ -665,10 +709,12 @@ export default function ServiceScreen() {
           (s) => s.spaceType === "all" || s.spaceType === "exclusive",
         ).length,
         Icon: Boxes,
-        bgClass: "bg-amber-50/80 border-amber-200/80 hover:border-amber-300",
+        WatermarkIcon: Crown,
+        bgClass: "bg-amber-50/60 border-amber-100/90 hover:border-amber-200",
         iconWrapClass: "bg-amber-500 text-white shadow-xs shadow-amber-500/20",
-        titleClass: "text-amber-900",
-        valueClass: "text-amber-950",
+        watermarkClass: "text-amber-200/50",
+        titleClass: "text-amber-950",
+        valueClass: "text-slate-900",
       },
     ];
   }, [
@@ -680,111 +726,147 @@ export default function ServiceScreen() {
   ]);
 
   return (
-    <div className="min-w-0 p-1">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-xl font-semibold">
-            {activeTable === "services"
-              ? "Services List"
-              : "Additional Services List"}
-          </h1>
+    <div className="min-w-0 p-1 space-y-3">
+      {/* Top Header Row: Title on left, + Add dropdown on top right corner */}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-base sm:text-xl font-bold tracking-tight text-slate-900">
+          {activeTable === "services"
+            ? "Services List"
+            : "Additional Services List"}
+        </h1>
 
-          {/* Toggle between Current MRT Table and Additional Service MRT Table */}
-          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100/90 p-1 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setActiveTable("services")}
-              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1 text-xs sm:text-sm font-semibold transition ${
-                activeTable === "services"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Briefcase size={14} />
-              <span>Services</span>
-              <span
-                className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                  activeTable === "services"
-                    ? "bg-white/20 text-white"
-                    : "bg-slate-200 text-slate-700"
-                }`}
-              >
-                {services.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTable("additional")}
-              className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1 text-xs sm:text-sm font-semibold transition ${
-                activeTable === "additional"
-                  ? "bg-indigo-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Boxes size={14} />
-              <span>Additional Services</span>
-              <span
-                className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
-                  activeTable === "additional"
-                    ? "bg-white/20 text-white"
-                    : "bg-slate-200 text-slate-700"
-                }`}
-              >
-                {additionalServices.length}
-              </span>
-            </button>
-          </div>
-        </div>
-
+        {/* Right: + Add Dropdown Button in the Top Right Corner */}
         <Can permission={PERMISSIONS.SERVICE_CREATE}>
-          <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-3">
+          <div className="relative shrink-0" ref={addMenuRef}>
             <button
               type="button"
-              onClick={() => {
-                setEditAdditionalService(null);
-                setShowAdditionalModal(true);
-              }}
-              className="flex-1 cursor-pointer rounded-xl bg-slate-900 px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 shadow-xs sm:flex-none sm:px-4 sm:py-2 sm:text-[14px] whitespace-nowrap text-center"
+              onClick={() => setAddMenuOpen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
             >
-              + Additional Services
+              <Plus size={15} />
+              <span>Add</span>
+              <ChevronDown
+                size={13}
+                className={`transition-transform duration-200 ${addMenuOpen ? "rotate-180" : ""}`}
+              />
             </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setEditService(null);
-                setActiveTable("services");
-                setShowCreateModal(true);
-              }}
-              className="flex-1 cursor-pointer rounded-xl bg-blue-600 px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 shadow-xs sm:flex-none sm:px-4 sm:py-2 sm:text-[14px] whitespace-nowrap text-center"
-            >
-              + Create Service
-            </button>
+            {addMenuOpen && (
+              <div className="absolute right-0 top-full mt-1.5 z-40 w-48 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl ring-1 ring-slate-900/5 animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddMenuOpen(false);
+                    setEditService(null);
+                    setActiveTable("services");
+                    setShowCreateModal(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 transition"
+                >
+                  <Briefcase size={16} className="text-slate-500" />
+                  <span>Service</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddMenuOpen(false);
+                    setEditAdditionalService(null);
+                    setActiveTable("additional");
+                    setShowAdditionalModal(true);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 transition border-t border-slate-100"
+                >
+                  <Boxes size={16} className="text-slate-500" />
+                  <span>Additional Service</span>
+                </button>
+              </div>
+            )}
           </div>
         </Can>
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+      {/* Tabs Row */}
+      <div>
+        <div className="rounded-2xl border border-blue-100/80 bg-blue-50/20 p-1 flex items-center gap-1.5 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setActiveTable("services")}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2 px-3 text-xs sm:text-sm font-bold transition duration-200 ${
+              activeTable === "services"
+                ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/20"
+                : "bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-slate-200/50"
+            }`}
+          >
+            <Briefcase size={15} className={activeTable === "services" ? "text-white" : "text-slate-700"} />
+            <span>Services</span>
+            <span
+              className={`ml-1 rounded-full px-2 py-0.5 text-xs font-bold ${
+                activeTable === "services"
+                  ? "bg-white text-blue-700 shadow-2xs"
+                  : "bg-blue-100/70 text-blue-800"
+              }`}
+            >
+              {services.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTable("additional")}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2 px-3 text-xs sm:text-sm font-bold transition duration-200 ${
+              activeTable === "additional"
+                ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md shadow-blue-500/20"
+                : "bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-slate-200/50"
+            }`}
+          >
+            <Boxes size={15} className={activeTable === "additional" ? "text-white" : "text-slate-700"} />
+            <span>Additional Services</span>
+            <span
+              className={`ml-1 rounded-full px-2 py-0.5 text-xs font-bold ${
+                activeTable === "additional"
+                  ? "bg-white text-blue-700 shadow-2xs"
+                  : "bg-blue-100/70 text-blue-800"
+              }`}
+            >
+              {additionalServices.length}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
         {cards.map((item, index) => (
           <div
             key={item.title}
-            className={`min-w-0 rounded-2xl border p-2.5 sm:p-4 shadow-xs transition duration-300 hover:shadow-md ${item.bgClass} ${
-              index === 2 ? "col-span-2 sm:col-span-1" : ""
+            className={`min-w-0 rounded-2xl border p-2.5 sm:p-3.5 shadow-2xs transition duration-300 hover:shadow-md relative overflow-hidden ${item.bgClass} ${
+              index === 2 ? "col-span-2" : "col-span-1"
             }`}
           >
-            <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+            {/* Watermark Icon */}
+            <item.WatermarkIcon
+              className={`absolute -right-2 -bottom-2 sm:-right-3 sm:-bottom-3 h-14 w-14 sm:h-20 sm:w-20 stroke-[1.2] pointer-events-none transition-transform duration-300 group-hover:scale-105 ${item.watermarkClass}`}
+            />
+
+            <div className="relative z-10 flex items-center gap-2 sm:gap-2.5">
               <div
-                className={`flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl shadow-xs ${item.iconWrapClass}`}
+                className={`flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl shadow-xs ${item.iconWrapClass}`}
               >
                 <item.Icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <span className={`min-w-0 truncate text-xs font-semibold sm:text-sm ${item.titleClass}`}>
-                {item.title}
-              </span>
-            </div>
-            <div className={`mt-1.5 text-lg font-bold sm:mt-3 sm:text-2xl ${item.valueClass}`}>
-              {item.value}
+              <div className="min-w-0 flex-1">
+                <span
+                  className={`block truncate text-[10px] sm:text-xs font-bold ${item.titleClass}`}
+                  title={item.title}
+                >
+                  {item.title}
+                </span>
+                <div
+                  className={`mt-0.5 text-lg sm:text-2xl font-extrabold tabular-nums ${item.valueClass}`}
+                >
+                  {item.value}
+                </div>
+              </div>
             </div>
           </div>
         ))}

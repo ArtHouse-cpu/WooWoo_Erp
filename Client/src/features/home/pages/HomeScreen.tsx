@@ -4006,9 +4006,17 @@ export default function HomeScreen() {
           open={showViewCustomerModal}
           customer={viewCustomer}
           onClose={() => {
-            }}
+            setShowViewCustomerModal(false);
+            setViewCustomer(null);
+          }}
           onUpdated={async () => {
             await loadDashboardData();
+          }}
+          onEdit={(c) => {
+            setShowViewCustomerModal(false);
+            setViewCustomer(null);
+            setEditCustomer(c as CustomerPayload);
+            setShowEditCustomerModal(true);
           }}
         />
       )}

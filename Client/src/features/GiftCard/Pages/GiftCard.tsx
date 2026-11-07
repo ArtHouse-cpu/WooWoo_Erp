@@ -8,7 +8,21 @@ import {
   type MRT_ColumnDef,
 } from "material-react-table";
 
-import { Eye, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Check,
+  Copy,
+  CreditCard,
+  Eye,
+  Gift,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Share2,
+  Trash2,
+  Wallet,
+  X,
+} from "lucide-react";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
 import { useAuthStore } from "@/store/authStore";
@@ -64,6 +78,20 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return err?.response?.data?.message || fallback;
 };
 
+const LIGHT_PALETTES = [
+  { progress: "bg-violet-500", text: "text-violet-700", bg: "bg-violet-50", border: "border-violet-200" },
+  { progress: "bg-sky-500", text: "text-sky-700", bg: "bg-sky-50", border: "border-sky-200" },
+  { progress: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
+  { progress: "bg-amber-500", text: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
+  { progress: "bg-rose-500", text: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200" },
+];
+
+function formatExpiryDate(dateStr?: string): string {
+  if (!dateStr) return "-";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : dateStr;
+}
+
 const GiftCard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [cards, setCards] = useState<GiftCardData[]>([]);
@@ -73,10 +101,49 @@ const GiftCard = () => {
   const [viewCard, setViewCard] = useState<GiftCardData | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [shareCard, setShareCard] = useState<GiftCardData | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const { can } = usePermission();
   const canCreate = can(PERMISSIONS.GIFT_CARD_CREATE);
   const canUpdate = can(PERMISSIONS.GIFT_CARD_UPDATE);
   const canDelete = can(PERMISSIONS.GIFT_CARD_DELETE);
+
+  const stats = useMemo(() => {
+    const total = cards.length;
+    const active = cards.filter((c) => c.status === "Active").length;
+    const used = cards.filter((c) => c.status === "Used").length;
+    const balance = cards.reduce(
+      (sum, c) => sum + (Number(c.currentBalance) || 0),
+      0,
+    );
+    return { total, active, used, balance };
+  }, [cards]);
+
+  const filteredCards = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return cards.filter((card) => {
+      if (statusFilter !== "All" && card.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        card.code.toLowerCase().includes(q) ||
+        card.name.toLowerCase().includes(q) ||
+        card.createdBy.toLowerCase().includes(q)
+      );
+    });
+  }, [cards, search, statusFilter]);
+
+  const handleCopyCode = async (code: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      toast.success(`Copied ${code}`);
+      setTimeout(() => setCopiedCode(null), 1500);
+    } catch {
+      toast.error("Failed to copy code");
+    }
+  };
 
   useEffect(() => {
     if (searchParams.get("create") !== "1") return;
@@ -385,7 +452,7 @@ const GiftCard = () => {
   // MRT Table
   const table = useMaterialReactTable({
     columns,
-    data: cards,
+    data: filteredCards,
     getRowId: (row) => row._id,
 
     enableColumnActions: false,
@@ -413,21 +480,23 @@ const GiftCard = () => {
   });
 
   return (
-    <div className="min-w-0 p-1">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Gift Cards</h1>
+    <div className="min-w-0 space-y-3.5 p-1 sm:p-2">
+      {/* Header: Title on left, + Create button parallel in the same line on right */}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-base sm:text-xl font-bold tracking-tight text-slate-900">
+          Gift Cards
+        </h1>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => void loadCards()}
             disabled={loading}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-gray-300 px-3 py-2 text-[14px] font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             title="Refresh"
           >
-            <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-            Refresh
+            <RefreshCw size={13} className={loading ? "animate-spin text-violet-600" : ""} />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
 
           {canCreate && (
@@ -437,16 +506,320 @@ const GiftCard = () => {
                 setSelectedCard(null);
                 setShowModal(true);
               }}
-              className="cursor-pointer rounded bg-black px-4 py-2 text-[14px] font-semibold text-white transition hover:bg-gray-800"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-95"
             >
-              + Create Gift Card
+              <Plus size={15} />
+              <span>+ Create</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* MRT Table */}
-      <MaterialReactTable table={table} />
+      {/* Colorful Top KPI Stat Cards */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
+        {/* Total Gift Cards */}
+        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-violet-100/90 bg-violet-50/60 p-2.5 sm:p-3.5 shadow-2xs transition duration-300 hover:shadow-md hover:border-violet-200">
+          <Gift className="absolute -right-2 -bottom-2 sm:-right-3 sm:-bottom-3 h-14 w-14 sm:h-20 sm:w-20 stroke-[1.2] pointer-events-none text-violet-200/50" />
+          <div className="relative z-10 flex items-center gap-2 sm:gap-2.5">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-xs shadow-violet-500/20">
+              <Gift className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-[10px] sm:text-xs font-bold text-slate-800" title="Total Cards">
+                Total Cards
+              </span>
+              <div className="mt-0.5 text-lg sm:text-2xl font-extrabold tabular-nums text-slate-900">
+                {stats.total}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Cards */}
+        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-emerald-100/90 bg-emerald-50/60 p-2.5 sm:p-3.5 shadow-2xs transition duration-300 hover:shadow-md hover:border-emerald-200">
+          <Wallet className="absolute -right-2 -bottom-2 sm:-right-3 sm:-bottom-3 h-14 w-14 sm:h-20 sm:w-20 stroke-[1.2] pointer-events-none text-emerald-200/50" />
+          <div className="relative z-10 flex items-center gap-2 sm:gap-2.5">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs shadow-emerald-500/20">
+              <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-[10px] sm:text-xs font-bold text-slate-800" title="Active Cards">
+                Active Cards
+              </span>
+              <div className="mt-0.5 text-lg sm:text-2xl font-extrabold tabular-nums text-slate-900">
+                {stats.active}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Available Balance */}
+        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-blue-100/90 bg-blue-50/60 p-2.5 sm:p-3.5 shadow-2xs transition duration-300 hover:shadow-md hover:border-blue-200">
+          <CreditCard className="absolute -right-2 -bottom-2 sm:-right-3 sm:-bottom-3 h-14 w-14 sm:h-20 sm:w-20 stroke-[1.2] pointer-events-none text-blue-200/50" />
+          <div className="relative z-10 flex items-center gap-2 sm:gap-2.5">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs shadow-blue-500/20">
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-[10px] sm:text-xs font-bold text-slate-800" title="Total Balance">
+                Total Balance
+              </span>
+              <div className="mt-0.5 text-lg sm:text-2xl font-extrabold tabular-nums text-slate-900">
+                ₹{stats.balance.toLocaleString("en-IN")}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Fully Redeemed */}
+        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-amber-100/90 bg-amber-50/60 p-2.5 sm:p-3.5 shadow-2xs transition duration-300 hover:shadow-md hover:border-amber-200">
+          <RefreshCw className="absolute -right-2 -bottom-2 sm:-right-3 sm:-bottom-3 h-14 w-14 sm:h-20 sm:w-20 stroke-[1.2] pointer-events-none text-amber-200/50" />
+          <div className="relative z-10 flex items-center gap-2 sm:gap-2.5">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs shadow-amber-500/20">
+              <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-[10px] sm:text-xs font-bold text-slate-800" title="Redeemed Cards">
+                Redeemed Cards
+              </span>
+              <div className="mt-0.5 text-lg sm:text-2xl font-extrabold tabular-nums text-slate-900">
+                {stats.used}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search and Status Filter in one row */}
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search
+            size={15}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by code, recipient name, or creator..."
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-8 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Filter by status"
+          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs sm:text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 cursor-pointer hover:bg-slate-50 shrink-0"
+        >
+          <option value="All">All Statuses</option>
+          <option value="Active">Active</option>
+          <option value="Used">Used</option>
+          <option value="Expired">Expired</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      {/* Desktop View: Table Form only */}
+      <div className="hidden md:block">
+        <MaterialReactTable table={table} />
+      </div>
+
+      {/* Mobile View: Light, Clean & Compact Card Form only */}
+      <div className="block md:hidden space-y-2.5">
+        {loading && cards.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-violet-600 border-t-transparent" />
+            <p className="mt-2 text-xs font-semibold">Loading gift cards...</p>
+          </div>
+        ) : filteredCards.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+            <Gift className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-2 text-xs font-semibold text-slate-700">No gift cards found</p>
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              {search || statusFilter !== "All"
+                ? "Try adjusting your search or status filter"
+                : "Create your first gift card to get started"}
+            </p>
+          </div>
+        ) : (
+          filteredCards.map((card, index) => {
+            const initial = Math.max(0, Number(card.initialAmount || 0));
+            const balance = Math.max(0, Number(card.currentBalance || 0));
+            const remainingPct =
+              initial > 0 ? Math.min(100, (balance / initial) * 100) : 0;
+            const isCopied = copiedCode === card.code;
+            const palette = LIGHT_PALETTES[index % LIGHT_PALETTES.length];
+
+            return (
+              <div
+                key={card._id}
+                onClick={() => void handleView(card)}
+                className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs space-y-2 transition hover:border-slate-300 cursor-pointer"
+              >
+                {/* Top Row: Code chip + Status + Action buttons */}
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                    {/* Monospace Code Pill */}
+                    <button
+                      type="button"
+                      onClick={(e) => void handleCopyCode(card.code, e)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-dashed border-violet-300 bg-violet-50/70 px-2 py-0.5 font-mono text-[11px] font-bold text-violet-800 hover:bg-violet-100 transition active:scale-95"
+                      title="Copy code"
+                    >
+                      <span>{card.code}</span>
+                      {isCopied ? (
+                        <Check size={11} className="text-emerald-600" />
+                      ) : (
+                        <Copy size={11} className="text-violet-500" />
+                      )}
+                    </button>
+
+                    {/* Status Badge */}
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        card.status === "Active"
+                          ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
+                          : card.status === "Used"
+                          ? "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20"
+                          : card.status === "Expired"
+                          ? "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20"
+                          : "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-600/20"
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          card.status === "Active"
+                            ? "bg-emerald-500"
+                            : card.status === "Used"
+                            ? "bg-blue-500"
+                            : card.status === "Expired"
+                            ? "bg-rose-500"
+                            : "bg-slate-400"
+                        }`}
+                      />
+                      {card.status}
+                    </span>
+
+                    {card.isShared && (
+                      <span
+                        className="inline-flex items-center rounded-full bg-slate-100 p-0.5 text-slate-500"
+                        title="Shared"
+                      >
+                        <Share2 size={11} />
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div
+                    className="flex items-center gap-0.5 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => void handleView(card)}
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                      title="View Details"
+                    >
+                      <Eye size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShareCard(card)}
+                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                      title="Share"
+                    >
+                      <Share2 size={15} />
+                    </button>
+                    {canUpdate && (
+                      <button
+                        type="button"
+                        onClick={() => openEdit(card)}
+                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                        title="Edit"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(card)}
+                        className="rounded-lg p-1 text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                        title="Delete"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Recipient / Name */}
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug truncate">
+                    {card.name || "Gift Card"}
+                  </h3>
+                </div>
+
+                {/* Balance & Progress Box (Compact & Light) */}
+                <div className="rounded-xl bg-slate-50/80 p-2 border border-slate-100 text-xs">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase text-slate-600 block">
+                        Balance
+                      </span>
+                      <span className="text-base sm:text-lg font-extrabold text-slate-900 tabular-nums">
+                        ₹{balance.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-semibold uppercase text-slate-600 block">
+                        Initial
+                      </span>
+                      <span className="text-xs font-bold text-slate-700 tabular-nums">
+                        ₹{initial.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="mt-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-slate-600 mb-0.5">
+                      <span>Remaining</span>
+                      <span className="font-bold">{Math.round(remainingPct)}%</span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${palette.progress} transition-all duration-300`}
+                        style={{ width: `${remainingPct}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer: Created By & Expiry */}
+                <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-slate-600 pt-0.5">
+                  <span className="truncate max-w-[140px]">
+                    {card.createdBy ? `By: ${card.createdBy}` : "—"}
+                  </span>
+                  <span className="font-medium shrink-0">
+                    Exp: {formatExpiryDate(card.expiryDate)}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
 
       {/* Create / Edit Modal */}
       <CreateGiftCardModal

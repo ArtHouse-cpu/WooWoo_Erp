@@ -461,9 +461,7 @@ export default function ManagePlanScreen() {
     <div className="p-3">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
-            <Plus size={18} />
-          </div>
+          
           <div>
             <div className="text-lg sm:text-xl font-semibold text-slate-900">
               Manage Plans
