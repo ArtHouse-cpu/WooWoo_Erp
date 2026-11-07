@@ -47,7 +47,8 @@ function plusHours(start: string, hours: number) {
   const from = timeToMinutes(start);
   if (from == null) return "";
   const total = from + hours * 60;
-  if (total > 21 * 60) return "";
+  if (total > 24 * 60) return "";
+  if (total === 24 * 60) return "24:00";
   const hour = Math.floor(total / 60);
   const minute = total % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
@@ -247,7 +248,9 @@ export default function RescheduleBookingModal({
   const initialDay = /weekend/i.test(String(booking.spaceDay || "")) ? "Weekend" : "Weekday";
   const [date, setDate] = useState(dateInput(booking.bookingDate));
   const [dayType, setDayType] = useState<"Weekday" | "Weekend">(initialDay);
-  const [duration, setDuration] = useState(hoursBetween(booking.startTime, booking.endTime));
+  const [duration, setDuration] = useState(() =>
+    Math.min(6, Math.max(1, hoursBetween(booking.startTime, booking.endTime))),
+  );
   const [start, setStart] = useState(booking.startTime || "09:00");
   const end = plusHours(start, duration);
   const [quote, setQuote] = useState<SpaceRescheduleQuote | null>(null);
@@ -299,20 +302,23 @@ export default function RescheduleBookingModal({
     excludeId: id,
     enabled: view === "reschedule" && Boolean(date),
   });
-  const openSlots = Array.from({ length: 12 }, (_, index) => {
-    const hour = 9 + index;
+  const openSlots: { slotStart: string; slotEnd: string; status: "available" | "booked" | "unavailable" }[] = [];
+  for (let hour = 6; hour < 24; hour += 1) {
     const slotStart = `${String(hour).padStart(2, "0")}:00`;
     const slotEnd = plusHours(slotStart, duration);
-    if (!slotEnd) return null;
-    const status = getSlotAvailability(
-      date,
+    if (!slotEnd) continue;
+    openSlots.push({
       slotStart,
       slotEnd,
-      availability.data?.busy || [],
-      now,
-    );
-    return { slotStart, slotEnd, status };
-  }).filter((slot): slot is { slotStart: string; slotEnd: string; status: "available" | "booked" | "unavailable" } => Boolean(slot));
+      status: getSlotAvailability(
+        date,
+        slotStart,
+        slotEnd,
+        availability.data?.busy || [],
+        now,
+      ),
+    });
+  }
 
   const confirmReschedule = async () => {
     if (!quote) return;
@@ -400,8 +406,17 @@ export default function RescheduleBookingModal({
   const membershipLine = `${quote?.membershipLabel || quote?.membershipType || "General"}${
     quote?.membershipPercent ? ` – ${quote.membershipPercent}% space` : ""
   }`;
+  const clockLabel = (value?: string) => {
+    if (!value) return "";
+    const [hStr, mStr = "00"] = value.split(":");
+    let hour = Number(hStr);
+    if (hour === 24) hour = 0;
+    const period = hour >= 12 ? "PM" : "AM";
+    const display = hour % 12 === 0 ? 12 : hour % 12;
+    return `${String(display).padStart(2, "0")}:${mStr} ${period}`;
+  };
   const timeLabel = (from?: string, to?: string) =>
-    from && to ? `${from} – ${to}` : "—";
+    from && to ? `${clockLabel(from)} – ${clockLabel(to)}` : "—";
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4">

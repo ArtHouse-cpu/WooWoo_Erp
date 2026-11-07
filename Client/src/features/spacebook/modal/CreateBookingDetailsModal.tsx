@@ -168,7 +168,7 @@ export function bookingCustomerDraft(
     membershipType: params.get("membershipType") || "none",
     spaceId: "",
     bookingDate,
-    startTime: "09:00",
+    startTime: "06:00",
     endTime: "12:00",
     status: "Upcoming",
   };
@@ -180,6 +180,7 @@ export type SelectedFoodItem = {
   price: number;
   qty: number;
   unit?: string;
+  applyMembershipDiscount?: boolean;
 };
 
 type CreateBookingDetailsModalProps = {
@@ -419,17 +420,23 @@ export const calculateEndDate = (startDateStr: string, days: number): string => 
   return calculatePlanEndDate(startDateStr, "day", days);
 };
 
+const BOOKING_OPEN_HOUR = 6;
+const BOOKING_CLOSE_HOUR = 24;
+const BOOKING_MAX_HOURS = BOOKING_CLOSE_HOUR - BOOKING_OPEN_HOUR;
+const BOOKING_DEFAULT_HOURS = 3;
+
 export const getTimeSlotsForDuration = (
   duration: number,
-  openingHour = 9,
-  closingHour = 21,
+  openingHour = BOOKING_OPEN_HOUR,
+  closingHour = BOOKING_CLOSE_HOUR,
 ): string[] => {
   const slots: string[] = [];
   const dur = Math.max(1, Math.min(closingHour - openingHour, Math.round(duration || 1)));
 
   const formatTime = (hour: number) => {
-    const period = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+    const normalized = hour === 24 ? 0 : hour;
+    const period = normalized >= 12 ? "PM" : "AM";
+    const displayHour = normalized % 12 === 0 ? 12 : normalized % 12;
     return `${String(displayHour).padStart(2, "0")}:00 ${period}`;
   };
 
@@ -528,11 +535,12 @@ export const formatDateDisplay = (value?: string | Date | null) => {
 };
 
 const formatTimeSlotDisplay = (time24: string) => {
-  if (!time24) return "09:00 AM";
+  if (!time24) return "06:00 AM";
   const [hStr, mStr] = time24.split(":");
   let h = Number(hStr);
   const m = Number(mStr) || 0;
-  if (Number.isNaN(h)) h = 9;
+  if (Number.isNaN(h)) h = 6;
+  if (h === 24) h = 0;
   const period = h >= 12 ? "PM" : "AM";
   const displayH = h % 12 === 0 ? 12 : h % 12;
   return `${String(displayH).padStart(2, "0")}:${String(m).padStart(2, "0")} ${period}`;
@@ -542,7 +550,7 @@ const parseTimeSlotRange = (
   slotStr: string,
 ): { hours: number; startTime: string; endTime: string } => {
   if (!slotStr || !slotStr.includes("-")) {
-    return { hours: 3, startTime: "09:00", endTime: "12:00" };
+    return { hours: BOOKING_DEFAULT_HOURS, startTime: "06:00", endTime: "09:00" };
   }
   const [startPart, endPart] = slotStr.split("-").map((s) => s.trim());
   const parsePart = (p: string) => {
@@ -559,6 +567,10 @@ const parseTimeSlotRange = (
 
   const start = parsePart(startPart);
   const end = parsePart(endPart);
+  if (end.totalM === 0 && start.totalM > 0) {
+    end.h = 24;
+    end.totalM = 24 * 60;
+  }
   const diffMinutes = Math.max(0, end.totalM - start.totalM);
   const hours = Math.round((diffMinutes / 60) * 100) / 100;
   const startTime = `${String(start.h).padStart(2, "0")}:${String(start.m).padStart(2, "0")}`;
@@ -569,8 +581,12 @@ const parseTimeSlotRange = (
 const calcDurationHours = (from: string, to: string) => {
   if (!from || !to) return 0;
   const [fh, fm = 0] = from.split(":").map(Number);
-  const [th, tm = 0] = to.split(":").map(Number);
-  return Math.max(0, Math.round(((th * 60 + tm - (fh * 60 + fm)) / 60) * 100) / 100);
+  let [th, tm = 0] = to.split(":").map(Number);
+  const startM = fh * 60 + fm;
+  let endM = th * 60 + tm;
+  if (endM === 0 && startM > 0) endM = 24 * 60;
+  if (th === 24) endM = 24 * 60 + tm;
+  return Math.max(0, Math.round(((endM - startM) / 60) * 100) / 100);
 };
 
 const normalizeSlot = (s: MultiDateSlot): MultiDateSlot => {
@@ -579,7 +595,7 @@ const normalizeSlot = (s: MultiDateSlot): MultiDateSlot => {
       (s.startTime && !s.startTime.endsWith(":00")) ||
       (s.endTime && !s.endTime.endsWith(":00")),
   );
-  const startTime = s.startTime || "09:00";
+  const startTime = s.startTime || "06:00";
   const endTime = s.endTime || "12:00";
   const dur = s.duration || calcDurationHours(startTime, endTime) || 3;
   const timeSlot =
@@ -683,19 +699,19 @@ const CreateBookingDetailsModal = ({
   // Exclusive Dates Mode
   const [dateMode, setDateMode] = useState<"single" | "multiple">("single");
   const [bookingDate, setBookingDate] = useState(() => getBusinessToday());
-  const [bookingFrom, setBookingFrom] = useState("09:00");
-  const [bookingTo, setBookingTo] = useState("12:00");
-  const [duration, setDuration] = useState(3);
-  const [timeSlot, setTimeSlot] = useState("09:00 AM - 12:00 PM");
+  const [bookingFrom, setBookingFrom] = useState("06:00");
+  const [bookingTo, setBookingTo] = useState("09:00");
+  const [duration, setDuration] = useState(BOOKING_DEFAULT_HOURS);
+  const [timeSlot, setTimeSlot] = useState("06:00 AM - 09:00 AM");
 
   const [multiDateSlots, setMultiDateSlots] = useState<MultiDateSlot[]>([
     {
       id: "slot-1",
       date: getBusinessToday(),
-      duration: 3,
-      timeSlot: "09:00 AM - 12:00 PM",
-      startTime: "09:00",
-      endTime: "12:00",
+      duration: BOOKING_DEFAULT_HOURS,
+      timeSlot: "06:00 AM - 09:00 AM",
+      startTime: "06:00",
+      endTime: "09:00",
     },
   ]);
 
@@ -862,7 +878,7 @@ const CreateBookingDetailsModal = ({
         }
       }
       const bDate = toDateInput(initialBooking.bookingDate);
-      const bFrom = initialBooking.startTime || "09:00";
+      const bFrom = initialBooking.startTime || "06:00";
       const bTo = initialBooking.endTime || "12:00";
       setBookingDate(bDate);
       setBookingFrom(bFrom);
@@ -1001,7 +1017,7 @@ const CreateBookingDetailsModal = ({
       );
       setSpaceQty(draftValues.spaceQty || 1);
       const bDate = toDateInput(draftValues.bookingDate);
-      const bFrom = draftValues.startTime || "09:00";
+      const bFrom = draftValues.startTime || "06:00";
       const bTo = draftValues.endTime || "12:00";
       setBookingDate(bDate);
       setBookingFrom(bFrom);
@@ -1135,21 +1151,21 @@ const CreateBookingDetailsModal = ({
       setFoodSearch("");
       const todayStr = getBusinessToday();
       setBookingDate(todayStr);
-      setBookingFrom("09:00");
-      setBookingTo("12:00");
+      setBookingFrom("06:00");
+      setBookingTo("09:00");
       setCoworkingStartDate(todayStr);
       setPlanDurationCount(1);
       setDateMode("single");
-      setDuration(3);
-      setTimeSlot("09:00 AM - 12:00 PM");
+      setDuration(BOOKING_DEFAULT_HOURS);
+      setTimeSlot("06:00 AM - 09:00 AM");
       setMultiDateSlots([
         {
           id: "slot-1",
           date: todayStr,
-          duration: 3,
-          timeSlot: "09:00 AM - 12:00 PM",
-          startTime: "09:00",
-          endTime: "12:00",
+          duration: BOOKING_DEFAULT_HOURS,
+          timeSlot: "06:00 AM - 09:00 AM",
+          startTime: "06:00",
+          endTime: "09:00",
         },
       ]);
       setCoworkingServices({
@@ -1481,7 +1497,7 @@ const CreateBookingDetailsModal = ({
     for (const b of busySlots) {
       if (b.date < coworkingStartDate || b.date > end) continue;
       if (originalSlotKeys.has(`${b.date}|full`)) continue;
-      if (findBusyOverlaps(b.date, "09:00", "21:00", [b]).length > 0) dates.add(b.date);
+      if (findBusyOverlaps(b.date, "06:00", "24:00", [b]).length > 0) dates.add(b.date);
     }
     return [...dates].sort();
   }, [isDurationPlan, coworkingStartDate, coworkingEndDate, busySlots, originalSlotKeys]);
@@ -1714,12 +1730,12 @@ const CreateBookingDetailsModal = ({
 
   // Exclusive Duration & Time Slot Handlers
   const handleApplySingleDuration = (hours: number) => {
-    const safeH = Math.max(1, Math.min(12, Math.round(hours)));
+    const safeH = Math.max(1, Math.min(BOOKING_MAX_HOURS, Math.round(hours)));
     setDuration(safeH);
     let [startH] = bookingFrom.split(":").map(Number);
-    if (Number.isNaN(startH) || startH < 9) startH = 9;
-    if (startH + safeH > 21) {
-      startH = Math.max(9, 21 - safeH);
+    if (Number.isNaN(startH) || startH < BOOKING_OPEN_HOUR) startH = BOOKING_OPEN_HOUR;
+    if (startH + safeH > BOOKING_CLOSE_HOUR) {
+      startH = Math.max(BOOKING_OPEN_HOUR, BOOKING_CLOSE_HOUR - safeH);
     }
     const endH = startH + safeH;
     const newFrom = `${String(startH).padStart(2, "0")}:00`;
@@ -1742,13 +1758,13 @@ const CreateBookingDetailsModal = ({
     const lastSlot = multiDateSlots[multiDateSlots.length - 1];
     const lastDate = lastSlot?.date || bookingDate || getBusinessToday();
     const nextDateStr = addDaysToKey(lastDate, 1);
-    const startTime = "09:00";
-    const endTime = "12:00";
+    const startTime = "06:00";
+    const endTime = "09:00";
     const newSlot: MultiDateSlot = {
       id: `slot-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       date: nextDateStr,
-      duration: 3,
-      timeSlot: "09:00 AM - 12:00 PM",
+      duration: BOOKING_DEFAULT_HOURS,
+      timeSlot: "06:00 AM - 09:00 AM",
       startTime,
       endTime,
       isCustom,
@@ -1773,7 +1789,7 @@ const CreateBookingDetailsModal = ({
         if (s.id !== id) return s;
         const nextCustom = forceCustom !== undefined ? forceCustom : !s.isCustom;
         if (nextCustom) {
-          const startTime = s.startTime || "09:00";
+          const startTime = s.startTime || "06:00";
           const endTime = s.endTime || "12:00";
           const dur = calcDurationHours(startTime, endTime) || s.duration || 3;
           const timeSlot = `${formatTimeSlotDisplay(startTime)} - ${formatTimeSlotDisplay(endTime)}`;
@@ -1786,10 +1802,10 @@ const CreateBookingDetailsModal = ({
             timeSlot,
           };
         } else {
-          const safeDur = Math.max(1, Math.min(12, Math.round(s.duration || 3)));
-          let [sh] = (s.startTime || "09:00").split(":").map(Number);
-          if (Number.isNaN(sh) || sh < 9) sh = 9;
-          if (sh + safeDur > 21) sh = Math.max(9, 21 - safeDur);
+          const safeDur = Math.max(1, Math.min(BOOKING_MAX_HOURS, Math.round(s.duration || BOOKING_MAX_HOURS)));
+          let [sh] = (s.startTime || "06:00").split(":").map(Number);
+          if (Number.isNaN(sh) || sh < BOOKING_OPEN_HOUR) sh = BOOKING_OPEN_HOUR;
+          if (sh + safeDur > BOOKING_CLOSE_HOUR) sh = Math.max(BOOKING_OPEN_HOUR, BOOKING_CLOSE_HOUR - safeDur);
           const startTime = `${String(sh).padStart(2, "0")}:00`;
           const endTime = `${String(sh + safeDur).padStart(2, "0")}:00`;
           const timeSlot = `${formatTimeSlotDisplay(startTime)} - ${formatTimeSlotDisplay(endTime)}`;
@@ -1814,8 +1830,10 @@ const CreateBookingDetailsModal = ({
     setMultiDateSlots((prev) =>
       prev.map((s) => {
         if (s.id !== id) return s;
-        const sValid = startTime ?? s.startTime ?? "09:00";
-        const eValid = endTime ?? s.endTime ?? "12:00";
+        const eValid = endTime === "00:00" || endTime === "24:00"
+          ? "24:00"
+          : endTime ?? s.endTime ?? "09:00";
+        const sValid = !startTime || startTime < "06:00" ? "06:00" : startTime;
         const dur = calcDurationHours(sValid, eValid);
         const timeSlot = `${formatTimeSlotDisplay(sValid)} - ${formatTimeSlotDisplay(eValid)}`;
         return {
@@ -1835,11 +1853,17 @@ const CreateBookingDetailsModal = ({
       prev.map((s) => {
         if (s.id !== id) return s;
         if (s.isCustom) {
-          const [sh = 9, sm = 0] = (s.startTime || "09:00").split(":").map(Number);
+          const [rawH = BOOKING_OPEN_HOUR, rawM = 0] = (s.startTime || "06:00").split(":").map(Number);
+          const startMinutes = Math.min(
+            BOOKING_CLOSE_HOUR * 60 - 30,
+            Math.max(BOOKING_OPEN_HOUR * 60, rawH * 60 + rawM),
+          );
+          const sh = Math.floor(startMinutes / 60);
+          const sm = startMinutes % 60;
           const currentDur = calcDurationHours(s.startTime, s.endTime) || s.duration || 1;
-          const newDur = Math.max(0.5, Math.min(14, Math.round((currentDur + delta) * 10) / 10));
+          const newDur = Math.max(0.5, Math.min(BOOKING_MAX_HOURS, Math.round((currentDur + delta) * 10) / 10));
           const totalEndMinutes = sh * 60 + sm + Math.round(newDur * 60);
-          const clampedEndMinutes = Math.min(23 * 60 + 59, totalEndMinutes);
+          const clampedEndMinutes = Math.min(BOOKING_CLOSE_HOUR * 60, totalEndMinutes);
           const endH = Math.floor(clampedEndMinutes / 60);
           const endM = clampedEndMinutes % 60;
           const endTime = `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
@@ -1847,16 +1871,17 @@ const CreateBookingDetailsModal = ({
           const timeSlot = `${formatTimeSlotDisplay(s.startTime)} - ${formatTimeSlotDisplay(endTime)}`;
           return {
             ...s,
+            startTime: `${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`,
             duration: actualDur,
             endTime,
             timeSlot,
           };
         }
-        const newDur = Math.max(1, Math.min(12, s.duration + delta));
-        let [startH] = (s.startTime || "09:00").split(":").map(Number);
-        if (Number.isNaN(startH) || startH < 9) startH = 9;
-        if (startH + newDur > 21) {
-          startH = Math.max(9, 21 - newDur);
+        const newDur = Math.max(1, Math.min(BOOKING_MAX_HOURS, s.duration + delta));
+        let [startH] = (s.startTime || "06:00").split(":").map(Number);
+        if (Number.isNaN(startH) || startH < BOOKING_OPEN_HOUR) startH = BOOKING_OPEN_HOUR;
+        if (startH + newDur > BOOKING_CLOSE_HOUR) {
+          startH = Math.max(BOOKING_OPEN_HOUR, BOOKING_CLOSE_HOUR - newDur);
         }
         const endH = startH + newDur;
         const startTime = `${String(startH).padStart(2, "0")}:00`;
@@ -1967,6 +1992,7 @@ const CreateBookingDetailsModal = ({
         price: Math.max(0, Number(food.price) || 0),
         qty: foodQty[String(food._id || "")] || 0,
         unit: food.unit || "",
+        applyMembershipDiscount: food.applyMembershipDiscount !== false,
       }))
       .filter((food) => food.foodId && food.qty > 0);
   }, [foodCatalog, foodQty, showFood]);
@@ -2095,6 +2121,11 @@ const CreateBookingDetailsModal = ({
       0,
     );
     const foodTotal = selectedFoodsList.reduce((acc, food) => acc + food.price * food.qty, 0);
+    const memberFoodTotal = selectedFoodsList.reduce(
+      (acc, food) =>
+        food.applyMembershipDiscount === false ? acc : acc + food.price * food.qty,
+      0,
+    );
     const subTotal = baseSpaceTotal + servicesTotal;
     const foodBenefit = resolveBenefitPercents("food", activeMembershipPlan);
 
@@ -2111,8 +2142,8 @@ const CreateBookingDetailsModal = ({
         ? 5
         : 0;
 
-    const discount = Math.round(subTotal * (discPct / 100)) + Math.round(foodTotal * ((foodBenefit.discountPercent || 0) / 100));
-    const cashback = Math.round(subTotal * (cashPct / 100)) + Math.round(foodTotal * ((foodBenefit.cashbackPercent || 0) / 100));
+    const discount = Math.round(subTotal * (discPct / 100)) + Math.round(memberFoodTotal * ((foodBenefit.discountPercent || 0) / 100));
+    const cashback = Math.round(subTotal * (cashPct / 100)) + Math.round(memberFoodTotal * ((foodBenefit.cashbackPercent || 0) / 100));
 
     return { discountAmount: discount, cashbackAmount: cashback, pricedSubTotal: subTotal + foodTotal };
   }, [
@@ -2347,12 +2378,12 @@ const CreateBookingDetailsModal = ({
         ? multiDateSlots[0]?.date || bookingDate
         : bookingDate,
       startTime: isDuration
-        ? "09:00"
+        ? "06:00"
         : isMultiple
         ? multiDateSlots[0]?.startTime || bookingFrom
         : bookingFrom,
       endTime: isDuration
-        ? "21:00"
+        ? "24:00"
         : isMultiple
         ? multiDateSlots[0]?.endTime || bookingTo
         : bookingTo,
@@ -2527,12 +2558,12 @@ const CreateBookingDetailsModal = ({
         ? multiDateSlots[0]?.date || bookingDate
         : bookingDate,
       startTime: isDuration
-        ? "09:00"
+        ? "06:00"
         : isMultiple
         ? multiDateSlots[0]?.startTime || bookingFrom
         : bookingFrom,
       endTime: isDuration
-        ? "21:00"
+        ? "24:00"
         : isMultiple
         ? multiDateSlots[0]?.endTime || bookingTo
         : bookingTo,
@@ -3481,7 +3512,8 @@ const CreateBookingDetailsModal = ({
                             <button
                               type="button"
                               onClick={() => handleApplySingleDuration(duration + 1)}
-                              className="flex h-full w-10 items-center justify-center border-l border-slate-100 text-slate-600 hover:bg-slate-50 transition"
+                              disabled={duration >= BOOKING_MAX_HOURS}
+                              className="flex h-full w-10 items-center justify-center border-l border-slate-100 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
                             >
                               <Plus size={14} />
                             </button>
@@ -3662,9 +3694,10 @@ const CreateBookingDetailsModal = ({
                                   >
                                     {/* Start Time Input */}
                                     <div className="relative flex-1 min-w-0">
-                                      <input
-                                        type="time"
-                                        value={slot.startTime || "09:00"}
+                                      <input type="time"
+                                        min="06:00"
+                                        max="23:59"
+                                        value={slot.startTime || "06:00"}
                                         onChange={(e) => {
                                           handleUpdateSlotCustomTimes(slot.id, e.target.value, slot.endTime);
                                           setErrors((prev) => ({ ...prev, multiDates: "" }));
@@ -3680,7 +3713,9 @@ const CreateBookingDetailsModal = ({
                                     <div className="relative flex-1 min-w-0">
                                       <input
                                         type="time"
-                                        value={slot.endTime || "12:00"}
+                                        min="06:00"
+                                        max="23:59"
+                                        value={slot.endTime === "24:00" ? "00:00" : slot.endTime || "09:00"}
                                         onChange={(e) => {
                                           handleUpdateSlotCustomTimes(slot.id, slot.startTime, e.target.value);
                                           setErrors((prev) => ({ ...prev, multiDates: "" }));

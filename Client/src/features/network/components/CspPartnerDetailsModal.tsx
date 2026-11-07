@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Calendar,
@@ -20,6 +20,7 @@ import {
   Users,
   Wallet,
   X,
+  MoreVertical,
 } from "lucide-react";
 import {
   handleCreateManualPayout,
@@ -163,6 +164,8 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
   const [paying, setPaying] = useState(false);
   const [payoutError, setPayoutError] = useState("");
   const [payoutDone, setPayoutDone] = useState("");
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!partner) return;
@@ -172,6 +175,15 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [partner, onClose]);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!actionsRef.current?.contains(event.target as Node)) setActionsOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [actionsOpen]);
 
   useEffect(() => {
     if (!partner) return;
@@ -355,45 +367,64 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => void closeIfConfirmed(onClose)}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            aria-label="Close partner details"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-slate-100 px-4 py-3 sm:flex-wrap sm:px-5">
-          <button
-            type="button"
-            onClick={() => openPurchase("/create-purchase")}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <ShoppingCart className="h-3.5 w-3.5" />
-            Create Purchase
-          </button>
-          <button
-            type="button"
-            onClick={() => openPurchase("/create-purchase-order")}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            <FilePlus2 className="h-3.5 w-3.5" />
-            Create Purchase Order
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setPayoutOpen((open) => !open);
-              setPayoutError("");
-              setPayoutDone("");
-            }}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#ff5a36] px-3 py-2 text-xs font-semibold text-white hover:bg-[#e64e2d]"
-          >
-            <Wallet className="h-3.5 w-3.5" />
-            Payout
-          </button>
+          <div ref={actionsRef} className="relative flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              aria-label="More actions"
+              aria-expanded={actionsOpen}
+              onClick={() => setActionsOpen((open) => !open)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void closeIfConfirmed(onClose)}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Close partner details"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            {actionsOpen ? (
+              <div className="absolute right-0 top-9 z-30 flex w-48 flex-col gap-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionsOpen(false);
+                    openPurchase("/create-purchase");
+                  }}
+                  className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-800 hover:bg-slate-50"
+                >
+                  <ShoppingCart className="h-3 w-3" />
+                  Create Purchase
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionsOpen(false);
+                    openPurchase("/create-purchase-order");
+                  }}
+                  className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-800 hover:bg-slate-50"
+                >
+                  <FilePlus2 className="h-3 w-3" />
+                  Create Purchase Order
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionsOpen(false);
+                    setPayoutOpen(true);
+                    setPayoutError("");
+                    setPayoutDone("");
+                  }}
+                  className="inline-flex h-7 w-full items-center gap-1 rounded-md bg-[#ff5a36] px-2 text-[11px] font-semibold text-white hover:bg-[#e64e2d]"
+                >
+                  <Wallet className="h-3 w-3" />
+                  Payout
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {payoutOpen ? (

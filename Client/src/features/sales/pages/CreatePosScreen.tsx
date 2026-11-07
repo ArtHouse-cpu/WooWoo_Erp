@@ -635,7 +635,12 @@ export default function CreatePosScreen({
   );
 
   const cashbackTotal = useMemo(
-    () => items.reduce((sum, item) => sum + (item.cashback || 0), 0),
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum + (item.isCsp || item.skipMembershipDiscount ? 0 : item.cashback || 0),
+        0,
+      ),
     [items],
   );
 
@@ -745,7 +750,10 @@ export default function CreatePosScreen({
           qty: item.qty,
           unitPrice: item.price,
           discount,
-          cashback: item.isCsp ? 0 : Math.max(0, Number(item.cashback || 0)),
+          cashback:
+            item.isCsp || item.skipMembershipDiscount
+              ? 0
+              : Math.max(0, Number(item.cashback || 0)),
           category: item.category || "General",
           isCsp: Boolean(item.isCsp),
           productDiscountAmount: productOnly,

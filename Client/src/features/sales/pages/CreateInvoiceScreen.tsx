@@ -634,7 +634,12 @@ export default function CreateInvoiceScreen({
     [items],
   );
   const cashbackTotal = useMemo(
-    () => items.reduce((sum, item) => sum + (item.cashback || 0), 0),
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum + (item.isCsp || item.skipMembershipDiscount ? 0 : item.cashback || 0),
+        0,
+      ),
     [items],
   );
   const displayCashbackTotal =
@@ -670,7 +675,7 @@ export default function CreateInvoiceScreen({
         qty: item.qty,
         price: item.unitPrice,
         discount: item.discount,
-        cashback: item.isCsp ? 0 : item.cashback,
+        cashback: item.isCsp || item.skipMembershipDiscount ? 0 : item.cashback,
         category: item.category,
         isCsp: Boolean(item.isCsp),
         productDiscountAmount: Number(item.productDiscountAmount ?? 0),
@@ -881,7 +886,10 @@ export default function CreateInvoiceScreen({
           qty: item.qty,
           unitPrice: item.unitPrice,
           discount,
-          cashback: item.isCsp ? 0 : Math.max(0, Number(item.cashback || 0)),
+          cashback:
+            item.isCsp || item.skipMembershipDiscount
+              ? 0
+              : Math.max(0, Number(item.cashback || 0)),
           category: item.category || "General",
           isCsp: Boolean(item.isCsp),
           productDiscountAmount: productOnly,

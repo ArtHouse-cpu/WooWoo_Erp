@@ -296,9 +296,11 @@ export function membershipBenefitsForLine(
         ? Math.round(((lineTotal * discountPercent) / 100) * 100) / 100
         : 0;
   const cashback =
-    cashbackPercent > 0
-      ? Math.round(((lineTotal * cashbackPercent) / 100) * 100) / 100
-      : 0;
+    options?.skipMembershipDiscount
+      ? 0
+      : cashbackPercent > 0
+        ? Math.round(((lineTotal * cashbackPercent) / 100) * 100) / 100
+        : 0;
   return { discount, cashback };
 }
 

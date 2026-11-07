@@ -82,12 +82,14 @@ function SpacePhoto({
   );
 }
 
-const OPEN_HOUR = 9;
+const OPEN_HOUR = 6;
 const SLOT_HOURS: Array<[number, number]> = [
+  [6, 9],
   [9, 12],
   [12, 15],
   [15, 18],
   [18, 21],
+  [21, 24],
 ];
 const LOOKAHEAD_DAYS = 14;
 
@@ -122,8 +124,9 @@ function formatDayChip(key: string) {
 }
 
 function formatClock(hour: number) {
-  const period = hour >= 12 ? 'PM' : 'AM';
-  const display = hour % 12 === 0 ? 12 : hour % 12;
+  const normalized = hour === 24 ? 0 : hour;
+  const period = normalized >= 12 ? 'PM' : 'AM';
+  const display = normalized % 12 === 0 ? 12 : normalized % 12;
   return `${String(display).padStart(2, '0')}:00 ${period}`;
 }
 
