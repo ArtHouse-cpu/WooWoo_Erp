@@ -115,6 +115,7 @@ interface FoodItem {
   imageUrl?: string | null;
   status?: "Active" | "Inactive";
   manageInventory?: boolean;
+  applyMembershipDiscount?: boolean;
   availableStock?: number | null;
 }
 
@@ -156,6 +157,8 @@ function mapApiFood(raw: any): FoodItem | null {
     imageUrl: imageUrl || null,
     status: raw?.status === "Inactive" ? "Inactive" : "Active",
     manageInventory: raw?.manageInventory === true || raw?.manageInventory === "true",
+    applyMembershipDiscount:
+      raw?.applyMembershipDiscount !== false && raw?.applyMembershipDiscount !== "false",
     availableStock:
       raw?.availableStock == null ? null : Math.max(0, Number(raw.availableStock) || 0),
   };
@@ -192,6 +195,7 @@ function foodItemToPayload(food: FoodItem): FoodPayload {
     description: food.description || "",
     isVeg: food.isVeg,
     manageInventory: food.manageInventory === true,
+    applyMembershipDiscount: food.applyMembershipDiscount !== false,
     status: food.status === "Inactive" ? "Inactive" : "Active",
     imageUrl: food.imageUrl || null,
   };
@@ -1078,7 +1082,7 @@ export default function FoodBill() {
         qty: line.quantity,
         // Use Food so plan usageLimits.Food applies (also matches food item categories)
         category: "Food",
-        skipMembershipDiscount: line.item.manageInventory === true,
+        skipMembershipDiscount: line.item.applyMembershipDiscount === false,
       })),
     );
   }, [
@@ -1763,7 +1767,7 @@ export default function FoodBill() {
             line.quantity,
             "Food",
             membershipPlan,
-            { skipMembershipDiscount: line.item.manageInventory === true },
+            { skipMembershipDiscount: line.item.applyMembershipDiscount === false },
           );
           return {
             productName: line.item.name,
@@ -1773,7 +1777,7 @@ export default function FoodBill() {
             category: "Food" as const,
             lineGross: line.item.price * line.quantity,
             promo: false as const,
-            allowMembershipDiscount: line.item.manageInventory !== true,
+            allowMembershipDiscount: line.item.applyMembershipDiscount !== false,
           };
         });
         const rawSum = lines.reduce(

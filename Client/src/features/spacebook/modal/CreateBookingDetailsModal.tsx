@@ -45,6 +45,8 @@ import {
   handleGetMemberships,
   handleGetAdditionalServices,
   handleGetFoods,
+  handleGetApplicableSpaceOffer,
+  type ApplicableSpaceOffer,
   type AdditionalServiceItem,
   type FoodPayload,
   customerPayloadToFormData,
@@ -133,6 +135,8 @@ export type BookingFormPayload = {
   subTotal?: number;
   discountAmount?: number;
   cashbackAmount?: number;
+  offerDiscount?: number;
+  offerSnapshot?: ApplicableSpaceOffer | null;
   selectedServices?: SelectedServiceItem[];
   foods?: SelectedFoodItem[];
   summarySnapshot?: any;
@@ -2022,9 +2026,69 @@ const CreateBookingDetailsModal = ({
     duration,
   ]);
 
+  const singleSlotHours =
+    !isDurationPlan && dateMode !== "multiple"
+      ? calcDurationHours(bookingFrom, bookingTo) || duration
+      : 0;
+  const [liveOffer, setLiveOffer] = useState<ApplicableSpaceOffer | null>(null);
+
+  useEffect(() => {
+    if (!(singleSlotHours > 0) || bookedSpaces.length === 0) {
+      setLiveOffer(null);
+      return;
+    }
+    const stored = (initialBooking as { offerSnapshot?: ApplicableSpaceOffer | null; offerDiscount?: number } | null)?.offerSnapshot;
+    const storedHours = Number(initialBooking?.durationHours || 0);
+    const sameSpace =
+      String(initialBooking?.spaceId || "") === String(bookedSpaces[0]?.spaceId || "") &&
+      Number(initialBooking?.spaceQty || 1) === Number(bookedSpaces[0]?.qty || 1);
+    if (isEdit && sameSpace && Math.abs(singleSlotHours - storedHours) < 0.001) {
+      setLiveOffer(
+        stored && Number(stored.freeHours) > 0
+          ? {
+              ...stored,
+              applied: true,
+              discount: Number(
+                (initialBooking as { offerDiscount?: number } | null)?.offerDiscount ??
+                  stored.discount ??
+                  0,
+              ),
+            }
+          : null,
+      );
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void handleGetApplicableSpaceOffer(
+        {
+          hours: singleSlotHours,
+          lines: bookedSpaces.map((space) => ({
+            hourlyRate: space.unitPrice,
+            qty: space.qty,
+          })),
+        },
+        controller.signal,
+      )
+        .then((response) => setLiveOffer(response.offer?.applied ? response.offer : null))
+        .catch((error: { code?: string }) => {
+          if (error?.code === "ERR_CANCELED") return;
+          setLiveOffer(null);
+        });
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [singleSlotHours, bookedSpaces, isEdit, initialBooking]);
+
   const { discountAmount, cashbackAmount, pricedSubTotal } = useMemo(() => {
     const benefit = resolveBenefitPercents("space", activeMembershipPlan);
-    const baseSpaceTotal = bookedSpaces.reduce((sum, space) => sum + space.lineTotal, 0);
+    const offerOff = !isDurationPlan && dateMode !== "multiple" ? Number(liveOffer?.discount || 0) : 0;
+    const baseSpaceTotal = Math.max(
+      0,
+      bookedSpaces.reduce((sum, space) => sum + space.lineTotal, 0) - offerOff,
+    );
 
     const servicesTotal = selectedServicesList.reduce(
       (acc, s) => acc + s.price * s.qty,
@@ -2068,6 +2132,7 @@ const CreateBookingDetailsModal = ({
     bookedSpaces,
     selectedServicesList,
     selectedFoodsList,
+    liveOffer,
   ]);
 
   const validate = () => {
@@ -2187,7 +2252,8 @@ const CreateBookingDetailsModal = ({
             )
           : unitPrice * (calcDurationHours(bookingFrom, bookingTo) || duration) * spaceQty);
 
-    const lineTotal = Math.max(0, spaceCharges + servicesTotal + foodCharges - discountAmount);
+    const offerOff = isDuration || isMultiple ? 0 : Number(liveOffer?.discount || 0);
+    const lineTotal = Math.max(0, spaceCharges + servicesTotal + foodCharges - offerOff - discountAmount);
 
     if (!isEdit && lineTotal <= 0) {
       toast.error("Booking total is ₹0. Check space price and booking duration.");
@@ -2315,6 +2381,8 @@ const CreateBookingDetailsModal = ({
       subTotal: spaceCharges + servicesTotal,
       discountAmount,
       cashbackAmount,
+      offerDiscount: isDuration || isMultiple ? 0 : Number(liveOffer?.discount || 0),
+      offerSnapshot: isDuration || isMultiple ? null : liveOffer,
       selectedServices: selectedServicesList,
       foods: selectedFoodsList,
       summarySnapshot,
@@ -2369,7 +2437,8 @@ const CreateBookingDetailsModal = ({
             )
           : unitPrice * (calcDurationHours(bookingFrom, bookingTo) || duration) * spaceQty);
 
-    const lineTotal = Math.max(0, spaceCharges + servicesTotal + foodCharges - discountAmount);
+    const offerOff = isDuration || isMultiple ? 0 : Number(liveOffer?.discount || 0);
+    const lineTotal = Math.max(0, spaceCharges + servicesTotal + foodCharges - offerOff - discountAmount);
 
     const spaceType = selectedSpace
       ? selectedSpace.spaceType ||
@@ -2492,6 +2561,8 @@ const CreateBookingDetailsModal = ({
       subTotal: spaceCharges + servicesTotal,
       discountAmount,
       cashbackAmount,
+      offerDiscount: isDuration || isMultiple ? 0 : Number(liveOffer?.discount || 0),
+      offerSnapshot: isDuration || isMultiple ? null : liveOffer,
       selectedServices: selectedServicesList,
       foods: selectedFoodsList,
       summarySnapshot,
@@ -2565,6 +2636,9 @@ const CreateBookingDetailsModal = ({
       foods={selectedFoodsList}
       discountAmount={discountAmount}
       cashbackAmount={cashbackAmount}
+      offerFreeHours={liveOffer?.freeHours || 0}
+      offerDiscount={liveOffer?.discount || 0}
+      offerName={liveOffer?.offerName || ""}
       formatDateDisplay={formatDateDisplay}
       bookedSpaces={bookedSpaces}
     />

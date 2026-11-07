@@ -26,6 +26,7 @@ import vendorRoutes from './routes/vendor.router.js';
 import inventoryRoutes from './routes/Inventory.router.js';
 import walletRoutes from './routes/wallet.router.js';
 import couponRoutes from './routes/coupon.route.js';
+import spaceOfferRoutes from './routes/spaceOffer.route.js';
 import giftCardRoutes from './routes/giftCard.route.js';
 import companyRoutes from './routes/company.route.js';
 import affiliateRoutes from './routes/affiliate.route.js';
@@ -167,6 +168,7 @@ app.use('/inventory', inventoryRoutes);
 
 app.use('/wallet', walletRoutes);
 app.use('/coupon', couponRoutes);
+app.use('/space-offers', spaceOfferRoutes);
 app.use('/gift-cards', giftCardRoutes);
 app.use('/company', companyRoutes);
 app.use('/affiliate', affiliateRoutes);

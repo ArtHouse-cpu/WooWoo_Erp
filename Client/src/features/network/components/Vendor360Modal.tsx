@@ -35,6 +35,7 @@ import {
   User,
   Wallet,
   X,
+  MoreVertical,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import Can from "@/components/rbac/Can";
@@ -275,6 +276,8 @@ export default function Vendor360Modal({
   const navigate = useNavigate();
   const { can } = usePermission();
   const canSeeBank = can(PERMISSIONS.VENDOR_UPDATE);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [period, setPeriod] = useState<Period>("all");
   const [data, setData] = useState<Vendor360Response | null>(null);
@@ -353,6 +356,15 @@ export default function Vendor360Modal({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!actionsRef.current?.contains(event.target as Node)) setActionsOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [actionsOpen]);
 
   useEffect(() => {
     setBill(null);
@@ -692,7 +704,7 @@ export default function Vendor360Modal({
       <div className="flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-[#F6F7FB] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl">
         <header className="border-b border-slate-200 bg-white px-3 sm:px-4 py-2.5 sm:py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           {/* Top row: Title, Name and Close Button */}
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-violet-600">
@@ -832,41 +844,72 @@ export default function Vendor360Modal({
           {/* Action buttons row: scrollable on mobile, flex on desktop */}
           <div className="mt-2.5 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar sm:mt-3 sm:flex-wrap sm:overflow-visible">
             <Can permission={PERMISSIONS.VENDOR_UPDATE}>
+            <div ref={actionsRef} className="relative flex shrink-0 items-center gap-2">
               <button
                 type="button"
-                onClick={() => setPayOpen(true)}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-purple-50 border border-purple-200/90 px-3 py-1.5 sm:py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                aria-label="More actions"
+                aria-expanded={actionsOpen}
+                onClick={() => setActionsOpen((open) => !open)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
-                <Wallet size={13} className="text-purple-600" /> Record Payment
+                <MoreVertical size={16} />
               </button>
-            </Can>
-            <button
-              type="button"
-              onClick={() =>
-                openWithVendor(
-                  `/expenses?create=1&vendorId=${vendor._id}&vendorName=${encodeURIComponent(profile?.name || vendor.name)}`,
-                )
-              }
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
-            >
-              <Receipt size={13} className="text-amber-600" /> Add Expense
-            </button>
-            <button
-              type="button"
-              onClick={() => openWithVendor("/create-purchase", vendorState)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
-            >
-              <ShoppingCart size={13} className="text-emerald-600" /> Create Purchase
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                openWithVendor("/create-purchase-order", vendorState)
-              }
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
-            >
-              <FilePlus2 size={13} className="text-blue-600" /> Create Purchase Order
-            </button>
+              <button
+                type="button"
+                onClick={() => void closeIfConfirmed(onClose)}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              >
+                <X size={14} /> Close
+              </button>
+              {actionsOpen ? (
+                <div className="absolute right-0 top-10 z-30 flex w-48 flex-col gap-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+                  <Can permission={PERMISSIONS.VENDOR_UPDATE}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActionsOpen(false);
+                        setPayOpen(true);
+                      }}
+                      className="inline-flex h-7 w-full items-center gap-1 rounded-md bg-violet-600 px-2 text-[11px] font-semibold text-white transition hover:bg-violet-700"
+                    >
+                      Record Payment
+                    </button>
+                  </Can>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionsOpen(false);
+                      openWithVendor(
+                        `/expenses?create=1&vendorId=${vendor._id}&vendorName=${encodeURIComponent(profile?.name || vendor.name)}`,
+                      );
+                    }}
+                    className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-800 transition hover:bg-slate-50"
+                  >
+                    <Receipt size={12} /> Add Expense
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionsOpen(false);
+                      openWithVendor("/create-purchase", vendorState);
+                    }}
+                    className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-800 transition hover:bg-slate-50"
+                  >
+                    <ShoppingCart size={12} /> Create Purchase
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActionsOpen(false);
+                      openWithVendor("/create-purchase-order", vendorState);
+                    }}
+                    className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-800 transition hover:bg-slate-50"
+                  >
+                    <FilePlus2 size={12} /> Create Purchase Order
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </header>
 

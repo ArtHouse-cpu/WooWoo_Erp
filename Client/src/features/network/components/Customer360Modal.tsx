@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, Phone, Mail, Building2, Wallet, CalendarDays, Crown, Receipt, CalendarPlus, FilePlus2 } from "lucide-react";
+import { X, Phone, Mail, Building2, Wallet, CalendarDays, Crown, Receipt, CalendarPlus, FilePlus2, MoreVertical } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import CreatePosScreen from "@/features/sales/pages/CreatePosScreen";
 import {
@@ -129,6 +129,8 @@ export default function Customer360Modal({
   const navigate = useNavigate();
   const { canPath } = usePermission();
   const [tab, setTab] = useState<Tab>("overview");
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
   const [sort, setSort] = useState<CreatedSort>("newest");
   const { datePreset: dateRange, setDatePreset: setDateRange } =
     usePersistedDateFilter<DateRange>(
@@ -142,6 +144,15 @@ export default function Customer360Modal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [posOpen, setPosOpen] = useState(false);
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!actionsRef.current?.contains(event.target as Node)) setActionsOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [actionsOpen]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -258,7 +269,7 @@ export default function Customer360Modal({
       <div className="flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-[#F6F7FB] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl">
         <header className="border-b border-slate-200 bg-white px-3 sm:px-4 py-2.5 sm:py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           {/* Top row: Title, Name, and Close Button */}
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-violet-600">
                 Customer 360 View
@@ -289,45 +300,64 @@ export default function Customer360Modal({
               </div>
             </div>
 
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => void closeIfConfirmed(onClose)}
-              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-slate-900 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-white hover:bg-slate-800 transition"
-            >
-              <X size={14} /> Close
-            </button>
-          </div>
-
-          {/* Action buttons row */}
-          <div className="mt-2.5 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar sm:mt-3 sm:flex-wrap sm:overflow-visible">
-            {canPath("/allBookings") ? (
+            <div ref={actionsRef} className="relative flex shrink-0 items-center gap-2">
               <button
                 type="button"
-                onClick={() => openBooking("full")}
-                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-violet-200 bg-violet-50 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition"
+                aria-label="More actions"
+                aria-expanded={actionsOpen}
+                onClick={() => setActionsOpen((open) => !open)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
-                <CalendarPlus size={13} /> Full Booking
+                <MoreVertical size={16} />
               </button>
-            ) : null}
-            {canPath("/spaceBooking") ? (
               <button
                 type="button"
-                onClick={() => openBooking("express")}
-                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition"
+                onClick={() => void closeIfConfirmed(onClose)}
+                className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
               >
-                <CalendarPlus size={13} /> Express Booking
+                <X size={14} /> Close
               </button>
-            ) : null}
-            {canPath("/create-pos") || canPath("/pos") || canPath("/create-invoice") ? (
-              <button
-                type="button"
-                onClick={() => setPosOpen(true)}
-                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-semibold text-[#2F6FED] hover:bg-blue-100 transition"
-              >
-                <FilePlus2 size={13} /> POS Bill
-              </button>
-            ) : null}
+              {actionsOpen ? (
+                <div className="absolute right-0 top-10 z-30 flex w-48 flex-col gap-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+                  {canPath("/allBookings") ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActionsOpen(false);
+                        openBooking("full");
+                      }}
+                      className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
+                    >
+                      <CalendarPlus size={12} /> Full Booking
+                    </button>
+                  ) : null}
+                  {canPath("/spaceBooking") ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActionsOpen(false);
+                        openBooking("express");
+                      }}
+                      className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                    >
+                      <CalendarPlus size={12} /> Express Booking
+                    </button>
+                  ) : null}
+                  {canPath("/create-pos") || canPath("/pos") || canPath("/create-invoice") ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActionsOpen(false);
+                        setPosOpen(true);
+                      }}
+                      className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 text-[11px] font-semibold text-[#2F6FED] transition hover:bg-blue-100"
+                    >
+                      <FilePlus2 size={12} /> POS Bill
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
         </header>
 

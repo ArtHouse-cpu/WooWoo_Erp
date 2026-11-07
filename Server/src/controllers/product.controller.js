@@ -16,6 +16,20 @@ import {
 const escapeRegex = (value) =>
   String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const readLowStockAlertLevel = (value) => {
+  if (value === undefined || value === null || String(value).trim() === '') {
+    return {ok: true, value: null};
+  }
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0) {
+    return {
+      ok: false,
+      message: 'Low stock alert level must be a non-negative number.',
+    };
+  }
+  return {ok: true, value: num};
+};
+
 const namedVariantsOf = (product) =>
   (Array.isArray(product?.variants) ? product.variants : []).filter((v) =>
     String(v?.name ?? '').trim(),
@@ -258,11 +272,16 @@ export const createProduct = async (req, res) => {
       isCsp,
       cspEnrollmentId,
       applyMembershipDiscount,
+      lowStockAlertLevel,
     } = req.body;
     console.log("product controller",req.body);
     const membershipDiscountOn = !['false', '0', 'no', 'off'].includes(
       String(applyMembershipDiscount ?? 'true').trim().toLowerCase(),
     );
+    const alertLevel = readLowStockAlertLevel(lowStockAlertLevel);
+    if (!alertLevel.ok) {
+      return res.status(400).json({success: false, message: alertLevel.message});
+    }
 
     // Product routes always create products; Services routes set forceItemType='service'
     const forcedType = String(req.forceItemType || '').trim().toLowerCase();
@@ -453,6 +472,7 @@ export const createProduct = async (req, res) => {
       discountType: discountType || "flat",
       discountValue: parsedDiscountValue,
       applyMembershipDiscount: itemType === 'product' ? membershipDiscountOn : true,
+      lowStockAlertLevel: itemType === 'product' ? alertLevel.value : null,
       variants: itemType === "product" ? parsedVariants : [],
       images: imageUrls,
       imageUrl: imageUrls[0] || null,
@@ -1019,9 +1039,32 @@ const PRODUCT_LIST_SELECT = [
   'isCsp',
   'cspEnrollmentId',
   'applyMembershipDiscount',
+  'lowStockAlertLevel',
   'createdAt',
   'updatedAt',
 ].join(' ');
+
+const countLowStockProducts = async (query) => {
+  const alertProducts = await Product.find({
+    $and: [
+      query,
+      {lowStockAlertLevel: {$ne: null}},
+      {itemType: {$ne: 'service'}},
+      {type: {$ne: 'service'}},
+    ],
+  })
+    .select('productName lowStockAlertLevel variants.name')
+    .lean();
+  if (!alertProducts.length) return 0;
+  const names = [...new Set(alertProducts.flatMap((product) => getProductStockNames(product)))];
+  const stockMap = await computeStockByProductNames({names});
+  return alertProducts.reduce((count, product) => {
+    const level = Number(product.lowStockAlertLevel);
+    if (!Number.isFinite(level) || level < 0) return count;
+    const qty = sumStockForNames(stockMap, getProductStockNames(product));
+    return qty <= level ? count + 1 : count;
+  }, 0);
+};
 
 const ALLOWED_PRODUCT_SORT = new Set([
   'createdAt',
@@ -1193,6 +1236,10 @@ export const getProducts = async (req, res) => {
         ...product,
         stockQty: liveStockQty,
         stockStatus: liveStockQty >= 3 ? 'in_stock' : 'out_of_stock',
+        isLowStock:
+          !isService &&
+          product.lowStockAlertLevel != null &&
+          liveStockQty <= Number(product.lowStockAlertLevel),
       };
     });
 
@@ -1229,6 +1276,7 @@ export const getProducts = async (req, res) => {
         inStockCount: Number(row?.inStockCount || 0),
         outOfStockCount: Number(row?.outOfStockCount || 0),
         categoryCount: categories.filter((c) => String(c || '').trim()).length,
+        lowStockCount: await countLowStockProducts(query),
       };
     }
 
@@ -1457,6 +1505,7 @@ export const updateProduct = async (req, res) => {
       isCsp,
       cspEnrollmentId,
       applyMembershipDiscount,
+      lowStockAlertLevel,
     } = req.body;
 
     // find existing product
@@ -1557,6 +1606,13 @@ export const updateProduct = async (req, res) => {
     existingProduct.discountType = discountType ?? existingProduct.discountType;
     existingProduct.discountValue =
       discountValue !== undefined ? Number(discountValue) : existingProduct.discountValue;
+    if (lowStockAlertLevel !== undefined && nextType !== 'service') {
+      const alertLevel = readLowStockAlertLevel(lowStockAlertLevel);
+      if (!alertLevel.ok) {
+        return res.status(400).json({success: false, message: alertLevel.message});
+      }
+      existingProduct.lowStockAlertLevel = alertLevel.value;
+    }
     if (applyMembershipDiscount !== undefined && nextType !== 'service') {
       existingProduct.applyMembershipDiscount = !['false', '0', 'no', 'off'].includes(
         String(applyMembershipDiscount).trim().toLowerCase(),

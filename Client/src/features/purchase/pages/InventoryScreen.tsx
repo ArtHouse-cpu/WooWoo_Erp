@@ -34,6 +34,7 @@ export default function InventoryScreen() {
   const [summary, setSummary] = useState<InventorySummary>(initialSummary);
   const [data, setData] = useState<InventoryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [stockFilter, setStockFilter] = useState<"all" | "low">("all");
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const navigate = useNavigate();
 
@@ -41,17 +42,18 @@ export default function InventoryScreen() {
     setLoading(true);
     setFetchError(null);
     try {
-      const response = await handleGetInventories(signal);
+      const response = await handleGetInventories(signal, { stock: stockFilter });
       setData(Array.isArray(response?.inventories) ? response.inventories : []);
       setSummary(response?.summary ?? initialSummary);
     } catch (error: any) {
+      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") return;
       setData([]);
       setSummary(initialSummary);
       setFetchError(error?.response?.data?.message);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  }, []);
+  }, [stockFilter]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -118,8 +120,7 @@ export default function InventoryScreen() {
         accessorKey: "status",
         header: "Status",
         Cell: ({ row }: { row: any }) => {
-          const qty = Number(row.original.qty ?? 0);
-          const isLowStock = qty <= 0;
+          const isLowStock = row.original.isLowStock === true;
           return (
             <span
               className={`rounded-full px-3 py-1 text-xs font-medium ${
@@ -142,7 +143,7 @@ export default function InventoryScreen() {
 
   const table = useMaterialReactTable({
     columns,
-    data,
+    data: filteredMobileData,
     state: { isLoading: loading },
     muiTablePaperProps: {
       elevation: 0,
@@ -177,6 +178,18 @@ export default function InventoryScreen() {
             by creating a purchase.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setStockFilter((current) => (current === "low" ? "all" : "low"))}
+            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold sm:text-sm ${
+              stockFilter === "low"
+                ? "bg-rose-600 text-white"
+                : "bg-white text-slate-700 ring-1 ring-slate-200"
+            }`}
+          >
+            Low Stock
+          </button>
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -184,6 +197,7 @@ export default function InventoryScreen() {
         >
           Back
         </button>
+        </div>
       </div>
 
       {fetchError && (
@@ -249,7 +263,7 @@ export default function InventoryScreen() {
           ) : filteredMobileData.length > 0 ? (
             filteredMobileData.map((item) => {
               const qty = Number(item.qty ?? 0);
-              const isLowStock = qty <= 0;
+              const isLowStock = item.isLowStock === true;
 
               return (
                 <div
@@ -404,14 +418,12 @@ export default function InventoryScreen() {
                   </div>
                   <span
                     className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${
-                      Number(selectedItem.qty ?? 0) <= 0
+                      selectedItem.isLowStock
                         ? "bg-rose-100 text-rose-800"
                         : "bg-emerald-100 text-emerald-800"
                     }`}
                   >
-                    {Number(selectedItem.qty ?? 0) <= 0
-                      ? "Low Stock"
-                      : "In Stock"}
+                    {selectedItem.isLowStock ? "Low Stock" : "In Stock"}
                   </span>
                 </div>
 
@@ -423,13 +435,18 @@ export default function InventoryScreen() {
                     </span>
                     <span
                       className={`text-base font-extrabold ${
-                        Number(selectedItem.qty ?? 0) <= 0
+                        selectedItem.isLowStock
                           ? "text-rose-600"
                           : "text-emerald-600"
                       }`}
                     >
                       {selectedItem.qty}
                     </span>
+                    {selectedItem.lowStockAlertLevel != null ? (
+                      <span className="mt-0.5 block text-[10px] text-slate-400">
+                        Alert at {selectedItem.lowStockAlertLevel}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="rounded-xl bg-white p-2.5 border border-slate-100 shadow-2xs">
                     <span className="text-[10px] font-medium text-slate-400 block">
