@@ -9,6 +9,7 @@ import Wallet from '../models/wallet.model.js';
 import WalletWithdrawal from '../models/walletWithdrawal.model.js';
 import {resolveTwoBuckets} from '../utils/walletBuckets.js';
 import {attachMembershipExpiry} from '../services/membershipEligibility.service.js';
+import Membership from '../models/membership.model.js';
 
 const getsailorSharePercent = () => {
   const n = Number(process.env.CSP_sailor_SHARE_PERCENT ?? 70);
@@ -203,7 +204,7 @@ export const getCSP = async (req, res) => {
     const enrollments = rows.map(row => {
       const dto = toEnrollmentDto(row);
       const customerId = dto.customerId ? String(dto.customerId) : '';
-      const wallet = customerId ? walletMap.get(customerId) : null;
+    const wallet = customerId ? walletMap.get(customerId) : null;
       const buckets = resolveTwoBuckets(wallet, dto.customer);
       const sales = salesByEnrollment.get(String(row._id)) || {salesAmount: 0};
       const payoutAmount = customerId ? payoutByCustomer.get(customerId) || 0 : 0;
@@ -725,6 +726,20 @@ const emptyCspProgram = () => ({
 const collectCspPartnerDetails = async (enrollment, {activityLimit = 8} = {}) => {
   const dto = toEnrollmentDto(enrollment);
     const customerId = dto.customerId ? String(dto.customerId) : '';
+    let customerDoc = dto.customer ? (dto.customer.toObject ? dto.customer.toObject() : {...dto.customer}) : null;
+    if (!customerDoc && customerId && mongoose.Types.ObjectId.isValid(customerId)) {
+      customerDoc = await Customer.findById(customerId)
+        .select('name mobile email walletAmount membershipType membershipPlanId membershipPurchase withdrawable affiliateBalance nonWithdrawable cashbackBalance closingBalance')
+        .lean();
+    }
+    if (customerDoc) {
+      await attachMembershipExpiry([customerDoc]);
+    }
+    let planDisplayName = customerDoc?.membershipType || '';
+    if (customerDoc?.membershipPlanId && mongoose.Types.ObjectId.isValid(String(customerDoc.membershipPlanId))) {
+      const plan = await Membership.findById(customerDoc.membershipPlanId).select('displayName planId').lean();
+      if (plan?.displayName) planDisplayName = plan.displayName;
+    }
     const wallet = customerId
       ? await Wallet.findOne({customerId})
           .select(
@@ -860,9 +875,9 @@ const collectCspPartnerDetails = async (enrollment, {activityLimit = 8} = {}) =>
         categories: Array.isArray(application?.categories)
           ? application.categories.filter(Boolean)
           : [],
-        membershipType: textOrEmpty(dto.customer?.membershipType),
-        membershipEndDate: dto.customer?.membershipEndDate || null,
-        membershipExpired: Boolean(dto.customer?.membershipExpired),
+        membershipType: textOrEmpty(planDisplayName || customerDoc?.membershipType),
+        membershipEndDate: customerDoc?.membershipEndDate || null,
+        membershipExpired: Boolean(customerDoc?.membershipExpired),
         sailorSharePercent:
           dto.sailorSharePercent == null ? null : Number(dto.sailorSharePercent),
         platformSharePercent:

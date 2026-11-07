@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   Mail,
   MessageCircle,
+  MoreVertical,
   Phone,
   Receipt,
   RotateCcw,
@@ -289,6 +290,7 @@ export default function Vendor360Modal({
       () => ({ from: "", to: "" }),
     );
   const [createdSort, setCreatedSort] = useState<CreatedSort>("newest");
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payDoc, setPayDoc] = useState("");
   const [bill, setBill] = useState<VendorBillRow | null>(null);
@@ -738,14 +740,93 @@ export default function Vendor360Modal({
               </div>
             </div>
 
-            {/* Close Button */}
-            <button
-              type="button"
-              onClick={() => void closeIfConfirmed(onClose)}
-              className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-rose-50 border border-rose-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
-            >
-              <X size={14} className="text-rose-600" /> Close
-            </button>
+            {/* Close Button & Mobile 3-dot */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <div className="relative sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setMobileActionsOpen((prev) => !prev)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 border border-blue-200/90 text-blue-700 hover:bg-blue-100 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                  title="Actions menu"
+                  aria-label="Actions menu"
+                >
+                  <MoreVertical size={16} />
+                </button>
+
+                {mobileActionsOpen ? (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40 bg-black/20 backdrop-blur-2xs"
+                      onClick={() => setMobileActionsOpen(false)}
+                    />
+                    <div
+                      className="absolute right-0 top-full mt-1.5 z-50 w-56 rounded-2xl border border-slate-200/90 bg-white p-2.5 shadow-xl animate-in fade-in zoom-in-95 duration-150"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex flex-col gap-2">
+                        <Can permission={PERMISSIONS.VENDOR_UPDATE}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMobileActionsOpen(false);
+                              setPayOpen(true);
+                            }}
+                            className="flex w-full items-center gap-2.5 rounded-xl bg-purple-50 border border-purple-200/90 px-3 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 shadow-2xs active:scale-95 transition-all text-left cursor-pointer"
+                          >
+                            <Wallet size={15} className="text-purple-600 shrink-0" />
+                            <span>Record Payment</span>
+                          </button>
+                        </Can>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileActionsOpen(false);
+                            openWithVendor(
+                              `/expenses?create=1&vendorId=${vendor._id}&vendorName=${encodeURIComponent(profile?.name || vendor.name)}`,
+                            );
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl bg-amber-50 border border-amber-200/90 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 shadow-2xs active:scale-95 transition-all text-left cursor-pointer"
+                        >
+                          <Receipt size={15} className="text-amber-600 shrink-0" />
+                          <span>Add Expense</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileActionsOpen(false);
+                            openWithVendor("/create-purchase", vendorState);
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl bg-emerald-50 border border-emerald-200/90 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 shadow-2xs active:scale-95 transition-all text-left cursor-pointer"
+                        >
+                          <ShoppingCart size={15} className="text-emerald-600 shrink-0" />
+                          <span>Create Purchase</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileActionsOpen(false);
+                            openWithVendor("/create-purchase-order", vendorState);
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-xl bg-blue-50 border border-blue-200/90 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 shadow-2xs active:scale-95 transition-all text-left cursor-pointer"
+                        >
+                          <FilePlus2 size={15} className="text-blue-600 shrink-0" />
+                          <span>Create Purchase Order</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => void closeIfConfirmed(onClose)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-rose-50 border border-rose-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+              >
+                <X size={14} className="text-rose-600" /> Close
+              </button>
+            </div>
           </div>
 
           {/* Action buttons row: scrollable on mobile, flex on desktop */}

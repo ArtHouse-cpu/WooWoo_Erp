@@ -638,6 +638,14 @@ export default function WalletScreen() {
       : sum;
   }, 0);
 
+  const fmtMoney = (val: number | string | undefined | null) => {
+    const num = Number(val || 0);
+    return num.toLocaleString("en-IN", {
+      minimumFractionDigits: Number.isInteger(num) ? 0 : 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   const historyHtml =
     displayTransactions.length > 0
       ? displayTransactions
@@ -663,7 +671,7 @@ export default function WalletScreen() {
             const nwDed = toAmount(entry?.nonWithdrawableDeducted);
             const splitHint =
               !isCredit && (wDed > 0 || nwDed > 0)
-                ? `<p class="mt-1 text-[11px] text-slate-400">Non-withdrawable −₹${nwDed.toLocaleString("en-IN")} · Withdrawable −₹${wDed.toLocaleString("en-IN")}</p>`
+                ? `NW −₹${fmtMoney(nwDed)} · W −₹${fmtMoney(wDed)}`
                 : "";
 
             const staffName =
@@ -679,7 +687,6 @@ export default function WalletScreen() {
             const dateStr =
               dateObj && !isNaN(dateObj.getTime())
                 ? dateObj.toLocaleString("en-IN", {
-                    year: "numeric",
                     month: "short",
                     day: "numeric",
                     hour: "2-digit",
@@ -700,96 +707,82 @@ export default function WalletScreen() {
               : "bg-rose-100 text-rose-600";
 
             return `
-              <div class="relative pl-6">
-                
+              <div class="relative pl-5 sm:pl-6">
                 ${
                   index !== displayTransactions.length - 1
-                    ? `<div class="absolute left-[11px] top-8 h-full w-[2px] bg-slate-200"></div>`
+                    ? `<div class="absolute left-[9px] sm:left-[11px] top-6 h-full w-[2px] bg-slate-200"></div>`
                     : ""
                 }
 
-                <div class="absolute left-0 top-5 w-5 h-5 rounded-full ${iconBg} flex items-center justify-center shadow-sm">
+                <div class="absolute left-0 top-3 w-5 h-5 rounded-full ${iconBg} flex items-center justify-center shadow-2xs">
                   ${
                     isCredit
                       ? `
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                           <path d="M12 5v14"/>
                           <path d="M5 12h14"/>
                         </svg>
                       `
                       : `
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                           <path d="M5 12h14"/>
                         </svg>
                       `
                   }
                 </div>
 
-                <div class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition-all duration-200">
-
-                  <div class="flex items-start justify-between gap-3">
-
-                    <div class="min-w-0 flex-1">
-                      <div class="flex items-center gap-2 flex-wrap">
-
-                        <span class="px-2.5 py-1 text-[11px] font-semibold rounded-full ${badgeClass}">
-                          ${type}
-                        </span>
-
-                        ${
-                          isWithdrawable
-                            ? `<span class="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-amber-100 text-amber-800 border border-amber-200">Withdrawable</span>`
-                            : !isCredit
-                              ? ""
-                              : `<span class="px-2.5 py-1 text-[11px] font-semibold rounded-full bg-slate-100 text-slate-700 border border-slate-200">Non-Withdrawable</span>`
-                        }
-
-                        <p class="text-sm font-medium text-slate-700 break-words">
-                          ${note}
-                        </p>
-
-                      </div>
-
-                      <div class="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-500">
-
-                        <div class="flex items-center gap-1">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path d="M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5Z"/>
-                            <path d="M20 21a8 8 0 1 0-16 0"/>
-                          </svg>
-
-                          <span class="font-medium text-slate-600">
-                            ${staffName}
-                          </span>
-                        </div>
-
-                        ${
-                          dateStr
-                            ? `
-                            <div class="flex items-center gap-1">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 6v6l4 2"/>
-                              </svg>
-
-                              <span>${dateStr}</span>
-                            </div>
-                          `
+                <div class="mb-2.5 rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-2xs hover:border-slate-300 transition-all duration-150">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">
+                      <span class="px-2 py-0.5 text-[10px] font-bold rounded-full ${badgeClass}">
+                        ${type}
+                      </span>
+                      ${
+                        isWithdrawable
+                          ? `<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-50 text-amber-800 border border-amber-200">Withdrawable</span>`
+                          : isCredit
+                            ? `<span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 text-slate-700 border border-slate-200">Non-Withdrawable</span>`
                             : ""
-                        }
-
-                      </div>
-                    </div>
-
-                    <div class="text-right shrink-0">
-                      <p class="text-lg font-bold ${amountColor}">
-                        ${isCredit ? "+" : "-"}₹${amount.toLocaleString(
-              "en-IN"
-            )}
+                      }
+                      <p class="text-xs font-semibold text-slate-700 truncate max-w-[150px] sm:max-w-xs" title="${note}">
+                        ${note}
                       </p>
-                      ${splitHint}
                     </div>
 
+                    <p class="text-sm sm:text-base font-bold ${amountColor} shrink-0 tabular-nums">
+                      ${isCredit ? "+" : "-"}₹${fmtMoney(amount)}
+                    </p>
+                  </div>
+
+                  <div class="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-slate-400 border-t border-slate-100 pt-1.5">
+                    <div class="flex items-center gap-2.5 text-[11px] text-slate-500 font-medium truncate">
+                      <span class="inline-flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path d="M12 12c2.761 0 5-2.239 5-5S14.761 2 12 2 7 4.239 7 7s2.239 5 5 5Z"/>
+                          <path d="M20 21a8 8 0 1 0-16 0"/>
+                        </svg>
+                        <span class="truncate max-w-[90px] sm:max-w-none">${staffName}</span>
+                      </span>
+                      ${
+                        dateStr
+                          ? `
+                          <span class="inline-flex items-center gap-1 text-slate-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <circle cx="12" cy="12" r="10"/>
+                              <path d="M12 6v6l4 2"/>
+                            </svg>
+                            <span>${dateStr}</span>
+                          </span>
+                        `
+                          : ""
+                      }
+                    </div>
+
+                    ${
+                      splitHint
+                        ? `<span class="text-[10px] text-slate-400 font-medium shrink-0">${splitHint}</span>`
+                        : ""
+                    }
                   </div>
                 </div>
               </div>
@@ -797,134 +790,159 @@ export default function WalletScreen() {
           })
           .join("")
       : `
-        <div class="flex flex-col items-center justify-center py-12 text-center">
-          <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2">
+        <div class="flex flex-col items-center justify-center py-10 text-center">
+          <div class="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#64748b" stroke-width="2">
               <path d="M3 3h18v18H3z"/>
               <path d="M8 12h8"/>
             </svg>
           </div>
-
-          <h3 class="text-base font-semibold text-slate-700">
+          <h3 class="text-sm font-semibold text-slate-700">
             No Wallet History
           </h3>
-
-          <p class="text-sm text-slate-500 mt-1">
+          <p class="text-xs text-slate-500 mt-0.5">
             No transactions found for this customer.
           </p>
         </div>
       `;
 
   await Swal.fire({
-    width: 720,
-
+    width: 680,
     showConfirmButton: false,
-
     background: "#f8fafc",
-
     customClass: {
-      popup: "rounded-[28px] overflow-hidden",
-      htmlContainer: "!p-0",
+      popup: "!rounded-[28px] !overflow-hidden !p-0",
+      htmlContainer: "!p-0 !m-0 !overflow-hidden",
     },
-
     html: `
-      <div class="flex flex-col h-full max-h-[85vh]">
+      <div class="flex flex-col h-full max-h-[88vh]">
 
-        <!-- Header -->
-        <div class="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-5">
-
-          <div class="flex items-center justify-between">
-
-            <div>
-              <h2 class="text-xl font-bold text-slate-800">
-                ${viewRow.customerName}
-              </h2>
-
-              <p class="text-sm text-slate-500 mt-1">
-                Wallet Transaction History
-              </p>
-            </div>
-
-            <button id="close-wallet-history"
-              class="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center transition">
-              ✕
-            </button>
-
+        <!-- Header (Compact, non-sticky content, title only) -->
+        <div class="shrink-0 bg-white border-b border-slate-100 px-5 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+              ${viewRow.customerName}
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Wallet Transaction History · ${viewRow.customerPhone || "-"}
+            </p>
           </div>
 
-          <!-- Summary: Total Balance · Withdrawable · Minimum · Credit · Debit -->
-          <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Total Balance
-              </p>
-              <h3 class="mt-1.5 text-xl font-bold tabular-nums text-slate-900">
-                ₹${Number(viewRow.walletAmount || 0).toLocaleString("en-IN")}
-              </h3>
-              <p class="mt-1 text-[11px] text-slate-400">
-                Withdrawable + non-withdrawable
-              </p>
-            </div>
-
-            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
-                Withdrawable
-              </p>
-              <h3 class="mt-1.5 text-xl font-bold tabular-nums text-emerald-800">
-                ₹${Number(viewRow.withdrawable ?? 0).toLocaleString("en-IN")}
-              </h3>
-              <p class="mt-1 text-[11px] text-emerald-600/80">
-                Affiliate, referral, CSP
-              </p>
-            </div>
-
-            <div class="rounded-2xl border border-slate-200 bg-white p-4 text-left">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Non-Withdrawable
-              </p>
-              <h3 class="mt-1.5 text-xl font-bold tabular-nums text-slate-800">
-                ₹${Number(viewRow.nonWithdrawable ?? 0).toLocaleString("en-IN")}
-              </h3>
-              <p class="mt-1 text-[11px] text-slate-400">
-                Cashback and restricted credits
-              </p>
-            </div>
-          </div>
-
-          <div class="mt-3 grid grid-cols-2 gap-3">
-            <div class="rounded-2xl border border-emerald-200 bg-white p-4 text-left">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
-                Total Credit
-              </p>
-              <h3 class="mt-1.5 text-lg font-bold tabular-nums text-emerald-700">
-                +₹${totalCredit.toLocaleString("en-IN")}
-              </h3>
-            </div>
-
-            <div class="rounded-2xl border border-rose-200 bg-white p-4 text-left">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-rose-600">
-                Total Debit
-              </p>
-              <h3 class="mt-1.5 text-lg font-bold tabular-nums text-rose-700">
-                -₹${totalDebit.toLocaleString("en-IN")}
-              </h3>
-            </div>
-          </div>
+          <button id="close-wallet-history"
+            class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition active:scale-95 cursor-pointer text-sm font-bold">
+            ✕
+          </button>
         </div>
 
-        <!-- Content -->
-        <div class="overflow-y-auto px-6 py-5 custom-scrollbar bg-slate-50">
-          ${historyHtml}
+        <!-- Scrollable Content: Cards + History scroll together naturally (cards don't stick!) -->
+        <div class="overflow-y-auto px-4 sm:px-6 py-4 custom-scrollbar bg-slate-50/70 flex-1 space-y-3.5">
+          
+          <!-- Summary Cards Section (Refactored to match design) -->
+          <div class="space-y-2.5">
+            <!-- Card 1: Total Balance -->
+            <div class="flex items-center justify-between rounded-2xl border border-purple-200/80 bg-[#f4f0ff] p-3 sm:p-3.5 transition">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/>
+                    <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>
+                    <circle cx="18" cy="14" r="1"/>
+                  </svg>
+                </div>
+                <span class="text-sm sm:text-base font-semibold text-slate-800 truncate">
+                  Total Balance
+                </span>
+              </div>
+              <span class="text-lg sm:text-2xl font-bold text-indigo-950 tabular-nums shrink-0 ml-2">
+                ₹${fmtMoney(viewRow.walletAmount)}
+              </span>
+            </div>
+
+            <!-- Card 2: Withdrawable -->
+            <div class="flex items-center justify-between rounded-2xl border border-emerald-200/80 bg-[#ecfdf5] p-3 sm:p-3.5 transition">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path d="M12 19V5M5 12l7-7 7 7"/>
+                  </svg>
+                </div>
+                <span class="text-sm sm:text-base font-semibold text-slate-800 truncate">
+                  Withdrawable
+                </span>
+              </div>
+              <span class="text-lg sm:text-2xl font-bold text-emerald-600 tabular-nums shrink-0 ml-2">
+                ₹${fmtMoney(viewRow.withdrawable)}
+              </span>
+            </div>
+
+            <!-- Card 3: Non-Withdrawable -->
+            <div class="flex items-center justify-between rounded-2xl border border-blue-200/80 bg-[#eff6ff] p-3 sm:p-3.5 transition">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <rect width="20" height="14" x="2" y="5" rx="2"/>
+                    <line x1="2" x2="22" y1="10" y2="10"/>
+                  </svg>
+                </div>
+                <span class="text-sm sm:text-base font-semibold text-slate-800 truncate">
+                  Non-Withdrawable
+                </span>
+              </div>
+              <span class="text-lg sm:text-2xl font-bold text-blue-950 tabular-nums shrink-0 ml-2">
+                ₹${fmtMoney(viewRow.nonWithdrawable)}
+              </span>
+            </div>
+
+            <!-- Card 4 & 5: Total Credit & Total Debit (Side by side) -->
+            <div class="grid grid-cols-2 gap-2.5 sm:gap-3">
+              <!-- Total Credit -->
+              <div class="flex flex-col justify-between rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-3 sm:p-3.5">
+                <div class="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600">
+                  <svg class="text-emerald-600 shrink-0" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path d="m22 7-8.5 8.5-5-5L2 17"/>
+                    <path d="M16 7h6v6"/>
+                  </svg>
+                  <span class="truncate">Total Credit</span>
+                </div>
+                <p class="mt-1.5 text-base sm:text-xl font-bold text-emerald-700 tabular-nums">
+                  +₹${fmtMoney(totalCredit)}
+                </p>
+              </div>
+
+              <!-- Total Debit -->
+              <div class="flex flex-col justify-between rounded-2xl border border-rose-200/80 bg-rose-50/70 p-3 sm:p-3.5">
+                <div class="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600">
+                  <svg class="text-rose-600 shrink-0" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path d="M12 5v14M19 12l-7 7-7-7"/>
+                  </svg>
+                  <span class="truncate">Total Debit</span>
+                </div>
+                <p class="mt-1.5 text-base sm:text-xl font-bold text-rose-600 tabular-nums">
+                  -₹${fmtMoney(totalDebit)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- History Section -->
+          <div class="pt-1">
+            <div class="flex items-center justify-between mb-2.5 px-0.5">
+              <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Activity History
+              </h3>
+              <span class="text-[11px] font-semibold text-slate-400">
+                ${displayTransactions.length} ${displayTransactions.length === 1 ? "entry" : "entries"}
+              </span>
+            </div>
+            ${historyHtml}
+          </div>
+
         </div>
 
       </div>
     `,
-
     didOpen: () => {
-      const closeBtn = document.getElementById(
-        "close-wallet-history"
-      );
-
+      const closeBtn = document.getElementById("close-wallet-history");
       closeBtn?.addEventListener("click", () => {
         Swal.close();
       });

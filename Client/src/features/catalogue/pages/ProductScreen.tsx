@@ -19,8 +19,10 @@ import {
   ArrowUpCircle,
   Boxes,
   ChevronDown,
+  FileSpreadsheet,
   Package,
   LayoutList,
+  Plus,
   Search,
   ShoppingBasket,
   SquarePen,
@@ -106,6 +108,21 @@ export default function ProductScreen() {
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [categories, setCategories] = useState<{ _id?: string; name?: string }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        addMenuRef.current &&
+        !addMenuRef.current.contains(event.target as Node)
+      ) {
+        setAddMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     handleGetCategories()
@@ -837,14 +854,38 @@ export default function ProductScreen() {
         </h1>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <Can permission={PERMISSIONS.PRODUCT_CREATE}>
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(true)}
-              className="cursor-pointer rounded bg-black px-2 py-1 text-xs font-semibold text-white transition sm:px-3 sm:py-2 sm:text-[14px]"
-            >
-              <span className="sm:hidden">+ Add</span>
-              <span className="hidden sm:inline">+ Add Product</span>
-            </button>
+            <div className="relative shrink-0" ref={addMenuRef}>
+              <button
+                type="button"
+                onClick={() => setAddMenuOpen((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 cursor-pointer"
+              >
+                <Plus size={15} />
+                <span>Add</span>
+                <ChevronDown
+                  size={13}
+                  className={`transition-transform duration-200 ${addMenuOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {addMenuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 z-40 w-48 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl ring-1 ring-slate-900/5 animate-in fade-in zoom-in-95 duration-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddMenuOpen(false);
+                      setEditProduct(null);
+                      setShowCreateModal(true);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer"
+                  >
+                    <Plus size={14} className="text-blue-600" />
+                    <span>Add Product</span>
+                  </button>
+                 
+                </div>
+              )}
+            </div>
           </Can>
 
           {showCreateModal && (

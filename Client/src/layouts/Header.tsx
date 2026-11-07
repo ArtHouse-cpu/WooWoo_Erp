@@ -12,6 +12,17 @@ import {
   Home,
   List,
   Plus,
+  FileText,
+  Printer,
+  UserPlus,
+  Store,
+  ShoppingCart,
+  ShieldCheck,
+  KeyRound,
+  TicketPercent,
+  Gift,
+  Box,
+  Layers,
 } from "lucide-react";
 import logo from "../assets/images/logo/woo_woo_art_house_logo.png";
 import { useEffect, useState } from "react";
@@ -32,6 +43,95 @@ import {
   type LeadPayload,
   type VerifiedStaff,
 } from "@/services/apiClient";
+
+const CreateExpenseIcon = ({
+  size = 18,
+  className = "",
+  strokeWidth = 2,
+}: {
+  size?: number;
+  className?: string;
+  strokeWidth?: number;
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h7" />
+    <path d="M14 2v6h6" />
+    <path d="M9 13h5" />
+    <path d="M9 17h3" />
+    <path d="M19 16v6" />
+    <path d="M16 19h6" />
+  </svg>
+);
+
+const FoodClocheIcon = ({
+  size = 18,
+  className = "",
+  strokeWidth = 2,
+}: {
+  size?: number;
+  className?: string;
+  strokeWidth?: number;
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <circle cx="12" cy="4" r="1.5" />
+    <path d="M5 18a7 7 0 0 1 14 0" />
+    <path d="M3 18h18" />
+  </svg>
+);
+
+const FoodBillIcon = ({
+  size = 18,
+  className = "",
+  strokeWidth = 2,
+}: {
+  size?: number;
+  className?: string;
+  strokeWidth?: number;
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={strokeWidth}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-5 2Z" />
+    <path d="M9 8h6" />
+    <path d="M9 12h6" />
+    <path d="M9 16h3" />
+  </svg>
+);
+
+type ShortcutItem = {
+  label: string;
+  path: string;
+  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
+  iconBg: string;
+};
 type HeaderProps = {
   onMenuClick?: () => void;
   showMenuButton?: boolean;
@@ -101,69 +201,107 @@ export default function Header({
     return () => window.removeEventListener("keydown", onKey);
   }, [bookingMenu, shortcutOpen]);
 
+  useEffect(() => {
+    if (shortcutOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [shortcutOpen]);
+
   const openShortcut = (path: string) => {
     setShortcutOpen(false);
     navigate(path);
   };
 
-  const shortcuts = [
+  const shortcuts: ShortcutItem[] = [
     can(PERMISSIONS.EXPENSE_CREATE) && {
       label: "Create Expense",
       path: "/expenses?create=1",
+      icon: CreateExpenseIcon,
+      iconBg: "bg-sky-50 text-sky-500",
     },
     canPath("/create-quotation") && {
       label: "Create Quotation",
       path: "/create-quotation",
+      icon: FileText,
+      iconBg: "bg-purple-50 text-purple-600",
     },
     canPath("/pos") && {
       label: "POS Drafts",
       path: "/pos?tab=draft",
+      icon: Printer,
+      iconBg: "bg-emerald-50 text-emerald-600",
     },
     can(PERMISSIONS.CUSTOMER_CREATE) && {
       label: "Add Customer",
       path: "/customers?create=1",
+      icon: UserPlus,
+      iconBg: "bg-amber-50 text-amber-500",
     },
     can(PERMISSIONS.VENDOR_CREATE) && {
       label: "Add Vendor",
       path: "/vendors?create=1",
+      icon: Store,
+      iconBg: "bg-rose-50 text-rose-500",
     },
     canPath("/create-purchase") && {
       label: "Create Purchase",
       path: "/create-purchase",
+      icon: ShoppingCart,
+      iconBg: "bg-sky-50 text-sky-500",
     },
     canAny([PERMISSIONS.CSP_WRITE, PERMISSIONS.CUSTOMER_CREATE]) && {
       label: "Enroll CSP",
       path: "/csp?enroll=1",
+      icon: ShieldCheck,
+      iconBg: "bg-indigo-50 text-indigo-600",
     },
     can(PERMISSIONS.ACCESS_MANAGE) && {
       label: "Add Access",
       path: "/access",
+      icon: KeyRound,
+      iconBg: "bg-emerald-50 text-emerald-600",
     },
     can(PERMISSIONS.COUPON_MANAGE) && {
       label: "Create Coupon",
       path: "/coupons?create=1",
+      icon: TicketPercent,
+      iconBg: "bg-purple-50 text-purple-600",
     },
     can(PERMISSIONS.GIFT_CARD_CREATE) && {
       label: "Create Gift Card",
       path: "/giftcard?create=1",
+      icon: Gift,
+      iconBg: "bg-rose-50 text-rose-500",
     },
     can(PERMISSIONS.FOOD_CREATE) && {
       label: "Add Food",
       path: "/foods?create=1",
+      icon: FoodClocheIcon,
+      iconBg: "bg-amber-50 text-amber-500",
     },
     canPath("/foodBill") && {
       label: "Food Bill",
       path: "/foodBill",
+      icon: FoodBillIcon,
+      iconBg: "bg-sky-50 text-sky-500",
     },
     can(PERMISSIONS.PRODUCT_CREATE) && {
       label: "Add Product",
       path: "/products?create=1",
+      icon: Box,
+      iconBg: "bg-sky-50 text-sky-600",
     },
     can(PERMISSIONS.SERVICE_CREATE) && {
       label: "Add Service",
       path: "/services?create=1",
+      icon: Layers,
+      iconBg: "bg-emerald-50 text-emerald-600",
     },
-  ].filter((item): item is { label: string; path: string } => Boolean(item));
+  ].filter((item): item is ShortcutItem => Boolean(item));
 
   const handleLeadSubmit = (payload: LeadPayload) => {
     setPendingLeadPayload(payload);
@@ -501,43 +639,77 @@ export default function Header({
           ))}
       </nav>
       {shortcutOpen ? (
-      <div className="fixed inset-0 z-[90] flex items-start justify-center bg-black/30 p-3 pt-16 sm:items-center sm:pt-3">
-        <button
-          type="button"
-          aria-label="Close shortcuts"
-          className="absolute inset-0 cursor-default"
-          onClick={() => setShortcutOpen(false)}
-        />
-        <div className="relative w-full max-w-xs rounded-2xl bg-white p-3 shadow-xl">
-          <div className="mb-2 flex items-center justify-between px-1">
-            <p className="text-sm font-bold text-slate-900">Shortcuts</p>
-            <button
-              type="button"
-              onClick={() => setShortcutOpen(false)}
-              className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-500"
-            >
-              Close
-            </button>
-          </div>
-          <div className="grid gap-1.5">
-            {shortcuts.length === 0 ? (
-              <p className="px-2 py-3 text-sm text-slate-500">No shortcuts for this account.</p>
-            ) : (
-              shortcuts.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => openShortcut(item.path)}
-                  className="rounded-xl bg-slate-50 px-3 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-blue-50 hover:text-blue-700"
-                >
-                  {item.label}
-                </button>
-              ))
-            )}
+        <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+          {/* Backdrop */}
+          <div
+            aria-label="Close shortcuts"
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+            onClick={() => setShortcutOpen(false)}
+          />
+
+          {/* Bottom Sheet Modal */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shortcuts-heading"
+            className="relative z-10 w-full max-h-[88dvh] sm:max-h-[82vh] md:max-w-xl md:mx-auto rounded-t-[28px] md:rounded-b-[28px] md:mb-6 bg-white shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300 ease-out"
+          >
+            {/* Grab handle */}
+            <div className="pt-3 pb-1 flex justify-center shrink-0">
+              <div className="h-1 w-11 rounded-full bg-slate-300" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-1 pb-3 shrink-0">
+              <h2
+                id="shortcuts-heading"
+                className="text-lg font-bold text-slate-900 tracking-tight"
+              >
+                Shortcuts
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShortcutOpen(false)}
+                className="text-sm font-semibold text-blue-600 hover:text-blue-700 active:text-blue-800 transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Scrollable grid content */}
+            <div className="overflow-y-auto px-4 sm:px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] custom-scrollbar">
+              {shortcuts.length === 0 ? (
+                <p className="px-2 py-8 text-center text-sm text-slate-500">
+                  No shortcuts for this account.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3 pb-2">
+                  {shortcuts.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={() => openShortcut(item.path)}
+                        className="group flex items-center gap-2.5 sm:gap-3 rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-3 text-left transition-all hover:bg-slate-50/80 hover:border-slate-300 hover:shadow-2xs active:scale-[0.98] cursor-pointer"
+                      >
+                        <div
+                          className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105 ${item.iconBg}`}
+                        >
+                          <Icon size={19} strokeWidth={2} />
+                        </div>
+                        <span className="truncate text-xs sm:text-[13px] font-semibold text-slate-800 group-hover:text-slate-900">
+                          {item.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    ) : null}
+      ) : null}
     {bookingMenu ? (
         <>
           <button
