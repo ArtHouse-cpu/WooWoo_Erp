@@ -52,9 +52,75 @@ const membershipLabel = (value?: string | null) => {
   return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
 };
 
-const membershipExpiryDate = (value?: string | Date | null) => {
-  if (!value) return "Lifetime";
-  return formatDate(value);
+const formatMembershipExpiryDisplay = (
+  type?: string | null,
+  endDate?: string | Date | null,
+  isExpired?: boolean,
+) => {
+  const isLifetime = String(type || "").toLowerCase().includes("lifetime");
+
+  if (endDate) {
+    const date = endDate instanceof Date ? endDate : new Date(endDate);
+    if (!Number.isNaN(date.getTime())) {
+      const formatted = date.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+      const now = new Date();
+      const diffTime = date.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const expired = Boolean(isExpired) || diffDays < 0;
+
+      if (expired) {
+        const expiredAgo = Math.abs(diffDays);
+        return {
+          text: `Expired (${formatted})`,
+          fullText: `Expired on ${formatted}${expiredAgo > 0 ? ` (${expiredAgo}d ago)` : ""}`,
+          badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
+          isExpired: true,
+        };
+      }
+      if (diffDays === 0) {
+        return {
+          text: `${formatted} (today)`,
+          fullText: `${formatted} (Expires today)`,
+          badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
+          isExpired: false,
+        };
+      }
+      if (diffDays <= 7) {
+        return {
+          text: `${formatted} (${diffDays}d left)`,
+          fullText: `${formatted} (${diffDays}d left)`,
+          badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
+          isExpired: false,
+        };
+      }
+      return {
+        text: formatted,
+        fullText: formatted,
+        badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        isExpired: false,
+      };
+    }
+  }
+
+  if (isLifetime) {
+    return {
+      text: "Lifetime",
+      fullText: "Lifetime",
+      badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      isExpired: false,
+    };
+  }
+
+  return {
+    text: "N/A",
+    fullText: "N/A",
+    badgeClass: "bg-slate-50 text-slate-600 border-slate-200",
+    isExpired: false,
+  };
 };
 
 const formatDate = (value?: string | Date | null) => {
@@ -220,6 +286,25 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
   if (!partner) return null;
 
   const profile = details?.partner;
+  const customerRecord = (partner.customer as Record<string, any>) || {};
+  const effectiveMembershipType =
+    profile?.membershipType ||
+    customerRecord?.membershipType ||
+    "";
+  const effectiveEndDate =
+    profile?.membershipEndDate ??
+    customerRecord?.membershipEndDate ??
+    null;
+  const effectiveExpired =
+    profile?.membershipExpired ??
+    customerRecord?.membershipExpired ??
+    (effectiveEndDate ? new Date(effectiveEndDate).getTime() < Date.now() : false);
+
+  const expiryInfo = formatMembershipExpiryDisplay(
+    effectiveMembershipType,
+    effectiveEndDate,
+    effectiveExpired,
+  );
   const fullName =
     profile?.fullName ||
     partner.customer?.name ||
@@ -337,7 +422,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
                 {fullName}
               </h2>
               <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">
-                {membershipLabel(profile?.membershipType)}
+                {membershipLabel(effectiveMembershipType)}
               </span>
             </div>
             <p className="text-[11px] font-semibold text-slate-400 sm:text-sm">
@@ -350,8 +435,10 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
               >
                 {statusLabel(status)}
               </span>
-              <span className="text-[11px] font-medium text-slate-500">
-                Expiry {membershipExpiryDate(profile?.membershipEndDate)}
+              <span
+                className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${expiryInfo.badgeClass}`}
+              >
+                Expiry: {expiryInfo.fullText}
               </span>
             </div>
           </div>
@@ -369,7 +456,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
           <button
             type="button"
             onClick={() => openPurchase("/create-purchase")}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 shadow-xs active:scale-95 transition-all cursor-pointer"
           >
             <ShoppingCart className="h-3.5 w-3.5" />
             Create Purchase
@@ -377,7 +464,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
           <button
             type="button"
             onClick={() => openPurchase("/create-purchase-order")}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 shadow-xs active:scale-95 transition-all cursor-pointer"
           >
             <FilePlus2 className="h-3.5 w-3.5" />
             Create Purchase Order
@@ -389,7 +476,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
               setPayoutError("");
               setPayoutDone("");
             }}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#ff5a36] px-3 py-2 text-xs font-semibold text-white hover:bg-[#e64e2d]"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#ff5a36] px-3 py-2 text-xs font-semibold text-white hover:bg-[#e64e2d] shadow-xs active:scale-95 transition-all cursor-pointer"
           >
             <Wallet className="h-3.5 w-3.5" />
             Payout

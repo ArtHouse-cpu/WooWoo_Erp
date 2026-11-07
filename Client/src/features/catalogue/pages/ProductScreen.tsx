@@ -20,6 +20,7 @@ import {
   ArrowUpCircle,
   Boxes,
   ChevronDown,
+  FileSpreadsheet,
   Package,
   LayoutList,
   Plus,
@@ -109,6 +110,21 @@ export default function ProductScreen() {
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [categories, setCategories] = useState<{ _id?: string; name?: string }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        addMenuRef.current &&
+        !addMenuRef.current.contains(event.target as Node)
+      ) {
+        setAddMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     handleGetCategories()
