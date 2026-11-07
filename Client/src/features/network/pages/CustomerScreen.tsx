@@ -387,6 +387,8 @@ export default function CustomerScreen() {
           <button
             onClick={(e) => {
               e.stopPropagation();
+              setDetailsOpen(false);
+              setDetailsCustomer(null);
               setSelectedCustomer(row.original);
               setOpenLedgerModal(true);
             }}
@@ -603,11 +605,12 @@ export default function CustomerScreen() {
                   <div className="relative shrink-0">
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setActionMenuCustomerId(
-                          actionMenuCustomerId === customerKey ? null : customerKey
-                        )
-                      }
+                          actionMenuCustomerId === customerKey ? null : customerKey,
+                        );
+                      }}
                       className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition active:scale-95 cursor-pointer"
                       aria-label="Customer actions"
                     >
@@ -618,13 +621,22 @@ export default function CustomerScreen() {
                       <>
                         <div
                           className="fixed inset-0 z-30"
-                          onClick={() => setActionMenuCustomerId(null)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActionMenuCustomerId(null);
+                          }}
                         />
-                        <div className="absolute right-0 top-full z-40 mt-1.5 w-38 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                        <div
+                          className="absolute right-0 top-full z-40 mt-1.5 w-38 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setActionMenuCustomerId(null);
+                              setSelectedCustomer(null);
+                              setOpenLedgerModal(false);
                               setDetailsCustomer(customer);
                               setDetailsOpen(true);
                             }}
@@ -636,8 +648,10 @@ export default function CustomerScreen() {
                           <Can permission={PERMISSIONS.CUSTOMER_UPDATE}>
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setActionMenuCustomerId(null);
+                                setDetailsOpen(false);
                                 setSelectedCustomer(customer);
                                 setEditOpen(true);
                               }}
@@ -649,8 +663,11 @@ export default function CustomerScreen() {
                           </Can>
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setActionMenuCustomerId(null);
+                              setDetailsOpen(false);
+                              setDetailsCustomer(null);
                               setSelectedCustomer(customer);
                               setOpenLedgerModal(true);
                             }}
@@ -662,7 +679,8 @@ export default function CustomerScreen() {
                           <Can permission={PERMISSIONS.CUSTOMER_DELETE}>
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setActionMenuCustomerId(null);
                                 if (customer._id) void handleDelete(customer._id);
                               }}
@@ -858,6 +876,18 @@ export default function CustomerScreen() {
         }}
         onUpdated={async () => {
           await fetchCustomers();
+        }}
+        onEdit={(cust) => {
+          setDetailsOpen(false);
+          setDetailsCustomer(null);
+          setSelectedCustomer(cust as any);
+          setEditOpen(true);
+        }}
+        onViewLedger={(cust) => {
+          setDetailsOpen(false);
+          setDetailsCustomer(null);
+          setSelectedCustomer(cust as any);
+          setOpenLedgerModal(true);
         }}
       />
 

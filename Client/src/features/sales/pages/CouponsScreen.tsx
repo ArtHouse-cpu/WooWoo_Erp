@@ -68,6 +68,19 @@ type CouponRow = CouponPayload & {
 };
 
 type StatusFilter = "all" | "active" | "inactive";
+type CouponTab = "all" | "store" | "space" | "food" | "membership";
+
+const COUPON_TABS: {
+  id: CouponTab;
+  label: string;
+  icon: LucideIcon;
+}[] = [
+  { id: "all", label: "All", icon: LayoutGrid },
+  { id: "store", label: "Store", icon: Package },
+  { id: "space", label: "Space", icon: MapPin },
+  { id: "food", label: "Food", icon: Utensils },
+  { id: "membership", label: "Membership", icon: Crown },
+];
 
 const APPLICABLE_OPTIONS: {
   value: CouponApplicableOn;
@@ -194,6 +207,7 @@ export default function CouponsScreen() {
   const [coupons, setCoupons] = useState<CouponRow[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [categoryTab, setCategoryTab] = useState<CouponTab>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [actionMenu, setActionMenu] = useState<{
     anchorEl: HTMLElement;
@@ -206,6 +220,37 @@ export default function CouponsScreen() {
   const [form, setForm] = useState<CouponPayload>(() => initialForm());
   const [limitPerCustomer, setLimitPerCustomer] = useState(false);
   const staff = useAppSelector((state) => state.user);
+
+  // Top KPI calculations
+  const activeCouponsCount = useMemo(() => {
+    return coupons.filter((c) => Boolean(c.isActive)).length;
+  }, [coupons]);
+
+  const totalUsageCount = useMemo(() => {
+    return coupons.reduce((sum, c) => sum + (Number(c.usedCount) || 0), 0);
+  }, [coupons]);
+
+  // Tab counts for (All, Store, Space, Food, Membership)
+  const tabCounts = useMemo(() => {
+    const counts: Record<CouponTab, number> = {
+      all: coupons.length,
+      store: 0,
+      space: 0,
+      food: 0,
+      membership: 0,
+    };
+    for (const c of coupons) {
+      const applicable =
+        Array.isArray(c.applicableOn) && c.applicableOn.length
+          ? c.applicableOn
+          : ["all"];
+      if (applicable.includes("store")) counts.store += 1;
+      if (applicable.includes("space")) counts.space += 1;
+      if (applicable.includes("food")) counts.food += 1;
+      if (applicable.includes("membership")) counts.membership += 1;
+    }
+    return counts;
+  }, [coupons]);
 
   useEffect(() => {
     if (searchParams.get("create") !== "1") return;
@@ -259,6 +304,14 @@ export default function CouponsScreen() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return coupons.filter((c) => {
+      // Filter by category tab (All, Store, Space, Food, Membership)
+      if (categoryTab !== "all") {
+        const applicable =
+          Array.isArray(c.applicableOn) && c.applicableOn.length
+            ? c.applicableOn
+            : ["all"];
+        if (!applicable.includes(categoryTab)) return false;
+      }
       if (statusFilter === "active" && !c.isActive) return false;
       if (statusFilter === "inactive" && c.isActive) return false;
       if (!q) return true;
@@ -271,7 +324,7 @@ export default function CouponsScreen() {
           .includes(q)
       );
     });
-  }, [coupons, search, statusFilter]);
+  }, [coupons, search, statusFilter, categoryTab]);
 
   const resetForm = () => {
     setForm(initialForm());
@@ -280,6 +333,12 @@ export default function CouponsScreen() {
 
   const openCreate = () => {
     resetForm();
+    if (categoryTab !== "all") {
+      setForm((prev) => ({
+        ...prev,
+        applicableOn: [categoryTab],
+      }));
+    }
     setModalOpen(true);
   };
 
@@ -602,9 +661,7 @@ export default function CouponsScreen() {
     <div className="min-w-0 space-y-4 p-1 sm:p-2">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
-            <TicketPercent size={18} />
-          </span>
+         
           <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
             Coupons
           </h1>
@@ -616,12 +673,61 @@ export default function CouponsScreen() {
             className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700"
           >
             <Plus size={16} />
-            Create Coupon
+            Create 
           </button>
         </Can>
       </div>
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      {/* KPI Cards above search bar: Active Coupons & Usage Count */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
+        {/* Active Coupons Card */}
+        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-emerald-100/90 bg-emerald-50/60 p-2.5 sm:p-3.5 shadow-2xs transition duration-300 hover:shadow-md hover:border-emerald-200">
+          <TicketPercent
+            className="absolute -right-2 -bottom-2 sm:-right-3 sm:-bottom-3 h-14 w-14 sm:h-20 sm:w-20 stroke-[1.2] pointer-events-none text-emerald-200/50 transition-transform duration-300"
+          />
+          <div className="relative z-10 flex items-center gap-2 sm:gap-2.5">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs shadow-emerald-500/20">
+              <TicketPercent className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span
+                className="block truncate text-[10px] sm:text-xs font-bold text-slate-800"
+                title="Active Coupons"
+              >
+                Active Coupons
+              </span>
+              <div className="mt-0.5 text-lg sm:text-2xl font-extrabold tabular-nums text-slate-900">
+                {activeCouponsCount}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Usage Count Card */}
+        <div className="relative min-w-0 overflow-hidden rounded-2xl border border-violet-100/90 bg-violet-50/60 p-2.5 sm:p-3.5 shadow-2xs transition duration-300 hover:shadow-md hover:border-violet-200">
+          <Users
+            className="absolute -right-2 -bottom-2 sm:-right-3 sm:-bottom-3 h-14 w-14 sm:h-20 sm:w-20 stroke-[1.2] pointer-events-none text-violet-200/50 transition-transform duration-300"
+          />
+          <div className="relative z-10 flex items-center gap-2 sm:gap-2.5">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-xs shadow-violet-500/20">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span
+                className="block truncate text-[10px] sm:text-xs font-bold text-slate-800"
+                title="Usage Count"
+              >
+                Usage Count
+              </span>
+              <div className="mt-0.5 text-lg sm:text-2xl font-extrabold tabular-nums text-slate-900">
+                {totalUsageCount.toLocaleString("en-IN")}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
         <div className="relative min-w-0 flex-1">
           <Search
             size={16}
@@ -631,21 +737,24 @@ export default function CouponsScreen() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by code or title..."
-            className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+            className="h-10 sm:h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs sm:text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
           />
         </div>
         <div className="relative shrink-0" ref={filtersRef}>
           <button
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
-            className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border bg-white px-4 text-sm font-medium transition sm:w-auto ${
+            className={`inline-flex h-10 sm:h-11 items-center justify-center gap-1.5 sm:gap-2 rounded-xl border bg-white px-3 sm:px-4 text-xs sm:text-sm font-medium transition shrink-0 ${
               statusFilter !== "all"
-                ? "border-violet-300 text-violet-700"
+                ? "border-violet-300 text-violet-700 bg-violet-50/50"
                 : "border-slate-200 text-slate-700 hover:bg-slate-50"
             }`}
           >
-            <Filter size={16} />
-            Filters
+            <Filter size={15} />
+            <span>Filters</span>
+            {statusFilter !== "all" ? (
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-600" />
+            ) : null}
           </button>
           {filtersOpen ? (
             <div className="absolute right-0 z-20 mt-1.5 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
@@ -663,7 +772,7 @@ export default function CouponsScreen() {
                     setStatusFilter(value);
                     setFiltersOpen(false);
                   }}
-                  className={`flex w-full px-3 py-2 text-left text-sm ${
+                  className={`flex w-full px-3 py-2 text-left text-xs sm:text-sm ${
                     statusFilter === value
                       ? "bg-violet-50 font-semibold text-violet-700"
                       : "text-slate-700 hover:bg-slate-50"
@@ -677,7 +786,202 @@ export default function CouponsScreen() {
         </div>
       </div>
 
-      <MaterialReactTable table={table} />
+      {/* Tabs below search bar: All, Store, Space, Food, Membership */}
+      <div className="overflow-x-auto scrollbar-none -mx-1 px-1 sm:mx-0 sm:px-0">
+        <div className="inline-flex min-w-full sm:min-w-0 items-center gap-1.5 rounded-2xl border border-violet-100/80 bg-violet-50/20 p-1 shadow-2xs">
+          {COUPON_TABS.map((tab) => {
+            const isActive = categoryTab === tab.id;
+            const Icon = tab.icon;
+            const count = tabCounts[tab.id];
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setCategoryTab(tab.id)}
+                className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 px-3 sm:px-4 text-xs sm:text-sm font-bold whitespace-nowrap transition duration-200 cursor-pointer ${
+                  isActive
+                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/20"
+                    : "bg-white/90 text-slate-700 hover:bg-white hover:text-slate-900 border border-slate-200/50"
+                }`}
+              >
+                <Icon
+                  size={15}
+                  className={isActive ? "text-white" : "text-slate-500"}
+                />
+                <span>{tab.label}</span>
+                <span
+                  className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                    isActive
+                      ? "bg-white text-violet-700 shadow-2xs"
+                      : "bg-violet-100/70 text-violet-800"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <MaterialReactTable table={table} />
+      </div>
+
+      {/* Mobile Card Form View */}
+      <div className="block md:hidden space-y-3">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-violet-600 border-t-transparent" />
+            <p className="mt-2 text-xs">Loading coupons...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+            <TicketPercent className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-2 text-xs font-semibold text-slate-700">No coupons found</p>
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              {search || statusFilter !== "all" || categoryTab !== "all"
+                ? "Try adjusting your search, filters, or category tab"
+                : "Create your first coupon to get started"}
+            </p>
+          </div>
+        ) : (
+          filtered.map((coupon) => (
+            <div
+              key={coupon._id}
+              className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5 transition hover:border-slate-300"
+            >
+              {/* Top Row: Coupon Code + Status + Action Menu */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-violet-300 bg-violet-50/70 px-2.5 py-1 font-mono text-xs font-bold uppercase tracking-wider text-violet-800">
+                    <Tag size={12} className="text-violet-600" />
+                    <span>{coupon.code}</span>
+                  </div>
+
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      coupon.isActive
+                        ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
+                        : "bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-600/20"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        coupon.isActive ? "bg-emerald-500" : "bg-rose-500"
+                      }`}
+                    />
+                    {coupon.isActive ? "Active" : "Inactive"}
+                  </span>
+                </div>
+
+                {/* Actions button */}
+                <Can anyOf={[PERMISSIONS.COUPON_MANAGE, PERMISSIONS.COUPON_READ]}>
+                  <button
+                    type="button"
+                    aria-label="Coupon actions"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActionMenu({
+                        anchorEl: e.currentTarget,
+                        coupon,
+                      });
+                    }}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                  >
+                    <MoreVertical size={16} />
+                  </button>
+                </Can>
+              </div>
+
+              {/* Title & Description */}
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 leading-snug">
+                  {coupon.title}
+                </h3>
+                {coupon.description ? (
+                  <p className="mt-1 text-xs text-slate-500 line-clamp-2">
+                    {coupon.description}
+                  </p>
+                ) : null}
+              </div>
+
+              {/* Key Metrics Grid: Discount, Min Order */}
+              <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-2.5 border border-slate-100 text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-600 block">
+                    Discount
+                  </span>
+                  <span className="font-extrabold text-violet-700 text-sm">
+                    {formatDiscount(coupon)}
+                    {coupon.maxDiscountAmount ? (
+                      <span className="text-[10px] font-normal text-slate-500 ml-1">
+                        (max ₹{Number(coupon.maxDiscountAmount).toLocaleString("en-IN")})
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-600 block">
+                    Min Order
+                  </span>
+                  <span className="font-bold text-slate-800 text-sm">
+                    ₹{Number(coupon.minOrderAmount ?? 0).toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+
+              {/* Extra Details: Expiry, Usage & Applicable On */}
+              <div className="space-y-1.5 pt-0.5 text-xs text-slate-600 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-600">
+                    <Calendar size={13} className="text-slate-600 shrink-0" />
+                    <span>Expires:</span>
+                  </span>
+                  <span className="font-semibold text-slate-700 text-[11px]">
+                    {formatExpiry(coupon.expiresAt)}
+                  </span>
+                </div>
+
+                {(coupon.usageLimit !== null && coupon.usageLimit !== undefined) ||
+                (coupon.usedCount !== undefined && coupon.usedCount > 0) ? (
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1 text-[11px] text-slate-600">
+                      <Users size={13} className="text-slate-600 shrink-0" />
+                      <span>Usage:</span>
+                    </span>
+                    <span className="font-semibold text-slate-700 text-[11px]">
+                      {coupon.usedCount ?? 0}
+                      {coupon.usageLimit ? ` / ${coupon.usageLimit}` : " used"}
+                    </span>
+                  </div>
+                ) : null}
+
+                {Array.isArray(coupon.applicableOn) && coupon.applicableOn.length > 0 ? (
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <span className="text-[10px] font-semibold text-slate-600 uppercase shrink-0">
+                      Applies to:
+                    </span>
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {coupon.applicableOn.map((opt) => (
+                        <span
+                          key={opt}
+                          className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 capitalize"
+                        >
+                          {opt}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
 
       <Menu
         anchorEl={actionMenu?.anchorEl ?? null}

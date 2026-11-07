@@ -1,14 +1,29 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
-import { Eye, Minus, Plus, Settings2, Wallet } from "lucide-react";
+import {
+  CreditCard,
+  Eye,
+  Minus,
+  MoreVertical,
+  Phone,
+  Plus,
+  Receipt,
+  Search,
+  Settings2,
+  ShieldAlert,
+  Trash2,
+  Users,
+  Wallet,
+} from "lucide-react";
 import Swal from "sweetalert2";
 import {
   handleBulkWalletUpdate,
   handleCreateWallet,
+  handleDeleteWallet,
   handleGetWalletById,
   handleGetWalletInstructions,
   handleGetWallets,
@@ -130,6 +145,24 @@ export default function WalletScreen() {
     minimumBalance: 0,
   });
   const staff = useAppSelector((state) => state.user);
+
+  // Mobile action dropdown menu
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setActiveMenuId(null);
+      }
+    };
+    if (activeMenuId) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [activeMenuId]);
 
   const fetchWalletRows = async () => {
     try {
@@ -461,6 +494,49 @@ export default function WalletScreen() {
           "Could not update wallet. Please verify the backend wallet API.",
         "error",
       );
+    }
+  };
+
+  const handleDelete = async (row: WalletRow) => {
+    const recordId = getWalletRecordId(row);
+    if (!recordId) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Cannot Delete",
+        text: "No wallet record found for this customer.",
+      });
+      return;
+    }
+    const result = await Swal.fire({
+      title: "Delete wallet?",
+      text: `Are you sure you want to delete the wallet for ${row.customerName}? This action cannot be undone.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Delete",
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      setLoading(true);
+      await handleDeleteWallet(recordId);
+      await fetchWalletRows();
+      await Swal.fire({
+        title: "Deleted",
+        text: "Wallet record deleted successfully.",
+        icon: "success",
+        timer: 1400,
+        showConfirmButton: false,
+      });
+    } catch (error: any) {
+      await Swal.fire(
+        "Delete failed",
+        error?.response?.data?.message ?? "Could not delete wallet record.",
+        "error",
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -866,6 +942,56 @@ export default function WalletScreen() {
     [walletRows],
   );
 
+  const statCards = useMemo(
+    () => [
+      {
+        title: "Total Wallet Balance",
+        value: `₹ ${totalWallet.toLocaleString("en-IN")}`,
+        Icon: Wallet,
+        WatermarkIcon: Wallet,
+        bgClass: "bg-blue-50/60 border-blue-100/90 hover:border-blue-200",
+        iconWrapClass: "bg-blue-600 text-white shadow-xs shadow-blue-500/20",
+        watermarkClass: "text-blue-200/50",
+        titleClass: "text-slate-900",
+        valueClass: "text-slate-900",
+      },
+      {
+        title: "Customers With Balance",
+        value: activeWallets,
+        Icon: Users,
+        WatermarkIcon: Users,
+        bgClass: "bg-emerald-50/60 border-emerald-100/90 hover:border-emerald-200",
+        iconWrapClass: "bg-emerald-600 text-white shadow-xs shadow-emerald-500/20",
+        watermarkClass: "text-emerald-200/50",
+        titleClass: "text-slate-900",
+        valueClass: "text-slate-900",
+      },
+      {
+        title: "Wallet Records",
+        value: walletRows.length,
+        Icon: Receipt,
+        WatermarkIcon: CreditCard,
+        bgClass: "bg-purple-50/60 border-purple-100/90 hover:border-purple-200",
+        iconWrapClass: "bg-purple-600 text-white shadow-xs shadow-purple-500/20",
+        watermarkClass: "text-purple-200/50",
+        titleClass: "text-slate-900",
+        valueClass: "text-slate-900",
+      },
+      {
+        title: "Minimum Balance Rule",
+        value: `₹ ${instruction.minimumBalance.toLocaleString("en-IN")}`,
+        Icon: ShieldAlert,
+        WatermarkIcon: ShieldAlert,
+        bgClass: "bg-amber-50/60 border-amber-100/90 hover:border-amber-200",
+        iconWrapClass: "bg-amber-500 text-white shadow-xs shadow-amber-500/20",
+        watermarkClass: "text-amber-200/50",
+        titleClass: "text-amber-950",
+        valueClass: "text-slate-900",
+      },
+    ],
+    [totalWallet, activeWallets, walletRows.length, instruction.minimumBalance],
+  );
+
   const columns = useMemo<MRT_ColumnDef<WalletRow>[]>(
     () => [
       { header: "Customer", accessorKey: "customerName", size: 220 },
@@ -929,7 +1055,7 @@ export default function WalletScreen() {
       {
         header: "Actions",
         id: "actions",
-        size: 150,
+        size: 160,
         Cell: ({ row }) => (
           <div className="flex items-center gap-2">
             <Can permission={PERMISSIONS.WALLET_MANAGE}>
@@ -960,6 +1086,16 @@ export default function WalletScreen() {
             >
               <Eye size={16} />
             </button>
+            <Can permission={PERMISSIONS.WALLET_MANAGE}>
+              <button
+                type="button"
+                onClick={() => void handleDelete(row.original)}
+                className="rounded-lg bg-rose-100 p-2 text-rose-700 hover:bg-rose-200"
+                title="Delete wallet"
+              >
+                <Trash2 size={16} />
+              </button>
+            </Can>
           </div>
         ),
       },
@@ -990,63 +1126,230 @@ export default function WalletScreen() {
   });
 
   return (
-    <div className="p-1">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Customer Wallets</h1>
-          <p className="text-sm text-slate-500">
-            Track wallet balance, add amount, deduct amount, and review activity.
-          </p>
-        </div>
-        <div className="flex w-full max-w-3xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          <Can permission={PERMISSIONS.WALLET_MANAGE}>
-            <button
-              type="button"
-              onClick={() => void handleSetInstruction()}
-              className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
-            >
-              <Settings2 size={16} />
-              Set Instructions
-            </button>
-          </Can>
-          <div className="w-full max-w-md">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search customer by name or mobile..."
-              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+    <div className="min-w-0 p-1 space-y-3">
+      {/* Header Row: Title on left, Instruction button on right */}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-base sm:text-xl font-bold tracking-tight text-slate-900">
+          Customer Wallets
+        </h1>
+        <Can permission={PERMISSIONS.WALLET_MANAGE}>
+          <button
+            type="button"
+            onClick={() => void handleSetInstruction()}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-semibold text-blue-700 transition hover:bg-blue-100 shadow-2xs"
+          >
+            <Settings2 size={15} />
+            <span>Instructions</span>
+          </button>
+        </Can>
+      </div>
+
+     
+
+      {/* Stat Cards: Two-two in one row on mobile (grid-cols-2), 4 on desktop (md:grid-cols-4) */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
+        {statCards.map((card) => (
+          <div
+            key={card.title}
+            className={`min-w-0 rounded-2xl border p-2.5 sm:p-3.5 shadow-2xs transition duration-300 hover:shadow-md relative overflow-hidden ${card.bgClass}`}
+          >
+            {/* Watermark Icon */}
+            <card.WatermarkIcon
+              className={`absolute -right-2 -bottom-2 sm:-right-3 sm:-bottom-3 h-14 w-14 sm:h-20 sm:w-20 stroke-[1.2] pointer-events-none transition-transform duration-300 group-hover:scale-105 ${card.watermarkClass}`}
             />
+
+            <div className="relative z-10 flex items-center gap-2 sm:gap-2.5">
+              <div
+                className={`flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl shadow-xs ${card.iconWrapClass}`}
+              >
+                <card.Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span
+                  className={`block truncate text-[10px] sm:text-xs font-bold ${card.titleClass}`}
+                  title={card.title}
+                >
+                  {card.title}
+                </span>
+                <div
+                  className={`mt-0.5 text-lg sm:text-2xl font-extrabold tabular-nums ${card.valueClass}`}
+                >
+                  {card.value}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        ))}
+      </div>
+       {/* Search Input */}
+      <div className="relative">
+        <Search
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          size={16}
+        />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search customer by name or mobile..."
+          className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs sm:text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10"
+        />
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-500">
-            <Wallet size={18} />
-            <span className="text-sm font-medium">Total Wallet Balance</span>
-          </div>
-          <div className="mt-3 text-2xl font-semibold">
-            ₹ {totalWallet.toLocaleString("en-IN")}
-          </div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm font-medium text-slate-500">Customers With Balance</div>
-          <div className="mt-3 text-2xl font-semibold">{activeWallets}</div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm font-medium text-slate-500">Wallet Records</div>
-          <div className="mt-3 text-2xl font-semibold">{walletRows.length}</div>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm font-medium text-slate-500">Minimum Balance Rule</div>
-          <div className="mt-3 text-2xl font-semibold">
-            ₹ {instruction.minimumBalance.toLocaleString("en-IN")}
-          </div>
-        </div>
+      {/* Desktop MRT Table View */}
+      <div className="hidden md:block">
+        <MaterialReactTable table={table} />
       </div>
 
-      <MaterialReactTable table={table} />
+      {/* Mobile Card Form View */}
+      <div className="block md:hidden space-y-2.5">
+        {loading && walletRows.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            Loading wallets...
+          </div>
+        ) : walletRows.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
+            No customer wallets found
+          </div>
+        ) : (
+          walletRows.map((row) => (
+            <div
+              key={row.id}
+              className="relative rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs transition hover:border-slate-300"
+            >
+              {/* Card Header: Customer Info + Three Dots Action Menu */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <h3 className="truncate text-sm font-bold text-slate-900">
+                      {row.customerName}
+                    </h3>
+                    {row.walletAmount > 0 ? (
+                      <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200/60">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                        Zero Balance
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                    <Phone size={12} className="text-slate-400 shrink-0" />
+                    <span className="font-mono text-[11px] text-slate-600">
+                      {row.customerPhone || "—"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Three Dots Menu: View, Add, Delete */}
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveMenuId((prev) => (prev === row.id ? null : row.id));
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition"
+                    title="Actions"
+                  >
+                    <MoreVertical size={16} />
+                  </button>
+
+                  {activeMenuId === row.id && (
+                    <div
+                      ref={menuRef}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute right-0 top-full mt-1 z-30 w-36 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl ring-1 ring-slate-900/5 animate-in fade-in zoom-in-95"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          void handleViewHistory(row);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        <Eye size={14} className="text-blue-600" />
+                        <span>View</span>
+                      </button>
+
+                      <Can permission={PERMISSIONS.WALLET_MANAGE}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            void handleWalletAction(row, "credit");
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
+                        >
+                          <Plus size={14} className="text-emerald-600" />
+                          <span>Add</span>
+                        </button>
+                      </Can>
+
+                      <Can permission={PERMISSIONS.WALLET_MANAGE}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            void handleDelete(row);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 transition border-t border-slate-100"
+                        >
+                          <Trash2 size={14} className="text-rose-600" />
+                          <span>Delete</span>
+                        </button>
+                      </Can>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Card Body: Balances Breakdown */}
+              <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                <div className="min-w-0">
+                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Total Balance
+                  </span>
+                  <span className="text-sm font-extrabold text-slate-900 tabular-nums">
+                    ₹ {row.walletAmount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-right">
+                  <div className="rounded-lg bg-emerald-50/80 px-2 py-1 text-right border border-emerald-100">
+                    <span className="block text-[9px] font-semibold uppercase text-emerald-700">
+                      Withdrawable
+                    </span>
+                    <span className="text-xs font-bold text-emerald-800 tabular-nums">
+                      ₹ {row.withdrawable.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 px-2 py-1 text-right border border-slate-100">
+                    <span className="block text-[9px] font-semibold uppercase text-slate-500">
+                      Non-Withdr.
+                    </span>
+                    <span className="text-xs font-bold text-slate-700 tabular-nums">
+                      ₹ {row.nonWithdrawable.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {row.lastActivity && (
+                <div className="mt-2 text-[10px] text-slate-400">
+                  Last activity:{" "}
+                  {new Date(row.lastActivity).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

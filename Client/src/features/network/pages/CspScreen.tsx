@@ -68,6 +68,9 @@ type ProductRow = {
   discountValue?: number;
   stockQty?: number;
   stockStatus?: string;
+  imageUrl?: string | null;
+  images?: string[];
+  image?: string | null;
   variants?: { name: string; sellingPrice: number; purchasePrice: number }[];
 };
 
@@ -517,6 +520,9 @@ export default function CspScreen() {
     products: ProductRow[];
     loading: boolean;
   }>({ open: false, csp: null, products: [], loading: false });
+  const [productImagePreview, setProductImagePreview] = useState<string | null>(
+    null,
+  );
   const [detailsPartner, setDetailsPartner] = useState<CspEnrollment | null>(
     null,
   );
@@ -542,8 +548,10 @@ export default function CspScreen() {
     }
   };
 
-  const closeProductsModal = () =>
+  const closeProductsModal = () => {
+    setProductImagePreview(null);
     setProductsModal({ open: false, csp: null, products: [], loading: false });
+  };
 
   // Fetch all CSP enrollments to preserve existing data
   const fetchRows = async () => {
@@ -2496,56 +2504,101 @@ export default function CspScreen() {
                           : null;
                       const hasVariants =
                         Array.isArray(p.variants) && p.variants.length > 0;
+                      const imgUrl =
+                        (typeof p.imageUrl === "string" && p.imageUrl.trim()
+                          ? p.imageUrl.trim()
+                          : null) ||
+                        (Array.isArray(p.images) &&
+                        p.images.length > 0 &&
+                        typeof p.images[0] === "string" &&
+                        p.images[0].trim()
+                          ? p.images[0].trim()
+                          : null) ||
+                        (typeof p.image === "string" && p.image.trim()
+                          ? p.image.trim()
+                          : null);
 
                       return (
                         <div
                           key={p._id || idx}
                           className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5"
                         >
-                          {/* Top header row: Name + Price */}
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">
-                                  {idx + 1}
-                                </span>
-                                <h4 className="text-sm font-bold text-slate-900 truncate">
-                                  {name}
-                                </h4>
-                              </div>
-
-                              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${
-                                    itemType === "service"
-                                      ? "bg-purple-100 text-purple-700"
-                                      : "bg-blue-100 text-blue-700"
-                                  }`}
-                                >
-                                  {itemType}
-                                </span>
-                                {p.category && (
-                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                                    {p.category}
-                                  </span>
-                                )}
-                                {discountLabel && (
-                                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200/60">
-                                    {discountLabel}
-                                  </span>
-                                )}
-                              </div>
+                          {/* Top row: Image + Info + Price */}
+                          <div className="flex items-start gap-3">
+                            {/* Product Image */}
+                            <div
+                              onClick={() => imgUrl && setProductImagePreview(imgUrl)}
+                              className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-100 flex items-center justify-center ${
+                                imgUrl ? "cursor-pointer active:scale-95 transition-transform" : ""
+                              }`}
+                              title={imgUrl ? "Click to view full image" : undefined}
+                            >
+                              {imgUrl ? (
+                                <>
+                                  <img
+                                    src={imgUrl}
+                                    alt={name}
+                                    className="h-full w-full object-cover"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                                      const fallback = e.currentTarget.parentElement?.querySelector(".fallback-icon");
+                                      if (fallback) fallback.classList.remove("hidden");
+                                    }}
+                                  />
+                                  <div className="fallback-icon hidden flex h-full w-full items-center justify-center text-slate-300">
+                                    <Package className="h-6 w-6 stroke-[1.5]" />
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-slate-300">
+                                  <Package className="h-6 w-6 stroke-[1.5]" />
+                                </div>
+                              )}
+                              <span className="absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-900/60 text-[9px] font-bold text-white backdrop-blur-xs">
+                                {idx + 1}
+                              </span>
                             </div>
 
-                            <div className="text-right shrink-0">
-                              <span className="block text-sm font-extrabold text-emerald-600">
-                                ₹{Number(p.sellingPrice ?? 0).toLocaleString("en-IN")}
-                              </span>
-                              {p.purchasePrice !== undefined && Number(p.purchasePrice) > 0 && (
-                                <span className="block text-[10px] text-slate-400 font-medium">
-                                  Cost: ₹{Number(p.purchasePrice).toLocaleString("en-IN")}
+                            {/* Info + Price */}
+                            <div className="min-w-0 flex-1 flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <h4 className="text-sm font-bold text-slate-900 truncate" title={name}>
+                                  {name}
+                                </h4>
+
+                                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                  <span
+                                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${
+                                      itemType === "service"
+                                        ? "bg-purple-100 text-purple-700"
+                                        : "bg-blue-100 text-blue-700"
+                                    }`}
+                                  >
+                                    {itemType}
+                                  </span>
+                                  {p.category && (
+                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 truncate max-w-[110px]">
+                                      {p.category}
+                                    </span>
+                                  )}
+                                  {discountLabel && (
+                                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200/60">
+                                      {discountLabel}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="text-right shrink-0">
+                                <span className="block text-sm font-extrabold text-emerald-600">
+                                  ₹{Number(p.sellingPrice ?? 0).toLocaleString("en-IN")}
                                 </span>
-                              )}
+                                {p.purchasePrice !== undefined && Number(p.purchasePrice) > 0 && (
+                                  <span className="block text-[10px] text-slate-400 font-medium">
+                                    Cost: ₹{Number(p.purchasePrice).toLocaleString("en-IN")}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -2580,10 +2633,11 @@ export default function CspScreen() {
 
                   {/* Desktop Table View */}
                   <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full text-left text-sm border-collapse min-w-[650px]">
+                    <table className="w-full text-left text-sm border-collapse min-w-[700px]">
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50/70 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                          <th className="py-2.5 px-3">#</th>
+                          <th className="py-2.5 px-3 w-10">#</th>
+                          <th className="py-2.5 px-3 w-16">Image</th>
                           <th className="py-2.5 px-3">Product Name</th>
                           <th className="py-2.5 px-3">Type</th>
                           <th className="py-2.5 px-3">Category</th>
@@ -2602,10 +2656,55 @@ export default function CspScreen() {
                                 ? `${p.discountValue}%`
                                 : `₹${p.discountValue}`
                               : "—";
+                          const imgUrl =
+                            (typeof p.imageUrl === "string" && p.imageUrl.trim()
+                              ? p.imageUrl.trim()
+                              : null) ||
+                            (Array.isArray(p.images) &&
+                            p.images.length > 0 &&
+                            typeof p.images[0] === "string" &&
+                            p.images[0].trim()
+                              ? p.images[0].trim()
+                              : null) ||
+                            (typeof p.image === "string" && p.image.trim()
+                              ? p.image.trim()
+                              : null);
+
                           return (
                             <tr key={p._id || idx} className="hover:bg-slate-50/70 transition">
                               <td className="py-3 px-3 text-xs text-slate-400">
                                 {idx + 1}
+                              </td>
+                              <td className="py-3 px-3">
+                                <div
+                                  onClick={() => imgUrl && setProductImagePreview(imgUrl)}
+                                  className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-100 flex items-center justify-center ${
+                                    imgUrl ? "cursor-pointer group" : ""
+                                  }`}
+                                  title={imgUrl ? "Click to view full image" : undefined}
+                                >
+                                  {imgUrl ? (
+                                    <>
+                                      <img
+                                        src={imgUrl}
+                                        alt={name}
+                                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-110"
+                                        onError={(e) => {
+                                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                                          const fallback = e.currentTarget.parentElement?.querySelector(".fallback-icon");
+                                          if (fallback) fallback.classList.remove("hidden");
+                                        }}
+                                      />
+                                      <div className="fallback-icon hidden flex h-full w-full items-center justify-center text-slate-300">
+                                        <Package className="h-5 w-5 stroke-[1.5]" />
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-slate-300">
+                                      <Package className="h-5 w-5 stroke-[1.5]" />
+                                    </div>
+                                  )}
+                                </div>
                               </td>
                               <td className="py-3 px-3">
                                 <span className="font-semibold text-slate-900 block">{name}</span>
@@ -2676,6 +2775,33 @@ export default function CspScreen() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox for Product Image */}
+      {productImagePreview && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs"
+          onClick={() => setProductImagePreview(null)}
+        >
+          <div
+            className="relative max-h-[85vh] max-w-lg overflow-hidden rounded-2xl bg-white p-2 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setProductImagePreview(null)}
+              className="absolute top-3 right-3 z-10 rounded-full bg-slate-900/60 p-1.5 text-white hover:bg-slate-900/80 transition"
+              aria-label="Close image preview"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <img
+              src={productImagePreview}
+              alt="Product preview"
+              className="max-h-[80vh] w-full rounded-xl object-contain bg-slate-50"
+            />
           </div>
         </div>
       )}

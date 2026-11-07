@@ -635,11 +635,11 @@ Cell: ({ row }) => (
               : `${vendors.length.toLocaleString("en-IN")} vendors`}
           </p>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:gap-3">
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-1 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
           <Can permission={PERMISSIONS.VENDOR_CREATE}>
             <button
               type="button"
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 sm:w-auto"
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 sm:flex-initial sm:px-4 sm:py-2.5 sm:text-sm whitespace-nowrap cursor-pointer"
               onClick={() => setOpenImportVendorModal(true)}
             >
               <FileSpreadsheet size={16} />
@@ -647,7 +647,7 @@ Cell: ({ row }) => (
             </button>
             <button
               type="button"
-              className="w-full rounded-lg bg-black px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-900 sm:w-auto"
+              className="inline-flex flex-1 items-center justify-center rounded-xl bg-black px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-900 sm:flex-initial sm:px-4 sm:py-2.5 sm:text-sm whitespace-nowrap cursor-pointer"
               onClick={() => {
                 setEditingVendor(null);
                 setOpenCreateVendorModal(true);

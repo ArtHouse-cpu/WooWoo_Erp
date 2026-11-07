@@ -8,6 +8,7 @@ import {
 import {
   Eye,
   Megaphone,
+  Plus,
   RefreshCw,
   RotateCcw,
   Search,
@@ -396,45 +397,40 @@ export default function AnnouncementScreen() {
   });
 
   return (
-    <div className="space-y-4 p-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
-            <Megaphone size={18} />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">
-              Announcements
-            </h1>
-            <p className="text-sm text-slate-500">
-              Track template sends — status, progress, and delivery time.
-            </p>
-          </div>
-        </div>
+    <div className="space-y-4 p-2 sm:p-3">
+      {/* Header: Title on left, + Create button parallel in the same line on right */}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-base sm:text-xl font-bold tracking-tight text-slate-900">
+          Announcements
+        </h1>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => void fetchAnnouncements()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            disabled={loading}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+            title="Refresh"
           >
-            <RefreshCw size={15} />
-            Refresh
+            <RefreshCw size={13} className={loading ? "animate-spin text-blue-600" : ""} />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
           <Can permission={PERMISSIONS.ANNOUNCEMENT_CREATE}>
             <button
               type="button"
               onClick={() => setOpenSendModal(true)}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-95"
             >
-              + Send Announcement
+              <Plus size={15} />
+              <span>+ Create</span>
             </button>
           </Can>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-0 w-full flex-1 md:max-w-sm">
+      {/* Search and Status Filters */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+        <div className="relative min-w-0 w-full flex-1 sm:max-w-sm">
           <Search
             size={15}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -443,11 +439,11 @@ export default function AnnouncementScreen() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search template, type, status..."
-            className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-400"
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs sm:text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
           />
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
           {STATUS_FILTERS.map((status) => {
             const active = statusFilter === status;
             return (
@@ -455,10 +451,10 @@ export default function AnnouncementScreen() {
                 key={status}
                 type="button"
                 onClick={() => setStatusFilter(status)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition ${
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize whitespace-nowrap transition cursor-pointer ${
                   active
-                    ? "bg-slate-900 text-white"
-                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                    ? "bg-slate-900 text-white shadow-2xs"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                 }`}
               >
                 {status}
@@ -468,7 +464,151 @@ export default function AnnouncementScreen() {
         </div>
       </div>
 
-      <MaterialReactTable table={table} />
+      {/* Desktop View: Table Form only */}
+      <div className="hidden md:block">
+        <MaterialReactTable table={table} />
+      </div>
+
+      {/* Mobile View: Card Form only */}
+      <div className="block md:hidden space-y-2.5">
+        {loading && rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+            <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            <p className="mt-2 text-xs font-semibold">Loading announcements...</p>
+          </div>
+        ) : filteredRows.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center">
+            <Megaphone className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="mt-2 text-xs font-semibold text-slate-700">No announcements found</p>
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              {search || statusFilter !== "All"
+                ? "Try adjusting your search or filters"
+                : "Create your first announcement to get started"}
+            </p>
+          </div>
+        ) : (
+          filteredRows.map((row) => {
+            const total = Math.max(0, Number(row.totalRecipients) || 0);
+            const sent = Math.max(0, Number(row.sentCount) || 0);
+            const failed = Math.max(0, Number(row.failedCount) || 0);
+            const processed = Math.min(total, sent + failed);
+            const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+            const sentPercent = total > 0 ? Math.round((sent / total) * 100) : 0;
+            const failedPercent = total > 0 ? Math.round((failed / total) * 100) : 0;
+
+            const barColor =
+              row.status === "failed"
+                ? "bg-rose-500"
+                : row.status === "pending"
+                ? "bg-amber-400"
+                : row.status === "sending"
+                ? "bg-sky-500"
+                : "bg-emerald-500";
+
+            return (
+              <div
+                key={row.id}
+                onClick={() => viewDetails(row)}
+                className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5 transition hover:border-slate-300 cursor-pointer"
+              >
+                {/* Top Row: Template Name + Status */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-bold text-slate-900 leading-snug truncate">
+                      {row.templateName}
+                    </h3>
+                    <span className="text-[10px] font-mono text-slate-400 block mt-0.5 truncate">
+                      {row.id}
+                    </span>
+                  </div>
+                  <div className="shrink-0">
+                    <StatusPill status={row.status} />
+                  </div>
+                </div>
+
+                {/* Second Row: Type badge + Action buttons */}
+                <div className="flex items-center justify-between gap-2">
+                  <TypePill type={row.type} />
+
+                  <div
+                    className="flex items-center gap-1.5 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      title="View details"
+                      onClick={() => viewDetails(row)}
+                      className="rounded-lg bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100 transition"
+                    >
+                      <Eye size={15} />
+                    </button>
+                    {(row.status === "failed" || row.failedCount > 0) && (
+                      <button
+                        type="button"
+                        title="Retry failed"
+                        onClick={() => void retrySend(row)}
+                        className="rounded-lg bg-amber-50 p-1.5 text-amber-700 hover:bg-amber-100 transition"
+                      >
+                        <RotateCcw size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Delivery Progress Box */}
+                <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100 text-xs">
+                  <div className="flex items-center justify-between text-[11px] text-slate-700 mb-1.5">
+                    <span className="font-semibold">Delivery Progress</span>
+                    <span className="font-bold tabular-nums text-slate-900">{percent}%</span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="flex h-2 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className={`h-full ${barColor} transition-all`}
+                      style={{ width: `${sentPercent}%` }}
+                    />
+                    {failedPercent > 0 && (
+                      <div
+                        className="h-full bg-rose-400 transition-all"
+                        style={{ width: `${failedPercent}%` }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Sent vs Failed count details */}
+                  <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-600">
+                    <span className="font-medium text-emerald-700">
+                      ✓ {sent}/{total} sent
+                    </span>
+                    {failed > 0 ? (
+                      <span className="font-medium text-rose-600">
+                        ✕ {failed} failed
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">0 failed</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer: Sent / Created Date */}
+                <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-slate-500 pt-0.5">
+                  <span className="text-slate-400 uppercase font-semibold text-[9px]">
+                    {row.status === "failed"
+                      ? "Failed At"
+                      : row.status === "completed"
+                      ? "Sent At"
+                      : "Created At"}
+                  </span>
+                  <span className="font-medium text-slate-700">
+                    {formatDateTime(row.completedAt || row.createdAt)}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
 
       <SendAnnouncementModal
         open={openSendModal}
