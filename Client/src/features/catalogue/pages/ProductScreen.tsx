@@ -110,21 +110,7 @@ export default function ProductScreen() {
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [categories, setCategories] = useState<{ _id?: string; name?: string }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const addMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        addMenuRef.current &&
-        !addMenuRef.current.contains(event.target as Node)
-      ) {
-        setAddMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   useEffect(() => {
     handleGetCategories()
@@ -894,10 +880,11 @@ export default function ProductScreen() {
                 setEditProduct(null);
                 setShowCreateModal(true);
               }}
-              className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.99] sm:min-h-11 sm:gap-2 sm:px-4 sm:py-2.5"
+              className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:scale-95"
             >
-              <Plus size={16} strokeWidth={2.5} />
-              Add Product
+              <Plus size={15} strokeWidth={2.5} />
+              <span className="sm:hidden">Add</span>
+              <span className="hidden sm:inline">Add Product</span>
             </button>
           </Can>
 

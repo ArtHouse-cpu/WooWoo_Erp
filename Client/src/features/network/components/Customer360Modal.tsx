@@ -1,6 +1,30 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, Phone, Mail, Building2, Wallet, CalendarDays, Crown, Receipt, CalendarPlus, FilePlus2, MoreVertical } from "lucide-react";
+import {
+  X,
+  Phone,
+  Mail,
+  Building2,
+  Wallet,
+  CalendarDays,
+  Crown,
+  Receipt,
+  CalendarPlus,
+  FilePlus2,
+  MoreVertical,
+  LayoutDashboard,
+  ShoppingBag,
+  Award,
+  Calendar,
+  History,
+  MessageCircle,
+  MapPin,
+  Sparkles,
+  Scale,
+  User,
+  AlertCircle,
+  TrendingUp,
+} from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import CreatePosScreen from "@/features/sales/pages/CreatePosScreen";
 import {
@@ -21,15 +45,7 @@ type ProgramTab = "csp" | "hap";
 type CreatedSort = "newest" | "oldest";
 type DateRange = "" | "today" | "this-week" | "this-month" | "last-month" | "this-year" | "last-year";
 
-const tabs: { key: Tab; label: string }[] = [
-  { key: "overview", label: "Overview" },
-  { key: "purchases", label: "Shopping" },
-  { key: "program", label: "Program" },
-  { key: "bookings", label: "Bookings" },
-  { key: "memberships", label: "Memberships" },
-  { key: "wallet", label: "Wallet" },
-  { key: "timeline", label: "Activity" },
-];
+// Tab config will be dynamically built inside the component with counts and icons
 
 const money = (value?: number | null) =>
   `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
@@ -233,156 +249,353 @@ export default function Customer360Modal({
 
   const openSales = purchases.filter((row) => !["cancelled", "draft"].includes(row.status.toLowerCase()));
   const openBookings = bookings.filter((row) => !["cancelled", "draft", "expired"].includes(row.status.toLowerCase()));
+
+  const tabsConfig = [
+    {
+      id: "overview" as const,
+      label: "Overview",
+      Icon: LayoutDashboard,
+      activeClass:
+        "bg-sky-100 text-sky-800 border-2 border-sky-400/80 shadow-xs ring-1 ring-sky-200",
+      inactiveClass:
+        "bg-sky-50/70 text-sky-700/80 border border-sky-200/70 hover:bg-sky-100/70",
+      badge: null,
+    },
+    {
+      id: "purchases" as const,
+      label: "Shopping",
+      Icon: ShoppingBag,
+      activeClass:
+        "bg-emerald-100 text-emerald-800 border-2 border-emerald-400/80 shadow-xs ring-1 ring-emerald-200",
+      inactiveClass:
+        "bg-emerald-50/70 text-emerald-700/80 border border-emerald-200/70 hover:bg-emerald-100/70",
+      badge: purchases.length || null,
+    },
+    {
+      id: "program" as const,
+      label: "Program",
+      Icon: Award,
+      activeClass:
+        "bg-amber-100 text-amber-800 border-2 border-amber-400/80 shadow-xs ring-1 ring-amber-200",
+      inactiveClass:
+        "bg-amber-50/70 text-amber-700/80 border border-amber-200/70 hover:bg-amber-100/70",
+      badge: null,
+    },
+    {
+      id: "bookings" as const,
+      label: "Bookings",
+      Icon: Calendar,
+      activeClass:
+        "bg-indigo-100 text-indigo-800 border-2 border-indigo-400/80 shadow-xs ring-1 ring-indigo-200",
+      inactiveClass:
+        "bg-indigo-50/70 text-indigo-700/80 border border-indigo-200/70 hover:bg-indigo-100/70",
+      badge: bookings.length || null,
+    },
+    {
+      id: "memberships" as const,
+      label: "Memberships",
+      Icon: Crown,
+      activeClass:
+        "bg-purple-100 text-purple-800 border-2 border-purple-400/80 shadow-xs ring-1 ring-purple-200",
+      inactiveClass:
+        "bg-purple-50/70 text-purple-700/80 border border-purple-200/70 hover:bg-purple-100/70",
+      badge: memberships.length || null,
+    },
+    {
+      id: "wallet" as const,
+      label: "Wallet",
+      Icon: Wallet,
+      activeClass:
+        "bg-teal-100 text-teal-800 border-2 border-teal-400/80 shadow-xs ring-1 ring-teal-200",
+      inactiveClass:
+        "bg-teal-50/70 text-teal-700/80 border border-teal-200/70 hover:bg-teal-100/70",
+      badge: walletRows.length || null,
+    },
+    {
+      id: "timeline" as const,
+      label: "Activity",
+      Icon: History,
+      activeClass:
+        "bg-orange-100 text-orange-800 border-2 border-orange-400/80 shadow-xs ring-1 ring-orange-200",
+      inactiveClass:
+        "bg-orange-50/70 text-orange-700/80 border border-orange-200/70 hover:bg-orange-100/70",
+      badge: timeline.length || null,
+    },
+  ];
+
   const cards = [
     {
       label: "Shopping",
       value: money(openSales.reduce((sum, row) => sum + row.amount, 0)),
       hint: `${openSales.length} bills`,
+      icon: ShoppingBag,
+      bg: "bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-white border-emerald-200/80",
+      iconBg: "bg-emerald-100/90",
+      iconColor: "text-emerald-600",
+      textColor: "text-emerald-950",
     },
     {
       label: "Due on bills",
       value: money(openSales.reduce((sum, row) => sum + row.dueAmount, 0)),
       hint: "Still payable",
+      icon: Scale,
+      bg: "bg-gradient-to-br from-rose-50/90 via-pink-50/50 to-white border-rose-200/80",
+      iconBg: "bg-rose-100/90",
+      iconColor: "text-rose-600",
+      textColor: "text-rose-950",
     },
     {
       label: "Bookings",
       value: money(openBookings.reduce((sum, row) => sum + row.amount, 0)),
       hint: `${openBookings.length} bookings`,
+      icon: Calendar,
+      bg: "bg-gradient-to-br from-blue-50/90 via-sky-50/50 to-white border-blue-200/80",
+      iconBg: "bg-blue-100/90",
+      iconColor: "text-blue-600",
+      textColor: "text-blue-950",
     },
     {
       label: "Memberships",
-      value: String(memberships.filter((row) => !["cancelled", "draft", "expired"].includes(row.status.toLowerCase())).length),
+      value: String(
+        memberships.filter(
+          (row) => !["cancelled", "draft", "expired"].includes(row.status.toLowerCase()),
+        ).length,
+      ),
       hint:
         currentMembership?.status === "active"
           ? currentMembership.plan || customer?.membershipType || "none"
           : "none",
+      icon: Crown,
+      bg: "bg-gradient-to-br from-purple-50/90 via-violet-50/50 to-white border-purple-200/80",
+      iconBg: "bg-purple-100/90",
+      iconColor: "text-purple-600",
+      textColor: "text-purple-950",
     },
     {
       label: "Wallet",
       value: money(summary?.walletBalance),
-      hint: `Credit ${money(walletRows.filter((row) => row.type === "credit").reduce((sum, row) => sum + row.amount, 0))} · Debit ${money(walletRows.filter((row) => row.type === "debit").reduce((sum, row) => sum + row.amount, 0))}`,
+      hint: `Credit ${money(
+        walletRows
+          .filter((row) => row.type === "credit")
+          .reduce((sum, row) => sum + row.amount, 0),
+      )} · Debit ${money(
+        walletRows
+          .filter((row) => row.type === "debit")
+          .reduce((sum, row) => sum + row.amount, 0),
+      )}`,
+      icon: Wallet,
+      bg: "bg-gradient-to-br from-amber-50/90 via-orange-50/50 to-white border-amber-200/80",
+      iconBg: "bg-amber-100/90",
+      iconColor: "text-amber-600",
+      textColor: "text-amber-950",
     },
   ];
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-slate-900/50 p-0 sm:items-center sm:p-4">
-      <div className="flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-[#F6F7FB] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl">
-        <header className="border-b border-slate-200 bg-white px-3 sm:px-4 py-2.5 sm:py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          {/* Top row: Title, Name, and Close Button */}
-          <div className="flex items-center justify-between gap-3">
+    <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-slate-900/60 p-0 backdrop-blur-2xs sm:items-center sm:p-4 animate-in fade-in duration-200">
+      <div className="flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-[#F8FAFC] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl">
+        {/* Modal Header */}
+        <header className="border-b border-slate-200 bg-white px-3.5 sm:px-5 py-2.5 sm:py-3.5 pt-[max(0.75rem,env(safe-area-inset-top))] shrink-0">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-violet-600">
-                Customer 360 View
+              <span className="inline-flex items-center gap-1 rounded-md bg-violet-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-violet-700">
+                <Building2 size={11} /> Customer 360 View
               </span>
-              <h2 className="truncate text-base sm:text-lg font-bold text-slate-900 mt-0.5">
+              <h2 className="truncate text-base sm:text-xl font-black text-slate-900 mt-1">
                 {customer?.name || customerName || "Customer"}
               </h2>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                <span className="truncate max-w-[150px] font-medium text-slate-600">
-                  {customer?.companyName || "No company"}
-                </span>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                {customer?.companyName ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-medium text-slate-700">
+                    <Building2 size={11} className="text-slate-400" />
+                    {customer.companyName}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-medium text-slate-400">
+                    No company
+                  </span>
+                )}
                 {customer?.mobile ? (
                   <a
                     href={`tel:${customer.mobile}`}
-                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition"
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200/90 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 transition shadow-2xs active:scale-95 cursor-pointer"
                   >
-                    <Phone size={11} /> {customer.mobile}
+                    <Phone size={11} className="text-emerald-600" /> {customer.mobile}
+                  </a>
+                ) : null}
+                {customer?.whatsappNumber ? (
+                  <a
+                    href={`https://wa.me/${String(customer.whatsappNumber).replace(/\D/g, "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200/90 px-2.5 py-0.5 text-[11px] font-bold text-teal-700 hover:bg-teal-100 transition shadow-2xs active:scale-95 cursor-pointer"
+                  >
+                    <MessageCircle size={11} className="text-teal-600" /> WhatsApp
                   </a>
                 ) : null}
                 {customer?.email ? (
                   <a
                     href={`mailto:${customer.email}`}
-                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition"
+                    className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200/90 px-2.5 py-0.5 text-[11px] font-bold text-sky-700 hover:bg-sky-100 transition shadow-2xs active:scale-95 cursor-pointer"
                   >
-                    <Mail size={11} /> {customer.email}
+                    <Mail size={11} className="text-sky-600" /> Email
                   </a>
                 ) : null}
               </div>
             </div>
 
-            <div ref={actionsRef} className="relative flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                aria-label="More actions"
-                aria-expanded={actionsOpen}
-                onClick={() => setActionsOpen((open) => !open)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50"
-              >
-                <MoreVertical size={16} />
-              </button>
+            {/* Actions & Close Button */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Mobile 3-dot actions */}
+              <div ref={actionsRef} className="relative sm:hidden">
+                <button
+                  type="button"
+                  aria-label="Actions menu"
+                  onClick={() => setActionsOpen((open) => !open)}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-violet-50 border border-violet-200/90 text-violet-700 hover:bg-violet-100 shadow-2xs active:scale-95 transition cursor-pointer"
+                >
+                  <MoreVertical size={16} />
+                </button>
+
+                {actionsOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40 bg-black/20 backdrop-blur-2xs"
+                      onClick={() => setActionsOpen(false)}
+                    />
+                    <div
+                      className="absolute right-0 top-full mt-1.5 z-50 w-52 rounded-2xl border border-slate-200/90 bg-white p-2.5 shadow-xl animate-in fade-in zoom-in-95 duration-150"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex flex-col gap-2">
+                        {canPath("/create-pos") || canPath("/pos") || canPath("/create-invoice") ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActionsOpen(false);
+                              setPosOpen(true);
+                            }}
+                            className="flex w-full items-center gap-2 rounded-xl bg-blue-50 border border-blue-200/90 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 shadow-2xs active:scale-95 transition text-left cursor-pointer"
+                          >
+                            <FilePlus2 size={15} className="text-blue-600 shrink-0" />
+                            <span>Create POS Bill</span>
+                          </button>
+                        ) : null}
+                        {canPath("/spaceBooking") ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActionsOpen(false);
+                              openBooking("express");
+                            }}
+                            className="flex w-full items-center gap-2 rounded-xl bg-purple-50 border border-purple-200/90 px-3 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 shadow-2xs active:scale-95 transition text-left cursor-pointer"
+                          >
+                            <CalendarPlus size={15} className="text-purple-600 shrink-0" />
+                            <span>Express Booking</span>
+                          </button>
+                        ) : null}
+                        {canPath("/allBookings") ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActionsOpen(false);
+                              openBooking("full");
+                            }}
+                            className="flex w-full items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200/90 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 shadow-2xs active:scale-95 transition text-left cursor-pointer"
+                          >
+                            <CalendarDays size={15} className="text-emerald-600 shrink-0" />
+                            <span>Full Booking</span>
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Close Button */}
               <button
                 type="button"
                 onClick={() => void closeIfConfirmed(onClose)}
-                className="inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-rose-50 border border-rose-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
               >
-                <X size={14} /> Close
+                <X size={14} className="text-rose-600" /> Close
               </button>
-              {actionsOpen ? (
-                <div className="absolute right-0 top-10 z-30 flex w-48 flex-col gap-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
-                  {canPath("/allBookings") ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActionsOpen(false);
-                        openBooking("full");
-                      }}
-                      className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
-                    >
-                      <CalendarPlus size={12} /> Full Booking
-                    </button>
-                  ) : null}
-                  {canPath("/spaceBooking") ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActionsOpen(false);
-                        openBooking("express");
-                      }}
-                      className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100"
-                    >
-                      <CalendarPlus size={12} /> Express Booking
-                    </button>
-                  ) : null}
-                  {canPath("/create-pos") || canPath("/pos") || canPath("/create-invoice") ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActionsOpen(false);
-                        setPosOpen(true);
-                      }}
-                      className="inline-flex h-7 w-full items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 text-[11px] font-semibold text-[#2F6FED] transition hover:bg-blue-100"
-                    >
-                      <FilePlus2 size={12} /> POS Bill
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
+          </div>
+
+          {/* Quick Action buttons row (scrollable on mobile) */}
+          <div className="mt-2.5 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-none sm:mt-3 sm:flex-wrap">
+            {canPath("/create-pos") || canPath("/pos") || canPath("/create-invoice") ? (
+              <button
+                type="button"
+                onClick={() => setPosOpen(true)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200/90 px-3 py-1.5 sm:py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+              >
+                <FilePlus2 size={13} className="text-blue-600" /> Create POS Bill
+              </button>
+            ) : null}
+            {canPath("/spaceBooking") ? (
+              <button
+                type="button"
+                onClick={() => openBooking("express")}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-purple-50 border border-purple-200/90 px-3 py-1.5 sm:py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+              >
+                <CalendarPlus size={13} className="text-purple-600" /> Express Booking
+              </button>
+            ) : null}
+            {canPath("/allBookings") ? (
+              <button
+                type="button"
+                onClick={() => openBooking("full")}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200/90 px-3 py-1.5 sm:py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+              >
+                <CalendarDays size={13} className="text-emerald-600" /> Full Booking
+              </button>
+            ) : null}
           </div>
         </header>
 
-        <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-3">
-          {tabs.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setTab(item.key)}
-              className={`shrink-0 border-b-2 px-3 py-2 text-sm font-semibold ${tab === item.key ? "border-violet-600 text-violet-700" : "border-transparent text-slate-500"}`}
-            >
-              {item.label}
-            </button>
-          ))}
+        {/* Colorful Tabs Bar */}
+        <div className="flex gap-2 overflow-x-auto border-b border-slate-200 bg-white px-3 sm:px-4 py-2 scrollbar-none shrink-0">
+          {tabsConfig.map((item) => {
+            const isActive = tab === item.id;
+            const Icon = item.Icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap active:scale-95 ${
+                  isActive ? item.activeClass : item.inactiveClass
+                }`}
+              >
+                <Icon size={14} className="shrink-0" />
+                <span>{item.label}</span>
+                {item.badge != null && (
+                  <span
+                    className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-black leading-none ${
+                      isActive ? "bg-white/80 text-slate-800 shadow-2xs" : "bg-white/60 text-slate-600"
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2">
-          <p className="text-xs font-semibold text-slate-500">
+        {/* Filter Controls Row */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/90 bg-white px-3 sm:px-4 py-2 shrink-0">
+          <p className="text-xs font-bold text-slate-500">
             {dateRange ? "Showing the selected period" : "Showing all dates"}
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={dateRange}
               onChange={(event) => setDateRange(event.target.value as DateRange)}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              className="rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-400"
             >
               <option value="">All dates</option>
               <option value="today">Today</option>
@@ -396,7 +609,7 @@ export default function Customer360Modal({
               <select
                 value={sort}
                 onChange={(event) => setSort(event.target.value as CreatedSort)}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                className="rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-slate-400"
               >
                 <option value="newest">Newest created</option>
                 <option value="oldest">Oldest created</option>
@@ -405,59 +618,239 @@ export default function Customer360Modal({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
-          {loading ? <p className="text-sm text-slate-500">Loading customer…</p> : null}
-          {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+        {/* Modal Scrollable Body */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          {loading ? (
+            <div className="flex min-h-[200px] items-center justify-center">
+              <p className="text-sm font-semibold text-slate-500">Loading customer details…</p>
+            </div>
+          ) : null}
+          {error ? (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-700">
+              {error}
+            </div>
+          ) : null}
 
           {!loading && data && tab === "overview" ? (
-            <div className="space-y-3">
+            <div className="space-y-3.5">
+              {/* Colorful Metric Cards */}
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
-                {cards.map((card) => (
-                  <article key={card.label} className="rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs transition hover:border-slate-300">
-                    <p className="truncate text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-slate-400">{card.label}</p>
-                    <p className="mt-1 truncate text-base sm:text-xl font-bold text-slate-900">{card.value}</p>
-                    <p className="mt-0.5 truncate text-[11px] sm:text-xs text-slate-500">{card.hint}</p>
-                  </article>
-                ))}
+                {cards.map((card) => {
+                  const Icon = card.icon;
+                  return (
+                    <article
+                      key={card.label}
+                      className={`relative overflow-hidden rounded-2xl border p-3 sm:p-4 shadow-2xs transition hover:shadow-xs ${card.bg}`}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <p className="truncate text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">
+                          {card.label}
+                        </p>
+                        <span
+                          className={`flex h-6 w-6 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-lg ${card.iconBg}`}
+                        >
+                          <Icon size={14} className={card.iconColor} />
+                        </span>
+                      </div>
+                      <p
+                        className={`mt-1.5 truncate text-base sm:text-xl font-black ${card.textColor}`}
+                      >
+                        {card.value}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] sm:text-xs font-medium text-slate-500">
+                        {card.hint}
+                      </p>
+                    </article>
+                  );
+                })}
               </div>
-              <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                  <Building2 size={16} /> Profile
-                </h3>
-                <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                  <Field label="Phone" value={customer?.mobile} />
-                  <Field label="WhatsApp" value={customer?.whatsappNumber} />
-                  <Field label="Email" value={customer?.email} />
-                  <Field
-                    label="Membership"
-                    value={
-                      currentMembership?.status === "active"
-                        ? currentMembership.plan || customer?.membershipType || "none"
-                        : "none"
-                    }
-                  />
-                  <Field label="Company" value={customer?.companyName} />
-                  <Field label="Referral" value={customer?.referralCode} />
-                  <Field label="Created" value={whenStamp(customer?.createdAt)} />
-                  <Field label="Address" value={[customer?.address, customer?.city, customer?.state, customer?.pincode].filter(Boolean).join(", ")} />
-                </dl>
-              </article>
-              {currentMembership ? (
-                <article className="rounded-2xl border border-violet-200 bg-white p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="flex items-center gap-2 text-sm font-bold capitalize text-slate-900">
-                      <Crown size={16} /> {currentMembership.plan || "Membership"}
+
+              {/* Profile Card with Details Card System */}
+              <article className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 text-white shadow-xs">
+                    <User size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Profile Details
                     </h3>
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${currentMembership.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-600"}`}>
+                    <p className="text-[11px] text-slate-400">
+                      Customer contact and account information
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {[
+                    {
+                      label: "PHONE",
+                      value: customer?.mobile,
+                      Icon: Phone,
+                      iconBg: "bg-purple-100/90",
+                      iconColor: "text-purple-600",
+                      cardBg: "bg-gradient-to-br from-purple-50/70 to-white border-purple-200/80",
+                      link: customer?.mobile ? `tel:${customer.mobile}` : undefined,
+                    },
+                    {
+                      label: "WHATSAPP",
+                      value: customer?.whatsappNumber,
+                      Icon: MessageCircle,
+                      iconBg: "bg-teal-100/90",
+                      iconColor: "text-teal-600",
+                      cardBg: "bg-gradient-to-br from-teal-50/70 to-white border-teal-200/80",
+                      link: customer?.whatsappNumber
+                        ? `https://wa.me/${String(customer.whatsappNumber).replace(/\D/g, "")}`
+                        : undefined,
+                    },
+                    {
+                      label: "EMAIL",
+                      value: customer?.email,
+                      Icon: Mail,
+                      iconBg: "bg-sky-100/90",
+                      iconColor: "text-sky-600",
+                      cardBg: "bg-gradient-to-br from-sky-50/70 to-white border-sky-200/80",
+                      link: customer?.email ? `mailto:${customer.email}` : undefined,
+                    },
+                    {
+                      label: "MEMBERSHIP",
+                      value:
+                        currentMembership?.status === "active"
+                          ? currentMembership.plan || customer?.membershipType || "none"
+                          : customer?.membershipType || "none",
+                      Icon: Crown,
+                      iconBg: "bg-amber-100/90",
+                      iconColor: "text-amber-600",
+                      cardBg: "bg-gradient-to-br from-amber-50/70 to-white border-amber-200/80",
+                    },
+                    {
+                      label: "COMPANY",
+                      value: customer?.companyName,
+                      Icon: Building2,
+                      iconBg: "bg-indigo-100/90",
+                      iconColor: "text-indigo-600",
+                      cardBg: "bg-gradient-to-br from-indigo-50/70 to-white border-indigo-200/80",
+                    },
+                    {
+                      label: "REFERRAL CODE",
+                      value: customer?.referralCode,
+                      Icon: Sparkles,
+                      iconBg: "bg-pink-100/90",
+                      iconColor: "text-pink-600",
+                      cardBg: "bg-gradient-to-br from-pink-50/70 to-white border-pink-200/80",
+                    },
+                    {
+                      label: "JOINED DATE",
+                      value: whenStamp(customer?.createdAt),
+                      Icon: Calendar,
+                      iconBg: "bg-blue-100/90",
+                      iconColor: "text-blue-600",
+                      cardBg: "bg-gradient-to-br from-blue-50/70 to-white border-blue-200/80",
+                    },
+                    {
+                      label: "ADDRESS",
+                      value: [
+                        customer?.address,
+                        customer?.city,
+                        customer?.state,
+                        customer?.pincode,
+                      ]
+                        .filter(Boolean)
+                        .join(", "),
+                      Icon: MapPin,
+                      iconBg: "bg-emerald-100/90",
+                      iconColor: "text-emerald-600",
+                      cardBg: "bg-gradient-to-br from-emerald-50/70 to-white border-emerald-200/80",
+                    },
+                  ].map((item) => {
+                    const Icon = item.Icon;
+                    return (
+                      <div
+                        key={item.label}
+                        className={`flex items-start gap-2.5 rounded-2xl border p-3 shadow-2xs transition hover:shadow-xs ${item.cardBg}`}
+                      >
+                        <div
+                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${item.iconBg} ${item.iconColor}`}
+                        >
+                          <Icon size={16} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            {item.label}
+                          </p>
+                          {item.link && item.value && item.value !== "—" ? (
+                            <a
+                              href={item.link}
+                              target={item.link.startsWith("http") ? "_blank" : undefined}
+                              rel="noreferrer"
+                              className="mt-0.5 block truncate text-xs font-bold text-slate-800 hover:text-blue-600 transition"
+                            >
+                              {item.value}
+                            </a>
+                          ) : (
+                            <p className="mt-0.5 truncate text-xs font-bold text-slate-800">
+                              {item.value || "—"}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+
+              {/* Active Membership Card */}
+              {currentMembership ? (
+                <article className="rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50/60 via-purple-50/30 to-white p-3.5 sm:p-4 shadow-2xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-600 text-white shadow-xs">
+                        <Crown size={16} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm sm:text-base font-bold capitalize text-slate-900">
+                          {currentMembership.plan || "Membership"}
+                        </h3>
+                        <p className="text-[11px] text-slate-500">Active Membership Plan</p>
+                      </div>
+                    </div>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                        currentMembership.status === "active"
+                          ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                          : "bg-rose-100 text-rose-600 border border-rose-200"
+                      }`}
+                    >
                       {currentMembership.status || "Active"}
                     </span>
                   </div>
-                  <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                    <Field label="Start" value={whenStamp(currentMembership.startDate, currentMembership.createdAt)} />
-                    <Field label="Expiry" value={currentMembership.term === "lifetime" ? "Lifetime" : when(currentMembership.endDate)} />
-                    <Field label="Months" value={currentMembership.months ? String(currentMembership.months) : currentMembership.term === "lifetime" ? "Lifetime" : "—"} />
-                    <Field label="Amount" value={money(currentMembership.amount)} />
-                  </dl>
+
+                  <div className="mt-3.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="rounded-xl border border-violet-100 bg-white p-2.5 text-center shadow-2xs">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Start Date</p>
+                      <p className="mt-0.5 truncate text-xs font-bold text-slate-800">
+                        {whenStamp(currentMembership.startDate, currentMembership.createdAt)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-violet-100 bg-white p-2.5 text-center shadow-2xs">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Expiry Date</p>
+                      <p className="mt-0.5 truncate text-xs font-bold text-slate-800">
+                        {currentMembership.term === "lifetime" ? "Lifetime" : when(currentMembership.endDate)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-violet-100 bg-white p-2.5 text-center shadow-2xs">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Duration</p>
+                      <p className="mt-0.5 truncate text-xs font-bold text-slate-800">
+                        {currentMembership.months ? `${currentMembership.months} Months` : currentMembership.term === "lifetime" ? "Lifetime" : "—"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-violet-100 bg-white p-2.5 text-center shadow-2xs">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Plan Amount</p>
+                      <p className="mt-0.5 truncate text-xs font-black text-emerald-700">
+                        {money(currentMembership.amount)}
+                      </p>
+                    </div>
+                  </div>
                 </article>
               ) : null}
             </div>
