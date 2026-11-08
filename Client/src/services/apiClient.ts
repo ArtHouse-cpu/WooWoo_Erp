@@ -3924,6 +3924,71 @@ export const handleReviewCspApplication = async (
   };
 };
 
+export type CspSoldProduct = {
+  id: string;
+  invoiceCode: string;
+  invoiceNumber?: number | string;
+  customerName: string;
+  customerPhone?: string;
+  productId?: string | null;
+  productName: string;
+  image?: string | null;
+  category?: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  sailorEarnings: number;
+  saleDate: string | null;
+  status: string;
+};
+
+export type CspTimelineEvent = {
+  id: string;
+  kind: "purchase" | "sale" | "stock_add" | "cancellation" | "payout";
+  type?: string;
+  title: string;
+  subtitle?: string;
+  idRef?: string;
+  productName?: string;
+  customerName?: string;
+  quantity?: number;
+  unitPrice?: number;
+  amount: number;
+  sailorEarnings?: number;
+  date: string | null;
+  at?: string | null;
+  status?: string;
+  image?: string | null;
+  details?: {
+    invoiceNumber?: string;
+    invoiceCode?: string;
+    supplierName?: string;
+    customerName?: string;
+    customerPhone?: string;
+    paidAmount?: number;
+    dueAmount?: number;
+    quantity?: number;
+    unitPrice?: number;
+    totalAmount?: number;
+    sailorEarnings?: number;
+    stockQty?: number;
+    sellingPrice?: number;
+    category?: string;
+    amount?: number;
+    method?: string;
+    paymentMode?: string;
+    status?: string;
+    notes?: string;
+    reason?: string;
+    items?: Array<{
+      productName: string;
+      qty: number;
+      unitPrice: number;
+      lineTotal: number;
+    }>;
+  };
+};
+
 export type CspPartnerDetails = {
   partner: {
     fullName: string;
@@ -3945,6 +4010,7 @@ export type CspPartnerDetails = {
     productsSold: number;
     totalEarnings: number;
     salesAmount: number;
+    successfulTransactionsCount?: number;
     pendingPayout: number;
     completedPayout: number;
     availableBalance: number;
@@ -3958,6 +4024,10 @@ export type CspPartnerDetails = {
     stock: number;
     sold: number;
     sales: number;
+    image?: string | null;
+    imageUrl?: string | null;
+    images?: string[];
+    createdAt?: string | null;
   }>;
   payouts: Array<{
     id: string;
@@ -3966,14 +4036,9 @@ export type CspPartnerDetails = {
     method: string;
     at: string | null;
   }>;
-  activity: Array<{
-    kind: "sale" | "payout";
-    title: string;
-    amount: number;
-    at: string | null;
-    detail: string;
-    status?: string;
-  }>;
+  sales: CspSoldProduct[];
+  timeline: CspTimelineEvent[];
+  activity: CspTimelineEvent[];
 };
 
 export const handleGetCspPartnerDetails = async (id: string) => {

@@ -548,8 +548,7 @@ export default function CustomerScreen() {
               <div
                 key={customerKey}
                 onClick={() => {
-                  setDetailsCustomer(customer);
-                  setDetailsOpen(true);
+                  setCustomer360(customer);
                 }}
                 className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-blue-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
               >
@@ -565,6 +564,10 @@ export default function CustomerScreen() {
                       <h4
                         className="text-sm font-bold text-slate-900 truncate transition group-hover:text-blue-600"
                         title={customer.name}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCustomer360(customer);
+                        }}
                       >
                         {customer.name || "Unnamed Customer"}
                       </h4>
@@ -637,13 +640,12 @@ export default function CustomerScreen() {
                               setActionMenuCustomerId(null);
                               setSelectedCustomer(null);
                               setOpenLedgerModal(false);
-                              setDetailsCustomer(customer);
-                              setDetailsOpen(true);
+                              setCustomer360(customer);
                             }}
                             className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
                           >
                             <Eye size={14} className="text-slate-400" />
-                            <span>View Details</span>
+                            <span>View 360 Details</span>
                           </button>
                           <Can permission={PERMISSIONS.CUSTOMER_UPDATE}>
                             <button

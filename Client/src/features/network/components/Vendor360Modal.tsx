@@ -740,7 +740,7 @@ export default function Vendor360Modal({
               </div>
             </div>
 
-            {/* Close Button & Mobile 3-dot */}
+{/* Close Button & Mobile 3-dot */}
             <div className="flex items-center gap-1.5 shrink-0">
               <div className="relative">
                 <button
@@ -827,6 +827,46 @@ export default function Vendor360Modal({
                 <X size={14} className="text-rose-600" /> Close
               </button>
             </div>
+          </div>
+
+          {/* Action buttons row: scrollable on mobile, flex on desktop */}
+          <div className="mt-2.5 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar sm:mt-3 sm:flex-wrap sm:overflow-visible">
+            <Can permission={PERMISSIONS.VENDOR_UPDATE}>
+              <button
+                type="button"
+                onClick={() => setPayOpen(true)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-purple-50 border border-purple-200/90 px-3 py-1.5 sm:py-2 text-xs font-bold text-purple-700 hover:bg-purple-100 hover:border-purple-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+              >
+                <Wallet size={13} className="text-purple-600" /> Record Payment
+              </button>
+            </Can>
+            <button
+              type="button"
+              onClick={() =>
+                openWithVendor(
+                  `/expenses?create=1&vendorId=${vendor._id}&vendorName=${encodeURIComponent(profile?.name || vendor.name)}`,
+                )
+              }
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 hover:border-amber-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+            >
+              <Receipt size={13} className="text-amber-600" /> Add Expense
+            </button>
+            <button
+              type="button"
+              onClick={() => openWithVendor("/create-purchase", vendorState)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+            >
+              <ShoppingCart size={13} className="text-emerald-600" /> Create Purchase
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                openWithVendor("/create-purchase-order", vendorState)
+              }
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+            >
+              <FilePlus2 size={13} className="text-blue-600" /> Create Purchase Order
+            </button>
           </div>
         </header>
 
