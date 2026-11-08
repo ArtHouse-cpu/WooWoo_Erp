@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -275,8 +275,6 @@ export default function Vendor360Modal({
   const navigate = useNavigate();
   const { can } = usePermission();
   const canSeeBank = can(PERMISSIONS.VENDOR_UPDATE);
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const actionsRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [period, setPeriod] = useState<Period>("all");
   const [data, setData] = useState<Vendor360Response | null>(null);
@@ -355,15 +353,6 @@ export default function Vendor360Modal({
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!actionsOpen) return;
-    const close = (event: MouseEvent) => {
-      if (!actionsRef.current?.contains(event.target as Node)) setActionsOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [actionsOpen]);
 
   useEffect(() => {
     setBill(null);
@@ -753,7 +742,7 @@ export default function Vendor360Modal({
 
 {/* Close Button & Mobile 3-dot */}
             <div className="flex items-center gap-1.5 shrink-0">
-              <div className="relative sm:hidden">
+              <div className="relative">
                 <button
                   type="button"
                   onClick={() => setMobileActionsOpen((prev) => !prev)}
@@ -1907,19 +1896,28 @@ export default function Vendor360Modal({
   );
 }
 
+type PaymentDocumentItem = {
+  url: string;
+  name: string;
+  mimeType: string;
+  size: number;
+};
+
+type PaymentDocumentsProps = {
+  documents: PaymentDocumentItem[];
+  uploading: boolean;
+  onUpload: (files: File[]) => void;
+  onRemove: (url: string) => void;
+  onOpen: (url: string) => void;
+};
+
 function PaymentDocuments({
   documents,
   uploading,
   onUpload,
   onRemove,
   onOpen,
-}: {
-  documents: { url: string; name: string; mimeType: string; size: number }[];
-  uploading: boolean;
-  onUpload: (files: File[]) => void;
-  onRemove: (url: string) => void;
-  onOpen: (url: string) => void;
-}) {
+}: PaymentDocumentsProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const full = documents.length >= 5;
   const take = (list: FileList | null) => {

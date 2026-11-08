@@ -5156,6 +5156,12 @@ export type LeadPurpose =
   | "Exhibition"
   | "Other";
 
+export type LeadLabel = {
+  _id: string;
+  name: string;
+  color: string;
+};
+
 export type LeadItem = {
   _id: string;
   leadId?: string;
@@ -5185,6 +5191,8 @@ export type LeadItem = {
   createdAt?: string;
   updatedAt?: string;
   timeline?: LeadTimelineEvent[];
+  labels?: LeadLabel[];
+  labelIds?: string[];
   /** Present when a customer with this phone holds a membership. */
   membership?: LeadMembership | null;
 };
@@ -5218,6 +5226,7 @@ export type LeadPayload = {
     m_staff_name?: string;
     m_staff_email?: string;
   } | null;
+  labelIds?: string[];
 };
 
 export function leadPayloadToFormData(
@@ -5228,7 +5237,7 @@ export function leadPayloadToFormData(
   for (const [key, value] of Object.entries(payload)) {
     if (value === undefined || value === null || key === "attachmentFiles")
       continue;
-    if (key === "assignedTo" || key === "createdBy" || key === "attachments") {
+    if (key === "assignedTo" || key === "createdBy" || key === "attachments" || key === "labelIds") {
       fd.append(key, JSON.stringify(value));
       continue;
     }
@@ -5251,6 +5260,7 @@ export type GetLeadsParams = {
   assignedTo?: string;
   search?: string;
   leadId?: string;
+  labels?: string;
 };
 
 export const handleGetLeads = async (
@@ -5275,6 +5285,7 @@ export const handleGetLeads = async (
         : {}),
       ...(params?.search ? { search: params.search } : {}),
       ...(params?.leadId ? { leadId: params.leadId } : {}),
+      ...(params?.labels ? { labels: params.labels } : {}),
     },
     signal,
   });
@@ -5286,6 +5297,29 @@ export type LeadMembership = {
   planId: string;
   customerId: string;
   customerName?: string;
+};
+
+export const handleGetLeadLabels = async (signal?: AbortSignal) => {
+  const response = await axiosInstance.get("/api/lead/labels", { signal });
+  return response.data as { success: boolean; labels: LeadLabel[] };
+};
+
+export const handleCreateLeadLabel = async (payload: { name: string; color: string }) => {
+  const response = await axiosInstance.post("/api/lead/labels", payload);
+  return response.data as { success: boolean; label: LeadLabel };
+};
+
+export const handleUpdateLeadLabel = async (
+  id: string,
+  payload: { name?: string; color?: string },
+) => {
+  const response = await axiosInstance.patch(`/api/lead/labels/${id}`, payload);
+  return response.data as { success: boolean; label: LeadLabel };
+};
+
+export const handleDeleteLeadLabel = async (id: string) => {
+  const response = await axiosInstance.delete(`/api/lead/labels/${id}`);
+  return response.data;
 };
 
 export const handleGetLeadMembership = async (
