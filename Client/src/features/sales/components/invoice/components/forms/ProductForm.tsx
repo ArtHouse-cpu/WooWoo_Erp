@@ -62,6 +62,8 @@ export default function ProductForm() {
   const discountValue = watch("discountValue");
   const isCsp = watch("isCsp");
   const applyMembershipDiscount = watch("applyMembershipDiscount");
+  const lowStockAlertLevel = watch("lowStockAlertLevel");
+  const itemType = watch("type");
   const categoryId = watch("categoryId");
   const categoryName = watch("category");
   const subCategoryId = watch("subCategoryId");
@@ -309,6 +311,35 @@ export default function ProductForm() {
           </div>
         </div>
       </Section>
+
+      {itemType === "service" ? null : (
+      <Section title="Inventory alert">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">
+            Low Stock Alert Level
+          </label>
+          <input
+            type="number"
+            min={0}
+            step="1"
+            value={lowStockAlertLevel ?? ""}
+            onChange={(event) => {
+              const raw = event.target.value;
+              setValue(
+                "lowStockAlertLevel",
+                raw === "" ? null : Math.max(0, Number(raw)),
+                { shouldValidate: true },
+              );
+            }}
+            placeholder="Leave empty for no alert"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Alert when available stock is at or below this number. Each product keeps its own level.
+          </p>
+        </div>
+      </Section>
+      )}
 
       <Section title="Membership">
         <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">

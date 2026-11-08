@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo, type ChangeEvent, type FormEvent } from "react";
 import { ImagePlus, Loader2, X, Sparkles, Calendar, Video } from "lucide-react";
+import Swal from "sweetalert2";
 import type { SpacePayload } from "@/services/apiClient";
+import { uploadSpaceVideos } from "@/services/apiClient";
 import { closeIfConfirmed } from "@/utils/confirmClose";
 
 export type SpaceDay = "Weekday" | "Weekend";
@@ -118,6 +120,7 @@ export default function AddSpaceModal({
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<SpaceImageItem[]>([]);
   const [videos, setVideos] = useState<SpaceVideoItem[]>([]);
+  const [uploadingVideos, setUploadingVideos] = useState(false);
 
   // Day selection mode: "Weekday" | "Weekend" | "Both"
   const [dayMode, setDayMode] = useState<DayOption>("Weekday");
@@ -239,9 +242,9 @@ export default function AddSpaceModal({
     }
   };
 
-  const mediaSelection = (): SpaceMediaSelection => {
-    const videoFiles = videos.flatMap((item) => (item.file ? [item.file] : []));
-    const existingVideos = videos
+  const mediaSelection = (source = videos): SpaceMediaSelection => {
+    const videoFiles = source.flatMap((item) => (item.file ? [item.file] : []));
+    const existingVideos = source
       .filter((item) => !item.file && /^https?:\/\//i.test(item.url))
       .map((item) => item.url);
     return {
@@ -310,7 +313,33 @@ export default function AddSpaceModal({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || loading) return;
+    if (!name.trim() || loading || uploadingVideos) return;
+
+    let readyVideos = videos;
+    if (videos.some((item) => item.file)) {
+      try {
+        setUploadingVideos(true);
+        const pending = videos.filter((item) => item.file);
+        const urls = await uploadSpaceVideos(
+          pending.map((item) => item.file as File),
+        );
+        readyVideos = videos.map((item) => {
+          const index = pending.findIndex((row) => row.id === item.id);
+          if (index < 0) return item;
+          if (item.url.startsWith("blob:")) URL.revokeObjectURL(item.url);
+          return { id: item.id, url: urls[index] };
+        });
+        setVideos(readyVideos);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "Could not upload the videos.";
+        await Swal.fire("Video upload failed", message, "error");
+        return;
+      } finally {
+        setUploadingVideos(false);
+      }
+    }
+    const media = mediaSelection(readyVideos);
 
     if (!isEdit && dayMode === "Both") {
       await onSubmit(
@@ -327,12 +356,11 @@ export default function AddSpaceModal({
           weekendPrice: Number(weekendPrice || 0),
           weekendStatus,
         },
-        mediaSelection(),
+        media,
       );
       return;
     }
 
-    // Single day mode (Weekday or Weekend, or Edit mode)
     await onSubmit(
       {
         name: name.trim(),
@@ -345,7 +373,7 @@ export default function AddSpaceModal({
         price: Number(price || 0),
         status,
       },
-      mediaSelection(),
+      media,
     );
   };
 
@@ -713,7 +741,7 @@ export default function AddSpaceModal({
               Space videos
             </label>
             <p className="mb-2 text-xs text-gray-500">
-              Up to {MAX_SPACE_VIDEOS} mp4, webm, or mov files.
+              Up to {MAX_SPACE_VIDEOS} mp4, webm, or mov files. They upload together, up to 100 MB each.
             </p>
             {videos.length < MAX_SPACE_VIDEOS ? (
               <label
@@ -767,11 +795,13 @@ export default function AddSpaceModal({
             </button>
             <button
               type="submit"
-              disabled={loading || !name.trim()}
+              disabled={loading || uploadingVideos || !name.trim()}
               className="inline-flex items-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-              {loading
+              {loading || uploadingVideos ? <Loader2 size={16} className="animate-spin" /> : null}
+              {uploadingVideos
+                ? "Uploading videos..."
+                : loading
                 ? isEdit
                   ? "Updating..."
                   : "Creating..."

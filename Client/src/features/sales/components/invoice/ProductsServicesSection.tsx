@@ -145,9 +145,7 @@ export default function ProductsServicesSection({
       discountType: item.discountType,
       discountValue: item.discountValue,
       isCsp: Boolean(item.isCsp),
-      skipMembershipDiscount:
-        Boolean(item.skipMembershipDiscount) ||
-        (item.sourceType === "food" && item.manageInventory === true),
+      skipMembershipDiscount: Boolean(item.skipMembershipDiscount),
     });
 
     return {
@@ -192,9 +190,7 @@ export default function ProductsServicesSection({
         productDiscountValue: Number(item.discountValue ?? 0),
         productDiscountAmount,
         membershipDiscountAmount,
-        skipMembershipDiscount:
-          Boolean(item.skipMembershipDiscount) ||
-        (item.sourceType === "food" && item.manageInventory === true),
+        skipMembershipDiscount: Boolean(item.skipMembershipDiscount),
       });
     }
   };
@@ -271,9 +267,7 @@ export default function ProductsServicesSection({
       discountType: item.discountType,
       discountValue: item.discountValue,
       isCsp,
-      skipMembershipDiscount:
-        Boolean(item.skipMembershipDiscount) ||
-        (item.sourceType === "food" && item.manageInventory === true),
+      skipMembershipDiscount: Boolean(item.skipMembershipDiscount),
     });
 
     const displayName = item.productName || item.name || "";

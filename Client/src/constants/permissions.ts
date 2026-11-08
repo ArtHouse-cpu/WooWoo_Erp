@@ -604,6 +604,7 @@ export const MENU_PERMISSION_MAP: Record<string, Permission | Permission[]> = {
   "/guests": PERMISSIONS.GUEST_READ,
   "/wallet": PERMISSIONS.WALLET_READ,
   "/coupons": PERMISSIONS.COUPON_READ,
+  "/set-offers": PERMISSIONS.COUPON_READ,
   "/buy-one-get-one": PERMISSIONS.FOOD_READ,
   "/announcements": PERMISSIONS.ANNOUNCEMENT_READ,
   "/affiliate-program": PERMISSIONS.AFFILIATE_READ,

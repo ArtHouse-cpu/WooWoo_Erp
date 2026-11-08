@@ -30,6 +30,9 @@ export type ExclusiveSingleDateSummaryCardProps = {
   foods?: SummaryFoodItem[];
   discountAmount?: number;
   cashbackAmount?: number;
+  offerFreeHours?: number;
+  offerDiscount?: number;
+  offerName?: string;
   formatDateDisplay: (val?: string | Date | null) => string;
   bookedSpaces?: SummaryBookedSpace[];
   showPayment?: boolean;
@@ -52,6 +55,9 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   foods = [],
   discountAmount = 0,
   cashbackAmount = 0,
+  offerFreeHours = 0,
+  offerDiscount = 0,
+  offerName = "",
   formatDateDisplay,
   bookedSpaces = [],
   showPayment = false,
@@ -98,8 +104,11 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   const subTotal = spaceCharges + servicesTotal + foodTotal;
 
   const safeDiscount = Math.max(0, Number(discountAmount) || 0);
+  const safeOffer = Math.max(0, Number(offerDiscount) || 0);
+  const freeHours = Math.max(0, Number(offerFreeHours) || 0);
+  const chargeableHours = Math.max(0, safeDuration - freeHours);
 
-  const grandTotal = Math.max(0, subTotal - safeDiscount);
+  const grandTotal = Math.max(0, subTotal - safeOffer - safeDiscount);
   const totalPrice = storedSubTotal > 0 ? storedSubTotal : subTotal;
   const payPrice = storedGrandTotal > 0 ? storedGrandTotal : grandTotal;
   const paidPrice = Math.max(0, Number(paidAmount) || 0);
@@ -336,6 +345,32 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
               </span>
             </div>
           </div>
+
+          {safeOffer > 0 ? (
+            <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/80 px-3 py-2 text-xs">
+              <p className="font-bold text-violet-800">Special Offer Applied – {freeHours} Hour{freeHours === 1 ? "" : "s"} FREE!</p>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Booking Duration</span>
+                <span className="font-semibold text-slate-800">{safeDuration} Hours</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Hourly Rate</span>
+                <span className="font-semibold text-slate-800">₹{safeHourlyRate.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Original Amount</span>
+                <span className="font-semibold text-slate-800">₹{spaceCharges.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Offer Applied{offerName ? ` · ${offerName}` : ""}</span>
+                <span className="font-semibold text-violet-700">{freeHours} Hours FREE · pay {chargeableHours}h</span>
+              </div>
+              <div className="flex items-center justify-between font-semibold text-rose-600">
+                <span>Discount</span>
+                <span>- ₹{safeOffer.toLocaleString("en-IN")}</span>
+              </div>
+            </div>
+          ) : null}
 
           {/* Membership Discount */}
           {safeDiscount > 0 && (

@@ -1,8 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { 
-  handleGetInvoices, 
-  handleGetPurchases
-} from "@/services/apiClient";
+import { useEffect, useState } from "react";
+import { handleGetInventoryTimeline } from "@/services/apiClient";
 import { 
   Package, 
   ArrowUpRight, 
@@ -31,126 +28,121 @@ type TimelineEntry = {
   createdBy: string;
   entityName: string; 
   category?: string;
-  rawInvoice?: any;
-  rawPurchase?: any;
-  rawItem?: any;
 };
+
+const PAGE_SIZE = 20;
 
 const InventoryTimelineScreen = () => {
   const [loading, setLoading] = useState(true);
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [purchases, setPurchases] = useState<any[]>([]);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
+  const [entries, setEntries] = useState<TimelineEntry[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary] = useState({
+    totalIn: 0,
+    totalOut: 0,
+    valueIn: 0,
+    valueOut: 0,
+  });
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [productTerm, setProductTerm] = useState("");
+  const [debouncedProduct, setDebouncedProduct] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "IN" | "OUT">("ALL");
+  const [stockFilter, setStockFilter] = useState<"all" | "low">("all");
   const [dateRange, setDateRange] = useState({
     start: "",
     end: ""
   });
   const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+      setDebouncedProduct(productTerm.trim());
+      setPage(1);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm, productTerm]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [invRes, purRes] = await Promise.all([
-        handleGetInvoices(),
-        handleGetPurchases()
-      ]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const response = await handleGetInventoryTimeline(
+          {
+            page,
+            limit: PAGE_SIZE,
+            search: debouncedSearch,
+            product: debouncedProduct,
+            type: typeFilter,
+            stock: stockFilter,
+            fromDate: dateRange.start,
+            toDate: dateRange.end,
+          },
+          controller.signal,
+        );
+        setEntries(
+          (response.entries || []).map((entry) => ({
+            ...entry,
+            date: new Date(entry.date),
+            type: entry.type === "IN" ? "IN" : "OUT",
+          })),
+        );
+        setTotal(Number(response.total || 0));
+        setTotalPages(Math.max(1, Number(response.totalPages || 1)));
+        setSummary(response.summary || { totalIn: 0, totalOut: 0, valueIn: 0, valueOut: 0 });
+      } catch (err: unknown) {
+        const canceled = err as { name?: string; code?: string };
+        if (canceled?.name === "CanceledError" || canceled?.code === "ERR_CANCELED") return;
+        setEntries([]);
+        setError("Failed to load inventory history");
+        Swal.fire("Error", "Failed to load inventory history", "error");
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setReady(true);
+        }
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [
+    page,
+    debouncedSearch,
+    debouncedProduct,
+    typeFilter,
+    stockFilter,
+    dateRange.start,
+    dateRange.end,
+    reloadToken,
+  ]);
 
-      if (invRes.success) setInvoices(invRes.invoices);
-      if (purRes.success) setPurchases(purRes.purchases);
-    } catch (error) {
-      console.error("Error fetching timeline data:", error);
-      Swal.fire("Error", "Failed to load inventory history", "error");
-    } finally {
-      setLoading(false);
-    }
+  const filteredData = entries;
+  const stats = {
+    totalIn: summary.totalIn,
+    totalOut: summary.totalOut,
+    valIn: summary.valueIn,
+    valOut: summary.valueOut,
   };
 
-  const timelineData = useMemo(() => {
-    const data: TimelineEntry[] = [];
+  const clearFilters = () => {
+    setSearchTerm("");
+    setProductTerm("");
+    setDebouncedSearch("");
+    setDebouncedProduct("");
+    setTypeFilter("ALL");
+    setStockFilter("all");
+    setDateRange({ start: "", end: "" });
+    setPage(1);
+  };
 
-    // Process Sales (OUT)
-    invoices.forEach((inv) => {
-      if (inv.status === "cancelled") return;
-      (inv.items || []).forEach((item: any, idx: number) => {
-        data.push({
-          id: `sale-${inv._id}-${idx}`,
-          date: new Date(inv.invoiceDate || inv.createdAt),
-          type: "OUT",
-          productName: item.productName || "Unknown Product",
-          qty: item.qty,
-          amount: item.unitPrice,
-          invoiceNo: inv.invoiceCode || inv.invoiceNumber || "N/A",
-          createdBy: inv.createdBy?.m_staff_name || "System",
-          entityName: inv.customerName || "Walk-in Customer",
-          category: item.category,
-          rawInvoice: inv,
-          rawItem: item,
-        });
-      });
-    });
-
-    // Process Purchases (IN)
-    purchases.forEach((pur) => {
-      if (pur.status === "cancelled") return;
-      (pur.items || []).forEach((item: any, idx: number) => {
-        data.push({
-          id: `pur-${pur._id}-${idx}`,
-          date: new Date(pur.invoiceDate || pur.createdAt),
-          type: "IN",
-          productName: item.productName || "Unknown Product",
-          qty: item.qty,
-          amount: item.unitPrice,
-          invoiceNo: pur.invoiceNumber || "N/A",
-          createdBy: pur.purchaser || "System",
-          entityName: pur.supplierName || "Direct Purchase",
-          category: "Purchase",
-          rawPurchase: pur,
-          rawItem: item,
-        });
-      });
-    });
-
-    // Sort by date descending
-    return data.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [invoices, purchases]);
-
-  const filteredData = useMemo(() => {
-    return timelineData.filter((item) => {
-      const matchesSearch = 
-        item.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.invoiceNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.entityName.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesType = typeFilter === "ALL" || item.type === typeFilter;
-      
-      const itemDate = item.date.toISOString().split("T")[0];
-      const matchesDate = 
-        (!dateRange.start || itemDate >= dateRange.start) &&
-        (!dateRange.end || itemDate <= dateRange.end);
-
-      return matchesSearch && matchesType && matchesDate;
-    });
-  }, [timelineData, searchTerm, typeFilter, dateRange]);
-
-  const stats = useMemo(() => {
-    return filteredData.reduce((acc, curr) => {
-      if (curr.type === "IN") {
-        acc.totalIn += curr.qty;
-        acc.valIn += curr.qty * curr.amount;
-      } else {
-        acc.totalOut += curr.qty;
-        acc.valOut += curr.qty * curr.amount;
-      }
-      return acc;
-    }, { totalIn: 0, totalOut: 0, valIn: 0, valOut: 0 });
-  }, [filteredData]);
-
-  if (loading) {
+  if (!ready && loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -178,7 +170,7 @@ const InventoryTimelineScreen = () => {
         <div className="flex items-center gap-3">
           <button 
             type="button"
-            onClick={fetchData}
+            onClick={() => setReloadToken((token) => token + 1)}
             className="w-full sm:w-auto px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-xs flex items-center justify-center gap-1.5"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
@@ -205,10 +197,10 @@ const InventoryTimelineScreen = () => {
         />
         <StatCard 
           title="Total Transactions" 
-          value={filteredData.length} 
+          value={total} 
           icon={<Package className="text-blue-600" size={18} />} 
           color="blue"
-          label="Recent movements"
+          label="Matching movements"
         />
         <StatCard 
           title="Net Movement" 
@@ -237,21 +229,21 @@ const InventoryTimelineScreen = () => {
             <div className="flex p-1 bg-gray-100 rounded-xl">
               <button 
                 type="button"
-                onClick={() => setTypeFilter("ALL")}
+                onClick={() => { setTypeFilter("ALL"); setPage(1); }}
                 className={`flex-1 px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${typeFilter === "ALL" ? "bg-white shadow-xs text-blue-600" : "text-gray-500 hover:text-gray-700"}`}
               >
                 ALL
               </button>
               <button 
                 type="button"
-                onClick={() => setTypeFilter("IN")}
+                onClick={() => { setTypeFilter("IN"); setPage(1); }}
                 className={`flex-1 px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${typeFilter === "IN" ? "bg-white shadow-xs text-emerald-600" : "text-gray-500 hover:text-gray-700"}`}
               >
                 STOCK IN
               </button>
               <button 
                 type="button"
-                onClick={() => setTypeFilter("OUT")}
+                onClick={() => { setTypeFilter("OUT"); setPage(1); }}
                 className={`flex-1 px-2.5 py-1.5 text-xs font-bold rounded-lg transition ${typeFilter === "OUT" ? "bg-white shadow-xs text-rose-600" : "text-gray-500 hover:text-gray-700"}`}
               >
                 STOCK OUT
@@ -265,7 +257,7 @@ const InventoryTimelineScreen = () => {
               <input 
                 type="date" 
                 value={dateRange.start}
-                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                onChange={(e) => { setDateRange(prev => ({ ...prev, start: e.target.value })); setPage(1); }}
                 className="w-full pl-8 pr-2 py-1.5 sm:py-2 border border-gray-200 rounded-xl text-xs outline-none focus:border-blue-500"
               />
             </div>
@@ -274,17 +266,42 @@ const InventoryTimelineScreen = () => {
               <input 
                 type="date" 
                 value={dateRange.end}
-                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                onChange={(e) => { setDateRange(prev => ({ ...prev, end: e.target.value })); setPage(1); }}
                 className="w-full pl-8 pr-2 py-1.5 sm:py-2 border border-gray-200 rounded-xl text-xs outline-none focus:border-blue-500"
               />
             </div>
           </div>
         </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            type="text"
+            placeholder="Exact product name"
+            value={productTerm}
+            onChange={(e) => setProductTerm(e.target.value)}
+            className="w-full sm:max-w-xs rounded-xl border border-gray-200 px-3 py-2 text-xs sm:text-sm outline-none focus:border-blue-500"
+          />
+          <button
+            type="button"
+            onClick={() => { setStockFilter((current) => (current === "low" ? "all" : "low")); setPage(1); }}
+            className={`rounded-xl px-3.5 py-2 text-xs font-semibold ${
+              stockFilter === "low"
+                ? "bg-rose-600 text-white"
+                : "bg-white text-slate-700 ring-1 ring-slate-200"
+            }`}
+          >
+            Low Stock
+          </button>
+          {error ? <p className="text-xs font-medium text-rose-600">{error}</p> : null}
+        </div>
       </div>
 
       {/* Mobile Card List (Mobile only: block md:hidden) */}
       <div className="block md:hidden space-y-2.5">
-        {filteredData.length > 0 ? (
+        {loading ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+            Loading movements...
+          </div>
+        ) : filteredData.length > 0 ? (
           filteredData.map((item) => {
             const isIn = item.type === "IN";
             const totalVal = item.qty * item.amount;
@@ -401,11 +418,7 @@ const InventoryTimelineScreen = () => {
             </p>
             <button
               type="button"
-              onClick={() => {
-                setSearchTerm("");
-                setTypeFilter("ALL");
-                setDateRange({ start: "", end: "" });
-              }}
+              onClick={clearFilters}
               className="mt-3 text-xs font-bold text-blue-600 hover:underline"
             >
               Clear all filters
@@ -430,7 +443,13 @@ const InventoryTimelineScreen = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredData.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">
+                    Loading movements...
+                  </td>
+                </tr>
+              ) : filteredData.length > 0 ? (
                 filteredData.map((item) => (
                   <tr 
                     key={item.id} 
@@ -503,11 +522,7 @@ const InventoryTimelineScreen = () => {
                       <p className="text-gray-500 font-medium">No matching inventory movements found</p>
                       <button 
                         type="button"
-                        onClick={() => {
-                          setSearchTerm("");
-                          setTypeFilter("ALL");
-                          setDateRange({ start: "", end: "" });
-                        }}
+                        onClick={clearFilters}
                         className="text-sm font-bold text-blue-600 hover:underline"
                       >
                         Clear all filters
@@ -518,6 +533,35 @@ const InventoryTimelineScreen = () => {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-slate-500">
+          {total === 0
+            ? "No movements"
+            : `Showing ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)} of ${total}`}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            className="rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span className="text-xs font-semibold text-slate-600">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page >= totalPages || loading}
+            onClick={() => setPage((current) => current + 1)}
+            className="rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 disabled:opacity-40"
+          >
+            Next
+          </button>
         </div>
       </div>
 
@@ -679,38 +723,6 @@ const InventoryTimelineScreen = () => {
                       })}
                     </span>
                   </div>
-                  {/* Payment Details if available */}
-                  {(selectedEntry.rawInvoice?.paymentType ||
-                    selectedEntry.rawPurchase?.paymentMode) && (
-                    <div>
-                      <span className="text-slate-400 block">Payment Mode</span>
-                      <span className="font-semibold text-slate-800">
-                        {selectedEntry.rawInvoice?.paymentType ||
-                          selectedEntry.rawPurchase?.paymentMode}
-                      </span>
-                    </div>
-                  )}
-                  {(selectedEntry.rawInvoice?.status ||
-                    selectedEntry.rawPurchase?.status) && (
-                    <div>
-                      <span className="text-slate-400 block">Status</span>
-                      <span className="font-semibold text-slate-800 capitalize">
-                        {selectedEntry.rawInvoice?.status ||
-                          selectedEntry.rawPurchase?.status}
-                      </span>
-                    </div>
-                  )}
-                  {/* Notes if available */}
-                  {(selectedEntry.rawInvoice?.notes ||
-                    selectedEntry.rawPurchase?.notes) && (
-                    <div className="col-span-2 border-t border-slate-100 pt-2">
-                      <span className="text-slate-400 block">Notes</span>
-                      <p className="text-slate-600 mt-0.5">
-                        {selectedEntry.rawInvoice?.notes ||
-                          selectedEntry.rawPurchase?.notes}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

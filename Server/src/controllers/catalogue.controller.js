@@ -131,9 +131,7 @@ const expandProductCatalogueRows = (product, searchRegex, stockByName) => {
     isCsp,
     cspLabel: isCsp ? 'CSP' : null,
     manageInventory: Boolean(product.foodId) && product.foodInventoryActive !== false,
-    skipMembershipDiscount:
-      (Boolean(product.foodId) && product.foodInventoryActive !== false) ||
-      product.applyMembershipDiscount === false,
+    skipMembershipDiscount: product.applyMembershipDiscount === false,
   };
 
   const pushParent = () => {
@@ -356,7 +354,8 @@ const mapFood = (food, stockByName) => {
     isVeg: food.isVeg !== false,
     status: food.status || 'Active',
     manageInventory: managed,
-    skipMembershipDiscount: managed,
+    applyMembershipDiscount: food.applyMembershipDiscount !== false,
+    skipMembershipDiscount: food.applyMembershipDiscount === false,
     discountType: 'flat',
     discountValue: 0,
   };

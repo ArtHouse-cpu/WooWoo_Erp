@@ -46,6 +46,7 @@ import {
   CouponsScreen,
   BuyOneGetOneScreen,
 } from "@/features/sales";
+import SetOffersScreen from "@/features/marketing/pages/SetOffersScreen";
 import CreateQuotationScreen from "@/features/sales/pages/CreateQuotationScreen";
 import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
 import SubscriptionScreen from "@/features/sales/pages/SubscriptionScreen";
@@ -132,6 +133,7 @@ export const router = createBrowserRouter([
           },
           { path: "Vendor list", element: <VendorScreen /> },
           { path: "coupons", element: <CouponsScreen /> },
+          { path: "set-offers", element: <SetOffersScreen /> },
           { path: "buy-one-get-one", element: <BuyOneGetOneScreen /> },
           { path: "affiliate-program", element: <AffiliateProgramScreen /> },
           { path: "access", element: <AccessScreen /> },

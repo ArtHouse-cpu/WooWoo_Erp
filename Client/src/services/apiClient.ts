@@ -689,6 +689,96 @@ export const handleDeleteQuotation = async (id: string) => {
   }
 };
 
+export type SpaceOfferRule = {
+  minimumHours: number;
+  freeHours: number;
+  priority?: number;
+  status?: "active" | "inactive";
+};
+
+export type SpaceOffer = {
+  _id?: string;
+  offerName: string;
+  description?: string;
+  offerType?: "space_booking";
+  priority?: number;
+  rules: SpaceOfferRule[];
+  status: "active" | "inactive";
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ApplicableSpaceOffer = {
+  applied: boolean;
+  offerId: string;
+  offerName: string;
+  minimumHours: number;
+  freeHours: number;
+  chargeableHours: number;
+  discount: number;
+  originalAmount: number;
+  finalAmount: number;
+};
+
+export const handleGetSpaceOffers = async (
+  params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: "all" | "active" | "inactive";
+  },
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/space-offers", {
+    signal,
+    params: {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 10,
+      search: params?.search || undefined,
+      status: params?.status || "all",
+    },
+  });
+  return response.data as {
+    success: boolean;
+    offers: SpaceOffer[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export const handleCreateSpaceOffer = async (payload: SpaceOffer) => {
+  const response = await axiosInstance.post("/space-offers", payload);
+  return response.data;
+};
+
+export const handleUpdateSpaceOffer = async (id: string, payload: SpaceOffer) => {
+  const response = await axiosInstance.patch(`/space-offers/${id}`, payload);
+  return response.data;
+};
+
+export const handleSetSpaceOfferStatus = async (
+  id: string,
+  status: "active" | "inactive",
+) => {
+  const response = await axiosInstance.patch(`/space-offers/${id}/status`, { status });
+  return response.data;
+};
+
+export const handleDeleteSpaceOffer = async (id: string) => {
+  const response = await axiosInstance.delete(`/space-offers/${id}`);
+  return response.data;
+};
+
+export const handleGetApplicableSpaceOffer = async (
+  body: { hours: number; lines: Array<{ hourlyRate: number; qty: number }> },
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.post("/space-offers/applicable", body, { signal });
+  return response.data as { success: boolean; offer: ApplicableSpaceOffer };
+};
+
 export const handleGetCoupons = async (
   params?: { search?: string; status?: "all" | "active" | "inactive" },
   signal?: AbortSignal,
@@ -2132,6 +2222,60 @@ export const handleGetSpaces = async (
   return response.data;
 };
 
+const MAX_SPACE_VIDEO_BYTES = 100 * 1024 * 1024;
+
+export const uploadSpaceVideos = async (files: File[]) => {
+  if (!files.length) return [] as string[];
+  const tooLarge = files.find((file) => file.size > MAX_SPACE_VIDEO_BYTES);
+  if (tooLarge) {
+    throw new Error(`${tooLarge.name} is larger than 100 MB.`);
+  }
+  let signed;
+  try {
+    signed = await axiosInstance.post("/space/video-signature");
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { message?: string } }; message?: string };
+    throw new Error(
+      err.response?.data?.message || err.message || "Could not prepare the video upload.",
+    );
+  }
+  const upload = signed.data?.upload as
+    | {
+        cloudName?: string;
+        apiKey?: string;
+        timestamp?: number;
+        signature?: string;
+        folder?: string;
+      }
+    | undefined;
+  if (!upload?.cloudName || !upload.apiKey || !upload.signature || !upload.folder) {
+    throw new Error(signed.data?.message || "Could not prepare the video upload.");
+  }
+  const urls = await Promise.all(
+    files.map(async (file) => {
+      const body = new FormData();
+      body.append("file", file);
+      body.append("api_key", upload.apiKey!);
+      body.append("timestamp", String(upload.timestamp));
+      body.append("signature", upload.signature!);
+      body.append("folder", upload.folder!);
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${upload.cloudName}/video/upload`,
+        { method: "POST", body },
+      );
+      const data = (await response.json().catch(() => null)) as {
+        secure_url?: string;
+        error?: { message?: string };
+      } | null;
+      if (!response.ok || !data?.secure_url) {
+        throw new Error(data?.error?.message || `Could not upload ${file.name}.`);
+      }
+      return data.secure_url;
+    }),
+  );
+  return urls;
+};
+
 export const handleGetSpaceById = async (id: string, signal?: AbortSignal) => {
   const response = await axiosInstance.get(`/space/${id}`, { signal });
   return response.data;
@@ -2866,6 +3010,7 @@ export type FoodPayload = {
   unit?: string;
   isPackaged?: boolean;
   manageInventory?: boolean;
+  applyMembershipDiscount?: boolean;
   availableStock?: number | null;
   description?: string;
   isVeg?: boolean;
@@ -2939,6 +3084,12 @@ export const foodPayloadToFormData = (
   }
   if (payload.manageInventory !== undefined) {
     fd.append("manageInventory", String(Boolean(payload.manageInventory)));
+  }
+  if (payload.applyMembershipDiscount !== undefined) {
+    fd.append(
+      "applyMembershipDiscount",
+      payload.applyMembershipDiscount === false ? "false" : "true",
+    );
   }
   if (payload.description !== undefined) {
     fd.append("description", String(payload.description));
@@ -3162,10 +3313,74 @@ export type InventoryItem = {
   purchase_price: string;
   sale_price: string;
   last_updated: string;
+  lowStockAlertLevel?: number | null;
+  isLowStock?: boolean;
 };
 
-export const handleGetInventories = async (signal?: AbortSignal) => {
-  const response = await axiosInstance.get("/inventory", { signal });
+export type InventoryTimelineEntry = {
+  id: string;
+  date: string;
+  type: "IN" | "OUT";
+  productName: string;
+  qty: number;
+  amount: number;
+  invoiceNo: string;
+  createdBy: string;
+  entityName: string;
+  category?: string;
+};
+
+export const handleGetInventoryTimeline = async (
+  params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    product?: string;
+    type?: "ALL" | "IN" | "OUT";
+    stock?: "all" | "low";
+    fromDate?: string;
+    toDate?: string;
+  },
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/inventory/timeline", {
+    signal,
+    params: {
+      page: params.page ?? 1,
+      limit: params.limit ?? 20,
+      search: params.search || undefined,
+      product: params.product || undefined,
+      type: params.type && params.type !== "ALL" ? params.type : undefined,
+      stock: params.stock === "low" ? "low" : undefined,
+      fromDate: params.fromDate || undefined,
+      toDate: params.toDate || undefined,
+    },
+  });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    entries: InventoryTimelineEntry[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    summary: {
+      totalIn: number;
+      totalOut: number;
+      valueIn: number;
+      valueOut: number;
+    };
+  };
+};
+
+export const handleGetInventories = async (
+  signal?: AbortSignal,
+  params?: { stock?: "all" | "low" },
+) => {
+  const response = await axiosInstance.get("/inventory", {
+    signal,
+    params: params?.stock && params.stock !== "all" ? { stock: params.stock } : undefined,
+  });
   return response.data as {
     success: boolean;
     message: string;
@@ -3709,6 +3924,71 @@ export const handleReviewCspApplication = async (
   };
 };
 
+export type CspSoldProduct = {
+  id: string;
+  invoiceCode: string;
+  invoiceNumber?: number | string;
+  customerName: string;
+  customerPhone?: string;
+  productId?: string | null;
+  productName: string;
+  image?: string | null;
+  category?: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  sailorEarnings: number;
+  saleDate: string | null;
+  status: string;
+};
+
+export type CspTimelineEvent = {
+  id: string;
+  kind: "purchase" | "sale" | "stock_add" | "cancellation" | "payout";
+  type?: string;
+  title: string;
+  subtitle?: string;
+  idRef?: string;
+  productName?: string;
+  customerName?: string;
+  quantity?: number;
+  unitPrice?: number;
+  amount: number;
+  sailorEarnings?: number;
+  date: string | null;
+  at?: string | null;
+  status?: string;
+  image?: string | null;
+  details?: {
+    invoiceNumber?: string;
+    invoiceCode?: string;
+    supplierName?: string;
+    customerName?: string;
+    customerPhone?: string;
+    paidAmount?: number;
+    dueAmount?: number;
+    quantity?: number;
+    unitPrice?: number;
+    totalAmount?: number;
+    sailorEarnings?: number;
+    stockQty?: number;
+    sellingPrice?: number;
+    category?: string;
+    amount?: number;
+    method?: string;
+    paymentMode?: string;
+    status?: string;
+    notes?: string;
+    reason?: string;
+    items?: Array<{
+      productName: string;
+      qty: number;
+      unitPrice: number;
+      lineTotal: number;
+    }>;
+  };
+};
+
 export type CspPartnerDetails = {
   partner: {
     fullName: string;
@@ -3730,6 +4010,7 @@ export type CspPartnerDetails = {
     productsSold: number;
     totalEarnings: number;
     salesAmount: number;
+    successfulTransactionsCount?: number;
     pendingPayout: number;
     completedPayout: number;
     availableBalance: number;
@@ -3743,6 +4024,10 @@ export type CspPartnerDetails = {
     stock: number;
     sold: number;
     sales: number;
+    image?: string | null;
+    imageUrl?: string | null;
+    images?: string[];
+    createdAt?: string | null;
   }>;
   payouts: Array<{
     id: string;
@@ -3751,14 +4036,9 @@ export type CspPartnerDetails = {
     method: string;
     at: string | null;
   }>;
-  activity: Array<{
-    kind: "sale" | "payout";
-    title: string;
-    amount: number;
-    at: string | null;
-    detail: string;
-    status?: string;
-  }>;
+  sales: CspSoldProduct[];
+  timeline: CspTimelineEvent[];
+  activity: CspTimelineEvent[];
 };
 
 export const handleGetCspPartnerDetails = async (id: string) => {

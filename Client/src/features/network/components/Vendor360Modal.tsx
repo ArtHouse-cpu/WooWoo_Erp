@@ -275,6 +275,8 @@ export default function Vendor360Modal({
   const navigate = useNavigate();
   const { can } = usePermission();
   const canSeeBank = can(PERMISSIONS.VENDOR_UPDATE);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<Tab>("overview");
   const [period, setPeriod] = useState<Period>("all");
   const [data, setData] = useState<Vendor360Response | null>(null);
@@ -353,6 +355,15 @@ export default function Vendor360Modal({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!actionsOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!actionsRef.current?.contains(event.target as Node)) setActionsOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [actionsOpen]);
 
   useEffect(() => {
     setBill(null);
@@ -692,7 +703,7 @@ export default function Vendor360Modal({
       <div className="flex h-dvh w-full max-w-6xl flex-col overflow-hidden bg-[#F6F7FB] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl">
         <header className="border-b border-slate-200 bg-white px-3 sm:px-4 py-2.5 sm:py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           {/* Top row: Title, Name and Close Button */}
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-violet-600">
@@ -740,7 +751,7 @@ export default function Vendor360Modal({
               </div>
             </div>
 
-            {/* Close Button & Mobile 3-dot */}
+{/* Close Button & Mobile 3-dot */}
             <div className="flex items-center gap-1.5 shrink-0">
               <div className="relative sm:hidden">
                 <button
