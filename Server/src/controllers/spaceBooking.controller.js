@@ -209,6 +209,7 @@ const applyLinkedInvoicePayments = async bookings => {
   const byId = new Map(invoices.map(invoice => [String(invoice._id), invoice]));
   const byCode = new Map(invoices.map(invoice => [String(invoice.invoiceCode || ''), invoice]));
   for (const booking of list) {
+    if (String(booking.status || '') === 'Draft') continue;
     const invoice =
       byId.get(String(booking.invoiceId || '')) ||
       byCode.get(String(booking.invoiceCode || ''));
@@ -266,6 +267,14 @@ const serializeBooking = doc => {
 
 /** A leftover under ₹1 is the bill round-off, not an open due. */
 const settleRoundOff = plain => {
+  if (String(plain.status || '') === 'Draft') {
+    const total = money(plain.grandTotal || plain.lineTotal || plain.summarySnapshot?.grandTotal || 0);
+    return {
+      paidAmount: 0,
+      dueAmount: total,
+      paymentStatus: '',
+    };
+  }
   const total = money(plain.grandTotal || plain.lineTotal || 0);
   const paid = money(plain.paidAmount || 0);
   const storedDue = money(plain.dueAmount || 0);

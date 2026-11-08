@@ -40,6 +40,8 @@ export type ExclusiveSingleDateSummaryCardProps = {
   dueAmount?: number | null;
   storedGrandTotal?: number;
   storedSubTotal?: number;
+  /** Shown above the payable figure. Drafts use "Draft Amount". */
+  amountLabel?: string;
 };
 
 export const ExclusiveSingleDateSummaryCard: React.FC<
@@ -65,6 +67,7 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   dueAmount,
   storedGrandTotal = 0,
   storedSubTotal = 0,
+  amountLabel = "Grand Total",
 }) => {
   /* --------------------------------
      Safe / calculated values
@@ -122,7 +125,7 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
 
 
   return (
-    <div className="flex h-full flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5">
+    <div className="flex min-h-full flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5">
       <div className="space-y-4">
 
         {/* ==============================
@@ -403,13 +406,18 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
           {/* Grand Total */}
           <div className="flex items-center justify-between border-t border-slate-100 pt-3">
             <span className="text-sm font-bold text-slate-800">
-              Grand Total
+              {amountLabel}
             </span>
 
             <span className="text-2xl font-black text-indigo-600">
               ₹{grandTotal.toLocaleString("en-IN")}
             </span>
           </div>
+          {amountLabel === "Draft Amount" ? (
+            <p className="text-[11px] font-medium text-slate-500">
+              Nothing is paid on a draft. This is the amount to collect.
+            </p>
+          ) : null}
           {showPayment ? (
             <PaymentAmounts
               totalPrice={totalPrice}

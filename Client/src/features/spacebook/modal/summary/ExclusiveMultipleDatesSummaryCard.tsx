@@ -201,7 +201,7 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
   ========================================= */
 
   return (
-    <div className="flex h-full flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5">
+    <div className="flex min-h-full flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm sm:p-5">
 
       <div className="space-y-4">
 
