@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -24,15 +24,18 @@ import Swal from "sweetalert2";
 
 import CreateLeadModal from "../components/CreateLeadModal";
 import LeadDetailsModal from "../components/LeadDetailsModal";
+import LeadLabelMenu, { LeadLabelBadges } from "../components/LeadLabelMenu";
 import LeadMembershipBadge from "../components/LeadMembershipBadge";
 import StaffVerifyModal from "@/features/sales/components/invoice/Modal/StaffVerifyModal";
 import {
   handleGetLeads,
+  handleGetLeadLabels,
   handleCreateLead,
   handleUpdateLead,
   handleDeleteLead,
   handleGetAccessStaff,
   type LeadItem,
+  type LeadLabel,
   type LeadPayload,
   type LeadStatus,
   type LeadSources,
@@ -179,6 +182,9 @@ const LeadScreen = () => {
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedSource, setSelectedSource] = useState<string>("all");
   const [selectedAssign, setSelectedAssign] = useState<string>("all");
+  const [leadLabels, setLeadLabels] = useState<LeadLabel[]>([]);
+  const [labelFilter, setLabelFilter] = useState<string[]>([]);
+  const labelFilterRef = useRef<string[]>([]);
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -281,6 +287,9 @@ const LeadScreen = () => {
             status: pStatus && pStatus !== "all" ? pStatus : undefined,
             source: pSource && pSource !== "all" ? pSource : undefined,
             assignedTo: pAssign && pAssign !== "all" ? pAssign : undefined,
+            labels: labelFilterRef.current.length
+              ? labelFilterRef.current.join(",")
+              : undefined,
           },
           signal,
         );
@@ -318,6 +327,13 @@ const LeadScreen = () => {
                 item.assignedTo?.m_staff_id === pAssign,
             );
           }
+        }
+        if (labelFilterRef.current.length) {
+          const wanted = new Set(labelFilterRef.current);
+          leadList = leadList.filter((item) =>
+            (item.labels || []).some((label) => wanted.has(label._id)) ||
+            (item.labelIds || []).some((id) => wanted.has(String(id))),
+          );
         }
         setLeads(leadList);
       } catch (error: any) {
@@ -451,6 +467,31 @@ const LeadScreen = () => {
     );
     return () => controller.abort();
   }, [fetchLeads]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    handleGetLeadLabels(controller.signal)
+      .then((res) => setLeadLabels(Array.isArray(res?.labels) ? res.labels : []))
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  const syncLabelCatalog = (next: LeadLabel[]) => {
+    setLeadLabels(next);
+    const ids = new Set(next.map((label) => label._id));
+    const previous = labelFilterRef.current.join(",");
+    labelFilterRef.current = labelFilterRef.current.filter((id) => ids.has(id));
+    setLabelFilter(labelFilterRef.current);
+    setLeads((prev) =>
+      prev.map((lead) => ({
+        ...lead,
+        labels: (lead.labels || [])
+          .map((label) => next.find((item) => item._id === label._id))
+          .filter((label): label is LeadLabel => Boolean(label)),
+      })),
+    );
+    if (labelFilterRef.current.join(",") !== previous) void fetchLeads();
+  };
 
   // Refresh leads if created from global Header
   useEffect(() => {
@@ -742,6 +783,9 @@ const LeadScreen = () => {
                 via {row.original.source}
               </span>
             )}
+            <div className="mt-1">
+              <LeadLabelBadges labels={row.original.labels} compact />
+            </div>
           </div>
         ),
       },
@@ -1130,6 +1174,21 @@ const LeadScreen = () => {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Label Filter */}
+          <div className="relative w-full sm:w-auto">
+            <LeadLabelMenu
+              labels={leadLabels}
+              selectedIds={labelFilter}
+              buttonLabel={labelFilter.length ? `Labels (${labelFilter.length})` : "Labels"}
+              onLabelsChange={syncLabelCatalog}
+              onChange={(ids) => {
+                labelFilterRef.current = ids;
+                setLabelFilter(ids);
+                void fetchLeads();
+              }}
+            />
           </div>
 
           {/* Status Filter Dropdown */}
@@ -1614,6 +1673,7 @@ const LeadScreen = () => {
                           {lead.purpose}
                         </span>
                       )}
+                      <LeadLabelBadges labels={lead.labels} compact />
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                       {lead.mobile && (
@@ -1736,6 +1796,8 @@ const LeadScreen = () => {
           setSelectedLeadForDetails(null);
         }}
         lead={selectedLeadForDetails}
+        labels={leadLabels}
+        onLabelsChange={syncLabelCatalog}
         onEdit={(lead) => {
           setIsDetailsModalOpen(false);
           handleEdit(lead);

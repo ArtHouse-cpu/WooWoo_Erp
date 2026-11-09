@@ -27,17 +27,22 @@ import {
 } from "lucide-react";
 import {
   handleAddLeadTimeline,
+  handleUpdateLead,
   type LeadItem,
+  type LeadLabel,
   type LeadStatus,
   type LeadTimelineEvent,
 } from "@/services/apiClient";
 import LeadMembershipBadge from "./LeadMembershipBadge";
+import LeadLabelMenu, { LeadLabelBadges } from "./LeadLabelMenu";
 import { closeIfConfirmed } from "@/utils/confirmClose";
 
 type LeadDetailsModalProps = {
   isOpen: boolean;
   onClose: () => void;
   lead: LeadItem | null;
+  labels?: LeadLabel[];
+  onLabelsChange?: (labels: LeadLabel[]) => void;
   onEdit?: (lead: LeadItem) => void;
   onUpdated?: (lead: LeadItem) => void;
 };
@@ -168,6 +173,8 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
   isOpen,
   onClose,
   lead,
+  labels = [],
+  onLabelsChange,
   onEdit,
   onUpdated,
 }) => {
@@ -227,6 +234,19 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
   const nextFollowUp = [...events].reverse().find((event) => event.followUpAt);
 
   if (!isOpen || !lead) return null;
+
+  const saveLabels = async (ids: string[]) => {
+    if (!lead?._id) return;
+    try {
+      const res = await handleUpdateLead(lead._id, { labelIds: ids });
+      if (res?.data) onUpdated?.(res.data as LeadItem);
+    } catch (err: unknown) {
+      setError(
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Could not update labels.",
+      );
+    }
+  };
 
   const saveStatus = async () => {
     setSaving(true);
@@ -379,6 +399,18 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
                 </div>
                 <Detail icon={Tag} label="Lead Source" value={lead.source || "—"} />
                 <Detail icon={Bookmark} label="Purpose" value={lead.purpose || "—"} />
+                <div className="sm:col-span-2">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Labels</span>
+                    <LeadLabelMenu
+                      labels={labels}
+                      selectedIds={(lead.labels || []).map((label) => label._id)}
+                      onChange={(ids) => void saveLabels(ids)}
+                      onLabelsChange={onLabelsChange || (() => {})}
+                    />
+                  </div>
+                  <LeadLabelBadges labels={lead.labels} />
+                </div>
                 <Detail icon={Calendar} label="Preferred Date" value={formatDay(lead.deadline) || "—"} />
                 <Detail icon={Calendar} label="Created Date" value={formatWhen(lead.createdAt || lead.date) || "—"} />
                 <Detail icon={UserCheck} label="Assigned To" value={lead.assignedTo?.m_staff_name || "Unassigned"} />

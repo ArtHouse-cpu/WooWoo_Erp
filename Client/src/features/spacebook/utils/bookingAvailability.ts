@@ -40,7 +40,9 @@ export const addDaysToKey = (key: string, days: number) => {
 };
 
 export const timeToMinutes = (time?: string | null) => {
-  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(time || "").trim());
+  const raw = String(time || "").trim();
+  if (raw === "24:00") return 24 * 60;
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(raw);
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 };
 

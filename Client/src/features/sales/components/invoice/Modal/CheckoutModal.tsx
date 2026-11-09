@@ -1214,7 +1214,7 @@ export default function CheckoutModal({
     () =>
       items.reduce(
         (sum, item) =>
-          sum + (item.isCsp ? 0 : Number(item.cashback ?? 0)),
+          sum + (item.isCsp || item.skipMembershipDiscount ? 0 : Number(item.cashback ?? 0)),
         0,
       ),
     [items],

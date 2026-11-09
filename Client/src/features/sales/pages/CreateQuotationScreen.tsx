@@ -451,7 +451,12 @@ export default function CreateQuotationScreen({
     [items],
   );
   const cashbackTotal = useMemo(
-    () => items.reduce((sum, item) => sum + (item.cashback || 0), 0),
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum + (item.isCsp || item.skipMembershipDiscount ? 0 : item.cashback || 0),
+        0,
+      ),
     [items],
   );
   const displayCashbackTotal =
@@ -520,7 +525,7 @@ export default function CreateQuotationScreen({
           qty: item.qty,
           unitPrice: item.unitPrice,
           discount: item.discount,
-          cashback: item.isCsp ? 0 : item.cashback,
+          cashback: item.isCsp || item.skipMembershipDiscount ? 0 : item.cashback,
           category: item.category || "General",
           isCsp: Boolean(item.isCsp),
           productDiscountType: item.productDiscountType,
@@ -854,7 +859,7 @@ export default function CreateQuotationScreen({
             qty: it.qty,
             price: it.unitPrice,
             discount: it.discount,
-            cashback: it.isCsp ? 0 : it.cashback,
+            cashback: it.isCsp || it.skipMembershipDiscount ? 0 : it.cashback,
             image: it.image,
             category: it.category,
             isCsp: Boolean(it.isCsp),
