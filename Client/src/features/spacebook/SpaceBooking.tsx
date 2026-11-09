@@ -482,7 +482,7 @@ const SpaceBook = () => {
     let paid = 0;
     let pending = 0;
     datedData.forEach((booking) => {
-      if (booking.status === "Cancelled") return;
+      if (booking.status === "Cancelled" || booking.status === "Draft") return;
       paid += Math.max(0, Number(booking.paidAmount) || 0);
       const due = Number(booking.dueAmount) || 0;
       pending += due < 1 ? 0 : due;
@@ -1018,12 +1018,12 @@ const SpaceBook = () => {
               productName: nameParts,
               qty: 1,
               unitPrice: lineTotal,
-              discount: payload.discountAmount || 0,
+              discount: 0,
               category: "space",
             },
           ],
-          subTotal: payload.subTotal || lineTotal,
-          discountTotal: payload.discountAmount || 0,
+          subTotal: lineTotal,
+          discountTotal: 0,
           grandTotal: lineTotal,
           status: "draft",
           mode: "Draft",
@@ -1219,8 +1219,12 @@ const SpaceBook = () => {
         size: 110,
         Cell: ({ row }) => {
           const b = row.original;
-          const amount = Number(b.grandTotal ?? b.paidAmount ?? 0);
           const isDraft = b.status === "Draft";
+          const amount = isDraft
+            ? Number(
+                b.summarySnapshot?.grandTotal ?? b.lineTotal ?? b.grandTotal ?? 0,
+              )
+            : Number(b.grandTotal ?? b.paidAmount ?? 0);
           return (
             <div className="flex flex-col">
               <span className="font-semibold text-slate-800 tabular-nums">
@@ -1880,7 +1884,11 @@ const SpaceBook = () => {
                 rawB.spaceImageUrl ||
                 (b.space as { image?: string } | undefined)?.image;
               const isDraft = b.status === "Draft";
-              const amount = Number(b.grandTotal ?? b.paidAmount ?? 0);
+              const amount = isDraft
+                ? Number(
+                    b.summarySnapshot?.grandTotal ?? b.lineTotal ?? b.grandTotal ?? 0,
+                  )
+                : Number(b.grandTotal ?? b.paidAmount ?? 0);
 
               return (
                 <article
@@ -2210,7 +2218,7 @@ const SpaceBook = () => {
                 </p>
                 <p>Original amount: ₹{Number(selectedBooking.originalAmount || selectedBooking.grandTotal || 0).toLocaleString("en-IN")}</p>
                 <p>Rescheduled amount: ₹{Number(selectedBooking.grandTotal || 0).toLocaleString("en-IN")}</p>
-                <p>Amount paid: ₹{Number(selectedBooking.paidAmount || 0).toLocaleString("en-IN")}</p>
+                <p>Amount paid: ₹{Number(selectedBooking.status === "Draft" ? 0 : selectedBooking.paidAmount || 0).toLocaleString("en-IN")}</p>
                 <p>
                   Refund / wallet adjustment: ₹
                   {(selectedBooking.payments || [])
@@ -2221,7 +2229,9 @@ const SpaceBook = () => {
                 <p>Pending amount: ₹{(Number(selectedBooking.dueAmount || 0) < 1 ? 0 : Number(selectedBooking.dueAmount || 0)).toLocaleString("en-IN")}</p>
                 <p>
                   Payment status:{" "}
-                  {Number(selectedBooking.dueAmount || 0) < 1
+                  {selectedBooking.status === "Draft"
+                    ? "Not paid"
+                    : Number(selectedBooking.dueAmount || 0) < 1
                     ? "Paid"
                     : Number(selectedBooking.paidAmount || 0) > 0
                       ? "Partially Paid"

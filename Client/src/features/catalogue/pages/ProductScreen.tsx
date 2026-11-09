@@ -145,6 +145,7 @@ export default function ProductScreen() {
   }, [products]);
 
   const [stockFilter, setStockFilter] = useState<"all" | "in_stock" | "out_of_stock">("all");
+  const [lowStockOnly, setLowStockOnly] = useState(false);
 
   const displayedMobileProducts = useMemo(() => {
     return products.filter((p) => {
@@ -226,6 +227,7 @@ export default function ProductScreen() {
           sortBy: sortParams.sortBy,
           sortDir: sortParams.sortDir,
           includeStats: Boolean(withStats),
+          stock: lowStockOnly ? "low" : "all",
           signal,
         });
 
@@ -290,7 +292,7 @@ export default function ProductScreen() {
         }
       }
     },
-    [search, sortParams.sortBy, sortParams.sortDir],
+    [lowStockOnly, search, sortParams.sortBy, sortParams.sortDir],
   );
 
   const reloadFromStart = useCallback(
@@ -872,7 +874,27 @@ export default function ProductScreen() {
         <h1 className="min-w-0 truncate text-lg font-semibold text-slate-900 sm:text-xl">
           Products List
         </h1>
-        <div className="flex shrink-0 items-center">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={lowStockOnly}
+            onClick={() => setLowStockOnly((on) => !on)}
+            className="inline-flex items-center gap-2 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 sm:px-3 sm:py-1.5"
+          >
+            <span>Low Stock</span>
+            <span
+              className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+                lowStockOnly ? "bg-rose-600" : "bg-slate-300"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+                  lowStockOnly ? "left-4" : "left-0.5"
+                }`}
+              />
+            </span>
+          </button>
           <Can permission={PERMISSIONS.PRODUCT_CREATE}>
             <button
               type="button"
@@ -880,7 +902,7 @@ export default function ProductScreen() {
                 setEditProduct(null);
                 setShowCreateModal(true);
               }}
-              className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:scale-95"
+              className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-green-900 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-green-800 active:scale-95"
             >
               <Plus size={15} strokeWidth={2.5} />
               <span className="sm:hidden">Add</span>

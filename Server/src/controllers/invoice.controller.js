@@ -1064,6 +1064,7 @@ const createInvoice = async (req, res) => {
         card: Number(paymentBreakdown?.card ?? 0),
         wallet: walletAmount,
         paidAmount: (() => {
+          if (status === 'draft') return 0;
           const explicit = Number(paymentBreakdown?.paidAmount ?? 0);
           if (explicit > 0) return explicit;
           const parts =

@@ -534,6 +534,17 @@ export const formatDateDisplay = (value?: string | Date | null) => {
   });
 };
 
+const bookingHoursLabel = (hours: number) => {
+  const value = Math.round((Number(hours) || 0) * 100) / 100;
+  const shown = Number.isInteger(value) ? String(value) : String(value);
+  return `${shown} ${value === 1 ? "Hour" : "Hours"}`;
+};
+
+const bookingTimingLabel = (from: string, to: string, slot?: string) => {
+  if (slot && slot.includes("-")) return slot;
+  return `${formatTimeSlotDisplay(from)} - ${formatTimeSlotDisplay(to)}`;
+};
+
 const formatTimeSlotDisplay = (time24: string) => {
   if (!time24) return "06:00 AM";
   const [hStr, mStr] = time24.split(":");
@@ -664,6 +675,7 @@ const CreateBookingDetailsModal = ({
   const formId = useId();
   const isEdit = Boolean(initialBooking?._id || initialBooking?.id);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [downloadingQuote, setDownloadingQuote] = useState(false);
   const staff = useAppSelector((state) => state.user);
   const customerSearchRef = useRef<HTMLDivElement>(null);
   const coworkingDateInputRef = useRef<HTMLInputElement>(null);
@@ -680,6 +692,8 @@ const CreateBookingDetailsModal = ({
   // Space Selection
   const [spaceId, setSpaceId] = useState("");
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([]);
+  const [spaceSectionOpen, setSpaceSectionOpen] = useState(true);
+  const [servicesSectionOpen, setServicesSectionOpen] = useState(true);
   const [spaceQty, setSpaceQty] = useState(1);
   const [spaces, setSpaces] = useState<SpacePayload[]>([]);
   const [spacesLoading, setSpacesLoading] = useState(false);
@@ -1143,6 +1157,8 @@ const CreateBookingDetailsModal = ({
       setMembershipPlanId(null);
       setSpaceId("");
       setSelectedSpaceIds([]);
+      setSpaceSectionOpen(true);
+      setServicesSectionOpen(true);
       setSpaceQty(1);
       setDayFilter("all");
       setPurpose("");
@@ -1210,16 +1226,9 @@ const CreateBookingDetailsModal = ({
               setSpaceTypeFilter(isCoworkingSpace(current) ? "coworking" : "exclusive");
             }
           } else {
-            const firstCowork = list.find(isCoworkingSpace);
-            if (firstCowork) {
-              setSpaceTypeFilter("coworking");
-              setSpaceId(String(firstCowork._id));
-              setSelectedSpaceIds([String(firstCowork._id)]);
-            } else if (list[0]) {
-              setSpaceTypeFilter("exclusive");
-              setSpaceId(String(list[0]._id));
-              setSelectedSpaceIds([String(list[0]._id)]);
-            }
+            setSpaceTypeFilter(list.some(isCoworkingSpace) ? "coworking" : "exclusive");
+            setSpaceId("");
+            setSelectedSpaceIds([]);
           }
         }
       })
@@ -1255,16 +1264,8 @@ const CreateBookingDetailsModal = ({
       if (!kept.includes(String(spaceId))) setSpaceId(kept[0]);
       return;
     }
-    if (matching.length === 0) {
-      setSelectedSpaceIds([]);
-      return;
-    }
-    const nextSpace = matching[0];
-    setSpaceId(String(nextSpace._id));
-    setSelectedSpaceIds([String(nextSpace._id)]);
-    setSpaceQty(1);
-    const info = parsePlanDuration(nextSpace.name, nextSpace.spaceType || spaceTypeFilter);
-    setPlanDurationCount(info.baseCount);
+    setSelectedSpaceIds([]);
+    setSpaceId("");
   };
 
   const handleSpaceTypeToggle = (type: "coworking" | "exclusive") => {
@@ -1285,14 +1286,8 @@ const CreateBookingDetailsModal = ({
       if (!kept.includes(String(spaceId))) setSpaceId(kept[0]);
       return;
     }
-    if (matching.length > 0) {
-      const nextSpace = matching[0];
-      setSpaceId(String(nextSpace._id));
-      setSelectedSpaceIds([String(nextSpace._id)]);
-      setSpaceQty(1);
-      const info = parsePlanDuration(nextSpace.name, nextSpace.spaceType || type);
-      setPlanDurationCount(info.baseCount);
-    }
+    setSelectedSpaceIds([]);
+    setSpaceId("");
   };
 
   const coworkingCount = useMemo(
@@ -2672,6 +2667,7 @@ const CreateBookingDetailsModal = ({
       offerName={liveOffer?.offerName || ""}
       formatDateDisplay={formatDateDisplay}
       bookedSpaces={bookedSpaces}
+      amountLabel={status === "Draft" ? "Draft Amount" : "Grand Total"}
     />
   );
 
@@ -2972,20 +2968,33 @@ const CreateBookingDetailsModal = ({
                   </div>
 
                   {/* 2. Select Space * */}
-                  
-                    <div className="flex items-center  gap-2">
-                      <span className="flex h-6 w-6  items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                        <Building2 size={14} />
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setSpaceSectionOpen((open) => !open)}
+                      className="flex w-full items-center justify-between gap-2 text-left"
+                      aria-expanded={spaceSectionOpen}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                          <Building2 size={14} />
+                        </span>
+                        <span className="font-bold text-slate-800 text-sm">
+                          Select Space <span className="text-rose-500">*</span>
+                          {selectedSpaceIds.length > 1 ? (
+                            <span className="ml-2 text-xs font-semibold text-indigo-600">
+                              {selectedSpaceIds.length} selected
+                            </span>
+                          ) : null}
+                        </span>
                       </span>
-                      <h3 className="font-bold text-slate-800 text-sm">
-                        Select Space <span className="text-rose-500">*</span>
-                        {selectedSpaceIds.length > 1 ? (
-                          <span className="ml-2 text-xs font-semibold text-indigo-600">
-                            {selectedSpaceIds.length} selected
-                          </span>
-                        ) : null}
-                      </h3>
-                    </div>
+                      <ChevronDown
+                        size={16}
+                        className={`shrink-0 text-slate-500 transition ${spaceSectionOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {spaceSectionOpen ? (
+                    <>
 
                     {/* Search & Tabs Row */}
                     <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
@@ -3117,7 +3126,7 @@ const CreateBookingDetailsModal = ({
                       </div>
                      
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                      <div className="flex gap-3.5 overflow-x-auto pb-1">
                         {filteredSpaces.map((space) => {
                           const spaceKey = String(space._id);
                           const isSelected = selectedSpaceIds.includes(spaceKey);
@@ -3150,7 +3159,7 @@ const CreateBookingDetailsModal = ({
                                   setErrors((prev) => ({ ...prev, spaceId: "" }));
                                 }
                               }}
-                              className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border text-left transition cursor-pointer select-none ${
+                              className={`group relative flex w-[220px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl border text-left transition cursor-pointer select-none ${
                                 isSelected
                                   ? "border-2 border-indigo-600 bg-white shadow-sm"
                                   : "border border-slate-200/90 bg-white hover:border-slate-300"
@@ -3279,6 +3288,9 @@ const CreateBookingDetailsModal = ({
                         })}
                       </div>
                     )}
+                  </div>
+                    </>
+                    ) : null}
                   </div>
 
                   {/* 3. Date & Duration * (Coworking or Duration Plan) OR Date & Time * (Hourly Exclusive) */}
@@ -3867,17 +3879,29 @@ const CreateBookingDetailsModal = ({
 
                   {/* 4. Additional Services (Optional) */}
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                        <FileText size={14} />
-                      </span>
-                      <h3 className="font-bold text-slate-800 text-sm">
-                        Additional Services{" "}
-                        <span className="font-normal text-slate-400 text-xs">
-                          (Optional)
+                    <button
+                      type="button"
+                      onClick={() => setServicesSectionOpen((open) => !open)}
+                      className="flex w-full items-center justify-between gap-2 text-left"
+                      aria-expanded={servicesSectionOpen}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                          <FileText size={14} />
                         </span>
-                      </h3>
-                    </div>
+                        <span className="font-bold text-slate-800 text-sm">
+                          Additional Services{" "}
+                          <span className="font-normal text-slate-400 text-xs">
+                            (Optional)
+                          </span>
+                        </span>
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        className={`shrink-0 text-slate-500 transition ${servicesSectionOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {servicesSectionOpen ? (
 
                     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
                       {(spaceTypeFilter === "coworking"
@@ -3969,6 +3993,7 @@ const CreateBookingDetailsModal = ({
                         );
                       })}
                     </div>
+                    ) : null}
                   </div>
 
                   {showFood ? (
@@ -4198,6 +4223,7 @@ const CreateBookingDetailsModal = ({
 
               <button
                 type="button"
+                disabled={downloadingQuote}
                 onClick={() => {
                   const code = `QT-${phone.replace(/\D/g, "").slice(-4) || "BOOK"}`;
                   const spaceLines =
@@ -4245,6 +4271,87 @@ const CreateBookingDetailsModal = ({
                     toast.warning("Add a customer and at least one space, service, or food item.");
                     return;
                   }
+                  const bookingDetails = isDurationPlan
+                    ? [
+                        {
+                          label: "Booking Date",
+                          value: `${formatDateDisplay(coworkingStartDate)} to ${formatDateDisplay(coworkingEndDate)}`,
+                        },
+                        {
+                          label: "Booking Timing",
+                          value: "6:00 AM - 12:00 AM",
+                        },
+                        {
+                          label: "Booking Hours",
+                          value: "18 Hours each day",
+                        },
+                        {
+                          label: "Booking Duration",
+                          value: `${planDurationCount} ${
+                            planDurationCount === 1
+                              ? planDurationInfo.unitSingular
+                              : planDurationInfo.unitPlural
+                          }`,
+                        },
+                      ]
+                    : dateMode === "multiple"
+                      ? [
+                          ...multiDateSlots.flatMap((slot, index) => {
+                            const prefix = multiDateSlots.length > 1 ? ` ${index + 1}` : "";
+                            const hours =
+                              Number(slot.duration) ||
+                              calcDurationHours(slot.startTime, slot.endTime) ||
+                              0;
+                            return [
+                              {
+                                label: `Booking Date${prefix}`,
+                                value: formatDateDisplay(slot.date),
+                              },
+                              {
+                                label: `Booking Timing${prefix}`,
+                                value: bookingTimingLabel(slot.startTime, slot.endTime, slot.timeSlot),
+                              },
+                              {
+                                label: `Booking Hours${prefix}`,
+                                value: bookingHoursLabel(hours),
+                              },
+                            ];
+                          }),
+                          ...(multiDateSlots.length > 1
+                            ? [
+                                {
+                                  label: "Total Booking Hours",
+                                  value: bookingHoursLabel(
+                                    multiDateSlots.reduce(
+                                      (sum, slot) =>
+                                        sum +
+                                        (Number(slot.duration) ||
+                                          calcDurationHours(slot.startTime, slot.endTime) ||
+                                          0),
+                                      0,
+                                    ),
+                                  ),
+                                },
+                              ]
+                            : []),
+                        ]
+                      : [
+                          {
+                            label: "Booking Date",
+                            value: formatDateDisplay(bookingDate),
+                          },
+                          {
+                            label: "Booking Timing",
+                            value: bookingTimingLabel(bookingFrom, bookingTo, timeSlot),
+                          },
+                          {
+                            label: "Booking Hours",
+                            value: bookingHoursLabel(
+                              calcDurationHours(bookingFrom, bookingTo) || duration,
+                            ),
+                          },
+                        ];
+                  setDownloadingQuote(true);
                   void downloadInvoicePdf(
                     {
                       invoiceCode: code,
@@ -4261,16 +4368,23 @@ const CreateBookingDetailsModal = ({
                       grandTotal: Math.max(0, pricedSubTotal - discountAmount),
                       items,
                       notes,
+                      bookingDetails,
                     },
                     "QUOTATION",
-                  ).catch((err: unknown) => {
-                    toast.error(err instanceof Error ? err.message : "Could not download the quotation.");
-                  });
+                  )
+                    .catch((err: unknown) => {
+                      toast.error(err instanceof Error ? err.message : "Could not download the quotation.");
+                    })
+                    .finally(() => setDownloadingQuote(false));
                 }}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition hover:border-indigo-300 hover:bg-indigo-50 disabled:opacity-50 sm:text-sm"
               >
-                <Download size={15} className="text-indigo-600" />
-                <span>Download Quotation</span>
+                {downloadingQuote ? (
+                  <Loader2 size={15} className="animate-spin text-indigo-600" />
+                ) : (
+                  <Download size={15} className="text-indigo-600" />
+                )}
+                <span>{downloadingQuote ? "Preparing…" : "Download Quotation"}</span>
               </button>
 
               <button

@@ -44,18 +44,24 @@ export default function CreateFoodScreen() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [lowStockOnly, setLowStockOnly] = useState(false);
   const [actionMenuFoodId, setActionMenuFoodId] = useState<string | null>(null);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   const filteredFoods = useMemo(() => {
-    if (!searchQuery.trim()) return foods;
-    const q = searchQuery.toLowerCase();
-    return foods.filter(
-      (f) =>
-        (f.name || "").toLowerCase().includes(q) ||
-        (f.category || "").toLowerCase().includes(q),
-    );
-  }, [foods, searchQuery]);
+    const q = searchQuery.trim().toLowerCase();
+    return foods.filter((food) => {
+      if (lowStockOnly) {
+        if (!food.manageInventory || food.lowStockAlertLevel == null) return false;
+        if (Number(food.availableStock || 0) > Number(food.lowStockAlertLevel)) return false;
+      }
+      if (!q) return true;
+      return (
+        (food.name || "").toLowerCase().includes(q) ||
+        (food.category || "").toLowerCase().includes(q)
+      );
+    });
+  }, [foods, searchQuery, lowStockOnly]);
 
   useEffect(() => {
     if (searchParams.get("create") !== "1") return;
@@ -197,7 +203,7 @@ export default function CreateFoodScreen() {
 
   const table = useMaterialReactTable({
     columns,
-    data: foods,
+    data: filteredFoods,
     state: { isLoading: loading },
     muiTablePaperProps: {
       elevation: 0,
@@ -341,6 +347,26 @@ export default function CreateFoodScreen() {
           Foods List
         </h1>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={lowStockOnly}
+            onClick={() => setLowStockOnly((on) => !on)}
+            className="inline-flex items-center gap-2 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 sm:px-3 sm:py-1.5"
+          >
+            <span>Low Stock</span>
+            <span
+              className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+                lowStockOnly ? "bg-rose-600" : "bg-slate-300"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+                  lowStockOnly ? "left-4" : "left-0.5"
+                }`}
+              />
+            </span>
+          </button>
           <Can permission={PERMISSIONS.FOOD_CREATE}>
             <button
               type="button"

@@ -10,6 +10,7 @@ export type FoodFormPayload = {
   unit: string;
   isPackaged: boolean;
   manageInventory: boolean;
+  lowStockAlertLevel: number | null;
   applyMembershipDiscount: boolean;
   description: string;
   isVeg: boolean;
@@ -45,6 +46,7 @@ const emptyForm: FoodFormPayload = {
   unit: "Plate",
   isPackaged: false,
   manageInventory: false,
+  lowStockAlertLevel: null,
   applyMembershipDiscount: true,
   description: "",
   isVeg: true,
@@ -72,6 +74,10 @@ export default function AddFoodModal({
         unit: String(initialFood.unit || "Plate"),
         isPackaged: initialFood.isPackaged === true,
         manageInventory: initialFood.manageInventory === true,
+        lowStockAlertLevel:
+          initialFood.lowStockAlertLevel == null
+            ? null
+            : Math.max(0, Number(initialFood.lowStockAlertLevel) || 0),
         applyMembershipDiscount: initialFood.applyMembershipDiscount !== false,
         description: String(initialFood.description || ""),
         isVeg: initialFood.isVeg !== false,
@@ -275,7 +281,32 @@ export default function AddFoodModal({
                   />
                 </button>
               </div>
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                <label className="mb-1.5 block text-sm font-medium text-gray-800">
+                  Low Stock Alert Level
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={form.lowStockAlertLevel ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setForm((p) => ({
+                      ...p,
+                      lowStockAlertLevel:
+                        raw === "" ? null : Math.max(0, Number(raw) || 0),
+                    }));
+                  }}
+                  disabled={loading}
+                  placeholder="Leave empty for no alert"
+                  className="w-full rounded-lg border border-gray-300 bg-white p-3 text-sm outline-none transition focus:ring-2 focus:ring-black disabled:opacity-60"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Alert when available stock is at or below this number. Each food keeps its own level.
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 sm:col-span-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-800">Membership Discount</p>
                   <p className="text-xs text-gray-500">
