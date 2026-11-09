@@ -173,16 +173,10 @@ export default function InventoryScreen() {
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
             Inventory List
           </h1>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Qty updates from purchases (in) and sales / returns (out). Add stock
-            by creating a purchase.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
+           <button
             type="button"
             onClick={() => setStockFilter((current) => (current === "low" ? "all" : "low"))}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold sm:text-sm ${
+            className={` rounded-xl px-3.5 py-1.5 text-xs font-semibold sm:text-sm ${
               stockFilter === "low"
                 ? "bg-rose-600 text-white"
                 : "bg-white text-slate-700 ring-1 ring-slate-200"
@@ -190,14 +184,12 @@ export default function InventoryScreen() {
           >
             Low Stock
           </button>
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="self-start rounded-xl bg-slate-100 px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-        >
-          Back
-        </button>
+
         </div>
+       
+         
+        
+        
       </div>
 
       {fetchError && (

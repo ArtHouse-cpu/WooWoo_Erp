@@ -4,8 +4,22 @@ import {
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
-import { Pencil,
-  Search, Trash2, Plus, Eye, Phone, Paperclip } from "lucide-react";
+import {
+  Pencil,
+  Search,
+  Trash2,
+  Plus,
+  Eye,
+  Phone,
+  Paperclip,
+  Users,
+  Clock,
+  HelpCircle,
+  CheckCircle2,
+  XCircle,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import Swal from "sweetalert2";
 
 import CreateLeadModal from "../components/CreateLeadModal";
@@ -970,6 +984,77 @@ const LeadScreen = () => {
     [],
   );
 
+  // Pipeline Counts for Summary KPI Cards
+  const stats = useMemo(() => {
+    const total = leads.length;
+    const newCount = leads.filter(
+      (l) => l.status === "New" || !l.status
+    ).length;
+    const contacted = leads.filter(
+      (l) => l.status === "Contacted" || l.status === "Need to message"
+    ).length;
+    const interested = leads.filter(
+      (l) =>
+        l.status === "Interested" ||
+        l.status === "Come for Visit" ||
+        l.status === "Shared Quotation" ||
+        l.status === "Negotiation" ||
+        l.status === "Contact Tomorrow" ||
+        l.status === "Contact in 2 Days" ||
+        l.status === "Follow Up (Custom)"
+    ).length;
+    const converted = leads.filter((l) => l.status === "Converted").length;
+    const lost = leads.filter(
+      (l) => l.status === "Lost" || l.status === "Not Interested"
+    ).length;
+    return { total, newCount, contacted, interested, converted, lost };
+  }, [leads]);
+
+  // Click on KPI card to quickly filter by status
+  const handleKpiStatusClick = (statusKey: string) => {
+    const nextStatus = selectedStatus === statusKey ? "all" : statusKey;
+    setSelectedStatus(nextStatus);
+    fetchLeads(
+      fromDate,
+      toDate,
+      selectedPurpose,
+      nextStatus,
+      selectedSource,
+      selectedAssign,
+    );
+  };
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      selectedAssign !== "all" ||
+      selectedStatus !== "all" ||
+      selectedSource !== "all" ||
+      selectedPurpose !== "all" ||
+      datePreset !== "month" ||
+      Boolean(mobileSearch.trim())
+    );
+  }, [
+    selectedAssign,
+    selectedStatus,
+    selectedSource,
+    selectedPurpose,
+    datePreset,
+    mobileSearch,
+  ]);
+
+  const handleResetFilters = () => {
+    setSelectedAssign("all");
+    setSelectedStatus("all");
+    setSelectedSource("all");
+    setSelectedPurpose("all");
+    setDatePreset("month");
+    setMobileSearch("");
+    const range = rangeForPreset("month");
+    setFromDate(range.from);
+    setToDate(range.to);
+    fetchLeads(range.from, range.to, "all", "all", "all", "all");
+  };
+
   const table = useMaterialReactTable({
     columns,
     data: leads,
@@ -1001,7 +1086,7 @@ const LeadScreen = () => {
   return (
     <div className="w-full space-y-5 p-4 sm:p-6">
       {/* Page Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
@@ -1020,14 +1105,15 @@ const LeadScreen = () => {
               setLeadToEdit(null);
               setIsCreateModalOpen(true);
             }}
-            className="sm:hidden inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 active:scale-[0.98] transition cursor-pointer shrink-0"
+            className="md:hidden inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 active:scale-[0.98] transition cursor-pointer shrink-0"
           >
             <Plus size={16} className="shrink-0" />
             <span>Create Lead</span>
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2.5">
+        {/* Desktop Filter Bar and Create Lead button */}
+        <div className="hidden md:flex md:flex-wrap md:items-center md:gap-2.5">
           {/* Assign Filter Dropdown (Staff names & Unassigned) */}
           <div className="relative w-full sm:w-auto">
             <select
@@ -1167,61 +1253,145 @@ const LeadScreen = () => {
         </div>
       </div>
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      {/* Summary KPI Cards (Visible on both mobile and desktop) */}
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3">
         {/* Total */}
-        {/* <div className="rounded-xl border border-gray-100 bg-white p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-gray-500">
-            <span className="text-xs font-medium">Total</span>
-            <Users size={16} className="text-indigo-500" />
+        <button
+          type="button"
+          onClick={() => handleKpiStatusClick("all")}
+          className={`group relative overflow-hidden rounded-xl border p-2 sm:p-3 text-left shadow-2xs transition active:scale-95 cursor-pointer ${
+            selectedStatus === "all"
+              ? "ring-2 ring-indigo-500 border-indigo-300 bg-indigo-50/90"
+              : "border-indigo-100/90 bg-gradient-to-br from-indigo-50/60 via-white to-indigo-100/30 hover:border-indigo-200"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-indigo-700 truncate">
+              Total
+            </span>
+            <span className="rounded-lg bg-indigo-100 p-1 sm:p-1.5 shrink-0 text-indigo-600">
+              <Users size={12} className="sm:w-3.5 sm:h-3.5" />
+            </span>
           </div>
-          <p className="mt-1.5 text-xl font-bold text-gray-900">{stats.total}</p>
-        </div> */}
+          <p className="mt-1 text-sm sm:text-lg font-extrabold text-indigo-950">
+            {stats.total}
+          </p>
+        </button>
 
         {/* New */}
-        {/* <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-blue-700">
-            <span className="text-xs font-medium">New</span>
-            <Clock size={16} className="text-blue-500" />
+        <button
+          type="button"
+          onClick={() => handleKpiStatusClick("New")}
+          className={`group relative overflow-hidden rounded-xl border p-2 sm:p-3 text-left shadow-2xs transition active:scale-95 cursor-pointer ${
+            selectedStatus === "New"
+              ? "ring-2 ring-blue-500 border-blue-300 bg-blue-50/90"
+              : "border-blue-100/90 bg-gradient-to-br from-blue-50/60 via-white to-blue-100/30 hover:border-blue-200"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-blue-700 truncate">
+              New
+            </span>
+            <span className="rounded-lg bg-blue-100 p-1 sm:p-1.5 shrink-0 text-blue-600">
+              <Clock size={12} className="sm:w-3.5 sm:h-3.5" />
+            </span>
           </div>
-          <p className="mt-1.5 text-xl font-bold text-blue-900">{stats.newCount}</p>
-        </div> */}
+          <p className="mt-1 text-sm sm:text-lg font-extrabold text-blue-950">
+            {stats.newCount}
+          </p>
+        </button>
 
         {/* Contacted */}
-        {/* <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-amber-700">
-            <span className="text-xs font-medium">Contacted</span>
-            <Phone size={16} className="text-amber-500" />
+        <button
+          type="button"
+          onClick={() => handleKpiStatusClick("Contacted")}
+          className={`group relative overflow-hidden rounded-xl border p-2 sm:p-3 text-left shadow-2xs transition active:scale-95 cursor-pointer ${
+            selectedStatus === "Contacted"
+              ? "ring-2 ring-amber-500 border-amber-300 bg-amber-50/90"
+              : "border-amber-100/90 bg-gradient-to-br from-amber-50/60 via-white to-amber-100/30 hover:border-amber-200"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-700 truncate">
+              Contacted
+            </span>
+            <span className="rounded-lg bg-amber-100 p-1 sm:p-1.5 shrink-0 text-amber-600">
+              <Phone size={12} className="sm:w-3.5 sm:h-3.5" />
+            </span>
           </div>
-          <p className="mt-1.5 text-xl font-bold text-amber-900">{stats.contacted}</p>
-        </div> */}
+          <p className="mt-1 text-sm sm:text-lg font-extrabold text-amber-950">
+            {stats.contacted}
+          </p>
+        </button>
 
         {/* Interested */}
-        {/* <div className="rounded-xl border border-purple-100 bg-purple-50/40 p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-purple-700">
-            <span className="text-xs font-medium">Interested</span>
-            <HelpCircle size={16} className="text-purple-500" />
+        <button
+          type="button"
+          onClick={() => handleKpiStatusClick("Interested")}
+          className={`group relative overflow-hidden rounded-xl border p-2 sm:p-3 text-left shadow-2xs transition active:scale-95 cursor-pointer ${
+            selectedStatus === "Interested"
+              ? "ring-2 ring-purple-500 border-purple-300 bg-purple-50/90"
+              : "border-purple-100/90 bg-gradient-to-br from-purple-50/60 via-white to-purple-100/30 hover:border-purple-200"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-purple-700 truncate">
+              Interested
+            </span>
+            <span className="rounded-lg bg-purple-100 p-1 sm:p-1.5 shrink-0 text-purple-600">
+              <HelpCircle size={12} className="sm:w-3.5 sm:h-3.5" />
+            </span>
           </div>
-          <p className="mt-1.5 text-xl font-bold text-purple-900">{stats.interested}</p>
-        </div> */}
+          <p className="mt-1 text-sm sm:text-lg font-extrabold text-purple-950">
+            {stats.interested}
+          </p>
+        </button>
 
         {/* Converted */}
-        {/* <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-emerald-700">
-            <span className="text-xs font-medium">Converted</span>
-            <CheckCircle2 size={16} className="text-emerald-500" />
+        <button
+          type="button"
+          onClick={() => handleKpiStatusClick("Converted")}
+          className={`group relative overflow-hidden rounded-xl border p-2 sm:p-3 text-left shadow-2xs transition active:scale-95 cursor-pointer ${
+            selectedStatus === "Converted"
+              ? "ring-2 ring-emerald-500 border-emerald-300 bg-emerald-50/90"
+              : "border-emerald-100/90 bg-gradient-to-br from-emerald-50/60 via-white to-emerald-100/30 hover:border-emerald-200"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-700 truncate">
+              Converted
+            </span>
+            <span className="rounded-lg bg-emerald-100 p-1 sm:p-1.5 shrink-0 text-emerald-600">
+              <CheckCircle2 size={12} className="sm:w-3.5 sm:h-3.5" />
+            </span>
           </div>
-          <p className="mt-1.5 text-xl font-bold text-emerald-900">{stats.converted}</p>
-        </div> */}
+          <p className="mt-1 text-sm sm:text-lg font-extrabold text-emerald-950">
+            {stats.converted}
+          </p>
+        </button>
 
-        {/* Lost */}
-        {/* <div className="rounded-xl border border-rose-100 bg-rose-50/40 p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-rose-700">
-            <span className="text-xs font-medium">Lost</span>
-            <XCircle size={16} className="text-rose-500" />
+        {/* Lost / Not Interested */}
+        <button
+          type="button"
+          onClick={() => handleKpiStatusClick("Not Interested")}
+          className={`group relative overflow-hidden rounded-xl border p-2 sm:p-3 text-left shadow-2xs transition active:scale-95 cursor-pointer ${
+            selectedStatus === "Not Interested" || selectedStatus === "Lost"
+              ? "ring-2 ring-rose-500 border-rose-300 bg-rose-50/90"
+              : "border-rose-100/90 bg-gradient-to-br from-rose-50/60 via-white to-rose-100/30 hover:border-rose-200"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-rose-700 truncate">
+              Lost
+            </span>
+            <span className="rounded-lg bg-rose-100 p-1 sm:p-1.5 shrink-0 text-rose-600">
+              <XCircle size={12} className="sm:w-3.5 sm:h-3.5" />
+            </span>
           </div>
-          <p className="mt-1.5 text-xl font-bold text-rose-900">{stats.lost}</p>
-        </div> */}
+          <p className="mt-1 text-sm sm:text-lg font-extrabold text-rose-950">
+            {stats.lost}
+          </p>
+        </button>
       </div>
 
       {/* MRT Table */}
@@ -1230,17 +1400,173 @@ const LeadScreen = () => {
         <MaterialReactTable table={table} />
       </div>
 
-      {/* Mobile Card List View */}
-      <div className="block md:hidden space-y-2.5">
-        <div className="relative mb-2">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+      {/* Mobile Card List View & Controls */}
+      <div className="block md:hidden space-y-3">
+        {/* Search Bar - Below KPIs */}
+        <div className="relative">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            size={15}
+          />
           <input
             type="text"
             value={mobileSearch}
             onChange={(e) => setMobileSearch(e.target.value)}
-            placeholder="Search leads..."
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-slate-400"
+            placeholder="Search leads by name, phone, email, purpose..."
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-8 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:border-indigo-500 shadow-2xs transition"
           />
+          {mobileSearch && (
+            <button
+              type="button"
+              onClick={() => setMobileSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+
+        {/* Dropdowns - Below Search Bar (three-three in one row) */}
+        <div className="grid grid-cols-3 gap-2">
+          {/* 1. Assign Filter Dropdown */}
+          <div className="relative w-full">
+            <select
+              value={selectedAssign}
+              onChange={handleAssignFilterChange}
+              disabled={loading}
+              className="h-8.5 w-full rounded-xl border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow-2xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50 truncate"
+            >
+              <option value="all">Assign: All</option>
+              <option value="unassigned">Unassigned</option>
+              {availableStaffNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 2. Status Filter Dropdown */}
+          <div className="relative w-full">
+            <select
+              value={selectedStatus}
+              onChange={handleStatusFilterChange}
+              disabled={loading}
+              className="h-8.5 w-full rounded-xl border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow-2xs hover:border-gray-300 focus:outline-none cursor-pointer disabled:opacity-50 truncate"
+            >
+              <option value="all">All Status</option>
+              {STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Source Filter Dropdown */}
+          <div className="relative w-full">
+            <select
+              value={selectedSource}
+              onChange={handleSourceFilterChange}
+              disabled={loading}
+              className="h-8.5 w-full rounded-xl border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow-2xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50 truncate"
+            >
+              <option value="all">All Sources</option>
+
+              {SOURCE_OPTIONS.map((source) => (
+                <option key={source} value={source}>
+                  {source}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 4. Purpose Filter Dropdown */}
+          <div className="relative w-full">
+            <select
+              value={selectedPurpose}
+              onChange={handlePurposeFilterChange}
+              disabled={loading}
+              className="h-8.5 w-full rounded-xl border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow-2xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50 truncate"
+            >
+              <option value="all">All Purposes</option>
+              {PURPOSE_OPTIONS.map((purpose) => (
+                <option key={purpose} value={purpose}>
+                  {purpose}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 5. Date Range Preset Dropdown */}
+          <div className="relative w-full">
+            <select
+              value={datePreset}
+              onChange={handlePresetChange}
+              disabled={loading}
+              className="h-8.5 w-full rounded-xl border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-700 shadow-2xs hover:border-gray-300 focus:border-indigo-500 focus:outline-none cursor-pointer disabled:opacity-50 truncate"
+            >
+              {DATE_PRESET_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 6. Reset Filters Button */}
+          <button
+            type="button"
+            disabled={loading || !hasActiveFilters}
+            onClick={handleResetFilters}
+            className={`h-8.5 w-full rounded-xl border px-2 py-1 text-xs font-semibold flex items-center justify-center gap-1 transition shadow-2xs cursor-pointer ${
+              hasActiveFilters
+                ? "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 active:scale-95"
+                : "bg-gray-50 text-gray-400 border-gray-200 opacity-60 cursor-not-allowed"
+            }`}
+            title="Reset all filters"
+          >
+            <RotateCcw size={12} className={hasActiveFilters ? "text-rose-600" : "text-gray-400"} />
+            <span>Reset</span>
+          </button>
+
+          {/* Custom Date Range Picker on mobile when datePreset === 'custom' */}
+          {datePreset === "custom" && (
+            <div className="col-span-3 flex items-center gap-1.5 w-full pt-1">
+              <input
+                type="date"
+                value={fromDate}
+                max={toDate || undefined}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="h-8.5 flex-1 rounded-xl border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 shadow-2xs focus:border-indigo-500 focus:outline-none"
+              />
+              <span className="text-xs text-gray-400 shrink-0">to</span>
+              <input
+                type="date"
+                value={toDate}
+                min={fromDate || undefined}
+                onChange={(e) => setToDate(e.target.value)}
+                className="h-8.5 flex-1 rounded-xl border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 shadow-2xs focus:border-indigo-500 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  fetchLeads(
+                    fromDate,
+                    toDate,
+                    selectedPurpose,
+                    selectedStatus,
+                    selectedSource,
+                    selectedAssign,
+                  )
+                }
+                disabled={loading || (!fromDate && !toDate)}
+                className="h-8.5 inline-flex items-center justify-center rounded-xl bg-indigo-600 px-3 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-indigo-700 disabled:opacity-50 transition cursor-pointer shrink-0"
+              >
+                Apply
+              </button>
+            </div>
+          )}
         </div>
 
         {loading && leads.length === 0 ? (
