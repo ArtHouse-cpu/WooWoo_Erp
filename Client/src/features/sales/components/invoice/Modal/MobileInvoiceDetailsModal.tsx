@@ -36,9 +36,46 @@ export type MobileInvoiceDetailsModalProps = {
   onMoreActions?: (invoice: any) => void;
 };
 
-function formatDetailDate(val?: string | Date): string {
+function clockLabel(value?: string | Date | null): string {
+  if (!value) return "";
+  const raw = value instanceof Date ? value.toISOString() : String(value).trim();
+  if (!raw || /^\d{4}-\d{2}-\d{2}$/.test(raw) || /T00:00:00(?:\.000)?Z$/.test(raw)) {
+    return "";
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function formatDetailDate(val?: string | Date, timeFrom?: string | Date | null): string {
   if (!val) return "";
-  const d = new Date(val);
+  const raw = val instanceof Date ? val.toISOString() : String(val).trim();
+  const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const utcMidnight = /T00:00:00(?:\.000)?Z$/.test(raw);
+  const dateLabel = (year: number, month: number, day: number) =>
+    new Date(year, month - 1, day).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    });
+  // A date saved without a clock is UTC midnight, which shows as 5:30 am in India.
+  // Keep that calendar date, and use the real saved time beside it.
+  if (dateOnly || utcMidnight) {
+    const parsed = dateOnly
+      ? { year: Number(dateOnly[1]), month: Number(dateOnly[2]), day: Number(dateOnly[3]) }
+      : {
+          year: new Date(raw).getUTCFullYear(),
+          month: new Date(raw).getUTCMonth() + 1,
+          day: new Date(raw).getUTCDate(),
+        };
+    const dateText = dateLabel(parsed.year, parsed.month, parsed.day);
+    const timeText = clockLabel(timeFrom);
+    return timeText ? `${dateText}, ${timeText}` : dateText;
+  }
+  const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return "";
   const shortDate = d.toLocaleDateString("en-GB", {
     day: "numeric",
@@ -161,6 +198,7 @@ export default function MobileInvoiceDetailsModal({
     raw.customerName || raw.customer || "Walk-in Customer";
   const invoiceDateStr = formatDetailDate(
     raw.invoiceDate || raw.createdAt || raw.date,
+    raw.createdAt || raw.updatedAt,
   );
   const categories = getInvoiceCategories(raw);
   const membershipLabel = getCustomerMembershipLabel(raw);

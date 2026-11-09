@@ -3010,6 +3010,7 @@ export type FoodPayload = {
   unit?: string;
   isPackaged?: boolean;
   manageInventory?: boolean;
+  lowStockAlertLevel?: number | null;
   applyMembershipDiscount?: boolean;
   availableStock?: number | null;
   description?: string;
@@ -3084,6 +3085,12 @@ export const foodPayloadToFormData = (
   }
   if (payload.manageInventory !== undefined) {
     fd.append("manageInventory", String(Boolean(payload.manageInventory)));
+  }
+  if (payload.lowStockAlertLevel !== undefined) {
+    fd.append(
+      "lowStockAlertLevel",
+      payload.lowStockAlertLevel == null ? "" : String(payload.lowStockAlertLevel),
+    );
   }
   if (payload.applyMembershipDiscount !== undefined) {
     fd.append(
@@ -4070,6 +4077,7 @@ export type GetProductsParams = {
   sortBy?: string;
   sortDir?: "asc" | "desc";
   includeStats?: boolean;
+  stock?: "all" | "low";
   signal?: AbortSignal;
 };
 
@@ -4098,6 +4106,7 @@ export const handleGetProducts = async (
         ...(params.sortBy ? { sortBy: params.sortBy } : {}),
         ...(params.sortDir ? { sortDir: params.sortDir } : {}),
         ...(params.includeStats ? { includeStats: 1 } : {}),
+        ...(params.stock === "low" ? { stock: "low" } : {}),
       },
       signal: params.signal ?? signal,
     });
