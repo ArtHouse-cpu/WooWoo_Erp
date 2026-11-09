@@ -25,6 +25,9 @@ import {
   CheckCircle2,
   XCircle,
   Link2,
+  Building2,
+  ExternalLink,
+  FileText,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import * as XLSX from "xlsx";
@@ -1329,42 +1332,42 @@ export default function CspScreen() {
       {/* ── 2. Top Summary KPI Cards (4 Grid) ─────────────────────────── */}
       <div className="grid grid-cols-2 gap-2.5 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Card 1: Total CSP Partners */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-xs transition-shadow hover:shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-500">
-              <Users className="h-5 w-5" />
-            </div>
-            <div className="text-xs font-medium text-slate-500 leading-tight">
+        <div className="rounded-2xl border border-orange-200/80 bg-gradient-to-br from-orange-50/90 via-amber-50/40 to-white p-3.5 sm:p-5 shadow-xs transition-all hover:shadow-md hover:border-orange-300">
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-orange-900/70 leading-tight">
               Total<br />CSP Partners
             </div>
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white shadow-xs shadow-orange-500/25">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
           </div>
-          <div className="mt-4">
-            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          <div className="mt-2.5 sm:mt-4">
+            <div className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
               {totalPartnersStat}
             </div>
           </div>
         </div>
 
         {/* Card 2: Sales & Earnings */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-xs transition-shadow hover:shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-500">
-              <ShoppingCart className="h-5 w-5" />
-            </div>
-            <div className="text-xs font-medium text-slate-500 leading-tight">
+        <div className="rounded-2xl border border-sky-200/80 bg-gradient-to-br from-sky-50/90 via-blue-50/40 to-white p-3.5 sm:p-5 shadow-xs transition-all hover:shadow-md hover:border-sky-300">
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-sky-900/70 leading-tight">
               Sales & Earnings<br />(Partners)
             </div>
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-xs shadow-sky-500/25">
+              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
           </div>
-          <div className="mt-3">
-            <div className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+          <div className="mt-2.5 sm:mt-3">
+            <div className="text-lg sm:text-2xl font-black tracking-tight text-slate-900">
               ₹0
             </div>
-            <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
+            <div className="mt-2 flex items-center justify-between border-t border-sky-100/90 pt-1.5 sm:pt-2">
               <div>
-                <div className="text-sm sm:text-base font-bold text-slate-800">
+                <div className="text-xs sm:text-base font-black text-emerald-700">
                   ₹{totalEarningsStat.toLocaleString("en-IN")}
                 </div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-[10px] font-semibold text-slate-500">
                   Partners' Earnings
                 </div>
               </div>
@@ -1373,60 +1376,60 @@ export default function CspScreen() {
         </div>
 
         {/* Card 3: Total Products */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-xs transition-shadow hover:shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-              <Package className="h-5 w-5" />
+        <div className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-white p-3.5 sm:p-5 shadow-xs transition-all hover:shadow-md hover:border-emerald-300">
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-emerald-900/70 leading-tight">
+              Total<br className="sm:hidden" /> Products
             </div>
-            <div className="text-xs font-medium text-slate-500 leading-tight">
-              Total Products
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-xs shadow-emerald-500/25">
+              <Package className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 divide-x divide-slate-100">
+          <div className="mt-2.5 sm:mt-4 grid grid-cols-2 gap-2 sm:gap-3 divide-x divide-emerald-100">
             <div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900">
+              <div className="text-lg sm:text-2xl font-black text-slate-900">
                 {totalDisplayedProducts}
               </div>
-              <div className="text-[11px] text-slate-400 font-medium">Displayed</div>
+              <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500">Displayed</div>
             </div>
-            <div className="pl-3">
-              <div className="text-xl sm:text-2xl font-bold text-slate-900">
+            <div className="pl-2 sm:pl-3">
+              <div className="text-lg sm:text-2xl font-black text-slate-900">
                 0
               </div>
-              <div className="text-[11px] text-slate-400 font-medium">Units Sold</div>
+              <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500">Units Sold</div>
             </div>
           </div>
         </div>
 
         {/* Card 4: Payouts */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-xs transition-shadow hover:shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-500">
-              <Wallet className="h-5 w-5" />
+        <div className="rounded-2xl border border-purple-200/80 bg-gradient-to-br from-purple-50/90 via-violet-50/40 to-white p-3.5 sm:p-5 shadow-xs transition-all hover:shadow-md hover:border-purple-300">
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-purple-900/70 leading-tight">
+              Payouts<br className="sm:hidden" /> Overview
             </div>
-            <div className="text-xs font-medium text-slate-500 leading-tight">
-              Payouts
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-500 to-violet-600 text-white shadow-xs shadow-purple-500/25">
+              <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 divide-x divide-slate-100">
+          <div className="mt-2.5 sm:mt-4 grid grid-cols-2 gap-2 sm:gap-3 divide-x divide-purple-100">
             <div>
-              <div className="text-xl sm:text-2xl font-bold text-slate-900">
+              <div className="text-lg sm:text-2xl font-black text-slate-900">
                 ₹0
               </div>
-              <div className="text-[11px] text-slate-400 font-medium">Completed</div>
+              <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500">Completed</div>
             </div>
-            <div className="pl-3">
-              <div className="text-xl sm:text-2xl font-bold text-slate-900">
+            <div className="pl-2 sm:pl-3">
+              <div className="text-lg sm:text-2xl font-black text-slate-900">
                 ₹0
               </div>
-              <div className="text-[11px] text-slate-400 font-medium">Pending</div>
+              <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500">Pending</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* ── 3. Tabs Bar ───────────────────────────────────────────── */}
-      <div className="flex items-center gap-6 border-b border-slate-200 pt-2">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         <button
           type="button"
           onClick={() => {
@@ -1434,14 +1437,25 @@ export default function CspScreen() {
             setCurrentPage(1);
             setSearchQuery("");
           }}
-          className={`relative pb-3 text-sm font-semibold transition-colors cursor-pointer ${
+          className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer active:scale-95 ${
             activeTab === "active"
-              ? "text-[#ff5a36] border-b-2 border-[#ff5a36]"
-              : "text-slate-500 hover:text-slate-800"
+              ? "bg-gradient-to-r from-orange-500 to-[#ff5a36] text-white shadow-md shadow-orange-500/25 ring-1 ring-[#ff5a36]"
+              : "bg-orange-50/70 text-orange-700 hover:bg-orange-100/90 border border-orange-200/70"
           }`}
         >
-          Active Partners ({activeCount})
+          <Users size={15} className="shrink-0" />
+          <span>Active Partners</span>
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none ${
+              activeTab === "active"
+                ? "bg-white text-orange-600 shadow-xs"
+                : "bg-white/90 text-orange-700 border border-orange-200/70"
+            }`}
+          >
+            {activeCount}
+          </span>
         </button>
+
         <button
           type="button"
           onClick={() => {
@@ -1449,13 +1463,23 @@ export default function CspScreen() {
             setCurrentAppPage(1);
             setSearchQuery("");
           }}
-          className={`relative pb-3 text-sm font-semibold transition-colors cursor-pointer ${
+          className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer active:scale-95 ${
             activeTab === "inactive"
-              ? "text-[#ff5a36] border-b-2 border-[#ff5a36]"
-              : "text-slate-500 hover:text-slate-800"
+              ? "bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-md shadow-purple-500/25 ring-1 ring-purple-600"
+              : "bg-purple-50/70 text-purple-700 hover:bg-purple-100/90 border border-purple-200/70"
           }`}
         >
-          Applications ({inactiveCount})
+          <FileText size={15} className="shrink-0" />
+          <span>Applications</span>
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none ${
+              activeTab === "inactive"
+                ? "bg-white text-purple-700 shadow-xs"
+                : "bg-white/90 text-purple-700 border border-purple-200/70"
+            }`}
+          >
+            {inactiveCount}
+          </span>
         </button>
       </div>
 
@@ -2001,67 +2025,69 @@ export default function CspScreen() {
                   <div
                     key={row._id}
                     onClick={() => openPartnerDetails(row)}
-                    className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                    className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs transition-all hover:shadow-md hover:border-orange-200 active:scale-[0.99] space-y-3"
                   >
                     {/* Top Row: Avatar, Partner Name, Brand, Index, Status */}
                     <div className="flex items-start justify-between gap-2.5">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${palette.bg} ${palette.text} ${palette.border}`}
+                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-xs font-black shadow-xs ${palette.bg} ${palette.text} ${palette.border}`}
                         >
                           {initials}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center gap-1.5">
-                            <span className="truncate text-sm font-bold text-slate-900">
+                          <div className="flex min-w-0 items-center gap-1.5 flex-wrap">
+                            <span className="truncate text-sm sm:text-base font-bold text-slate-900">
                               {partnerName}
                             </span>
-                            <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-700">
+                            <span className="shrink-0 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 px-2 py-0.5 text-[9px] font-black uppercase text-white shadow-2xs tracking-wider">
                               {getRowMembershipLabel(row)}
                             </span>
-                            <span className="shrink-0 text-[10px] font-mono text-slate-400">
+                            <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono font-bold text-slate-500">
                               #{globalIdx + 1}
                             </span>
                           </div>
-                          <span className="text-xs text-slate-500 font-medium truncate block mt-0.5">
-                            {brandName !== "—" ? brandName : "CSP Seller"}
-                          </span>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500 font-medium truncate">
+                            <Building2 size={12} className="text-slate-400 shrink-0" />
+                            <span className="truncate">{brandName !== "—" ? brandName : "CSP Seller"}</span>
+                          </div>
                         </div>
                       </div>
                       <span
-                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${
+                        className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
                           row.status === "inactive"
-                            ? "bg-rose-50 text-rose-700 ring-rose-200/60"
-                            : "bg-emerald-50 text-emerald-700 ring-emerald-200/60"
+                            ? "bg-rose-50 text-rose-700 border border-rose-200/80"
+                            : "bg-emerald-50 text-emerald-700 border border-emerald-200/80"
                         }`}
                       >
+                        <span className={`h-1.5 w-1.5 rounded-full ${row.status === "inactive" ? "bg-rose-500" : "bg-emerald-500 animate-pulse"}`} />
                         {row.status === "inactive" ? "Inactive" : "Active"}
                       </span>
                     </div>
 
                     {/* Metrics Grid: Sales, Earnings, Payouts */}
-                    <div className="mt-3.5 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center text-xs">
-                      <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100/80">
-                        <span className="block text-[10px] uppercase font-bold text-slate-400">
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div className="rounded-xl border border-blue-200/80 bg-gradient-to-br from-blue-50/90 to-indigo-50/40 p-2 sm:p-2.5 shadow-2xs">
+                        <span className="block text-[10px] uppercase font-bold tracking-wider text-blue-700/80">
                           Sales
                         </span>
-                        <span className="text-xs font-bold text-slate-900 mt-0.5 block">
+                        <span className="text-xs sm:text-sm font-black text-blue-950 mt-0.5 block truncate">
                           ₹{salesAmt.toLocaleString("en-IN")}
                         </span>
                       </div>
-                      <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100/80">
-                        <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      <div className="rounded-xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/90 to-teal-50/40 p-2 sm:p-2.5 shadow-2xs">
+                        <span className="block text-[10px] uppercase font-bold tracking-wider text-emerald-700/80">
                           Earnings
                         </span>
-                        <span className="text-xs font-bold text-emerald-700 mt-0.5 block">
+                        <span className="text-xs sm:text-sm font-black text-emerald-700 mt-0.5 block truncate">
                           ₹{withdrawableAmt.toLocaleString("en-IN")}
                         </span>
                       </div>
-                      <div className="rounded-xl bg-slate-50 p-2.5 border border-slate-100/80">
-                        <span className="block text-[10px] uppercase font-bold text-slate-400">
+                      <div className="rounded-xl border border-purple-200/80 bg-gradient-to-br from-purple-50/90 to-violet-50/40 p-2 sm:p-2.5 shadow-2xs">
+                        <span className="block text-[10px] uppercase font-bold tracking-wider text-purple-700/80">
                           Payouts
                         </span>
-                        <span className="text-xs font-bold text-slate-900 mt-0.5 block">
+                        <span className="text-xs sm:text-sm font-black text-purple-950 mt-0.5 block truncate">
                           ₹{payoutAmt.toLocaleString("en-IN")}
                         </span>
                       </div>
@@ -2071,16 +2097,24 @@ export default function CspScreen() {
                     {(() => {
                       const exp = getRowMembershipExpiry(row);
                       return (
-                        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                          <div className="flex items-center gap-1.5">
-                            <Phone size={12} className="text-slate-400 shrink-0" />
-                            <span>{mobile || "No phone"}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-[11px]">
-                            <span className="text-slate-500 font-medium">Expire on</span>
-                            <span className="text-slate-600 font-medium">
-                              {exp.dateText}
-                            </span>
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          {mobile ? (
+                            <a
+                              href={`tel:${mobile}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition"
+                            >
+                              <Phone size={11} className="text-emerald-600 shrink-0" />
+                              <span>{mobile}</span>
+                            </a>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-medium">No phone</span>
+                          )}
+
+                          <div className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                            <Calendar size={11} className="text-slate-400 shrink-0" />
+                            <span className="font-medium text-slate-400">Expire:</span>
+                            <span className="font-bold text-slate-700">{exp.dateText}</span>
                           </div>
                         </div>
                       );
@@ -2088,16 +2122,16 @@ export default function CspScreen() {
 
                     {/* Action Buttons Row */}
                     <div
-                      className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs"
+                      className="flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => openProductsModal(row)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 transition cursor-pointer"
+                          className="inline-flex items-center gap-1 rounded-xl bg-blue-50 border border-blue-200/90 px-2.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 shadow-2xs active:scale-95 transition cursor-pointer"
                         >
-                          <Package size={13} />
+                          <Package size={13} className="text-blue-600" />
                           <span>Products ({prodCount})</span>
                         </button>
 
@@ -2105,8 +2139,9 @@ export default function CspScreen() {
                           <button
                             type="button"
                             onClick={() => copyToClipboard(mobile, "Mobile number")}
-                            className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-200 transition cursor-pointer"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100 shadow-2xs active:scale-95 transition cursor-pointer"
                             title="Copy phone"
+                            aria-label="Copy phone"
                           >
                             <Copy size={12} />
                           </button>
@@ -2118,10 +2153,10 @@ export default function CspScreen() {
                           <button
                             type="button"
                             onClick={() => toggleStatus(row)}
-                            className={`rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition cursor-pointer ${
+                            className={`rounded-xl px-2.5 py-1.5 text-xs font-bold shadow-2xs active:scale-95 transition cursor-pointer border ${
                               row.status === "inactive"
-                                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200/90 hover:bg-emerald-100"
+                                : "bg-rose-50 text-rose-700 border-rose-200/90 hover:bg-rose-100"
                             }`}
                           >
                             {row.status === "inactive" ? "Activate" : "Deactivate"}
@@ -2131,7 +2166,7 @@ export default function CspScreen() {
                         <button
                           type="button"
                           onClick={() => openPartnerDetails(row)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-orange-50 px-2.5 py-1.5 text-[11px] font-semibold text-[#ff5a36] hover:bg-orange-100 transition cursor-pointer"
+                          className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-orange-500 to-[#ff5a36] text-white px-3 py-1.5 text-xs font-bold shadow-xs shadow-orange-500/25 hover:from-orange-600 hover:to-[#ea4824] active:scale-95 transition cursor-pointer"
                           title="View details"
                         >
                           <Eye size={13} />
@@ -2166,54 +2201,70 @@ export default function CspScreen() {
                 return (
                   <div
                     key={app.id}
-                    className="flex items-start gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0"
+                    className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5 transition-all hover:shadow-md"
                   >
-                    <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-bold ${app.avatarBg} ${app.avatarText}`}
-                    >
-                      {app.avatarInitials}
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div
+                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-xs font-black shadow-xs ${app.avatarBg} ${app.avatarText}`}
+                        >
+                          {app.avatarInitials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-slate-900">{app.name}</p>
+                          <p className="truncate text-xs text-slate-500 font-medium">
+                            {app.brandName || "CSP Applicant"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-amber-50 border border-amber-200/80 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        Under Review
+                      </span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-900">{app.name}</p>
-                      {app.brandName ? (
-                        <p className="truncate text-xs text-slate-500">{app.brandName}</p>
-                      ) : null}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs border-t border-slate-100 pt-2">
                       {phone ? (
-                        <p className="mt-1 flex items-center gap-1 text-xs text-slate-600">
-                          <Phone size={12} className="shrink-0 text-slate-400" />
+                        <a
+                          href={`tel:${phone}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200/80 px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                          <Phone size={11} className="shrink-0 text-emerald-600" />
                           <span>{phone}</span>
-                        </p>
+                        </a>
                       ) : null}
+
                       {site ? (
                         <a
                           href={`https://${site}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-0.5 block truncate text-xs font-medium text-blue-600"
+                          className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200/80 px-2 py-0.5 text-[11px] font-semibold text-sky-700 hover:bg-sky-100"
                         >
-                          {site}
+                          <ExternalLink size={11} className="shrink-0 text-sky-600" />
+                          <span className="truncate max-w-[150px]">{site}</span>
                         </a>
                       ) : null}
                     </div>
-                    <div className="flex shrink-0 flex-col gap-1.5">
+
+                    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenRejectModal(app)}
+                        className="inline-flex items-center gap-1 rounded-xl border border-rose-200/90 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100 transition active:scale-95"
+                      >
+                        <XCircle className="h-3.5 w-3.5" />
+                        Reject
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
                           setApproveTarget(app);
                           setOpenApproveModal(true);
                         }}
-                        className="inline-flex items-center justify-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-600"
+                        className="inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-3.5 py-1.5 text-xs font-bold shadow-xs shadow-emerald-500/25 hover:from-emerald-700 hover:to-teal-700 transition active:scale-95"
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenRejectModal(app)}
-                        className="inline-flex items-center justify-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-500"
-                      >
-                        <XCircle className="h-3.5 w-3.5" />
-                        Reject
                       </button>
                     </div>
                   </div>

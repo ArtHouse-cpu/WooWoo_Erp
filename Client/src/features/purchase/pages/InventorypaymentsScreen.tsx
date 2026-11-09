@@ -397,43 +397,28 @@ const InventorypaymentsScreen = () => {
 
   return (
     <div className="min-w-0 space-y-6 p-1 sm:p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <CreditCard className="text-blue-600" />
-            Inventory Payments Timeline
-          </h1>
-        </div>
+      {/* Header - Date filter and text in same line, icon removed, refresh button removed */}
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
+        <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 truncate">
+          Inventory Payments Timeline
+        </h1>
 
-        <div className="flex items-center gap-3">
-          {/* Right Top: Lifetime Filter Dropdown */}
-          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
-            <Calendar size={14} className="text-blue-600 shrink-0" />
-            <select
-              value={timeRange}
-              onChange={(e) => handleTimeRangeChange(e.target.value)}
-              className="text-xs font-semibold text-gray-800 bg-transparent outline-none cursor-pointer pr-1"
-            >
-              <option value="lifetime">Lifetime</option>
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="this_week">This Week</option>
-              <option value="this_month">This Month</option>
-              <option value="last_month">Last Month</option>
-              <option value="this_year">This Year</option>
-            </select>
-          </div>
-
-          <button
-            onClick={fetchData}
-            disabled={refreshing}
-            className="px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            title="Refresh Data"
+        {/* Right Top: Lifetime Filter Dropdown (Same line) */}
+        <div className="flex items-center gap-1.5 bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border border-slate-200 shadow-2xs hover:border-slate-300 transition shrink-0">
+          <Calendar size={14} className="text-indigo-600 shrink-0" />
+          <select
+            value={timeRange}
+            onChange={(e) => handleTimeRangeChange(e.target.value)}
+            className="text-xs font-semibold text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
           >
-            <RefreshCw size={13} className={refreshing ? "animate-spin text-blue-600" : "text-gray-500"} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
+            <option value="lifetime">Lifetime</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="this_week">This Week</option>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="this_year">This Year</option>
+          </select>
         </div>
       </div>
 
@@ -472,47 +457,47 @@ const InventorypaymentsScreen = () => {
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-4">
           <div className="md:col-span-8 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
             <input
               type="text"
               placeholder="Search payment ID, invoice, party, or method..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm transition"
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-xs sm:text-sm font-medium transition shadow-2xs"
             />
           </div>
 
           <div className="md:col-span-4">
-            <div className="flex p-1 bg-gray-100 rounded-lg">
+            <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200/60">
               <button
                 onClick={() => setFlowFilter("ALL")}
-                className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-md transition ${
+                className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
                   flowFilter === "ALL"
-                    ? "bg-white shadow-sm text-blue-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "bg-indigo-600 shadow-sm text-white"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 ALL
               </button>
               <button
                 onClick={() => setFlowFilter("INFLOW")}
-                className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-md transition ${
+                className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
                   flowFilter === "INFLOW"
-                    ? "bg-white shadow-sm text-emerald-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "bg-emerald-600 shadow-sm text-white"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 RECEIVED
               </button>
               <button
                 onClick={() => setFlowFilter("OUTFLOW")}
-                className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-md transition ${
+                className={`flex-1 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
                   flowFilter === "OUTFLOW"
-                    ? "bg-white shadow-sm text-rose-600"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "bg-rose-600 shadow-sm text-white"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 PAID OUT
@@ -522,23 +507,41 @@ const InventorypaymentsScreen = () => {
         </div>
 
         {/* Secondary Filter: Status Pills */}
-        <div className="flex items-center gap-2 pt-2 border-t border-gray-100 flex-wrap">
-          <span className="text-xs font-bold text-gray-400 mr-1 flex items-center gap-1 uppercase tracking-wider">
-            <Filter size={12} /> Status:
-          </span>
-          {(["ALL", "Paid", "Partial", "Pending", "Cancelled"] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${
-                statusFilter === status
-                  ? "bg-blue-600 text-white shadow-sm font-bold"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              {status === "ALL" ? "All Statuses" : status}
-            </button>
-          ))}
+        <div className="flex items-center gap-1.5 sm:gap-2 pt-2 border-t border-slate-100 flex-wrap">
+         
+          {(["ALL", "Paid", "Partial", "Pending", "Cancelled"] as const).map((status) => {
+            const isSelected = statusFilter === status;
+            let activeClass = "";
+            let inactiveClass = "";
+            if (status === "ALL") {
+              activeClass = "bg-indigo-600 text-white shadow-xs font-bold";
+              inactiveClass = "bg-slate-100 text-slate-700 hover:bg-slate-200";
+            } else if (status === "Paid") {
+              activeClass = "bg-emerald-600 text-white shadow-xs font-bold";
+              inactiveClass = "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60";
+            } else if (status === "Partial") {
+              activeClass = "bg-blue-600 text-white shadow-xs font-bold";
+              inactiveClass = "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60";
+            } else if (status === "Pending") {
+              activeClass = "bg-amber-600 text-white shadow-xs font-bold";
+              inactiveClass = "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/60";
+            } else {
+              activeClass = "bg-rose-600 text-white shadow-xs font-bold";
+              inactiveClass = "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/60";
+            }
+
+            return (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-2.5 sm:px-3 py-1 text-xs rounded-lg transition cursor-pointer font-semibold ${
+                  isSelected ? activeClass : inactiveClass
+                }`}
+              >
+                {status === "ALL" ? "All Statuses" : status}
+              </button>
+            );
+          })}
           {(searchTerm || flowFilter !== "ALL" || statusFilter !== "ALL" || timeRange !== "lifetime") && (
             <button
               onClick={() => {
@@ -548,15 +551,16 @@ const InventorypaymentsScreen = () => {
                 setTimeRange("lifetime");
                 setDateRange({ start: "", end: "" });
               }}
-              className="ml-auto text-xs text-blue-600 hover:underline font-semibold"
+              className="ml-auto inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 font-bold hover:underline cursor-pointer"
             >
+              <RotateCcw size={12} />
               Reset Filters
             </button>
           )}
         </div>
       </div>
 
-            {/* Mobile Card List (Mobile only: block md:hidden) */}
+      {/* Mobile Card List (Mobile only: block md:hidden) */}
       <div className="block md:hidden space-y-2.5">
         {filteredData.length > 0 ? (
           filteredData.map((item) => {
@@ -576,70 +580,104 @@ const InventorypaymentsScreen = () => {
               <div
                 key={item.id}
                 onClick={() => setSelectedPayment(item)}
-                className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                className={`cursor-pointer rounded-2xl border p-3.5 shadow-2xs transition active:scale-[0.99] hover:shadow-xs ${
+                  isInflow
+                    ? "border-emerald-200/80 bg-gradient-to-br from-emerald-50/40 via-white to-white hover:border-emerald-300"
+                    : "border-rose-200/80 bg-gradient-to-br from-rose-50/40 via-white to-white hover:border-rose-300"
+                }`}
               >
                 {/* Card Top Section */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    {/* Party Name + Party Type Pill */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h3 className="truncate text-base font-bold text-slate-900">
-                        {item.partyName}
-                      </h3>
-                      <span
-                        className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
-                          item.partyType === "Customer"
-                            ? "bg-blue-50 text-blue-700"
-                            : "bg-purple-50 text-purple-700"
-                        }`}
-                      >
-                        {item.partyType}
-                      </span>
+                <div className="flex items-start justify-between gap-2.5">
+                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                    {/* Party Initial Avatar */}
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white font-extrabold text-xs shadow-2xs ${
+                        item.partyType === "Customer"
+                          ? "bg-gradient-to-br from-blue-500 to-indigo-600"
+                          : "bg-gradient-to-br from-purple-500 to-violet-700"
+                      }`}
+                    >
+                      {item.partyName ? item.partyName.charAt(0).toUpperCase() : (item.partyType === "Customer" ? "C" : "S")}
                     </div>
 
-                    {/* Payment No + Invoice No + Payment Method */}
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                      <span className="font-semibold text-blue-600">
-                        #{item.paymentNo}
-                      </span>
-                      {item.invoiceNo && (
-                        <>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-slate-500 font-medium">
-                            {item.invoiceNo}
+                    <div className="min-w-0 flex-1">
+                      {/* Party Name + Party Type Pill */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h3 className="truncate text-sm sm:text-base font-bold text-slate-900">
+                          {item.partyName}
+                        </h3>
+                        <span
+                          className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold border ${
+                            item.partyType === "Customer"
+                              ? "bg-blue-100/80 text-blue-800 border-blue-200/70"
+                              : "bg-purple-100/80 text-purple-800 border-purple-200/70"
+                          }`}
+                        >
+                          {item.partyType}
+                        </span>
+                        {item.status && (
+                          <span
+                            className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold border ${getStatusBadgeStyle(
+                              item.status
+                            )}`}
+                          >
+                            {item.status}
                           </span>
-                        </>
-                      )}
-                      <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                        <PaymentMethodIcon method={item.paymentMethod} />
-                        {item.paymentMethod}
-                      </span>
+                        )}
+                      </div>
+
+                      {/* Payment No + Invoice No + Payment Method */}
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="font-bold text-indigo-600">
+                          #{item.paymentNo}
+                        </span>
+                        {item.invoiceNo && (
+                          <>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-slate-600 font-semibold bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border border-slate-200/60">
+                              {item.invoiceNo}
+                            </span>
+                          </>
+                        )}
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold border ${getPaymentMethodBadgeStyle(
+                            item.paymentMethod
+                          )}`}
+                        >
+                          <PaymentMethodIcon method={item.paymentMethod} />
+                          {item.paymentMethod}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Right: Flow Badge & Amount */}
                   <div className="flex shrink-0 flex-col items-end">
                     <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide border shadow-2xs ${
                         isInflow
-                          ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : "border border-rose-200 bg-rose-50 text-rose-700"
+                          ? "border-emerald-300 bg-emerald-100 text-emerald-800"
+                          : "border-rose-300 bg-rose-100 text-rose-800"
                       }`}
                     >
                       {isInflow ? (
-                        <ArrowDownLeft size={12} className="stroke-[2.5]" />
+                        <ArrowDownLeft size={11} className="stroke-[2.5]" />
                       ) : (
-                        <ArrowUpRight size={12} className="stroke-[2.5]" />
+                        <ArrowUpRight size={11} className="stroke-[2.5]" />
                       )}
-                      {isInflow ? "INFLOW" : "OUTFLOW"}
+                      {isInflow ? "Inflow" : "Outflow"}
                     </span>
 
                     <div className="mt-1 text-right">
-                      <span className="text-base font-bold text-slate-900">
-                        ₹{item.amount.toLocaleString("en-IN")}
+                      <span
+                        className={`text-base font-black ${
+                          isInflow ? "text-emerald-700" : "text-rose-700"
+                        }`}
+                      >
+                        {isInflow ? "+" : "-"}₹{item.amount.toLocaleString("en-IN")}
                       </span>
                       {item.dueAmount > 0 && (
-                        <div className="text-[10px] font-semibold text-amber-600">
+                        <div className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/70">
                           Due ₹{item.dueAmount.toLocaleString("en-IN")}
                         </div>
                       )}
@@ -653,9 +691,10 @@ const InventorypaymentsScreen = () => {
                 {/* Card Bottom Section */}
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <div className="flex min-w-0 items-center gap-1 truncate text-slate-400">
-                    <Calendar size={13} className="shrink-0 text-slate-400" />
-                    <span className="truncate">
-                      {formattedDate}, {formattedTime} • By {item.createdBy}
+                    <Calendar size={12} className="shrink-0 text-indigo-500" />
+                    <span className="truncate text-[11px] text-slate-500 font-medium">
+                      {formattedDate}, {formattedTime} • By{" "}
+                      <b className="text-slate-700">{item.createdBy}</b>
                     </span>
                   </div>
 
@@ -666,11 +705,12 @@ const InventorypaymentsScreen = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedPayment(item)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition hover:bg-slate-200 active:scale-95"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/70 text-xs font-bold shadow-2xs active:scale-95 transition cursor-pointer"
                       title="View Payment Details"
                       aria-label="View Payment Details"
                     >
-                      <Eye size={15} />
+                      <Eye size={13} />
+                      <span>Details</span>
                     </button>
                   </div>
                 </div>
@@ -696,7 +736,7 @@ const InventorypaymentsScreen = () => {
                 setStatusFilter("ALL");
                 setDateRange({ start: "", end: "" });
               }}
-              className="mt-3 text-xs font-bold text-blue-600 hover:underline"
+              className="mt-3 text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
             >
               Clear all filters
             </button>
@@ -932,6 +972,39 @@ const InventorypaymentsScreen = () => {
   );
 };
 
+const getStatusBadgeStyle = (status: string) => {
+  switch (status) {
+    case "Paid":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    case "Partial":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "Pending":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "Refunded":
+    case "Cancelled":
+      return "bg-rose-50 text-rose-700 border-rose-200";
+    default:
+      return "bg-slate-100 text-slate-700 border-slate-200";
+  }
+};
+
+const getPaymentMethodBadgeStyle = (method: string) => {
+  const m = (method || "").toLowerCase();
+  if (m.includes("upi")) return "bg-emerald-50 text-emerald-700 border-emerald-200/80";
+  if (m.includes("card")) return "bg-blue-50 text-blue-700 border-blue-200/80";
+  if (m.includes("cash")) return "bg-amber-50 text-amber-700 border-amber-200/80";
+  if (
+    m.includes("bank") ||
+    m.includes("transfer") ||
+    m.includes("neft") ||
+    m.includes("rtgs")
+  ) {
+    return "bg-indigo-50 text-indigo-700 border-indigo-200/80";
+  }
+  if (m.includes("wallet")) return "bg-purple-50 text-purple-700 border-purple-200/80";
+  return "bg-slate-100 text-slate-700 border-slate-200";
+};
+
 const StatCard = ({
   title,
   value,
@@ -945,30 +1018,68 @@ const StatCard = ({
   color: "emerald" | "rose" | "blue" | "indigo" | "amber";
   label: string;
 }) => {
-  const colorMap: Record<string, string> = {
-    emerald: "bg-emerald-50 text-emerald-600",
-    rose: "bg-rose-50 text-rose-600",
-    blue: "bg-blue-50 text-blue-600",
-    indigo: "bg-indigo-50 text-indigo-600",
-    amber: "bg-amber-50 text-amber-600",
-  };
+  const styles = {
+    emerald: {
+      card: "border-emerald-200/90 bg-gradient-to-br from-emerald-50/80 via-white to-emerald-100/30 hover:border-emerald-300",
+      title: "text-emerald-700",
+      iconWrap: "bg-emerald-100 text-emerald-600",
+      value: "text-emerald-950",
+      label: "text-emerald-700/80",
+      bgBlob: "bg-emerald-200/30",
+    },
+    rose: {
+      card: "border-rose-200/90 bg-gradient-to-br from-rose-50/80 via-white to-rose-100/30 hover:border-rose-300",
+      title: "text-rose-700",
+      iconWrap: "bg-rose-100 text-rose-600",
+      value: "text-rose-950",
+      label: "text-rose-700/80",
+      bgBlob: "bg-rose-200/30",
+    },
+    amber: {
+      card: "border-amber-200/90 bg-gradient-to-br from-amber-50/80 via-white to-amber-100/30 hover:border-amber-300",
+      title: "text-amber-700",
+      iconWrap: "bg-amber-100 text-amber-600",
+      value: "text-amber-950",
+      label: "text-amber-700/80",
+      bgBlob: "bg-amber-200/30",
+    },
+    blue: {
+      card: "border-blue-200/90 bg-gradient-to-br from-blue-50/80 via-white to-indigo-100/30 hover:border-blue-300",
+      title: "text-blue-700",
+      iconWrap: "bg-blue-100 text-blue-600",
+      value: "text-blue-950",
+      label: "text-blue-700/80",
+      bgBlob: "bg-blue-200/30",
+    },
+    indigo: {
+      card: "border-indigo-200/90 bg-gradient-to-br from-indigo-50/80 via-white to-indigo-100/30 hover:border-indigo-300",
+      title: "text-indigo-700",
+      iconWrap: "bg-indigo-100 text-indigo-600",
+      value: "text-indigo-950",
+      label: "text-indigo-700/80",
+      bgBlob: "bg-indigo-200/30",
+    },
+  }[color];
 
   return (
-    <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/90 shadow-xs sm:shadow-sm transition hover:shadow-md hover:border-slate-300">
+    <div className={`relative overflow-hidden p-3.5 sm:p-5 rounded-2xl border shadow-2xs sm:shadow-xs transition hover:shadow-md ${styles.card}`}>
       <div className="flex items-center justify-between mb-2 sm:mb-3">
-        <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate mr-1">
+        <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider truncate mr-1 ${styles.title}`}>
           {title}
         </span>
-        <div className={`p-1.5 sm:p-2 rounded-xl shrink-0 ${colorMap[color] || colorMap.blue}`}>
+        <div className={`p-1.5 sm:p-2 rounded-xl shrink-0 ${styles.iconWrap}`}>
           {icon}
         </div>
       </div>
       <div className="flex flex-col">
-        <span className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
+        <span className={`text-lg sm:text-2xl font-extrabold tracking-tight ${styles.value}`}>
           {typeof value === "number" ? value.toLocaleString("en-IN") : value}
         </span>
-        <span className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1 truncate">{label}</span>
+        <span className={`text-[10px] sm:text-[11px] font-semibold mt-0.5 sm:mt-1 truncate ${styles.label}`}>
+          {label}
+        </span>
       </div>
+      <div className={`pointer-events-none absolute -bottom-6 -right-6 h-20 w-20 rounded-full ${styles.bgBlob}`} />
     </div>
   );
 };
