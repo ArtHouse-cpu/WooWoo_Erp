@@ -28,6 +28,16 @@ const baseSchema = z.object({
   barcode: z.string().optional().default(""),
   category: z.string().optional().default(""),
   categoryId: z.string().optional().default(""),
+  segment: z.string().optional().default(""),
+  segmentId: z.string().optional().default(""),
+  segments: z
+    .array(
+      z.object({
+        id: z.string().optional().default(""),
+        name: z.string().optional().default(""),
+      }),
+    )
+    .default([]),
   subCategory: z.string().optional().default(""),
   subCategoryId: z.string().optional().default(""),
   description: z.string().optional().default(""),
@@ -151,6 +161,30 @@ type Props = {
   mode?: "create" | "edit";
 };
 
+function readInitialSegments(initialData?: Partial<AddItemFormValues>) {
+  const raw = (initialData as { segments?: unknown })?.segments;
+  if (Array.isArray(raw)) {
+    const rows = raw
+      .map((row) => {
+        const item = row as { segmentId?: unknown; id?: unknown; _id?: unknown; name?: unknown; segment?: unknown };
+        return {
+          id: String(item?.segmentId || item?.id || item?._id || ""),
+          name: String(item?.name || item?.segment || "").trim(),
+        };
+      })
+      .filter((row) => row.id || row.name);
+    if (rows.length) return rows;
+  }
+  const source = initialData as { segmentId?: unknown; segment?: unknown } | undefined;
+  const rawId = source?.segmentId as { _id?: string } | string | undefined;
+  const id = String(
+    rawId && typeof rawId === "object" ? rawId._id || "" : rawId || "",
+  );
+  const name = String(source?.segment || "").trim();
+  if (!id && !name) return [];
+  return [{ id, name }];
+}
+
 const buildDefaultValues = (
   initialData?: Partial<AddItemFormValues>,
   lockType?: "product" | "service",
@@ -179,6 +213,13 @@ const buildDefaultValues = (
       "",
     category: initialData?.category || "",
     categoryId: String((initialData as any)?.categoryId || ""),
+    segment: String((initialData as any)?.segment || ""),
+    segmentId: String(
+      (initialData as any)?.segmentId?._id ||
+        (initialData as any)?.segmentId ||
+        "",
+    ),
+    segments: readInitialSegments(initialData),
     subCategory: initialData?.subCategory || "",
     subCategoryId: String((initialData as any)?.subCategoryId || ""),
     description: initialData?.description || "",
@@ -234,8 +275,16 @@ export default function AddItemModal({
     defaultValues: buildDefaultValues(initialData, lockType),
   });
 
-  const { handleSubmit, watch, formState, reset, setFocus } = methods;
+  const { handleSubmit, watch, formState, reset, setFocus, getValues } = methods;
   const [submitError, setSubmitError] = useState("");
+  const [step, setStep] = useState(0);
+  const productSteps = [
+    "Basic Details",
+    "Pricing & Discount",
+    "Inventory & Variants",
+    "Media",
+    "Review",
+  ];
 
   const itemType = watch("type");
 
@@ -320,6 +369,21 @@ export default function AddItemModal({
     payload.append("barCode", values.barcode);
     payload.append("category", values.category);
     payload.append("subCategory", values.subCategory);
+    const selectedSegments =
+      resolvedType === "product"
+        ? (values.segments || [])
+            .map((row) => ({
+              segmentId: String(row?.id || "").trim(),
+              name: String(row?.name || "").trim(),
+            }))
+            .filter((row) => row.segmentId || row.name)
+        : [];
+    payload.append("segments", JSON.stringify(selectedSegments));
+    payload.append(
+      "segment",
+      selectedSegments.map((row) => row.name).filter(Boolean).join(", "),
+    );
+    payload.append("segmentId", selectedSegments[0]?.segmentId || "");
     payload.append("description", values.description);
     payload.append("discountType", values.discountType);
     payload.append("discountValue", String(values.discountValue));
@@ -373,20 +437,20 @@ export default function AddItemModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 sm:p-6 backdrop-blur-sm transition-opacity">
-      <div className="relative flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 sm:items-center sm:p-6">
+      <div className="relative flex h-[100dvh] w-full max-w-6xl flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-slate-900/5 sm:h-auto sm:max-h-[min(92dvh,880px)] sm:rounded-2xl">
         
         {/* Header */}
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-100 bg-white px-6 py-5">
-          <div className="flex items-center gap-4">
-            <div className={`flex h-12 w-12 items-center justify-center rounded-full ${itemType === "product" ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"}`}>
-              {itemType === "product" ? <Package size={24} /> : <Briefcase size={24} />}
+        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3 sm:px-6 sm:py-5">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12 ${itemType === "product" ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"}`}>
+              {itemType === "product" ? <Package size={20} /> : <Briefcase size={20} />}
             </div>
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">
+            <div className="min-w-0">
+              <h2 className="truncate text-base font-semibold text-slate-900 sm:text-xl">
                 {modalTitle}
               </h2>
-              <p className="mt-0.5 text-sm text-slate-500">
+              <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">
                 {modalSubtitle}
               </p>
             </div>
@@ -399,6 +463,37 @@ export default function AddItemModal({
             <X size={20} />
           </button>
         </div>
+        {itemType === "product" ? (
+          <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-slate-100 px-4 py-3 sm:px-6">
+            {productSteps.map((label, index) => {
+              const active = index === step;
+              const done = index < step;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setStep(index)}
+                  className="flex shrink-0 items-center gap-2 text-left"
+                >
+                  <span
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${
+                      active
+                        ? "bg-violet-600 text-white"
+                        : done
+                          ? "bg-violet-100 text-violet-700"
+                          : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
+                  <span className={`hidden text-xs font-semibold sm:inline ${active ? "text-violet-700" : "text-slate-500"}`}>
+                    {label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
 
         {/* Form Wrapper */}
         <FormProvider {...methods}>
@@ -412,8 +507,8 @@ export default function AddItemModal({
           >
             
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
-              <div className="space-y-8">
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-6 sm:py-6">
+              <div className="space-y-4 sm:space-y-6">
                 
                 {/* Type Selector */}
                 {!lockType && (
@@ -451,7 +546,7 @@ export default function AddItemModal({
                 {/* Dynamic Form Content */}
                 <div className="min-w-0">
                   {itemType === "product" ? (
-                    <ProductForm />
+                    <ProductForm step={step} />
                   ) : (
                     <ServiceForm />
                   )}
@@ -479,21 +574,47 @@ export default function AddItemModal({
             </div>
 
             {/* Footer */}
-            <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-4 backdrop-blur-sm">
+            <div className="flex flex-shrink-0 items-center gap-2 border-t border-slate-100 bg-slate-50/80 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:justify-end sm:gap-3 sm:px-6 sm:py-4">
               <button
                 type="button"
                 onClick={() => void closeIfConfirmed(onClose)}
                 disabled={loading}
-                className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:opacity-50"
+                className="h-10 flex-1 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:opacity-50 sm:flex-none sm:px-5"
               >
                 Cancel
               </button>
+              {itemType === "product" && step > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setStep((current) => Math.max(0, current - 1))}
+                  className="h-10 flex-1 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 sm:flex-none"
+                >
+                  Back
+                </button>
+              ) : null}
+              {itemType === "product" && step < productSteps.length - 1 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (step === 0 && !String(getValues("productName") || "").trim()) {
+                      setSubmitError("Product name is required");
+                      setFocus("productName");
+                      return;
+                    }
+                    setSubmitError("");
+                    setStep((current) => current + 1);
+                  }}
+                  className="flex h-10 flex-1 items-center justify-center rounded-lg bg-violet-600 px-4 text-sm font-semibold text-white sm:flex-none sm:px-6"
+                >
+                  {`Next: ${productSteps[step + 1]}`}
+                </button>
+              ) : (
               <button
                 type="submit"
                 disabled={loading || formState.isSubmitting}
-                className={`flex items-center justify-center rounded-lg px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`flex h-10 flex-1 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none sm:px-6 ${
                   itemType === "product"
-                    ? "bg-blue-600 hover:bg-blue-700 focus:ring-blue-600"
+                    ? "bg-violet-600 hover:bg-violet-700 focus:ring-violet-600"
                     : "bg-purple-600 hover:bg-purple-700 focus:ring-purple-600"
                 }`}
               >
@@ -510,6 +631,7 @@ export default function AddItemModal({
                   "Create Services"
                 )}
               </button>
+              )}
             </div>
             
           </form>

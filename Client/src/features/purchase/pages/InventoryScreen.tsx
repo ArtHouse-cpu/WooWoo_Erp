@@ -306,9 +306,28 @@ export default function InventoryScreen() {
         >
           <AlertTriangle size={15} />
           <span>Low Stock</span>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+            Inventory List
+          </h1>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={stockFilter === "low"}
+          onClick={() => setStockFilter((current) => (current === "low" ? "all" : "low"))}
+          className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 sm:text-sm"
+        >
+          <span>Low Stock</span>
+          <span
+            className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+              stockFilter === "low" ? "bg-rose-600" : "bg-slate-300"
+            }`}
+          >
             <span
-              className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-                stockFilter === "low" ? "bg-rose-600" : "bg-slate-300"
+              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+                stockFilter === "low" ? "left-4" : "left-0.5"
               }`}
             >
               <span
@@ -329,6 +348,13 @@ export default function InventoryScreen() {
             </span>
           )}
         </button>
+            />
+          </span>
+        </button>
+       
+         
+        
+        
       </div>
 
       {fetchError && (

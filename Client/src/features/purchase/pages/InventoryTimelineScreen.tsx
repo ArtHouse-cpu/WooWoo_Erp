@@ -9,7 +9,6 @@ import {
   User, 
   Hash, 
   ShoppingBag, 
-  History, 
   Tag,
   X,
   Eye,
@@ -264,19 +263,6 @@ const InventoryTimelineScreen = () => {
               />
             </div>
           )}
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <History className="text-blue-600" />
-            Inventory Timeline
-          </h1>
-          <p className="text-gray-500 text-xs sm:text-sm mt-0.5 sm:mt-1">
-            Track every stock movement across your store
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
           <button
             type="button"
             role="switch"
@@ -300,7 +286,7 @@ const InventoryTimelineScreen = () => {
               />
             </span>
           </button>
-          <button 
+          <button
             type="button"
             onClick={() => setReloadToken((token) => token + 1)}
             className="shrink-0 px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-xs flex items-center justify-center gap-1.5"

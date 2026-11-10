@@ -662,6 +662,71 @@ const getSpaceCode = (space: SpacePayload) => {
   return space.spaceCode || (space as any).code || "SP-" + String(space._id).slice(-4).toUpperCase();
 };
 
+type BookingSpaceCard = {
+  key: string;
+  spaces: SpacePayload[];
+  primary: SpacePayload;
+  weekday: SpacePayload | null;
+  weekend: SpacePayload | null;
+};
+
+const bookingDayType = (dateStr?: string): "Weekday" | "Weekend" | null => {
+  const match = String(dateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(date.getTime())) return null;
+  const day = date.getDay();
+  return day === 0 || day === 6 ? "Weekend" : "Weekday";
+};
+
+const isWeekendSpace = (space: SpacePayload) =>
+  String(space.day || "").toLowerCase().includes("weekend");
+
+const spaceGroupKey = (space: SpacePayload) => {
+  const type = String(space.spaceType || "").trim().toLowerCase();
+  const name = String(space.name || "").trim().toLowerCase();
+  return `${type}|${name}`;
+};
+
+const dayRateEnabled = (space: SpacePayload | null) =>
+  Boolean(space) && String(space?.status || "Available").toLowerCase() !== "maintenance";
+
+const groupBookingSpaces = (list: SpacePayload[]): BookingSpaceCard[] => {
+  const buckets = new Map<string, SpacePayload[]>();
+  for (const space of list) {
+    const key = spaceGroupKey(space);
+    const bucket = buckets.get(key) || [];
+    bucket.push(space);
+    buckets.set(key, bucket);
+  }
+  return [...buckets.values()].map((group) => {
+    const weekday = group.find((space) => !isWeekendSpace(space)) || null;
+    const weekend = group.find((space) => isWeekendSpace(space)) || null;
+    return {
+      key: spaceGroupKey(group[0]),
+      spaces: group,
+      primary: weekday || weekend || group[0],
+      weekday,
+      weekend,
+    };
+  });
+};
+
+const rateForCard = (card: BookingSpaceCard, dateStr?: string) => {
+  const kind = bookingDayType(dateStr);
+  if (!kind) return null;
+  const row = kind === "Weekend" ? card.weekend : card.weekday;
+  return {
+    kind,
+    row,
+    enabled: dayRateEnabled(row),
+    price: dayRateEnabled(row) ? Math.max(0, Number(row?.price || 0)) : 0,
+  };
+};
+
+const formatInr = (value: number) =>
+  `₹${Math.max(0, Number(value) || 0).toLocaleString("en-IN")}`;
+
 const CreateBookingDetailsModal = ({
   isOpen,
   onClose,
@@ -699,7 +764,6 @@ const CreateBookingDetailsModal = ({
   const [spacesLoading, setSpacesLoading] = useState(false);
   const [spacesError, setSpacesError] = useState("");
   const [spaceTypeFilter, setSpaceTypeFilter] = useState<"coworking" | "exclusive">("coworking");
-  const [dayFilter, setDayFilter] = useState<"all" | "weekday" | "weekend">("all");
   const [spaceSearch, setSpaceSearch] = useState("");
 
   // Customer Autocomplete & Create Modal
@@ -1160,7 +1224,6 @@ const CreateBookingDetailsModal = ({
       setSpaceSectionOpen(true);
       setServicesSectionOpen(true);
       setSpaceQty(1);
-      setDayFilter("all");
       setPurpose("");
       setNotes("");
       setFoodQty({});
@@ -1247,39 +1310,18 @@ const CreateBookingDetailsModal = ({
     return () => ac.abort();
   }, [isOpen]);
 
-  const handleDayFilter = (next: "all" | "weekday" | "weekend") => {
-    setDayFilter(next);
-    const matching = spaces.filter((space) => {
-      const matchesType =
-        spaceTypeFilter === "coworking"
-          ? isCoworkingSpace(space)
-          : isExclusiveSpace(space);
-      return matchesType && spaceMatchesDay(space, next);
-    });
-    const kept = selectedSpaceIds.filter((id) =>
-      matching.some((space) => String(space._id) === id),
-    );
-    if (kept.length > 0) {
-      setSelectedSpaceIds(kept);
-      if (!kept.includes(String(spaceId))) setSpaceId(kept[0]);
-      return;
-    }
-    setSelectedSpaceIds([]);
-    setSpaceId("");
-  };
-
   const handleSpaceTypeToggle = (type: "coworking" | "exclusive") => {
     setSpaceTypeFilter(type);
     if (type === "exclusive") {
       setDateMode("single");
     }
-    const matching = spaces.filter((space) => {
-      const matchesType =
-        type === "coworking" ? isCoworkingSpace(space) : isExclusiveSpace(space);
-      return matchesType && spaceMatchesDay(space, dayFilter);
-    });
+    const matching = groupBookingSpaces(
+      spaces.filter((space) =>
+        type === "coworking" ? isCoworkingSpace(space) : isExclusiveSpace(space),
+      ),
+    );
     const kept = selectedSpaceIds.filter((id) =>
-      matching.some((space) => String(space._id) === id),
+      matching.some((card) => card.spaces.some((space) => String(space._id) === id)),
     );
     if (kept.length > 0) {
       setSelectedSpaceIds(kept);
@@ -1290,50 +1332,50 @@ const CreateBookingDetailsModal = ({
     setSpaceId("");
   };
 
+  const spaceCards = useMemo(() => groupBookingSpaces(spaces), [spaces]);
+
   const coworkingCount = useMemo(
-    () => spaces.filter(isCoworkingSpace).length,
-    [spaces],
+    () => spaceCards.filter((card) => isCoworkingSpace(card.primary)).length,
+    [spaceCards],
   );
 
   const exclusiveCount = useMemo(
-    () => spaces.filter(isExclusiveSpace).length,
-    [spaces],
+    () => spaceCards.filter((card) => isExclusiveSpace(card.primary)).length,
+    [spaceCards],
   );
 
-  const spaceMatchesDay = (
-    space: SpacePayload,
-    filter: "all" | "weekday" | "weekend",
-  ) => {
-    if (filter === "all") return true;
-    const day = String(space.day || "").toLowerCase();
-    if (filter === "weekend") return day.includes("weekend");
-    return !day.includes("weekend");
-  };
-
-  const filteredSpaces = useMemo(() => {
-    return spaces.filter((space) => {
+  const visibleCards = useMemo(() => {
+    const q = spaceSearch.trim().toLowerCase();
+    return spaceCards.filter((card) => {
+      const space = card.primary;
       const matchesType =
         spaceTypeFilter === "coworking"
           ? isCoworkingSpace(space)
           : isExclusiveSpace(space);
       if (!matchesType) return false;
-      if (!spaceMatchesDay(space, dayFilter)) return false;
-
-      const q = spaceSearch.trim().toLowerCase();
       if (!q) return true;
-
-      const sName = String(space.name || "").toLowerCase();
-      const sCode = getSpaceCode(space).toLowerCase();
-      const sCat = String(space.category || "").toLowerCase();
-      const sDay = String(space.day || "").toLowerCase();
-
-      return sName.includes(q) || sCode.includes(q) || sCat.includes(q) || sDay.includes(q);
+      const haystack = [
+        space.name,
+        getSpaceCode(space),
+        space.category,
+        space.spaceType,
+        space.description,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
     });
-  }, [spaces, spaceTypeFilter, spaceSearch, dayFilter]);
+  }, [spaceCards, spaceTypeFilter, spaceSearch]);
 
-  const selectedSpace = useMemo(() => {
-    return spaces.find((s) => String(s._id) === String(spaceId)) || filteredSpaces[0] || null;
-  }, [spaces, spaceId, filteredSpaces]);
+  const selectedCard = useMemo(
+    () =>
+      spaceCards.find((card) =>
+        card.spaces.some((space) => String(space._id) === String(spaceId)),
+      ) || null,
+    [spaceCards, spaceId],
+  );
+
+  const selectedSpace = selectedCard?.primary || null;
 
   const planDurationInfo = useMemo(() => {
     return parsePlanDuration(
@@ -1344,6 +1386,19 @@ const CreateBookingDetailsModal = ({
 
   const isDurationPlan =
     spaceTypeFilter === "coworking" || planDurationInfo.isDurationPlan;
+
+  const pricingDate = isDurationPlan
+    ? coworkingStartDate
+    : dateMode === "multiple"
+      ? multiDateSlots.find((slot) => slot.date)?.date || ""
+      : bookingDate;
+  const appliedRate = selectedCard ? rateForCard(selectedCard, pricingDate) : null;
+  const quotedUnitPrice = appliedRate
+    ? appliedRate.price
+    : dayRateEnabled(selectedCard?.weekday || null)
+      ? Number(selectedCard?.weekday?.price || 0)
+      : Number(selectedCard?.weekend?.price || 0);
+  const pricedSpace = appliedRate?.row || selectedSpace;
 
   const packageMultiplier = useMemo(() => {
     const base = planDurationInfo.baseCount || 1;
@@ -2007,25 +2062,34 @@ const CreateBookingDetailsModal = ({
         : [];
     const qtyEach = ids.length > 1 ? 1 : Math.max(1, spaceQty);
     const hours = calcDurationHours(bookingFrom, bookingTo) || duration;
-    const fallback = spaceTypeFilter === "coworking" ? 400 : 800;
+    const seen = new Set<string>();
     return ids
-      .map((id) => spaces.find((space) => String(space._id) === String(id)))
-      .filter((space): space is NonNullable<typeof space> => Boolean(space))
-      .map((space) => {
-        const unitPrice = Math.max(0, Number(space.price ?? fallback));
+      .map((id) => spaceCards.find((card) => card.spaces.some((space) => String(space._id) === String(id))))
+      .filter((card): card is BookingSpaceCard => {
+        if (!card || seen.has(card.key)) return false;
+        seen.add(card.key);
+        return true;
+      })
+      .map((card) => {
+        const space = card.primary;
+        const singleRate = rateForCard(card, isDurationPlan ? coworkingStartDate : bookingDate);
+        const unitPrice = isDurationPlan || dateMode !== "multiple"
+          ? singleRate?.price || 0
+          : rateForCard(card, multiDateSlots.find((slot) => slot.date)?.date)?.price || 0;
         const lineTotal = isDurationPlan
           ? unitPrice * packageMultiplier * qtyEach
           : dateMode === "multiple"
-            ? multiDateSlots.reduce(
-                (sum, slot) => sum + unitPrice * (slot.duration || 1) * qtyEach,
-                0,
-              )
+            ? multiDateSlots.reduce((sum, slot) => {
+                const rate = rateForCard(card, slot.date);
+                return sum + (rate?.enabled ? rate.price : 0) * (slot.duration || 1) * qtyEach;
+              }, 0)
             : unitPrice * hours * qtyEach;
+        const priced = singleRate?.row || space;
         return {
-          spaceId: String(space._id),
+          spaceId: String(priced._id || space._id),
           spaceName: space.name || "",
           spaceCode: getSpaceCode(space),
-          spaceDay: space.day || "",
+          spaceDay: singleRate?.kind || priced.day || "",
           spaceCategory: space.category || "space",
           unitPrice,
           lineTotal,
@@ -2035,9 +2099,8 @@ const CreateBookingDetailsModal = ({
   }, [
     selectedSpaceIds,
     spaceId,
-    spaces,
+    spaceCards,
     spaceQty,
-    spaceTypeFilter,
     isDurationPlan,
     packageMultiplier,
     dateMode,
@@ -2045,6 +2108,8 @@ const CreateBookingDetailsModal = ({
     bookingFrom,
     bookingTo,
     duration,
+    bookingDate,
+    coworkingStartDate,
   ]);
 
   const singleSlotHours =
@@ -2170,6 +2235,18 @@ const CreateBookingDetailsModal = ({
     }
 
     if (!selectedSpaceIds.length && !spaceId) err.spaceId = "Please select a space.";
+    else if (appliedRate && !appliedRate.enabled) {
+      err.spaceId = `${appliedRate.kind} bookings are not available for this space.`;
+    } else if (dateMode === "multiple" && selectedCard) {
+      const blocked = multiDateSlots.find((slot) => {
+        const rate = rateForCard(selectedCard, slot.date);
+        return rate && !rate.enabled;
+      });
+      if (blocked) {
+        const rate = rateForCard(selectedCard, blocked.date);
+        err.multiDates = err.multiDates || `${rate?.kind || "That day"} is not available for this space.`;
+      }
+    }
 
     if (isDurationPlan) {
       if (!coworkingStartDate) err.coworkingStartDate = "Start date is required.";
@@ -2257,12 +2334,7 @@ const CreateBookingDetailsModal = ({
       ? multiDateSlots.reduce((acc, s) => acc + (s.duration || 1), 0)
       : calcDurationHours(bookingFrom, bookingTo) || duration;
 
-    const unitPrice = Math.max(
-      0,
-      Number(
-        selectedSpace?.price ?? (spaceTypeFilter === "coworking" ? 400 : 800),
-      ),
-    );
+    const unitPrice = Math.max(0, Number(quotedUnitPrice || 0));
     const servicesTotal = selectedServicesList.reduce(
       (acc, s) => acc + s.price * s.qty,
       0,
@@ -2321,7 +2393,7 @@ const CreateBookingDetailsModal = ({
       selectedSpaces: bookedSpaces,
       spaceCode,
       spaceImageUrl: (selectedSpace as any)?.images?.[0] || selectedSpace?.imageUrl || null,
-      spaceDay: selectedSpace?.day || "",
+      spaceDay: appliedRate?.kind || pricedSpace?.day || "",
       spaceCategory: selectedSpace?.category || "space",
       spaceQty,
       unitPrice,
@@ -2366,7 +2438,7 @@ const CreateBookingDetailsModal = ({
       customerId: customerId || undefined,
       membershipType: membershipType || undefined,
       membershipPlanId: membershipPlanId || undefined,
-      spaceId: selectedSpace?._id ? String(selectedSpace._id) : spaceId,
+      spaceId: pricedSpace?._id ? String(pricedSpace._id) : spaceId,
       bookingDate: isDuration
         ? coworkingStartDate
         : isMultiple
@@ -2391,7 +2463,7 @@ const CreateBookingDetailsModal = ({
       selectedSpaces: bookedSpaces,
       spaceCode,
       spaceType,
-      spaceDay: selectedSpace?.day || "",
+      spaceDay: appliedRate?.kind || pricedSpace?.day || "",
       spaceCategory: selectedSpace?.category || "space",
       unitPrice,
       durationHours,
@@ -2427,6 +2499,18 @@ const CreateBookingDetailsModal = ({
     if (!name.trim()) err.name = "Customer name is required.";
     if (!phone.trim()) err.phone = "Phone number is required.";
     if (!selectedSpaceIds.length && !spaceId) err.spaceId = "Please select a space.";
+    else if (appliedRate && !appliedRate.enabled) {
+      err.spaceId = `${appliedRate.kind} bookings are not available for this space.`;
+    } else if (dateMode === "multiple" && selectedCard) {
+      const blocked = multiDateSlots.find((slot) => {
+        const rate = rateForCard(selectedCard, slot.date);
+        return rate && !rate.enabled;
+      });
+      if (blocked) {
+        const rate = rateForCard(selectedCard, blocked.date);
+        err.multiDates = err.multiDates || `${rate?.kind || "That day"} is not available for this space.`;
+      }
+    }
 
     if (Object.keys(err).length > 0) {
       setErrors((prev) => ({ ...prev, ...err }));
@@ -2442,12 +2526,7 @@ const CreateBookingDetailsModal = ({
       ? multiDateSlots.reduce((acc, s) => acc + (s.duration || 1), 0)
       : calcDurationHours(bookingFrom, bookingTo) || duration;
 
-    const unitPrice = Math.max(
-      0,
-      Number(
-        selectedSpace?.price ?? (spaceTypeFilter === "coworking" ? 400 : 800),
-      ),
-    );
+    const unitPrice = Math.max(0, Number(quotedUnitPrice || 0));
     const servicesTotal = selectedServicesList.reduce(
       (acc, s) => acc + s.price * s.qty,
       0,
@@ -2501,7 +2580,7 @@ const CreateBookingDetailsModal = ({
       selectedSpaces: bookedSpaces,
       spaceCode,
       spaceImageUrl: (selectedSpace as any)?.images?.[0] || selectedSpace?.imageUrl || null,
-      spaceDay: selectedSpace?.day || "",
+      spaceDay: appliedRate?.kind || pricedSpace?.day || "",
       spaceCategory: selectedSpace?.category || "space",
       spaceQty,
       unitPrice,
@@ -2546,7 +2625,7 @@ const CreateBookingDetailsModal = ({
       customerId: customerId || undefined,
       membershipType: membershipType || undefined,
       membershipPlanId: membershipPlanId || undefined,
-      spaceId: selectedSpace?._id ? String(selectedSpace._id) : spaceId,
+      spaceId: pricedSpace?._id ? String(pricedSpace._id) : spaceId,
       bookingDate: isDuration
         ? coworkingStartDate
         : isMultiple
@@ -2571,7 +2650,7 @@ const CreateBookingDetailsModal = ({
       selectedSpaces: bookedSpaces,
       spaceCode,
       spaceType,
-      spaceDay: selectedSpace?.day || "",
+      spaceDay: appliedRate?.kind || pricedSpace?.day || "",
       spaceCategory: selectedSpace?.category || "space",
       unitPrice,
       durationHours,
@@ -2612,7 +2691,7 @@ const CreateBookingDetailsModal = ({
 
   const bookingSummary = isDurationPlan ? (
     <CoworkingSummaryCard
-      space={selectedSpace || null}
+      space={pricedSpace || selectedSpace || null}
       spaceQty={spaceQty}
       startDate={coworkingStartDate}
       endDate={coworkingEndDate}
@@ -2623,13 +2702,7 @@ const CreateBookingDetailsModal = ({
       durationUnitPlural={planDurationInfo.unitPlural}
       priceSuffix={planDurationInfo.priceSuffix}
       packageMultiplier={packageMultiplier}
-      unitPrice={
-        selectedSpace?.price
-          ? Number(selectedSpace.price)
-          : spaceTypeFilter === "coworking"
-          ? 400
-          : 800
-      }
+      unitPrice={quotedUnitPrice}
       selectedServices={selectedServicesList}
       foods={selectedFoodsList}
       discountAmount={discountAmount}
@@ -2639,10 +2712,10 @@ const CreateBookingDetailsModal = ({
     />
   ) : dateMode === "multiple" ? (
     <ExclusiveMultipleDatesSummaryCard
-      space={selectedSpace || null}
+      space={pricedSpace || selectedSpace || null}
       spaceQty={spaceQty}
       slots={multiDateSlots}
-      hourlyRate={Number(selectedSpace?.price || 800)}
+      hourlyRate={quotedUnitPrice}
       selectedServices={selectedServicesList}
       foods={selectedFoodsList}
       discountAmount={discountAmount}
@@ -2652,12 +2725,12 @@ const CreateBookingDetailsModal = ({
     />
   ) : (
     <ExclusiveSingleDateSummaryCard
-      space={selectedSpace || null}
+      space={pricedSpace || selectedSpace || null}
       spaceQty={spaceQty}
       bookingDate={bookingDate}
       timeSlot={timeSlot}
       duration={duration}
-      hourlyRate={Number(selectedSpace?.price || 800)}
+      hourlyRate={quotedUnitPrice}
       selectedServices={selectedServicesList}
       foods={selectedFoodsList}
       discountAmount={discountAmount}
@@ -3073,28 +3146,6 @@ const CreateBookingDetailsModal = ({
                         </button>
                       </div>
 
-                      <div className="inline-flex self-start rounded-xl border border-slate-200/80 bg-slate-100 p-1 sm:self-auto">
-                        {(
-                          [
-                            ["all", "All"],
-                            ["weekday", "Weekday"],
-                            ["weekend", "Weekend"],
-                          ] as const
-                        ).map(([id, label]) => (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => handleDayFilter(id)}
-                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                              dayFilter === id
-                                ? "border border-indigo-200 bg-white text-indigo-700 shadow-xs"
-                                : "border border-transparent text-slate-600 hover:text-slate-900"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
                     </div>
 
                     {errors.spaceId && (
@@ -3114,32 +3165,38 @@ const CreateBookingDetailsModal = ({
                         <AlertCircle size={14} className="mt-0.5 shrink-0" />
                         <span>{spacesError}</span>
                       </div>
-                    ) : filteredSpaces.length === 0 ? (
+                    ) : visibleCards.length === 0 ? (
                       <div className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center">
                         <Search size={20} className="text-slate-400" />
                         <p className="text-xs font-semibold text-slate-700">No spaces found</p>
                         <p className="text-[11px] text-slate-400 max-w-xs">
                           {spaceSearch
-                            ? `No ${dayFilter === "all" ? "" : `${dayFilter} `}${spaceTypeFilter} spaces matched "${spaceSearch}".`
-                            : `No ${dayFilter === "all" ? "" : `${dayFilter} `}${spaceTypeFilter} spaces are currently available.`}
+                            ? `No ${spaceTypeFilter} spaces matched "${spaceSearch}".`
+                            : `No ${spaceTypeFilter} spaces are currently available.`}
                         </p>
                       </div>
                      
                     ) : (
                       <div className="flex gap-3.5 overflow-x-auto pb-1">
-                        {filteredSpaces.map((space) => {
+                        {visibleCards.map((card) => {
+                          const space = card.primary;
+                          const cardIds = card.spaces.map((item) => String(item._id));
                           const spaceKey = String(space._id);
-                          const isSelected = selectedSpaceIds.includes(spaceKey);
+                          const isSelected = cardIds.some((id) => selectedSpaceIds.includes(id));
                           const code = getSpaceCode(space);
+                          const priceSuffix = parsePlanDuration(
+                            space.name,
+                            space.spaceType || spaceTypeFilter,
+                          ).priceSuffix;
 
                           return (
                             <div
                               key={String(space._id)}
                               onClick={() => {
                                 setSelectedSpaceIds((prev) => {
-                                  if (prev.includes(spaceKey)) {
-                                    const next = prev.filter((id) => id !== spaceKey);
-                                    if (String(spaceId) === spaceKey) {
+                                  if (cardIds.some((id) => prev.includes(id))) {
+                                    const next = prev.filter((id) => !cardIds.includes(id));
+                                    if (cardIds.includes(String(spaceId))) {
                                       setSpaceId(next[0] || "");
                                     }
                                     return next;
@@ -3159,7 +3216,7 @@ const CreateBookingDetailsModal = ({
                                   setErrors((prev) => ({ ...prev, spaceId: "" }));
                                 }
                               }}
-                              className={`group relative flex w-[220px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl border text-left transition cursor-pointer select-none ${
+                              className={`group relative flex w-[280px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl border text-left transition cursor-pointer select-none ${
                                 isSelected
                                   ? "border-2 border-indigo-600 bg-white shadow-sm"
                                   : "border border-slate-200/90 bg-white hover:border-slate-300"
@@ -3182,11 +3239,6 @@ const CreateBookingDetailsModal = ({
 
                                 {/* Top-Right: Weekday/Weekend or Selection Checkmark */}
                                 <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
-                                  {spaceTypeFilter === "exclusive" && (
-                                    <span className="inline-flex items-center rounded-full bg-white/95 px-2.5 py-0.5 text-[10px] font-bold text-slate-800 shadow-xs">
-                                      {space.day || "Weekday"}
-                                    </span>
-                                  )}
                                   <span
                                     className={`flex h-5 w-5 items-center justify-center rounded border shadow-xs ${
                                       isSelected
@@ -3211,75 +3263,37 @@ const CreateBookingDetailsModal = ({
 
                               {/* Details */}
                               <div className="p-3">
-                                <h4 className="text-xs font-bold text-slate-800 line-clamp-1">
+                                <h4 className="text-sm font-bold text-slate-800 line-clamp-1">
                                   {space.name}
                                 </h4>
-                                <p className="text-[11px] font-medium text-slate-400 mt-0.5">
-                                  {code}
+                                <p className="mt-0.5 text-[11px] font-medium text-slate-400">{code}</p>
+                                <p className="mt-1 text-[11px] text-slate-500">
+                                  {space.spaceType || (spaceTypeFilter === "coworking" ? "Coworking" : "Exclusive")}
+                                  {space.category ? ` · ${space.category}` : ""}
+                                  {` · ${space.capacity || 1} people`}
                                 </p>
+                                {space.description ? (
+                                  <p className="mt-1 line-clamp-2 text-[11px] text-slate-500">
+                                    {space.description}
+                                  </p>
+                                ) : null}
 
-                                {/* Price & Stepper Row */}
-                                <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-100">
-                                  <span className="text-xs font-bold text-indigo-600">
-                                    ₹
-                                    {Number(
-                                      space.price ||
-                                        (spaceTypeFilter === "coworking" ? 400 : 800),
-                                    ).toLocaleString("en-IN")}
-                                    <span className="text-[11px] font-normal text-slate-400">
-                                      {
-                                        parsePlanDuration(
-                                          space.name,
-                                          space.spaceType || spaceTypeFilter,
-                                        ).priceSuffix
-                                      }
-                                    </span>
-                                  </span>
-
-                                  {/* Stepper */}
-                                  <div
-                                    className="flex h-7 items-center overflow-hidden rounded-lg border border-slate-200 bg-white"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (isSelected) {
-                                          setSpaceQty((prev) => Math.max(1, prev - 1));
-                                        }
-                                      }}
-                                      disabled={
-                                        !isSelected ||
-                                        selectedSpaceIds.length > 1 ||
-                                        spaceQty <= 1
-                                      }
-                                      className="flex h-full w-7 items-center justify-center border-r border-slate-100 text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 transition"
-                                    >
-                                      <Minus size={11} />
-                                    </button>
-                                    <div className="flex w-6 items-center justify-center text-xs font-semibold text-slate-700">
-                                      {isSelected
-                                        ? selectedSpaceIds.length > 1
-                                          ? 1
-                                          : spaceQty
-                                        : 0}
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (!isSelected) {
-                                          setSelectedSpaceIds((prev) =>
-                                            prev.includes(spaceKey) ? prev : [...prev, spaceKey],
-                                          );
-                                          setSpaceId(spaceKey);
-                                        } else if (selectedSpaceIds.length === 1) {
-                                          setSpaceQty((prev) => Math.min(10, prev + 1));
-                                        }
-                                      }}
-                                      className="flex h-full w-7 items-center justify-center border-l border-slate-100 text-slate-600 hover:bg-slate-50 transition"
-                                    >
-                                      <Plus size={11} />
-                                    </button>
+                                <div className="mt-2.5 grid grid-cols-2 gap-1.5 border-t border-slate-100 pt-2">
+                                  <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+                                    <p className="text-[10px] font-semibold text-slate-500">Weekday</p>
+                                    <p className="text-xs font-bold text-indigo-700">
+                                      {dayRateEnabled(card.weekday) ? formatInr(Number(card.weekday?.price || 0)) : "Unavailable"}
+                                      <span className="font-normal text-slate-400">{priceSuffix}</span>
+                                    </p>
+                                    <p className="text-[10px] text-slate-400">Mon–Fri</p>
+                                  </div>
+                                  <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+                                    <p className="text-[10px] font-semibold text-slate-500">Weekend</p>
+                                    <p className="text-xs font-bold text-indigo-700">
+                                      {dayRateEnabled(card.weekend) ? formatInr(Number(card.weekend?.price || 0)) : "Unavailable"}
+                                      <span className="font-normal text-slate-400">{priceSuffix}</span>
+                                    </p>
+                                    <p className="text-[10px] text-slate-400">Sat–Sun</p>
                                   </div>
                                 </div>
                               </div>
@@ -3292,6 +3306,32 @@ const CreateBookingDetailsModal = ({
                     </>
                     ) : null}
                   </div>
+
+                  {selectedCard && appliedRate ? (
+                    <div
+                      className={`rounded-xl border px-3 py-2 text-xs ${
+                        appliedRate.enabled
+                          ? "border-indigo-100 bg-indigo-50 text-indigo-800"
+                          : "border-rose-200 bg-rose-50 text-rose-700"
+                      }`}
+                    >
+                      {appliedRate.enabled ? (
+                        <span>
+                          {formatDateDisplay(pricingDate)} · {appliedRate.kind} price ·{" "}
+                          <span className="font-bold">{formatInr(appliedRate.price)}</span>
+                          {isDurationPlan ? "" : " / hr"} is applied automatically.
+                        </span>
+                      ) : (
+                        <span>
+                          {appliedRate.kind} is turned off for {selectedCard.primary.name}. Choose another date.
+                        </span>
+                      )}
+                    </div>
+                  ) : selectedCard ? (
+                    <p className="text-xs text-slate-500">
+                      Choose a date and the weekday or weekend price is applied automatically.
+                    </p>
+                  ) : null}
 
                   {/* 3. Date & Duration * (Coworking or Duration Plan) OR Date & Time * (Hourly Exclusive) */}
                   <div className="space-y-3">
@@ -3903,7 +3943,7 @@ const CreateBookingDetailsModal = ({
                     </button>
                     {servicesSectionOpen ? (
 
-                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+                    <div className="flex w-full min-w-0 gap-2.5 overflow-x-auto pb-1">
                       {(spaceTypeFilter === "coworking"
                         ? activeCoworkingServices
                         : activeExclusiveServices
@@ -3918,7 +3958,7 @@ const CreateBookingDetailsModal = ({
                         return (
                           <div
                             key={service.key}
-                            className={`flex flex-col justify-between rounded-2xl border p-3 transition ${
+                            className={`flex w-[168px] shrink-0 flex-col justify-between rounded-2xl border p-3 transition ${
                               isSelected
                                 ? "border-indigo-500 bg-indigo-50/20 shadow-xs"
                                 : "border-slate-200/90 bg-white hover:border-slate-300"

@@ -94,6 +94,7 @@ export const PERMISSIONS = {
   MEMBERSHIP_PLAN_READ: "membership_plan.read",
   MEMBERSHIP_PLAN_MANAGE: "membership_plan.manage",
   CATEGORY_MANAGE: "category.manage",
+  SEGMENT_CREATE: "segment.create",
 
   // Network
   CUSTOMER_READ: "customer.read",
@@ -430,6 +431,11 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
     key: PERMISSIONS.CATEGORY_MANAGE,
     module: "catalogue",
     label: "Manage categories",
+  },
+  {
+    key: PERMISSIONS.SEGMENT_CREATE,
+    module: "catalogue",
+    label: "Manage segments",
   },
 
   {
