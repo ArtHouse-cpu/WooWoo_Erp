@@ -215,14 +215,40 @@ const InventoryTimelineScreen = () => {
 
   return (
     <div className="min-w-0 space-y-5 sm:space-y-6 p-2 sm:p-6 max-w-7xl mx-auto font-sans">
-      {/* Header - Date selection on same row, icon removed, subtitle removed, refresh removed */}
-      <div className="flex items-center justify-between gap-2 sm:gap-4 flex-wrap">
-        <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 truncate">
-          Inventory Timeline
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 flex-wrap">
+        <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2 truncate">
+          <History className="text-blue-600 shrink-0" size={22} />
+          <span>Inventory Timeline</span>
         </h1>
 
-        {/* Custom Date Selection (in same row parallel to title) */}
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Low Stock Toggle */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={stockFilter === "low"}
+            onClick={() => {
+              setStockFilter((current) => (current === "low" ? "all" : "low"));
+              setPage(1);
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-1.5 sm:py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 shadow-2xs hover:border-slate-300 transition"
+          >
+            <span>Low Stock</span>
+            <span
+              className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+                stockFilter === "low" ? "bg-rose-600" : "bg-slate-300"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+                  stockFilter === "low" ? "left-4" : "left-0.5"
+                }`}
+              />
+            </span>
+          </button>
+
+          {/* Date Selection */}
           <div className="flex items-center gap-1.5 bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border border-slate-200 shadow-2xs hover:border-slate-300 transition shrink-0">
             <Calendar size={14} className="text-indigo-600 shrink-0" />
             <select
@@ -264,49 +290,15 @@ const InventoryTimelineScreen = () => {
               />
             </div>
           )}
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <History className="text-blue-600" />
-            Inventory Timeline
-          </h1>
-          <p className="text-gray-500 text-xs sm:text-sm mt-0.5 sm:mt-1">
-            Track every stock movement across your store
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={stockFilter === "low"}
-            onClick={() => {
-              setStockFilter((current) => (current === "low" ? "all" : "low"));
-              setPage(1);
-            }}
-            className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 sm:text-sm"
-          >
-            <span>Low Stock</span>
-            <span
-              className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-                stockFilter === "low" ? "bg-rose-600" : "bg-slate-300"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                  stockFilter === "low" ? "left-4" : "left-0.5"
-                }`}
-              />
-            </span>
-          </button>
+
+          {/* Refresh Data */}
           <button 
             type="button"
             onClick={() => setReloadToken((token) => token + 1)}
-            className="shrink-0 px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-xs flex items-center justify-center gap-1.5"
+            className="shrink-0 px-3 py-1.5 sm:py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Refresh Data
+            <span className="hidden sm:inline">Refresh Data</span>
           </button>
         </div>
       </div>

@@ -294,29 +294,28 @@ export default function InventoryScreen() {
         </h1>
         <button
           type="button"
-            role="switch"
-            aria-checked={stockFilter === "low"}
+          role="switch"
+          aria-checked={stockFilter === "low"}
           onClick={() => setStockFilter((current) => (current === "low" ? "all" : "low"))}
           className={`inline-flex items-center gap-1.5 rounded-xl px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold transition shadow-2xs cursor-pointer ${
             stockFilter === "low"
               ? "bg-rose-600 text-white shadow-rose-200 hover:bg-rose-700"
               : "bg-rose-50 text-rose-700 border-2 border-rose-200 hover:bg-rose-100"
           }`}
-            className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 sm:text-sm"
         >
           <AlertTriangle size={15} />
           <span>Low Stock</span>
+          <span
+            className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+              stockFilter === "low" ? "bg-white/30" : "bg-slate-300"
+            }`}
+          >
             <span
-              className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-                stockFilter === "low" ? "bg-rose-600" : "bg-slate-300"
+              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+                stockFilter === "low" ? "left-4" : "left-0.5"
               }`}
-            >
-              <span
-                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
-                  stockFilter === "low" ? "left-4" : "left-0.5"
-                }`}
-              />
-            </span>
+            />
+          </span>
           {summary.lowStock.items > 0 && (
             <span
               className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
