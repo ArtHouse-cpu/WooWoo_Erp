@@ -1121,8 +1121,9 @@ export default function CouponsScreen() {
                   </button>
                 </div>
 
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="min-h-0 flex-1 space-y-4 sm:space-y-5 overflow-y-auto overscroll-contain px-4 py-5 sm:px-5">
+                  {/* Row 1: Coupon Code & Title (Two in one row) */}
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <FieldLabel required>Coupon Code</FieldLabel>
                       <IconInput
@@ -1154,10 +1155,11 @@ export default function CouponsScreen() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {/* Row 2: Discount Type & Discount Value (Two in one row) */}
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <FieldLabel required>Discount Type</FieldLabel>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-1 sm:gap-1.5">
                         <button
                           type="button"
                           onClick={() =>
@@ -1166,13 +1168,14 @@ export default function CouponsScreen() {
                               discountType: "percentage",
                             }))
                           }
-                          className={`inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border text-sm font-semibold transition ${
+                          className={`inline-flex h-11 items-center justify-center gap-1 rounded-xl border text-xs sm:text-sm font-semibold transition px-1 ${
                             form.discountType === "percentage"
-                              ? "border-violet-600 bg-violet-600 text-white"
+                              ? "border-violet-600 bg-violet-600 text-white shadow-2xs"
                               : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                           }`}
                         >
-                          <span className="text-base">%</span> Percentage
+                          <span className="text-sm sm:text-base font-bold">%</span>
+                          <span>Percent</span>
                         </button>
                         <button
                           type="button"
@@ -1182,13 +1185,14 @@ export default function CouponsScreen() {
                               discountType: "flat",
                             }))
                           }
-                          className={`inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border text-sm font-semibold transition ${
+                          className={`inline-flex h-11 items-center justify-center gap-1 rounded-xl border text-xs sm:text-sm font-semibold transition px-1 ${
                             form.discountType === "flat"
-                              ? "border-violet-600 bg-violet-600 text-white"
+                              ? "border-violet-600 bg-violet-600 text-white shadow-2xs"
                               : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                           }`}
                         >
-                          <span className="text-base">₹</span> Fixed Amount
+                          <span className="text-sm sm:text-base font-bold">₹</span>
+                          <span>Fixed</span>
                         </button>
                       </div>
                     </div>
@@ -1210,6 +1214,7 @@ export default function CouponsScreen() {
                     </div>
                   </div>
 
+                  {/* Row 3: Applicable On */}
                   <div>
                     <FieldLabel required>Applicable On</FieldLabel>
                     <div className="flex flex-wrap gap-2">
@@ -1230,9 +1235,9 @@ export default function CouponsScreen() {
                                 ),
                               }))
                             }
-                            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs sm:text-sm font-medium transition cursor-pointer ${
                               selected
-                                ? "border-violet-400 bg-violet-50 text-violet-700"
+                                ? "border-violet-400 bg-violet-50 text-violet-700 font-semibold"
                                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                             }`}
                           >
@@ -1249,7 +1254,8 @@ export default function CouponsScreen() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  {/* Row 4: Minimum Order (INR) & Expiry Date (Two in one row) */}
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <FieldLabel>Minimum Order (INR)</FieldLabel>
                       <IconInput
@@ -1280,6 +1286,10 @@ export default function CouponsScreen() {
                         }
                       />
                     </div>
+                  </div>
+
+                  {/* Row 5: Max Usage & Uses Per Customer (Two in one row) */}
+                  <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
                     <div>
                       <FieldLabel>Max Usage</FieldLabel>
                       <IconInput
@@ -1298,52 +1308,67 @@ export default function CouponsScreen() {
                         }
                       />
                     </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <FieldLabel>Uses Per Customer</FieldLabel>
+                        <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={limitPerCustomer}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setLimitPerCustomer(checked);
+                              if (!checked) {
+                                setForm((prev) => ({ ...prev, perCustomerLimit: null }));
+                              } else if (!form.perCustomerLimit) {
+                                setForm((prev) => ({ ...prev, perCustomerLimit: 1 }));
+                              }
+                            }}
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                          />
+                          <span className="text-[11px]">Limit</span>
+                        </label>
+                      </div>
+                      {limitPerCustomer ? (
+                        <div>
+                          <IconInput
+                            icon={Users}
+                            type="number"
+                            min={1}
+                            step={1}
+                            placeholder="E.g. 1"
+                            value={form.perCustomerLimit ?? ""}
+                            onChange={(e) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                perCustomerLimit: e.target.value
+                                  ? Math.max(1, Math.floor(Number(e.target.value) || 0))
+                                  : null,
+                              }))
+                            }
+                          />
+                          {Number(form.perCustomerLimit) > 0 && (
+                            <p className="mt-1 text-[11px] text-slate-500 truncate">
+                              {Math.floor(Number(form.perCustomerLimit))} use(s) per customer
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLimitPerCustomer(true);
+                            setForm((prev) => ({ ...prev, perCustomerLimit: 1 }));
+                          }}
+                          className="flex h-11 w-full items-center justify-between rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 text-xs text-slate-500 hover:border-violet-300 hover:bg-violet-50/50 hover:text-violet-700 transition cursor-pointer"
+                        >
+                          <span>Unlimited</span>
+                          <span className="text-[10px] text-violet-600 font-semibold underline">Set limit</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                  <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={limitPerCustomer}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setLimitPerCustomer(checked);
-                        if (!checked) {
-                          setForm((prev) => ({ ...prev, perCustomerLimit: null }));
-                        }
-                      }}
-                      className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-                    />
-                    Limit to use per customer
-                  </label>
-                  {limitPerCustomer ? (
-                    <div className="max-w-xs">
-                      <FieldLabel required>Uses per customer</FieldLabel>
-                      <IconInput
-                        icon={Users}
-                        type="number"
-                        min={1}
-                        step={1}
-                        placeholder="E.g. 2"
-                        value={form.perCustomerLimit ?? ""}
-                        onChange={(e) =>
-                          setForm((prev) => ({
-                            ...prev,
-                            perCustomerLimit: e.target.value
-                              ? Math.max(1, Math.floor(Number(e.target.value) || 0))
-                              : null,
-                          }))
-                        }
-                      />
-                      {Number(form.perCustomerLimit) > 0 ? (
-                        <p className="mt-1.5 text-xs text-slate-500">
-                          Each customer can use this coupon{" "}
-                          {Math.floor(Number(form.perCustomerLimit))}{" "}
-                          {Number(form.perCustomerLimit) === 1 ? "time" : "times"}.
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
 
                 <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
                   <button
