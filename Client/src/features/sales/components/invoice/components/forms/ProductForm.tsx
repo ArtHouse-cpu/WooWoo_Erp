@@ -452,7 +452,7 @@ export default function ProductForm({ step = 0 }: { step?: number }) {
         </div>
         <dl className="mt-3 space-y-1.5 text-xs">
           <div className="flex justify-between gap-3"><dt className="text-slate-400">Brand</dt><dd className="font-medium text-slate-700">{watch("brandName") || "—"}</dd></div>
-          <div className="flex justify-between gap-3"><dt className="text-slate-400">Shop Category</dt><dd className="font-medium text-slate-700">{subCategoryName || "—"}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-slate-400">Sub Category</dt><dd className="font-medium text-slate-700">{subCategoryName || "—"}</dd></div>
           <div className="flex justify-between gap-3"><dt className="text-slate-400">Barcode</dt><dd className="font-medium text-slate-700">{barcodeValue || "Not added"}</dd></div>
         </dl>
       </Section>
@@ -992,7 +992,7 @@ export default function ProductForm({ step = 0 }: { step?: number }) {
             <div><dt className="text-xs text-slate-400">Name</dt><dd className="font-medium">{productName || "—"}</dd></div>
             <div><dt className="text-xs text-slate-400">Brand</dt><dd className="font-medium">{watch("brandName") || "—"}</dd></div>
             <div><dt className="text-xs text-slate-400">Category</dt><dd className="font-medium">{categoryName || "—"}</dd></div>
-            <div><dt className="text-xs text-slate-400">Shop category</dt><dd className="font-medium">{subCategoryName || "—"}</dd></div>
+            <div><dt className="text-xs text-slate-400">Sub category</dt><dd className="font-medium">{subCategoryName || "—"}</dd></div>
             <div><dt className="text-xs text-slate-400">Segment</dt><dd className="font-medium">{segmentName || "—"}</dd></div>
             <div><dt className="text-xs text-slate-400">Selling price</dt><dd className="font-medium">₹{Number(watch("sellingPrice") || 0).toLocaleString("en-IN")}</dd></div>
             <div><dt className="text-xs text-slate-400">SKU</dt><dd className="font-medium">{itemCode || "—"}</dd></div>

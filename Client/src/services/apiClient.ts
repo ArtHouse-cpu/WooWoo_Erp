@@ -5441,3 +5441,113 @@ export const handleDeleteLead = async (id: string) => {
   const response = await axiosInstance.delete(`/api/lead/${id}`);
   return response.data;
 };
+
+export type ActivityChange = {
+  field: string;
+  oldValue: unknown;
+  newValue: unknown;
+};
+
+export type ActivityItem = {
+  _id: string;
+  userId?: string | null;
+  userName?: string;
+  userEmail?: string;
+  actorType?: "Admin" | "Staff" | "Customer" | "System" | string;
+  action: string;
+  module: string;
+  description?: string;
+  resourceId?: string;
+  resourceName?: string;
+  resourceType?: string;
+  method?: string;
+  endpoint?: string;
+  status?: "success" | "failure" | string;
+  ipAddress?: string;
+  requestId?: string;
+  companyId?: string;
+  changes?: ActivityChange[];
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type ActivityQuery = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  module?: string;
+  action?: string;
+  userId?: string;
+  status?: "" | "success" | "failure";
+  from?: string;
+  to?: string;
+  sort?: "newest" | "oldest";
+};
+
+const activityParams = (query: ActivityQuery, includePage: boolean) => {
+  const params: Record<string, string | number> = {};
+  if (includePage) {
+    if (query.page) params.page = query.page;
+    if (query.limit) params.limit = query.limit;
+  }
+  if (query.search) params.search = query.search;
+  if (query.module) params.module = query.module;
+  if (query.action) params.action = query.action;
+  if (query.userId) params.userId = query.userId;
+  if (query.status) params.status = query.status;
+  if (query.from) params.from = query.from;
+  if (query.to) params.to = query.to;
+  if (includePage && query.sort) params.sort = query.sort;
+  return params;
+};
+
+export const handleGetActivityTimeline = async (
+  query: ActivityQuery,
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/api/activities/timeline", {
+    signal,
+    params: activityParams(query, true),
+  });
+  return response.data as {
+    success: boolean;
+    items: ActivityItem[];
+    groups: { date: string; label: string; items: ActivityItem[] }[];
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+};
+
+export const handleGetActivityStats = async (
+  query: ActivityQuery,
+  signal?: AbortSignal,
+) => {
+  const response = await axiosInstance.get("/api/activities/stats", {
+    signal,
+    params: activityParams(query, false),
+  });
+  return response.data as {
+    success: boolean;
+    stats: {
+      total: number;
+      today: number;
+      created: number;
+      updatedOrDeleted: number;
+    };
+  };
+};
+
+export const handleGetActivityUsers = async (signal?: AbortSignal) => {
+  const response = await axiosInstance.get("/api/activities/users", { signal });
+  return response.data as {
+    success: boolean;
+    users: { _id: string; userName?: string; userEmail?: string }[];
+  };
+};
+
+export const handleGetActivityModules = async (signal?: AbortSignal) => {
+  const response = await axiosInstance.get("/api/activities/modules", { signal });
+  return response.data as { success: boolean; modules: string[] };
+};

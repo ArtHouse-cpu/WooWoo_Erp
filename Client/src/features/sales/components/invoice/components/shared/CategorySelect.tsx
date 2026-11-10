@@ -490,11 +490,11 @@ export default function CategorySelect({
 
       {!hideSubCategory && (
         <SingleSelectCreatable
-          label="Shop Category *"
+          label="Sub Category *"
           value={subCategoryValue}
           options={subCategoriesBySelectedCategory}
           placeholder={
-            categoryValue ? "Select shop category" : "Select category first"
+            categoryValue ? "Select Sub category" : "Select category first"
           }
           disabled={disabled || !categoryValue}
           canCreate={!!categoryValue}

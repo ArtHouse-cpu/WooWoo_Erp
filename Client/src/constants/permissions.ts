@@ -8,6 +8,7 @@
 export const PERMISSIONS = {
   // System
   DASHBOARD_READ: "dashboard.read",
+  ACTIVITY_READ: "activity.read",
   ACCESS_READ: "access.read",
   ACCESS_MANAGE: "access.manage",
   COMPANY_READ: "company.read",
@@ -154,6 +155,11 @@ export const PERMISSION_CATALOG: PermissionCatalogItem[] = [
     key: PERMISSIONS.DASHBOARD_READ,
     module: "system",
     label: "View dashboard",
+  },
+  {
+    key: PERMISSIONS.ACTIVITY_READ,
+    module: "system",
+    label: "View activity timeline",
   },
   {
     key: PERMISSIONS.ACCESS_READ,

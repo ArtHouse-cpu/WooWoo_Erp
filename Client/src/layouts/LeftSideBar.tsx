@@ -30,6 +30,7 @@ Sparkles ,
   type LucideIcon,
   Megaphone,
   ChartNoAxesCombined,
+  TimerIcon,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -143,6 +144,12 @@ const MENU_GROUPS: MenuGroup[] = [
     label: "Timeline",
     icon: Package,
     submenu: [
+      {
+        name: "Activity Timeline",
+        label: "Activity Timeline",
+        icon: TimerIcon,
+        path: "/activity-timeline",
+      },
       {
         name: "Inventory",
         label: "Inventory",

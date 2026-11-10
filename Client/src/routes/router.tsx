@@ -67,6 +67,7 @@ import GiftCard from "@/features/GiftCard/Pages/GiftCard";
 import InventorypaymentsScreen from "@/features/purchase/pages/InventorypaymentsScreen";
 import ExhibitionTable from "@/features/exhibition-table/ExhibitionTable";
 import BookingOverView from "@/features/BookingOverview/BookingOverView";
+import ActivityTimelineScreen from "@/features/purchase/pages/ActivityTimelineScreen";
 
 
 export const router = createBrowserRouter([
@@ -104,6 +105,7 @@ export const router = createBrowserRouter([
             path: "create-purchase-return",
             element: <CreatePurchaseReturnScreen />,
           },
+          { path: "activity-timeline", element: <ActivityTimelineScreen/> },
           { path: "inventory", element: <InventoryScreen /> },
           { path: "inventory-timeline", element: <InventoryTimelineScreen /> },
           { path: "inventory-payments", element: <InventorypaymentsScreen /> },
