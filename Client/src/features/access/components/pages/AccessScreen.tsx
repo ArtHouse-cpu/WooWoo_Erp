@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import {
+  ChevronDown,
   Eye,
   KeyRound,
   Loader2,
+  Mail,
+  Phone,
   Receipt,
   RefreshCw,
   Shield,
+  ShieldCheck,
   SquarePen,
   Trash2,
+  UserPlus,
   Users,
 } from "lucide-react";
 import {
@@ -57,6 +62,9 @@ export default function AccessScreen() {
   const [savingRole, setSavingRole] = useState(false);
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [createStaffCollapsed, setCreateStaffCollapsed] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 768,
+  );
   const [newStaff, setNewStaff] = useState({
     fullName: "",
     email: "",
@@ -660,53 +668,224 @@ export default function AccessScreen() {
 
   return (
     <div className="space-y-5 p-2">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Access Control</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Assign roles to staff and review permission bundles. Frontend gates
-            are UX; APIs enforce the real rules.
-          </p>
-        </div>
+      {/* ACCESS CONTROL HEADER */}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-2xl">
+          Access Control
+        </h1>
+
         <button
           type="button"
           onClick={() => void loadAll(search)}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          disabled={loading}
+          title="Refresh access data"
+          aria-label="Refresh access data"
+          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
         >
           {loading ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
             <RefreshCw size={16} />
           )}
-          Refresh
+          <span>Refresh</span>
         </button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs text-gray-500">Your RBAC role</div>
-          <div className="text-lg font-bold capitalize">
+      {/* COLORFUL ACCESS SUMMARY — 2 COLUMNS ON MOBILE */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {/* RBAC ROLE */}
+        <div className="relative min-w-0 overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-blue-100 p-3 shadow-sm transition hover:shadow-md sm:p-4">
+          <div className="flex items-center justify-between gap-1">
+            <p className="text-[10px] font-semibold text-blue-700 sm:text-xs">
+              Your RBAC role
+            </p>
+            <span className="shrink-0 rounded-lg bg-blue-100 p-1.5">
+              <ShieldCheck size={17} className="text-blue-600" />
+            </span>
+          </div>
+          <div className="mt-2 truncate text-sm font-extrabold capitalize text-blue-950 sm:text-xl">
             {authUser?.rbacRole?.name || role || "—"}
           </div>
-          <div className="mt-1 font-mono text-xs text-gray-400">
+          <div className="mt-1 truncate font-mono text-[9px] font-medium text-blue-600 sm:text-xs">
             {authUser?.rbacRole?.slug || "no role assigned"}
           </div>
+          <div className="pointer-events-none absolute -bottom-7 -right-5 h-20 w-20 rounded-full bg-blue-200/40" />
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs text-gray-500">Your permissions</div>
-          <div className="text-2xl font-bold">{permissions.length}</div>
+
+        {/* PERMISSIONS COUNT */}
+        <div className="relative min-w-0 overflow-hidden rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 via-white to-violet-100 p-3 shadow-sm transition hover:shadow-md sm:p-4">
+          <div className="flex items-center justify-between gap-1">
+            <p className="text-[10px] font-semibold text-purple-700 sm:text-xs">
+              Your permissions
+            </p>
+            <span className="shrink-0 rounded-lg bg-purple-100 p-1.5">
+              <KeyRound size={17} className="text-purple-600" />
+            </span>
+          </div>
+          <div className="mt-2 text-xl font-extrabold text-purple-950 sm:text-2xl">
+            {permissions.length}
+          </div>
+          <p className="mt-1 text-[9px] text-purple-600 sm:text-xs">
+            Assigned permissions
+          </p>
+          <div className="pointer-events-none absolute -bottom-7 -right-5 h-20 w-20 rounded-full bg-purple-200/40" />
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="text-xs text-gray-500">Can manage access</div>
-          <div className="text-lg font-bold">
+
+        {/* ACCESS MANAGEMENT */}
+        <div className="relative min-w-0 overflow-hidden rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-green-100 p-3 shadow-sm transition hover:shadow-md sm:p-4">
+          <div className="flex items-center justify-between gap-1">
+            <p className="text-[10px] font-semibold text-emerald-700 sm:text-xs">
+              Can manage access
+            </p>
+            <span className="shrink-0 rounded-lg bg-emerald-100 p-1.5">
+              <Shield size={17} className="text-emerald-600" />
+            </span>
+          </div>
+          <div className="mt-2 text-base font-extrabold text-emerald-950 sm:text-xl">
             {canManage ? "Yes" : "View only"}
           </div>
-          <div className="mt-1 text-xs text-gray-400">
-            Needs <code>access.manage</code>
-          </div>
+          <p className="mt-1 text-[9px] text-emerald-700 sm:text-xs">
+            {canManage ? "Access management enabled" : "Restricted access"}
+          </p>
+          <div className="pointer-events-none absolute -bottom-7 -right-5 h-20 w-20 rounded-full bg-emerald-200/40" />
         </div>
       </div>
 
+      {/* MOBILE ONLY: 1. CREATE STAFF ACCOUNT & 2. SEARCH BAR (JUST BELOW KPIS) */}
+      {tab === "staff" && (
+        <div className="block md:hidden space-y-3">
+          <Can permission={PERMISSIONS.ACCESS_MANAGE}>
+            <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 shadow-2xs transition-all">
+              <div
+                onClick={() => setCreateStaffCollapsed((prev) => !prev)}
+                className="flex items-center justify-between cursor-pointer select-none group"
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-xs">
+                    <UserPlus size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-blue-900 group-hover:text-blue-700 transition">
+                      Create staff account
+                    </div>
+                    {createStaffCollapsed ? (
+                      <p className="mt-0.5 text-xs text-blue-800/80 font-medium truncate">
+                        Tap to expand and create a new staff account
+                      </p>
+                    ) : (
+                      <p className="mt-0.5 text-xs text-blue-800/80">
+                        Public signup is disabled once the first account exists. Create
+                        users here and assign a role.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCreateStaffCollapsed((prev) => !prev);
+                  }}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/90 border border-blue-200/80 text-blue-700 hover:bg-white transition active:scale-95 cursor-pointer ml-2 shadow-2xs"
+                  aria-label={createStaffCollapsed ? "Expand create staff account form" : "Collapse create staff account form"}
+                >
+                  <ChevronDown
+                    size={16}
+                    className={`transition-transform duration-200 ${
+                      createStaffCollapsed ? "" : "rotate-180"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {!createStaffCollapsed && (
+                <div className="mt-3.5 space-y-3 animate-in fade-in duration-150">
+                  <div className="grid gap-2 grid-cols-1">
+                    <input
+                      value={newStaff.fullName}
+                      onChange={(e) =>
+                        setNewStaff((s) => ({ ...s, fullName: e.target.value }))
+                      }
+                      placeholder="Full name"
+                      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    />
+                    <input
+                      value={newStaff.email}
+                      onChange={(e) =>
+                        setNewStaff((s) => ({ ...s, email: e.target.value }))
+                      }
+                      placeholder="Email"
+                      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    />
+                    <input
+                      value={newStaff.phone}
+                      onChange={(e) =>
+                        setNewStaff((s) => ({ ...s, phone: e.target.value }))
+                      }
+                      placeholder="10-digit phone"
+                      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    />
+                    <input
+                      type="password"
+                      value={newStaff.password}
+                      onChange={(e) =>
+                        setNewStaff((s) => ({ ...s, password: e.target.value }))
+                      }
+                      placeholder="Password (min 8)"
+                      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    />
+                    <select
+                      value={newStaff.roleId}
+                      onChange={(e) =>
+                        setNewStaff((s) => ({ ...s, roleId: e.target.value }))
+                      }
+                      className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="">Viewer (default)</option>
+                      {roles.map((r) => (
+                        <option key={r._id} value={String(r._id)}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={creating}
+                    onClick={() => void onCreateStaff()}
+                    className="w-full rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 active:scale-98 transition disabled:opacity-60 cursor-pointer"
+                  >
+                    {creating ? "Creating..." : "Create staff"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </Can>
+
+          {/* 2. Search Bar */}
+          <div className="flex items-center gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void onSearchStaff();
+              }}
+              placeholder="Search staff by name, email, phone..."
+              className="min-w-0 w-full flex-1 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 shadow-2xs"
+            />
+            <button
+              type="button"
+              onClick={() => void onSearchStaff()}
+              className="shrink-0 rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-2xs hover:bg-gray-800 transition active:scale-95 cursor-pointer"
+            >
+              Search
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. SCROLLABLE TABS BAR */}
       <div className="hide-scrollbar flex flex-nowrap gap-2 overflow-x-auto border-b border-gray-200">
         {(
           [
@@ -737,96 +916,248 @@ export default function AccessScreen() {
       </div>
 
       {tab === "staff" && (
-        <div className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <Can permission={PERMISSIONS.ACCESS_MANAGE}>
-            <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
-              <div className="mb-2 text-sm font-semibold text-blue-900">
-                Create staff account
-              </div>
-              <p className="mb-3 text-xs text-blue-800/80">
-                Public signup is disabled once the first account exists. Create
-                users here and assign a role.
-              </p>
-              <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-5">
-                <input
-                  value={newStaff.fullName}
-                  onChange={(e) =>
-                    setNewStaff((s) => ({ ...s, fullName: e.target.value }))
-                  }
-                  placeholder="Full name"
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                />
-                <input
-                  value={newStaff.email}
-                  onChange={(e) =>
-                    setNewStaff((s) => ({ ...s, email: e.target.value }))
-                  }
-                  placeholder="Email"
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                />
-                <input
-                  value={newStaff.phone}
-                  onChange={(e) =>
-                    setNewStaff((s) => ({ ...s, phone: e.target.value }))
-                  }
-                  placeholder="10-digit phone"
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                />
-                <input
-                  type="password"
-                  value={newStaff.password}
-                  onChange={(e) =>
-                    setNewStaff((s) => ({ ...s, password: e.target.value }))
-                  }
-                  placeholder="Password (min 8)"
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                />
-                <select
-                  value={newStaff.roleId}
-                  onChange={(e) =>
-                    setNewStaff((s) => ({ ...s, roleId: e.target.value }))
-                  }
-                  className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+        <div className="space-y-3 md:rounded-2xl md:border md:border-gray-200 md:bg-white md:p-4 md:shadow-sm">
+          {/* DESKTOP ONLY: Create Staff Account Form & Search bar */}
+          <div className="hidden md:block space-y-3 mb-4">
+            <Can permission={PERMISSIONS.ACCESS_MANAGE}>
+              <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 shadow-2xs transition-all">
+                <div
+                  onClick={() => setCreateStaffCollapsed((prev) => !prev)}
+                  className="flex items-center justify-between cursor-pointer select-none group"
                 >
-                  <option value="">Viewer (default)</option>
-                  {roles.map((r) => (
-                    <option key={r._id} value={String(r._id)}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-xs">
+                      <UserPlus size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-blue-900 group-hover:text-blue-700 transition">
+                        Create staff account
+                      </div>
+                      {createStaffCollapsed ? (
+                        <p className="mt-0.5 text-xs text-blue-800/80 font-medium truncate">
+                          Tap to expand and create a new staff account
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-xs text-blue-800/80">
+                          Public signup is disabled once the first account exists. Create
+                          users here and assign a role.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCreateStaffCollapsed((prev) => !prev);
+                    }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/90 border border-blue-200/80 text-blue-700 hover:bg-white transition active:scale-95 cursor-pointer ml-2 shadow-2xs"
+                    aria-label={createStaffCollapsed ? "Expand create staff account form" : "Collapse create staff account form"}
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform duration-200 ${
+                        createStaffCollapsed ? "" : "rotate-180"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {!createStaffCollapsed && (
+                  <div className="mt-3.5 space-y-3 animate-in fade-in duration-150">
+                    <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-5">
+                      <input
+                        value={newStaff.fullName}
+                        onChange={(e) =>
+                          setNewStaff((s) => ({ ...s, fullName: e.target.value }))
+                        }
+                        placeholder="Full name"
+                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      />
+                      <input
+                        value={newStaff.email}
+                        onChange={(e) =>
+                          setNewStaff((s) => ({ ...s, email: e.target.value }))
+                        }
+                        placeholder="Email"
+                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      />
+                      <input
+                        value={newStaff.phone}
+                        onChange={(e) =>
+                          setNewStaff((s) => ({ ...s, phone: e.target.value }))
+                        }
+                        placeholder="10-digit phone"
+                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      />
+                      <input
+                        type="password"
+                        value={newStaff.password}
+                        onChange={(e) =>
+                          setNewStaff((s) => ({ ...s, password: e.target.value }))
+                        }
+                        placeholder="Password (min 8)"
+                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      />
+                      <select
+                        value={newStaff.roleId}
+                        onChange={(e) =>
+                          setNewStaff((s) => ({ ...s, roleId: e.target.value }))
+                        }
+                        className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      >
+                        <option value="">Viewer (default)</option>
+                        {roles.map((r) => (
+                          <option key={r._id} value={String(r._id)}>
+                            {r.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={creating}
+                      onClick={() => void onCreateStaff()}
+                      className="w-full sm:w-auto rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-blue-700 active:scale-98 transition disabled:opacity-60 cursor-pointer"
+                    >
+                      {creating ? "Creating..." : "Create staff"}
+                    </button>
+                  </div>
+                )}
               </div>
+            </Can>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void onSearchStaff();
+                }}
+                placeholder="Search staff by name, email, phone..."
+                className="min-w-0 w-full flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm sm:min-w-[240px]"
+              />
               <button
                 type="button"
-                disabled={creating}
-                onClick={() => void onCreateStaff()}
-                className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                onClick={() => void onSearchStaff()}
+                className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white"
               >
-                {creating ? "Creating..." : "Create staff"}
+                Search
               </button>
             </div>
-          </Can>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void onSearchStaff();
-              }}
-              placeholder="Search staff by name, email, phone..."
-              className="min-w-0 w-full flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm sm:min-w-[240px]"
-            />
-            <button
-              type="button"
-              onClick={() => void onSearchStaff()}
-              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white"
-            >
-              Search
-            </button>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Card View */}
+          <div className="block md:hidden space-y-3">
+            {loading && !staff.length ? (
+              <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 text-center text-sm text-gray-400">
+                Loading staff...
+              </div>
+            ) : staff.length === 0 ? (
+              <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 text-center text-sm text-gray-400">
+                No staff found.
+              </div>
+            ) : (
+              staff.map((row) => (
+                <div
+                  key={row._id}
+                  className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100/80 text-blue-700 font-bold text-sm">
+                        {row.fullName?.charAt(0)?.toUpperCase() || "S"}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-slate-900 text-sm truncate">
+                          {row.fullName}
+                        </div>
+                        <div className="font-mono text-[11px] text-slate-400">
+                          {row.m_staff_id}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Can permission={PERMISSIONS.ACCESS_MANAGE}>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          title="Edit staff"
+                          onClick={() => void onEditStaff(row)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/70 hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
+                        >
+                          <SquarePen size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          title="Delete staff"
+                          onClick={() => void onDeleteStaff(row)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600 border border-rose-200/70 hover:bg-rose-100 transition active:scale-95 cursor-pointer"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </Can>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-1.5 rounded-xl bg-slate-50/80 p-2.5 text-xs text-slate-600">
+                    <div className="flex items-center gap-2 truncate">
+                      <Mail size={13} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{row.email || "No email"}</span>
+                    </div>
+                    {row.phoneNumber && (
+                      <div className="flex items-center gap-2">
+                        <Phone size={13} className="text-slate-400 shrink-0" />
+                        <span>{row.phoneNumber}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 pt-1 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-medium">Current Role:</span>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 border border-indigo-100">
+                        <Shield size={12} />
+                        {row.role?.name || "Unassigned"} ({row.permissionCount} perms)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-slate-500 font-medium shrink-0">
+                        Assign:
+                      </span>
+                      <Can
+                        permission={PERMISSIONS.ACCESS_MANAGE}
+                        fallback={
+                          <span className="text-xs text-gray-400">View only</span>
+                        }
+                      >
+                        <select
+                          className="w-full flex-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 disabled:opacity-60"
+                          disabled={assigningId === row._id}
+                          value={row.role?.id || ""}
+                          onChange={(e) =>
+                            void onAssignRole(row._id, e.target.value)
+                          }
+                        >
+                          <option value="">Unassigned</option>
+                          {roles.map((r) => (
+                            <option key={r._id} value={String(r._id)}>
+                              {r.name} ({r.permissionCount ?? r.permissions?.length ?? 0})
+                            </option>
+                          ))}
+                        </select>
+                      </Can>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
@@ -964,7 +1295,129 @@ export default function AccessScreen() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile Card View */}
+          <div className="block md:hidden space-y-3">
+            {loading && !staff.length ? (
+              <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 text-center text-sm text-gray-400">
+                Loading staff...
+              </div>
+            ) : staff.length === 0 ? (
+              <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 text-center text-sm text-gray-400">
+                No staff found.
+              </div>
+            ) : (
+              staff.map((row) => (
+                <div
+                  key={row._id}
+                  className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100/80 text-violet-700 font-bold text-sm">
+                        {row.fullName?.charAt(0)?.toUpperCase() || "S"}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-slate-900 text-sm truncate">
+                          {row.fullName}
+                        </div>
+                        <div className="font-mono text-[11px] text-slate-400">
+                          {row.m_staff_id}
+                        </div>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                        row.pinSet && row.pinEnabled
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                          : "bg-gray-100 text-gray-500 border border-gray-200/60"
+                      }`}
+                    >
+                      {row.pinSet
+                        ? row.pinEnabled
+                          ? "Active PIN"
+                          : "Disabled"
+                        : "No PIN"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-1.5 rounded-xl bg-slate-50/80 p-2.5 text-xs text-slate-600">
+                    {row.phoneNumber && (
+                      <div className="flex items-center gap-2">
+                        <Phone size={13} className="text-slate-400 shrink-0" />
+                        <span className="font-medium text-slate-800">{row.phoneNumber}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 truncate">
+                      <Mail size={13} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{row.email || "—"}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-medium">PIN Status:</span>
+                      <span className="font-mono text-xs font-semibold text-slate-700">
+                        {row.pinSet ? "••••••" : "Not configured"}
+                      </span>
+                    </div>
+
+                    <Can
+                      permission={PERMISSIONS.ACCESS_MANAGE}
+                      fallback={
+                        <span className="text-xs text-gray-400">View only</span>
+                      }
+                    >
+                      <div className="grid grid-cols-2 gap-2 pt-1 sm:flex sm:flex-wrap">
+                        <button
+                          type="button"
+                          disabled={pinBusyId === row._id || Boolean(row.pinSet)}
+                          onClick={() => void onCreateBillingPin(row)}
+                          className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 border border-blue-200/60 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                        >
+                          <KeyRound size={13} />
+                          Create
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pinBusyId === row._id || !row.pinSet}
+                          onClick={() => void onGenerateStaffPin(row)}
+                          className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 border border-indigo-200/60 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                        >
+                          <RefreshCw size={13} />
+                          Reset
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pinBusyId === row._id || !row.pinSet}
+                          onClick={() => void onViewStaffPin(row)}
+                          className="flex items-center justify-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                        >
+                          {pinBusyId === row._id ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <Eye size={13} />
+                          )}
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pinBusyId === row._id || !row.pinSet}
+                          onClick={() => void onClearStaffPin(row)}
+                          className="flex items-center justify-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 border border-red-200/60 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </Can>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full min-w-[780px] text-left text-sm">
               <thead className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
                 <tr>

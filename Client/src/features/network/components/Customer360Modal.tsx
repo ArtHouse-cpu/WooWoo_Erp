@@ -24,6 +24,13 @@ import {
   User,
   AlertCircle,
   TrendingUp,
+  ChevronDown,
+  Eye,
+  Clock,
+  CheckCircle2,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Package,
 } from "lucide-react";
 import { usePermission } from "@/hooks/usePermission";
 import CreatePosScreen from "@/features/sales/pages/CreatePosScreen";
@@ -160,6 +167,7 @@ export default function Customer360Modal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [posOpen, setPosOpen] = useState(false);
+  const [profileCollapsed, setProfileCollapsed] = useState(false);
 
   useEffect(() => {
     if (!actionsOpen) return;
@@ -256,9 +264,9 @@ export default function Customer360Modal({
       label: "Overview",
       Icon: LayoutDashboard,
       activeClass:
-        "bg-sky-100 text-sky-800 border-2 border-sky-400/80 shadow-xs ring-1 ring-sky-200",
+        "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 ring-1 ring-blue-600",
       inactiveClass:
-        "bg-sky-50/70 text-sky-700/80 border border-sky-200/70 hover:bg-sky-100/70",
+        "bg-blue-50/70 text-blue-700 hover:bg-blue-100/90 border border-blue-200/70",
       badge: null,
     },
     {
@@ -266,9 +274,9 @@ export default function Customer360Modal({
       label: "Shopping",
       Icon: ShoppingBag,
       activeClass:
-        "bg-emerald-100 text-emerald-800 border-2 border-emerald-400/80 shadow-xs ring-1 ring-emerald-200",
+        "bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-md shadow-purple-500/25 ring-1 ring-purple-600",
       inactiveClass:
-        "bg-emerald-50/70 text-emerald-700/80 border border-emerald-200/70 hover:bg-emerald-100/70",
+        "bg-purple-50/70 text-purple-700 hover:bg-purple-100/90 border border-purple-200/70",
       badge: purchases.length || null,
     },
     {
@@ -276,19 +284,19 @@ export default function Customer360Modal({
       label: "Program",
       Icon: Award,
       activeClass:
-        "bg-amber-100 text-amber-800 border-2 border-amber-400/80 shadow-xs ring-1 ring-amber-200",
+        "bg-gradient-to-r from-amber-500 to-[#ff5a36] text-white shadow-md shadow-orange-500/25 ring-1 ring-[#ff5a36]",
       inactiveClass:
-        "bg-amber-50/70 text-amber-700/80 border border-amber-200/70 hover:bg-amber-100/70",
+        "bg-orange-50/70 text-orange-700 hover:bg-orange-100/90 border border-orange-200/70",
       badge: null,
     },
     {
       id: "bookings" as const,
       label: "Bookings",
-      Icon: Calendar,
+      Icon: CalendarDays,
       activeClass:
-        "bg-indigo-100 text-indigo-800 border-2 border-indigo-400/80 shadow-xs ring-1 ring-indigo-200",
+        "bg-gradient-to-r from-sky-500 to-cyan-600 text-white shadow-md shadow-sky-500/25 ring-1 ring-sky-600",
       inactiveClass:
-        "bg-indigo-50/70 text-indigo-700/80 border border-indigo-200/70 hover:bg-indigo-100/70",
+        "bg-sky-50/70 text-sky-700 hover:bg-sky-100/90 border border-sky-200/70",
       badge: bookings.length || null,
     },
     {
@@ -296,9 +304,9 @@ export default function Customer360Modal({
       label: "Memberships",
       Icon: Crown,
       activeClass:
-        "bg-purple-100 text-purple-800 border-2 border-purple-400/80 shadow-xs ring-1 ring-purple-200",
+        "bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-md shadow-pink-500/25 ring-1 ring-pink-600",
       inactiveClass:
-        "bg-purple-50/70 text-purple-700/80 border border-purple-200/70 hover:bg-purple-100/70",
+        "bg-pink-50/70 text-pink-700 hover:bg-pink-100/90 border border-pink-200/70",
       badge: memberships.length || null,
     },
     {
@@ -306,9 +314,9 @@ export default function Customer360Modal({
       label: "Wallet",
       Icon: Wallet,
       activeClass:
-        "bg-teal-100 text-teal-800 border-2 border-teal-400/80 shadow-xs ring-1 ring-teal-200",
+        "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/25 ring-1 ring-emerald-600",
       inactiveClass:
-        "bg-teal-50/70 text-teal-700/80 border border-teal-200/70 hover:bg-teal-100/70",
+        "bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100/90 border border-emerald-200/70",
       badge: walletRows.length || null,
     },
     {
@@ -316,9 +324,9 @@ export default function Customer360Modal({
       label: "Activity",
       Icon: History,
       activeClass:
-        "bg-orange-100 text-orange-800 border-2 border-orange-400/80 shadow-xs ring-1 ring-orange-200",
+        "bg-gradient-to-r from-indigo-600 to-violet-700 text-white shadow-md shadow-indigo-500/25 ring-1 ring-indigo-600",
       inactiveClass:
-        "bg-orange-50/70 text-orange-700/80 border border-orange-200/70 hover:bg-orange-100/70",
+        "bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100/90 border border-indigo-200/70",
       badge: timeline.length || null,
     },
   ];
@@ -566,7 +574,7 @@ export default function Customer360Modal({
                 key={item.id}
                 type="button"
                 onClick={() => setTab(item.id)}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap active:scale-95 ${
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer whitespace-nowrap active:scale-95 ${
                   isActive ? item.activeClass : item.inactiveClass
                 }`}
               >
@@ -574,8 +582,10 @@ export default function Customer360Modal({
                 <span>{item.label}</span>
                 {item.badge != null && (
                   <span
-                    className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-black leading-none ${
-                      isActive ? "bg-white/80 text-slate-800 shadow-2xs" : "bg-white/60 text-slate-600"
+                    className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none ${
+                      isActive
+                        ? "bg-white text-slate-800 shadow-xs"
+                        : "bg-white/90 text-slate-700 border border-slate-200/70"
                     }`}
                   >
                     {item.badge}
@@ -666,22 +676,52 @@ export default function Customer360Modal({
               </div>
 
               {/* Profile Card with Details Card System */}
-              <article className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 text-white shadow-xs">
-                    <User size={18} />
+              <article className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs transition-all">
+                <div
+                  onClick={() => setProfileCollapsed((prev) => !prev)}
+                  className="flex items-center justify-between cursor-pointer select-none group"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-xs">
+                      <User size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-base font-bold text-slate-900 group-hover:text-violet-600 transition">
+                        Profile Details
+                      </h3>
+                      {profileCollapsed ? (
+                        <p className="text-[11px] text-slate-400 font-medium truncate">
+                          {customer?.mobile ? `${customer.mobile} · ` : ""}
+                          Click to expand
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-slate-400">
+                          Customer contact and account information
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      Profile Details
-                    </h3>
-                    <p className="text-[11px] text-slate-400">
-                      Customer contact and account information
-                    </p>
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setProfileCollapsed((prev) => !prev);
+                    }}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600 hover:bg-slate-100 transition active:scale-95 cursor-pointer"
+                    aria-label={profileCollapsed ? "Expand profile section" : "Collapse profile section"}
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform duration-200 ${
+                        profileCollapsed ? "" : "rotate-180"
+                      }`}
+                    />
+                  </button>
                 </div>
 
-                <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {!profileCollapsed && (
+                  <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 animate-in fade-in duration-150">
                   {[
                     {
                       label: "PHONE",
@@ -797,6 +837,7 @@ export default function Customer360Modal({
                     );
                   })}
                 </div>
+                )}
               </article>
 
               {/* Active Membership Card */}
@@ -970,44 +1011,79 @@ function ProgramPanel({
                 {products.length === 0 ? (
                   <Empty text="No CSP products for this customer." />
                 ) : (
-                  <ul className="divide-y divide-slate-100">
+                  <div className="space-y-2">
                     {products.map((row) => (
-                      <li key={row.id} className="flex items-start justify-between gap-3 py-3 text-sm">
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-900">{row.name || "Product"}</p>
-                          <p className="text-xs text-slate-500">
-                            {row.category || "No category"}
-                            {` · ${row.sold} sold`}
-                            {row.createdAt ? ` · ${when(row.createdAt)}` : ""}
-                          </p>
+                      <div
+                        key={row.id}
+                        className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs space-y-1.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-100/80 text-purple-700">
+                              <Package size={15} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                                {row.name || "Product"}
+                              </p>
+                              <span className="text-[11px] text-slate-400">
+                                {row.category || "No category"}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="font-bold text-xs sm:text-sm text-slate-900 shrink-0">
+                            {money(row.price)}
+                          </span>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-slate-900">{money(row.price)}</p>
-                          <p className="text-xs text-slate-500">Sales {money(row.sales)}</p>
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px]">
+                          <span className="rounded-md bg-blue-50 border border-blue-100 px-2 py-0.5 font-bold text-blue-700">
+                            {row.sold} Sold
+                          </span>
+                          <span className="font-bold text-emerald-700">
+                            Sales: {money(row.sales)}
+                          </span>
                         </div>
-                      </li>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </ProgramBlock>
               <ProgramBlock title="Sales">
                 {sales.length === 0 ? (
                   <Empty text="No CSP sales for this customer." />
                 ) : (
-                  <ul className="divide-y divide-slate-100">
+                  <div className="space-y-2">
                     {sales.map((row) => (
-                      <li key={row.id} className="flex items-start justify-between gap-3 py-3 text-sm">
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-900">{row.title || "Sale"}</p>
-                          <p className="text-xs text-slate-500">
-                            {whenStamp(row.at)}
-                            {row.detail ? ` · ${row.detail}` : ""}
-                          </p>
+                      <div
+                        key={row.id}
+                        className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs space-y-1.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100/80 text-emerald-700">
+                              <TrendingUp size={15} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                                {row.title || "Sale"}
+                              </p>
+                              <span className="text-[11px] text-slate-400">
+                                {whenStamp(row.at)}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="font-black text-xs sm:text-sm text-emerald-700 shrink-0">
+                            {money(row.amount)}
+                          </span>
                         </div>
-                        <p className="font-bold text-slate-900">{money(row.amount)}</p>
-                      </li>
+                        {row.detail && (
+                          <p className="text-[11px] text-slate-600 rounded-lg bg-slate-50 p-1.5">
+                            {row.detail}
+                          </p>
+                        )}
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </ProgramBlock>
               <ProgramBlock title="Payout">
@@ -1101,7 +1177,12 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="text-sm text-slate-500">{text}</p>;
+  return (
+    <div className="py-12 text-center text-xs text-slate-400">
+      <Sparkles size={32} className="mx-auto mb-2 text-slate-300" />
+      <p>{text}</p>
+    </div>
+  );
 }
 
 function PurchaseList({
@@ -1113,137 +1194,356 @@ function PurchaseList({
 }) {
   if (!rows.length) return <Empty text="No product sales for this customer." />;
   return (
-    <ul className="divide-y divide-slate-100">
+    <div className="space-y-2.5">
       {rows.map((row) => (
-        <li key={row.id}>
-          <button type="button" onClick={() => onOpen(row)} className="flex w-full items-start justify-between gap-3 py-3 text-left text-sm hover:bg-violet-50/60">
-            <div className="min-w-0">
-              <p className="flex items-center gap-1 font-bold text-violet-700"><Receipt size={14} /> {row.code || "Invoice"}</p>
-              <p className="mt-0.5 text-xs text-slate-600">
-                {(row.items || []).map((item) => item.name).filter(Boolean).join(", ") || "No products"}
-              </p>
-              <p className="text-xs text-slate-500">
-                {whenStamp(row.invoiceDate, row.createdAt)}
-                {monthOf(row.invoiceDate) ? ` · ${monthOf(row.invoiceDate)}` : ""}
-                {` · Discount ${money(row.discountTotal)}`}
-              </p>
+        <div
+          key={row.id}
+          onClick={() => onOpen(row)}
+          className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5 transition active:scale-[0.99] cursor-pointer hover:border-purple-300"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-100/90 text-purple-700 shadow-xs">
+                <Receipt size={16} />
+              </div>
+              <div className="min-w-0">
+                <span className="font-bold text-xs sm:text-sm text-purple-700 truncate block">
+                  {row.code || "Invoice"}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {whenStamp(row.invoiceDate, row.createdAt)}
+                  {monthOf(row.invoiceDate) ? ` · ${monthOf(row.invoiceDate)}` : ""}
+                </span>
+              </div>
             </div>
-            <div className="shrink-0 text-right">
-              <p className="font-bold text-slate-900">{money(row.amount)}</p>
-              <p className="text-xs text-slate-500">Paid {money(row.paidAmount)} · Due {money(row.dueAmount)}</p>
+
+            <span className="text-sm sm:text-base font-black text-slate-900 shrink-0">
+              {money(row.amount)}
+            </span>
+          </div>
+
+          {/* Items */}
+          <div className="rounded-xl bg-purple-50/50 border border-purple-100/80 p-2 text-xs">
+            <span className="text-[10px] font-bold uppercase text-purple-700 block mb-0.5">
+              Purchased Items
+            </span>
+            <p className="text-xs font-semibold text-slate-800 line-clamp-2">
+              {(row.items || []).map((item) => item.name).filter(Boolean).join(", ") || "No products"}
+            </p>
+          </div>
+
+          {/* Metrics & Actions */}
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px]">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="rounded-md bg-emerald-50 border border-emerald-100 px-2 py-0.5 font-bold text-emerald-700">
+                Paid: {money(row.paidAmount)}
+              </span>
+              {Number(row.dueAmount) > 0 ? (
+                <span className="rounded-md bg-rose-50 border border-rose-100 px-2 py-0.5 font-bold text-rose-700">
+                  Due: {money(row.dueAmount)}
+                </span>
+              ) : null}
+              {row.discountTotal ? (
+                <span className="rounded-md bg-amber-50 border border-amber-100 px-2 py-0.5 font-bold text-amber-800">
+                  Disc: {money(row.discountTotal)}
+                </span>
+              ) : null}
             </div>
-          </button>
-        </li>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpen(row);
+              }}
+              className="inline-flex items-center gap-1 rounded-xl bg-purple-50 border border-purple-200/90 hover:bg-purple-100 px-2.5 py-1 text-xs font-bold text-purple-700 transition active:scale-95 cursor-pointer shrink-0"
+            >
+              <Eye size={12} /> View
+            </button>
+          </div>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
 
 function BookingList({ rows }: { rows: Customer360Booking[] }) {
   if (!rows.length) return <Empty text="No bookings for this customer." />;
   return (
-    <ul className="divide-y divide-slate-100">
-      {rows.map((row) => (
-        <li key={`${row.kind}-${row.id}`} className="flex items-start justify-between gap-3 py-3 text-sm">
-          <div>
-            <p className="flex items-center gap-1 font-bold text-slate-900">
-              <CalendarDays size={14} /> {row.title}
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-500">{row.kind}</span>
-            </p>
-            <p className="text-xs text-slate-500">
-              {whenStamp(row.bookingDate, row.createdAt)}
-              {row.startTime ? ` · ${row.startTime}${row.endTime ? `–${row.endTime}` : ""}` : ""}
-              {row.status ? ` · ${row.status}` : ""}
-            </p>
+    <div className="space-y-2.5">
+      {rows.map((row) => {
+        const isCancelled = ["cancelled", "draft", "expired"].includes((row.status || "").toLowerCase());
+        return (
+          <div
+            key={`${row.kind}-${row.id}`}
+            className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5 transition hover:shadow-xs"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100/90 text-sky-700 shadow-xs">
+                  <CalendarDays size={16} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                      {row.title}
+                    </span>
+                    <span className="rounded-full bg-sky-50 border border-sky-200/70 px-2 py-0.5 text-[10px] font-bold uppercase text-sky-700">
+                      {row.kind}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    {whenStamp(row.bookingDate, row.createdAt)}
+                    {row.startTime ? ` · ${row.startTime}${row.endTime ? `–${row.endTime}` : ""}` : ""}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-right shrink-0">
+                <span className="text-sm sm:text-base font-black text-slate-900 block">
+                  {money(row.amount)}
+                </span>
+                <span
+                  className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    isCancelled
+                      ? "bg-rose-50 text-rose-700 border border-rose-200/60"
+                      : "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                  }`}
+                >
+                  {row.status || "Confirmed"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px]">
+              <span className="text-slate-500">
+                Paid: <b className="text-emerald-700 font-bold">{money(row.paidAmount)}</b>
+              </span>
+              {Number(row.dueAmount) > 0 ? (
+                <span className="text-slate-500">
+                  Due: <b className="text-rose-600 font-bold">{money(row.dueAmount)}</b>
+                </span>
+              ) : (
+                <span className="text-slate-400 font-medium">Fully Paid</span>
+              )}
+            </div>
           </div>
-          <div className="text-right">
-            <p className="font-bold text-slate-900">{money(row.amount)}</p>
-            <p className="text-xs text-slate-500">Paid {money(row.paidAmount)} · Due {money(row.dueAmount)}</p>
-          </div>
-        </li>
-      ))}
-    </ul>
+        );
+      })}
+    </div>
   );
 }
 
 function MembershipList({ rows }: { rows: Customer360Membership[] }) {
   if (!rows.length) return <Empty text="No memberships for this customer." />;
   return (
-    <ul className="divide-y divide-slate-100">
+    <div className="space-y-2.5">
       {rows.map((row) => (
-        <li key={row.id} className="flex items-start justify-between gap-3 py-3 text-sm">
-          <div>
-            <p className="flex items-center gap-1 font-bold capitalize text-slate-900">
-              <Crown size={14} /> {row.plan || "Membership"}
-              {row.current || row.code === "Current" ? (
-                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-700">Current</span>
-              ) : null}
-            </p>
-            <p className="text-xs text-slate-500">
-              {row.code ? `${row.code} · ` : ""}
-              {whenStamp(row.startDate || row.invoiceDate, row.createdAt)}
-              {row.months ? ` · ${row.months} months` : row.term === "lifetime" ? " · Lifetime" : ""}
-              {row.endDate ? ` – ${when(row.endDate)}` : ""}
-              {row.status ? ` · ${row.status}` : ""}
-            </p>
+        <div
+          key={row.id}
+          className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5 transition hover:shadow-xs"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100/90 text-amber-700 shadow-xs">
+                <Crown size={16} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-bold text-xs sm:text-sm text-slate-900 capitalize truncate">
+                    {row.plan || "Membership"}
+                  </span>
+                  {row.current || row.code === "Current" ? (
+                    <span className="rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-700">
+                      Current
+                    </span>
+                  ) : null}
+                </div>
+                <span className="text-[11px] text-slate-400">
+                  {whenStamp(row.startDate || row.invoiceDate, row.createdAt)}
+                </span>
+              </div>
+            </div>
+
+            <span className="text-sm sm:text-base font-black text-slate-900 shrink-0">
+              {money(row.amount)}
+            </span>
           </div>
-          <p className="font-bold text-slate-900">{money(row.amount)}</p>
-        </li>
+
+          <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+            {row.code && (
+              <span className="rounded-lg bg-slate-100 px-2 py-0.5 font-mono font-medium text-slate-700">
+                {row.code}
+              </span>
+            )}
+            {row.months ? (
+              <span className="rounded-lg bg-blue-50 border border-blue-100 px-2 py-0.5 font-semibold text-blue-700">
+                {row.months} Months
+              </span>
+            ) : row.term === "lifetime" ? (
+              <span className="rounded-lg bg-amber-50 border border-amber-100 px-2 py-0.5 font-semibold text-amber-800">
+                Lifetime
+              </span>
+            ) : null}
+            {row.endDate && (
+              <span className="rounded-lg bg-slate-50 border border-slate-200 px-2 py-0.5 text-slate-600">
+                Valid till: {when(row.endDate)}
+              </span>
+            )}
+            {row.status && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  row.status.toLowerCase() === "active"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+                    : "bg-slate-100 text-slate-500 border border-slate-200/60"
+                }`}
+              >
+                {row.status}
+              </span>
+            )}
+          </div>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
 
 function WalletList({ rows }: { rows: Customer360WalletTx[] }) {
   if (!rows.length) return <Empty text="No wallet credits or debits in this period." />;
   return (
-    <div>
-      <p className="mb-3 text-xs text-slate-500">Wallet only. Credits add money. Debits spend it. Product sales stay in Sell Product and Activity.</p>
-      <ul className="divide-y divide-slate-100">
-      {rows.map((row) => (
-        <li key={row.id} className="flex items-start justify-between gap-3 py-3 text-sm">
-          <div>
-            <p className="flex items-center gap-1 font-bold capitalize text-slate-900"><Wallet size={14} /> {row.type} · {row.reason || row.walletType || "Wallet"}</p>
-            <p className="text-xs text-slate-500">
-              {whenStamp(row.createdAt)}
-              {row.note ? ` · ${row.note}` : ""}
-              {row.by ? ` · ${row.by}` : ""}
-            </p>
+    <div className="space-y-2.5">
+      <p className="text-xs text-slate-400">
+        Wallet transaction ledger. Credits add funds, debits spend funds.
+      </p>
+      {rows.map((row) => {
+        const isCredit = row.type !== "debit";
+        return (
+          <div
+            key={row.id}
+            className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5 transition hover:shadow-xs"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-xs ${
+                    isCredit
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-rose-100 text-rose-700"
+                  }`}
+                >
+                  <Wallet size={16} />
+                </div>
+                <div className="min-w-0">
+                  <span className="font-bold text-xs sm:text-sm capitalize text-slate-900 block truncate">
+                    {row.reason || row.walletType || `${row.type} transaction`}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    {whenStamp(row.createdAt)}
+                  </span>
+                </div>
+              </div>
+
+              <span
+                className={`text-sm sm:text-base font-black shrink-0 ${
+                  isCredit ? "text-emerald-700" : "text-rose-600"
+                }`}
+              >
+                {isCredit ? "+" : "−"}{money(row.amount)}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px]">
+              <span className="text-slate-400 truncate">
+                {row.by ? `By ${row.by}` : row.note ? row.note : "Wallet"}
+              </span>
+              <span className="rounded-lg bg-slate-50 border border-slate-200/80 px-2 py-0.5 font-bold text-slate-700 shrink-0">
+                Balance: {money(row.balanceAfter)}
+              </span>
+            </div>
           </div>
-          <div className="text-right">
-            <p className={`font-bold ${row.type === "debit" ? "text-rose-600" : "text-emerald-700"}`}>
-              {row.type === "debit" ? "−" : "+"}{money(row.amount)}
-            </p>
-            <p className="text-xs text-slate-500">Balance {money(row.balanceAfter)}</p>
-          </div>
-        </li>
-      ))}
-    </ul>
+        );
+      })}
     </div>
   );
 }
+
 function TimelineList({ rows }: { rows: Customer360TimelineItem[] }) {
   if (!rows.length) return <Empty text="No activity in this period." />;
   return (
-    <div>
-      <p className="mb-3 text-xs text-slate-500">
-        Activity is the history. A product sale, a payment, a membership, a booking, and a wallet credit or debit each show their own details.
-      </p>
-      <ol className="space-y-3">
-        {rows.map((item) => (
-          <li key={item.id} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-violet-600">{activityLabel(item.type)}</p>
-                <p className="text-sm font-bold text-slate-900">{item.title}</p>
-                <p className="text-xs text-slate-500">{whenStamp(item.createdAt || item.at, item.createdAt || item.at)}</p>
+    <div className="space-y-3">
+      <div className="relative pl-6 space-y-3 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-violet-400 before:via-purple-300 before:to-slate-200">
+        {rows.map((item) => {
+          const type = (item.type || "").toLowerCase();
+          const isSale = type.includes("sale");
+          const isPayment = type.includes("payment");
+          const isBooking = type.includes("booking");
+          const isMembership = type.includes("membership");
+          const isWallet = type.includes("wallet");
+
+          const nodeBg = isSale
+            ? "bg-purple-600 ring-4 ring-purple-100 text-white"
+            : isPayment
+            ? "bg-blue-600 ring-4 ring-blue-100 text-white"
+            : isBooking
+            ? "bg-sky-600 ring-4 ring-sky-100 text-white"
+            : isMembership
+            ? "bg-amber-500 ring-4 ring-amber-100 text-white"
+            : isWallet
+            ? "bg-emerald-600 ring-4 ring-emerald-100 text-white"
+            : "bg-indigo-600 ring-4 ring-indigo-100 text-white";
+
+          return (
+            <div key={item.id} className="relative group">
+              {/* Node circle */}
+              <div
+                className={`absolute -left-6 top-3 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full text-[10px] font-bold shadow-xs ${nodeBg}`}
+              >
+                {isSale ? (
+                  <ShoppingBag size={10} />
+                ) : isPayment ? (
+                  <Receipt size={10} />
+                ) : isBooking ? (
+                  <CalendarDays size={10} />
+                ) : isMembership ? (
+                  <Crown size={10} />
+                ) : isWallet ? (
+                  <Wallet size={10} />
+                ) : (
+                  <History size={10} />
+                )}
               </div>
-              {item.amount ? <p className="shrink-0 text-sm font-bold text-slate-900">{money(item.amount)}</p> : null}
+
+              {/* Card */}
+              <div className="rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-3.5 shadow-2xs space-y-2 transition hover:shadow-xs hover:border-slate-300">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="rounded-full bg-violet-50 border border-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 inline-block mb-1">
+                      {activityLabel(item.type)}
+                    </span>
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                      {item.title}
+                    </h4>
+                  </div>
+                  {item.amount ? (
+                    <span className="shrink-0 rounded-full bg-emerald-50 border border-emerald-200/70 px-2.5 py-0.5 text-xs font-black text-emerald-700">
+                      {money(item.amount)}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-400">
+                  <span className="flex items-center gap-1 font-medium text-slate-500">
+                    <Calendar size={12} className="text-slate-400" />
+                    {whenStamp(item.createdAt || item.at, item.createdAt || item.at)}
+                  </span>
+                </div>
+
+                <ActivityFacts item={item} />
+              </div>
             </div>
-            <ActivityFacts item={item} />
-          </li>
-        ))}
-      </ol>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1260,38 +1560,59 @@ function activityLabel(type: string) {
 function ActivityFacts({ item }: { item: Customer360TimelineItem }) {
   if (item.type === "sale") {
     return (
-      <p className="mt-1 text-xs text-slate-600">
-        Products: {item.products?.length ? item.products.join(", ") : "—"}
-        {` · Discount ${money(item.discount)}`}
-        {` · Paid ${money(item.paidAmount)} · Due ${money(item.dueAmount)}`}
-      </p>
+      <div className="rounded-xl bg-purple-50/50 border border-purple-100/70 p-2 text-xs space-y-1">
+        {item.products?.length ? (
+          <p className="font-semibold text-slate-800">
+            Products: <span className="font-medium text-slate-700">{item.products.join(", ")}</span>
+          </p>
+        ) : null}
+        <div className="flex items-center gap-2 flex-wrap text-[11px]">
+          <span className="font-bold text-emerald-700">Paid: {money(item.paidAmount)}</span>
+          {Number(item.dueAmount) > 0 ? (
+            <span className="font-bold text-rose-600">Due: {money(item.dueAmount)}</span>
+          ) : null}
+          {item.discount ? (
+            <span className="font-bold text-amber-700">Disc: {money(item.discount)}</span>
+          ) : null}
+        </div>
+      </div>
     );
   }
   if (item.type === "payment") {
     return (
-      <p className="mt-1 text-xs text-slate-600">
-        Payment activity{item.paymentMode ? ` · ${item.paymentMode}` : ""}
-        {item.detail ? ` · ${item.detail}` : ""}
-      </p>
+      <div className="rounded-xl bg-blue-50/50 border border-blue-100/70 p-2 text-xs">
+        <p className="font-semibold text-blue-900">
+          Payment {item.paymentMode ? `· ${item.paymentMode}` : ""}
+        </p>
+        {item.detail && <p className="text-slate-600 mt-0.5">{item.detail}</p>}
+      </div>
     );
   }
   if (item.type === "wallet") {
     return (
-      <p className="mt-1 text-xs text-slate-600">
-        {item.credit ? `Credit ${money(item.credit)}` : `Debit ${money(item.debit)}`}
-        {item.detail ? ` · ${item.detail}` : ""}
-      </p>
+      <div className="rounded-xl bg-emerald-50/50 border border-emerald-100/70 p-2 text-xs">
+        <p className="font-semibold text-emerald-900">
+          {item.credit ? `Credit: +${money(item.credit)}` : `Debit: -${money(item.debit)}`}
+        </p>
+        {item.detail && <p className="text-slate-600 mt-0.5">{item.detail}</p>}
+      </div>
     );
   }
   if (item.type === "membership") {
     return (
-      <p className="mt-1 text-xs text-slate-600">
-        {item.months ? `${item.months} months` : "Lifetime"}
-        {item.detail ? ` · ${item.detail}` : ""}
-      </p>
+      <div className="rounded-xl bg-amber-50/50 border border-amber-100/70 p-2 text-xs">
+        <p className="font-semibold text-amber-900">
+          {item.months ? `${item.months} months plan` : "Lifetime plan"}
+        </p>
+        {item.detail && <p className="text-slate-600 mt-0.5">{item.detail}</p>}
+      </div>
     );
   }
-  return item.detail ? <p className="mt-1 text-xs text-slate-600">{item.detail}</p> : null;
+  return item.detail ? (
+    <p className="rounded-xl bg-slate-50 border border-slate-100 p-2 text-xs text-slate-600">
+      {item.detail}
+    </p>
+  ) : null;
 }
 
 function SaleDetail({ sale, onClose }: { sale: Customer360Purchase; onClose: () => void }) {

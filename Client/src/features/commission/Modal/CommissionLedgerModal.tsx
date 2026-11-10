@@ -387,57 +387,18 @@ const CommissionLedgerModal = ({
               </p>
             </div>
           ) : (
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="sticky top-0 bg-gray-100 text-gray-600 font-semibold uppercase tracking-wider border-b border-gray-200 z-10">
-                <tr>
-                  <th className="py-2.5 px-4">Invoice No</th>
-                  <th className="py-2.5 px-4">Date</th>
-                  <th className="py-2.5 px-4">Customer</th>
-                  <th className="py-2.5 px-4">Category</th>
-                  <th className="py-2.5 px-4 text-right">Invoice Total</th>
-                 
-                  <th className="py-2.5 px-4 text-right">Commission</th>
-                  <th className="py-2.5 px-4 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
+            <>
+              {/* Mobile Card UI */}
+              <div className="block md:hidden p-3 space-y-2.5">
                 {filteredInvoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-indigo-50/30 transition">
-                    <td className="py-3 px-4 font-bold text-indigo-600">
-                      {inv.invoiceCode}
-                    </td>
-
-                    <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
-                      {inv.date}
-                    </td>
-
-                    <td className="py-3 px-4">
-                      <p className="font-medium text-gray-900">
-                        {inv.customerName}
-                      </p>
-                      {inv.customerPhone && (
-                        <p className="text-[10px] text-gray-400">
-                          {inv.customerPhone}
-                        </p>
-                      )}
-                    </td>
-
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-700">
-                        {inv.category}
+                  <div
+                    key={inv.id}
+                    className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-xs text-indigo-600 font-mono">
+                        {inv.invoiceCode}
                       </span>
-                    </td>
-
-                    <td className="py-3 px-4 text-right font-semibold text-gray-800">
-                      ₹{inv.invoiceAmount.toLocaleString("en-IN")}
-                    </td>
-
-
-                    <td className="py-3 px-4 text-right font-bold text-emerald-600 text-sm">
-                      +₹{inv.commissionAmount.toLocaleString("en-IN")}
-                    </td>
-
-                    <td className="py-3 px-4 text-center">
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                           inv.status === "Credited"
@@ -454,11 +415,124 @@ const CommissionLedgerModal = ({
                         )}
                         {inv.status}
                       </span>
-                    </td>
-                  </tr>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>{inv.date}</span>
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-700">
+                        {inv.category}
+                      </span>
+                    </div>
+
+                    {(inv.customerName || inv.customerPhone) && (
+                      <div className="rounded-lg bg-slate-50/80 p-2 text-xs">
+                        <p className="font-semibold text-slate-800">
+                          {inv.customerName || "Customer"}
+                        </p>
+                        {inv.customerPhone && (
+                          <p className="text-[11px] text-slate-400">
+                            {inv.customerPhone}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-xs">
+                      <div>
+                        <span className="text-[10px] uppercase text-slate-400 font-bold block">
+                          Invoice Total
+                        </span>
+                        <span className="font-bold text-slate-800">
+                          ₹{inv.invoiceAmount.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase text-emerald-600 font-bold block">
+                          Commission
+                        </span>
+                        <span className="font-black text-emerald-700 text-sm">
+                          +₹{inv.commissionAmount.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+
+              {/* Desktop Table UI */}
+              <table className="hidden md:table w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 bg-gray-100 text-gray-600 font-semibold uppercase tracking-wider border-b border-gray-200 z-10">
+                  <tr>
+                    <th className="py-2.5 px-4">Invoice No</th>
+                    <th className="py-2.5 px-4">Date</th>
+                    <th className="py-2.5 px-4">Customer</th>
+                    <th className="py-2.5 px-4">Category</th>
+                    <th className="py-2.5 px-4 text-right">Invoice Total</th>
+                   
+                    <th className="py-2.5 px-4 text-right">Commission</th>
+                    <th className="py-2.5 px-4 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredInvoices.map((inv) => (
+                    <tr key={inv.id} className="hover:bg-indigo-50/30 transition">
+                      <td className="py-3 px-4 font-bold text-indigo-600">
+                        {inv.invoiceCode}
+                      </td>
+
+                      <td className="py-3 px-4 text-gray-600 whitespace-nowrap">
+                        {inv.date}
+                      </td>
+
+                      <td className="py-3 px-4">
+                        <p className="font-medium text-gray-900">
+                          {inv.customerName}
+                        </p>
+                        {inv.customerPhone && (
+                          <p className="text-[10px] text-gray-400">
+                            {inv.customerPhone}
+                          </p>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-700">
+                          {inv.category}
+                        </span>
+                      </td>
+
+                      <td className="py-3 px-4 text-right font-semibold text-gray-800">
+                        ₹{inv.invoiceAmount.toLocaleString("en-IN")}
+                      </td>
+
+
+                      <td className="py-3 px-4 text-right font-bold text-emerald-600 text-sm">
+                        +₹{inv.commissionAmount.toLocaleString("en-IN")}
+                      </td>
+
+                      <td className="py-3 px-4 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            inv.status === "Credited"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : inv.status === "Paid"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {inv.status === "Credited" ? (
+                            <CheckCircle2 size={10} />
+                          ) : (
+                            <Clock size={10} />
+                          )}
+                          {inv.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
 

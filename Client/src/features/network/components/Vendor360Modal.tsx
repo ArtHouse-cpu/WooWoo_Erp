@@ -6,7 +6,9 @@ import {
   ArrowUpRight,
   Building2,
   Calendar,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Coins,
   CreditCard,
   Download,
@@ -291,6 +293,8 @@ export default function Vendor360Modal({
     );
   const [createdSort, setCreatedSort] = useState<CreatedSort>("newest");
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
+  const [profileCollapsed, setProfileCollapsed] = useState(false);
+  const [balanceCollapsed, setBalanceCollapsed] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [payDoc, setPayDoc] = useState("");
   const [bill, setBill] = useState<VendorBillRow | null>(null);
@@ -878,9 +882,9 @@ export default function Vendor360Modal({
                 label: "Overview",
                 Icon: LayoutDashboard,
                 activeClass:
-                  "bg-sky-100 text-sky-800 border-2 border-sky-400/80 shadow-xs ring-1 ring-sky-200",
+                  "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 ring-1 ring-blue-600",
                 inactiveClass:
-                  "bg-sky-50/70 text-sky-700/80 border border-sky-200/70 hover:bg-sky-100/70",
+                  "bg-blue-50/70 text-blue-700 hover:bg-blue-100/90 border border-blue-200/70",
                 badge: null,
               },
               {
@@ -888,9 +892,9 @@ export default function Vendor360Modal({
                 label: "Timeline",
                 Icon: History,
                 activeClass:
-                  "bg-orange-100 text-orange-800 border-2 border-orange-400/80 shadow-xs ring-1 ring-orange-200",
+                  "bg-gradient-to-r from-amber-500 to-[#ff5a36] text-white shadow-md shadow-orange-500/25 ring-1 ring-[#ff5a36]",
                 inactiveClass:
-                  "bg-orange-50/70 text-orange-700/80 border border-orange-200/70 hover:bg-orange-100/70",
+                  "bg-orange-50/70 text-orange-700 hover:bg-orange-100/90 border border-orange-200/70",
                 badge: data?.timeline?.length || null,
               },
               {
@@ -898,9 +902,9 @@ export default function Vendor360Modal({
                 label: "Purchases",
                 Icon: ShoppingCart,
                 activeClass:
-                  "bg-emerald-100 text-emerald-800 border-2 border-emerald-400/80 shadow-xs ring-1 ring-emerald-200",
+                  "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/25 ring-1 ring-emerald-600",
                 inactiveClass:
-                  "bg-emerald-50/70 text-emerald-700/80 border border-emerald-200/70 hover:bg-emerald-100/70",
+                  "bg-emerald-50/70 text-emerald-700 hover:bg-emerald-100/90 border border-emerald-200/70",
                 badge: data?.purchases?.length || null,
               },
               {
@@ -908,9 +912,9 @@ export default function Vendor360Modal({
                 label: "Orders",
                 Icon: FileText,
                 activeClass:
-                  "bg-indigo-100 text-indigo-800 border-2 border-indigo-400/80 shadow-xs ring-1 ring-indigo-200",
+                  "bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-md shadow-purple-500/25 ring-1 ring-purple-600",
                 inactiveClass:
-                  "bg-indigo-50/70 text-indigo-700/80 border border-indigo-200/70 hover:bg-indigo-100/70",
+                  "bg-purple-50/70 text-purple-700 hover:bg-purple-100/90 border border-purple-200/70",
                 badge: data?.orders?.length || null,
               },
               {
@@ -918,9 +922,9 @@ export default function Vendor360Modal({
                 label: "Payments",
                 Icon: Wallet,
                 activeClass:
-                  "bg-purple-100 text-purple-800 border-2 border-purple-400/80 shadow-xs ring-1 ring-purple-200",
+                  "bg-gradient-to-r from-pink-500 to-rose-600 text-white shadow-md shadow-pink-500/25 ring-1 ring-pink-600",
                 inactiveClass:
-                  "bg-purple-50/70 text-purple-700/80 border border-purple-200/70 hover:bg-purple-100/70",
+                  "bg-pink-50/70 text-pink-700 hover:bg-pink-100/90 border border-pink-200/70",
                 badge: data?.payments?.length || null,
               },
             ] as const
@@ -938,7 +942,7 @@ export default function Vendor360Modal({
                   setStatus("");
                   setDateRange("");
                 }}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all duration-200 cursor-pointer whitespace-nowrap active:scale-95 ${
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold transition-all duration-200 cursor-pointer whitespace-nowrap active:scale-95 ${
                   isActive ? item.activeClass : item.inactiveClass
                 }`}
               >
@@ -946,10 +950,10 @@ export default function Vendor360Modal({
                 <span>{item.label}</span>
                 {item.badge != null && (
                   <span
-                    className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-black leading-none ${
+                    className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-black leading-none ${
                       isActive
-                        ? "bg-white text-slate-800 shadow-2xs"
-                        : "bg-white/80 text-slate-600 border border-slate-200/60"
+                        ? "bg-white text-slate-800 shadow-xs"
+                        : "bg-white/90 text-slate-700 border border-slate-200/70"
                     }`}
                   >
                     {item.badge}
@@ -1011,17 +1015,48 @@ export default function Vendor360Modal({
 
               <div className="grid gap-3 lg:grid-cols-2">
                 {/* Profile Card */}
-                <article className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
-                      <User size={18} />
+                <article className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs transition-all">
+                  <div
+                    onClick={() => setProfileCollapsed((prev) => !prev)}
+                    className="flex items-center justify-between cursor-pointer select-none group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
+                        <User size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition">
+                          Profile
+                        </h3>
+                        {profileCollapsed ? (
+                          <p className="text-[11px] text-slate-400 font-medium truncate">
+                            {profile?.mobile || vendor.mobile ? `${profile?.mobile || vendor.mobile} · ` : ""}
+                            Click to expand
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      Profile
-                    </h3>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProfileCollapsed((prev) => !prev);
+                      }}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600 hover:bg-slate-100 transition active:scale-95 cursor-pointer"
+                      aria-label={profileCollapsed ? "Expand profile section" : "Collapse profile section"}
+                    >
+                      <ChevronDown
+                        size={16}
+                        className={`transition-transform duration-200 ${
+                          profileCollapsed ? "" : "rotate-180"
+                        }`}
+                      />
+                    </button>
                   </div>
 
-                  <div className="mt-3.5 grid grid-cols-2 gap-2 text-sm">
+                  {!profileCollapsed && (
+                    <div className="mt-3.5 grid grid-cols-2 gap-2 text-sm animate-in fade-in duration-150">
                     {[
                       {
                         label: "PHONE",
@@ -1183,140 +1218,234 @@ export default function Vendor360Modal({
                       />
                     </div>
                   </div>
+                  )}
                 </article>
 
                 {/* Balance Card */}
-                <article className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
+                <article className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs transition-all">
+                  <div
+                    onClick={() => setBalanceCollapsed((prev) => !prev)}
+                    className="flex items-center justify-between cursor-pointer select-none group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
                         <Wallet size={18} />
                       </div>
-                      <h3 className="text-base font-bold text-slate-900">
-                        Balance
-                      </h3>
-                    </div>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200/60">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Active
-                    </span>
-                  </div>
-
-                  <ul className="mt-3.5 space-y-2.5">
-                    {[
-                      {
-                        label: "Opening balance",
-                        value: money(summary?.openingBalance),
-                        Icon: ArrowDownLeft,
-                        iconBg: "bg-emerald-100/80",
-                        iconColor: "text-emerald-600",
-                      },
-                      {
-                        label: "Purchases",
-                        value: money(summary?.purchaseTotal),
-                        Icon: ShoppingBag,
-                        iconBg: "bg-sky-100/80",
-                        iconColor: "text-sky-600",
-                      },
-                      {
-                        label: "Returns",
-                        value: money(summary?.returnTotal),
-                        Icon: RotateCcw,
-                        iconBg: "bg-emerald-100/80",
-                        iconColor: "text-emerald-600",
-                      },
-                      {
-                        label: "Paid on bills",
-                        value: money(summary?.paidOnBills),
-                        Icon: Receipt,
-                        iconBg: "bg-amber-100/80",
-                        iconColor: "text-amber-600",
-                      },
-                      {
-                        label: "Advance paid",
-                        value: money(summary?.advance),
-                        Icon: Wallet,
-                        iconBg: "bg-purple-100/80",
-                        iconColor: "text-purple-600",
-                      },
-                      {
-                        label: "Pay-in received",
-                        value: money(summary?.payIn),
-                        Icon: Coins,
-                        iconBg: "bg-rose-100/80",
-                        iconColor: "text-rose-600",
-                      },
-                    ].map((item) => {
-                      const Icon = item.Icon;
-                      return (
-                        <li
-                          key={item.label}
-                          className="flex items-center justify-between py-0.5"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${item.iconBg} ${item.iconColor}`}
-                            >
-                              <Icon size={15} />
-                            </div>
-                            <span className="truncate text-xs sm:text-sm font-semibold text-slate-700">
-                              {item.label}
+                      <div className="min-w-0">
+                        <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition">
+                          Balance
+                        </h3>
+                        {balanceCollapsed ? (
+                          <p className="text-[11px] text-slate-400 font-medium truncate">
+                            Outstanding:{" "}
+                            <span className="font-bold text-rose-600">
+                              {money(summary?.outstanding)}
                             </span>
-                          </div>
-                          <span className="text-xs sm:text-sm font-bold text-slate-900 shrink-0">
-                            {item.value}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-
-                  {/* Outstanding Full Width Row */}
-                  <div className="mt-3 flex items-center justify-between rounded-2xl bg-rose-50/90 border border-rose-100/90 px-3.5 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <Scale size={16} className="text-rose-600" />
-                      <span className="text-xs sm:text-sm font-bold text-rose-700">
-                        Outstanding
-                      </span>
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                    <span className="text-xs sm:text-sm font-black text-rose-700">
-                      {money(summary?.outstanding)}
-                    </span>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200/60">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Active
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setBalanceCollapsed((prev) => !prev);
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600 hover:bg-slate-100 transition active:scale-95 cursor-pointer"
+                        aria-label={balanceCollapsed ? "Expand balance section" : "Collapse balance section"}
+                      >
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-200 ${
+                            balanceCollapsed ? "" : "rotate-180"
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
+
+                  {!balanceCollapsed && (
+                    <div className="animate-in fade-in duration-150">
+                      <ul className="mt-3.5 space-y-2.5">
+                        {[
+                          {
+                            label: "Opening balance",
+                            value: money(summary?.openingBalance),
+                            Icon: ArrowDownLeft,
+                            iconBg: "bg-emerald-100/80",
+                            iconColor: "text-emerald-600",
+                          },
+                          {
+                            label: "Purchases",
+                            value: money(summary?.purchaseTotal),
+                            Icon: ShoppingBag,
+                            iconBg: "bg-sky-100/80",
+                            iconColor: "text-sky-600",
+                          },
+                          {
+                            label: "Returns",
+                            value: money(summary?.returnTotal),
+                            Icon: RotateCcw,
+                            iconBg: "bg-emerald-100/80",
+                            iconColor: "text-emerald-600",
+                          },
+                          {
+                            label: "Paid on bills",
+                            value: money(summary?.paidOnBills),
+                            Icon: Receipt,
+                            iconBg: "bg-amber-100/80",
+                            iconColor: "text-amber-600",
+                          },
+                          {
+                            label: "Advance paid",
+                            value: money(summary?.advance),
+                            Icon: Wallet,
+                            iconBg: "bg-purple-100/80",
+                            iconColor: "text-purple-600",
+                          },
+                          {
+                            label: "Pay-in received",
+                            value: money(summary?.payIn),
+                            Icon: Coins,
+                            iconBg: "bg-rose-100/80",
+                            iconColor: "text-rose-600",
+                          },
+                        ].map((item) => {
+                          const Icon = item.Icon;
+                          return (
+                            <li
+                              key={item.label}
+                              className="flex items-center justify-between py-0.5"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div
+                                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${item.iconBg} ${item.iconColor}`}
+                                >
+                                  <Icon size={15} />
+                                </div>
+                                <span className="truncate text-xs sm:text-sm font-semibold text-slate-700">
+                                  {item.label}
+                                </span>
+                              </div>
+                              <span className="text-xs sm:text-sm font-bold text-slate-900 shrink-0">
+                                {item.value}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+
+                      {/* Outstanding Full Width Row */}
+                      <div className="mt-3 flex items-center justify-between rounded-2xl bg-rose-50/90 border border-rose-100/90 px-3.5 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <Scale size={16} className="text-rose-600" />
+                          <span className="text-xs sm:text-sm font-bold text-rose-700">
+                            Outstanding
+                          </span>
+                        </div>
+                        <span className="text-xs sm:text-sm font-black text-rose-700">
+                          {money(summary?.outstanding)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </article>
               </div>
             </div>
           ) : null}
 
           {!loading && data && tab === "timeline" ? (
-            <section className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="mb-3 flex justify-end">
+            <section className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Activity Timeline ({sortedTimeline.length})
+                </span>
                 <CreatedSortSelect value={createdSort} onChange={setCreatedSort} />
               </div>
               {sortedTimeline.length === 0 ? (
-                <p className="text-sm text-slate-500">No activity yet.</p>
+                <div className="py-12 text-center text-xs text-slate-400">
+                  <History size={32} className="mx-auto mb-2 text-slate-300" />
+                  <p>No activity recorded yet for this vendor.</p>
+                </div>
               ) : (
-                <ol className="space-y-3">
-                  {sortedTimeline.map((item: VendorTimelineItem) => (
-                    <li
-                      key={item.id}
-                      className="border-l-2 border-violet-200 pl-3"
-                    >
-                      <p className="text-sm font-bold text-slate-900">
-                        {item.title}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {whenStamp(item.createdAt || item.at, item.createdAt || item.at)}
-                        {item.amount ? ` · ${money(item.amount)}` : ""}
-                        {/* {item.reference ? ` · ${item.reference}` : ""} */}
-                        {item.by ? ` · ${item.by}` : ""}
-                      </p>
-                      {item.detail ? (
-                        <p className="text-xs text-slate-600">{item.detail}</p>
-                      ) : null}
-                    </li>
-                  ))}
-                </ol>
+                <div className="relative pl-6 space-y-3 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-indigo-400 before:via-purple-300 before:to-slate-200">
+                  {sortedTimeline.map((item: VendorTimelineItem) => {
+                    const isPurchase = item.type?.toLowerCase().includes("purchase") || item.title?.toLowerCase().includes("purchase");
+                    const isPayment = item.type?.toLowerCase().includes("pay") || item.title?.toLowerCase().includes("pay");
+                    const isOrder = item.type?.toLowerCase().includes("order") || item.title?.toLowerCase().includes("order");
+                    
+                    const nodeBg = isPurchase
+                      ? "bg-blue-600 ring-4 ring-blue-100 text-white"
+                      : isPayment
+                      ? "bg-emerald-600 ring-4 ring-emerald-100 text-white"
+                      : isOrder
+                      ? "bg-purple-600 ring-4 ring-purple-100 text-white"
+                      : "bg-amber-500 ring-4 ring-amber-100 text-white";
+
+                    return (
+                      <div key={item.id} className="relative group">
+                        {/* Node circle */}
+                        <div
+                          className={`absolute -left-6 top-3 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full text-[10px] font-bold shadow-xs ${nodeBg}`}
+                        >
+                          {isPurchase ? (
+                            <ShoppingCart size={10} />
+                          ) : isPayment ? (
+                            <Wallet size={10} />
+                          ) : isOrder ? (
+                            <FileText size={10} />
+                          ) : (
+                            <Activity size={10} />
+                          )}
+                        </div>
+
+                        {/* Card */}
+                        <div className="rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-3.5 shadow-2xs space-y-2 transition hover:shadow-xs hover:border-slate-300">
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                              {item.title}
+                            </h4>
+                            {item.amount ? (
+                              <span className="shrink-0 rounded-full bg-emerald-50 border border-emerald-200/70 px-2.5 py-0.5 text-xs font-black text-emerald-700">
+                                {money(item.amount)}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-400">
+                            <span className="flex items-center gap-1 font-medium text-slate-500">
+                              <Calendar size={12} className="text-slate-400" />
+                              {whenStamp(item.createdAt || item.at, item.createdAt || item.at)}
+                            </span>
+                            {item.by && (
+                              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">
+                                By {item.by}
+                              </span>
+                            )}
+                            {item.reference && (
+                              <span className="rounded-md bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 font-mono text-indigo-700">
+                                {item.reference}
+                              </span>
+                            )}
+                          </div>
+
+                          {item.detail ? (
+                            <p className="rounded-xl bg-slate-50/90 border border-slate-100/90 p-2 text-xs text-slate-700 leading-relaxed">
+                              {item.detail}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </section>
           ) : null}
@@ -1347,12 +1476,17 @@ export default function Vendor360Modal({
                   ? "No purchase orders for this vendor."
                   : "No purchases for this vendor."
               }
+              searchPlaceholder={
+                tab === "orders"
+                  ? "Search order number"
+                  : "Search invoice number"
+              }
             />
           ) : null}
 
           {!loading && data && tab === "payments" ? (
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-              <div className="flex flex-col gap-2 border-b border-slate-100 p-3 sm:flex-row">
+              <div className="flex flex-col gap-2 border-b border-slate-100 p-2.5 sm:p-3 sm:flex-row">
                 <label className="relative min-w-0 flex-1">
                   <Search
                     size={15}
@@ -1362,75 +1496,166 @@ export default function Vendor360Modal({
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search reference or bill"
-                    className="w-full rounded-xl border border-slate-200 py-2 pr-3 pl-9 text-sm"
+                    className="w-full rounded-xl border border-slate-200 py-2 pr-3 pl-9 text-xs sm:text-sm outline-none focus:border-slate-400"
                   />
                 </label>
-                <select
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value)}
-                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                >
-                  <option value="">All types</option>
-                  <option value="pay-out">Pay-out</option>
-                  <option value="pay-in">Pay-in</option>
-                  <option value="adjustment">Adjustment</option>
-                </select>
-                <DateRangeSelect value={dateRange} onChange={setDateRange} />
-                <CreatedSortSelect value={createdSort} onChange={setCreatedSort} />
+                <div className="grid grid-cols-3 gap-1.5 sm:flex sm:items-center sm:gap-2">
+                  <select
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value)}
+                    className="w-full sm:w-auto min-w-0 truncate rounded-xl border border-slate-200 bg-white px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-slate-400"
+                  >
+                    <option value="">All types</option>
+                    <option value="pay-out">Pay-out</option>
+                    <option value="pay-in">Pay-in</option>
+                    <option value="adjustment">Adjustment</option>
+                  </select>
+                  <DateRangeSelect value={dateRange} onChange={setDateRange} />
+                  <CreatedSortSelect value={createdSort} onChange={setCreatedSort} />
+                </div>
               </div>
               {filteredPayments.length === 0 ? (
-                <p className="px-4 py-8 text-center text-sm text-slate-500">
-                  No payments recorded yet.
-                </p>
+                <div className="py-12 text-center text-xs text-slate-400">
+                  <Wallet size={32} className="mx-auto mb-2 text-slate-300" />
+                  <p>No payments recorded yet for this vendor.</p>
+                </div>
               ) : (
-                <ul className="divide-y divide-slate-100">
-                  {sortedPayments.map((payment) => (
-                    <li
-                      key={payment.id}
-                      className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                          {payment.direction === "pay-in" ? (
-                            <ArrowDownLeft
-                              size={15}
-                              className="text-emerald-600"
-                            />
-                          ) : (
-                            <ArrowUpRight
-                              size={15}
-                              className="text-violet-600"
-                            />
-                          )}
-                          {payment.direction} · {money(payment.amount)}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {whenStamp(payment.paidAt, payment.createdAt)}
-                          {payment.method ? ` · ${payment.method}` : ""}
-                          {payment.reference ? ` · ${payment.reference}` : ""}
-                          {payment.purchaseInvoice
-                            ? ` · ${payment.purchaseInvoice}`
-                            : ""}
-                          {payment.documents?.length
-                            ? ` · ${payment.documents.length} file`
-                            : ""}
-                          {payment.advanceAmount
-                            ? ` · Advance ${money(payment.advanceAmount)}`
-                            : ""}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          downloadReceipt(profile?.name || vendor.name, payment)
-                        }
-                        className="inline-flex items-center gap-1.5 self-start rounded-xl bg-blue-50 border border-blue-200/90 hover:bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                <>
+                  {/* Mobile Card View */}
+                  <div className="block md:hidden p-3 space-y-2.5">
+                    {sortedPayments.map((payment) => (
+                      <div
+                        key={payment.id}
+                        className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5 transition hover:shadow-xs"
                       >
-                        <Download size={13} className="text-blue-600" /> Receipt
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl shadow-xs ${
+                                payment.direction === "pay-in"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-purple-100 text-purple-700"
+                              }`}
+                            >
+                              {payment.direction === "pay-in" ? (
+                                <ArrowDownLeft size={16} />
+                              ) : (
+                                <ArrowUpRight size={16} />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-bold text-xs uppercase tracking-wide text-slate-900 block">
+                                {payment.direction}
+                              </span>
+                              <span className="text-[11px] text-slate-400">
+                                {whenStamp(payment.paidAt, payment.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`text-sm sm:text-base font-black shrink-0 ${
+                              payment.direction === "pay-in"
+                                ? "text-emerald-700"
+                                : "text-purple-700"
+                            }`}
+                          >
+                            {money(payment.amount)}
+                          </span>
+                        </div>
+
+                        {/* Fact pills */}
+                        <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                          {payment.method && (
+                            <span className="rounded-lg bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                              {payment.method}
+                            </span>
+                          )}
+                          {payment.purchaseInvoice && (
+                            <span className="rounded-lg bg-blue-50 border border-blue-100 px-2 py-0.5 font-semibold text-blue-700">
+                              Bill: {payment.purchaseInvoice}
+                            </span>
+                          )}
+                          {payment.reference && (
+                            <span className="rounded-lg bg-violet-50 border border-violet-100 px-2 py-0.5 font-mono font-medium text-violet-700">
+                              Ref: {payment.reference}
+                            </span>
+                          )}
+                          {payment.advanceAmount ? (
+                            <span className="rounded-lg bg-amber-50 border border-amber-100 px-2 py-0.5 font-semibold text-amber-800">
+                              Advance: {money(payment.advanceAmount)}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                          <span className="text-[11px] text-slate-400 truncate">
+                            {payment.createdBy ? `By ${payment.createdBy}` : ""}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              downloadReceipt(profile?.name || vendor.name, payment)
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200/90 hover:bg-blue-100 px-3 py-1.5 text-xs font-bold text-blue-700 shadow-2xs active:scale-95 transition cursor-pointer shrink-0"
+                          >
+                            <Download size={13} className="text-blue-600" /> Receipt
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop List View */}
+                  <ul className="hidden md:block divide-y divide-slate-100">
+                    {sortedPayments.map((payment) => (
+                      <li
+                        key={payment.id}
+                        className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                            {payment.direction === "pay-in" ? (
+                              <ArrowDownLeft
+                                size={15}
+                                className="text-emerald-600"
+                              />
+                            ) : (
+                              <ArrowUpRight
+                                size={15}
+                                className="text-violet-600"
+                              />
+                            )}
+                            {payment.direction} · {money(payment.amount)}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {whenStamp(payment.paidAt, payment.createdAt)}
+                            {payment.method ? ` · ${payment.method}` : ""}
+                            {payment.reference ? ` · ${payment.reference}` : ""}
+                            {payment.purchaseInvoice
+                              ? ` · ${payment.purchaseInvoice}`
+                              : ""}
+                            {payment.documents?.length
+                              ? ` · ${payment.documents.length} file`
+                              : ""}
+                            {payment.advanceAmount
+                              ? ` · Advance ${money(payment.advanceAmount)}`
+                              : ""}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            downloadReceipt(profile?.name || vendor.name, payment)
+                          }
+                          className="inline-flex items-center gap-1.5 self-start rounded-xl bg-blue-50 border border-blue-200/90 hover:bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                        >
+                          <Download size={13} className="text-blue-600" /> Receipt
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </section>
           ) : null}
@@ -2070,15 +2295,17 @@ function Field({ label, value }: { label: string; value?: string | null }) {
 function CreatedSortSelect({
   value,
   onChange,
+  className = "",
 }: {
   value: CreatedSort;
   onChange: (value: CreatedSort) => void;
+  className?: string;
 }) {
   return (
     <select
       value={value}
       onChange={(event) => onChange(event.target.value as CreatedSort)}
-      className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+      className={`w-full sm:w-auto min-w-0 truncate rounded-xl border border-slate-200 bg-white px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-slate-400 ${className}`}
       aria-label="Sort by created date"
     >
       <option value="newest">Newest created</option>
@@ -2090,15 +2317,18 @@ function CreatedSortSelect({
 function DateRangeSelect({
   value,
   onChange,
+  className = "",
 }: {
   value: DateRange;
   onChange: (value: DateRange) => void;
+  className?: string;
 }) {
   return (
     <select
       value={value}
       onChange={(event) => onChange(event.target.value as DateRange)}
-      className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+      className={`w-full sm:w-auto min-w-0 truncate rounded-xl border border-slate-200 bg-white px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-slate-400 ${className}`}
+      aria-label="Filter by date range"
     >
       <option value="">All dates</option>
       <option value="today">Today</option>
@@ -2124,6 +2354,7 @@ function BillTable({
   onOpen,
   onPay,
   empty,
+  searchPlaceholder,
 }: {
   rows: VendorBillRow[];
   search: string;
@@ -2137,11 +2368,12 @@ function BillTable({
   onOpen?: (row: VendorBillRow) => void;
   onPay?: (row: VendorBillRow) => void;
   empty: string;
+  searchPlaceholder?: string;
 }) {
   const columns = onPay ? 7 : 6;
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <div className="flex flex-col gap-2 border-b border-slate-100 p-3 sm:flex-row">
+      <div className="flex flex-col gap-2 border-b border-slate-100 p-2.5 sm:p-3 sm:flex-row">
         <label className="relative min-w-0 flex-1">
           <Search
             size={15}
@@ -2150,24 +2382,27 @@ function BillTable({
           <input
             value={search}
             onChange={(event) => onSearch(event.target.value)}
-            placeholder="Search invoice number"
-            className="w-full rounded-xl border border-slate-200 py-2 pr-3 pl-9 text-sm"
+            placeholder={searchPlaceholder || "Search invoice number"}
+            className="w-full rounded-xl border border-slate-200 py-2 pr-3 pl-9 text-xs sm:text-sm outline-none focus:border-slate-400"
           />
         </label>
-        <select
-          value={status}
-          onChange={(event) => onStatus(event.target.value)}
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-        >
-          <option value="">All statuses</option>
-          <option value="paid">Paid</option>
-          <option value="partial">Partial</option>
-          <option value="due">Due</option>
-          <option value="pending">Pending</option>
-          <option value="overdue">Overdue</option>
-        </select>
-        <DateRangeSelect value={dateRange} onChange={onDateRange} />
-        <CreatedSortSelect value={createdSort} onChange={onCreatedSort} />
+        <div className="grid grid-cols-3 gap-1.5 sm:flex sm:items-center sm:gap-2">
+          <select
+            value={status}
+            onChange={(event) => onStatus(event.target.value)}
+            className="w-full sm:w-auto min-w-0 truncate rounded-xl border border-slate-200 bg-white px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-slate-700 outline-none focus:border-slate-400"
+            aria-label="Filter by status"
+          >
+            <option value="">All statuses</option>
+            <option value="paid">Paid</option>
+            <option value="partial">Partial</option>
+            <option value="due">Due</option>
+            <option value="pending">Pending</option>
+            <option value="overdue">Overdue</option>
+          </select>
+          <DateRangeSelect value={dateRange} onChange={onDateRange} />
+          <CreatedSortSelect value={createdSort} onChange={onCreatedSort} />
+        </div>
       </div>
       {/* Desktop Table View */}
       <div className="hidden md:block overflow-x-auto">
@@ -2245,9 +2480,9 @@ function BillTable({
       </div>
 
       {/* Mobile Card List View */}
-      <div className="block md:hidden divide-y divide-slate-100">
+      <div className="block md:hidden p-3 space-y-2.5">
         {rows.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400">
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-8 text-center text-xs text-slate-400">
             {empty}
           </div>
         ) : (
@@ -2255,38 +2490,58 @@ function BillTable({
             <div
               key={row.id}
               onClick={onOpen ? () => onOpen(row) : undefined}
-              className={`p-3 space-y-2 transition active:bg-slate-50/70 ${onOpen ? "cursor-pointer" : ""}`}
+              className={`rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs space-y-2.5 transition active:scale-[0.99] ${
+                onOpen ? "cursor-pointer hover:border-violet-300" : ""
+              }`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-xs text-slate-900 truncate">
-                  {row.invoiceNumber || "—"}
-                </span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone(row.status, row.overdue)}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100/90 text-violet-700 shadow-xs">
+                    <FileText size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-bold text-xs sm:text-sm text-slate-900 truncate block">
+                      {row.invoiceNumber || "—"}
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      {whenStamp(row.invoiceDate, row.createdAt)}
+                    </span>
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${tone(row.status, row.overdue)}`}>
                   {row.overdue ? "Overdue" : row.status || "—"}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span>{whenStamp(row.invoiceDate, row.createdAt)}</span>
-                <span className="font-bold text-slate-900">{money(row.amount)}</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-slate-100/80 pt-1.5 text-[11px]">
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-500">Paid: <b className="text-slate-700">{money(row.paidAmount)}</b></span>
-                  <span className="text-slate-500">Due: <b className={Number(row.dueAmount) > 0 ? "text-rose-600" : "text-slate-700"}>{money(row.dueAmount)}</b></span>
+
+              <div className="grid grid-cols-3 gap-2 rounded-xl bg-slate-50/80 p-2 text-center text-xs">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">Total</span>
+                  <span className="font-bold text-slate-900">{money(row.amount)}</span>
                 </div>
-                {onPay && row.dueAmount > 0 ? (
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-emerald-600 block">Paid</span>
+                  <span className="font-bold text-emerald-700">{money(row.paidAmount)}</span>
+                </div>
+                <div>
+                  <span className={`text-[10px] font-bold uppercase block ${Number(row.dueAmount) > 0 ? "text-rose-600" : "text-slate-400"}`}>Due</span>
+                  <span className={`font-bold ${Number(row.dueAmount) > 0 ? "text-rose-600" : "text-slate-700"}`}>{money(row.dueAmount)}</span>
+                </div>
+              </div>
+
+              {onPay && row.dueAmount > 0 ? (
+                <div className="pt-1 flex justify-end">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       onPay(row);
                     }}
-                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200/90 hover:bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs active:scale-95 transition cursor-pointer"
                   >
-                    <IndianRupee size={11} className="text-emerald-600" /> Pay
+                    <IndianRupee size={12} /> Pay {money(row.dueAmount)}
                   </button>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
             </div>
           ))
         )}
