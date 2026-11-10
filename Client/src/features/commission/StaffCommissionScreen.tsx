@@ -20,6 +20,7 @@ import {
   User,
   Check,
   ChevronDown,
+  MoreVertical,
 } from "lucide-react";
 
 import CommissionLedgerModal, {
@@ -67,19 +68,21 @@ const StaffCommissionScreen = () => {
     rangeForPreset
   );
 
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showDateDropdown, setShowDateDropdown] = useState(false);
-  const dateMenuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!showDateDropdown) return;
+    if (!isMenuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (dateMenuRef.current && !dateMenuRef.current.contains(e.target as Node)) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
         setShowDateDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showDateDropdown]);
+  }, [isMenuOpen]);
 
   const dateFilterLabel = useMemo(() => {
     const opt = DATE_PRESET_OPTIONS.find((o) => o.value === datePreset);
@@ -326,142 +329,141 @@ const StaffCommissionScreen = () => {
     <div className="p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 font-sans bg-gray-50/50 min-h-screen">
 
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+      <div className="flex items-center justify-between gap-3">
 
-        <div>
+        <div className="min-w-0">
           <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
             <CircleDollarSign
               className="w-5 h-5 sm:w-7 sm:h-7 text-violet-600 shrink-0"
             />
-            <span>Staff Commission &amp; Performance</span>
+            <span className="truncate">Staff Commission &amp; Performance</span>
           </h1>
         </div>
 
-        {/* ACTION BUTTONS AND DATE FILTER */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+        {/* THREE DOT MENU AT RIGHT TOP CORNER */}
+        <div className="relative shrink-0" ref={menuRef}>
+          <button
+            type="button"
+            aria-label="Staff commission options"
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+            className={`inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border transition-all duration-200 cursor-pointer active:scale-95 ${
+              isMenuOpen
+                ? "border-indigo-400 bg-indigo-50 text-indigo-700 shadow-sm"
+                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50 shadow-2xs"
+            }`}
+          >
+            <MoreVertical size={18} />
+          </button>
 
-          {/* 50-50 RATIO ON MOBILE ROW, AUTO ON DESKTOP */}
-          <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:items-center sm:w-auto">
+          {/* THREE DOT DROPDOWN MENU */}
+          {isMenuOpen && (
+            <div className="absolute right-0 top-full z-50 mt-2 w-56  rounded-2xl border border-gray-200 bg-white p-3 shadow-xl animate-in fade-in zoom-in-95 duration-150 space-y-3">
+              {/* SET COMMISSION BUTTON */}
+              <div>
+               
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCommissionModalOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 active:scale-95 transition cursor-pointer"
+                >
+                  <Calendar size={14} className="text-white shrink-0" />
+                  <span>Set Commission</span>
+                </button>
+              </div>
 
-            {/* SET COMMISSION (50% ON MOBILE) */}
-            <button
-              type="button"
-              onClick={() => setIsCommissionModalOpen(true)}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm text-white font-semibold cursor-pointer transition-all duration-200 shadow-sm active:scale-95"
-            >
-              <Calendar size={14} className="text-white shrink-0" />
-              <span className="whitespace-nowrap">
-                Set Commission
-              </span>
-            </button>
+              <div className="border-t border-gray-100" />
 
-            {/* PERIOD FILTER DROPDOWN (50% ON MOBILE) */}
-            <div className="relative w-full sm:w-auto" ref={dateMenuRef}>
-              <button
-                type="button"
-                onClick={() => setShowDateDropdown((prev) => !prev)}
-                className="w-full sm:w-auto inline-flex items-center justify-between gap-1.5 bg-white px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-xs sm:text-sm font-semibold text-gray-800 shadow-sm hover:border-gray-300 transition-colors cursor-pointer active:scale-95"
-              >
-                <div className="flex items-center gap-1.5 min-w-0 truncate">
-                  <Calendar size={14} className="text-indigo-500 shrink-0" />
-                  <span className="truncate">{dateFilterLabel}</span>
-                </div>
-                <ChevronDown
-                  size={14}
-                  className={`text-gray-400 shrink-0 transition-transform duration-200 ${
-                    showDateDropdown ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
+              {/* DATE FILTER BUTTON & PRESETS */}
+              <div>
+               
 
-              {/* DROPDOWN MENU */}
-              {showDateDropdown && (
-                <div className="absolute right-0 top-full z-50 mt-1.5 w-48 sm:w-44 max-h-80 overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-xl animate-in fade-in zoom-in-95 duration-100">
-                  {DATE_PRESET_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        const preset = opt.value;
-                        setDatePreset(preset);
+                <button
+                  type="button"
+                  onClick={() => setShowDateDropdown((prev) => !prev)}
+                  className="w-full inline-flex items-center justify-between gap-1.5 rounded-xl border border-gray-200 bg-gray-50/70 hover:bg-gray-100/70 px-3 py-2 text-xs sm:text-sm font-semibold text-gray-800 transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0 truncate">
+                    <Calendar size={14} className="text-indigo-600 shrink-0" />
+                    <span className="truncate">{dateFilterLabel}</span>
+                  </div>
+                  <ChevronDown
+                    size={14}
+                    className={`text-gray-400 shrink-0 transition-transform duration-200 ${
+                      showDateDropdown ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
 
-                        if (preset === "all") {
-                          setFromDate("");
-                          setToDate("");
-                        } else if (preset === "custom") {
-                          // Keep current custom dates
-                        } else {
-                          const range = rangeForPreset(preset);
-                          setFromDate(range.from);
-                          setToDate(range.to);
-                        }
-                        if (preset !== "custom") setShowDateDropdown(false);
-                      }}
-                      className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs transition-colors cursor-pointer ${
-                        datePreset === opt.value
-                          ? "bg-indigo-50 font-bold text-indigo-700"
-                          : "font-medium text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      <span className="truncate">{opt.label}</span>
-                      {datePreset === opt.value && (
-                        <Check className="h-3.5 w-3.5 shrink-0 text-indigo-600" />
-                      )}
-                    </button>
-                  ))}
+                {/* DATE PRESETS ACCORDION */}
+                {showDateDropdown && (
+                  <div className="mt-2 space-y-1 max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-inner">
+                    {DATE_PRESET_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          const preset = opt.value;
+                          setDatePreset(preset);
 
-                  {datePreset === "custom" && (
-                    <div className="mt-1 space-y-2 border-t border-gray-100 px-3 py-2 bg-gray-50/60 rounded-b-xl">
-                      <label className="block text-[11px] font-semibold text-gray-500">
-                        From
-                        <input
-                          type="date"
-                          value={fromDate}
-                          max={toDate || undefined}
-                          onChange={(e) => setFromDate(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 outline-none focus:border-indigo-400"
-                        />
-                      </label>
-                      <label className="block text-[11px] font-semibold text-gray-500">
-                        To
-                        <input
-                          type="date"
-                          value={toDate}
-                          min={fromDate || undefined}
-                          onChange={(e) => setToDate(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 outline-none focus:border-indigo-400"
-                        />
-                      </label>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+                          if (preset === "all") {
+                            setFromDate("");
+                            setToDate("");
+                            setShowDateDropdown(false);
+                            setIsMenuOpen(false);
+                          } else if (preset === "custom") {
+                            // Keep open for custom dates
+                          } else {
+                            const range = rangeForPreset(preset);
+                            setFromDate(range.from);
+                            setToDate(range.to);
+                            setShowDateDropdown(false);
+                            setIsMenuOpen(false);
+                          }
+                        }}
+                        className={`flex w-full items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-left text-xs transition cursor-pointer ${
+                          datePreset === opt.value
+                            ? "bg-indigo-50 font-bold text-indigo-700"
+                            : "font-medium text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        <span className="truncate">{opt.label}</span>
+                        {datePreset === opt.value && (
+                          <Check className="h-3.5 w-3.5 shrink-0 text-indigo-600" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-          {/* CUSTOM DATE RANGE (WHEN CLOSED & SELECTED) */}
-          {datePreset === "custom" && !showDateDropdown && (
-            <div className="flex items-center justify-between sm:justify-start gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs shadow-sm w-full sm:w-auto">
-
-              <input
-                type="date"
-                value={fromDate}
-                max={toDate || undefined}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="bg-transparent text-gray-700 outline-none text-xs flex-1 sm:flex-none min-w-0"
-              />
-
-              <span className="text-gray-400 font-medium shrink-0">
-                to
-              </span>
-
-              <input
-                type="date"
-                value={toDate}
-                min={fromDate || undefined}
-                onChange={(e) => setToDate(e.target.value)}
-                className="bg-transparent text-gray-700 outline-none text-xs flex-1 sm:flex-none min-w-0"
-              />
+                {/* CUSTOM DATE PICKER (WHEN CUSTOM SELECTED) */}
+                {datePreset === "custom" && (
+                  <div className="mt-2 space-y-2 rounded-xl border border-gray-200 bg-gray-50/60 p-2.5 text-xs">
+                    <label className="block text-[11px] font-semibold text-gray-500">
+                      From
+                      <input
+                        type="date"
+                        value={fromDate}
+                        max={toDate || undefined}
+                        onChange={(e) => setFromDate(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 outline-none focus:border-indigo-400"
+                      />
+                    </label>
+                    <label className="block text-[11px] font-semibold text-gray-500">
+                      To
+                      <input
+                        type="date"
+                        value={toDate}
+                        min={fromDate || undefined}
+                        onChange={(e) => setToDate(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 outline-none focus:border-indigo-400"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

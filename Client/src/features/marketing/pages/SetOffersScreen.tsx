@@ -1,8 +1,7 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Calendar,
-  Eye,
   Pencil,
   Plus,
   Power,
@@ -47,33 +46,6 @@ const ruleSummary = (rules: SpaceOfferRule[]) =>
     .map((rule) => `${rule.minimumHours}h → ${rule.freeHours}h FREE`)
     .join(", ");
 
-const previewRows = (rules: SpaceOfferRule[]) => {
-  const active = rules
-    .filter(
-      (rule) =>
-        rule.status !== "inactive" &&
-        rule.minimumHours > rule.freeHours &&
-        rule.freeHours > 0
-    )
-    .slice()
-    .sort((a, b) => a.minimumHours - b.minimumHours);
-
-  return [1, 2, 4, 6, 8, 10, 12].map((hours) => {
-    const match = active
-      .filter((rule) => hours >= rule.minimumHours)
-      .at(-1);
-
-    const free = match ? Math.min(hours, match.freeHours) : 0;
-
-    return {
-      hours,
-      free,
-      chargeable: Math.max(0, hours - free),
-      amount: Math.max(0, hours - free) * 500,
-    };
-  });
-};
-
 const SetOffersScreen = () => {
   const [offers, setOffers] = useState<SpaceOffer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +57,6 @@ const SetOffersScreen = () => {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [editor, setEditor] = useState<SpaceOffer | null>(null);
-  const [viewing, setViewing] = useState<SpaceOffer | null>(null);
   const [saving, setSaving] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [formError, setFormError] = useState("");
@@ -214,11 +185,6 @@ const SetOffersScreen = () => {
       )
     );
   };
-
-  const preview = useMemo(
-    () => (editor ? previewRows(editor.rules) : []),
-    [editor]
-  );
 
   // Filter styles
   const filterStyles = {
@@ -385,21 +351,11 @@ const SetOffersScreen = () => {
               </div>
 
               {/* Offer Rules Box */}
-              <div className="rounded-xl bg-violet-50/60 border border-violet-100/80 p-2.5 space-y-1">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-bold uppercase tracking-wider text-violet-700 flex items-center gap-1">
-                    <Sparkles size={12} />
-                    Offer Rules
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setViewing(offer)}
-                    className="font-semibold text-violet-600 hover:text-violet-800 underline flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <Eye size={12} />
-                    Preview
-                  </button>
-                </div>
+              <div className="rounded-xl bg-violet-50/70 border border-violet-100/80 p-2.5 space-y-1">
+                <span className="font-bold uppercase tracking-wider text-[11px] text-violet-700 flex items-center gap-1">
+                  <Sparkles size={12} />
+                  Offer Rules
+                </span>
                 <p className="text-xs font-semibold text-slate-800">
                   {ruleSummary(offer.rules) || "No active rules configured"}
                 </p>
@@ -417,15 +373,6 @@ const SetOffersScreen = () => {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setViewing(offer)}
-                    className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition active:scale-95 text-xs cursor-pointer"
-                  >
-                    <Eye size={13} />
-                    View
-                  </button>
-
                   <Can permission={PERMISSIONS.COUPON_MANAGE}>
                     <button
                       type="button"
@@ -527,13 +474,9 @@ const SetOffersScreen = () => {
                     </td>
 
                     <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => setViewing(offer)}
-                        className="text-left text-xs font-medium text-violet-700 hover:underline"
-                      >
+                      <span className="text-xs font-semibold text-violet-800">
                         {ruleSummary(offer.rules) || "No active rules"}
-                      </button>
+                      </span>
                     </td>
 
                     <td className="px-4 py-3">
@@ -560,15 +503,6 @@ const SetOffersScreen = () => {
 
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          title="View"
-                          onClick={() => setViewing(offer)}
-                          className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                        >
-                          View
-                        </button>
-
                         <Can permission={PERMISSIONS.COUPON_MANAGE}>
                           <button
                             type="button"
@@ -643,349 +577,330 @@ const SetOffersScreen = () => {
         </div>
       </div>
 
-      {/* VIEW OFFER MODAL */}
-      {viewing ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
-          onClick={() => setViewing(null)}
-        >
-          <div
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 sm:rounded-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-bold">
-                {viewing.offerName}
-              </h2>
-
-              <button
-                type="button"
-                onClick={() => setViewing(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <p className="text-sm text-slate-500">
-              {viewing.description || "Space booking offer"}
-            </p>
-
-            <div className="mt-4 space-y-2">
-              {viewing.rules.map((rule, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm"
-                >
-                  <span>
-                    Book {rule.minimumHours}h or more
-                  </span>
-
-                  <span className="font-semibold">
-                    {rule.freeHours}h FREE · pays{" "}
-                    {Math.max(
-                      0,
-                      rule.minimumHours - rule.freeHours
-                    )}
-                    h
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
       {/* CREATE / EDIT OFFER MODAL */}
       {editor ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
-          <div className="flex max-h-[100dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl bg-white sm:max-h-[92vh] sm:rounded-2xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 backdrop-blur-[2px] p-0 sm:items-center sm:p-4">
+          <div className="flex max-h-[95dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:max-h-[90vh] sm:rounded-2xl border border-violet-100">
 
             {/* MODAL HEADER */}
-            <div className="flex items-center justify-between border-b px-5 py-4">
-              <div>
-                <h2 className="text-lg font-bold">
-                  {editor._id ? "Edit Offer" : "Create Offer"}
-                </h2>
-
-                <p className="text-xs text-slate-500">
-                  Free hours apply to a single-date hourly space booking.
-                </p>
+            <div className="flex items-center justify-between border-b border-violet-100 bg-gradient-to-r from-violet-100/70 via-purple-50/60 to-indigo-50/80 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-md shadow-violet-200">
+                  <Tag size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                    {editor._id ? "Edit Space Offer" : "Create Space Offer"}
+                  </h2>
+                  <p className="text-xs font-medium text-violet-700/80">
+                    Free hours apply to a single-date hourly space booking
+                  </p>
+                </div>
               </div>
 
               <button
                 type="button"
                 onClick={() => setEditor(null)}
+                className="rounded-xl p-2 text-slate-400 hover:bg-white/80 hover:text-slate-700 transition"
               >
                 <X size={18} />
               </button>
             </div>
 
             {/* MODAL BODY */}
-            <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-5 lg:grid-cols-2">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
 
-              {/* OFFER DETAILS */}
-              <div className="space-y-3">
-                <label className="block text-sm font-medium">
-                  Offer Name
-
-                  <input
-                    value={editor.offerName}
-                    onChange={(event) =>
-                      setEditor({
-                        ...editor,
-                        offerName: event.target.value,
-                      })
-                    }
-                    className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
-                  />
+              {/* OFFER NAME */}
+              <div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Offer Name <span className="text-rose-500">*</span>
                 </label>
+                <input
+                  value={editor.offerName}
+                  onChange={(event) =>
+                    setEditor({
+                      ...editor,
+                      offerName: event.target.value,
+                    })
+                  }
+                  placeholder="e.g. Creator Weekend Special"
+                  className="w-full rounded-xl border border-violet-200/90 bg-violet-50/20 px-3.5 py-2.5 text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-violet-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-violet-100 transition"
+                />
+              </div>
 
-                <label className="block text-sm font-medium">
-                  Offer Description
-
-                  <textarea
-                    value={editor.description || ""}
-                    onChange={(event) =>
-                      setEditor({
-                        ...editor,
-                        description: event.target.value,
-                      })
-                    }
-                    className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
-                    rows={2}
-                  />
+              {/* OFFER DESCRIPTION */}
+              <div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Description
                 </label>
+                <textarea
+                  value={editor.description || ""}
+                  onChange={(event) =>
+                    setEditor({
+                      ...editor,
+                      description: event.target.value,
+                    })
+                  }
+                  placeholder="e.g. Book 4 hours and get 1 hour free on space bookings"
+                  rows={2}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none focus:ring-4 focus:ring-violet-100 transition resize-none"
+                />
+              </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="block text-sm font-medium">
+              {/* OFFER TYPE & STATUS */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
                     Offer Type
-
-                    <input
-                      value="Space Booking Offer"
-                      disabled
-                      className="mt-1 w-full rounded-xl border bg-slate-50 px-3 py-2 text-sm"
-                    />
                   </label>
-
-                  <label className="block text-sm font-medium">
-                    Status
-
-                    <select
-                      value={editor.status}
-                      onChange={(event) =>
-                        setEditor({
-                          ...editor,
-                          status: event.target.value as
-                            | "active"
-                            | "inactive",
-                        })
-                      }
-                      className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </label>
+                  <div className="flex h-10 items-center gap-2 rounded-xl border border-blue-200/80 bg-blue-50/70 px-3.5 text-xs font-bold text-blue-800">
+                    <Sparkles size={14} className="text-blue-600" />
+                    <span>Space Booking Offer</span>
+                  </div>
                 </div>
 
-                <label className="block text-sm font-medium">
-                  Offer priority
-
-                  <input
-                    type="number"
-                    value={editor.priority || 0}
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
+                    Status
+                  </label>
+                  <select
+                    value={editor.status}
                     onChange={(event) =>
                       setEditor({
                         ...editor,
-                        priority: Number(event.target.value),
+                        status: event.target.value as "active" | "inactive",
                       })
                     }
-                    className="mt-1 w-full rounded-xl border px-3 py-2 text-sm"
-                  />
+                    className={`h-10 w-full rounded-xl border px-3.5 text-xs font-bold transition focus:outline-none focus:ring-4 ${
+                      editor.status === "active"
+                        ? "border-emerald-300 bg-emerald-50/80 text-emerald-800 focus:border-emerald-500 focus:ring-emerald-100"
+                        : "border-slate-300 bg-slate-50 text-slate-700 focus:border-slate-400 focus:ring-slate-100"
+                    }`}
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* OFFER PRIORITY */}
+              <div>
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Offer Priority
                 </label>
+                <input
+                  type="number"
+                  value={editor.priority || 0}
+                  onChange={(event) =>
+                    setEditor({
+                      ...editor,
+                      priority: Number(event.target.value),
+                    })
+                  }
+                  placeholder="0"
+                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-800 focus:border-violet-500 focus:outline-none focus:ring-4 focus:ring-violet-100 transition"
+                />
+              </div>
 
-                {/* RULES */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">
-                      Rules
+              {/* RULES SECTION */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                      <Sparkles size={13} />
+                    </div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Offer Rules & Thresholds
                     </h3>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setEditor({
-                          ...editor,
-                          rules: [...editor.rules, emptyRule()],
-                        })
-                      }
-                      className="text-xs font-bold text-violet-700"
-                    >
-                      Add rule
-                    </button>
+                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-bold text-violet-700">
+                      {editor.rules.length}
+                    </span>
                   </div>
 
-                  {editor.rules.map((rule, index) => (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditor({
+                        ...editor,
+                        rules: [...editor.rules, emptyRule()],
+                      })
+                    }
+                    className="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700 hover:bg-violet-100 transition active:scale-95 border border-violet-200/80 cursor-pointer"
+                  >
+                    <Plus size={13} />
+                    Add Rule
+                  </button>
+                </div>
+
+                {editor.rules.map((rule, index) => {
+                  const paysHours = Math.max(
+                    0,
+                    Number(rule.minimumHours) - Number(rule.freeHours)
+                  );
+                  return (
                     <div
                       key={index}
-                      className="grid grid-cols-2 gap-2 rounded-xl border p-3 sm:grid-cols-4"
+                      className="space-y-3 rounded-2xl border-2 border-violet-200/80 bg-gradient-to-br from-violet-50/40 via-white to-purple-50/30 p-3.5 shadow-xs"
                     >
-                      <label className="text-xs text-slate-500">
-                        Minimum hours
+                      {/* Rule Card Header */}
+                      <div className="flex items-center justify-between border-b border-violet-100/70 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-[11px] font-bold text-white shadow-xs">
+                            {index + 1}
+                          </span>
+                          <span className="text-xs font-bold text-violet-950">
+                            Rule #{index + 1}
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                              rule.status === "active"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-slate-100 text-slate-500 border-slate-200"
+                            }`}
+                          >
+                            {rule.status === "active" ? "Active" : "Inactive"}
+                          </span>
+                        </div>
 
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.5"
-                          value={rule.minimumHours}
-                          onChange={(event) => {
-                            const rules = editor.rules.slice();
-
-                            rules[index] = {
-                              ...rule,
-                              minimumHours: Number(event.target.value),
-                            };
-
-                            setEditor({ ...editor, rules });
-                          }}
-                          className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm"
-                        />
-                      </label>
-
-                      <label className="text-xs text-slate-500">
-                        Free hours
-
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.5"
-                          value={rule.freeHours}
-                          onChange={(event) => {
-                            const rules = editor.rules.slice();
-
-                            rules[index] = {
-                              ...rule,
-                              freeHours: Number(event.target.value),
-                            };
-
-                            setEditor({ ...editor, rules });
-                          }}
-                          className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm"
-                        />
-                      </label>
-
-                      <label className="text-xs text-slate-500">
-                        Priority
-
-                        <input
-                          type="number"
-                          value={rule.priority || 0}
-                          onChange={(event) => {
-                            const rules = editor.rules.slice();
-
-                            rules[index] = {
-                              ...rule,
-                              priority: Number(event.target.value),
-                            };
-
-                            setEditor({ ...editor, rules });
-                          }}
-                          className="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm"
-                        />
-                      </label>
-
-                      <div className="flex items-end justify-between gap-2">
-                        <select
-                          value={rule.status || "active"}
-                          onChange={(event) => {
-                            const rules = editor.rules.slice();
-
-                            rules[index] = {
-                              ...rule,
-                              status: event.target.value as
-                                | "active"
-                                | "inactive",
-                            };
-
-                            setEditor({ ...editor, rules });
-                          }}
-                          className="w-full rounded-lg border px-2 py-1.5 text-sm"
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                        </select>
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEditor({
-                              ...editor,
-                              rules: editor.rules.filter(
-                                (_, ruleIndex) => ruleIndex !== index
-                              ),
-                            })
-                          }
-                          className="rounded-lg p-1.5 text-rose-600"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        {editor.rules.length > 1 ? (
+                          <button
+                            type="button"
+                            title="Delete rule"
+                            onClick={() =>
+                              setEditor({
+                                ...editor,
+                                rules: editor.rules.filter(
+                                  (_, ruleIndex) => ruleIndex !== index
+                                ),
+                              })
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        ) : null}
                       </div>
 
-                      <p className="col-span-2 text-[11px] text-slate-400 sm:col-span-4">
-                        Customer pays for{" "}
-                        {Math.max(
-                          0,
-                          Number(rule.minimumHours) -
-                            Number(rule.freeHours)
-                        )}{" "}
-                        hour(s) at this threshold.
-                      </p>
-                    </div>
-                  ))}
-                </div>
+                      {/* Rule Inputs */}
+                      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-slate-600">
+                            Min Hours
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.5"
+                              value={rule.minimumHours}
+                              onChange={(event) => {
+                                const rules = editor.rules.slice();
+                                rules[index] = {
+                                  ...rule,
+                                  minimumHours: Number(event.target.value),
+                                };
+                                setEditor({ ...editor, rules });
+                              }}
+                              className="w-full rounded-xl border border-violet-200 bg-white py-1.5 pl-2.5 pr-8 text-xs font-bold text-slate-800 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                            />
+                            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-violet-600">
+                              hrs
+                            </span>
+                          </div>
+                        </div>
 
-                {formError ? (
-                  <p className="text-sm text-rose-600">
-                    {formError}
-                  </p>
-                ) : null}
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-slate-600">
+                            Free Hours
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.5"
+                              value={rule.freeHours}
+                              onChange={(event) => {
+                                const rules = editor.rules.slice();
+                                rules[index] = {
+                                  ...rule,
+                                  freeHours: Number(event.target.value),
+                                };
+                                setEditor({ ...editor, rules });
+                              }}
+                              className="w-full rounded-xl border border-emerald-200 bg-emerald-50/30 py-1.5 pl-2.5 pr-8 text-xs font-bold text-emerald-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                            />
+                            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-600">
+                              free
+                            </span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-slate-600">
+                            Priority
+                          </label>
+                          <input
+                            type="number"
+                            value={rule.priority || 0}
+                            onChange={(event) => {
+                              const rules = editor.rules.slice();
+                              rules[index] = {
+                                ...rule,
+                                priority: Number(event.target.value),
+                              };
+                              setEditor({ ...editor, rules });
+                            }}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-[11px] font-bold text-slate-600">
+                            Status
+                          </label>
+                          <select
+                            value={rule.status || "active"}
+                            onChange={(event) => {
+                              const rules = editor.rules.slice();
+                              rules[index] = {
+                                ...rule,
+                                status: event.target.value as "active" | "inactive",
+                              };
+                              setEditor({ ...editor, rules });
+                            }}
+                            className="w-full rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-800 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                          >
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Outcome Explanation pill */}
+                      <div className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50/70 border border-emerald-200/60 px-3 py-1.5 text-[11px] font-semibold text-emerald-800">
+                        <Sparkles size={12} className="text-emerald-600 shrink-0" />
+                        <span>
+                          Customer books <span className="font-bold underline">{rule.minimumHours}h</span>, gets <span className="font-bold text-emerald-700">{rule.freeHours}h FREE</span> & pays for <span className="font-bold">{paysHours}h</span>.
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* PREVIEW */}
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <h3 className="text-sm font-semibold">
-                  Preview at ₹500 / hour
-                </h3>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  Only the highest matching threshold is applied.
-                </p>
-
-                <div className="mt-3 space-y-1.5">
-                  {preview.map((row) => (
-                    <div
-                      key={row.hours}
-                      className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-xs"
-                    >
-                      <span>{row.hours}h booked</span>
-
-                      <span className="text-right font-semibold">
-                        {row.free
-                          ? `${row.free}h FREE · pays ${row.chargeable}h · ₹${row.amount.toLocaleString("en-IN")}`
-                          : `No offer · ₹${row.amount.toLocaleString("en-IN")}`}
-                      </span>
-                    </div>
-                  ))}
+              {formError ? (
+                <div className="rounded-xl bg-rose-50 border border-rose-200/80 px-3 py-2 text-xs font-medium text-rose-700">
+                  {formError}
                 </div>
-              </div>
+              ) : null}
             </div>
 
             {/* MODAL FOOTER */}
-            <div className="flex gap-2 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="flex items-center gap-2.5 border-t border-slate-100 bg-slate-50/80 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <button
                 type="button"
                 onClick={() => setEditor(null)}
-                className="flex-1 rounded-xl bg-slate-100 py-2.5 text-sm font-semibold"
+                className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100 transition active:scale-95 cursor-pointer"
               >
                 Cancel
               </button>
@@ -994,9 +909,9 @@ const SetOffersScreen = () => {
                 type="button"
                 disabled={saving}
                 onClick={() => void save()}
-                className="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-200 hover:from-violet-700 hover:to-indigo-700 transition active:scale-95 disabled:opacity-60 cursor-pointer"
               >
-                {saving ? "Saving..." : "Save Offer"}
+                {saving ? "Saving..." : editor._id ? "Update Offer" : "Create Offer"}
               </button>
             </div>
           </div>

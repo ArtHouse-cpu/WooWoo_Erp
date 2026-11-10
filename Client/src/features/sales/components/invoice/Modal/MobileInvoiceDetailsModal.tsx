@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   ChevronDown,
@@ -232,13 +233,15 @@ export default function MobileInvoiceDetailsModal({
     raw.owner ||
     "Ankur Anand";
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[70] flex flex-col bg-[#F7F8FA] md:hidden animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex h-screen h-[100dvh] max-h-[100dvh] w-screen flex-col bg-[#F7F8FA] md:hidden overscroll-none"
       role="dialog"
       aria-modal="true"
     >
-      <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200/90 bg-white px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] shadow-xs">
+      <header className="shrink-0 border-b border-slate-200/90 bg-white px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] shadow-xs">
         <div className="flex items-center justify-between gap-2">
           {/* Left: Back Arrow + Invoice Title */}
           <div className="flex items-center gap-3 min-w-0">
@@ -288,7 +291,7 @@ export default function MobileInvoiceDetailsModal({
           </div>
         </div>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3.5 pb-36 space-y-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3.5 pb-6 space-y-4 [-webkit-overflow-scrolling:touch]">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-3">
             <Loader2 size={32} className="animate-spin text-blue-600" />
@@ -689,10 +692,10 @@ export default function MobileInvoiceDetailsModal({
       </div>
 
       {/* ============================================================== */}
-      {/* C. FIXED BOTTOM ACTION PANEL                                   */}
+      {/* C. BOTTOM ACTION PANEL (Pinned to bottom on iPhone)            */}
       {/* Edit, Convert, Cancel, Delete                                  */}
       {/* ============================================================== */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/90 bg-white/95 px-3 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-8px_25px_rgba(0,0,0,0.06)] backdrop-blur-md">
+      <div className="shrink-0 z-30 border-t border-slate-200/90 bg-white/95 px-3 pt-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-8px_25px_rgba(0,0,0,0.06)] backdrop-blur-md">
         {/* Top subtle drag pill */}
         <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-slate-300" />
 
@@ -746,6 +749,7 @@ export default function MobileInvoiceDetailsModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

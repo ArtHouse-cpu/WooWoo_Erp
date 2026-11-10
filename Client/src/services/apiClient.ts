@@ -1482,6 +1482,7 @@ export const handleGetCustomers = async (
   page = 1,
   fromDate = "",
   toDate = "",
+  visitedToday = false,
 ) => {
   try {
     const response = await axiosInstance.get("/customer", {
@@ -1491,6 +1492,7 @@ export const handleGetCustomers = async (
         page,
         ...(fromDate ? { fromDate } : {}),
         ...(toDate ? { toDate } : {}),
+        ...(visitedToday ? { visitedToday: true } : {}),
       },
       signal,
     });
