@@ -254,7 +254,7 @@ export default function AddFoodModal({
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:col-span-2">
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className={`flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 ${form.manageInventory ? "" : "sm:col-span-2"}`}>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-800">Manage Inventory</p>
                   <p className="text-xs text-gray-500">
@@ -268,7 +268,11 @@ export default function AddFoodModal({
                   disabled={loading}
                   aria-pressed={form.manageInventory}
                   onClick={() =>
-                    setForm((p) => ({ ...p, manageInventory: !p.manageInventory }))
+                    setForm((p) => ({
+                      ...p,
+                      manageInventory: !p.manageInventory,
+                      lowStockAlertLevel: p.manageInventory ? null : p.lowStockAlertLevel,
+                    }))
                   }
                   className={`relative h-8 w-14 shrink-0 rounded-full transition ${
                     form.manageInventory ? "bg-black" : "bg-gray-300"
@@ -281,6 +285,7 @@ export default function AddFoodModal({
                   />
                 </button>
               </div>
+              {form.manageInventory ? (
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
                 <label className="mb-1.5 block text-sm font-medium text-gray-800">
                   Low Stock Alert Level
@@ -306,9 +311,10 @@ export default function AddFoodModal({
                   Alert when available stock is at or below this number. Each food keeps its own level.
                 </p>
               </div>
+              ) : null}
               <div className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 sm:col-span-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800">Membership Discount</p>
+                  <p className="text-sm font-medium text-gray-800">Membership Benefits</p>
                   <p className="text-xs text-gray-500">
                     {form.applyMembershipDiscount
                       ? "On. The customer's membership discount applies at checkout."

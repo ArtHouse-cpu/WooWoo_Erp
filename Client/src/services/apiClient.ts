@@ -4510,6 +4510,35 @@ export const handleDeleteProduct = async (id: string) => {
   }
 };
 
+export type SegmentOption = {
+  _id?: string;
+  id?: string;
+  name?: string;
+  segmentName?: string;
+  title?: string;
+  label?: string;
+};
+
+export const handleGetSegments = async (signal?: AbortSignal) => {
+  const response = await axiosInstance.get("/segment", { signal });
+  return response.data;
+};
+
+export const handleCreateSegment = async (name: string) => {
+  const response = await axiosInstance.post("/segment", { name });
+  return response.data;
+};
+
+export const handleUpdateSegment = async (id: string, name: string) => {
+  const response = await axiosInstance.patch(`/segment/${id}`, { name });
+  return response.data;
+};
+
+export const handleDeleteSegment = async (id: string) => {
+  const response = await axiosInstance.delete(`/segment/${id}`);
+  return response.data;
+};
+
 export const handleGetCategories = async (signal?: AbortSignal) => {
   try {
     const response = await axiosInstance.get("/api/categories", { signal });
