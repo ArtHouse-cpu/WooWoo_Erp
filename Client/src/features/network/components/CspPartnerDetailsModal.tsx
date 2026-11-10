@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Loader2,
   Mail,
+  MoreVertical,
   Package,
   Phone,
   Search,
@@ -294,6 +295,8 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
   const [payoutDone, setPayoutDone] = useState("");
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!partner) return;
@@ -325,6 +328,7 @@ export default function CspPartnerDetailsModal({ partner, onClose }: Props) {
     setPayoutDone("");
     setImageErrors({});
     setImagePreview(null);
+    setActionsOpen(false);
     if (!isSavedPartner(partner._id)) {
       setLoading(false);
       return;
