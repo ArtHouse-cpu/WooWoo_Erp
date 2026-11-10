@@ -6,12 +6,16 @@ import {
   type MRT_Row,
 } from "material-react-table";
 import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
   Eye,
   Megaphone,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
+  Send,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import Can from "@/components/rbac/Can";
@@ -197,6 +201,27 @@ export default function AnnouncementScreen() {
     useState<(typeof STATUS_FILTERS)[number]>("All");
   const [loading, setLoading] = useState(false);
   const [openSendModal, setOpenSendModal] = useState(false);
+
+  const completedCount = useMemo(
+    () => rows.filter((r) => r.status === "completed").length,
+    [rows],
+  );
+  const pendingCount = useMemo(
+    () => rows.filter((r) => r.status === "pending").length,
+    [rows],
+  );
+  const failedCount = useMemo(
+    () => rows.filter((r) => r.status === "failed").length,
+    [rows],
+  );
+  const sendingCount = useMemo(
+    () => rows.filter((r) => r.status === "sending").length,
+    [rows],
+  );
+
+  const handleToggleKpi = (status: AnnouncementStatus) => {
+    setStatusFilter((prev) => (prev === status ? "All" : status));
+  };
 
   const fetchAnnouncements = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -426,6 +451,133 @@ export default function AnnouncementScreen() {
             </button>
           </Can>
         </div>
+      </div>
+
+      {/* KPI Cards: Completed, Pending, Failed, Sending */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        {/* Completed Card */}
+        <button
+          type="button"
+          onClick={() => handleToggleKpi("completed")}
+          className={`flex items-center gap-2.5 sm:gap-3.5 rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer ${
+            statusFilter === "completed"
+              ? "border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-400/30 shadow-xs"
+              : "border-slate-200/90 bg-white hover:border-emerald-200 hover:bg-emerald-50/30 hover:shadow-xs"
+          }`}
+        >
+          <div
+            className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+              statusFilter === "completed"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-emerald-50 text-emerald-600"
+            }`}
+          >
+            <CheckCircle2 size={18} className="sm:w-5 sm:h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-base sm:text-lg font-bold tracking-tight text-emerald-950 leading-none">
+              {loading && rows.length === 0
+                ? "..."
+                : completedCount.toLocaleString("en-IN")}
+            </div>
+            <div className="mt-1 text-[11px] sm:text-xs font-semibold text-emerald-700/80 truncate">
+              Completed
+            </div>
+          </div>
+        </button>
+
+        {/* Pending Card */}
+        <button
+          type="button"
+          onClick={() => handleToggleKpi("pending")}
+          className={`flex items-center gap-2.5 sm:gap-3.5 rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer ${
+            statusFilter === "pending"
+              ? "border-amber-500 bg-amber-50/80 ring-2 ring-amber-400/30 shadow-xs"
+              : "border-slate-200/90 bg-white hover:border-amber-200 hover:bg-amber-50/30 hover:shadow-xs"
+          }`}
+        >
+          <div
+            className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+              statusFilter === "pending"
+                ? "bg-amber-600 text-white shadow-xs"
+                : "bg-amber-50 text-amber-600"
+            }`}
+          >
+            <Clock size={18} className="sm:w-5 sm:h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-base sm:text-lg font-bold tracking-tight text-amber-950 leading-none">
+              {loading && rows.length === 0
+                ? "..."
+                : pendingCount.toLocaleString("en-IN")}
+            </div>
+            <div className="mt-1 text-[11px] sm:text-xs font-semibold text-amber-700/80 truncate">
+              Pending
+            </div>
+          </div>
+        </button>
+
+        {/* Failed Card */}
+        <button
+          type="button"
+          onClick={() => handleToggleKpi("failed")}
+          className={`flex items-center gap-2.5 sm:gap-3.5 rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer ${
+            statusFilter === "failed"
+              ? "border-rose-500 bg-rose-50/80 ring-2 ring-rose-400/30 shadow-xs"
+              : "border-slate-200/90 bg-white hover:border-rose-200 hover:bg-rose-50/30 hover:shadow-xs"
+          }`}
+        >
+          <div
+            className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+              statusFilter === "failed"
+                ? "bg-rose-600 text-white shadow-xs"
+                : "bg-rose-50 text-rose-600"
+            }`}
+          >
+            <AlertCircle size={18} className="sm:w-5 sm:h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-base sm:text-lg font-bold tracking-tight text-rose-950 leading-none">
+              {loading && rows.length === 0
+                ? "..."
+                : failedCount.toLocaleString("en-IN")}
+            </div>
+            <div className="mt-1 text-[11px] sm:text-xs font-semibold text-rose-700/80 truncate">
+              Failed
+            </div>
+          </div>
+        </button>
+
+        {/* Sending Card */}
+        <button
+          type="button"
+          onClick={() => handleToggleKpi("sending")}
+          className={`flex items-center gap-2.5 sm:gap-3.5 rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer ${
+            statusFilter === "sending"
+              ? "border-blue-500 bg-blue-50/80 ring-2 ring-blue-400/30 shadow-xs"
+              : "border-slate-200/90 bg-white hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-xs"
+          }`}
+        >
+          <div
+            className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+              statusFilter === "sending"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-blue-50 text-blue-600"
+            }`}
+          >
+            <Send size={18} className="sm:w-5 sm:h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-base sm:text-lg font-bold tracking-tight text-slate-900 leading-none">
+              {loading && rows.length === 0
+                ? "..."
+                : sendingCount.toLocaleString("en-IN")}
+            </div>
+            <div className="mt-1 text-[11px] sm:text-xs font-semibold text-slate-500 truncate">
+              Sending
+            </div>
+          </div>
+        </button>
       </div>
 
       {/* Search and Status Filters */}

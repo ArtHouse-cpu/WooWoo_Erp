@@ -329,50 +329,60 @@ const CommissionLedgerModal = ({
         </div>
 
         {/* Ledger Title & Filter Controls */}
-        <div className="p-4 border-b border-gray-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
+        <div className="p-3.5 sm:p-4 border-b border-gray-200 bg-white space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-              <Receipt size={16} className="text-indigo-600" />
-              Commission Ledger Transactions
+              <Receipt size={16} className="text-indigo-600 shrink-0" />
+              <span>Commission Ledger Transactions</span>
             </h3>
-            <p className="text-xs text-gray-500">
-              Breakdown of all invoices where commission was credited
-            </p>
+            <span className="text-[11px] font-semibold text-gray-400">
+              {filteredInvoices.length} {filteredInvoices.length === 1 ? "record" : "records"}
+            </span>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Search Input */}
-            <div className="relative min-w-[200px]">
-              <Search
-                size={14}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                type="text"
-                placeholder="Search invoice or customer..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-lg outline-none focus:bg-white focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
+          {/* Search Input - Takes Whole Space */}
+          <div className="relative w-full">
+            <Search
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            />
+            <input
+              type="text"
+              placeholder="Search invoice or customer..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm bg-gray-50/80 border border-gray-200 rounded-xl outline-none transition placeholder:text-gray-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            />
+          </div>
 
-            {/* Status Filter */}
-            <div className="flex items-center bg-gray-100 p-0.5 rounded-lg text-xs font-medium">
-              {["All", "Credited", "Pending"].map((status) => (
+          {/* Status Filter Toggles - Colorful and Takes Whole Space */}
+          <div className="grid grid-cols-3 gap-2 w-full">
+            {(["All", "Credited", "Pending"] as const).map((status) => {
+              const active = statusFilter === status;
+              const colorClasses =
+                status === "All"
+                  ? active
+                    ? "bg-violet-600 text-white shadow-md shadow-violet-200 font-bold"
+                    : "bg-violet-50/80 text-violet-700 hover:bg-violet-100 border border-violet-200/60 font-semibold"
+                  : status === "Credited"
+                  ? active
+                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-200 font-bold"
+                    : "bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60 font-semibold"
+                  : active
+                  ? "bg-amber-500 text-white shadow-md shadow-amber-200 font-bold"
+                  : "bg-amber-50/80 text-amber-700 hover:bg-amber-100 border border-amber-200/60 font-semibold";
+
+              return (
                 <button
                   key={status}
                   type="button"
                   onClick={() => setStatusFilter(status)}
-                  className={`px-2.5 py-1 rounded-md transition ${
-                    statusFilter === status
-                      ? "bg-white text-indigo-700 shadow-sm font-semibold"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
+                  className={`flex h-9 sm:h-10 items-center justify-center rounded-xl px-2 text-xs sm:text-sm transition-all duration-200 cursor-pointer active:scale-95 ${colorClasses}`}
                 >
-                  {status}
+                  <span>{status}</span>
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
 
@@ -546,13 +556,7 @@ const CommissionLedgerModal = ({
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void closeIfConfirmed(onClose)}
-            className="px-5 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 font-semibold transition shadow-sm"
-          >
-            Close Ledger
-          </button>
+        
         </div>
       </div>
     </div>,

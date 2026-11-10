@@ -5,8 +5,15 @@ import {
   useMaterialReactTable,
   type MRT_ColumnDef,
 } from "material-react-table";
-import { Eye, FileSpreadsheet,
-  Search, Trash2,SquarePen } from "lucide-react";
+import {
+  Building2,
+  Eye,
+  FileSpreadsheet,
+  Search,
+  ShieldCheck,
+  SquarePen,
+  Trash2,
+} from "lucide-react";
 import Swal from "sweetalert2";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -184,6 +191,7 @@ export default function VendorScreen() {
   const [importingVendor, setImportingVendor] = useState(false);
   const [openLedgerModal, setOpenLedgerModal] = useState(false);
   const [mobileSearch, setMobileSearch] = useState("");
+  const [kpiFilter, setKpiFilter] = useState<"all" | "csp" | null>(null);
 
   const [selectedVendorForLedger, setSelectedVendorForLedger] =
     useState<VendorRow | null>(null);
@@ -369,7 +377,22 @@ export default function VendorScreen() {
     }
   };
 
-  const data = useMemo<VendorTableRow[]>(
+  const totalVendors = vendors.length;
+  const totalCsp = useMemo(
+    () =>
+      vendors.filter(
+        (v) =>
+          Boolean(v.cspLabel) ||
+          Boolean((v as unknown as { isCsp?: boolean }).isCsp),
+      ).length,
+    [vendors],
+  );
+
+  const handleToggleKpi = (filter: "all" | "csp") => {
+    setKpiFilter((prev) => (prev === filter ? null : filter));
+  };
+
+  const allData = useMemo<VendorTableRow[]>(
     () =>
       vendors.map((vendor, index) => ({
         id: index + 1,
@@ -378,6 +401,17 @@ export default function VendorScreen() {
       })),
     [vendors],
   );
+
+  const data = useMemo<VendorTableRow[]>(() => {
+    if (kpiFilter === "csp") {
+      return allData.filter(
+        (v) =>
+          Boolean(v.cspLabel) ||
+          Boolean((v as unknown as { isCsp?: boolean }).isCsp),
+      );
+    }
+    return allData;
+  }, [allData, kpiFilter]);
 
   const filteredVendors = useMemo(() => {
     if (!mobileSearch.trim()) return data;
@@ -629,11 +663,7 @@ Cell: ({ row }) => (
       <div className="mb-4 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <h1 className="truncate text-base font-semibold text-slate-900 sm:text-xl">Vendors List</h1>
-          <p className="text-xs text-slate-500 sm:text-sm">
-            {loadingVendors
-              ? "Loading..."
-              : `${vendors.length.toLocaleString("en-IN")} vendors`}
-          </p>
+         
         </div>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <Can permission={PERMISSIONS.VENDOR_CREATE}>
@@ -643,20 +673,81 @@ Cell: ({ row }) => (
               onClick={() => setOpenImportVendorModal(true)}
             >
               <FileSpreadsheet size={14} className="shrink-0" />
-              Excel Import
+              
             </button>
             <button
               type="button"
-              className="whitespace-nowrap rounded-lg bg-black px-2 py-2 text-[11px] font-semibold text-white transition hover:bg-neutral-900 sm:px-4 sm:py-2.5 sm:text-sm"
+              className="whitespace-nowrap rounded-lg bg-black px-2 py-2 text-[15px] font-semibold text-white transition hover:bg-neutral-900 sm:px-4 sm:py-2.5 sm:text-sm"
               onClick={() => {
                 setEditingVendor(null);
                 setOpenCreateVendorModal(true);
               }}
             >
-              Create New Vendor
+              +
             </button>
           </Can>
         </div>
+      </div>
+
+      {/* KPI Cards: Total Vendors & Total CSP */}
+      <div className="grid grid-cols-2 sm:max-w-md gap-2.5 sm:gap-3 mb-3.5">
+        {/* Total Vendors Card */}
+        <button
+          type="button"
+          onClick={() => handleToggleKpi("all")}
+          className={`flex items-center gap-2.5 sm:gap-3.5 rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer ${
+            kpiFilter === "all"
+              ? "border-blue-500 bg-blue-50/80 ring-2 ring-blue-400/30 shadow-xs"
+              : "border-slate-200/90 bg-white hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-xs"
+          }`}
+        >
+          <div
+            className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+              kpiFilter === "all"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-blue-50 text-blue-600"
+            }`}
+          >
+            <Building2 size={18} className="sm:w-5 sm:h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-base sm:text-lg font-bold tracking-tight text-slate-900 leading-none">
+              {loadingVendors ? "..." : totalVendors.toLocaleString("en-IN")}
+            </div>
+            <div className="mt-1 text-[11px] sm:text-xs font-semibold text-slate-500 truncate">
+              Total Vendors
+            </div>
+          </div>
+        </button>
+
+        {/* Total CSP Card */}
+        <button
+          type="button"
+          onClick={() => handleToggleKpi("csp")}
+          className={`flex items-center gap-2.5 sm:gap-3.5 rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer ${
+            kpiFilter === "csp"
+              ? "border-purple-500 bg-purple-50/80 ring-2 ring-purple-400/30 shadow-xs"
+              : "border-slate-200/90 bg-white hover:border-purple-200 hover:bg-purple-50/30 hover:shadow-xs"
+          }`}
+        >
+          <div
+            className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+              kpiFilter === "csp"
+                ? "bg-purple-600 text-white shadow-xs"
+                : "bg-purple-50 text-purple-600"
+            }`}
+          >
+            <ShieldCheck size={18} className="sm:w-5 sm:h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-base sm:text-lg font-bold tracking-tight text-purple-950 leading-none">
+              {loadingVendors ? "..." : totalCsp.toLocaleString("en-IN")}
+            </div>
+            <div className="mt-1 text-[11px] sm:text-xs font-semibold text-purple-600/80 truncate">
+              Total CSP
+            </div>
+          </div>
+        </button>
       </div>
 
       {/* Desktop Table View */}

@@ -7,7 +7,7 @@ import {
   type MRT_PaginationState,
   type MRT_Row,
 } from "material-react-table";
-import { Eye, FileSpreadsheet, Loader2, MoreVertical, Phone, Search, SquarePen, Trash2, X } from "lucide-react";
+import { Eye, FileSpreadsheet, Loader2, MoreVertical, Phone, Search, SquarePen, Trash2, UserCheck, Users, X } from "lucide-react";
 import Swal from "sweetalert2";
 import LedgerModal from "@/features/network/components/LedgerModal";
 import CreateCustomerModal from "@/features/network/components/CreateCustomerModal";
@@ -97,6 +97,9 @@ export default function CustomerScreen() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [rowCount, setRowCount] = useState(0);
+  const [kpiFilter, setKpiFilter] = useState<"all" | "visited_today" | null>(null);
+  const [totalCustomersCount, setTotalCustomersCount] = useState<number>(0);
+  const [visitedTodayCount, setVisitedTodayCount] = useState<number>(0);
   const [pagination, setPagination] = useState<MRT_PaginationState>({
     pageIndex: 0,
     pageSize: PAGE_SIZE_DEFAULT,
@@ -117,6 +120,11 @@ export default function CustomerScreen() {
   );
   const [customer360, setCustomer360] = useState<CustomerRow | null>(null);
   const [actionMenuCustomerId, setActionMenuCustomerId] = useState<string | null>(null);
+
+  const handleToggleKpi = (filter: "all" | "visited_today") => {
+    setKpiFilter((prev) => (prev === filter ? null : filter));
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  };
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -139,11 +147,15 @@ export default function CustomerScreen() {
     try {
       setLoadingCustomers(true);
       const page = pagination.pageIndex + 1;
+      const isVisited = kpiFilter === "visited_today";
       const response = await handleGetCustomers(
         debouncedSearch,
         signal,
         pagination.pageSize,
         page,
+        "",
+        "",
+        isVisited,
       );
       const customerList: CustomerRow[] = Array.isArray(response?.customers)
         ? response.customers
@@ -164,6 +176,18 @@ export default function CustomerScreen() {
           ? Number(response.total)
           : customerList.length,
       );
+      if (Number.isFinite(Number(response?.totalCustomersCount))) {
+        setTotalCustomersCount(Number(response.totalCustomersCount));
+      } else if (!isVisited && !debouncedSearch) {
+        setTotalCustomersCount(
+          Number.isFinite(Number(response?.total))
+            ? Number(response.total)
+            : customerList.length,
+        );
+      }
+      if (Number.isFinite(Number(response?.visitedTodayCount))) {
+        setVisitedTodayCount(Number(response.visitedTodayCount));
+      }
     } catch (error) {
       if (
         (error as { name?: string; code?: string })?.name === "CanceledError" ||
@@ -181,8 +205,8 @@ export default function CustomerScreen() {
     const controller = new AbortController();
     void fetchCustomers(controller.signal);
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on page/search
-  }, [debouncedSearch, pagination.pageIndex, pagination.pageSize]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on page/search/kpiFilter
+  }, [debouncedSearch, pagination.pageIndex, pagination.pageSize, kpiFilter]);
 
   const handleDelete = async (id: string) => {
     const result = await Swal.fire({
@@ -475,35 +499,96 @@ export default function CustomerScreen() {
   });
   return (
     <div className="p-1">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Customers</h1>
-          <div className="text-sm text-slate-500">
-            {loadingCustomers
-              ? "Loading..."
-              : `${rowCount.toLocaleString("en-IN")} customers`}
-          </div>
+      <div className="mb-4 flex items-center justify-between gap-2 sm:gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-base font-semibold text-slate-900 sm:text-xl">Customers</h1>
+         
         </div>
 
-        <div className="flex w-full items-center gap-2 sm:w-auto sm:flex-1 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
           <Can permission={PERMISSIONS.CUSTOMER_CREATE}>
             <button
               type="button"
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 sm:flex-initial sm:px-4 sm:py-2.5 sm:text-sm"
+              className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2 text-[11px] font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 sm:gap-1.5 sm:px-4 sm:py-2.5 sm:text-sm"
               onClick={() => setOpenImportModal(true)}
             >
-              <FileSpreadsheet size={16} />
-              Excel Import
+              <FileSpreadsheet size={14} className="shrink-0" />
+              
             </button>
             <button
               type="button"
-              className="inline-flex flex-1 items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:flex-initial sm:px-4 sm:py-2.5 sm:text-sm"
+              className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 sm:px-4 sm:py-2.5 sm:text-sm"
               onClick={() => setOpenCreateCustomerModal(true)}
             >
-              + New Customer
+              <span>+  </span>
             </button>
           </Can>
         </div>
+      </div>
+
+      {/* KPI Cards: Total Customers & Visited Today */}
+      <div className="grid grid-cols-2 sm:max-w-md gap-2.5 sm:gap-3 mb-3.5">
+        {/* Total Customers Card */}
+        <button
+          type="button"
+          onClick={() => handleToggleKpi("all")}
+          className={`flex items-center gap-2.5 sm:gap-3.5 rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer ${
+            kpiFilter === "all"
+              ? "border-blue-500 bg-blue-50/80 ring-2 ring-blue-400/30 shadow-xs"
+              : "border-slate-200/90 bg-white hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-xs"
+          }`}
+        >
+          <div
+            className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+              kpiFilter === "all"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-blue-50 text-blue-600"
+            }`}
+          >
+            <Users size={18} className="sm:w-5 sm:h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-base sm:text-lg font-bold tracking-tight text-slate-900 leading-none">
+              {loadingCustomers && !totalCustomersCount && rowCount === 0
+                ? "..."
+                : (totalCustomersCount || rowCount).toLocaleString("en-IN")}
+            </div>
+            <div className="mt-1 text-[11px] sm:text-xs font-semibold text-slate-500 truncate">
+              Total Customers
+            </div>
+          </div>
+        </button>
+
+        {/* Visited Today Card */}
+        <button
+          type="button"
+          onClick={() => handleToggleKpi("visited_today")}
+          className={`flex items-center gap-2.5 sm:gap-3.5 rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer ${
+            kpiFilter === "visited_today"
+              ? "border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-400/30 shadow-xs"
+              : "border-slate-200/90 bg-white hover:border-emerald-200 hover:bg-emerald-50/30 hover:shadow-xs"
+          }`}
+        >
+          <div
+            className={`flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+              kpiFilter === "visited_today"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-emerald-50 text-emerald-600"
+            }`}
+          >
+            <UserCheck size={18} className="sm:w-5 sm:h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-base sm:text-lg font-bold tracking-tight text-emerald-950 leading-none">
+              {loadingCustomers && visitedTodayCount === 0
+                ? "..."
+                : visitedTodayCount.toLocaleString("en-IN")}
+            </div>
+            <div className="mt-1 text-[11px] sm:text-xs font-semibold text-emerald-700/80 truncate">
+              Visited Today
+            </div>
+          </div>
+        </button>
       </div>
 
       {/* Desktop Table View */}

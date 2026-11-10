@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Crown,
   Ellipsis,
   Eye,
@@ -644,6 +645,9 @@ export default function HomeScreen() {
   const [menuId, setMenuId] = useState<string | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const kpiRef = useRef<HTMLDivElement>(null);
+  const billsSectionRef = useRef<HTMLDivElement>(null);
+  const tenthCardRef = useRef<HTMLDivElement>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const [bills, setBills] = useState<RecentBill[]>([]);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
@@ -1501,6 +1505,57 @@ export default function HomeScreen() {
     };
   }, [hasMore, tab, visibleCount, pageSize]);
 
+  useEffect(() => {
+    if (tab !== "bills") {
+      setShowScrollTop(false);
+      return;
+    }
+
+    const checkScroll = () => {
+      if (tenthCardRef.current) {
+        const rect = tenthCardRef.current.getBoundingClientRect();
+        // Visible when scrolled to or past the 10th card
+        if (rect.top <= window.innerHeight * 0.65) {
+          setShowScrollTop(true);
+          return;
+        }
+      } else if (visibleCount > 10 && billsSectionRef.current) {
+        const rect = billsSectionRef.current.getBoundingClientRect();
+        if (rect.top <= -600) {
+          setShowScrollTop(true);
+          return;
+        }
+      }
+      setShowScrollTop(false);
+    };
+
+    const mainEl = document.querySelector("main");
+    checkScroll();
+
+    mainEl?.addEventListener("scroll", checkScroll, { passive: true });
+    window.addEventListener("scroll", checkScroll, { passive: true });
+    window.addEventListener("resize", checkScroll, { passive: true });
+
+    return () => {
+      mainEl?.removeEventListener("scroll", checkScroll);
+      window.removeEventListener("scroll", checkScroll);
+      window.removeEventListener("resize", checkScroll);
+    };
+  }, [tab, visibleCount, pageBills.length]);
+
+  const handleScrollToUpside = () => {
+    if (billsSectionRef.current) {
+      billsSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      const mainEl = document.querySelector("main");
+      if (mainEl) {
+        mainEl.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    }
+  };
+
   const searchPlaceholder =
     tab === "bills"
       ? "Search by invoice no., customer name or phone..."
@@ -2341,7 +2396,7 @@ export default function HomeScreen() {
         />
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <section ref={billsSectionRef} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         <div className="overflow-x-auto border-b border-gray-100">
           <div className="flex min-w-max gap-1 px-2 pt-2 sm:px-4">
             {TABS.map((item) => {
@@ -2565,7 +2620,7 @@ export default function HomeScreen() {
                   </p>
                 </div>
               ) : (
-                pageBills.map((bill) => {
+                pageBills.map((bill, cardIndex) => {
                   const raw = (bill.raw || {}) as Record<string, unknown>;
                   const isPaid = bill.status === "Paid";
                   const isPending =
@@ -2598,6 +2653,7 @@ export default function HomeScreen() {
                   return (
                     <div
                       key={bill.id}
+                      ref={cardIndex === 9 ? tenthCardRef : undefined}
                       onClick={() => void handleMobileBillClick(bill)}
                       className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
                     >
@@ -4805,6 +4861,19 @@ export default function HomeScreen() {
           loading={foodModalLoading}
           initialFood={editFood}
         />
+      )}
+
+      {/* Scroll to upside button in Bills section when scrolling more than 10 customer detail cards */}
+      {tab === "bills" && showScrollTop && (
+        <button
+          type="button"
+          onClick={handleScrollToUpside}
+          title="Go to top"
+          aria-label="Go to top of bills"
+          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] left-4 z-40 flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-2 ring-white/90 transition-all duration-200 hover:bg-blue-700 hover:scale-110 active:scale-95 cursor-pointer animate-in fade-in zoom-in-75 lg:left-72"
+        >
+          <ChevronUp size={22} className="stroke-[2.5]" />
+        </button>
       )}
     </div>
   );
