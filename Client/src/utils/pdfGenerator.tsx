@@ -42,22 +42,40 @@ function invoicePdfBasename(invoice: InvoicePdfInput): string {
   return `${safePdfFileName(String(code))}.pdf`;
 }
 
-/** Wait for fonts and <img> loads so html2canvas captures real pixels. */
+/** Wait for fonts and images, but do not let one slow image hold the download. */
 async function waitForCaptureReady(root: HTMLElement): Promise<void> {
-  await document.fonts.ready.catch(() => undefined);
+  await Promise.race([
+    document.fonts.ready.catch(() => undefined),
+    new Promise((resolve) => window.setTimeout(resolve, 800)),
+  ]);
 
   const imgs = [...root.querySelectorAll("img")] as HTMLImageElement[];
   await Promise.all(
     imgs.map(
       (img) =>
         new Promise<void>((resolve) => {
-          if (img.complete && img.naturalHeight > 0) {
+          if (img.complete) {
             resolve();
             return;
           }
           const done = () => resolve();
-          img.addEventListener("load", done, { once: true });
-          img.addEventListener("error", done, { once: true });
+          const timer = window.setTimeout(done, 1500);
+          img.addEventListener(
+            "load",
+            () => {
+              window.clearTimeout(timer);
+              done();
+            },
+            { once: true },
+          );
+          img.addEventListener(
+            "error",
+            () => {
+              window.clearTimeout(timer);
+              done();
+            },
+            { once: true },
+          );
         }),
     ),
   );
@@ -109,7 +127,7 @@ function addCanvasAsPagedPdf(
 
   let imgData: string;
   try {
-    imgData = canvas.toDataURL("image/png", 1.0);
+    imgData = canvas.toDataURL("image/jpeg", 0.86);
   } catch {
     throw new Error(
       "PDF export blocked a captured image (often due to cross-origin photos). Try again or remove external product images.",
@@ -139,7 +157,7 @@ function addCanvasAsPagedPdf(
     }
   };
 
-  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+  pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
   placeLinksForPage(pageIndex, position);
   heightLeft -= pdfHeight;
 
@@ -147,7 +165,7 @@ function addCanvasAsPagedPdf(
     position = heightLeft - imgHeight;
     pageIndex += 1;
     pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+    pdf.addImage(imgData, "JPEG", 0, position, imgWidth, imgHeight);
     placeLinksForPage(pageIndex, position);
     heightLeft -= pdfHeight;
   }
@@ -206,11 +224,12 @@ async function createInvoicePdf(
     const links = collectInvoiceLinks(element);
 
     const canvas = await html2canvas(element, {
-      scale: Math.min(2, (window.devicePixelRatio || 1) * 1.5),
+      scale: 1.25,
       useCORS: true,
       allowTaint: false,
       logging: false,
       backgroundColor: "#ffffff",
+      imageTimeout: 1500,
       windowWidth: element.scrollWidth,
       windowHeight: element.scrollHeight,
       scrollX: 0,

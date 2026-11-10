@@ -1,4 +1,5 @@
 import React from "react";
+import { QRCodeSVG } from "qrcode.react";
 import logo from "@/assets/images/logo/woo_woo_art_house_logo.png";
 import stamp from "@/assets/images/logo/StampWooWooArtHouse.jpeg";
 // import ativesLogo from "@/assets/images/logo/Atives_Logo.png";
@@ -39,6 +40,8 @@ export type ThermalPrintProps = {
   totalDue: number;
   totalQty: number;
   extraCharges?: Array<{ label: string; amount: number }>;
+  /** Space quotation: date, timing, and hours */
+  bookingDetails?: Array<{ label: string; value: string }>;
 };
 
 const YELLOW = "#d1d0d0";
@@ -313,6 +316,7 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
   totalDue,
   totalQty,
   extraCharges = [],
+  bookingDetails = [],
 }) => {
   const amountInWords = `INR ${rupeesToWords(Math.round(finalAmount))} Rupees Only`;
   const title = String(documentType || "INVOICE").toUpperCase();
@@ -327,11 +331,9 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
     const value = String(membershipType || "").trim();
     return value.toLowerCase() === "none" ? "Visitor" : value;
   })();
-  const upiQrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(
-    `upi://pay?pa=7587270125@okbizaxis&pn=${encodeURIComponent(
-      STORE.name,
-    )}&am=${finalAmount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(invoiceNo)}`,
-  )}`;
+  const upiPayload = `upi://pay?pa=7587270125@okbizaxis&pn=${encodeURIComponent(
+    STORE.name,
+  )}&am=${finalAmount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(invoiceNo)}`;
 
   const th: React.CSSProperties = {
     background: YELLOW,
@@ -491,6 +493,44 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
             <MetaRow label={billedByLabel} value={salesPerson || "—"} />
           </div>
         </div>
+
+        {bookingDetails.length > 0 ? (
+          <div
+            style={{
+              marginBottom: "10px",
+              border: "1px solid #e5e7eb",
+              borderRadius: "6px",
+              padding: "8px 10px",
+            }}
+          >
+            <div
+              style={{
+                marginBottom: "6px",
+                fontSize: "12px",
+                fontWeight: 700,
+                color: TEXT,
+              }}
+            >
+              Booking Details
+            </div>
+            {bookingDetails.map((row, index) => (
+              <div
+                key={`${row.label}-${index}`}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: "16px",
+                  padding: "3px 0",
+                  fontSize: "11px",
+                  color: TEXT,
+                }}
+              >
+                <span style={{ color: MUTED, fontWeight: 600 }}>{row.label}</span>
+                <span style={{ fontWeight: 700, textAlign: "right" }}>{row.value}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {/* Items table */}
         <table
@@ -829,12 +869,13 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
             >
               Pay using UPI:
             </div>
-            <img
-              src={upiQrSrc}
-              alt="UPI QR"
+            <QRCodeSVG
+              value={upiPayload}
+              size={118}
+              level="M"
+              bgColor="#ffffff"
+              fgColor="#111827"
               data-pdf-keep
-              crossOrigin="anonymous"
-              style={{ width: "118px", height: "118px", display: "block" }}
             />
           </div>
 

@@ -161,9 +161,11 @@ export default function ProductsServicesSection({
         const response = await handleCatalogueLookup(
           debouncedDraftName,
           controller.signal,
-          { page: 1, limit: 48, sourceType: "product" },
+          { page: 1, limit: 48 },
         );
-        const list = Array.isArray(response?.items) ? response.items : [];
+        const list = (Array.isArray(response?.items) ? response.items : []).filter(
+          (item) => item.sourceType === "product" || item.sourceType === "food",
+        );
         setCatalogueItems(list);
       } catch (error) {
         if (!isAbortError(error)) setCatalogueItems([]);
@@ -282,7 +284,7 @@ export default function ProductsServicesSection({
               setDropdownOpen(true);
             }}
             onFocus={() => setDropdownOpen(true)}
-            placeholder="Search product or variant..."
+            placeholder="Search product or food..."
             className={inputStyle}
           />
           {dropdownOpen && (
@@ -293,7 +295,7 @@ export default function ProductsServicesSection({
                 </div>
               ) : catalogueItems.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-gray-500">
-                  No products found
+                  No products or foods found
                 </div>
               ) : (
                 <div className="max-h-56 overflow-y-auto">
@@ -322,6 +324,13 @@ export default function ProductsServicesSection({
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <CatalogueItemLabel item={p} />
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase ${
+                                (SOURCE_BADGE[p.sourceType] || SOURCE_BADGE.product).className
+                              }`}
+                            >
+                              {(SOURCE_BADGE[p.sourceType] || SOURCE_BADGE.product).label}
+                            </span>
                             {p.isCsp ? (
                               <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-amber-800">
                                 {p.cspLabel || "CSP"}

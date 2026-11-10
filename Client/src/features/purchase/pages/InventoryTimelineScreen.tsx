@@ -264,6 +264,50 @@ const InventoryTimelineScreen = () => {
               />
             </div>
           )}
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <History className="text-blue-600" />
+            Inventory Timeline
+          </h1>
+          <p className="text-gray-500 text-xs sm:text-sm mt-0.5 sm:mt-1">
+            Track every stock movement across your store
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={stockFilter === "low"}
+            onClick={() => {
+              setStockFilter((current) => (current === "low" ? "all" : "low"));
+              setPage(1);
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 sm:text-sm"
+          >
+            <span>Low Stock</span>
+            <span
+              className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+                stockFilter === "low" ? "bg-rose-600" : "bg-slate-300"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition ${
+                  stockFilter === "low" ? "left-4" : "left-0.5"
+                }`}
+              />
+            </span>
+          </button>
+          <button 
+            type="button"
+            onClick={() => setReloadToken((token) => token + 1)}
+            className="shrink-0 px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition shadow-xs flex items-center justify-center gap-1.5"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            Refresh Data
+          </button>
         </div>
       </div>
 

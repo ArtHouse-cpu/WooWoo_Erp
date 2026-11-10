@@ -68,19 +68,25 @@ const rowNameKey = (item: CatalogueLookupItem) =>
   String(item.productName || item.name || "").trim().toLowerCase();
 
 /**
- * Food added with Manage Inventory is one catalogue row: Food, with purchase stock.
- * Hide the linked product row so POS search does not list the same item twice.
+ * A food is listed once, as Food. Hide a service or inventory product
+ * that uses the same name so it does not also appear as a service.
  */
 function collapseManagedFoodRows(
   items: CatalogueLookupItem[],
 ): CatalogueLookupItem[] {
+  const foodNames = new Set(
+    items
+      .filter((item) => item.sourceType === "food")
+      .map(rowNameKey)
+      .filter(Boolean),
+  );
   const managedFoodNames = new Set(
     items
       .filter((item) => item.sourceType === "food" && item.manageInventory)
       .map(rowNameKey)
       .filter(Boolean),
   );
-  if (!managedFoodNames.size) return items;
+  if (!foodNames.size) return items;
 
   const stockFromProduct = new Map<string, number>();
   for (const item of items) {
@@ -89,7 +95,12 @@ function collapseManagedFoodRows(
   }
 
   return items
-    .filter((item) => !(item.sourceType === "product" && managedFoodNames.has(rowNameKey(item))))
+    .filter((item) => {
+      const key = rowNameKey(item);
+      if (item.sourceType === "service" && foodNames.has(key)) return false;
+      if (item.sourceType === "product" && managedFoodNames.has(key)) return false;
+      return true;
+    })
     .map((item) => {
       if (item.sourceType !== "food" || !item.manageInventory) return item;
       const qty =

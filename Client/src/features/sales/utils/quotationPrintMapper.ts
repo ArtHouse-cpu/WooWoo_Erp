@@ -140,5 +140,13 @@ export function mapQuotationToThermalPrintProps(
     totalDue: finalAmount,
     totalQty,
     extraCharges,
+    bookingDetails: Array.isArray(q.bookingDetails)
+      ? (q.bookingDetails as Array<{ label?: string; value?: string }>)
+          .map((row) => ({
+            label: String(row?.label || "").trim(),
+            value: String(row?.value || "").trim(),
+          }))
+          .filter((row) => row.label && row.value)
+      : [],
   };
 }

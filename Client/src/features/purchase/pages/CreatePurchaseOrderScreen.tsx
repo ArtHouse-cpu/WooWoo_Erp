@@ -23,6 +23,7 @@ import NotesSection from "@/features/sales/components/invoice/NotesSection";
 import InvoiceDetailsSection from "@/features/sales/components/invoice/InvoiceDetailsSection";
 import AddVendorModal from "../Modal/AddVendorModal";
 import type { InvoiceItem } from "@/features/sales/components/invoice/types";
+import { assignUniqueLineIds, nextLineId } from "../components/types";
 import CheckoutModal from "@/features/sales/components/invoice/Modal/CheckoutModal";
 import DocumentFormModal from "@/components/DocumentFormModal";
 import FileAttachmentSection from "../components/FileAttachmentSection";
@@ -94,6 +95,10 @@ export default function CreatePurchaseOrderScreen({
   const [draftDiscount, setDraftDiscount] = useState("0");
   const [draftImage, setDraftImage] = useState("");
   const [items, setItems] = useState<InvoiceItem[]>([]);
+
+  useEffect(() => {
+    setItems((prev) => assignUniqueLineIds(prev));
+  }, [items]);
   const [manualDiscount, setManualDiscount] = useState(0);
   const [manualDiscountType, setManualDiscountType] =
     useState<ManualDiscountType>("flat");
@@ -148,7 +153,7 @@ export default function CreatePurchaseOrderScreen({
       setPhone(data.phone || "");
       setPurchaseDate(data.purchaseDate || today);
       setNotes(data.notes || "");
-      setItems(Array.isArray(data.items) ? data.items : []);
+      setItems(assignUniqueLineIds(Array.isArray(data.items) ? data.items : []));
       setDraftName(data.draftName || "");
       setDraftQty(data.draftQty || "1");
       setDraftPrice(data.draftPrice || "0");
@@ -188,14 +193,14 @@ export default function CreatePurchaseOrderScreen({
       });
       if (Array.isArray(purchase.items)) {
         setItems(
-          purchase.items.map((item: any, idx: number) => ({
+          assignUniqueLineIds(purchase.items.map((item: any, idx: number) => ({
             id: idx + 1,
             productName: item.productName || "",
             qty: Number(item.qty ?? 1),
             unitPrice: Number(item.unitPrice ?? 0),
             discount: Number(item.discount ?? 0),
             image: item.image || item.imageUrl || "",
-          })),
+          }))),
         );
       }
     };
@@ -247,7 +252,7 @@ export default function CreatePurchaseOrderScreen({
     setItems((prev) => [
       ...prev,
       {
-        id: prev.length + 1,
+        id: nextLineId(prev),
         productName: draftName.trim(),
         qty,
         unitPrice: price,
@@ -280,7 +285,7 @@ export default function CreatePurchaseOrderScreen({
       return [
         ...prev,
         {
-          id: prev.length + 1,
+          id: nextLineId(prev),
           productName: item.productName,
           qty: Number(item.qty || 1),
           unitPrice: Number(item.unitPrice || 0),
@@ -302,7 +307,9 @@ export default function CreatePurchaseOrderScreen({
       return;
     }
     setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, qty: newQty } : item)),
+      prev.map((item) =>
+        item.id === id ? { ...item, qty: Math.max(1, newQty) } : item,
+      ),
     );
   };
 
