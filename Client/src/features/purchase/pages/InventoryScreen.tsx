@@ -328,6 +328,13 @@ export default function InventoryScreen() {
             </span>
           )}
         </button>
+            />
+          </span>
+        </button>
+       
+         
+        
+        
       </div>
 
       {fetchError && (

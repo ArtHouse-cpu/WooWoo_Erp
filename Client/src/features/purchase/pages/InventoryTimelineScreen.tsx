@@ -9,7 +9,6 @@ import {
   User, 
   Hash, 
   ShoppingBag, 
-  History, 
   Tag,
   X,
   Eye,

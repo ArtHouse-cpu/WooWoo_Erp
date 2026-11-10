@@ -37,7 +37,7 @@ import {
   handleDeleteProduct,
   handleBulkUploadProducts,
   handleCreateCategories,
-  handleGetCategories,
+  handleGetSegments,
 } from "@/services/apiClient";
 import CreateProductModal from "@/features/sales/components/invoice/Modal/CreateProductModal";
 import UploadBulkProductModal, {
@@ -65,8 +65,20 @@ type ProductRow = {
   barcode?: string;
   categoryId?: string;
   subCategoryId?: string;
+  segment?: string;
+  segments?: Array<{ segmentId?: string; name?: string }>;
   variants?: Array<{ name?: string } | string>;
 };
+
+function productSegmentNames(product: ProductRow): string[] {
+  const rows = Array.isArray(product.segments) ? product.segments : [];
+  const fromRows = rows
+    .map((row) => String(row?.name || "").trim())
+    .filter(Boolean);
+  if (fromRows.length) return fromRows;
+  const legacy = String(product.segment || "").trim();
+  return legacy ? [legacy] : [];
+}
 
 type ProductStats = {
   totalProducts: number;
@@ -108,60 +120,66 @@ export default function ProductScreen() {
   const [editProduct, setEditProduct] = useState<any | null>(null);
   const [viewProduct, setViewProduct] = useState<any | null>(null);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
-  const [categories, setCategories] = useState<{ _id?: string; name?: string }[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-
+  const [catalogueSegments, setCatalogueSegments] = useState<string[]>([]);
+  const [selectedSegment, setSelectedSegment] = useState<string>("all");
 
   useEffect(() => {
-    handleGetCategories()
+    handleGetSegments()
       .then((res) => {
-        const list = Array.isArray(res?.categories)
-          ? res.categories
-          : Array.isArray(res)
-            ? res
-            : [];
-        setCategories(list);
+        const list = Array.isArray(res)
+          ? res
+          : Array.isArray(res?.segments)
+            ? res.segments
+            : Array.isArray(res?.data)
+              ? res.data
+              : [];
+        setCatalogueSegments(
+          list
+            .map((row: { name?: string; segmentName?: string }) =>
+              String(row?.name || row?.segmentName || "").trim(),
+            )
+            .filter(Boolean),
+        );
       })
-      .catch((err) => console.error("Error fetching categories:", err));
+      .catch((err) => console.error("Error fetching segments:", err));
   }, []);
 
-  const categoriesList = useMemo(() => {
-    const fromApi = categories
-      .map((c) => String(c?.name || "").trim())
-      .filter(Boolean);
-    const fromProducts = products
-      .map((p) => String(p?.category || "").trim())
-      .filter(Boolean);
-    return Array.from(new Set([...fromApi, ...fromProducts]));
-  }, [categories, products]);
+  const segmentsList = useMemo(() => {
+    const fromProducts = products.flatMap((product) => productSegmentNames(product));
+    return Array.from(new Set([...catalogueSegments, ...fromProducts]));
+  }, [catalogueSegments, products]);
 
-  const categoryCounts = useMemo(() => {
+  const segmentCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const p of products) {
-      const cat = String(p.category || "General").trim().toLowerCase();
-      counts[cat] = (counts[cat] || 0) + 1;
+    for (const product of products) {
+      for (const name of productSegmentNames(product)) {
+        const key = name.toLowerCase();
+        counts[key] = (counts[key] || 0) + 1;
+      }
     }
     return counts;
   }, [products]);
+
+  const matchesSelectedSegment = (product: ProductRow) => {
+    if (selectedSegment === "all") return true;
+    return productSegmentNames(product).some(
+      (name) => name.toLowerCase() === selectedSegment.toLowerCase(),
+    );
+  };
 
   const [stockFilter, setStockFilter] = useState<"all" | "in_stock" | "out_of_stock">("all");
   const [lowStockOnly, setLowStockOnly] = useState(false);
 
   const displayedMobileProducts = useMemo(() => {
     return products.filter((p) => {
-      if (
-        selectedCategory !== "all" &&
-        String(p.category || "").trim().toLowerCase() !== selectedCategory.toLowerCase()
-      ) {
-        return false;
-      }
+      if (!matchesSelectedSegment(p)) return false;
       const stock = Number(p.stockQty ?? 0);
       const isOut = stock < 3;
       if (stockFilter === "in_stock" && isOut) return false;
       if (stockFilter === "out_of_stock" && !isOut) return false;
       return true;
     });
-  }, [products, selectedCategory, stockFilter]);
+  }, [products, selectedSegment, stockFilter]);
   const [globalFilter, setGlobalFilter] = useState("");
   const search = String(globalFilter ?? "").trim();
   const [sorting, setSorting] = useState<MRT_SortingState>([]);
@@ -637,12 +655,13 @@ export default function ProductScreen() {
         },
       },
       {
-        accessorKey: "category",
-        header: "Category",
-        size: 150,
-        Cell: ({ cell }: { cell: any }) => (
-          <span className=" text-slate-800">{cell.getValue()}</span>
-        ),
+        accessorKey: "segment",
+        header: "Segment",
+        size: 180,
+        Cell: ({ row }: { row: any }) => {
+          const names = productSegmentNames(row.original as ProductRow);
+          return <span className="text-slate-800">{names.length ? names.join(", ") : "—"}</span>;
+        },
       },
       {
         accessorKey: "subCategory",
@@ -725,9 +744,14 @@ export default function ProductScreen() {
     [],
   );
 
+  const tableProducts = useMemo(
+    () => products.filter((product) => matchesSelectedSegment(product)),
+    [products, selectedSegment],
+  );
+
   const table = useMaterialReactTable({
     columns,
-    data: products,
+    data: tableProducts,
     getRowId: (row, index) =>
       String(row._id || `${row.productName ?? "product"}-${index}`),
     enablePagination: false,
@@ -1005,49 +1029,40 @@ export default function ProductScreen() {
       </div>
       {/* Desktop Table View */}
       <div className="hidden md:block space-y-3">
-        {categoriesList.length > 0 && (
+        {segmentsList.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <button
               type="button"
-              onClick={() => {
-                setSelectedCategory("all");
-                table.getColumn("category")?.setFilterValue(undefined);
-              }}
+              onClick={() => setSelectedSegment("all")}
               className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
-                selectedCategory === "all"
+                selectedSegment === "all"
                   ? "bg-blue-600 text-white shadow-xs"
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
             >
               All
-              {selectedCategory === "all" && products.length > 0 && (
+              {selectedSegment === "all" && products.length > 0 && (
                 <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
                   {products.length}
                 </span>
               )}
             </button>
-            {categoriesList.map((catName) => {
+            {segmentsList.map((segmentName) => {
               const isSelected =
-                selectedCategory.toLowerCase() === catName.toLowerCase();
-              const count = categoryCounts[catName.toLowerCase()] || 0;
+                selectedSegment.toLowerCase() === segmentName.toLowerCase();
+              const count = segmentCounts[segmentName.toLowerCase()] || 0;
               return (
                 <button
-                  key={catName}
+                  key={segmentName}
                   type="button"
-                  onClick={() => {
-                    const next = isSelected ? "all" : catName;
-                    setSelectedCategory(next);
-                    table
-                      .getColumn("category")
-                      ?.setFilterValue(next === "all" ? undefined : next);
-                  }}
+                  onClick={() => setSelectedSegment(isSelected ? "all" : segmentName)}
                   className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-sm font-semibold transition active:scale-95 cursor-pointer ${
                     isSelected
                       ? "bg-blue-600 text-white shadow-xs"
                       : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                   }`}
                 >
-                  {catName}
+                  {segmentName}
                   {isSelected && (
                     <span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-bold text-blue-600">
                       {count}
@@ -1109,42 +1124,40 @@ export default function ProductScreen() {
         </div>
 
         {/* Category Pills Below Search Bar */}
-        {categoriesList.length > 0 && (
+        {segmentsList.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <button
               type="button"
-              onClick={() => setSelectedCategory("all")}
+              onClick={() => setSelectedSegment("all")}
               className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-semibold transition active:scale-95 cursor-pointer ${
-                selectedCategory === "all"
+                selectedSegment === "all"
                   ? "bg-blue-600 text-white shadow-xs"
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
             >
               All
-              {selectedCategory === "all" && displayedMobileProducts.length > 0 && (
+              {selectedSegment === "all" && displayedMobileProducts.length > 0 && (
                 <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-blue-600">
                   {displayedMobileProducts.length}
                 </span>
               )}
             </button>
-            {categoriesList.map((catName) => {
+            {segmentsList.map((segmentName) => {
               const isSelected =
-                selectedCategory.toLowerCase() === catName.toLowerCase();
-              const count = categoryCounts[catName.toLowerCase()] || 0;
+                selectedSegment.toLowerCase() === segmentName.toLowerCase();
+              const count = segmentCounts[segmentName.toLowerCase()] || 0;
               return (
                 <button
-                  key={catName}
+                  key={segmentName}
                   type="button"
-                  onClick={() =>
-                    setSelectedCategory(isSelected ? "all" : catName)
-                  }
+                  onClick={() => setSelectedSegment(isSelected ? "all" : segmentName)}
                   className={`inline-flex shrink-0 items-center rounded-full px-4 py-2 text-xs font-semibold transition active:scale-95 cursor-pointer ${
                     isSelected
                       ? "bg-blue-600 text-white shadow-xs"
                       : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                   }`}
                 >
-                  {catName}
+                  {segmentName}
                   {isSelected && (
                     <span className="ml-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-blue-600">
                       {count}
@@ -1239,7 +1252,7 @@ export default function ProductScreen() {
                       {/* Category & Stock */}
                       <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] font-medium text-slate-500">
                         <span className="truncate">
-                          {p.category || "General"}
+                          {productSegmentNames(p).join(", ") || "No segment"}
                         </span>
                         {stock > 0 && (
                           <span className="shrink-0 text-slate-400">
