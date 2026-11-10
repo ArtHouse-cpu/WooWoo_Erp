@@ -517,10 +517,10 @@ export default function CustomerScreen() {
             </button>
             <button
               type="button"
-              className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 sm:px-4 sm:py-2.5 sm:text-sm"
+              className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-blue-700 active:scale-95 sm:px-2 sm:py-2.5 sm:text-sm"
               onClick={() => setOpenCreateCustomerModal(true)}
             >
-              <span>+  </span>
+              <span>+Add </span>
             </button>
           </Can>
         </div>

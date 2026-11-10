@@ -683,7 +683,7 @@ Cell: ({ row }) => (
                 setOpenCreateVendorModal(true);
               }}
             >
-              +
+              +Add
             </button>
           </Can>
         </div>

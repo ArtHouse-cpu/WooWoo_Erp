@@ -12,6 +12,7 @@ import {
   Tag,
   X,
   Eye,
+  History,
   RefreshCw,
   RotateCcw
 } from "lucide-react";
