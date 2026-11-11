@@ -25,13 +25,28 @@ export function spaceQueryUrl(
 ) {
   const text = [
     'Hi, I have a query about this space at WooWoo Art House.',
-    `Name: ${space.name}`,
+    `Space: ${space.name}`,
     `Space ID: ${space.id}`,
     space.spaceType ? `Type: ${space.spaceType}` : '',
     spacePriceLine(space),
     enquiry?.name?.trim() ? `From: ${enquiry.name.trim()}` : '',
     enquiry?.phone?.trim() ? `Phone: ${enquiry.phone.trim()}` : '',
     enquiry?.message?.trim() ? `Message: ${enquiry.message.trim()}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return `https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent(text)}`;
+}
+
+export function spaceBookingUrl(
+  space: Pick<SpaceCard, 'id' | 'name' | 'spaceType' | 'weekdayPrice' | 'weekendPrice' | 'fromPrice'>,
+) {
+  const text = [
+    'Hi, I would like to book a space at WooWoo Art House.',
+    `Space: ${space.name}`,
+    `Space ID: ${space.id}`,
+    space.spaceType ? `Type: ${space.spaceType}` : '',
+    spacePriceLine(space),
   ]
     .filter(Boolean)
     .join('\n');

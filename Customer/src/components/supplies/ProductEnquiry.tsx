@@ -2,49 +2,31 @@ import {useState} from 'react';
 import {Loader2, MessageCircle, Share2} from 'lucide-react';
 import {toast} from 'sonner';
 import type {CustomerProduct} from '../../services/product.service';
-import {copyProductLink, openNativeShare, productQueryUrl} from './productActions';
+import {copyProductLink, productQueryUrl} from './productActions';
+import {ShareProductModal} from './ShareProductModal';
 
 type ProductEnquiryProps = {
   product: CustomerProduct;
 };
 
 export function ProductEnquiry({product}: ProductEnquiryProps) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [message, setMessage] = useState('');
-  const [errors, setErrors] = useState<{name?: string; phone?: string}>({});
-  const [sending, setSending] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
-  const submitQuery = async () => {
-    const nextErrors: {name?: string; phone?: string} = {};
-    if (!name.trim()) nextErrors.name = 'Your name is required.';
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length !== 10) nextErrors.phone = 'Enter a 10-digit mobile number.';
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) return;
-
-    setSending(true);
-    try {
-      const url = productQueryUrl(product, {name, phone: digits, message});
-      window.open(url, '_blank', 'noopener,noreferrer');
-      toast.success('Query opened in WhatsApp for this product.');
-      setOpen(false);
-    } catch {
-      toast.error('Could not open the query. Try again.');
-    } finally {
-      setSending(false);
-    }
+  const handleQuery = () => {
+    const url = productQueryUrl(product);
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const share = async () => {
+  const handleShare = async () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setShowShareModal(true);
+      return;
+    }
     setSharing(true);
     try {
-      const url = await copyProductLink(product._id);
-      toast.success('Product link copied.');
-      const result = await openNativeShare(product, url);
-      if (result === 'failed') toast.error('Could not open the share dialog.');
+      await copyProductLink(product._id);
+      toast.success('Product link copied to clipboard');
     } catch {
       toast.error('Could not copy the product link.');
     } finally {
@@ -57,72 +39,28 @@ export function ProductEnquiry({product}: ProductEnquiryProps) {
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => setOpen(value => !value)}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#EA580C] px-4 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#C2410C]"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Query
-        </button>
-        <button
-          type="button"
-          onClick={() => void share()}
+          onClick={() => void handleShare()}
           disabled={sharing}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[#EA580C] bg-white px-4 py-3 text-sm font-extrabold text-[#EA580C] transition hover:bg-[#FFF7ED] disabled:opacity-60"
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-purple-200 bg-white px-4 py-3 text-sm font-extrabold text-[#6344E7] transition hover:bg-purple-50 active:scale-95 disabled:opacity-60 cursor-pointer"
         >
           {sharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
           Share
         </button>
+        <button
+          type="button"
+          onClick={handleQuery}
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#6344E7] px-4 py-3 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#5235D9] active:scale-95 cursor-pointer"
+        >
+          <MessageCircle className="h-4 w-4" />
+          Query
+        </button>
       </div>
 
-      {open ? (
-        <form
-          className="space-y-3 rounded-2xl border border-orange-100 bg-[#FFF7ED] p-3"
-          onSubmit={event => {
-            event.preventDefault();
-            void submitQuery();
-          }}
-        >
-          <p className="text-left text-xs font-bold text-[#9A3412]">
-            This enquiry is for {product.name}.
-          </p>
-          <label className="block text-left">
-            <span className="mb-1 block text-xs font-bold text-slate-600">Your name</span>
-            <input
-              value={name}
-              onChange={event => setName(event.target.value)}
-              className="w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#EA580C]"
-            />
-            {errors.name ? <span className="mt-1 block text-xs font-semibold text-red-600">{errors.name}</span> : null}
-          </label>
-          <label className="block text-left">
-            <span className="mb-1 block text-xs font-bold text-slate-600">Mobile number</span>
-            <input
-              inputMode="numeric"
-              value={phone}
-              onChange={event => setPhone(event.target.value)}
-              className="w-full rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#EA580C]"
-            />
-            {errors.phone ? <span className="mt-1 block text-xs font-semibold text-red-600">{errors.phone}</span> : null}
-          </label>
-          <label className="block text-left">
-            <span className="mb-1 block text-xs font-bold text-slate-600">Message</span>
-            <textarea
-              rows={3}
-              value={message}
-              onChange={event => setMessage(event.target.value)}
-              className="w-full resize-none rounded-xl border border-orange-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#EA580C]"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={sending}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#111111] px-4 py-2.5 text-sm font-extrabold text-white disabled:opacity-60"
-          >
-            {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Send query
-          </button>
-        </form>
-      ) : null}
+      <ShareProductModal
+        product={product}
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
     </div>
   );
 }
