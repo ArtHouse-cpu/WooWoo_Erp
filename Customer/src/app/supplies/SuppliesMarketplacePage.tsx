@@ -1,26 +1,61 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import axios from 'axios';
-import {ArrowLeft, Search} from 'lucide-react';
+import {ArrowLeft, Search, Package, ShoppingCart, Share2, ArrowUp} from 'lucide-react';
+import {toast} from 'sonner';
 import {ProductDetailsModal} from '../../components/supplies/ProductDetailsModal';
 import {ProductPhoto} from '../../components/supplies/ProductPhoto';
-import {formatInr} from '../../components/supplies/productActions';
+import {ShareProductModal} from '../../components/supplies/ShareProductModal';
+import {
+  formatInr,
+  productQueryUrl,
+  copyProductLink,
+} from '../../components/supplies/productActions';
 import {
   fetchCustomerProducts,
   type CustomerProduct,
 } from '../../services/product.service';
 
+function getOriginalPrice(product: CustomerProduct): number {
+  if (!product.discountValue || product.discountValue <= 0) return 0;
+  if (product.discountType === 'percentage') {
+    if (product.discountValue >= 100) return 0;
+    return Math.round(product.price / (1 - product.discountValue / 100));
+  }
+  return product.price + product.discountValue;
+}
+
 export default function SuppliesMarketplacePage() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<CustomerProduct[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<CustomerProduct | null>(null);
+  const [shareProduct, setShareProduct] = useState<CustomerProduct | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const tenthCardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const checkScroll = () => {
+      if (tenthCardRef.current) {
+        const rect = tenthCardRef.current.getBoundingClientRect();
+        setShowScrollTop(rect.top <= window.innerHeight);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+
+    window.addEventListener('scroll', checkScroll, {passive: true});
+    window.addEventListener('resize', checkScroll, {passive: true});
+    checkScroll();
+    return () => {
+      window.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [products]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(searchInput.trim()), 250);
@@ -31,10 +66,9 @@ export default function SuppliesMarketplacePage() {
     const controller = new AbortController();
     setLoading(true);
     setError('');
-    fetchCustomerProducts({search, category, limit: 200}, controller.signal)
+    fetchCustomerProducts({search, limit: 200}, controller.signal)
       .then(result => {
         setProducts(result.products);
-        if (result.categories.length) setCategories(result.categories);
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted || axios.isCancel(err)) return;
@@ -46,7 +80,32 @@ export default function SuppliesMarketplacePage() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [search, category, reloadKey]);
+  }, [search, reloadKey]);
+
+  const handleBuy = (product: CustomerProduct) => {
+    const url = productQueryUrl(product);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({top: 0, behavior: 'smooth'});
+    document.documentElement.scrollTo({top: 0, behavior: 'smooth'});
+  };
+
+  const handleShare = async (product: CustomerProduct) => {
+    // Open share link modal in mobile screen only
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setShareProduct(product);
+      return;
+    }
+    // Desktop: copy link directly to clipboard
+    try {
+      await copyProductLink(product._id);
+      toast.success('Product link copied to clipboard');
+    } catch {
+      toast.error('Failed to copy link');
+    }
+  };
 
   return (
     <div className="min-h-dvh bg-[#FAFBFD] text-left">
@@ -61,11 +120,8 @@ export default function SuppliesMarketplacePage() {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="min-w-0">
-            <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#EA580C]">
-              WooWoo Supplies
-            </p>
             <h1 className="truncate font-display text-xl font-bold text-[#111111]">
-              Explore supplies
+              Supplies
             </h1>
           </div>
         </div>
@@ -79,21 +135,6 @@ export default function SuppliesMarketplacePage() {
               className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400"
             />
           </label>
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            <CategoryChip
-              label="All"
-              active={!category}
-              onClick={() => setCategory('')}
-            />
-            {categories.map(name => (
-              <CategoryChip
-                key={name}
-                label={name}
-                active={category === name}
-                onClick={() => setCategory(name)}
-              />
-            ))}
-          </div>
         </div>
       </header>
 
@@ -112,11 +153,18 @@ export default function SuppliesMarketplacePage() {
         ) : loading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({length: 8}).map((_, index) => (
-              <div key={index} className="overflow-hidden rounded-3xl bg-white shadow-sm">
-                <div className="aspect-square animate-pulse bg-slate-100" />
-                <div className="space-y-2 p-3">
-                  <div className="h-3 w-2/3 animate-pulse rounded bg-slate-100" />
-                  <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100" />
+              <div key={index} className="overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 shadow-xs">
+                <div className="aspect-4/3 w-full animate-pulse rounded-2xl bg-slate-100" />
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="h-4 w-1/2 animate-pulse rounded bg-slate-100" />
+                    <div className="h-4 w-16 animate-pulse rounded-full bg-slate-100" />
+                  </div>
+                  <div className="h-4 w-1/3 animate-pulse rounded-full bg-slate-100" />
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="h-5 w-14 animate-pulse rounded bg-slate-100" />
+                    <div className="h-8 w-20 animate-pulse rounded-xl bg-slate-100" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -125,67 +173,132 @@ export default function SuppliesMarketplacePage() {
           <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center">
             <p className="text-lg font-extrabold text-[#111111]">No supplies found</p>
             <p className="mt-1 text-sm font-semibold text-slate-500">
-              Try another search or category.
+              Try another search or keyword.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {products.map(product => (
-              <button
-                key={product._id}
-                type="button"
-                onClick={() => setSelected(product)}
-                className="overflow-hidden rounded-3xl border border-slate-100 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className="aspect-square">
-                  <ProductPhoto src={product.imageUrl} alt={product.name} />
+            {products.map((product, index) => {
+              const inStock = product.availability !== 'out_of_stock';
+              const originalPrice = getOriginalPrice(product);
+
+              return (
+                <div
+                  key={product._id}
+                  ref={index === 9 ? tenthCardRef : undefined}
+                  onClick={() => setSelected(product)}
+                  className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 text-left shadow-xs transition hover:-translate-y-1 hover:shadow-md cursor-pointer"
+                >
+                  <div>
+                    {/* Product Photo Container */}
+                    <div className="relative aspect-4/3 w-full overflow-hidden rounded-2xl bg-[#FFF9F3] flex items-center justify-center">
+                      <ProductPhoto
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    </div>
+
+                    {/* Title & In/Out Stock Badge on Parallel Row */}
+                    <div className="mt-3 flex items-center justify-between gap-1.5">
+                      <h3
+                        className="min-w-0 flex-1 truncate text-xs sm:text-sm font-extrabold text-[#111111]"
+                        title={product.name}
+                      >
+                        {product.name}
+                      </h3>
+                      {inStock ? (
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-700 border border-emerald-200/60">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                          In Stock
+                        </span>
+                      ) : (
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-rose-700 border border-rose-200/60">
+                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                          Out of Stock
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Category Pill */}
+                    <div className="mt-1.5 flex items-center">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#F3E8FF] px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-[#7C3AED]">
+                        <Package size={12} className="shrink-0 text-[#7C3AED]" />
+                        <span className="truncate max-w-[120px] sm:max-w-[150px]">
+                          {product.category || 'Craft Supplies'}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Price & Buy/Share Action Row */}
+                  <div className="mt-3 flex items-center justify-between gap-1.5 pt-2 border-t border-slate-50">
+                    <div className="flex items-baseline gap-1 min-w-0">
+                      <span className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                        ₹{formatInr(product.price)}
+                      </span>
+                      {originalPrice > product.price && (
+                        <span className="text-[11px] sm:text-xs font-semibold text-slate-400 line-through">
+                          ₹{formatInr(originalPrice)}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleBuy(product);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-xl bg-[#6344E7] hover:bg-[#5235D9] px-2.5 sm:px-3 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
+                      >
+                        <ShoppingCart size={13} className="shrink-0" />
+                        <span>Buy</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          void handleShare(product);
+                        }}
+                        className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl border border-purple-200 bg-white text-[#6344E7] hover:bg-purple-50 transition active:scale-95 cursor-pointer shrink-0"
+                        title="Share product"
+                        aria-label="Share product"
+                      >
+                        <Share2 size={13} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1 p-3">
-                  <p className="line-clamp-2 text-sm font-extrabold text-[#111111]">
-                    {product.name}
-                  </p>
-                  <p className="line-clamp-2 text-xs font-medium text-slate-500">
-                    {product.description || product.brandName || product.category || 'Art supplies'}
-                  </p>
-                  <p className="text-sm font-extrabold text-[#111111]">₹{formatInr(product.price)}</p>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#EA580C]">
-                    {product.category || 'Supplies'}
-                  </p>
-                  <span className="inline-flex text-[11px] font-extrabold text-slate-400">
-                    View details
-                  </span>
-                </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
 
-      <ProductDetailsModal product={selected} onClose={() => setSelected(null)} />
-    </div>
-  );
-}
+      {/* Scroll to Top Button (visible after scrolling past 10 cards) */}
+      <button
+        type="button"
+        onClick={scrollToTop}
+        aria-label="Go to top"
+        title="Go to top"
+        className={`fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-40 flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-[#6344E7] text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:bg-[#5235D9] hover:scale-110 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 ${
+          showScrollTop
+            ? 'opacity-100 translate-y-0 pointer-events-auto'
+            : 'opacity-0 translate-y-4 pointer-events-none'
+        }`}
+      >
+        <ArrowUp className="h-5 w-5 stroke-[2.5]" />
+      </button>
 
-function CategoryChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-extrabold transition ${
-        active
-          ? 'border-[#EA580C] bg-[#FFF7ED] text-[#EA580C]'
-          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-      }`}
-    >
-      {label}
-    </button>
+      <ProductDetailsModal product={selected} onClose={() => setSelected(null)} />
+
+      <ShareProductModal
+        product={shareProduct}
+        isOpen={Boolean(shareProduct)}
+        onClose={() => setShareProduct(null)}
+      />
+    </div>
   );
 }

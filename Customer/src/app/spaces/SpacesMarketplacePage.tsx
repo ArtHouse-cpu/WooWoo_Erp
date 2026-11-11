@@ -1,22 +1,37 @@
 import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import axios from 'axios';
-import {ArrowLeft, Search} from 'lucide-react';
+import {ArrowLeft, Search, Share2} from 'lucide-react';
+import {toast} from 'sonner';
 import {SpaceDetailsModal} from '../../components/spaces/SpaceDetailsModal';
 import {SpacePhoto} from '../../components/spaces/SpacePhoto';
-import {formatInr} from '../../components/spaces/spaceActions';
+import {
+  formatInr,
+  spaceBookingUrl,
+  copySpaceLink,
+  openNativeShare,
+  spaceShareUrl,
+  SPACE_WHATSAPP,
+} from '../../components/spaces/spaceActions';
 import {
   fetchAvailableSpaces,
   groupSpacesByName,
   type SpaceCard,
 } from '../../services/space.service';
 
+function WhatsAppIcon({className = 'h-4 w-4'}: {className?: string}) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+      <path d="M12.004 0c-6.627 0-12 5.373-12 12 0 2.115.549 4.102 1.51 5.834L0 24l6.335-1.464c1.656.921 3.56 1.464 5.669 1.464 6.627 0 12-5.373 12-12s-5.373-12-12-12zm6.75 16.035c-.244.686-1.22 1.256-1.787 1.348-.567.094-1.127.359-3.666-.639-3.245-1.275-5.334-4.57-5.496-4.786-.162-.217-1.3-1.725-1.3-3.292 0-1.567.818-2.337 1.109-2.643.29-.306.634-.383.847-.383.213 0 .426.002.612.01.196.008.46-.073.72.549.26.623.89 2.169.966 2.322.077.153.128.331.026.536-.102.205-.153.332-.306.509-.153.178-.323.398-.46.549-.153.153-.314.321-.136.628.178.307.79 1.298 1.696 2.107.907.809 1.666 1.059 1.972 1.213.307.153.486.128.665-.077.179-.205.766-.893.97-1.199.205-.306.41-.255.69-.153.28.102 1.776.837 2.083.99.307.153.51.23.587.357.077.127.077.738-.167 1.424z" />
+    </svg>
+  );
+}
+
 export default function SpacesMarketplacePage() {
   const navigate = useNavigate();
   const [spaces, setSpaces] = useState<SpaceCard[]>([]);
   const [search, setSearch] = useState('');
   const [spaceType, setSpaceType] = useState('');
-  const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<SpaceCard | null>(null);
@@ -40,42 +55,76 @@ export default function SpacesMarketplacePage() {
     return () => controller.abort();
   }, [reloadKey]);
 
-  const categories = useMemo(() => {
-    const names = new Set(spaces.map(space => space.category).filter(Boolean));
-    return [...names].sort((a, b) => a.localeCompare(b));
-  }, [spaces]);
-
   const visible = useMemo(() => {
     const query = search.trim().toLowerCase();
     return spaces.filter(space => {
       if (spaceType && space.spaceType.toLowerCase() !== spaceType.toLowerCase()) return false;
-      if (category && space.category !== category) return false;
       if (!query) return true;
-      return [space.name, space.category, space.spaceType, space.description]
+      return [space.name, space.spaceType, space.description]
         .join(' ')
         .toLowerCase()
         .includes(query);
     });
-  }, [spaces, search, spaceType, category]);
+  }, [spaces, search, spaceType]);
+
+  const handleBook = (space: SpaceCard) => {
+    const url = spaceBookingUrl(space);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleShare = async (space: SpaceCard) => {
+    const url = spaceShareUrl(space.id);
+    if (
+      typeof window !== 'undefined' &&
+      window.innerWidth < 768 &&
+      typeof navigator !== 'undefined' &&
+      typeof navigator.share === 'function'
+    ) {
+      const result = await openNativeShare(space, url);
+      if (result === 'shared') {
+        toast.success('Space link shared');
+        return;
+      }
+      if (result === 'cancelled') return;
+    }
+    try {
+      await copySpaceLink(space.id);
+      toast.success('Space link copied to clipboard');
+    } catch {
+      toast.error('Failed to copy link');
+    }
+  };
 
   return (
     <div className="min-h-dvh bg-[#FAFBFD] text-left">
       <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
-          <button
-            type="button"
-            onClick={() => navigate('/home')}
-            className="rounded-full p-2 text-slate-600 hover:bg-slate-100"
-            aria-label="Back to home"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="min-w-0">
-            <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#EA580C]">
-              WooWoo Spaces
-            </p>
-            <h1 className="truncate font-display text-xl font-bold text-[#111111]">Explore spaces</h1>
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={() => navigate('/home')}
+              className="rounded-full p-2 text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              aria-label="Back to home"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="min-w-0">
+              <h1 className="truncate font-display text-xl font-bold text-[#111111]">Spaces</h1>
+            </div>
           </div>
+
+          <a
+            href={`https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent(
+              'Hi, I want some help .',
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#25D366] hover:bg-[#20ba59] px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
+            title="Book Now on WhatsApp"
+          >
+            <WhatsAppIcon className="h-4 w-4" />
+            <span>Need Help</span>
+          </a>
         </div>
         <div className="mx-auto max-w-6xl px-4 pb-3 sm:px-6">
           <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-[#F8FAFC] px-3 py-2.5 focus-within:border-[#EA580C]">
@@ -88,23 +137,30 @@ export default function SpacesMarketplacePage() {
             />
           </label>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {['', 'Exclusive', 'Coworking'].map(type => (
-              <Chip
-                key={type || 'all-types'}
-                label={type || 'All types'}
-                active={spaceType === type}
-                onClick={() => setSpaceType(type)}
-              />
-            ))}
-            <Chip label="All categories" active={!category} onClick={() => setCategory('')} />
-            {categories.map(name => (
-              <Chip
-                key={name}
-                label={name}
-                active={category === name}
-                onClick={() => setCategory(name)}
-              />
-            ))}
+            {[
+              {label: 'All', value: ''},
+              {label: 'Exclusive', value: 'Exclusive'},
+              {label: 'Coworking', value: 'Coworking'},
+            ].map(tab => {
+              const active =
+                tab.value === ''
+                  ? !spaceType
+                  : spaceType.toLowerCase() === tab.value.toLowerCase();
+              return (
+                <button
+                  key={tab.label}
+                  type="button"
+                  onClick={() => setSpaceType(tab.value)}
+                  className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-extrabold transition cursor-pointer ${
+                    active
+                      ? 'border-[#6344E7] bg-[#F3E8FF] text-[#7C3AED] shadow-2xs'
+                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </header>
@@ -124,11 +180,16 @@ export default function SpacesMarketplacePage() {
         ) : loading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {Array.from({length: 8}).map((_, index) => (
-              <div key={index} className="overflow-hidden rounded-3xl bg-white shadow-sm">
-                <div className="aspect-[4/3] animate-pulse bg-slate-100" />
-                <div className="space-y-2 p-3">
-                  <div className="h-3 w-2/3 animate-pulse rounded bg-slate-100" />
-                  <div className="h-3 w-1/2 animate-pulse rounded bg-slate-100" />
+              <div key={index} className="overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 shadow-xs">
+                <div className="aspect-4/3 w-full animate-pulse rounded-2xl bg-slate-100" />
+                <div className="mt-3 space-y-2">
+                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
+                  <div className="h-4 w-24 animate-pulse rounded-full bg-slate-100" />
+                  <div className="h-4 w-28 animate-pulse rounded bg-slate-100" />
+                  <div className="flex items-center justify-end gap-1.5 pt-2">
+                    <div className="h-8 w-8 animate-pulse rounded-xl bg-slate-100" />
+                    <div className="h-8 w-16 animate-pulse rounded-xl bg-slate-100" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -141,28 +202,73 @@ export default function SpacesMarketplacePage() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {visible.map(space => (
-              <button
+              <div
                 key={space.id}
-                type="button"
                 onClick={() => setSelected(space)}
-                className="overflow-hidden rounded-3xl border border-slate-100 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 text-left shadow-xs transition hover:-translate-y-1 hover:shadow-md cursor-pointer"
               >
-                <div className="aspect-[4/3]">
-                  <SpacePhoto src={space.imageUrl} alt={space.name} />
+                <div>
+                  {/* Space Image Container */}
+                  <div className="relative aspect-4/3 w-full overflow-hidden rounded-2xl bg-[#FFF9F3] flex items-center justify-center">
+                    <SpacePhoto src={space.imageUrl} alt={space.name} />
+                  </div>
+
+                  {/* Space Title */}
+                  <div className="mt-3">
+                    <h3
+                      className="min-w-0 truncate text-xs sm:text-sm font-extrabold text-[#111111]"
+                      title={space.name}
+                    >
+                      {space.name}
+                    </h3>
+                  </div>
+
+                  {/* Capacity Badge (At the place of Available) */}
+                  <div className="mt-1.5 flex items-center">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-700 border border-emerald-200/60">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      {space.capacity > 0
+                        ? `Capacity: ${space.capacity} ${space.capacity === 1 ? 'person' : 'people'}`
+                        : 'Capacity: Flexible'}
+                    </span>
+                  </div>
+
+                  {/* Price (Just below capacity) */}
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-[11px] sm:text-xs font-semibold text-slate-500">From</span>
+                    <span className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                      ₹{formatInr(space.fromPrice)}
+                    </span>
+                    <span className="text-[11px] sm:text-xs font-medium text-slate-400">/ hour</span>
+                  </div>
                 </div>
-                <div className="space-y-1 p-3">
-                  <p className="line-clamp-2 text-sm font-extrabold text-[#111111]">{space.name}</p>
-                  <p className="line-clamp-2 text-xs font-medium text-slate-500">
-                    {space.description || space.category || 'Bookable space'}
-                  </p>
-                  <p className="text-sm font-extrabold text-[#111111]">From ₹{formatInr(space.fromPrice)}</p>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#EA580C]">
-                    {space.spaceType || 'Space'}
-                    {space.category ? ` · ${space.category}` : ''}
-                  </p>
-                  <span className="inline-flex text-[11px] font-extrabold text-slate-400">View details</span>
+
+                {/* Action Buttons (Share and Book) */}
+                <div className="mt-3 flex items-center justify-end gap-1.5 pt-2 border-t border-slate-50">
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation();
+                      void handleShare(space);
+                    }}
+                    className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl border border-purple-200 bg-white text-[#6344E7] hover:bg-purple-50 transition active:scale-95 cursor-pointer shrink-0"
+                    title="Share space"
+                    aria-label="Share space"
+                  >
+                    <Share2 size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleBook(space);
+                    }}
+                    className="inline-flex items-center justify-center rounded-xl bg-[#6344E7] hover:bg-[#5235D9] px-3.5 sm:px-4 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer shrink-0"
+                  >
+                    Book
+                  </button>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
@@ -170,29 +276,5 @@ export default function SpacesMarketplacePage() {
 
       <SpaceDetailsModal space={selected} onClose={() => setSelected(null)} />
     </div>
-  );
-}
-
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-extrabold transition ${
-        active
-          ? 'border-[#EA580C] bg-[#FFF7ED] text-[#EA580C]'
-          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-      }`}
-    >
-      {label}
-    </button>
   );
 }

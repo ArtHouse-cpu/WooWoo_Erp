@@ -38,30 +38,46 @@ function GoogleMapsPinIcon({className}: {className?: string}) {
   );
 }
 
+function WhatsAppIcon({className, ...props}: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 16 16"
+      fill="currentColor"
+      className={className}
+      {...props}
+    >
+      <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232"/>
+    </svg>
+  );
+}
+
+const WOOWOO_WHATSAPP = '918073988123';
+
 export function VisitBottomSheet({isOpen, onClose}: VisitBottomSheetProps) {
   const locations: LocationCard[] = [
     {
       id: 'bhilai',
       badge: '01',
       name: 'Bhilai',
-      address: 'Nehru Nagar East, Bhilai, Chhattisgarh',
+      address: 'A44,B, Central Avenue,behind blackberrys,SmritiNagar Bhilai, Chhattisgarh',
       rating: 4.8,
       reviewsCount: 126,
       image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=500&q=80',
-      phone: '+919876543210',
-      mapsUrl: 'https://maps.google.com/?q=Nehru+Nagar+East+Bhilai',
+      phone: '+918073988123',
+      mapsUrl: 'https://maps.app.goo.gl/F8Tj2rj2CuLCu5Nh8?g_st=aw',
     },
-    {
-      id: 'raipur',
-      badge: '02',
-      name: 'Raipur',
-      address: 'Civil Lines, Raipur, Chhattisgarh',
-      rating: 4.9,
-      reviewsCount: 182,
-      image: 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?auto=format&fit=crop&w=500&q=80',
-      phone: '+919876543211',
-      mapsUrl: 'https://maps.google.com/?q=Civil+Lines+Raipur',
-    },
+    // {
+    //   id: 'raipur',
+    //   badge: '02',
+    //   name: 'Raipur',
+    //   address: 'Civil Lines, Raipur, Chhattisgarh',
+    //   rating: 4.9,
+    //   reviewsCount: 182,
+    //   image: 'https://images.unsplash.com/photo-1543007630-9710e4a00a20?auto=format&fit=crop&w=500&q=80',
+    //   phone: '+919876543211',
+    //   mapsUrl: 'https://maps.google.com/?q=Civil+Lines+Raipur',
+    // },
   ];
 
   return (
@@ -102,20 +118,23 @@ export function VisitBottomSheet({isOpen, onClose}: VisitBottomSheetProps) {
                     Visit Art House
                   </h3>
                   <p className="mt-1.5 text-[12px] font-medium text-[#6B7280] leading-none">
-                    Find our houses near you
+                 Explore,Experience & Admire
                   </p>
                 </div>
               </div>
 
-              {/* Close Button */}
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB]"
-                aria-label="Close sheet"
-              >
-                <X className="h-4.5 w-4.5" strokeWidth={2.5} />
-              </button>
+              {/* Header Right: WhatsApp & Close Button */}
+              <div className="flex items-center gap-2">
+      
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB]"
+                  aria-label="Close sheet"
+                >
+                  <X className="h-4.5 w-4.5" strokeWidth={2.5} />
+                </button>
+              </div>
             </div>
 
             {/* Scrollable Contents */}
@@ -164,25 +183,40 @@ export function VisitBottomSheet({isOpen, onClose}: VisitBottomSheetProps) {
                     </div>
 
                     {/* Action Buttons Row */}
-                    <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-1.5 mt-3">
                       {/* Directions CTA */}
                       <a
                         href={loc.mapsUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-[12px] border border-slate-200 bg-white text-[#EA580C] text-[11.5px] font-bold shadow-3xs hover:bg-slate-50 transition cursor-pointer"
+                        className="flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-[12px] border border-slate-200 bg-white text-[#EA580C] text-[11.5px] font-bold shadow-3xs hover:bg-slate-50 transition cursor-pointer min-w-0"
                       >
                         <GoogleMapsPinIcon className="h-4 w-4 shrink-0" />
-                        <span>Directions</span>
+                        <span className="truncate">Directions</span>
                       </a>
 
                       {/* Call CTA */}
                       <a
                         href={`tel:${loc.phone}`}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-[12px] border border-slate-200 bg-white text-[#111111] text-[11.5px] font-bold shadow-3xs hover:bg-slate-50 transition cursor-pointer"
+                        className="flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-[12px] border border-slate-200 bg-white text-[#111111] text-[11.5px] font-bold shadow-3xs hover:bg-slate-50 transition cursor-pointer min-w-0"
                       >
                         <Phone className="h-3.5 w-3.5 text-[#111111] shrink-0" strokeWidth={2.2} />
-                        <span>Call</span>
+                        <span className="truncate">Call</span>
+                      </a>
+
+                      {/* WhatsApp CTA */}
+                      <a
+                        href={`https://wa.me/${WOOWOO_WHATSAPP}?text=${encodeURIComponent(
+                          `Hi WooWoo Art House, I would like to visit the ${loc.name} Art House.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-1 py-2 px-2.5 rounded-[12px] border border-emerald-200 bg-emerald-50 text-[#16A34A] hover:bg-emerald-100 hover:border-emerald-300 transition cursor-pointer shadow-3xs shrink-0"
+                        title="Chat on WhatsApp"
+                        aria-label="Chat on WhatsApp"
+                      >
+                        <WhatsAppIcon className="h-3.5 w-3.5 fill-[#25D366] text-[#25D366] shrink-0" />
+                        <span className="hidden min-[420px]:inline text-[11.5px] font-bold text-emerald-700">WhatsApp</span>
                       </a>
                     </div>
                   </div>
