@@ -2,27 +2,25 @@ import {useState} from 'react';
 import {Loader2, Share2} from 'lucide-react';
 import {toast} from 'sonner';
 import type {SpaceCard} from '../../services/space.service';
-import {copySpaceLink, openNativeShare, spaceBookingUrl} from './spaceActions';
+import {copySpaceLink, spaceBookingUrl} from './spaceActions';
+import {ShareSpaceModal} from './ShareSpaceModal';
 
 export function SpaceEnquiry({space}: {space: SpaceCard}) {
   const [sharing, setSharing] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const handleBook = () => {
     window.open(spaceBookingUrl(space), '_blank', 'noopener,noreferrer');
   };
 
   const handleShare = async () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setShowShareModal(true);
+      return;
+    }
     setSharing(true);
     try {
-      const url = await copySpaceLink(space.id);
-      if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-        const result = await openNativeShare(space, url);
-        if (result === 'shared') {
-          toast.success('Space link shared');
-          return;
-        }
-        if (result === 'cancelled') return;
-      }
+      await copySpaceLink(space.id);
       toast.success('Space link copied to clipboard');
     } catch {
       toast.error('Could not copy the space link.');
@@ -51,6 +49,12 @@ export function SpaceEnquiry({space}: {space: SpaceCard}) {
           Book Space
         </button>
       </div>
+
+      <ShareSpaceModal
+        space={space}
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+      />
     </div>
   );
 }

@@ -35,6 +35,8 @@ export type SpaceRecord = {
   imageUrl?: string | null;
   image?: string | null;
   images?: string[] | null;
+  videoUrl?: string | null;
+  videos?: string[] | null;
 };
 
 export type SpaceCard = {
@@ -45,6 +47,8 @@ export type SpaceCard = {
   description: string;
   capacity: number;
   imageUrl: string | null;
+  images: string[];
+  videos: string[];
   weekdayPrice: number | null;
   weekendPrice: number | null;
   fromPrice: number;
@@ -55,8 +59,44 @@ type SpaceListResponse = {
   spaces?: SpaceRecord[];
 };
 
+function collectRowImages(row: SpaceRecord): string[] {
+  const list = [
+    row.imageUrl,
+    row.image,
+    ...(Array.isArray(row.images) ? row.images : []),
+  ];
+  const set = new Set<string>();
+  const res: string[] = [];
+  for (const item of list) {
+    const resolved = resolveSpaceImageUrl(item);
+    if (resolved && !set.has(resolved)) {
+      set.add(resolved);
+      res.push(resolved);
+    }
+  }
+  return res;
+}
+
+function collectRowVideos(row: SpaceRecord): string[] {
+  const list = [
+    row.videoUrl,
+    ...(Array.isArray(row.videos) ? row.videos : []),
+  ];
+  const set = new Set<string>();
+  const res: string[] = [];
+  for (const item of list) {
+    const resolved = resolveSpaceImageUrl(item);
+    if (resolved && !set.has(resolved)) {
+      set.add(resolved);
+      res.push(resolved);
+    }
+  }
+  return res;
+}
+
 /** Weekday and weekend rows for the same space become one card. */
 export function groupSpacesByName(rows: SpaceRecord[]): SpaceCard[] {
+  if (!Array.isArray(rows)) return [];
   const grouped = new Map<string, SpaceCard>();
 
   for (const row of rows) {
@@ -67,6 +107,9 @@ export function groupSpacesByName(rows: SpaceRecord[]): SpaceCard[] {
     const isWeekend = String(row.day || '').toLowerCase() === 'weekend';
     const existing = grouped.get(key);
 
+    const rowImages = collectRowImages(row);
+    const rowVideos = collectRowVideos(row);
+
     if (!existing) {
       grouped.set(key, {
         id: String(row._id),
@@ -76,6 +119,8 @@ export function groupSpacesByName(rows: SpaceRecord[]): SpaceCard[] {
         description: String(row.description || '').trim(),
         capacity: Math.max(0, Number(row.capacity) || 0),
         imageUrl: pickSpaceImage(row),
+        images: rowImages,
+        videos: rowVideos,
         weekdayPrice: isWeekend ? null : price,
         weekendPrice: isWeekend ? price : null,
         fromPrice: price,
@@ -87,6 +132,12 @@ export function groupSpacesByName(rows: SpaceRecord[]): SpaceCard[] {
     else existing.weekdayPrice = price;
     existing.fromPrice = Math.min(existing.fromPrice, price);
     if (!existing.imageUrl) existing.imageUrl = pickSpaceImage(row);
+    for (const img of rowImages) {
+      if (!existing.images.includes(img)) existing.images.push(img);
+    }
+    for (const vid of rowVideos) {
+      if (!existing.videos.includes(vid)) existing.videos.push(vid);
+    }
     if (!existing.description && row.description) {
       existing.description = String(row.description).trim();
     }
@@ -141,12 +192,22 @@ export async function fetchAvailableSpaces(signal?: AbortSignal): Promise<SpaceR
 }
 
 export async function fetchPublicSpace(id: string, signal?: AbortSignal): Promise<SpaceCard> {
-  const {data} = await api.get<{success: boolean; space?: SpaceCard}>(
+  const {data} = await api.get<{success: boolean; space?: any}>(
     `/space/${encodeURIComponent(id)}`,
     {signal},
   );
   const space = data?.space;
   if (!space?.name) throw new Error('Space not found');
+  const rawImages = Array.isArray(space.images)
+    ? space.images
+    : (space.imageUrl ? [space.imageUrl] : []);
+  const rawVideos = Array.isArray(space.videos)
+    ? space.videos
+    : (space.videoUrl ? [space.videoUrl] : []);
+
+  const images = rawImages.map(resolveSpaceImageUrl).filter(Boolean) as string[];
+  const videos = rawVideos.map(resolveSpaceImageUrl).filter(Boolean) as string[];
+
   return {
     id: String(space.id || id),
     name: String(space.name || '').trim(),
@@ -155,6 +216,8 @@ export async function fetchPublicSpace(id: string, signal?: AbortSignal): Promis
     description: String(space.description || '').trim(),
     capacity: Math.max(0, Number(space.capacity) || 0),
     imageUrl: resolveSpaceImageUrl(space.imageUrl),
+    images,
+    videos,
     weekdayPrice: space.weekdayPrice == null ? null : Math.max(0, Number(space.weekdayPrice) || 0),
     weekendPrice: space.weekendPrice == null ? null : Math.max(0, Number(space.weekendPrice) || 0),
     fromPrice: Math.max(0, Number(space.fromPrice) || 0),
