@@ -197,27 +197,29 @@ export default function SuppliesMarketplacePage() {
                         alt={product.name}
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
-                    </div>
 
-                    {/* Title & In/Out Stock Badge on Parallel Row */}
-                    <div className="mt-3 flex items-center justify-between gap-1.5">
-                      <h3
-                        className="min-w-0 flex-1 truncate text-xs sm:text-sm font-extrabold text-[#111111]"
-                        title={product.name}
-                      >
-                        {product.name}
-                      </h3>
+                      {/* Stock Badge in Right Corner */}
                       {inStock ? (
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-700 border border-emerald-200/60">
+                        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-700 border border-emerald-200/80 shadow-xs">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                           In Stock
                         </span>
                       ) : (
-                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-rose-700 border border-rose-200/60">
+                        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-rose-700 border border-rose-200/80 shadow-xs">
                           <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                           Out of Stock
                         </span>
                       )}
+                    </div>
+
+                    {/* Product Title */}
+                    <div className="mt-3">
+                      <h3
+                        className="truncate text-xs sm:text-sm font-extrabold text-[#111111]"
+                        title={product.name}
+                      >
+                        {product.name}
+                      </h3>
                     </div>
 
                     {/* Category Pill */}

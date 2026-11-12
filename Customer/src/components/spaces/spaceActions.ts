@@ -14,21 +14,22 @@ export function spaceShareUrl(spaceId: string) {
 
 export function spacePriceLine(space: Pick<SpaceCard, 'weekdayPrice' | 'weekendPrice' | 'fromPrice'>) {
   const parts: string[] = [];
-  if (space.weekdayPrice != null) parts.push(`Weekday ₹${formatInr(space.weekdayPrice)}`);
-  if (space.weekendPrice != null) parts.push(`Weekend ₹${formatInr(space.weekendPrice)}`);
-  return parts.join(' · ') || `From ₹${formatInr(space.fromPrice)}`;
+  if (space.weekdayPrice != null) parts.push(`Weekday ₹${formatInr(space.weekdayPrice)}/hr`);
+  if (space.weekendPrice != null) parts.push(`Weekend ₹${formatInr(space.weekendPrice)}/hr`);
+  return parts.join(' · ') || `₹${formatInr(space.fromPrice)}/hr`;
 }
 
 export function spaceQueryUrl(
-  space: Pick<SpaceCard, 'id' | 'name' | 'spaceType' | 'weekdayPrice' | 'weekendPrice' | 'fromPrice'>,
+  space: Pick<SpaceCard, 'id' | 'name' | 'spaceType' | 'weekdayPrice' | 'weekendPrice' | 'fromPrice'> & {imageUrl?: string | null},
   enquiry?: {name?: string; phone?: string; message?: string},
 ) {
   const text = [
     'Hi, I have a query about this space at WooWoo Art House.',
-    `Space: ${space.name}`,
-    `Space ID: ${space.id}`,
+    space.imageUrl ? `Image: ${space.imageUrl}` : '',
+    `Product name: ${space.name}`,
+    `Price: ${spacePriceLine(space)}`,
     space.spaceType ? `Type: ${space.spaceType}` : '',
-    spacePriceLine(space),
+    `Link: ${spaceShareUrl(space.id)}`,
     enquiry?.name?.trim() ? `From: ${enquiry.name.trim()}` : '',
     enquiry?.phone?.trim() ? `Phone: ${enquiry.phone.trim()}` : '',
     enquiry?.message?.trim() ? `Message: ${enquiry.message.trim()}` : '',
@@ -39,14 +40,15 @@ export function spaceQueryUrl(
 }
 
 export function spaceBookingUrl(
-  space: Pick<SpaceCard, 'id' | 'name' | 'spaceType' | 'weekdayPrice' | 'weekendPrice' | 'fromPrice'>,
+  space: Pick<SpaceCard, 'id' | 'name' | 'spaceType' | 'weekdayPrice' | 'weekendPrice' | 'fromPrice'> & {imageUrl?: string | null},
 ) {
   const text = [
     'Hi, I would like to book a space at WooWoo Art House.',
-    `Space: ${space.name}`,
-    `Space ID: ${space.id}`,
+    space.imageUrl ? `Image: ${space.imageUrl}` : '',
+    `Product name: ${space.name}`,
+    `Price: ${spacePriceLine(space)}`,
     space.spaceType ? `Type: ${space.spaceType}` : '',
-    spacePriceLine(space),
+    `Link: ${spaceShareUrl(space.id)}`,
   ]
     .filter(Boolean)
     .join('\n');

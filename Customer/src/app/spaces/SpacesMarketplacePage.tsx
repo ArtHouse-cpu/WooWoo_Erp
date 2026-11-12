@@ -1,16 +1,15 @@
 import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import axios from 'axios';
-import {ArrowLeft, Search, Share2} from 'lucide-react';
+import {ArrowLeft, Search, Share2, MessageCircle} from 'lucide-react';
 import {toast} from 'sonner';
 import {SpaceDetailsModal} from '../../components/spaces/SpaceDetailsModal';
 import {SpacePhoto} from '../../components/spaces/SpacePhoto';
+import {ShareSpaceModal} from '../../components/spaces/ShareSpaceModal';
 import {
   formatInr,
   spaceBookingUrl,
   copySpaceLink,
-  openNativeShare,
-  spaceShareUrl,
   SPACE_WHATSAPP,
 } from '../../components/spaces/spaceActions';
 import {
@@ -18,14 +17,6 @@ import {
   groupSpacesByName,
   type SpaceCard,
 } from '../../services/space.service';
-
-function WhatsAppIcon({className = 'h-4 w-4'}: {className?: string}) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-      <path d="M12.004 0c-6.627 0-12 5.373-12 12 0 2.115.549 4.102 1.51 5.834L0 24l6.335-1.464c1.656.921 3.56 1.464 5.669 1.464 6.627 0 12-5.373 12-12s-5.373-12-12-12zm6.75 16.035c-.244.686-1.22 1.256-1.787 1.348-.567.094-1.127.359-3.666-.639-3.245-1.275-5.334-4.57-5.496-4.786-.162-.217-1.3-1.725-1.3-3.292 0-1.567.818-2.337 1.109-2.643.29-.306.634-.383.847-.383.213 0 .426.002.612.01.196.008.46-.073.72.549.26.623.89 2.169.966 2.322.077.153.128.331.026.536-.102.205-.153.332-.306.509-.153.178-.323.398-.46.549-.153.153-.314.321-.136.628.178.307.79 1.298 1.696 2.107.907.809 1.666 1.059 1.972 1.213.307.153.486.128.665-.077.179-.205.766-.893.97-1.199.205-.306.41-.255.69-.153.28.102 1.776.837 2.083.99.307.153.51.23.587.357.077.127.077.738-.167 1.424z" />
-    </svg>
-  );
-}
 
 export default function SpacesMarketplacePage() {
   const navigate = useNavigate();
@@ -35,6 +26,7 @@ export default function SpacesMarketplacePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<SpaceCard | null>(null);
+  const [shareSpace, setShareSpace] = useState<SpaceCard | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -73,19 +65,9 @@ export default function SpacesMarketplacePage() {
   };
 
   const handleShare = async (space: SpaceCard) => {
-    const url = spaceShareUrl(space.id);
-    if (
-      typeof window !== 'undefined' &&
-      window.innerWidth < 768 &&
-      typeof navigator !== 'undefined' &&
-      typeof navigator.share === 'function'
-    ) {
-      const result = await openNativeShare(space, url);
-      if (result === 'shared') {
-        toast.success('Space link shared');
-        return;
-      }
-      if (result === 'cancelled') return;
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setShareSpace(space);
+      return;
     }
     try {
       await copySpaceLink(space.id);
@@ -119,11 +101,11 @@ export default function SpacesMarketplacePage() {
             )}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#25D366] hover:bg-[#20ba59] px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer"
-            title="Book Now on WhatsApp"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-[13px] border border-emerald-500 bg-emerald-50 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 hover:border-emerald-600 shadow-3xs transition active:scale-95 cursor-pointer"
+            title="Help on WhatsApp"
           >
-            <WhatsAppIcon className="h-4 w-4" />
-            <span>Need Help</span>
+            <MessageCircle className="h-4 w-4 text-emerald-600 stroke-[2.2]" />
+            <span>Help</span>
           </a>
         </div>
         <div className="mx-auto max-w-6xl px-4 pb-3 sm:px-6">
@@ -274,7 +256,14 @@ export default function SpacesMarketplacePage() {
         )}
       </main>
 
-      <SpaceDetailsModal space={selected} onClose={() => setSelected(null)} />
+      {selected ? (
+        <SpaceDetailsModal space={selected} onClose={() => setSelected(null)} />
+      ) : null}
+      <ShareSpaceModal
+        space={shareSpace}
+        isOpen={Boolean(shareSpace)}
+        onClose={() => setShareSpace(null)}
+      />
     </div>
   );
 }

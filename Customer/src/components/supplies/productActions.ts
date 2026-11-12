@@ -13,14 +13,15 @@ export function productShareUrl(productId: string) {
 }
 
 export function productQueryUrl(
-  product: Pick<CustomerProduct, '_id' | 'name' | 'price'>,
+  product: Pick<CustomerProduct, '_id' | 'name' | 'price'> & {imageUrl?: string | null},
   enquiry?: {name?: string; phone?: string; message?: string},
 ) {
   const text = [
-    'Hi, I have a query about this product at WooWoo Art House.',
-    `Name: ${product.name}`,
-    `Product ID: ${product._id}`,
+    'Hi, I would like to buy this product from WooWoo Art House.',
+    product.imageUrl ? `Image: ${product.imageUrl}` : '',
+    `Product name: ${product.name}`,
     `Price: ₹${formatInr(product.price)}`,
+    `Link: ${productShareUrl(product._id)}`,
     enquiry?.name?.trim() ? `From: ${enquiry.name.trim()}` : '',
     enquiry?.phone?.trim() ? `Phone: ${enquiry.phone.trim()}` : '',
     enquiry?.message?.trim() ? `Message: ${enquiry.message.trim()}` : '',
