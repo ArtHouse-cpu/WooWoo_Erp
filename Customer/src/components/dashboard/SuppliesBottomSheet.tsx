@@ -23,12 +23,16 @@ import {
 
 const SUPPLIES_WHATSAPP = '918073988123';
 
-function suppliesQueryUrl(product: {name: string; price: number}) {
+function suppliesQueryUrl(product: {name: string; price: number; _id?: string; imageUrl?: string | null}) {
   const text = [
-    'Hi, I have a query about this product at WooWoo Art House.',
-    `Name: ${product.name}`,
+    'Hi, I would like to buy this product from WooWoo Art House.',
+    product.imageUrl ? `Image: ${product.imageUrl}` : '',
+    `Product name: ${product.name}`,
     `Price: ₹${formatInr(product.price)}`,
-  ].join('\n');
+    product._id ? `Link: ${window.location.origin}/supplies/product/${encodeURIComponent(product._id)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
   return `https://wa.me/${SUPPLIES_WHATSAPP}?text=${encodeURIComponent(text)}`;
 }
 

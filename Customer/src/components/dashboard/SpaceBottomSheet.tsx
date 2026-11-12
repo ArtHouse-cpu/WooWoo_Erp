@@ -8,7 +8,6 @@ import {
   Laptop,
   Ticket,
   Calendar,
-  Clock,
   Paintbrush,
   GraduationCap,
   Users,
@@ -24,12 +23,11 @@ import {
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {
-  fetchSpaceAvailability,
   fetchSpacesByType,
   groupSpacesByName,
-  type BusyInterval,
   type SpaceCard,
 } from '../../services/space.service';
+import {SpaceDetailsModal} from '../spaces/SpaceDetailsModal';
 
 const SPACE_WHATSAPP = '918073988123';
 
@@ -79,262 +77,6 @@ function SpacePhoto({
       className={`h-full w-full object-cover ${className || ''}`}
       onError={() => setBroken(true)}
     />
-  );
-}
-
-const OPEN_HOUR = 6;
-const SLOT_HOURS: Array<[number, number]> = [
-  [6, 9],
-  [9, 12],
-  [12, 15],
-  [15, 18],
-  [18, 21],
-  [21, 24],
-];
-const LOOKAHEAD_DAYS = 14;
-
-function businessDateKey(date = new Date()) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kolkata',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
-}
-
-function addDateDays(key: string, days: number) {
-  const [year, month, day] = key.split('-').map(Number);
-  const next = new Date(Date.UTC(year, month - 1, day + days));
-  return next.toISOString().slice(0, 10);
-}
-
-function isWeekendDate(key: string) {
-  const [year, month, day] = key.split('-').map(Number);
-  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  return weekday === 0 || weekday === 6;
-}
-
-function formatDayChip(key: string) {
-  const [year, month, day] = key.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return {
-    weekday: new Intl.DateTimeFormat('en-IN', {weekday: 'short', timeZone: 'UTC'}).format(date),
-    label: new Intl.DateTimeFormat('en-IN', {day: 'numeric', month: 'short', timeZone: 'UTC'}).format(date),
-  };
-}
-
-function formatClock(hour: number) {
-  const normalized = hour === 24 ? 0 : hour;
-  const period = normalized >= 12 ? 'PM' : 'AM';
-  const display = normalized % 12 === 0 ? 12 : normalized % 12;
-  return `${String(display).padStart(2, '0')}:00 ${period}`;
-}
-
-function clockToMinutes(value: string) {
-  const match = /^(\d{2}):(\d{2})$/.exec(value);
-  if (!match) return null;
-  return Number(match[1]) * 60 + Number(match[2]);
-}
-
-type SlotState = 'available' | 'booked' | 'past';
-
-function slotState(
-  dateKey: string,
-  startHour: number,
-  endHour: number,
-  today: string,
-  nowMinutes: number,
-  busy: BusyInterval[],
-): SlotState {
-  const start = startHour * 60;
-  const end = endHour * 60;
-  if (dateKey < today || (dateKey === today && start <= nowMinutes)) return 'past';
-  const taken = busy.some(interval => {
-    if (interval.date !== dateKey) return false;
-    const busyStart = clockToMinutes(interval.startTime);
-    const busyEnd = clockToMinutes(interval.endTime);
-    if (busyStart == null || busyEnd == null) return false;
-    return start < busyEnd && busyStart < end;
-  });
-  return taken ? 'booked' : 'available';
-}
-
-function SpaceDetailsModal({
-  space,
-  onClose,
-}: {
-  space: SpaceCard;
-  onClose: () => void;
-}) {
-  const today = businessDateKey();
-  const dates = Array.from({length: LOOKAHEAD_DAYS}, (_, index) => addDateDays(today, index));
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [busy, setBusy] = useState<BusyInterval[]>([]);
-  const [serverToday, setServerToday] = useState(today);
-  const [nowMinutes, setNowMinutes] = useState(OPEN_HOUR * 60);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setError('');
-    fetchSpaceAvailability(space.id, dates[0], dates[dates.length - 1], controller.signal)
-      .then(result => {
-        setBusy(result.busy);
-        setServerToday(result.today || today);
-        setNowMinutes(result.nowMinutes);
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted || axios.isCancel(err)) return;
-        if (axios.isAxiosError(err) && err.code === 'ERR_CANCELED') return;
-        setBusy([]);
-        setError('Could not check availability.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, [space.id]);
-
-  const weekend = isWeekendDate(selectedDate);
-  const dayPrice = weekend ? space.weekendPrice : space.weekdayPrice;
-  const slots = SLOT_HOURS.map(([startHour, endHour]) => ({
-    startHour,
-    endHour,
-    label: `${formatClock(startHour)} - ${formatClock(endHour)}`,
-    state: slotState(selectedDate, startHour, endHour, serverToday, nowMinutes, busy),
-  }));
-  const openCount = slots.filter(slot => slot.state === 'available').length;
-  const chip = formatDayChip(selectedDate);
-
-  return (
-    <div className="fixed inset-0 z-20 flex items-end justify-center">
-      <button
-        type="button"
-        aria-label="Close space details"
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-      />
-      <div className="relative z-10 flex max-h-[88dvh] w-full max-w-lg flex-col rounded-t-[28px] bg-white shadow-2xl">
-        <div className="flex shrink-0 justify-center pt-3">
-          <div className="h-1.5 w-12 rounded-full bg-[#E5E7EB]" />
-        </div>
-        <div className="flex items-start gap-3 px-5 pb-3 pt-3">
-          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[14px]">
-            <SpacePhoto
-              src={space.imageUrl}
-              alt={space.name}
-              fallback={<Building className="h-5 w-5" />}
-            />
-          </div>
-          <div className="min-w-0 flex-1 text-left">
-            <h3 className="text-[16px] font-black leading-tight text-[#111111]">{space.name}</h3>
-            <p className="mt-0.5 text-[11px] font-bold text-[#6B7280]">
-              {space.category || 'Space'}
-              {space.capacity > 0 ? ` · Upto ${space.capacity} people` : ''}
-            </p>
-            <p className="mt-1 text-[12px] font-black text-[#EA580C]">
-              {dayPrice != null
-                ? `₹${formatInr(dayPrice)} / ${weekend ? 'weekend' : 'weekday'}`
-                : `From ₹${formatInr(space.fromPrice)}`}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563]"
-            aria-label="Close details"
-          >
-            <X className="h-4 w-4" strokeWidth={2.5} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 pb-5">
-          <p className="mb-2 text-left text-[12px] font-black text-[#111111]">Date</p>
-          <div className="mb-4 flex gap-2 overflow-x-auto scrollbar-none pb-1">
-            {dates.map(dateKey => {
-              const item = formatDayChip(dateKey);
-              const selected = dateKey === selectedDate;
-              return (
-                <button
-                  key={dateKey}
-                  type="button"
-                  onClick={() => setSelectedDate(dateKey)}
-                  className={`shrink-0 rounded-[14px] border px-3 py-2 text-center ${
-                    selected
-                      ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C]'
-                      : 'border-slate-200 bg-white text-[#111111]'
-                  }`}
-                >
-                  <span className="block text-[10px] font-bold">{item.weekday}</span>
-                  <span className="block text-[12px] font-black">{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mb-3 flex items-center justify-between text-left">
-            <p className="text-[12px] font-black text-[#111111]">
-              Time · {chip.weekday}, {chip.label}
-            </p>
-            {loading ? (
-              <span className="text-[11px] font-bold text-[#9CA3AF]">Checking…</span>
-            ) : error ? (
-              <span className="text-[11px] font-bold text-red-500">Unavailable</span>
-            ) : openCount > 0 ? (
-              <span className="rounded-full bg-[#E8F8EF] px-2 py-0.5 text-[10px] font-black text-[#15803D]">
-                Available
-              </span>
-            ) : (
-              <span className="rounded-full bg-[#FEE2E2] px-2 py-0.5 text-[10px] font-black text-[#B91C1C]">
-                Not available
-              </span>
-            )}
-          </div>
-
-          {error ? (
-            <p className="mb-3 text-left text-[12px] font-bold text-red-500">{error}</p>
-          ) : null}
-
-          <div className="grid grid-cols-1 gap-2">
-            {slots.map(slot => (
-              <div
-                key={slot.label}
-                className={`flex items-center justify-between rounded-[14px] border px-3 py-3 ${
-                  slot.state === 'available'
-                    ? 'border-[#BBF7D0] bg-[#F0FDF4]'
-                    : slot.state === 'booked'
-                      ? 'border-[#FECACA] bg-[#FEF2F2]'
-                      : 'border-slate-200 bg-[#F8FAFC]'
-                }`}
-              >
-                <span className="flex items-center gap-2 text-[13px] font-black text-[#111111]">
-                  <Clock className="h-4 w-4 text-[#6B7280]" strokeWidth={2.25} />
-                  {slot.label}
-                </span>
-                <span
-                  className={`text-[11px] font-black ${
-                    slot.state === 'available'
-                      ? 'text-[#15803D]'
-                      : slot.state === 'booked'
-                        ? 'text-[#B91C1C]'
-                        : 'text-[#9CA3AF]'
-                  }`}
-                >
-                  {slot.state === 'available' ? 'Available' : slot.state === 'booked' ? 'Booked' : 'Passed'}
-                </span>
-              </div>
-            ))}
-          </div>
-          {space.description ? (
-            <p className="mt-4 text-left text-[12px] font-semibold leading-snug text-[#6B7280]">
-              {space.description}
-            </p>
-          ) : null}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -523,15 +265,29 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                 </div>
               </div>
 
-              {/* Close Button */}
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB]"
-                aria-label="Close sheet"
-              >
-                <X className="h-4.5 w-4.5" strokeWidth={2.5} />
-              </button>
+              {/* Header Right: Help Button & Close Button */}
+              <div className="flex items-center gap-2">
+                <a
+                  href={`https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent(
+                    'Hi WooWoo Art House, I need some help regarding spaces.',
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-[13px] border border-emerald-500 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 hover:border-emerald-600 transition active:scale-95 cursor-pointer shadow-3xs"
+                  title="Help on WhatsApp"
+                >
+                  <MessageCircle className="h-4 w-4 text-emerald-600 stroke-[2.2]" />
+                  <span>Help</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB]"
+                  aria-label="Close sheet"
+                >
+                  <X className="h-4.5 w-4.5" strokeWidth={2.5} />
+                </button>
+              </div>
             </div>
 
             {/* Exclusive Space & Coworking Main Tabs */}

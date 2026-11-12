@@ -86,8 +86,8 @@ export function ShareProductModal({product, isOpen, onClose}: ShareProductModalP
                     Share Product
                   </h3>
                   <p className="text-xs font-semibold text-slate-500">
-                    Share with friends or customers
-                  </p>
+                    Share with anyone
+                    </p>
                 </div>
               </div>
 
