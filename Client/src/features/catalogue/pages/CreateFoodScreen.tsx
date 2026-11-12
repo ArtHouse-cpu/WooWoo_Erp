@@ -116,57 +116,57 @@ export default function CreateFoodScreen() {
             ? Number(row.original.availableStock || 0)
             : "—",
       },
-      {
-        accessorKey: "isPackaged",
-        header: "Label",
-        Cell: ({ cell }: { cell: { getValue: () => unknown } }) => {
-          const packaged = cell.getValue() === true;
-          return (
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                packaged
-                  ? "bg-orange-100 text-orange-700"
-                  : "bg-slate-100 text-slate-600"
-              }`}
-            >
-              {packaged ? "Packaged Food" : "Food"}
-            </span>
-          );
-        },
-      },
-       {
-        accessorKey: "status",
-        header: "Availability",
-        Cell: ({ cell }: { cell: { getValue: () => unknown } }) => {
-          const available = String(cell.getValue() || "Active") !== "Inactive";
-          return (
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                available
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-rose-100 text-rose-700"
-              }`}
-            >
-              {available ? "Available" : "Not Available"}
-            </span>
-          );
-        },
-      },
-      {
-        accessorKey: "isVeg",
-        header: "Type",
-        Cell: ({ cell }: { cell: { getValue: () => unknown } }) => (
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-              cell.getValue()
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-orange-100 text-orange-700"
-            }`}
-          >
-            {cell.getValue() ? "Veg" : "Non-Veg"}
-          </span>
-        ),
-      },
+      // {
+      //   accessorKey: "isPackaged",
+      //   header: "Label",
+      //   Cell: ({ cell }: { cell: { getValue: () => unknown } }) => {
+      //     const packaged = cell.getValue() === true;
+      //     return (
+      //       <span
+      //         className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+      //           packaged
+      //             ? "bg-orange-100 text-orange-700"
+      //             : "bg-slate-100 text-slate-600"
+      //         }`}
+      //       >
+      //         {packaged ? "Packaged Food" : "Food"}
+      //       </span>
+      //     );
+      //   },
+      // },
+      //  {
+      //   accessorKey: "status",
+      //   header: "Availability",
+      //   Cell: ({ cell }: { cell: { getValue: () => unknown } }) => {
+      //     const available = String(cell.getValue() || "Active") !== "Inactive";
+      //     return (
+      //       <span
+      //         className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+      //           available
+      //             ? "bg-emerald-100 text-emerald-700"
+      //             : "bg-rose-100 text-rose-700"
+      //         }`}
+      //       >
+      //         {available ? "Available" : "Not Available"}
+      //       </span>
+      //     );
+      //   },
+      // },
+      // {
+      //   accessorKey: "isVeg",
+      //   header: "Type",
+      //   Cell: ({ cell }: { cell: { getValue: () => unknown } }) => (
+      //     <span
+      //       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+      //         cell.getValue()
+      //           ? "bg-emerald-100 text-emerald-700"
+      //           : "bg-orange-100 text-orange-700"
+      //       }`}
+      //     >
+      //       {cell.getValue() ? "Veg" : "Non-Veg"}
+      //     </span>
+      //   ),
+      // },
       {
         header: "Actions",
         accessorKey: "actions",

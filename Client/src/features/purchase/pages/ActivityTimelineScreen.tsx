@@ -16,6 +16,7 @@ import {
   Search,
   ShoppingCart,
   User,
+  Users,
   Wallet,
   X,
 } from "lucide-react";
@@ -69,8 +70,22 @@ const getPeriodRange = (period: string) => {
       end: toYmd(startOfToday),
     };
   }
+  if (period === "last_month") {
+    const first = new Date(startOfToday.getFullYear(), startOfToday.getMonth() - 1, 1);
+    const last = new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 0);
+    return { start: toYmd(first), end: toYmd(last) };
+  }
   return { start: "", end: "" };
 };
+
+const DATE_PRESETS = [
+  { value: "all", label: "All" },
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "this_month", label: "This month" },
+  { value: "last_month", label: "Last month" },
+  { value: "custom", label: "Custom" },
+];
 
 const istBound = (ymd: string, end: boolean) => {
   if (!ymd) return "";
@@ -112,6 +127,27 @@ const displayValue = (value: unknown) => {
   }
 };
 
+const actionLabel = (action: string, failed: boolean) => {
+  if (failed) return "Failed";
+  const labels: Record<string, string> = {
+    CREATE: "Created",
+    UPDATE: "Updated",
+    DELETE: "Deleted",
+    PAYMENT: "Paid",
+    LOGIN: "Login",
+    LOGOUT: "Logout",
+    APPROVE: "Approved",
+    CANCEL: "Cancelled",
+    REFUND: "Refunded",
+  };
+  return labels[action] || action;
+};
+
+const formatInr = (amount?: number | null) => {
+  if (amount == null || !Number.isFinite(Number(amount)) || Number(amount) === 0) return "";
+  return `₹${Number(amount).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+};
+
 const actionStyle = (action: string, failed: boolean) => {
   if (failed) return "bg-rose-50 text-rose-700 ring-rose-200";
   if (action === "CREATE") return "bg-emerald-50 text-emerald-700 ring-emerald-200";
@@ -141,7 +177,14 @@ const ActivityTimelineScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [groups, setGroups] = useState<{ date: string; label: string; items: ActivityItem[] }[]>([]);
-  const [stats, setStats] = useState({ total: 0, today: 0, created: 0, updatedOrDeleted: 0 });
+  const [stats, setStats] = useState({
+    total: 0,
+    today: 0,
+    activeUsers: 0,
+    created: 0,
+    updated: 0,
+    payments: 0,
+  });
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(0);
   const [total, setTotal] = useState(0);
@@ -151,6 +194,8 @@ const ActivityTimelineScreen = () => {
   const [action, setAction] = useState("");
   const [userId, setUserId] = useState("");
   const [status, setStatus] = useState<"" | "success" | "failure">("");
+  const [source, setSource] = useState("");
+  const [transactionType, setTransactionType] = useState("");
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
   const [datePreset, setDatePreset] = useState("all");
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
@@ -189,6 +234,8 @@ const ActivityTimelineScreen = () => {
       action,
       userId,
       status,
+      source,
+      transactionType,
       sort,
       from: istBound(dateRange.start, false),
       to: istBound(dateRange.end, true),
@@ -203,7 +250,16 @@ const ActivityTimelineScreen = () => {
         setGroups(timeline.groups || []);
         setPages(timeline.pages || 0);
         setTotal(timeline.total || 0);
-        setStats(summary.stats || { total: 0, today: 0, created: 0, updatedOrDeleted: 0 });
+        setStats(
+          summary.stats || {
+            total: 0,
+            today: 0,
+            activeUsers: 0,
+            created: 0,
+            updated: 0,
+            payments: 0,
+          },
+        );
       })
       .catch((err: { name?: string; response?: { data?: { message?: string } } }) => {
         if (err?.name === "CanceledError" || err?.name === "AbortError") return;
@@ -221,6 +277,8 @@ const ActivityTimelineScreen = () => {
     action,
     userId,
     status,
+    source,
+    transactionType,
     sort,
     dateRange.start,
     dateRange.end,
@@ -240,100 +298,104 @@ const ActivityTimelineScreen = () => {
           <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Activity Timeline</h1>
           <p className="mt-1 text-sm text-slate-500">Business actions recorded across the ERP.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-2xs">
-            <Calendar className="h-3.5 w-3.5 text-indigo-600" />
-            <select
-              value={datePreset}
-              onChange={(event) => applyPreset(event.target.value)}
-              className="bg-transparent text-xs font-semibold text-slate-800 outline-none"
-            >
-              <option value="all">All dates</option>
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="this_week">This week</option>
-              <option value="this_month">This month</option>
-              <option value="custom">Custom date</option>
-            </select>
-          </label>
-          {datePreset === "custom" && (
-            <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-1">
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={(event) => {
-                  setDateRange((current) => ({ ...current, start: event.target.value }));
-                  setPage(1);
-                }}
-                className="bg-transparent text-xs text-slate-700 outline-none"
-              />
-              <span className="text-xs text-slate-400">to</span>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={(event) => {
-                  setDateRange((current) => ({ ...current, end: event.target.value }));
-                  setPage(1);
-                }}
-                className="bg-transparent text-xs text-slate-700 outline-none"
-              />
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setReloadToken((token) => token + 1)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-        </div>
       </div>
 
-      <div className="grid shrink-0 grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-4">
-        <StatCard title="Total activities" value={stats.total} color="blue" icon={<Activity size={18} />} label="Matching this filter" />
+      <div className="grid shrink-0 grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-6 xl:gap-3">
+        <StatCard title="Total" value={stats.total} color="blue" icon={<Activity size={18} />} label="Matching filters" />
         <StatCard title="Today" value={stats.today} color="indigo" icon={<Calendar size={18} />} label="Since midnight" />
+        <StatCard title="Active users" value={stats.activeUsers} color="amber" icon={<Users size={18} />} label="Users active today" />
         <StatCard title="Created" value={stats.created} color="emerald" icon={<Plus size={18} />} label="Create actions" />
-        <StatCard title="Updated / deleted" value={stats.updatedOrDeleted} color="rose" icon={<Pencil size={18} />} label="Update and delete" />
+        <StatCard title="Updated" value={stats.updated} color="blue" icon={<Pencil size={18} />} label="Update actions" />
+        <StatCard title="Payments" value={stats.payments} color="rose" icon={<Wallet size={18} />} label="Payment activity" />
       </div>
 
-      <div className="grid shrink-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-6">
-        <label className="relative xl:col-span-2">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto">
+        <FilterSelect value={datePreset} onChange={applyPreset} className="w-32">
+          {DATE_PRESETS.map((preset) => (
+            <option key={preset.value} value={preset.value}>{preset.label}</option>
+          ))}
+        </FilterSelect>
+        {datePreset === "custom" && (
+          <div className="flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-0.5">
+            <input
+              type="date"
+              value={dateRange.start}
+              onChange={(event) => {
+                setDateRange((current) => ({ ...current, start: event.target.value }));
+                setPage(1);
+              }}
+              className="bg-transparent text-[11px] text-slate-700 outline-none"
+            />
+            <span className="text-[11px] text-slate-400">to</span>
+            <input
+              type="date"
+              value={dateRange.end}
+              onChange={(event) => {
+                setDateRange((current) => ({ ...current, end: event.target.value }));
+                setPage(1);
+              }}
+              className="bg-transparent text-[11px] text-slate-700 outline-none"
+            />
+          </div>
+        )}
+        <label className="relative w-44 shrink-0">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search user, resource, or description"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-indigo-300"
+            placeholder="Search"
+            className="w-full rounded-md border border-slate-200 bg-white py-1 pl-7 pr-2 text-[11px] outline-none focus:border-indigo-300"
           />
         </label>
-        <FilterSelect label="Module" value={moduleName} onChange={(value) => { setModuleName(value); setPage(1); }}>
+        <FilterSelect value={moduleName} onChange={(value) => { setModuleName(value); setPage(1); }}>
           <option value="">All modules</option>
           {modules.map((name) => <option key={name} value={name}>{name}</option>)}
         </FilterSelect>
-        <FilterSelect label="User" value={userId} onChange={(value) => { setUserId(value); setPage(1); }}>
+        <FilterSelect value={userId} onChange={(value) => { setUserId(value); setPage(1); }}>
           <option value="">All users</option>
           {users.map((user) => (
             <option key={user._id} value={user._id}>{user.userName || user.userEmail || "Staff"}</option>
           ))}
         </FilterSelect>
-        <FilterSelect label="Action" value={action} onChange={(value) => { setAction(value); setPage(1); }}>
+        <FilterSelect value={action} onChange={(value) => { setAction(value); setPage(1); }}>
           <option value="">All actions</option>
           {ACTIONS.map((name) => <option key={name} value={name}>{name}</option>)}
         </FilterSelect>
-        <FilterSelect label="Status" value={status} onChange={(value) => { setStatus(value as "" | "success" | "failure"); setPage(1); }}>
+        <FilterSelect value={status} onChange={(value) => { setStatus(value as "" | "success" | "failure"); setPage(1); }}>
           <option value="">All statuses</option>
           <option value="success">Success</option>
           <option value="failure">Failed</option>
         </FilterSelect>
-      </div>
-
-      <div className="flex shrink-0 items-center justify-between">
-        <p className="text-xs font-medium text-slate-500">{total.toLocaleString()} activities</p>
-        <FilterSelect label="Sort" value={sort} onChange={(value) => { setSort(value as "newest" | "oldest"); setPage(1); }}>
+        <FilterSelect value={source} onChange={(value) => { setSource(value); setPage(1); }}>
+          <option value="">All sources</option>
+          <option value="Web">Web</option>
+          <option value="POS">POS</option>
+          <option value="Mobile">Mobile</option>
+          <option value="Customer Portal">Customer Portal</option>
+          <option value="System">System</option>
+        </FilterSelect>
+        <FilterSelect value={transactionType} onChange={(value) => { setTransactionType(value); setPage(1); }}>
+          <option value="">All types</option>
+          <option value="payment">Payment</option>
+          <option value="refund">Refund</option>
+          <option value="wallet">Wallet</option>
+          <option value="booking">Booking</option>
+          <option value="membership">Membership</option>
+          <option value="inventory">Inventory</option>
+        </FilterSelect>
+        <FilterSelect value={sort} onChange={(value) => { setSort(value as "newest" | "oldest"); setPage(1); }}>
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
         </FilterSelect>
+        <button
+          type="button"
+          onClick={() => setReloadToken((token) => token + 1)}
+          className="inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700"
+        >
+          <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
+        <p className="shrink-0 text-[11px] font-medium text-slate-500">{total.toLocaleString()}</p>
       </div>
 
       <div className="min-h-0 flex-1 space-y-4 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
@@ -383,8 +445,9 @@ const ActivityTimelineScreen = () => {
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-1.5">
                             <span className="text-sm font-semibold text-slate-900">{item.userName || item.actorType || "System"}</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{item.userRole || item.actorType}</span>
                             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ${actionStyle(item.action, failed)}`}>
-                              {failed ? "FAILED" : item.action}
+                              {actionLabel(item.action, failed)}
                             </span>
                             <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200">
                               <ModuleIcon module={item.module} />
@@ -394,6 +457,7 @@ const ActivityTimelineScreen = () => {
                           <span className="mt-1 block text-sm text-slate-700">{item.description || `${item.action} ${item.module}`}</span>
                           <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
                             <span>{item.resourceName || item.resourceType || "No resource"}</span>
+                            {formatInr(item.amount) ? <span className="font-semibold text-slate-700">{formatInr(item.amount)}</span> : null}
                             <span>{formatTime(item.createdAt)}</span>
                             <span className={failed ? "font-semibold text-rose-600" : "font-semibold text-emerald-600"}>
                               {failed ? "Failed" : "Success"}
@@ -452,26 +516,23 @@ const ActivityTimelineScreen = () => {
 };
 
 const FilterSelect = ({
-  label,
   value,
   onChange,
+  className = "w-28",
   children,
 }: {
-  label: string;
   value: string;
   onChange: (value: string) => void;
+  className?: string;
   children: ReactNode;
 }) => (
-  <label className="block">
-    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none"
-    >
-      {children}
-    </select>
-  </label>
+  <select
+    value={value}
+    onChange={(event) => onChange(event.target.value)}
+    className={`${className} shrink-0 rounded-md border border-slate-200 bg-white px-1.5 py-1 text-[11px] text-slate-800 outline-none`}
+  >
+    {children}
+  </select>
 );
 
 const ChangeTable = ({ changes }: { changes: ActivityItem["changes"] }) => (
@@ -529,20 +590,26 @@ const ActivityDrawer = ({ item, onClose }: { item: ActivityItem; onClose: () => 
             </span>
             <div>
               <p className="text-sm font-semibold text-slate-900">{item.userName || "System"}</p>
-              <p className="text-xs text-slate-500">{item.userEmail || item.actorType || "No email"}</p>
+              <p className="text-xs text-slate-500">
+                {[item.userRole || item.actorType, item.userEmail].filter(Boolean).join(" · ") || "No email"}
+              </p>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <DetailRow label="Module" value={item.module} />
             <DetailRow label="Action" value={failed ? `${item.action} · Failed` : item.action} />
             <DetailRow label="Date and time" value={formatDateTime(item.createdAt)} />
-            <DetailRow label="Actor" value={item.actorType} />
+            <DetailRow label="Role" value={item.userRole || item.actorType} />
+            <DetailRow label="Source" value={item.source} />
             <DetailRow label="Resource" value={item.resourceName} />
             <DetailRow label="Resource ID" value={item.resourceId} />
+            <DetailRow label="Customer / vendor" value={item.relatedName} />
+            <DetailRow label="Amount" value={formatInr(item.amount) || undefined} />
             <DetailRow label="HTTP method" value={item.method} />
             <DetailRow label="IP address" value={item.ipAddress} />
           </div>
           <DetailRow label="API endpoint" value={item.endpoint} />
+          <DetailRow label="Request ID" value={item.requestId} />
           {!!item.changes?.length && (
             <div>
               <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Old value vs new value</p>
@@ -575,7 +642,7 @@ const StatCard = ({
   title: string;
   value: number;
   icon: React.ReactNode;
-  color: "blue" | "indigo" | "emerald" | "rose";
+  color: "blue" | "indigo" | "emerald" | "rose" | "amber";
   label: string;
 }) => {
   const styles = {
@@ -583,6 +650,7 @@ const StatCard = ({
     indigo: "border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-white text-indigo-700",
     emerald: "border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white text-emerald-700",
     rose: "border-rose-200 bg-gradient-to-br from-rose-50 via-white to-white text-rose-700",
+    amber: "border-amber-200 bg-gradient-to-br from-amber-50 via-white to-white text-amber-700",
   };
   return (
     <div className={`rounded-2xl border p-3.5 shadow-2xs sm:p-5 ${styles[color]}`}>

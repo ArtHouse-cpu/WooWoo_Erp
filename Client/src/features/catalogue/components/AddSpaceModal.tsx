@@ -39,6 +39,9 @@ export type SpaceFormPayload = {
   weekdayStatus?: SpaceStatus;
   weekendPrice?: number;
   weekendStatus?: SpaceStatus;
+  updateBothDays?: boolean;
+  weekdayId?: string;
+  weekendId?: string;
   day?: SpaceDay;
   price?: number;
   status?: SpaceStatus;
@@ -225,18 +228,32 @@ export default function AddSpaceModal({
             : [];
       setVideos(savedVideos.filter(Boolean).map((url) => ({ id: url, url })));
 
+      const paired = initialSpace as SpacePayload & {
+        weekday?: SpacePayload;
+        weekend?: SpacePayload;
+      };
       const d = normalizeDay(initialSpace.day);
       const savedPrice = Number(initialSpace.price || 0);
       const savedStatus = (initialSpace.status as SpaceStatus) || "Available";
-      setDayMode(d);
-      setPrice(savedPrice);
-      setStatus(savedStatus);
-      if (d === "Weekend") {
-        setWeekendPrice(savedPrice);
-        setWeekendStatus(savedStatus);
+      if (paired.weekday?._id && paired.weekend?._id) {
+        setDayMode("Both");
+        setPrice(Number(paired.weekday.price || 0));
+        setStatus((paired.weekday.status as SpaceStatus) || "Available");
+        setWeekdayPrice(Number(paired.weekday.price || 0));
+        setWeekdayStatus((paired.weekday.status as SpaceStatus) || "Available");
+        setWeekendPrice(Number(paired.weekend.price || 0));
+        setWeekendStatus((paired.weekend.status as SpaceStatus) || "Available");
       } else {
-        setWeekdayPrice(savedPrice);
-        setWeekdayStatus(savedStatus);
+        setDayMode(d);
+        setPrice(savedPrice);
+        setStatus(savedStatus);
+        if (d === "Weekend") {
+          setWeekendPrice(savedPrice);
+          setWeekendStatus(savedStatus);
+        } else {
+          setWeekdayPrice(savedPrice);
+          setWeekdayStatus(savedStatus);
+        }
       }
     } else {
       setName("");
@@ -395,6 +412,32 @@ export default function AddSpaceModal({
       }
     }
     const media = mediaSelection(readyVideos);
+
+    const paired = initialSpace as (SpacePayload & {
+      weekday?: SpacePayload;
+      weekend?: SpacePayload;
+    }) | null;
+    if (isEdit && dayMode === "Both" && paired?.weekday?._id && paired.weekend?._id) {
+      await onSubmit(
+        {
+          name: name.trim(),
+          spaceCode: spaceCode.trim() || undefined,
+          spaceType,
+          category,
+          capacity: Math.max(1, Number(capacity || 1)),
+          description: description.trim(),
+          updateBothDays: true,
+          weekdayId: String(paired.weekday._id),
+          weekendId: String(paired.weekend._id),
+          weekdayPrice: Number(weekdayPrice || 0),
+          weekdayStatus,
+          weekendPrice: Number(weekendPrice || 0),
+          weekendStatus,
+        },
+        media,
+      );
+      return;
+    }
 
     if (!isEdit && dayMode === "Both") {
       await onSubmit(
@@ -603,7 +646,11 @@ export default function AddSpaceModal({
                 </div>
                 <p className="text-sm text-slate-500">
                   Set price and availability for Weekday and Weekend.
-                  {isEdit ? " This space keeps its saved day." : " Turn a day off to skip it."}
+                  {isEdit && dayMode === "Both"
+                    ? " Both prices can be edited here."
+                    : isEdit
+                      ? " This space keeps its saved day."
+                      : " Turn a day off to skip it."}
                 </p>
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

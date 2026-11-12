@@ -19,6 +19,12 @@ import SelectedSpacesSummary, {
   type SummaryBookedSpace,
 } from "./SelectedSpacesSummary";
 
+const formatOfferHours = (value: number) => {
+  const hours = Number(value);
+  if (!Number.isFinite(hours)) return "0";
+  return Number.isInteger(hours) ? String(hours) : String(Math.round(hours * 100) / 100);
+};
+
 export type ExclusiveSingleDateSummaryCardProps = {
   space: SpacePayload | null;
   spaceQty: number;
@@ -33,6 +39,8 @@ export type ExclusiveSingleDateSummaryCardProps = {
   offerFreeHours?: number;
   offerDiscount?: number;
   offerName?: string;
+  offerMinimumHours?: number;
+  offerChargeableHours?: number;
   formatDateDisplay: (val?: string | Date | null) => string;
   bookedSpaces?: SummaryBookedSpace[];
   showPayment?: boolean;
@@ -60,6 +68,8 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   offerFreeHours = 0,
   offerDiscount = 0,
   offerName = "",
+  offerMinimumHours = 0,
+  offerChargeableHours = 0,
   formatDateDisplay,
   bookedSpaces = [],
   showPayment = false,
@@ -109,7 +119,18 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   const safeDiscount = Math.max(0, Number(discountAmount) || 0);
   const safeOffer = Math.max(0, Number(offerDiscount) || 0);
   const freeHours = Math.max(0, Number(offerFreeHours) || 0);
-  const chargeableHours = Math.max(0, safeDuration - freeHours);
+  const minimumHours = Math.max(0, Number(offerMinimumHours) || 0);
+  const chargeableHours = Math.max(
+    0,
+    Number(offerChargeableHours) > 0
+      ? Number(offerChargeableHours)
+      : safeDuration - freeHours,
+  );
+  const offerUsed = safeOffer > 0 || freeHours > 0;
+  const offerRule =
+    minimumHours > 0 && freeHours > 0
+      ? `Book ${formatOfferHours(minimumHours)} get ${formatOfferHours(freeHours)}hr Free`
+      : "";
 
   const grandTotal = Math.max(0, subTotal - safeOffer - safeDiscount);
   const totalPrice = storedSubTotal > 0 ? storedSubTotal : subTotal;
@@ -230,6 +251,37 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
               {safeDuration === 1 ? "Hour" : "Hours"}
             </span>
           </div>
+
+          {offerUsed ? (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-slate-500">Offer</span>
+                <span className="text-right font-semibold text-violet-700">
+                  {offerRule || offerName || "Applied"}
+                </span>
+              </div>
+              {offerName ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-slate-500">Offer name</span>
+                  <span className="text-right font-semibold text-slate-800">{offerName}</span>
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Free hours</span>
+                <span className="font-semibold text-slate-800">{formatOfferHours(freeHours)} hr</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Hours charged</span>
+                <span className="font-semibold text-slate-800">{formatOfferHours(chargeableHours)} hr</span>
+              </div>
+              {safeOffer > 0 ? (
+                <div className="flex items-center justify-between font-semibold text-rose-600">
+                  <span>Offer discount</span>
+                  <span>- ₹{safeOffer.toLocaleString("en-IN")}</span>
+                </div>
+              ) : null}
+            </>
+          ) : null}
         </div>
 
         {/* ==============================
@@ -349,29 +401,17 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
             </div>
           </div>
 
-          {safeOffer > 0 ? (
-            <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/80 px-3 py-2 text-xs">
-              <p className="font-bold text-violet-800">Special Offer Applied – {freeHours} Hour{freeHours === 1 ? "" : "s"} FREE!</p>
-              <div className="flex items-center justify-between text-slate-600">
-                <span>Booking Duration</span>
-                <span className="font-semibold text-slate-800">{safeDuration} Hours</span>
-              </div>
-              <div className="flex items-center justify-between text-slate-600">
-                <span>Hourly Rate</span>
-                <span className="font-semibold text-slate-800">₹{safeHourlyRate.toLocaleString("en-IN")}</span>
-              </div>
-              <div className="flex items-center justify-between text-slate-600">
-                <span>Original Amount</span>
-                <span className="font-semibold text-slate-800">₹{spaceCharges.toLocaleString("en-IN")}</span>
-              </div>
-              <div className="flex items-center justify-between text-slate-600">
-                <span>Offer Applied{offerName ? ` · ${offerName}` : ""}</span>
-                <span className="font-semibold text-violet-700">{freeHours} Hours FREE · pay {chargeableHours}h</span>
-              </div>
-              <div className="flex items-center justify-between font-semibold text-rose-600">
-                <span>Discount</span>
-                <span>- ₹{safeOffer.toLocaleString("en-IN")}</span>
-              </div>
+          {offerUsed ? (
+            <div className="space-y-1.5 rounded-xl border border-violet-100 bg-violet-50/80 px-3 py-2 text-xs">
+              <p className="font-bold text-violet-800">
+                {offerRule || `Special offer${offerName ? ` · ${offerName}` : ""}`}
+              </p>
+              <p className="text-slate-600">
+                Booked {formatOfferHours(safeDuration)} hr
+                {freeHours > 0 ? `, ${formatOfferHours(freeHours)} hr free` : ""}
+                {chargeableHours > 0 ? `, pay for ${formatOfferHours(chargeableHours)} hr` : ""}
+                {safeOffer > 0 ? ` · discount ₹${safeOffer.toLocaleString("en-IN")}` : ""}
+              </p>
             </div>
           ) : null}
 

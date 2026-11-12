@@ -156,6 +156,36 @@ const shortInr = (value: number) => {
   return `₹${Math.round(amount).toLocaleString("en-IN")}`;
 };
 
+type BookingOfferSnapshot = {
+  applied?: boolean;
+  offerName?: string;
+  minimumHours?: number;
+  freeHours?: number;
+  chargeableHours?: number;
+  discount?: number;
+};
+
+const bookingOffer = (booking: SpaceBookingPayload): BookingOfferSnapshot | null => {
+  const row = booking as SpaceBookingPayload & {
+    offerSnapshot?: BookingOfferSnapshot | null;
+    offerDiscount?: number;
+  };
+  const snap = row.offerSnapshot;
+  const discount = Number(row.offerDiscount ?? snap?.discount ?? 0);
+  const freeHours = Number(snap?.freeHours || 0);
+  if (!snap || (!(discount > 0) && !(freeHours > 0) && !snap.applied)) return null;
+  return { ...snap, discount, freeHours };
+};
+
+const offerRuleText = (offer: BookingOfferSnapshot) => {
+  const minimum = Number(offer.minimumHours || 0);
+  const free = Number(offer.freeHours || 0);
+  if (!(minimum > 0) || !(free > 0)) return offer.offerName || "Offer applied";
+  const hours = (value: number) =>
+    Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100);
+  return `Book ${hours(minimum)} get ${hours(free)}hr Free`;
+};
+
 const toDateInput = (value?: string | Date | null) => {
   if (!value) return "";
   const d = new Date(value);
@@ -298,6 +328,7 @@ const BookingSummaryRenderer = ({
   const duration = snap?.duration || booking.durationHours || 1;
   const hourlyRate =
     snap?.unitPrice ?? booking.unitPrice ?? Number(booking.space?.price || 800);
+  const offer = bookingOffer(booking);
 
   return (
     <div className="w-full max-w-sm mx-auto text-left">
@@ -311,6 +342,11 @@ const BookingSummaryRenderer = ({
         selectedServices={selectedServices}
         discountAmount={discountAmount}
         cashbackAmount={cashbackAmount}
+        offerFreeHours={Number(offer?.freeHours || 0)}
+        offerDiscount={Number(offer?.discount || 0)}
+        offerName={offer?.offerName || ""}
+        offerMinimumHours={Number(offer?.minimumHours || 0)}
+        offerChargeableHours={Number(offer?.chargeableHours || 0)}
         formatDateDisplay={formatDateDisplay}
         {...paymentView}
       />
@@ -751,7 +787,16 @@ const SpaceBook = () => {
     const referralDiscount = Number(payment.referral?.discountAmount ?? 0);
     const membershipDiscount = Number(payment.membershipDiscount ?? 0);
     const manualDiscount = Number(payment.manualDiscount?.discountAmount ?? payment.manualDiscountAmount ?? 0);
-    const totalDiscount = couponDiscount + referralDiscount + membershipDiscount + manualDiscount;
+    const offerDiscount = Math.max(
+      0,
+      Number(
+        pendingCheckout.offerDiscount ??
+          pendingCheckout.summarySnapshot?.offerDiscount ??
+          0,
+      ),
+    );
+    const totalDiscount =
+      couponDiscount + referralDiscount + membershipDiscount + manualDiscount + offerDiscount;
 
     const existingDraftId = (pendingCheckout as any)?._originalBookingId as
       | string
@@ -2227,6 +2272,21 @@ const SpaceBook = () => {
                     .toLocaleString("en-IN")}
                 </p>
                 <p>Pending amount: ₹{(Number(selectedBooking.dueAmount || 0) < 1 ? 0 : Number(selectedBooking.dueAmount || 0)).toLocaleString("en-IN")}</p>
+                {bookingOffer(selectedBooking) ? (
+                  <div className="mt-3 space-y-1 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-violet-900">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-violet-500">Offer used</p>
+                    <p className="font-bold">{offerRuleText(bookingOffer(selectedBooking)!)}</p>
+                    {bookingOffer(selectedBooking)?.offerName ? (
+                      <p>Offer name: {bookingOffer(selectedBooking)?.offerName}</p>
+                    ) : null}
+                    <p>Free hours: {Number(bookingOffer(selectedBooking)?.freeHours || 0)}</p>
+                    <p>Hours charged: {Number(bookingOffer(selectedBooking)?.chargeableHours || 0)}</p>
+                    <p>
+                      Offer discount: ₹
+                      {Number(bookingOffer(selectedBooking)?.discount || 0).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                ) : null}
                 <p>
                   Payment status:{" "}
                   {selectedBooking.status === "Draft"

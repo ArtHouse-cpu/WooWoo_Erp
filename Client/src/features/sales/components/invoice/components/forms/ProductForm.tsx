@@ -440,19 +440,13 @@ export default function ProductForm({ step = 0 }: { step?: number }) {
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-900">{productName || "Product name"}</p>
             <p className="text-xs text-slate-400">{itemCode || "SKU"}</p>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {categoryName ? (
-                <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">{categoryName}</span>
-              ) : null}
-              {segmentName ? (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{segmentName}</span>
-              ) : null}
-            </div>
           </div>
         </div>
         <dl className="mt-3 space-y-1.5 text-xs">
-          <div className="flex justify-between gap-3"><dt className="text-slate-400">Brand</dt><dd className="font-medium text-slate-700">{watch("brandName") || "—"}</dd></div>
-          <div className="flex justify-between gap-3"><dt className="text-slate-400">Sub Category</dt><dd className="font-medium text-slate-700">{subCategoryName || "—"}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-slate-400">Segment</dt><dd className="font-medium text-slate-700">{segmentName || "—"}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-slate-400">Category</dt><dd className="font-medium text-slate-700">{categoryName || "—"}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-slate-400">Sub category</dt><dd className="font-medium text-slate-700">{subCategoryName || "—"}</dd></div>
+          <div className="flex justify-between gap-3"><dt className="text-slate-400">Brand name</dt><dd className="font-medium text-slate-700">{watch("brandName") || "—"}</dd></div>
           <div className="flex justify-between gap-3"><dt className="text-slate-400">Barcode</dt><dd className="font-medium text-slate-700">{barcodeValue || "Not added"}</dd></div>
         </dl>
       </Section>
@@ -493,23 +487,7 @@ export default function ProductForm({ step = 0 }: { step?: number }) {
     />
   </div>
   <div className="sm:col-span-2 grid grid-cols-1 gap-3 lg:grid-cols-3">
-    <div className="lg:col-span-2 [&_label]:mb-1.5 [&_label]:block [&_label]:text-xs [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-slate-500 [&>div]:grid [&>div]:grid-cols-1 [&>div]:gap-3 [&>div]:space-y-0 sm:[&>div]:grid-cols-2 [&_button.flex]:h-10 [&_button.flex]:rounded-lg [&_button.flex]:border-slate-200">
-      <CategorySelect
-        categoryValue={categoryId || ""}
-        categoryName={categoryName || ""}
-        onCategoryChange={(id, name) => {
-          setValue("categoryId", id, { shouldDirty: true });
-          setValue("category", name, { shouldDirty: true });
-        }}
-        subCategoryValue={subCategoryId || ""}
-        subCategoryName={subCategoryName || ""}
-        onSubCategoryChange={(id, name) => {
-          setValue("subCategoryId", id, { shouldDirty: true });
-          setValue("subCategory", name, { shouldDirty: true });
-        }}
-      />
-    </div>
-    <div className="relative min-w-0" ref={segmentMenuRef}>
+      <div className="relative min-w-0" ref={segmentMenuRef}>
       <label className={labelClass}>
         <LayoutGrid size={12} className="mr-1 inline" />
         Segment
@@ -673,6 +651,22 @@ export default function ProductForm({ step = 0 }: { step?: number }) {
           {segmentError ? <p className="px-2 pb-2 text-xs text-red-600">{segmentError}</p> : null}
         </div>
       ) : null}
+    </div>
+    <div className="lg:col-span-2 [&_label]:mb-1.5 [&_label]:block [&_label]:text-xs [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-wide [&_label]:text-slate-500 [&>div]:grid [&>div]:grid-cols-1 [&>div]:gap-3 [&>div]:space-y-0 sm:[&>div]:grid-cols-2 [&_button.flex]:h-10 [&_button.flex]:rounded-lg [&_button.flex]:border-slate-200">
+      <CategorySelect
+        categoryValue={categoryId || ""}
+        categoryName={categoryName || ""}
+        onCategoryChange={(id, name) => {
+          setValue("categoryId", id, { shouldDirty: true });
+          setValue("category", name, { shouldDirty: true });
+        }}
+        subCategoryValue={subCategoryId || ""}
+        subCategoryName={subCategoryName || ""}
+        onSubCategoryChange={(id, name) => {
+          setValue("subCategoryId", id, { shouldDirty: true });
+          setValue("subCategory", name, { shouldDirty: true });
+        }}
+      />
     </div>
   </div>
 </div>
@@ -989,11 +983,11 @@ export default function ProductForm({ step = 0 }: { step?: number }) {
       {step === 4 ? (
         <Section title="Review" description="Check the product before saving.">
           <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            <div><dt className="text-xs text-slate-400">Name</dt><dd className="font-medium">{productName || "—"}</dd></div>
-            <div><dt className="text-xs text-slate-400">Brand</dt><dd className="font-medium">{watch("brandName") || "—"}</dd></div>
+            <div><dt className="text-xs text-slate-400">Segment</dt><dd className="font-medium">{segmentName || "—"}</dd></div>
             <div><dt className="text-xs text-slate-400">Category</dt><dd className="font-medium">{categoryName || "—"}</dd></div>
             <div><dt className="text-xs text-slate-400">Sub category</dt><dd className="font-medium">{subCategoryName || "—"}</dd></div>
-            <div><dt className="text-xs text-slate-400">Segment</dt><dd className="font-medium">{segmentName || "—"}</dd></div>
+            <div><dt className="text-xs text-slate-400">Brand name</dt><dd className="font-medium">{watch("brandName") || "—"}</dd></div>
+            <div><dt className="text-xs text-slate-400">Name</dt><dd className="font-medium">{productName || "—"}</dd></div>
             <div><dt className="text-xs text-slate-400">Selling price</dt><dd className="font-medium">₹{Number(watch("sellingPrice") || 0).toLocaleString("en-IN")}</dd></div>
             <div><dt className="text-xs text-slate-400">SKU</dt><dd className="font-medium">{itemCode || "—"}</dd></div>
             <div><dt className="text-xs text-slate-400">Photos</dt><dd className="font-medium">{images?.length || 0}</dd></div>

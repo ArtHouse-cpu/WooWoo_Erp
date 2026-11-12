@@ -19,6 +19,7 @@ import {
 import Swal from "sweetalert2";
 import AddSpaceModal, {
   type SpaceFormPayload,
+  type SpaceMediaSelection,
   COWORKING_CATEGORIES,
 } from "@/features/catalogue/components/AddSpaceModal";
 import {
@@ -31,8 +32,59 @@ import {
 } from "@/services/apiClient";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
+import SpaceOfferPreview from "@/features/catalogue/components/SpaceOfferPreview";
 
 type SpaceRow = SpacePayload & { _id: string };
+type SpaceTableRow = SpaceRow & {
+  weekday?: SpaceRow;
+  weekend?: SpaceRow;
+};
+
+const pairKey = (space: SpaceRow) => {
+  const name = String(space.name || "").trim().toLowerCase();
+  const code = String(space.spaceCode || "").trim().toLowerCase();
+  if (!name || !code) return "";
+  return `${name}|${code}`;
+};
+
+const groupSpaceRows = (list: SpaceRow[]): SpaceTableRow[] => {
+  const buckets = new Map<string, SpaceRow[]>();
+  const loose: SpaceTableRow[] = [];
+  for (const space of list) {
+    const key = pairKey(space);
+    if (!key) {
+      loose.push(space);
+      continue;
+    }
+    const bucket = buckets.get(key) || [];
+    bucket.push(space);
+    buckets.set(key, bucket);
+  }
+  const rows: SpaceTableRow[] = [...loose];
+  for (const bucket of buckets.values()) {
+    const weekday = bucket.find(
+      (space) => String(space.day || "").toLowerCase() === "weekday",
+    );
+    const weekend = bucket.find(
+      (space) => String(space.day || "").toLowerCase() === "weekend",
+    );
+    if (weekday && weekend) {
+      const images = [
+        ...new Set([...spaceImageUrls(weekday), ...spaceImageUrls(weekend)]),
+      ];
+      rows.push({
+        ...weekday,
+        images,
+        imageUrl: images[0] || weekday.imageUrl,
+        weekday,
+        weekend,
+      });
+      continue;
+    }
+    rows.push(...bucket);
+  }
+  return rows;
+};
 
 const statusClass = (status?: string) => {
   if (status === "Available") return "bg-emerald-100 text-emerald-700";
@@ -40,9 +92,70 @@ const statusClass = (status?: string) => {
   return "bg-amber-100 text-amber-700";
 };
 
+const spaceImageUrls = (space: SpaceRow) => {
+  const urls: string[] = [];
+  const push = (value: unknown) => {
+    const url = typeof value === "string" ? value.trim() : "";
+    if (url && !urls.includes(url)) urls.push(url);
+  };
+  if (Array.isArray(space.images)) space.images.forEach(push);
+  push(space.imageUrl);
+  return urls;
+};
+
+function SpaceThumb({
+  space,
+  className = "h-12 w-16 rounded-lg object-cover",
+}: {
+  space: SpaceRow;
+  className?: string;
+}) {
+  const urls = spaceImageUrls(space);
+  const [index, setIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setIndex(0);
+    setFailed(false);
+  }, [space._id, urls.join("|")]);
+
+  useEffect(() => {
+    if (urls.length < 2) return;
+    const timer = window.setInterval(() => {
+      setIndex((current) => (current + 1) % urls.length);
+    }, 2200);
+    return () => window.clearInterval(timer);
+  }, [urls.length, space._id]);
+
+  const src = urls[index] || "";
+  if (!src || failed) {
+    return (
+      <span className="flex h-12 w-16 items-center justify-center rounded-lg bg-slate-100 text-slate-300">
+        <MapPin size={16} />
+      </span>
+    );
+  }
+
+  return (
+    <img
+      key={src}
+      src={src}
+      alt={space.name || "Space"}
+      className={`${className} animate-in fade-in duration-500`}
+      onError={() => {
+        if (index < urls.length - 1) {
+          setIndex((current) => current + 1);
+          return;
+        }
+        setFailed(true);
+      }}
+    />
+  );
+}
+
 export default function CreateSpacesScreen() {
   const [openModal, setOpenModal] = useState(false);
-  const [editing, setEditing] = useState<SpaceRow | null>(null);
+  const [editing, setEditing] = useState<SpaceTableRow | null>(null);
   const [viewSpace, setViewSpace] = useState<SpaceRow | null>(null);
   const [spaces, setSpaces] = useState<SpaceRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -90,6 +203,11 @@ export default function CreateSpacesScreen() {
     );
   }, [spaces, searchQuery, selectedSpaceType]);
 
+  const tableSpaces = useMemo(
+    () => groupSpaceRows(filteredSpaces),
+    [filteredSpaces],
+  );
+
   const fetchSpaces = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
@@ -118,15 +236,19 @@ export default function CreateSpacesScreen() {
   const columns = useMemo(
     () => [
       {
-        id: "rowIndex",
-        header: "ID",
-        size: 50,
-        Cell: ({ row }: { row: { index: number } }) => row.index + 1,
+        id: "image",
+        header: "Image",
+        size: 90,
+        enableSorting: false,
+        Cell: ({ row }: { row: { original: SpaceRow } }) => (
+          <SpaceThumb space={row.original} />
+        ),
       },
+      { accessorKey: "name", header: "Name", size: 200 },
       {
         accessorKey: "spaceCode",
         header: "Space Code",
-        size: 110,
+        size: 120,
         Cell: ({ row }: { row: { original: SpaceRow } }) => (
           <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700 border border-slate-200">
             {row.original.spaceCode ||
@@ -134,67 +256,42 @@ export default function CreateSpacesScreen() {
           </span>
         ),
       },
-      { accessorKey: "name", header: "Space Name", size: 200 },
       {
-        accessorKey: "spaceType",
-        header: "Type",
-        size: 110,
-        Cell: ({ row }: { row: { original: SpaceRow } }) => {
-          const raw = String(row.original.spaceType || "").toLowerCase();
-          const cat = String(row.original.category || "").toLowerCase();
-          const isCoworking =
-            raw === "coworking" ||
-            (raw !== "exclusive" &&
-              (COWORKING_CATEGORIES.some((c) => c.toLowerCase() === cat) ||
-                cat.includes("cowork")));
-          return (
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                isCoworking
-                  ? "bg-indigo-100 text-indigo-700"
-                  : "bg-emerald-100 text-emerald-700"
-              }`}
-            >
-              {isCoworking ? "Coworking" : "Exclusive"}
-            </span>
-          );
-        },
-      },
-      { accessorKey: "category", header: "Category" },
-      {
-        accessorKey: "day",
-        header: "Day",
-        Cell: ({ row }: { row: { original: SpaceRow } }) => {
-          const day = String(row.original.day || "").trim();
-          const isWeekend = day.toLowerCase() === "weekend";
-          const label = isWeekend
-            ? "Weekend"
-            : day.toLowerCase() === "weekday"
-              ? "Weekday"
-              : day || "—";
-          return (
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                isWeekend
-                  ? "bg-violet-100 text-violet-700"
-                  : day
-                    ? "bg-sky-100 text-sky-700"
-                    : "bg-gray-100 text-gray-500"
-              }`}
-            >
-              {label}
-            </span>
-          );
-        },
+        accessorKey: "category",
+        header: "Category",
+        Cell: ({ row }: { row: { original: SpaceRow } }) =>
+          row.original.category || "—",
       },
       {
         accessorKey: "price",
         header: "Price",
-        Cell: ({ row }: { row: { original: SpaceRow } }) => (
-          <span className="font-semibold text-gray-900">
-            ₹{Number(row.original.price || 0).toLocaleString("en-IN")}
-          </span>
-        ),
+        Cell: ({ row }: { row: { original: SpaceTableRow } }) => {
+          const weekday = row.original.weekday;
+          const weekend = row.original.weekend;
+          if (weekday && weekend) {
+            return (
+              <div className="text-xs leading-5">
+                <p>
+                  <span className="text-slate-500">Weekday </span>
+                  <span className="font-semibold text-gray-900">
+                    ₹{Number(weekday.price || 0).toLocaleString("en-IN")}
+                  </span>
+                </p>
+                <p>
+                  <span className="text-slate-500">Weekend </span>
+                  <span className="font-semibold text-gray-900">
+                    ₹{Number(weekend.price || 0).toLocaleString("en-IN")}
+                  </span>
+                </p>
+              </div>
+            );
+          }
+          return (
+            <span className="font-semibold text-gray-900">
+              ₹{Number(row.original.price || 0).toLocaleString("en-IN")}
+            </span>
+          );
+        },
       },
       {
         accessorKey: "capacity",
@@ -205,8 +302,26 @@ export default function CreateSpacesScreen() {
       {
         accessorKey: "status",
         header: "Status",
-        Cell: ({ cell }: { cell: { getValue: () => unknown } }) => {
-          const status = String(cell.getValue() || "Available");
+        Cell: ({ row }: { row: { original: SpaceTableRow } }) => {
+          const weekday = row.original.weekday;
+          const weekend = row.original.weekend;
+          if (
+            weekday &&
+            weekend &&
+            String(weekday.status || "Available") !== String(weekend.status || "Available")
+          ) {
+            return (
+              <div className="space-y-1">
+                <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClass(weekday.status)}`}>
+                  Weekday {weekday.status || "Available"}
+                </span>
+                <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClass(weekend.status)}`}>
+                  Weekend {weekend.status || "Available"}
+                </span>
+              </div>
+            );
+          }
+          const status = String(row.original.status || "Available");
           return (
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass(status)}`}
@@ -250,10 +365,16 @@ export default function CreateSpacesScreen() {
     [],
   );
 
-  const selectedSpaces = useMemo(
-    () => spaces.filter((space) => rowSelection[space._id]),
-    [spaces, rowSelection],
-  );
+  const selectedSpaces = useMemo(() => {
+    const picked = spaces.filter((space) => rowSelection[space._id]);
+    const keys = new Set(picked.map(pairKey).filter(Boolean));
+    if (!keys.size) return picked;
+    const partners = spaces.filter((space) => {
+      const key = pairKey(space);
+      return Boolean(key && keys.has(key) && !rowSelection[space._id]);
+    });
+    return [...picked, ...partners];
+  }, [spaces, rowSelection]);
 
   const handleDeleteMany = async () => {
     const targets = selectedSpaces.filter((space) => space._id);
@@ -296,7 +417,7 @@ export default function CreateSpacesScreen() {
 
   const table = useMaterialReactTable({
     columns,
-    data: filteredSpaces,
+    data: tableSpaces,
     getRowId: (row) => row._id,
     enableRowSelection: true,
     enableMultiRowSelection: true,
@@ -379,10 +500,14 @@ export default function CreateSpacesScreen() {
     },
   ];
 
-  const handleDelete = async (space: SpaceRow) => {
+  const handleDelete = async (space: SpaceTableRow) => {
+    const partnerId =
+      space.weekend?._id && space.weekend._id !== space._id ? space.weekend._id : "";
     const result = await Swal.fire({
       title: "Delete space?",
-      text: `Remove "${space.name}" from catalogue?`,
+      text: partnerId
+        ? `Remove weekday and weekend prices for "${space.name}"?`
+        : `Remove "${space.name}" from catalogue?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Yes, delete",
@@ -392,6 +517,7 @@ export default function CreateSpacesScreen() {
 
     try {
       await handleDeleteSpace(space._id);
+      if (partnerId) await handleDeleteSpace(partnerId);
       await Swal.fire({
         icon: "success",
         title: "Deleted",
@@ -411,18 +537,69 @@ export default function CreateSpacesScreen() {
 
   const handleSubmit = async (
     payload: SpaceFormPayload,
-    media: {
-      imageFiles: File[];
-      existingImages: string[];
-      videoFile: File | null;
-      removeVideo: boolean;
-    },
+    media: SpaceMediaSelection,
   ) => {
     try {
       setSaving(true);
       const formData = spacePayloadToFormData(payload, media);
 
-      if (editing?._id) {
+      if (payload.updateBothDays && payload.weekdayId && payload.weekendId) {
+        const shared = {
+          name: payload.name,
+          spaceCode: payload.spaceCode,
+          spaceType: payload.spaceType,
+          category: payload.category,
+          capacity: payload.capacity,
+          description: payload.description,
+        };
+        const weekdayRes = await handleUpdateSpace(
+          payload.weekdayId,
+          spacePayloadToFormData(
+            {
+              ...shared,
+              day: "Weekday",
+              price: payload.weekdayPrice ?? 0,
+              status: payload.weekdayStatus ?? "Available",
+            },
+            media,
+          ),
+        );
+        const savedRaw = weekdayRes?.space as SpacePayload | SpacePayload[] | undefined;
+        const saved = Array.isArray(savedRaw) ? savedRaw[0] : savedRaw;
+        const images =
+          Array.isArray(saved?.images) && saved.images.length
+            ? saved.images
+            : media.existingImages;
+        const videos =
+          Array.isArray(saved?.videos) && saved.videos.length
+            ? saved.videos
+            : media.existingVideos || [];
+        await handleUpdateSpace(
+          payload.weekendId,
+          spacePayloadToFormData(
+            {
+              ...shared,
+              day: "Weekend",
+              price: payload.weekendPrice ?? 0,
+              status: payload.weekendStatus ?? "Available",
+            },
+            {
+              imageFiles: [],
+              existingImages: images.filter(Boolean) as string[],
+              videoFiles: [],
+              existingVideos: videos.filter(Boolean) as string[],
+              videoFile: null,
+              removeVideo: videos.length === 0,
+            },
+          ),
+        );
+        await Swal.fire({
+          icon: "success",
+          title: "Space updated",
+          timer: 1400,
+          showConfirmButton: false,
+        });
+      } else if (editing?._id) {
         await handleUpdateSpace(editing._id, formData);
         await Swal.fire({
           icon: "success",
@@ -928,6 +1105,8 @@ export default function CreateSpacesScreen() {
                   </div>
                 </div>
               </div>
+
+              <SpaceOfferPreview hourlyRate={Number(viewSpace.price || 0)} />
 
               {/* Specs List */}
               <div className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-2.5 text-xs">

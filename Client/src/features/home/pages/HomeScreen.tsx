@@ -19,6 +19,7 @@ import {
   Package,
   Phone,
   Search,
+  Share2,
   ShoppingCart,
   SquarePen,
   Ticket,
@@ -68,6 +69,8 @@ import {
   type DashboardSummaryData,
   type MembershipPlanPayload,
 } from "@/services/apiClient";
+import ProductShareModal from "@/features/catalogue/components/ProductShareModal";
+import SpaceOfferPreview from "@/features/catalogue/components/SpaceOfferPreview";
 import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { usePermission } from "@/hooks/usePermission";
 import { useAppSelector } from "@/store/hooks";
@@ -677,6 +680,12 @@ export default function HomeScreen() {
   const [productCategories, setProductCategories] = useState<{ _id?: string; name?: string }[]>([]);
   const [selectedProductCategory, setSelectedProductCategory] = useState<string>("all");
   const [viewProduct, setViewProduct] = useState<any | null>(null);
+  const [shareProduct, setShareProduct] = useState<{
+    id: string;
+    name: string;
+    category?: string;
+    price?: string;
+  } | null>(null);
   const [editProduct, setEditProduct] = useState<any | null>(null);
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
   const [productModalLoading, setProductModalLoading] = useState(false);
@@ -1052,25 +1061,9 @@ export default function HomeScreen() {
             "createdAt",
           );
           if (!alive) return;
-          let list = Array.isArray(res?.subscriptions)
+          const list = Array.isArray(res?.subscriptions)
             ? res.subscriptions
             : [];
-          // For all date filters: if no subscriptions created in the specific date window, load subscriptions across all dates so membership subscriptions are displayed
-          if (list.length === 0 && (listBounds.fromDate || listBounds.toDate)) {
-            const allRes = await handleGetSubscriptions(
-              "",
-              100,
-              undefined,
-              1,
-              undefined,
-              undefined,
-              "createdAt",
-            );
-            if (!alive) return;
-            if (Array.isArray(allRes?.subscriptions) && allRes.subscriptions.length > 0) {
-              list = allRes.subscriptions;
-            }
-          }
           const sortedList = [...list].sort((a, b) => {
             const ta = parseDate(a?.createdAt)?.getTime() ?? 0;
             const tb = parseDate(b?.createdAt)?.getTime() ?? 0;
@@ -1290,30 +1283,13 @@ export default function HomeScreen() {
   const networkSummary = dashboardSummary?.network;
   const purchaseExpense = dashboardSummary?.purchaseExpense;
 
-  const displayMembershipTotal = useMemo(() => {
-    if (typeof membershipSummary?.total === "number" && membershipSummary.total > 0) {
-      return membershipSummary.total;
-    }
-    return membershipPlans.length;
-  }, [membershipSummary, membershipPlans]);
+  const displayMembershipTotal = membershipSummary?.total ?? 0;
 
-  const membershipBreakdown = useMemo(() => {
-    if (membershipSummary?.breakdown && membershipSummary.breakdown.length > 0) {
-      return membershipSummary.breakdown.map((row, i) => ({
-        label: row.code,
-        value: formatCount(row.count),
-        colorClass: MEMBERSHIP_BREAKDOWN_COLORS[i % MEMBERSHIP_BREAKDOWN_COLORS.length],
-      }));
-    }
-    if (membershipPlans.length > 0) {
-      return membershipPlans.slice(0, 4).map((p, i) => ({
-        label: (p.displayName || p.planId || "Plan").slice(0, 10),
-        value: p.status || "Active",
-        colorClass: MEMBERSHIP_BREAKDOWN_COLORS[i % MEMBERSHIP_BREAKDOWN_COLORS.length],
-      }));
-    }
-    return [];
-  }, [membershipSummary, membershipPlans]);
+  const membershipBreakdown = (membershipSummary?.breakdown ?? []).map((row, i) => ({
+    label: row.code,
+    value: formatCount(row.count),
+    colorClass: MEMBERSHIP_BREAKDOWN_COLORS[i % MEMBERSHIP_BREAKDOWN_COLORS.length],
+  }));
 
   const filteredBills = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -3648,7 +3624,7 @@ export default function HomeScreen() {
                           </h4>
                         </div>
 
-                        {/* Footer: Price + 3 dots (food) / arrow (products, spaces) */}
+                        {/* Footer: Price + food menu / product share / space arrow */}
                         <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
                           <div>
                             <span className="text-xs font-extrabold text-slate-900 sm:text-sm">
@@ -3723,6 +3699,23 @@ export default function HomeScreen() {
                                 </>
                               )}
                             </div>
+                          ) : tab === "products" && row.id ? (
+                            <button
+                              type="button"
+                              aria-label={`Share ${row.title || "product"}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setShareProduct({
+                                  id: String(row.id),
+                                  name: row.title || "Product",
+                                  category: row.subtitle || "Supplies",
+                                  price: row.amount || "",
+                                });
+                              }}
+                              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-blue-600 hover:text-white"
+                            >
+                              <Share2 size={13} />
+                            </button>
                           ) : (
                             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-blue-600 group-hover:text-white">
                               <ChevronRight size={13} />
@@ -4555,6 +4548,10 @@ export default function HomeScreen() {
                 </div>
               </div>
 
+              <SpaceOfferPreview
+                hourlyRate={Number((viewSpace.raw as { price?: number } | undefined)?.price || 0)}
+              />
+
               {/* Specs List */}
               <div className="rounded-2xl border border-slate-200/80 bg-white p-4 space-y-2.5 text-xs">
                 <div className="flex justify-between border-b border-slate-100 pb-2">
@@ -4847,6 +4844,15 @@ export default function HomeScreen() {
               }
             : undefined
         }
+      />
+
+      <ProductShareModal
+        open={Boolean(shareProduct)}
+        productId={shareProduct?.id || ""}
+        productName={shareProduct?.name || ""}
+        category={shareProduct?.category}
+        price={shareProduct?.price}
+        onClose={() => setShareProduct(null)}
       />
 
       {showAddFoodModal && (

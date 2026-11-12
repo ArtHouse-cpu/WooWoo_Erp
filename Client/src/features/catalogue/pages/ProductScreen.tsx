@@ -25,11 +25,13 @@ import {
   LayoutList,
   Plus,
   Search,
+  Share2,
   ShoppingBasket,
   SquarePen,
   Trash2,
   X,
 } from "lucide-react";
+import ProductShareModal from "../components/ProductShareModal";
 import {
   handleGetProducts,
   handleCreateProduct,
@@ -119,6 +121,12 @@ export default function ProductScreen() {
   const [bulkImporting, setBulkImporting] = useState(false);
   const [editProduct, setEditProduct] = useState<any | null>(null);
   const [viewProduct, setViewProduct] = useState<any | null>(null);
+  const [shareTarget, setShareTarget] = useState<{
+    id: string;
+    name: string;
+    category?: string;
+    price?: string;
+  } | null>(null);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [catalogueSegments, setCatalogueSegments] = useState<string[]>([]);
   const [selectedSegment, setSelectedSegment] = useState<string>("all");
@@ -1278,6 +1286,24 @@ export default function ProductScreen() {
                           ₹{Number(p.sellingPrice || 0).toLocaleString("en-IN")}
                         </span>
                       </div>
+                      {p._id ? (
+                        <button
+                          type="button"
+                          aria-label={`Share ${p.productName || "product"}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setShareTarget({
+                              id: String(p._id),
+                              name: p.productName || "Product",
+                              category: productSegmentNames(p).join(", ") || p.category || "Supplies",
+                              price: `₹${Number(p.sellingPrice || 0).toLocaleString("en-IN")}`,
+                            });
+                          }}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600"
+                        >
+                          <Share2 size={14} />
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -1504,6 +1530,14 @@ export default function ProductScreen() {
           </div>
         </div>
       )}
+      <ProductShareModal
+        open={Boolean(shareTarget)}
+        productId={shareTarget?.id || ""}
+        productName={shareTarget?.name || ""}
+        category={shareTarget?.category}
+        price={shareTarget?.price}
+        onClose={() => setShareTarget(null)}
+      />
     </div>
   );
 }

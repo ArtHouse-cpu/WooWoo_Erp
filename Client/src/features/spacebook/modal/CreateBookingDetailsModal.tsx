@@ -759,6 +759,7 @@ const CreateBookingDetailsModal = ({
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([]);
   const [spaceSectionOpen, setSpaceSectionOpen] = useState(true);
   const [servicesSectionOpen, setServicesSectionOpen] = useState(true);
+  const [foodSectionOpen, setFoodSectionOpen] = useState(true);
   const [spaceQty, setSpaceQty] = useState(1);
   const [spaces, setSpaces] = useState<SpacePayload[]>([]);
   const [spacesLoading, setSpacesLoading] = useState(false);
@@ -2129,16 +2130,20 @@ const CreateBookingDetailsModal = ({
       String(initialBooking?.spaceId || "") === String(bookedSpaces[0]?.spaceId || "") &&
       Number(initialBooking?.spaceQty || 1) === Number(bookedSpaces[0]?.qty || 1);
     if (isEdit && sameSpace && Math.abs(singleSlotHours - storedHours) < 0.001) {
+      const storedDiscount = Number(
+        (initialBooking as { offerDiscount?: number } | null)?.offerDiscount ??
+          stored?.discount ??
+          0,
+      );
+      const storedUsed = Boolean(
+        stored && (Number(stored.freeHours) > 0 || storedDiscount > 0 || stored.applied),
+      );
       setLiveOffer(
-        stored && Number(stored.freeHours) > 0
+        storedUsed && stored
           ? {
               ...stored,
               applied: true,
-              discount: Number(
-                (initialBooking as { offerDiscount?: number } | null)?.offerDiscount ??
-                  stored.discount ??
-                  0,
-              ),
+              discount: storedDiscount,
             }
           : null,
       );
@@ -2738,6 +2743,8 @@ const CreateBookingDetailsModal = ({
       offerFreeHours={liveOffer?.freeHours || 0}
       offerDiscount={liveOffer?.discount || 0}
       offerName={liveOffer?.offerName || ""}
+      offerMinimumHours={liveOffer?.minimumHours || 0}
+      offerChargeableHours={liveOffer?.chargeableHours || 0}
       formatDateDisplay={formatDateDisplay}
       bookedSpaces={bookedSpaces}
       amountLabel={status === "Draft" ? "Draft Amount" : "Grand Total"}
@@ -4038,17 +4045,30 @@ const CreateBookingDetailsModal = ({
 
                   {showFood ? (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
-                        <UtensilsCrossed size={14} />
-                      </span>
-                      <h3 className="font-bold text-slate-800 text-sm">
-                        Food{" "}
-                        <span className="font-normal text-slate-400 text-xs">
-                          (Optional)
+                    <button
+                      type="button"
+                      onClick={() => setFoodSectionOpen((open) => !open)}
+                      className="flex w-full items-center justify-between gap-2 text-left"
+                      aria-expanded={foodSectionOpen}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-orange-50 text-orange-600">
+                          <UtensilsCrossed size={14} />
                         </span>
-                      </h3>
-                    </div>
+                        <span className="font-bold text-slate-800 text-sm">
+                          Food{" "}
+                          <span className="font-normal text-slate-400 text-xs">
+                            (Optional)
+                          </span>
+                        </span>
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        className={`shrink-0 text-indigo-600 transition ${foodSectionOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {foodSectionOpen ? (
+                    <>
                     <input
                       type="text"
                       value={foodSearch}
@@ -4056,7 +4076,7 @@ const CreateBookingDetailsModal = ({
                       placeholder="Search food"
                       className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                     />
-                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+                    <div className="flex w-full min-w-0 gap-2.5 overflow-x-auto pb-1">
                       {foodCatalog
                         .filter((food) => {
                           const query = foodSearch.trim().toLowerCase();
@@ -4070,7 +4090,7 @@ const CreateBookingDetailsModal = ({
                           return (
                             <div
                               key={id}
-                              className={`flex flex-col justify-between rounded-2xl border p-3 transition ${
+                              className={`flex w-[168px] shrink-0 flex-col justify-between rounded-2xl border p-3 transition ${
                                 qty > 0
                                   ? "border-orange-400 bg-orange-50/40 shadow-xs"
                                   : "border-slate-200/90 bg-white hover:border-slate-300"
@@ -4140,6 +4160,8 @@ const CreateBookingDetailsModal = ({
                           );
                         })}
                     </div>
+                    </>
+                    ) : null}
                   </div>
                   ) : null}
 

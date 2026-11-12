@@ -31,6 +31,7 @@ Sparkles ,
   Megaphone,
   ChartNoAxesCombined,
   TimerIcon,
+  GitGraphIcon,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -167,6 +168,12 @@ const MENU_GROUPS: MenuGroup[] = [
         label: "Payments",
         icon: FileSpreadsheet,
         path: "/inventory-payments",
+      },
+      {
+        name: "Insights & Analytics",
+        label: "Insights & Analytics",
+        icon: GitGraphIcon,
+        path: "/insights-analytics",
       },
     ],
   },

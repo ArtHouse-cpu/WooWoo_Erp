@@ -5453,12 +5453,17 @@ export type ActivityItem = {
   userId?: string | null;
   userName?: string;
   userEmail?: string;
-  actorType?: "Admin" | "Staff" | "Customer" | "System" | string;
+  actorType?: "Admin" | "Staff" | "Customer" | "POS" | "System" | string;
+  userRole?: string;
   action: string;
   module: string;
   description?: string;
   resourceId?: string;
   resourceName?: string;
+  relatedName?: string;
+  amount?: number | null;
+  transactionType?: string;
+  source?: string;
   resourceType?: string;
   method?: string;
   endpoint?: string;
@@ -5479,6 +5484,8 @@ export type ActivityQuery = {
   action?: string;
   userId?: string;
   status?: "" | "success" | "failure";
+  source?: string;
+  transactionType?: string;
   from?: string;
   to?: string;
   sort?: "newest" | "oldest";
@@ -5495,6 +5502,8 @@ const activityParams = (query: ActivityQuery, includePage: boolean) => {
   if (query.action) params.action = query.action;
   if (query.userId) params.userId = query.userId;
   if (query.status) params.status = query.status;
+  if (query.source) params.source = query.source;
+  if (query.transactionType) params.transactionType = query.transactionType;
   if (query.from) params.from = query.from;
   if (query.to) params.to = query.to;
   if (includePage && query.sort) params.sort = query.sort;
@@ -5533,8 +5542,10 @@ export const handleGetActivityStats = async (
     stats: {
       total: number;
       today: number;
+      activeUsers: number;
       created: number;
-      updatedOrDeleted: number;
+      updated: number;
+      payments: number;
     };
   };
 };

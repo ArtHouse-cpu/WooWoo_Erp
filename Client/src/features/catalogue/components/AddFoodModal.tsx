@@ -261,8 +261,8 @@ export default function AddFoodModal({
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2">
-              <div className="space-y-3">
-                <div className="flex h-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-slate-900">Manage Inventory</p>
                     <p className="mt-0.5 text-xs text-slate-500">
@@ -294,8 +294,8 @@ export default function AddFoodModal({
                   </button>
                 </div>
                 {form.manageInventory ? (
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <label className={labelClass}>Low Stock Alert Level</label>
+                  <div className="mt-3 border-t border-slate-200 pt-3">
+                    <label className={labelClass}>Stock level</label>
                     <input
                       type="number"
                       min={0}
@@ -309,7 +309,7 @@ export default function AddFoodModal({
                         }));
                       }}
                       disabled={loading}
-                      placeholder="Leave empty for no alert"
+                      placeholder="Set the low-stock level"
                       className={fieldClass}
                     />
                     <p className="mt-1.5 text-xs text-slate-500">

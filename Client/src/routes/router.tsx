@@ -68,6 +68,7 @@ import InventorypaymentsScreen from "@/features/purchase/pages/Inventorypayments
 import ExhibitionTable from "@/features/exhibition-table/ExhibitionTable";
 import BookingOverView from "@/features/BookingOverview/BookingOverView";
 import ActivityTimelineScreen from "@/features/purchase/pages/ActivityTimelineScreen";
+import InsightsAnalyticsScreen from "@/features/purchase/pages/InsightsAnalyticsScreen";
 
 
 export const router = createBrowserRouter([
@@ -109,6 +110,7 @@ export const router = createBrowserRouter([
           { path: "inventory", element: <InventoryScreen /> },
           { path: "inventory-timeline", element: <InventoryTimelineScreen /> },
           { path: "inventory-payments", element: <InventorypaymentsScreen /> },
+          { path: "insights-analytics", element: <InsightsAnalyticsScreen/> },
 
           { path: "debit-notes", element: <DebitNoteScreen /> },
           { path: "pos", element: <PosScreen /> },
