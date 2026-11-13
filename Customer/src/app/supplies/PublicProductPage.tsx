@@ -1,12 +1,15 @@
 import {useEffect, useState} from 'react';
-import {Link, useParams} from 'react-router-dom';
+import {Link, useParams, useNavigate} from 'react-router-dom';
 import axios from 'axios';
+import {ChevronLeft} from 'lucide-react';
 import {ProductEnquiry} from '../../components/supplies/ProductEnquiry';
 import {ProductPhoto} from '../../components/supplies/ProductPhoto';
+import {ImageCarousel} from '../../components/ui/ImageCarousel';
 import {formatInr, productShareUrl, setProductPageMeta} from '../../components/supplies/productActions';
 import {fetchCustomerProduct, type CustomerProduct} from '../../services/product.service';
 
 export default function PublicProductPage() {
+  const navigate = useNavigate();
   const {id = ''} = useParams();
   const [product, setProduct] = useState<CustomerProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,7 +57,17 @@ export default function PublicProductPage() {
     <div className="min-h-dvh bg-[#FAFBFD]">
       <header className="border-b border-slate-100 bg-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-          <p className="font-display text-lg font-bold text-[#111111]">WooWoo Supplies</p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
+              aria-label="Go back"
+            >
+              <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+            </button>
+            <p className="font-display text-lg font-bold text-[#111111]">WooWoo Supplies</p>
+          </div>
           <Link to="/login" className="text-sm font-extrabold text-[#EA580C]">
             Customer login
           </Link>
@@ -75,11 +88,26 @@ export default function PublicProductPage() {
         ) : error ? (
           <Unavailable message={error} />
         ) : product ? (
-          <article className="grid gap-6 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm md:grid-cols-2">
-            <div className="bg-[#FFF7ED]">
-              <div className="aspect-square">
-                <ProductPhoto src={activeImage} alt={product.name} />
-              </div>
+          (() => {
+            const gallery =
+              product.images?.length > 0 ? product.images : product.imageUrl ? [product.imageUrl] : [];
+            const activeIndex = Math.max(0, gallery.indexOf(activeImage || ''));
+
+            return (
+              <article className="grid gap-6 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm md:grid-cols-2">
+                <div className="bg-[#FFF7ED]">
+                  <ImageCarousel
+                    images={gallery}
+                    alt={product.name}
+                    aspectRatio="aspect-square"
+                    roundedClassName="rounded-t-3xl md:rounded-l-3xl md:rounded-tr-none"
+                    activeIndex={activeIndex}
+                    onIndexChange={newIdx => {
+                      if (gallery[newIdx]) setActiveImage(gallery[newIdx]);
+                    }}
+                    showDots={gallery.length > 1}
+                    showArrows={gallery.length > 1}
+                  />
               {product.images.length > 1 ? (
                 <div className="flex gap-2 overflow-x-auto p-3">
                   {product.images.map(url => (
@@ -116,6 +144,8 @@ export default function PublicProductPage() {
               <ProductEnquiry product={product} />
             </div>
           </article>
+            );
+          })()
         ) : null}
       </main>
     </div>

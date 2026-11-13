@@ -2,15 +2,21 @@ import {useState} from 'react';
 import {Loader2, Share2} from 'lucide-react';
 import {toast} from 'sonner';
 import type {SpaceCard} from '../../services/space.service';
-import {copySpaceLink, spaceBookingUrl} from './spaceActions';
+import {copySpaceLink, spaceBookingUrl, type MembershipTier} from './spaceActions';
 import {ShareSpaceModal} from './ShareSpaceModal';
 
-export function SpaceEnquiry({space}: {space: SpaceCard}) {
+export function SpaceEnquiry({
+  space,
+  membershipTier,
+}: {
+  space: SpaceCard;
+  membershipTier?: MembershipTier | null;
+}) {
   const [sharing, setSharing] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
   const handleBook = () => {
-    window.open(spaceBookingUrl(space), '_blank', 'noopener,noreferrer');
+    window.open(spaceBookingUrl(space, membershipTier), '_blank', 'noopener,noreferrer');
   };
 
   const handleShare = async () => {
@@ -20,7 +26,7 @@ export function SpaceEnquiry({space}: {space: SpaceCard}) {
     }
     setSharing(true);
     try {
-      await copySpaceLink(space.id);
+      await copySpaceLink(space.id, membershipTier?.id);
       toast.success('Space link copied to clipboard');
     } catch {
       toast.error('Could not copy the space link.');

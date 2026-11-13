@@ -4,6 +4,7 @@ import type {CustomerProduct} from '../../services/product.service';
 import {formatInr} from './productActions';
 import {ProductEnquiry} from './ProductEnquiry';
 import {ProductPhoto} from './ProductPhoto';
+import {ImageCarousel} from '../ui/ImageCarousel';
 
 type ProductDetailsModalProps = {
   product: CustomerProduct | null;
@@ -80,9 +81,18 @@ export function ProductDetailsModal({product, onClose}: ProductDetailsModalProps
         <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           {/* Image Section */}
           <div className="bg-[#FFF9F3] p-4 flex flex-col justify-center">
-            <div className="aspect-square w-full overflow-hidden rounded-2xl bg-white/60 flex items-center justify-center shadow-xs">
-              <ProductPhoto src={activeImage} alt={product.name} />
-            </div>
+            <ImageCarousel
+              images={gallery}
+              alt={product.name}
+              aspectRatio="aspect-square"
+              roundedClassName="rounded-2xl"
+              activeIndex={Math.max(0, gallery.indexOf(activeImage || ''))}
+              onIndexChange={newIdx => {
+                if (gallery[newIdx]) setActiveImage(gallery[newIdx]);
+              }}
+              showDots={gallery.length > 1}
+              showArrows={gallery.length > 1}
+            />
             {gallery.length > 1 ? (
               <div className="flex gap-2 overflow-x-auto pt-3">
                 {gallery.map(url => (

@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import {
-  ArrowLeft,
+  ChevronLeft,
   Clock,
   Copy,
   Gift,
@@ -185,10 +185,10 @@ export default function ReferAndEarnPage() {
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="flex h-10 w-10 items-center justify-center rounded-2xl border border-black/[0.05] bg-white text-[#111111]"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
           aria-label="Go back"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
         </button>
         <div>
           <h1 className="text-[20px] font-bold text-[#111111]">Refer & Earn</h1>

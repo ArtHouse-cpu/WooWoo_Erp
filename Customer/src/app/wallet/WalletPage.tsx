@@ -2,7 +2,7 @@ import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {
   ArrowDown,
-  ArrowLeft,
+  ChevronLeft,
   ArrowUp,
   ArrowUpRight,
   Calendar,
@@ -87,12 +87,60 @@ const earnCategoryLabels: Record<string, string> = {
   food: 'Food',
 };
 
+export type WalletTimeframe = 'today' | 'yesterday' | 'week' | 'month' | 'lifetime';
+
+export const TIMEFRAME_OPTIONS: Array<{id: WalletTimeframe; label: string}> = [
+  {id: 'today', label: 'Today'},
+  {id: 'yesterday', label: 'Yesterday'},
+  {id: 'week', label: 'This Week'},
+  {id: 'month', label: 'This Month'},
+  {id: 'lifetime', label: 'Lifetime'},
+];
+
+function isTxInTimeframe(dateStr?: string | null, timeframe: WalletTimeframe = 'lifetime'): boolean {
+  if (timeframe === 'lifetime') return true;
+  if (!dateStr) return false;
+
+  const txDate = new Date(dateStr);
+  const txTime = txDate.getTime();
+  if (isNaN(txTime)) return true;
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+
+  if (timeframe === 'today') {
+    return txTime >= startOfToday && txTime <= endOfToday;
+  }
+
+  if (timeframe === 'yesterday') {
+    const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+    const endOfYesterday = startOfToday - 1;
+    return txTime >= startOfYesterday && txTime <= endOfYesterday;
+  }
+
+  if (timeframe === 'week') {
+    const day = now.getDay();
+    const diffToMonday = (day + 6) % 7;
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday, 0, 0, 0, 0).getTime();
+    return txTime >= startOfWeek && txTime <= endOfToday;
+  }
+
+  if (timeframe === 'month') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).getTime();
+    return txTime >= startOfMonth && txTime <= endOfToday;
+  }
+
+  return true;
+}
+
 export default function WalletPage() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<WalletDashboard | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const [timeframe, setTimeframe] = useState<WalletTimeframe>('lifetime');
 
   const loadWallet = async () => {
     setLoading(true);
@@ -115,12 +163,21 @@ export default function WalletPage() {
     void loadWallet();
   }, []);
 
+  const currentTimeframeLabel =
+    TIMEFRAME_OPTIONS.find(t => t.id === timeframe)?.label || 'Lifetime';
+
+  const filteredTransactions = useMemo(() => {
+    const list = data?.transactions || [];
+    if (timeframe === 'lifetime') return list;
+    return list.filter(tx => isTxInTimeframe(tx.createdAt, timeframe));
+  }, [data?.transactions, timeframe]);
+
   const visibleTransactions = useMemo(
     () =>
       showAllTransactions
-        ? data?.transactions || []
-        : (data?.transactions || []).slice(0, 4),
-    [data?.transactions, showAllTransactions],
+        ? filteredTransactions
+        : filteredTransactions.slice(0, 4),
+    [filteredTransactions, showAllTransactions],
   );
 
   const copyValue = async (title: string, value: string) => {
@@ -227,50 +284,92 @@ export default function WalletPage() {
       ]
     : [];
 
-  const affiliateStats = data
-    ? [
-        {
-          id: 'earnings',
-          label: 'Earnings',
-          icon: Wallet,
-          value: formatInr(data.affiliateThisMonth.earnings),
-          color: 'text-[#7C3AED]',
-          bg: 'bg-[#F3E8FF]',
-        },
-        {
-          id: 'referrals',
-          label: 'Referrals',
-          icon: Users,
-          value: String(data.affiliateThisMonth.referrals),
-          color: 'text-[#22C55E]',
-          bg: 'bg-[#DCFCE7]',
-        },
-        {
-          id: 'revenue',
-          label: 'Revenue',
-          icon: FileText,
-          value: formatInr(data.affiliateThisMonth.revenue),
-          color: 'text-[#F97316]',
-          bg: 'bg-[#FFEDD5]',
-        },
-        {
-          id: 'conversion',
-          label: 'Conversion',
-          icon: Percent,
-          value: `${data.affiliateThisMonth.conversionRate}%`,
-          color: 'text-[#2563EB]',
-          bg: 'bg-[#DBEAFE]',
-        },
-      ]
-    : [];
+  const affiliateStats = useMemo(() => {
+    if (!data) return [];
 
-  const earnCategories = (data?.categories || [])
-    .filter(category => category.category in earnCategoryVisuals)
-    .map(category => ({
-      ...category,
-      label: earnCategoryLabels[category.category] || category.label,
-      ...earnCategoryVisuals[category.category],
-    }));
+    let earningsValue = data.affiliateThisMonth.earnings;
+    let referralsValue = data.affiliateThisMonth.referrals;
+    let revenueValue = data.affiliateThisMonth.revenue;
+    const conversionValue = `${data.affiliateThisMonth.conversionRate}%`;
+
+    if (timeframe === 'lifetime') {
+      earningsValue = data.summary.totalAffiliateEarned || data.affiliateThisMonth.earnings;
+    } else if (timeframe !== 'month') {
+      const credits = filteredTransactions.filter(
+        tx =>
+          tx.type === 'credit' &&
+          (tx.kind === 'commission' || tx.category === 'affiliate' || tx.category === 'invite'),
+      );
+      const totalEarned = credits.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+      earningsValue = totalEarned;
+      referralsValue = filteredTransactions.filter(tx => tx.category === 'invite').length;
+      revenueValue = totalEarned;
+    }
+
+    return [
+      {
+        id: 'earnings',
+        label: 'Earnings',
+        icon: Wallet,
+        value: formatInr(earningsValue),
+        color: 'text-[#7C3AED]',
+        bg: 'bg-[#F3E8FF]',
+      },
+      {
+        id: 'referrals',
+        label: 'Referrals',
+        icon: Users,
+        value: String(referralsValue),
+        color: 'text-[#22C55E]',
+        bg: 'bg-[#DCFCE7]',
+      },
+      {
+        id: 'revenue',
+        label: 'Revenue',
+        icon: FileText,
+        value: formatInr(revenueValue),
+        color: 'text-[#F97316]',
+        bg: 'bg-[#FFEDD5]',
+      },
+      {
+        id: 'conversion',
+        label: 'Conversion',
+        icon: Percent,
+        value: conversionValue,
+        color: 'text-[#2563EB]',
+        bg: 'bg-[#DBEAFE]',
+      },
+    ];
+  }, [data, timeframe, filteredTransactions]);
+
+  const earnCategories = useMemo(() => {
+    if (!data?.categories) return [];
+    if (timeframe === 'lifetime') {
+      return data.categories
+        .filter(category => category.category in earnCategoryVisuals)
+        .map(category => ({
+          ...category,
+          label: earnCategoryLabels[category.category] || category.label,
+          ...earnCategoryVisuals[category.category],
+        }));
+    }
+
+    return data.categories
+      .filter(category => category.category in earnCategoryVisuals)
+      .map(category => {
+        const catTxs = filteredTransactions.filter(
+          tx => tx.category === category.category && tx.type === 'credit',
+        );
+        const catSum = catTxs.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+        return {
+          ...category,
+          amount: catSum,
+          transactionCount: catTxs.length,
+          label: earnCategoryLabels[category.category] || category.label,
+          ...earnCategoryVisuals[category.category],
+        };
+      });
+  }, [data?.categories, timeframe, filteredTransactions]);
 
   const shareLinkDisplay = data
     ? data.referral.shareUrl.replace(/^https?:\/\//, '')
@@ -462,7 +561,38 @@ export default function WalletPage() {
 
         {/* 3. Affiliate Earnings */}
         <div className="space-y-2.5">
-          <h3 className="text-[15px] font-black text-[#111111]">Affiliate Earnings (This Month)</h3>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <h3 className="text-[15px] font-black text-[#111111]">Earnings</h3>
+              {timeframe !== 'lifetime' && (
+                <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-[#EA580C] border border-orange-200/60">
+                  {currentTimeframeLabel}
+                </span>
+              )}
+            </div>
+
+            {/* Timeframe Toggle Pills (today, yesterday, this week, this month, lifetime) */}
+            <div className="flex items-center gap-1 overflow-x-auto rounded-[14px] bg-[#F3F4F6] p-1 scrollbar-none">
+              {TIMEFRAME_OPTIONS.map(option => {
+                const isActive = timeframe === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setTimeframe(option.id)}
+                    className={`rounded-[10px] px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-bold transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                      isActive
+                        ? 'bg-white text-[#111111] shadow-[0_2px_6px_rgba(0,0,0,0.06)]'
+                        : 'text-[#6B7280] hover:text-[#111111]'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="rounded-[24px] border border-black/[0.05] bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
             <div className="grid grid-cols-4 divide-x divide-slate-100 py-2.5">
               {affiliateStats.map(item => (
@@ -483,8 +613,15 @@ export default function WalletPage() {
         {/* 4. Recent Transactions */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <h3 className="text-[15px] font-black text-[#111111]">Recent Transactions</h3>
-            {data.transactions.length > 4 ? (
+            <div className="flex items-center gap-2">
+              <h3 className="text-[15px] font-black text-[#111111]">
+                {timeframe === 'lifetime' ? 'Recent Transactions' : `${currentTimeframeLabel} Transactions`}
+              </h3>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                {filteredTransactions.length}
+              </span>
+            </div>
+            {filteredTransactions.length > 4 ? (
               <button
                 type="button"
                 onClick={() => setShowAllTransactions(value => !value)}
@@ -496,9 +633,22 @@ export default function WalletPage() {
           </div>
           <div className="rounded-[24px] border border-black/[0.05] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
             {visibleTransactions.length === 0 ? (
-              <p className="py-8 text-center text-[13px] text-[#6B7280]">
-                No transactions yet. Start earning by inviting friends!
-              </p>
+              <div className="py-8 text-center text-[#6B7280]">
+                <p className="text-[13px] font-medium">
+                  {timeframe === 'lifetime'
+                    ? 'No transactions yet. Start earning by inviting friends!'
+                    : `No transactions found for ${currentTimeframeLabel.toLowerCase()}.`}
+                </p>
+                {timeframe !== 'lifetime' && (
+                  <button
+                    type="button"
+                    onClick={() => setTimeframe('lifetime')}
+                    className="mt-2 text-xs font-bold text-[#EA580C] hover:underline cursor-pointer"
+                  >
+                    View all lifetime transactions
+                  </button>
+                )}
+              </div>
             ) : (
               <div className="divide-y divide-slate-100">
                 {visibleTransactions.map(tx => {
@@ -591,10 +741,10 @@ export default function WalletPage() {
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className="cursor-pointer text-[#111111] transition hover:opacity-80"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
                 aria-label="Go back"
               >
-                <ArrowLeft className="h-6 w-6" strokeWidth={2.25} />
+                <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
               </button>
               <h1 className="text-[24px] font-black text-[#111111]">Wallet</h1>
             </div>
@@ -610,10 +760,10 @@ export default function WalletPage() {
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                className="cursor-pointer text-[#111111] transition hover:opacity-80"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
                 aria-label="Go back"
               >
-                <ArrowLeft className="h-6 w-6" strokeWidth={2.25} />
+                <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
               </button>
               <h1 className="text-[22px] font-extrabold tracking-tight text-[#111111]">Wallet</h1>
             </div>

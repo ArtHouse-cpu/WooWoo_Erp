@@ -616,10 +616,10 @@ const handleDeleteProduct = async (id: string, name: string) => {
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-gray-100 bg-gray-50 text-gray-700 transition hover:bg-gray-100 active:scale-95 sm:h-10 sm:w-10"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
               aria-label="Go back"
             >
-              <ChevronLeft size={20} strokeWidth={2.5} />
+              <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
             </button>
 
             <div className="shrink-0">

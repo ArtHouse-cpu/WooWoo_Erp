@@ -11,52 +11,49 @@ function membershipLabel(type?: string) {
 
 export function HeroBanner() {
   const customer = useAuthStore(s => s.customer);
-  console.log('customer', customer);
   const firstName = (customer?.name || 'Member').split(' ')[0];
   const wallet = Number(customer?.walletBalance ?? 0);
-
-  // const wallet = customer?.walletBalance ?? customer?.affiliateBalance ?? 0;
 
   return (
     <motion.section
       initial={{opacity: 0, y: 16}}
       animate={{opacity: 1, y: 0}}
       transition={{duration: 0.45}}
-      className="rounded-[20px] border border-black/[0.05] bg-white py-3.5 px-4 shadow-[0_6px_24px_rgba(0,0,0,0.03)] sm:py-4 sm:px-5"
+      className="rounded-[18px] border border-black/[0.05] bg-white py-2.5 px-3.5 shadow-[0_4px_20px_rgba(0,0,0,0.025)] sm:py-3 sm:px-4"
     >
-      <div className="grid grid-cols-2 items-center gap-3 divide-x divide-slate-100">
+      <div className="grid grid-cols-2 items-center gap-2.5 divide-x divide-slate-100">
         {/* Left Side: Greeting & Membership Badge */}
-        <div className="flex flex-col justify-center space-y-0.5 pr-2">
-          <h1 className="text-[18px] font-extrabold tracking-tight text-[#111111] sm:text-[22px] leading-tight">
+        <div className="flex flex-col justify-center space-y-0.5 pr-1.5">
+          <h1 className="text-[15px] font-extrabold tracking-tight text-[#111111] sm:text-[19px] leading-tight">
             Hi, {firstName} 👋
           </h1>
-          <div className="w-fit -mt-1">
-  <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF4FF] px-2.5 py-0.5 text-[10.5px] font-bold text-[#2563EB]">
-    <span className="text-[11px] leading-none">★</span>
-    {membershipLabel(customer?.membershipType)}
-  </span>
-</div>
+          <div className="w-fit">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF4FF] px-2 py-0.5 text-[9px] sm:text-[9.5px] font-bold text-[#2563EB]">
+              <span className="text-[9.5px] leading-none">★</span>
+              {membershipLabel(customer?.membershipType)}
+            </span>
+          </div>
         </div>
 
         {/* Right Side: Wallet details */}
-        <div className="relative pl-4 sm:pl-5 flex items-center justify-between">
+        <div className="relative pl-3 sm:pl-4 flex items-center justify-between">
           <div>
-            <p className="text-[10.5px] font-semibold text-[#9CA3AF] tracking-wide">Wallet Balance</p>
-            <p className="text-[21px] font-black tracking-tight text-[#111111] tabular-nums sm:text-[24px] leading-tight mt-0.5">
-              <span className="text-[19px] font-bold sm:text-[21px] mr-0.5">₹</span>
+            <p className="text-[9.5px] font-semibold text-[#9CA3AF] tracking-wide">Wallet Balance</p>
+            <p className="text-[18px] font-black tracking-tight text-[#111111] tabular-nums sm:text-[21px] leading-tight mt-0.5">
+              <span className="text-[16px] font-bold sm:text-[18px] mr-0.5">₹</span>
               {wallet.toLocaleString('en-IN', {minimumFractionDigits: 0})}
             </p>
           </div>
 
-          <div className="flex flex-col items-end justify-between space-y-2 text-right">
+          <div className="flex flex-col items-end justify-between space-y-1.5 text-right">
             <div className="text-[#9CA3AF] hover:text-[#4B5563] transition-colors">
-              <Wallet className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={1.5} />
+              <Wallet className="h-4 w-4 sm:h-4.5 sm:w-4.5" strokeWidth={1.5} />
             </div>
             <Link
               to="/wallet"
               className="inline-flex items-center gap-1 text-[11px] font-extrabold text-[#EA580C] transition hover:text-[#C2410C]"
             >
-             <ArrowRight className="h-5 w-5" strokeWidth={3.5} />
+              <ArrowRight className="h-4 w-4" strokeWidth={3} />
             </Link>
           </div>
         </div>

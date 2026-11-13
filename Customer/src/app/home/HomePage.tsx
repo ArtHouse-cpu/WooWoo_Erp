@@ -32,9 +32,9 @@ export default function HomePage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [programsOpen, setProgramsOpen] = useState(false);
-  const [selectedProgram, setSelectedProgram] = useState<'csp' | 'hap'>('csp');
+  const [selectedProgram, setSelectedProgram] = useState<'all' | 'csp' | 'hap' | 'cvp'>('all');
 
-  const handleProgramClick = (tab: 'csp' | 'hap') => {
+  const handleProgramClick = (tab: 'all' | 'csp' | 'hap' | 'cvp') => {
     setSelectedProgram(tab);
     setProgramsOpen(true);
   };
@@ -61,7 +61,7 @@ export default function HomePage() {
     } else if (id === 'cafe') {
       setWoofooOpen(true);
     } else if (id === 'programs') {
-      handleProgramClick('csp');
+      handleProgramClick('all');
     }
   };
  
