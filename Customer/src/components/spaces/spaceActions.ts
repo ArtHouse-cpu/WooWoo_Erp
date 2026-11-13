@@ -1,6 +1,65 @@
 import type {SpaceCard} from '../../services/space.service';
+import {Crown, Gem, GraduationCap, Star, User} from 'lucide-react';
 
 export const SPACE_WHATSAPP = '918073988123';
+
+export interface MembershipTier {
+  id: string;
+  name: string;
+  discountPercent: number;
+  cashbackPercent: number;
+  icon: typeof User;
+  iconBg: string;
+  iconColor: string;
+}
+
+export const MEMBERSHIP_TIERS: MembershipTier[] = [
+  {
+    id: 'general',
+    name: 'General Membership',
+    discountPercent: 5,
+    cashbackPercent: 1,
+    icon: User,
+    iconBg: 'bg-[#F3E8FF]',
+    iconColor: 'text-[#7C3AED]',
+  },
+  {
+    id: 'special',
+    name: 'Special Membership',
+    discountPercent: 15,
+    cashbackPercent: 1,
+    icon: Star,
+    iconBg: 'bg-[#DBEAFE]',
+    iconColor: 'text-[#2563EB]',
+  },
+  {
+    id: 'premium',
+    name: 'Premium Membership',
+    discountPercent: 40,
+    cashbackPercent: 2,
+    icon: Crown,
+    iconBg: 'bg-[#FEF3C7]',
+    iconColor: 'text-[#D97706]',
+  },
+  {
+    id: 'elite',
+    name: 'Elite Membership',
+    discountPercent: 40,
+    cashbackPercent: 2,
+    icon: Gem,
+    iconBg: 'bg-[#F3E8FF]',
+    iconColor: 'text-[#9333EA]',
+  },
+  {
+    id: 'junior',
+    name: 'Junior Membership',
+    discountPercent: 15,
+    cashbackPercent: 1,
+    icon: GraduationCap,
+    iconBg: 'bg-[#DCFCE7]',
+    iconColor: 'text-[#16A34A]',
+  },
+];
 
 export function formatInr(value: number) {
   return Math.max(0, Number(value) || 0).toLocaleString('en-IN', {
@@ -8,8 +67,9 @@ export function formatInr(value: number) {
   });
 }
 
-export function spaceShareUrl(spaceId: string) {
-  return `${window.location.origin}/spaces/space/${encodeURIComponent(spaceId)}`;
+export function spaceShareUrl(spaceId: string, membershipId?: string | null) {
+  const base = `${window.location.origin}/spaces/space/${encodeURIComponent(spaceId)}`;
+  return membershipId ? `${base}?membership=${encodeURIComponent(membershipId)}` : base;
 }
 
 export function spacePriceLine(space: Pick<SpaceCard, 'weekdayPrice' | 'weekendPrice' | 'fromPrice'>) {
@@ -41,22 +101,36 @@ export function spaceQueryUrl(
 
 export function spaceBookingUrl(
   space: Pick<SpaceCard, 'id' | 'name' | 'spaceType' | 'weekdayPrice' | 'weekendPrice' | 'fromPrice'> & {imageUrl?: string | null},
+  membershipTier?: MembershipTier | null,
 ) {
+  const basePrice = space.weekdayPrice ?? space.fromPrice;
+  const unitDiscount = membershipTier ? Math.round(basePrice * (membershipTier.discountPercent / 100)) : 0;
+  const finalPrice = Math.max(0, basePrice - unitDiscount);
+
+  const membershipLine = membershipTier
+    ? `Membership: ${membershipTier.name} (${membershipTier.discountPercent}% OFF · Save ₹${formatInr(unitDiscount)}/hr)`
+    : '';
+
+  const priceLine = membershipTier
+    ? `Price: ₹${formatInr(finalPrice)}/hr (Base: ${spacePriceLine(space)})`
+    : `Price: ${spacePriceLine(space)}`;
+
   const text = [
     'Hi, I would like to book a space at WooWoo Art House.',
     space.imageUrl ? `Image: ${space.imageUrl}` : '',
     `Product name: ${space.name}`,
-    `Price: ${spacePriceLine(space)}`,
+    membershipLine,
+    priceLine,
     space.spaceType ? `Type: ${space.spaceType}` : '',
-    `Link: ${spaceShareUrl(space.id)}`,
+    `Link: ${spaceShareUrl(space.id, membershipTier?.id)}`,
   ]
     .filter(Boolean)
     .join('\n');
   return `https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent(text)}`;
 }
 
-export async function copySpaceLink(spaceId: string) {
-  const url = spaceShareUrl(spaceId);
+export async function copySpaceLink(spaceId: string, membershipId?: string | null) {
+  const url = spaceShareUrl(spaceId, membershipId);
   await navigator.clipboard.writeText(url);
   return url;
 }
