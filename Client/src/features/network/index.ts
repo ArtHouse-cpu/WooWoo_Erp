@@ -4,6 +4,7 @@ export { default as PartnerScreen } from "./pages/PartnerScreen";
 export { default as GuestScreen } from "./pages/GuestScreen";
 export { default as CspScreen } from "./pages/CspScreen";
 export { default as HapScreen } from "./pages/HapScreen";
+export { default as CvpScreen } from "./pages/CvpScreen";
 export { default as LeadScreen } from "./pages/LeadScreen";
 export { default as CreateLeadModal } from "./components/CreateLeadModal";
 export { default as LeadDetailsModal } from "./components/LeadDetailsModal";

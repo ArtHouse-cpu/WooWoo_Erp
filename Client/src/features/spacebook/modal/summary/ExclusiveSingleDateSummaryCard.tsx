@@ -48,6 +48,7 @@ export type ExclusiveSingleDateSummaryCardProps = {
   dueAmount?: number | null;
   storedGrandTotal?: number;
   storedSubTotal?: number;
+  paymentMethod?: string;
   /** Shown above the payable figure. Drafts use "Draft Amount". */
   amountLabel?: string;
 };
@@ -77,6 +78,7 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
   dueAmount,
   storedGrandTotal = 0,
   storedSubTotal = 0,
+  paymentMethod = "",
   amountLabel = "Grand Total",
 }) => {
   /* --------------------------------
@@ -464,6 +466,7 @@ export const ExclusiveSingleDateSummaryCard: React.FC<
               payPrice={payPrice}
               paidPrice={paidPrice}
               pendingPrice={pendingPrice}
+              paymentMethod={paymentMethod}
             />
           ) : null}
         </div>

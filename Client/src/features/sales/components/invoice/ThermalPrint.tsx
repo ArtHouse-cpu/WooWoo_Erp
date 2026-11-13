@@ -42,6 +42,9 @@ export type ThermalPrintProps = {
   extraCharges?: Array<{ label: string; amount: number }>;
   /** Space quotation: date, timing, and hours */
   bookingDetails?: Array<{ label: string; value: string }>;
+  /** Space offer rule, for example Book 2 get 1hr Free. */
+  offerLabel?: string;
+  offerDiscount?: number;
 };
 
 const YELLOW = "#d1d0d0";
@@ -317,6 +320,8 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
   totalQty,
   extraCharges = [],
   bookingDetails = [],
+  offerLabel = "",
+  offerDiscount = 0,
 }) => {
   const amountInWords = `INR ${rupeesToWords(Math.round(finalAmount))} Rupees Only`;
   const title = String(documentType || "INVOICE").toUpperCase();
@@ -324,9 +329,14 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
   const numberLabel = isQuotation ? "Quotation #" : "Invoice #";
   const dateLabel = isQuotation ? "Quotation Date" : "Invoice Date";
   const billedByLabel = isQuotation ? "Quoted By" : "Billed By";
+  const safeOfferDiscount = Math.max(0, Number(offerDiscount) || 0);
   const showSplitDiscounts =
     isQuotation &&
-    (productDiscountTotal > 0 || membershipDiscountTotal > 0 || couponDiscount > 0);
+    (productDiscountTotal > 0 ||
+      membershipDiscountTotal > 0 ||
+      couponDiscount > 0 ||
+      safeOfferDiscount > 0);
+  const otherDiscount = Math.max(0, discountTotal - safeOfferDiscount);
   const membershipLabel = (() => {
     const value = String(membershipType || "").trim();
     return value.toLowerCase() === "none" ? "Visitor" : value;
@@ -700,20 +710,46 @@ export const ThermalPrint: React.FC<ThermalPrintProps> = ({
                     <span>- ₹ {formatMoney(couponDiscount)}</span>
                   </div>
                 )}
+                {safeOfferDiscount > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <span>Offer{offerLabel ? ` (${offerLabel})` : ""}</span>
+                    <span>- ₹ {formatMoney(safeOfferDiscount)}</span>
+                  </div>
+                )}
               </>
             ) : (
-              discountTotal > 0 && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "6px",
-                  }}
-                >
-                  <span>Discount</span>
-                  <span>- ₹ {formatMoney(discountTotal)}</span>
-                </div>
-              )
+              <>
+                {safeOfferDiscount > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <span>Offer{offerLabel ? ` (${offerLabel})` : ""}</span>
+                    <span>- ₹ {formatMoney(safeOfferDiscount)}</span>
+                  </div>
+                )}
+                {otherDiscount > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <span>Discount</span>
+                    <span>- ₹ {formatMoney(otherDiscount)}</span>
+                  </div>
+                )}
+              </>
             )}
             {cashbackAmount > 0 && (
               <div

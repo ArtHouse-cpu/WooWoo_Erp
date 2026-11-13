@@ -57,6 +57,7 @@ export type CoworkingSummaryCardProps = {
   dueAmount?: number | null;
   storedGrandTotal?: number;
   storedSubTotal?: number;
+  paymentMethod?: string;
 };
 
 /* ----------------------------------
@@ -89,6 +90,7 @@ export const CoworkingSummaryCard: React.FC<
   dueAmount,
   storedGrandTotal = 0,
   storedSubTotal = 0,
+  paymentMethod = "",
 }) => {
   /* ----------------------------------
      Safe values
@@ -545,6 +547,7 @@ export const CoworkingSummaryCard: React.FC<
               payPrice={payPrice}
               paidPrice={paidPrice}
               pendingPrice={pendingPrice}
+              paymentMethod={paymentMethod}
             />
           ) : null}
 

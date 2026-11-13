@@ -6,11 +6,13 @@ export default function PaymentAmounts({
   payPrice,
   paidPrice,
   pendingPrice,
+  paymentMethod,
 }: {
   totalPrice: number;
   payPrice: number;
   paidPrice: number;
   pendingPrice: number;
+  paymentMethod?: string;
 }) {
   return (
     <div className="space-y-1.5 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
@@ -30,6 +32,12 @@ export default function PaymentAmounts({
         <div className="flex items-center justify-between border-t border-slate-200 pt-1.5 font-semibold text-amber-700">
           <span>Pending price</span>
           <span>{inr(pendingPrice)}</span>
+        </div>
+      ) : null}
+      {paymentMethod ? (
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-1.5 text-slate-600">
+          <span>Payment method</span>
+          <span className="text-right font-semibold text-slate-900">{paymentMethod}</span>
         </div>
       ) : null}
     </div>

@@ -1,4 +1,8 @@
 import type { ThermalPrintProps } from "@/features/sales/components/invoice/ThermalPrint";
+import {
+  spaceOfferDetailRows,
+  spaceOfferFromSnapshot,
+} from "@/features/spacebook/spaceOfferLabel";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
@@ -86,12 +90,16 @@ export function mapQuotationToThermalPrintProps(
     (sum, it) => sum + Number(it.discount || 0),
     0,
   );
+  const offer = spaceOfferFromSnapshot(
+    q.spaceOffer as Parameters<typeof spaceOfferFromSnapshot>[0],
+  );
+  const offerDiscount = offer?.discount || 0;
   const headerLineDiscount = Math.max(0, num(q.discountTotal) || lineDiscount);
   const productDiscountTotal =
     lineProductDiscount > 0
       ? lineProductDiscount
       : membershipDiscountTotal > 0
-        ? Math.max(0, headerLineDiscount - membershipDiscountTotal)
+        ? Math.max(0, headerLineDiscount - membershipDiscountTotal - offerDiscount)
         : 0;
   const discountTotal = Math.max(0, headerLineDiscount + couponDiscount);
   const cashbackAmount = Math.max(
@@ -140,13 +148,19 @@ export function mapQuotationToThermalPrintProps(
     totalDue: finalAmount,
     totalQty,
     extraCharges,
-    bookingDetails: Array.isArray(q.bookingDetails)
-      ? (q.bookingDetails as Array<{ label?: string; value?: string }>)
-          .map((row) => ({
-            label: String(row?.label || "").trim(),
-            value: String(row?.value || "").trim(),
-          }))
-          .filter((row) => row.label && row.value)
-      : [],
+    bookingDetails: (() => {
+      const stored = Array.isArray(q.bookingDetails)
+        ? (q.bookingDetails as Array<{ label?: string; value?: string }>)
+            .map((row) => ({
+              label: String(row?.label || "").trim(),
+              value: String(row?.value || "").trim(),
+            }))
+            .filter((row) => row.label && row.value)
+        : [];
+      const hasOffer = stored.some((row) => row.label.toLowerCase() === "offer");
+      return offer && !hasOffer ? [...stored, ...spaceOfferDetailRows(offer)] : stored;
+    })(),
+    offerLabel: offer?.ruleLabel || "",
+    offerDiscount,
   };
 }

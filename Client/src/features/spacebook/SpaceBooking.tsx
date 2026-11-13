@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
+import { spaceOfferFromSnapshot } from "./spaceOfferLabel";
 import CreateBookingDetailsModal, {
   bookingCustomerDraft,
   type BookingFormPayload,
@@ -177,6 +178,36 @@ const bookingOffer = (booking: SpaceBookingPayload): BookingOfferSnapshot | null
   return { ...snap, discount, freeHours };
 };
 
+const paymentMethodLabel = (mode?: string) => {
+  const value = String(mode || "").trim();
+  if (!value || value.toLowerCase() === "draft") return "";
+  const labels: Record<string, string> = {
+    cash: "Cash",
+    upi: "UPI",
+    card: "Card",
+    wallet: "Wallet",
+    bank: "Bank",
+    credit: "Credit",
+    multi: "Split payment",
+  };
+  return labels[value.toLowerCase()] || value;
+};
+
+const bookingPaymentMethod = (booking: SpaceBookingPayload) => {
+  if (booking.status === "Draft") return "Not paid";
+  const recorded = (booking.payments || [])
+    .filter((row) => row.kind === "payment" && Number(row.amount || 0) > 0)
+    .map((row) => {
+      const label = paymentMethodLabel(row.mode || row.walletType);
+      return label
+        ? `${label} · ₹${Number(row.amount || 0).toLocaleString("en-IN")}`
+        : "";
+    })
+    .filter(Boolean);
+  if (recorded.length) return recorded.join(", ");
+  return paymentMethodLabel(booking.paymentMode) || "Not recorded";
+};
+
 const offerRuleText = (offer: BookingOfferSnapshot) => {
   const minimum = Number(offer.minimumHours || 0);
   const free = Number(offer.freeHours || 0);
@@ -240,6 +271,7 @@ const BookingSummaryRenderer = ({
     dueAmount: booking.dueAmount,
     storedGrandTotal: Number(booking.grandTotal) || 0,
     storedSubTotal: Number(booking.subTotal) || Number(snap?.subTotal) || 0,
+    paymentMethod: bookingPaymentMethod(booking),
   };
 
   if (isCoworking) {
@@ -771,30 +803,40 @@ const SpaceBook = () => {
         : `Manual Discount (Flat): -₹${payment.manualDiscount.discountAmount}`
       : "";
 
+    const offer = spaceOfferFromSnapshot(
+      pendingCheckout.offerSnapshot ??
+        (pendingCheckout.offerDiscount
+          ? {
+              applied: true,
+              offerName: "Space offer",
+              discount: pendingCheckout.offerDiscount,
+            }
+          : null),
+    );
+    const offerDiscount = offer?.discount || 0;
+
     const bookingNotes = [
       pendingCheckout.notes,
       `Space booking · ${pendingCheckout.spaceName || "Space"}`,
       `${formatDateDisplay(pendingCheckout.bookingDate)} · ${pendingCheckout.startTime}-${pendingCheckout.endTime}`,
       manualDiscountDesc,
+      offer
+        ? `${offer.ruleLabel}${
+            offer.discount > 0
+              ? ` · Offer discount ₹${Math.round(offer.discount).toLocaleString("en-IN")}`
+              : ""
+          }`
+        : "",
       payment.notes,
     ]
       .map((v) => String(v || "").trim())
       .filter(Boolean)
       .join(" | ");
 
-    const lineTotal = Math.max(0, Number(pendingCheckout.lineTotal ?? 0));
     const couponDiscount = Number(payment.coupon?.discountAmount ?? 0);
     const referralDiscount = Number(payment.referral?.discountAmount ?? 0);
     const membershipDiscount = Number(payment.membershipDiscount ?? 0);
     const manualDiscount = Number(payment.manualDiscount?.discountAmount ?? payment.manualDiscountAmount ?? 0);
-    const offerDiscount = Math.max(
-      0,
-      Number(
-        pendingCheckout.offerDiscount ??
-          pendingCheckout.summarySnapshot?.offerDiscount ??
-          0,
-      ),
-    );
     const totalDiscount =
       couponDiscount + referralDiscount + membershipDiscount + manualDiscount + offerDiscount;
 
@@ -920,6 +962,7 @@ const SpaceBook = () => {
         cashbackTotal: payment.cashbackTotal,
         membershipDiscount: payment.membershipDiscount,
         membershipType: pendingCheckout.membershipType || undefined,
+        spaceOffer: offer,
         activityType: "Space Booking",
         createdBy: {
           m_staff_id: staff.m_staff_id,
@@ -944,6 +987,7 @@ const SpaceBook = () => {
             invoiceId,
             invoiceCode,
             grandTotal: payment.finalAmount,
+            offerDiscount,
             paidAmount: payment.paymentBreakdown.paidAmount,
             dueAmount: payment.paymentBreakdown.dueAmount,
             paymentStatus: payment.paymentStatus,
@@ -1040,6 +1084,7 @@ const SpaceBook = () => {
 
       const today = getBusinessToday();
       const lineTotal = Math.max(0, Number(payload.lineTotal ?? 0));
+      const offer = spaceOfferFromSnapshot(payload.offerSnapshot);
       const hours = Math.max(0, Number(payload.durationHours ?? 0));
       const nameParts = [
         payload.spaceName || "Space Booking",
@@ -1057,7 +1102,7 @@ const SpaceBook = () => {
           invoiceDate: today,
           dueDate: today,
           salesPersonName: staff.m_staff_name || "Space Booking",
-          notes: payload.notes || "Space Booking Draft",
+          notes: [payload.notes, offer?.ruleLabel].filter(Boolean).join(" | ") || "Space Booking Draft",
           items: [
             {
               productName: nameParts,
@@ -1083,6 +1128,7 @@ const SpaceBook = () => {
             changeAmount: 0,
           },
           pendingAmount: lineTotal,
+          spaceOffer: offer ? { ...offer, discount: 0 } : null,
           activityType: "Space Booking",
           createdBy: {
             m_staff_id: staff.m_staff_id,
@@ -2296,6 +2342,12 @@ const SpaceBook = () => {
                     : Number(selectedBooking.paidAmount || 0) > 0
                       ? "Partially Paid"
                       : "Pending"}
+                </p>
+                <p>
+                  Payment method:{" "}
+                  <span className="font-semibold text-slate-800">
+                    {bookingPaymentMethod(selectedBooking)}
+                  </span>
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button

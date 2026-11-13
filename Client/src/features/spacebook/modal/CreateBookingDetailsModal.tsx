@@ -36,6 +36,7 @@ import Swal from "sweetalert2";
 // Optional: import jsPDF from "jspdf"; // If you want PDF download
 import { toast } from "react-toastify";
 import { downloadInvoicePdf } from "@/utils/pdfGenerator";
+import { spaceOfferFromSnapshot } from "../spaceOfferLabel";
 import { useAppSelector } from "@/store/hooks";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
@@ -4333,6 +4334,15 @@ const CreateBookingDetailsModal = ({
                     toast.warning("Add a customer and at least one space, service, or food item.");
                     return;
                   }
+                  const offer =
+                    !isDurationPlan && dateMode !== "multiple"
+                      ? spaceOfferFromSnapshot(liveOffer)
+                      : null;
+                  const offerOff = offer?.discount || 0;
+                  const lineSum = items.reduce(
+                    (sum, item) => sum + Number(item.qty) * Number(item.unitPrice),
+                    0,
+                  );
                   const bookingDetails = isDurationPlan
                     ? [
                         {
@@ -4425,12 +4435,13 @@ const CreateBookingDetailsModal = ({
                       membershipType: membershipType !== "none" ? membershipType : "",
                       membershipDiscount: discountAmount,
                       cashbackTotal: cashbackAmount,
-                      subTotal: pricedSubTotal,
-                      discountTotal: discountAmount,
-                      grandTotal: Math.max(0, pricedSubTotal - discountAmount),
+                      subTotal: lineSum,
+                      discountTotal: discountAmount + offerOff,
+                      grandTotal: Math.max(0, lineSum - discountAmount - offerOff),
                       items,
                       notes,
                       bookingDetails,
+                      spaceOffer: offer,
                     },
                     "QUOTATION",
                   )

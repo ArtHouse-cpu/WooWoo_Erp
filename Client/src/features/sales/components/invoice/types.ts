@@ -82,6 +82,7 @@ export type InvoicePdfInput = {
     m_staff_name?: string | null;
   };
   notes?: string;
+  bookingDetails?: Array<{ label?: string; value?: string }>;
   items?: InvoicePdfItem[];
   subTotal?: number;
   grandTotal?: number;
@@ -95,6 +96,15 @@ export type InvoicePdfInput = {
     discountValue?: number;
     discountAmount?: number;
   };
+  /** Space booking offer stored on the invoice. */
+  spaceOffer?: {
+    offerName?: string;
+    ruleLabel?: string;
+    minimumHours?: number;
+    freeHours?: number;
+    chargeableHours?: number;
+    discount?: number;
+  } | null;
   /** Aggregate tax if API sends it */
   taxTotal?: number;
   /** Default GST % when line items omit tax */

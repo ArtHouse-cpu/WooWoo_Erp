@@ -21,6 +21,7 @@ import {
   CustomerScreen,
   CspScreen,
   HapScreen,
+  CvpScreen,
   GuestScreen,
   PartnerScreen,
   VendorScreen,
@@ -53,7 +54,7 @@ import SubscriptionScreen from "@/features/sales/pages/SubscriptionScreen";
 import PurchaseScreen from "@/features/purchase/pages/PurchaseScreen";
 import CreatePurchaseOrderScreen from "@/features/purchase/pages/CreatePurchaseOrderScreen";
 import { WalletScreen } from "@/features/wallet";
-import { AffiliateProgramScreen } from "@/features/affiliate";
+import { AffiliateSectionScreen } from "@/features/affiliate";
 import { AccessScreen } from "@/features/access/components/pages";
 import CreateSpacesScreen from "@/features/catalogue/pages/CreateSpacesScreen";
 import CreateFoodScreen from "@/features/catalogue/pages/CreateFoodScreen";
@@ -92,6 +93,7 @@ export const router = createBrowserRouter([
           { path: "customers", element: <CustomerScreen /> },
           { path: "csp", element: <CspScreen /> },
           { path: "hap", element: <HapScreen /> },
+          { path: "cvp", element: <CvpScreen /> },
           { path: "leads", element: <LeadScreen /> },
           { path: "partners", element: <PartnerScreen /> },
           { path: "guests", element: <GuestScreen /> },
@@ -139,7 +141,7 @@ export const router = createBrowserRouter([
           { path: "coupons", element: <CouponsScreen /> },
           { path: "set-offers", element: <SetOffersScreen /> },
           { path: "buy-one-get-one", element: <BuyOneGetOneScreen /> },
-          { path: "affiliate-program", element: <AffiliateProgramScreen /> },
+          { path: "affiliate-program", element: <AffiliateSectionScreen /> },
           { path: "access", element: <AccessScreen /> },
           { path: "spaces", element: <CreateSpacesScreen /> },
           { path: "foods", element: <CreateFoodScreen /> },

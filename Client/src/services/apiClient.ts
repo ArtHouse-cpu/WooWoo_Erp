@@ -197,6 +197,15 @@ export type CreateInvoicePayload = {
   membershipType?: string;
   /** e.g. Food Bill | Space Booking | Invoice */
   activityType?: string;
+  /** Space booking offer printed on the invoice PDF. */
+  spaceOffer?: {
+    offerName: string;
+    ruleLabel: string;
+    minimumHours: number;
+    freeHours: number;
+    chargeableHours: number;
+    discount: number;
+  } | null;
   createdBy?: {
     m_staff_id?: string | null;
     m_staff_name?: string | null;
@@ -2423,6 +2432,7 @@ export type SpaceBookingPayload = {
   subTotal?: number;
   discountAmount?: number;
   cashbackAmount?: number;
+  offerDiscount?: number;
   selectedServices?: Array<{
     label: string;
     price: number;

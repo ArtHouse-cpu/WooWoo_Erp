@@ -46,6 +46,7 @@ export type ExclusiveMultipleDatesSummaryCardProps = {
   dueAmount?: number | null;
   storedGrandTotal?: number;
   storedSubTotal?: number;
+  paymentMethod?: string;
 };
 
 /* =========================================
@@ -70,6 +71,7 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
   dueAmount,
   storedGrandTotal = 0,
   storedSubTotal = 0,
+  paymentMethod = "",
 }) => {
   /* =========================================
      Safe Values
@@ -649,6 +651,7 @@ export const ExclusiveMultipleDatesSummaryCard: React.FC<
               payPrice={payPrice}
               paidPrice={paidPrice}
               pendingPrice={pendingPrice}
+              paymentMethod={paymentMethod}
             />
           ) : null}
 

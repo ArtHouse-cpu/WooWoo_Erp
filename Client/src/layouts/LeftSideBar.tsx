@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
- Gift,
-Sparkles ,
+  Gift,
+  Sparkles,
   ChevronDown,
   ShoppingCart,
   Wallet,
@@ -24,7 +24,7 @@ Sparkles ,
   MapPin,
   UtensilsCrossed,
   BadgeIndianRupee,
-  CircleDollarSign ,
+  CircleDollarSign,
   CalendarCheck,
   ClipboardList,
   type LucideIcon,
@@ -77,9 +77,24 @@ const MENU_GROUPS: MenuGroup[] = [
     label: "Booking",
     icon: BookOpenText,
     submenu: [
-      { name: "bookingOverView", label: "Bookings Overview", icon: ClipboardList, path: "/bookingOverView" },
-      { name: "spaceBooking", label: "Space Booking", icon: CalendarCheck  , path: "/spaceBooking" },
-      { name: "allBookings", label: "Full Bookings", icon: ChartNoAxesCombined, path: "/allBookings" },
+      {
+        name: "bookingOverView",
+        label: "Bookings Overview",
+        icon: ClipboardList,
+        path: "/bookingOverView",
+      },
+      {
+        name: "spaceBooking",
+        label: "Space Booking",
+        icon: CalendarCheck,
+        path: "/spaceBooking",
+      },
+      {
+        name: "allBookings",
+        label: "Full Bookings",
+        icon: ChartNoAxesCombined,
+        path: "/allBookings",
+      },
     ],
   },
   {
@@ -216,29 +231,13 @@ const MENU_GROUPS: MenuGroup[] = [
     submenu: [
       { name: "vendor", label: "Vendors", icon: Users, path: "/vendors" },
 
-      {name: "lead",
-         label : "Leads",
-          icon: Users ,
-           path:"/leads" },
-     
+      { name: "lead", label: "Leads", icon: Users, path: "/leads" },
+
       {
         name: "customers",
         label: "Customers",
         icon: Users,
         path: "/customers",
-      },
-
-      {
-        name: "csp",
-        label: "CSP",
-        icon: Users,
-        path: "/csp",
-      },
-      {
-        name: "hap",
-        label: "HAP",
-        icon: Users,
-        path: "/hap",
       },
     ],
   },
@@ -252,6 +251,24 @@ const MENU_GROUPS: MenuGroup[] = [
         label: "Affiliate",
         icon: Users,
         path: "/affiliate-program",
+      },
+          {
+        name: "csp",
+        label: "CSP",
+        icon: Users,
+        path: "/csp",
+      },
+      // {
+      //   name: "hap",
+      //   label: "HAP",
+      //   icon: Users,
+      //   path: "/hap",
+      // },
+      {
+        name: "cvp",
+        label: "CVP",
+        icon: Users,
+        path: "/cvp",
       },
     ],
   },
@@ -304,9 +321,18 @@ const MENU_GROUPS: MenuGroup[] = [
         path: "/access",
       },
       { name: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
-  { name: "staffCommission", label: "Staff Commission", icon: CircleDollarSign , path: "/staffCommission" },
-  { name: "expenses", label: "Expense", icon: BadgeIndianRupee, path: "/expenses" },
-
+      {
+        name: "staffCommission",
+        label: "Staff Commission",
+        icon: CircleDollarSign,
+        path: "/staffCommission",
+      },
+      {
+        name: "expenses",
+        label: "Expense",
+        icon: BadgeIndianRupee,
+        path: "/expenses",
+      },
 
       {
         name: "Announcements",
@@ -327,9 +353,13 @@ const TOP_LINKS: TopLink[] = [
   // { key: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
   // { key: "giftcard", label: "Gift Card", icon: Gift , path: "/giftcard" },
   // { key: "coupons", label: "Coupons", icon: Percent, path: "/coupons" },
-  { key: "exhibition", label: "Exhibition", icon: Sparkles, path: "/exhibitiontable" },
+  {
+    key: "exhibition",
+    label: "Exhibition",
+    icon: Sparkles,
+    path: "/exhibitiontable",
+  },
   // { key: "access", label: "Access", icon: ShieldUser, path: "/access" },
-
 ];
 
 /**
@@ -361,7 +391,9 @@ export default function LeftSideBar({
   const location = useLocation();
   const currentPath = location.pathname;
 
-  const [openSubCategories, setOpenSubCategories] = useState<Record<string, boolean>>({
+  const [openSubCategories, setOpenSubCategories] = useState<
+    Record<string, boolean>
+  >({
     sales: true,
     purchases: false,
   });
@@ -374,8 +406,17 @@ export default function LeftSideBar({
   };
 
   useEffect(() => {
-    const isSalesRoute = ["/pos", "/creditnotes", "/subscriptions", "/quotations"].includes(currentPath);
-    const isPurchaseRoute = ["/purchase", "/purchase-orders", "/debit-notes"].includes(currentPath);
+    const isSalesRoute = [
+      "/pos",
+      "/creditnotes",
+      "/subscriptions",
+      "/quotations",
+    ].includes(currentPath);
+    const isPurchaseRoute = [
+      "/purchase",
+      "/purchase-orders",
+      "/debit-notes",
+    ].includes(currentPath);
 
     if (isSalesRoute || isPurchaseRoute) {
       setActiveMenu("bills");
@@ -464,12 +505,14 @@ export default function LeftSideBar({
 
   return (
     <div
-      className={`flex h-full max-h-dvh flex-col border-r border-gray-100 bg-white/95 shadow-sm backdrop-blur transition-all duration-300 ${mobile ? "w-full" : isCollapsed ? "w-16" : "w-64"
-        }`}
+      className={`flex h-full max-h-dvh flex-col border-r border-gray-100 bg-white/95 shadow-sm backdrop-blur transition-all duration-300 ${
+        mobile ? "w-full" : isCollapsed ? "w-16" : "w-64"
+      }`}
     >
       <div
-        className={`flex items-center justify-between border-b border-gray-100 px-3 py-3 ${mobile ? "" : ""
-          }`}
+        className={`flex items-center justify-between border-b border-gray-100 px-3 py-3 ${
+          mobile ? "" : ""
+        }`}
       >
         {!isCollapsed && (
           <span className="text-sm font-semibold tracking-wide text-gray-500 uppercase">
@@ -478,11 +521,16 @@ export default function LeftSideBar({
         )}
         {!mobile ? (
           <button
-            className={`rounded-lg p-2 text-gray-600 transition-all hover:bg-gray-100 hover:text-black ${isCollapsed ? "mx-auto" : ""
-              }`}
+            className={`rounded-lg p-2 text-gray-600 transition-all hover:bg-gray-100 hover:text-black ${
+              isCollapsed ? "mx-auto" : ""
+            }`}
             onClick={() => setCollapsed(!collapsed)}
           >
-            {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            {isCollapsed ? (
+              <ChevronRight size={18} />
+            ) : (
+              <ChevronLeft size={18} />
+            )}
           </button>
         ) : (
           <span className="text-xs font-medium text-gray-400">Menu</span>
@@ -492,10 +540,11 @@ export default function LeftSideBar({
       <div className="flex-1 space-y-2 overflow-y-auto px-3 py-4 text-gray-700">
         {showHome ? (
           <button
-            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${activeMenu === "home"
+            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
+              activeMenu === "home"
                 ? "border-l-4 border-blue-500 bg-gray-100 text-black shadow-sm"
                 : "text-gray-700 hover:bg-gray-50 hover:text-black"
-              }`}
+            }`}
             onClick={() => handleMenuClick("home", "/")}
           >
             <LayoutDashboard size={20} className="text-gray-500" />
@@ -511,10 +560,11 @@ export default function LeftSideBar({
           return (
             <div key={menu.key} className="mt-2">
               <button
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${activeMenu === menu.key
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
+                  activeMenu === menu.key
                     ? "border-l-4 border-blue-500 bg-gray-100 text-black shadow-sm"
                     : "text-gray-700 hover:bg-gray-50 hover:text-black"
-                  }`}
+                }`}
                 onClick={() => {
                   handleMenuClick(menu.key);
                   handleToggleMenu(menu.key);
@@ -523,16 +573,19 @@ export default function LeftSideBar({
                 <Icon size={20} className="text-gray-500" />
 
                 {!isCollapsed && (
-                  <span className="text-[15px] font-semibold">{menu.label}</span>
+                  <span className="text-[15px] font-semibold">
+                    {menu.label}
+                  </span>
                 )}
 
                 {!isCollapsed && (
                   <ChevronDown
                     size={18}
-                    className={`ml-auto transition-all duration-300 ${openMenu === menu.key
+                    className={`ml-auto transition-all duration-300 ${
+                      openMenu === menu.key
                         ? "rotate-180 text-gray-700"
                         : "text-gray-400"
-                      }`}
+                    }`}
                   />
                 )}
               </button>
@@ -545,7 +598,9 @@ export default function LeftSideBar({
                         const CatIcon = cat.icon;
                         const isCatOpen = Boolean(openSubCategories[cat.name]);
                         const hasActiveChild = cat.items.some(
-                          (item) => activeSubmenu === item.name || currentPath === item.path,
+                          (item) =>
+                            activeSubmenu === item.name ||
+                            currentPath === item.path,
                         );
 
                         return (
@@ -564,13 +619,19 @@ export default function LeftSideBar({
                             >
                               <CatIcon
                                 size={15}
-                                className={hasActiveChild ? "text-blue-600" : "text-gray-400"}
+                                className={
+                                  hasActiveChild
+                                    ? "text-blue-600"
+                                    : "text-gray-400"
+                                }
                               />
                               <span>{cat.label}</span>
                               <ChevronDown
                                 size={14}
                                 className={`ml-auto transition-transform duration-200 ${
-                                  isCatOpen ? "rotate-180 text-gray-700" : "text-gray-400"
+                                  isCatOpen
+                                    ? "rotate-180 text-gray-700"
+                                    : "text-gray-400"
                                 }`}
                               />
                             </button>
@@ -580,7 +641,8 @@ export default function LeftSideBar({
                                 {cat.items.map((sub) => {
                                   const SubIcon = sub.icon;
                                   const isActive =
-                                    activeSubmenu === sub.name || currentPath === sub.path;
+                                    activeSubmenu === sub.name ||
+                                    currentPath === sub.path;
 
                                   return (
                                     <div
@@ -591,11 +653,24 @@ export default function LeftSideBar({
                                           : "text-gray-600 hover:bg-gray-50 hover:text-black"
                                       }`}
                                       onClick={() =>
-                                        handleSubmenuClick(menu.key, sub.name, sub.path)
+                                        handleSubmenuClick(
+                                          menu.key,
+                                          sub.name,
+                                          sub.path,
+                                        )
                                       }
                                     >
-                                      <SubIcon size={16} className={isActive ? "text-blue-600" : "text-gray-400"} />
-                                      <span className="text-[14px]">{sub.label}</span>
+                                      <SubIcon
+                                        size={16}
+                                        className={
+                                          isActive
+                                            ? "text-blue-600"
+                                            : "text-gray-400"
+                                        }
+                                      />
+                                      <span className="text-[14px]">
+                                        {sub.label}
+                                      </span>
                                     </div>
                                   );
                                 })}
@@ -623,7 +698,12 @@ export default function LeftSideBar({
                             handleSubmenuClick(menu.key, sub.name, sub.path)
                           }
                         >
-                          <SubIcon size={16} className={isActive ? "text-blue-600" : "text-gray-400"} />
+                          <SubIcon
+                            size={16}
+                            className={
+                              isActive ? "text-blue-600" : "text-gray-400"
+                            }
+                          />
                           <span className="text-[14px]">{sub.label}</span>
                         </div>
                       );
@@ -640,15 +720,18 @@ export default function LeftSideBar({
           return (
             <div key={link.key} className="mt-2">
               <button
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${activeMenu === link.key
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all ${
+                  activeMenu === link.key
                     ? "border-l-4 border-blue-500 bg-gray-100 text-black shadow-sm"
                     : "text-gray-700 hover:bg-gray-50 hover:text-black"
-                  }`}
+                }`}
                 onClick={() => handleMenuClick(link.key, link.path)}
               >
                 <Icon size={20} className="text-gray-500" />
                 {!isCollapsed && (
-                  <span className="text-[15px] font-semibold">{link.label}</span>
+                  <span className="text-[15px] font-semibold">
+                    {link.label}
+                  </span>
                 )}
               </button>
             </div>
@@ -674,7 +757,9 @@ export default function LeftSideBar({
             <span className="min-w-0 text-left leading-tight">
               <span className="block text-[15px] font-semibold">Profile</span>
               {staffName ? (
-                <span className="block truncate text-xs text-gray-500">{staffName}</span>
+                <span className="block truncate text-xs text-gray-500">
+                  {staffName}
+                </span>
               ) : null}
             </span>
           </button>

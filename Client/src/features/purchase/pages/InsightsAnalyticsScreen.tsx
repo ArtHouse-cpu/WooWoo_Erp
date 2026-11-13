@@ -1,30 +1,21 @@
-import { useMemo, useState, type ReactElement, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
-  BadgeIndianRupee,
-  BarChart3,
-  Building2,
-  Calendar,
-  Download,
-  Lightbulb,
-  Package,
+  Clock3,
+  Loader2,
   RefreshCw,
-  ShoppingCart,
-  Sparkles,
-  TrendingUp,
+  RotateCcw,
+  Search,
+  ShoppingBag,
+  Store,
   Users,
-  Wallet,
+  Utensils,
+  X,
 } from "lucide-react";
 import {
-  Area,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
-  ComposedChart,
-  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -32,979 +23,674 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  fetchInsights,
+  fetchVisitHistory,
+  fetchVisitors,
+  type InsightMembership,
+  type InsightPreset,
+  type InsightQuery,
+  type InsightSegment,
+  type InsightsPayload,
+  type RankedItem,
+  type VisitHistory,
+  type VisitorRow,
+} from "@/features/purchase/insightsApi";
 
-type Preset =
-  | "today"
-  | "yesterday"
-  | "last7"
-  | "last30"
-  | "thisMonth"
-  | "lastMonth"
-  | "quarter"
-  | "year"
-  | "custom";
-
-type Grouping = "daily" | "weekly" | "monthly";
-type CustomerSort = "billed" | "invoices" | "due";
-type VendorSort = "purchase" | "txns" | "due";
-type ProductMode = "qty" | "revenue";
-
-const PRESETS: { id: Preset; label: string; factor: number }[] = [
-  { id: "today", label: "Today", factor: 0.045 },
-  { id: "yesterday", label: "Yesterday", factor: 0.038 },
-  { id: "last7", label: "Last 7 Days", factor: 0.24 },
-  { id: "last30", label: "Last 30 Days", factor: 1 },
-  { id: "thisMonth", label: "This Month", factor: 0.86 },
-  { id: "lastMonth", label: "Last Month", factor: 0.94 },
-  { id: "quarter", label: "This Quarter", factor: 2.55 },
-  { id: "year", label: "This Year", factor: 9.4 },
-  { id: "custom", label: "Custom Date Range", factor: 1 },
+const PRESETS: { id: InsightPreset; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "yesterday", label: "Yesterday" },
+  { id: "last7", label: "Last 7 Days" },
+  { id: "last30", label: "Last 30 Days" },
+  { id: "thisMonth", label: "This Month" },
+  { id: "lastMonth", label: "Last Month" },
+  { id: "year", label: "This Year" },
+  { id: "custom", label: "Custom" },
 ];
 
-const BRANCHES = ["All branches", "Main Studio", "Warehouse"];
-
-const inr = (value: number) =>
-  `₹${Math.round(value).toLocaleString("en-IN")}`;
-
-const pct = (current: number, previous: number) => {
-  if (!(previous > 0)) return 0;
-  return ((current - previous) / previous) * 100;
+const SEGMENT_COLOR = { food: "#d97706", space: "#4f46e5", store: "#0f766e" };
+const inr = (value: number) => `₹${Math.round(Number(value) || 0).toLocaleString("en-IN")}`;
+const pretty = (ymd?: string) => {
+  if (!ymd) return "—";
+  const [year, month, day] = ymd.split("-").map(Number);
+  if (!year || !month || !day) return ymd;
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 };
 
-const scale = (value: number, factor: number) => Math.round(value * factor);
-
-type CustomerRow = {
-  name: string;
-  code: string;
-  billed: number;
-  invoices: number;
-  paid: number;
-  due: number;
+const apiMessage = (error: unknown) => {
+  const err = error as { response?: { data?: { message?: string } } };
+  return err?.response?.data?.message || "Could not load insights. Try again.";
 };
-
-type VendorRow = {
-  name: string;
-  code: string;
-  purchase: number;
-  txns: number;
-  paid: number;
-  due: number;
-};
-
-type ProductRow = {
-  name: string;
-  sku: string;
-  category: string;
-  type: string;
-  qty: number;
-  revenue: number;
-  invoices: number;
-  stock: number;
-};
-
-type ExpenseRow = {
-  title: string;
-  category: string;
-  amount: number;
-  date: string;
-  method: string;
-};
-
-const BASE_CUSTOMERS: CustomerRow[] = [
-  { name: "Aarav Mehta", code: "CUS-0142", billed: 128400, invoices: 14, paid: 110200, due: 18200 },
-  { name: "Studio North", code: "CUS-0088", billed: 96400, invoices: 9, paid: 96400, due: 0 },
-  { name: "Kavya Iyer", code: "CUS-0210", billed: 81250, invoices: 11, paid: 64000, due: 17250 },
-  { name: "Bright Classroom", code: "CUS-0061", billed: 73800, invoices: 7, paid: 50000, due: 23800 },
-  { name: "Rohan Das", code: "CUS-0304", billed: 54200, invoices: 8, paid: 54200, due: 0 },
-  { name: "Paper Lane", code: "CUS-0119", billed: 48600, invoices: 6, paid: 32000, due: 16600 },
-  { name: "Meera Shah", code: "CUS-0177", billed: 39400, invoices: 5, paid: 39400, due: 0 },
-  { name: "City Workshop", code: "CUS-0044", billed: 33100, invoices: 4, paid: 20000, due: 13100 },
-  { name: "Anika Rao", code: "CUS-0266", billed: 27800, invoices: 6, paid: 27800, due: 0 },
-  { name: "Oak & Ink", code: "CUS-0093", billed: 19050, invoices: 3, paid: 12000, due: 7050 },
-];
-
-const BASE_VENDORS: VendorRow[] = [
-  { name: "Creative Art Supply", code: "VEN-0041", purchase: 142600, txns: 11, paid: 98000, due: 44600 },
-  { name: "Metro Papers", code: "VEN-0018", purchase: 98600, txns: 8, paid: 98600, due: 0 },
-  { name: "Colour House", code: "VEN-0072", purchase: 76400, txns: 6, paid: 40000, due: 36400 },
-  { name: "Frame Works", code: "VEN-0033", purchase: 52100, txns: 5, paid: 52100, due: 0 },
-  { name: "Ink & Fibre", code: "VEN-0090", purchase: 41800, txns: 4, paid: 25000, due: 16800 },
-  { name: "Studio Tools", code: "VEN-0055", purchase: 28600, txns: 3, paid: 28600, due: 0 },
-  { name: "PackRight", code: "VEN-0112", purchase: 19400, txns: 2, paid: 10000, due: 9400 },
-  { name: "Light Grid", code: "VEN-0027", purchase: 15200, txns: 2, paid: 15200, due: 0 },
-  { name: "Canvas Co.", code: "VEN-0084", purchase: 10800, txns: 1, paid: 0, due: 10800 },
-];
-
-const BASE_PRODUCTS: ProductRow[] = [
-  { name: "Velvet black", sku: "PRD-110", category: "Supplies", type: "Paint", qty: 186, revenue: 20460, invoices: 42, stock: 24 },
-  { name: "Sketch pad A3", sku: "PRD-088", category: "Paper", type: "Paper", qty: 154, revenue: 23100, invoices: 31, stock: 60 },
-  { name: "Acrylic set", sku: "PRD-214", category: "Supplies", type: "Paint", qty: 97, revenue: 48500, invoices: 28, stock: 12 },
-  { name: "Brush pack", sku: "PRD-056", category: "Tools", type: "Tool", qty: 88, revenue: 17600, invoices: 22, stock: 40 },
-  { name: "Canvas 16x20", sku: "PRD-301", category: "Canvas", type: "Surface", qty: 64, revenue: 32000, invoices: 19, stock: 8 },
-  { name: "Ink bottle", sku: "PRD-077", category: "Supplies", type: "Ink", qty: 59, revenue: 8850, invoices: 17, stock: 33 },
-  { name: "Palette knife", sku: "PRD-142", category: "Tools", type: "Tool", qty: 41, revenue: 6150, invoices: 14, stock: 15 },
-  { name: "Gold leaf", sku: "PRD-190", category: "Supplies", type: "Finish", qty: 28, revenue: 16800, invoices: 9, stock: 6 },
-];
-
-const BASE_EXPENSES: ExpenseRow[] = [
-  { title: "Studio rent", category: "Rent", amount: 28000, date: "02 Nov 2026", method: "Bank" },
-  { title: "Electricity bill", category: "Electricity", amount: 6400, date: "06 Nov 2026", method: "UPI" },
-  { title: "Staff salary", category: "Salary", amount: 32000, date: "01 Nov 2026", method: "Bank" },
-  { title: "Delivery van", category: "Transportation", amount: 4800, date: "09 Nov 2026", method: "Cash" },
-  { title: "Instagram ads", category: "Marketing", amount: 3500, date: "11 Nov 2026", method: "Card" },
-  { title: "AC service", category: "Maintenance", amount: 2200, date: "08 Nov 2026", method: "UPI" },
-  { title: "Printer paper", category: "Office Supplies", amount: 1600, date: "04 Nov 2026", method: "Cash" },
-];
-
-const TREND_WEIGHTS = [0.62, 0.7, 0.66, 0.84, 0.9, 1, 0.78, 0.88, 0.95, 0.72, 0.81, 0.93];
-const AXIS = { fontSize: 11, fill: "#94a3b8" };
-const GRID = "#eef2f6";
 
 const InsightsAnalyticsScreen = () => {
-  const navigate = useNavigate();
-  const [preset, setPreset] = useState<Preset>("last30");
-  const [fromDate, setFromDate] = useState("2026-10-12");
-  const [toDate, setToDate] = useState("2026-11-11");
-  const [compare, setCompare] = useState(true);
-  const [branch, setBranch] = useState(BRANCHES[0]);
-  const [grouping, setGrouping] = useState<Grouping>("weekly");
-  const [customerSort, setCustomerSort] = useState<CustomerSort>("billed");
-  const [vendorSort, setVendorSort] = useState<VendorSort>("purchase");
-  const [productMode, setProductMode] = useState<ProductMode>("qty");
-  const [productCategory, setProductCategory] = useState("All");
-  const [productType, setProductType] = useState("All");
-  const [updatedAt, setUpdatedAt] = useState(() => new Date());
-  const [refreshing, setRefreshing] = useState(false);
+  const [preset, setPreset] = useState<InsightPreset>("today");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [segment, setSegment] = useState<InsightSegment>("all");
+  const [membership, setMembership] = useState<InsightMembership>("all");
+  const [data, setData] = useState<InsightsPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const factor = useMemo(() => {
-    if (preset !== "custom") return PRESETS.find((item) => item.id === preset)?.factor ?? 1;
-    const from = new Date(`${fromDate}T00:00:00`);
-    const to = new Date(`${toDate}T00:00:00`);
-    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to < from) return 0;
-    const days = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
-    return Math.min(12, Math.max(0.02, days / 30));
-  }, [preset, fromDate, toDate]);
+  const query = useMemo<InsightQuery>(
+    () => ({ preset, from, to, segment, membership }),
+    [preset, from, to, segment, membership],
+  );
+  const canLoad = preset !== "custom" || (Boolean(from) && Boolean(to) && from <= to);
 
-  const branchFactor = branch === "Main Studio" ? 0.62 : branch === "Warehouse" ? 0.38 : 1;
-  const amountFactor = factor * branchFactor;
-  const empty = factor === 0;
+  useEffect(() => {
+    if (!canLoad) return;
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    fetchInsights(query)
+      .then(payload => {
+        if (!controller.signal.aborted) setData(payload);
+      })
+      .catch(err => {
+        if (!controller.signal.aborted) setError(apiMessage(err));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [query, canLoad, reloadKey]);
 
-  const data = useMemo(() => {
-    const customers = BASE_CUSTOMERS.map((row) => ({
-      ...row,
-      billed: scale(row.billed, amountFactor),
-      invoices: Math.max(1, scale(row.invoices, Math.max(amountFactor, 0.2))),
-      paid: scale(row.paid, amountFactor),
-      due: scale(row.due, amountFactor),
-    }));
-    const vendors = BASE_VENDORS.map((row) => ({
-      ...row,
-      purchase: scale(row.purchase, amountFactor),
-      txns: Math.max(1, scale(row.txns, Math.max(amountFactor, 0.25))),
-      paid: scale(row.paid, amountFactor),
-      due: scale(row.due, amountFactor),
-    }));
-    const products = BASE_PRODUCTS.map((row) => ({
-      ...row,
-      qty: Math.max(1, scale(row.qty, amountFactor)),
-      revenue: scale(row.revenue, amountFactor),
-      invoices: Math.max(1, scale(row.invoices, Math.max(amountFactor, 0.3))),
-    }));
-    const expenses = BASE_EXPENSES.map((row) => ({
-      ...row,
-      amount: scale(row.amount, amountFactor),
-    }));
-    const sales = customers.reduce((sum, row) => sum + row.billed, 0);
-    const purchase = vendors.reduce((sum, row) => sum + row.purchase, 0);
-    const cashIn = scale(540000, amountFactor);
-    const cashOut = scale(398000, amountFactor);
-    const expenseTotal = expenses.reduce((sum, row) => sum + row.amount, 0);
-    const previous = 0.91;
-    return {
-      customers,
-      vendors,
-      products,
-      expenses,
-      sales,
-      salesCount: customers.reduce((sum, row) => sum + row.invoices, 0),
-      purchase,
-      purchaseCount: vendors.reduce((sum, row) => sum + row.txns, 0),
-      cashIn,
-      cashInCount: Math.max(1, scale(71, Math.max(amountFactor, 0.2))),
-      cashOut,
-      cashOutCount: Math.max(1, scale(54, Math.max(amountFactor, 0.2))),
-      expenseTotal,
-      expenseCount: expenses.length,
-      previous,
-    };
-  }, [amountFactor]);
-
-  const trend = (value: number, drift: number) => pct(value, value * data.previous * drift);
-
-  const points = useMemo(() => {
-    const labels =
-      grouping === "daily"
-        ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
-        : grouping === "monthly"
-          ? ["Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov"]
-          : ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12"];
-    return labels.map((label, index) => {
-      const weight = TREND_WEIGHTS[index] ?? 1;
-      const purchase = scale(data.purchase / labels.length, weight);
-      const txns = Math.max(0, Math.round((data.purchaseCount / labels.length) * weight));
-      const cashIn = scale(data.cashIn / labels.length, weight);
-      const cashOut = scale(data.cashOut / labels.length, TREND_WEIGHTS[(index + 3) % 12] ?? 1);
-      const expense = scale(data.expenseTotal / labels.length, TREND_WEIGHTS[(index + 5) % 12] ?? 1);
-      return {
-        label,
-        purchase,
-        previousPurchase: Math.round(purchase * data.previous),
-        txns,
-        cashIn,
-        cashOut,
-        net: cashIn - cashOut,
-        expense,
-      };
-    });
-  }, [grouping, data]);
-
-  const expenseSlices = useMemo(() => {
-    const totals = new Map<string, number>();
-    data.expenses.forEach((row) => {
-      totals.set(row.category, (totals.get(row.category) || 0) + row.amount);
-    });
-    const colors = ["#2563eb", "#7c3aed", "#ea580c", "#dc2626", "#059669", "#0891b2", "#ca8a04", "#64748b"];
-    return [...totals.entries()].map(([name, value], index) => ({
-      name,
-      value,
-      fill: colors[index % colors.length],
-    }));
-  }, [data.expenses]);
-
-  const paymentSlices = useMemo(() => {
-    const paid = data.vendors.reduce((sum, row) => sum + row.paid, 0);
-    const due = data.vendors.reduce((sum, row) => sum + row.due, 0);
-    const partial = Math.round(due * 0.42);
-    const unpaid = Math.max(0, due - partial);
-    return [
-      { name: "Paid", value: paid, fill: "#059669" },
-      { name: "Partial", value: partial, fill: "#ea580c" },
-      { name: "Unpaid", value: unpaid, fill: "#dc2626" },
-    ];
-  }, [data.vendors]);
-
-  const purchaseCategories = useMemo(() => {
-    const shares = [
-      ["Paper", 0.32, "#2563eb"],
-      ["Paint", 0.28, "#7c3aed"],
-      ["Canvas", 0.18, "#0891b2"],
-      ["Tools", 0.12, "#ea580c"],
-      ["Packaging", 0.1, "#64748b"],
-    ] as const;
-    return shares.map(([name, share, fill]) => ({
-      name,
-      value: Math.round(data.purchase * share),
-      fill,
-    }));
-  }, [data.purchase]);
-
-  const sortedCustomers = useMemo(() => {
-    const rows = [...data.customers];
-    rows.sort((a, b) =>
-      customerSort === "invoices" ? b.invoices - a.invoices : customerSort === "due" ? b.due - a.due : b.billed - a.billed,
-    );
-    return rows;
-  }, [data.customers, customerSort]);
-
-  const sortedVendors = useMemo(() => {
-    const rows = [...data.vendors];
-    rows.sort((a, b) =>
-      vendorSort === "txns" ? b.txns - a.txns : vendorSort === "due" ? b.due - a.due : b.purchase - a.purchase,
-    );
-    return rows;
-  }, [data.vendors, vendorSort]);
-
-  const productCategories = ["All", ...new Set(BASE_PRODUCTS.map((row) => row.category))];
-  const productTypes = ["All", ...new Set(BASE_PRODUCTS.map((row) => row.type))];
-  const filteredProducts = useMemo(() => {
-    const rows = data.products.filter(
-      (row) =>
-        (productCategory === "All" || row.category === productCategory) &&
-        (productType === "All" || row.type === productType),
-    );
-    rows.sort((a, b) => (productMode === "qty" ? b.qty - a.qty : b.revenue - a.revenue));
-    return rows;
-  }, [data.products, productCategory, productType, productMode]);
-
-  const insights = useMemo(() => {
-    if (empty || !(data.sales > 0)) return [];
-    const topCustomer = sortedCustomers[0];
-    const topVendor = sortedVendors[0];
-    const topProduct = [...data.products].sort((a, b) => b.qty - a.qty)[0];
-    const topCategory = [...expenseSlices].sort((a, b) => b.value - a.value)[0];
-    const lines = [
-      `${topCustomer.name} contributed ${Math.round((topCustomer.billed / data.sales) * 100)}% of total billing.`,
-      `${topVendor.name} accounts for ${Math.round((topVendor.purchase / data.purchase) * 100)}% of total purchases.`,
-      `${topProduct.name} is the highest-selling product in this period, with ${topProduct.qty.toLocaleString("en-IN")} units sold.`,
-      data.cashOut > data.cashIn
-        ? "Cash out exceeded cash in during the selected period."
-        : `Net cash flow is positive at ${inr(data.cashIn - data.cashOut)}.`,
-      `${topCategory?.name || "Expenses"} is the largest expense category at ${inr(topCategory?.value || 0)}.`,
-      `Outstanding vendor payables are ${inr(data.vendors.reduce((sum, row) => sum + row.due, 0))}.`,
-    ];
-    return lines;
-  }, [empty, data, sortedCustomers, sortedVendors, expenseSlices]);
-
-  const refresh = () => {
-    setRefreshing(true);
-    window.setTimeout(() => {
-      setUpdatedAt(new Date());
-      setRefreshing(false);
-    }, 400);
+  const reset = () => {
+    setPreset("today");
+    setFrom("");
+    setTo("");
+    setSegment("all");
+    setMembership("all");
   };
-
-  const exportReport = () => {
-    const rows = [
-      ["Metric", "Value"],
-      ["Total Purchase", String(data.purchase)],
-      ["Total Sales", String(data.sales)],
-      ["Cash In", String(data.cashIn)],
-      ["Cash Out", String(data.cashOut)],
-      ["Expenses", String(data.expenseTotal)],
-      ["Net Cash Flow", String(data.cashIn - data.cashOut)],
-    ];
-    const blob = new Blob([rows.map((row) => row.join(",")).join("\n")], { type: "text/csv" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "purchase-insights-sample.csv";
-    link.click();
-    URL.revokeObjectURL(link.href);
-  };
-
-  const highestCashIn = [...points].sort((a, b) => b.cashIn - a.cashIn)[0];
-  const highestCashOut = [...points].sort((a, b) => b.cashOut - a.cashOut)[0];
-  const net = data.cashIn - data.cashOut;
-
-  const periodLabel = PRESETS.find((item) => item.id === preset)?.label ?? "Custom";
 
   return (
-    <div className={`space-y-4 pb-8 transition-opacity ${refreshing ? "opacity-70" : ""}`}>
-      <header className="overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-        <div className="relative bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-4 py-5 text-white sm:px-6">
-          <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-indigo-500/30 blur-2xl" />
-          <div className="pointer-events-none absolute bottom-0 left-1/3 h-16 w-40 rounded-full bg-emerald-400/10 blur-2xl" />
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-100">
-                <Sparkles size={12} />
-                Sample data
-              </p>
-              <h1 className="mt-3 text-2xl font-semibold tracking-tight sm:text-[28px]">
-                Purchase Insights & Analytics
-              </h1>
-              <p className="mt-1 max-w-xl text-sm text-slate-300">
-                Track purchasing performance, sales trends, cash flow, and business expenses.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="rounded-full bg-white/10 px-3 py-1.5 text-[11px] text-slate-200">
-                {periodLabel} · Updated {updatedAt.toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" })}
-              </p>
-              <button type="button" onClick={refresh} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15">
-                <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-                Refresh
-              </button>
-              <button type="button" onClick={exportReport} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900">
-                <Download size={14} />
-                Export report
-              </button>
-            </div>
-          </div>
+    <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Insights & Analytics</h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">
+            Net sales from final bills, split into Food, Space, and Store. Drafts, cancellations, and membership-plan sales are left out.
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            {data ? `${pretty(data.range.from)} – ${pretty(data.range.to)} · Updated ${new Date(data.generatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : "Select a date range"}
+          </p>
         </div>
-        <div className="flex flex-col gap-3 bg-slate-50/80 px-3 py-3 sm:px-4">
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-            {PRESETS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setPreset(item.id)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                  preset === item.id ? "bg-slate-900 text-white shadow-sm" : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={branch}
-              onChange={(event) => setBranch(event.target.value)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700"
-            >
-              {BRANCHES.map((name) => (
-                <option key={name}>{name}</option>
-              ))}
-            </select>
-            <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600">
-              <input type="checkbox" checked={compare} onChange={(event) => setCompare(event.target.checked)} className="accent-indigo-600" />
-              Compare previous period
-            </label>
-            {preset === "custom" ? (
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                <Calendar size={14} />
-                <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} className="rounded-full border border-slate-200 bg-white px-2 py-1" />
-                <span>to</span>
-                <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} className="rounded-full border border-slate-200 bg-white px-2 py-1" />
-              </div>
-            ) : null}
-          </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={reset} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
+            <RotateCcw size={14} /> Reset
+          </button>
+          <button type="button" onClick={() => setReloadKey(key => key + 1)} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
+            <RefreshCw size={14} /> Refresh
+          </button>
         </div>
       </header>
 
-      {empty ? (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-16 text-center text-sm text-slate-500">
-          Choose a valid date range to see sample analytics.
-        </div>
-      ) : (
-        <>
-          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <Kpi title="Total Purchase" value={inr(data.purchase)} hint={`${data.purchaseCount} purchases`} change={trend(data.purchase, 1)} compare={compare} icon={<ShoppingCart size={16} />} tone="blue" spark={points.map((point) => point.purchase)} />
-            <Kpi title="Total Sales" value={inr(data.sales)} hint={`${data.salesCount} invoices`} change={trend(data.sales, 0.97)} compare={compare} icon={<TrendingUp size={16} />} tone="indigo" spark={points.map((point) => Math.round(point.purchase * (data.sales / Math.max(data.purchase, 1))))} />
-            <Kpi title="Net Cash Flow" value={inr(net)} hint={net >= 0 ? "More came in than went out" : "More went out than came in"} change={trend(net, 0.94)} compare={compare} icon={<ArrowUpRight size={16} />} tone={net >= 0 ? "green" : "red"} spark={points.map((point) => point.net)} featured />
-            <Kpi title="Cash In" value={inr(data.cashIn)} hint={`${data.cashInCount} receipts`} change={trend(data.cashIn, 1.02)} compare={compare} icon={<Wallet size={16} />} tone="green" spark={points.map((point) => point.cashIn)} />
-            <Kpi title="Cash Out" value={inr(data.cashOut)} hint={`${data.cashOutCount} payments`} change={trend(data.cashOut, 1.05)} compare={compare} icon={<BadgeIndianRupee size={16} />} tone="red" spark={points.map((point) => point.cashOut)} />
-            <Kpi title="Total Expenses" value={inr(data.expenseTotal)} hint={`${data.expenseCount} expenses`} change={trend(data.expenseTotal, 1.08)} compare={compare} icon={<BarChart3 size={16} />} tone="amber" spark={points.map((point) => point.expense)} />
-          </section>
-
-          <section className="grid gap-3 xl:grid-cols-2">
-            <RankingSection
-              title="Top Customers by Billing"
-              kicker="Billing"
-              chart={sortedCustomers.slice(0, 8).map((row) => ({ name: row.name.split(" ")[0], value: row.billed }))}
-              color="#7c3aed"
-              sort={
-                <SortSelect
-                  value={customerSort}
-                  onChange={(value) => setCustomerSort(value as CustomerSort)}
-                  options={[
-                    ["billed", "Highest billed"],
-                    ["invoices", "Invoice count"],
-                    ["due", "Outstanding"],
-                  ]}
-                />
-              }
-            >
-              <RankTable
-                headers={["Customer", "Billed", "Share"]}
-                rows={sortedCustomers.map((row, index) => ({
-                  key: row.code,
-                  rank: index + 1,
-                  onClick: () => navigate("/customers"),
-                  cells: [
-                    <Identity key={row.code} name={row.name} code={`${row.code} · ${row.invoices} invoices`} tone="bg-violet-100 text-violet-700" />,
-                    <span key="amt" className="block"><span className="block font-semibold tabular-nums text-slate-900">{inr(row.billed)}</span><span className="block text-[10px] text-slate-400">Paid {inr(row.paid)} · Due {inr(row.due)}</span></span>,
-                    <ShareMeter key="share" value={data.sales ? Math.round((row.billed / data.sales) * 100) : 0} color="#7c3aed" />,
-                  ],
-                }))}
-              />
-            </RankingSection>
-            <RankingSection
-              title="Top Vendors by Purchase Value"
-              kicker="Purchasing"
-              chart={sortedVendors.slice(0, 8).map((row) => ({ name: row.name.split(" ")[0], value: row.purchase }))}
-              color="#2563eb"
-              sort={
-                <SortSelect
-                  value={vendorSort}
-                  onChange={(value) => setVendorSort(value as VendorSort)}
-                  options={[
-                    ["purchase", "Highest purchase"],
-                    ["txns", "Most transactions"],
-                    ["due", "Highest payable"],
-                  ]}
-                />
-              }
-            >
-              <RankTable
-                headers={["Vendor", "Purchase", "Payable"]}
-                rows={sortedVendors.map((row, index) => ({
-                  key: row.code,
-                  rank: index + 1,
-                  onClick: () => navigate("/vendors"),
-                  cells: [
-                    <Identity key={row.code} name={row.name} code={`${row.code} · ${row.txns} bills`} tone="bg-blue-100 text-blue-700" />,
-                    <span key="amt" className="font-semibold tabular-nums text-slate-900">{inr(row.purchase)}</span>,
-                    <span key="due" className={row.due > 0 ? "font-semibold text-orange-600" : "text-emerald-600"}>{row.due > 0 ? inr(row.due) : "Clear"}</span>,
-                  ],
-                }))}
-              />
-            </RankingSection>
-          </section>
-
-          <Panel
-            kicker="Catalogue"
-            title="Top Selling Products"
-            extra={
-              <div className="flex flex-wrap gap-1.5">
-                <button type="button" onClick={() => setProductMode("qty")} className={`rounded-full px-3 py-1 text-[11px] font-semibold ${productMode === "qty" ? "bg-slate-900 text-white" : "border border-slate-200 text-slate-600"}`}>Most sold</button>
-                <button type="button" onClick={() => setProductMode("revenue")} className={`rounded-full px-3 py-1 text-[11px] font-semibold ${productMode === "revenue" ? "bg-slate-900 text-white" : "border border-slate-200 text-slate-600"}`}>Highest revenue</button>
-                <select value={productCategory} onChange={(event) => setProductCategory(event.target.value)} className="rounded-full border border-slate-200 px-3 py-1 text-[11px]">
-                  {productCategories.map((name) => <option key={name}>{name}</option>)}
-                </select>
-                <select value={productType} onChange={(event) => setProductType(event.target.value)} className="rounded-full border border-slate-200 px-3 py-1 text-[11px]">
-                  {productTypes.map((name) => <option key={name}>{name}</option>)}
-                </select>
-              </div>
-            }
-          >
-            <div className="rounded-2xl bg-gradient-to-b from-slate-50 to-white p-2">
-              <ChartBox height={260}>
-                <BarChart data={filteredProducts.slice(0, 8)} layout="vertical" margin={{ left: 8, right: 16 }}>
-                  <CartesianGrid stroke={GRID} horizontal={false} />
-                  <XAxis type="number" tick={AXIS} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" width={108} tick={AXIS} axisLine={false} tickLine={false} />
-                  <Tooltip content={(props) => <ChartTip {...props} money={productMode === "revenue"} suffix={productMode === "qty" ? " sold" : ""} />} />
-                  <Bar dataKey={productMode === "qty" ? "qty" : "revenue"} radius={[0, 8, 8, 0]} barSize={14}>
-                    {filteredProducts.slice(0, 8).map((row, index) => (
-                      <Cell key={row.sku} fill={index === 0 ? "#4f46e5" : "#93c5fd"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ChartBox>
-            </div>
-            <RankTable
-              headers={["Product", "Sold", "Revenue", "Avg", "Stock"]}
-              rows={filteredProducts.map((row, index) => ({
-                key: row.sku,
-                rank: index + 1,
-                onClick: () => navigate("/products"),
-                cells: [
-                  <Identity key={row.sku} name={row.name} code={`${row.sku} · ${row.category}`} tone="bg-indigo-100 text-indigo-700" icon={<Package size={13} />} />,
-                  row.qty.toLocaleString("en-IN"),
-                  inr(row.revenue),
-                  inr(row.qty ? row.revenue / row.qty : 0),
-                  <span key="stock" className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${row.stock < 15 ? "bg-orange-50 text-orange-700" : "bg-slate-100 text-slate-600"}`}>{row.stock} in stock</span>,
-                ],
-              }))}
-            />
-          </Panel>
-
-          <section className="grid gap-3 xl:grid-cols-5">
-            <Panel className="xl:col-span-3" kicker="Purchasing" title="Purchase Amount Trend" extra={<GroupingSwitch value={grouping} onChange={setGrouping} />}>
-              <ChartBox height={280}>
-                <ComposedChart data={points}>
-                  <defs>
-                    <linearGradient id="purchaseFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.28} />
-                      <stop offset="100%" stopColor="#4f46e5" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke={GRID} vertical={false} />
-                  <XAxis dataKey="label" tick={AXIS} axisLine={false} tickLine={false} />
-                  <YAxis tick={AXIS} axisLine={false} tickLine={false} />
-                  <Tooltip content={(props) => <ChartTip {...props} />} />
-                  <Area type="monotone" dataKey="purchase" name="This period" stroke="#4f46e5" strokeWidth={2.5} fill="url(#purchaseFill)" />
-                  {compare ? <Line type="monotone" dataKey="previousPurchase" name="Previous" stroke="#94a3b8" strokeDasharray="5 5" dot={false} strokeWidth={1.5} /> : null}
-                </ComposedChart>
-              </ChartBox>
-            </Panel>
-            <Panel className="xl:col-span-2" kicker="Volume" title="Purchase Transactions">
-              <ChartBox height={280}>
-                <BarChart data={points}>
-                  <CartesianGrid stroke={GRID} vertical={false} />
-                  <XAxis dataKey="label" tick={AXIS} axisLine={false} tickLine={false} />
-                  <YAxis tick={AXIS} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip content={(props) => <ChartTip {...props} money={false} />} />
-                  <Bar dataKey="txns" name="Purchases" fill="#4f46e5" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ChartBox>
-            </Panel>
-          </section>
-
-          <section className="grid gap-3 xl:grid-cols-2">
-            <Panel kicker="Mix" title="Purchase by Category">
-              <Donut data={purchaseCategories} center={inr(data.purchase)} caption="Purchases" />
-            </Panel>
-            <Panel kicker="Payables" title="Payment Status">
-              <Donut data={paymentSlices} center={inr(data.vendors.reduce((sum, row) => sum + row.due, 0))} caption="Still due" />
-            </Panel>
-          </section>
-
-          <Panel kicker="Treasury" title="Cash Flow Analysis" extra={<GroupingSwitch value={grouping} onChange={setGrouping} />}>
-            <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-5">
-              <Mini label="Cash in" value={inr(data.cashIn)} tone="green" />
-              <Mini label="Cash out" value={inr(data.cashOut)} tone="red" />
-              <Mini label="Net" value={inr(net)} tone={net >= 0 ? "green" : "red"} />
-              <Mini label="Peak cash in" value={highestCashIn ? `${highestCashIn.label} · ${inr(highestCashIn.cashIn)}` : "—"} />
-              <Mini label="Peak cash out" value={highestCashOut ? `${highestCashOut.label} · ${inr(highestCashOut.cashOut)}` : "—"} />
-            </div>
-            <ChartBox height={300}>
-              <ComposedChart data={points}>
-                <CartesianGrid stroke={GRID} vertical={false} />
-                <XAxis dataKey="label" tick={AXIS} axisLine={false} tickLine={false} />
-                <YAxis tick={AXIS} axisLine={false} tickLine={false} />
-                <Tooltip content={(props) => <ChartTip {...props} />} />
-                <Bar dataKey="cashIn" name="Cash in" fill="#10b981" radius={[7, 7, 0, 0]} />
-                <Bar dataKey="cashOut" name="Cash out" fill="#f43f5e" radius={[7, 7, 0, 0]} />
-                <Line type="monotone" dataKey="net" name="Net cash flow" stroke="#0f172a" strokeWidth={2.4} dot={false} />
-              </ComposedChart>
-            </ChartBox>
-          </Panel>
-
-          <section className="grid gap-3 xl:grid-cols-5">
-            <Panel className="xl:col-span-2" kicker="Spend" title="Expense Analysis">
-              <div className="mb-3 grid grid-cols-3 gap-2">
-                <Mini label="Total" value={inr(data.expenseTotal)} />
-                <Mini label="Records" value={String(data.expenseCount)} />
-                <Mini label="Average" value={inr(data.expenseCount ? data.expenseTotal / data.expenseCount : 0)} />
-              </div>
-              <Donut data={expenseSlices} center={inr(data.expenseTotal)} caption="Expenses" />
-            </Panel>
-            <Panel className="xl:col-span-3" kicker="Spend" title="Expense Trend">
-              <ChartBox height={280}>
-                <ComposedChart data={points}>
-                  <defs>
-                    <linearGradient id="expenseFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#e11d48" stopOpacity={0.22} />
-                      <stop offset="100%" stopColor="#e11d48" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke={GRID} vertical={false} />
-                  <XAxis dataKey="label" tick={AXIS} axisLine={false} tickLine={false} />
-                  <YAxis tick={AXIS} axisLine={false} tickLine={false} />
-                  <Tooltip content={(props) => <ChartTip {...props} />} />
-                  <Area type="monotone" dataKey="expense" name="Expenses" stroke="#e11d48" strokeWidth={2.5} fill="url(#expenseFill)" />
-                </ComposedChart>
-              </ChartBox>
-              <RankTable
-                headers={["Expense", "Category", "Amount", "When"]}
-                rows={[...data.expenses]
-                  .sort((a, b) => b.amount - a.amount)
-                  .slice(0, 4)
-                  .map((row) => ({
-                    key: row.title,
-                    onClick: () => navigate("/expenses"),
-                    cells: [
-                      <Identity key={row.title} name={row.title} code={row.method} tone="bg-rose-100 text-rose-700" />,
-                      row.category,
-                      inr(row.amount),
-                      row.date,
-                    ],
-                  }))}
-              />
-            </Panel>
-          </section>
-
-          <Panel kicker="Highlights" title="Business Insights">
-            <div className="grid gap-2.5 md:grid-cols-2">
-              {insights.map((line, index) => (
-                <article key={line} className="flex gap-3 rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-slate-50 px-3.5 py-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                    {index === 0 ? <Users size={16} /> : index === 1 ? <Building2 size={16} /> : index === 2 ? <Package size={16} /> : <Lightbulb size={16} />}
-                  </span>
-                  <p className="text-sm leading-5 text-slate-700">{line}</p>
-                </article>
-              ))}
-            </div>
-          </Panel>
-        </>
-      )}
-    </div>
-  );
-};
-
-const TONES = {
-  blue: { icon: "bg-blue-50 text-blue-700", line: "#2563eb", wash: "from-blue-50/80" },
-  indigo: { icon: "bg-indigo-50 text-indigo-700", line: "#4f46e5", wash: "from-indigo-50/80" },
-  green: { icon: "bg-emerald-50 text-emerald-700", line: "#059669", wash: "from-emerald-50/80" },
-  red: { icon: "bg-rose-50 text-rose-700", line: "#e11d48", wash: "from-rose-50/70" },
-  amber: { icon: "bg-amber-50 text-amber-700", line: "#d97706", wash: "from-amber-50/80" },
-};
-
-const Kpi = ({
-  title,
-  value,
-  hint,
-  change,
-  compare,
-  icon,
-  tone,
-  spark,
-  featured,
-}: {
-  title: string;
-  value: string;
-  hint: string;
-  change: number;
-  compare: boolean;
-  icon: ReactNode;
-  tone: keyof typeof TONES;
-  spark: number[];
-  featured?: boolean;
-}) => {
-  const up = change >= 0;
-  const palette = TONES[tone];
-  return (
-    <article className={`relative overflow-hidden rounded-[14px] border p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] ${featured ? "border-transparent bg-gradient-to-br from-slate-900 to-indigo-900 text-white" : "border-slate-200/80 bg-gradient-to-br to-white " + palette.wash}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${featured ? "text-indigo-200" : "text-slate-500"}`}>{title}</p>
-          <p className={`mt-2 text-[22px] font-semibold tracking-tight tabular-nums sm:text-2xl ${featured ? "text-white" : "text-slate-950"}`}>{value}</p>
-        </div>
-        <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${featured ? "bg-white/10 text-white" : palette.icon}`}>{icon}</span>
-      </div>
-      <div className="mt-3 h-10">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={spark.map((point, index) => ({ index, point }))}>
-            <Area type="monotone" dataKey="point" stroke={featured ? "#a5b4fc" : palette.line} fill={featured ? "rgba(165,180,252,0.18)" : palette.line} fillOpacity={featured ? 1 : 0.12} strokeWidth={2} dot={false} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className={`text-[11px] ${featured ? "text-slate-300" : "text-slate-500"}`}>{hint}</p>
-        {compare ? (
-          <p className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${featured ? "bg-white/10 text-white" : up ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
-            {up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-            {Math.abs(change).toFixed(1)}%
-          </p>
+      <section className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <FilterSelect
+          label="Date"
+          value={preset}
+          onChange={value => setPreset(value as InsightPreset)}
+          className="w-40"
+        >
+          {PRESETS.map(item => (
+            <option key={item.id} value={item.id}>{item.label}</option>
+          ))}
+        </FilterSelect>
+        {preset === "custom" ? (
+          <>
+            <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              From
+              <input type="date" value={from} onChange={event => setFrom(event.target.value)} className="w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              To
+              <input type="date" value={to} onChange={event => setTo(event.target.value)} className="w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
+            </label>
+          </>
         ) : null}
-      </div>
-    </article>
+        <FilterSelect
+          label="Segment"
+          value={segment}
+          onChange={value => setSegment(value as InsightSegment)}
+          className="w-36"
+        >
+          <option value="all">All segments</option>
+          <option value="food">Food</option>
+          <option value="space">Space</option>
+          <option value="store">Store</option>
+        </FilterSelect>
+        <FilterSelect
+          label="Membership"
+          value={membership}
+          onChange={value => setMembership(value as InsightMembership)}
+          className="w-44"
+        >
+          <option value="all">All customers</option>
+          <option value="member">Membership</option>
+          <option value="nonmember">Non-membership</option>
+        </FilterSelect>
+      </section>
+
+      {error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+      ) : null}
+      {preset === "custom" && !canLoad ? (
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">Choose a start and end date.</div>
+      ) : null}
+
+      {loading && !data ? <Skeleton /> : null}
+      {data ? (
+        <>
+          <RevenueSection data={data} loading={loading} />
+          <TopSection data={data} />
+          <VisitorSection query={query} summary={data.visitors} />
+          <PeakSection data={data} />
+        </>
+      ) : null}
+    </div>
   );
 };
 
-const Panel = ({
-  title,
-  kicker,
-  extra,
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  className = "w-36",
   children,
-  className = "",
 }: {
-  title: string;
-  kicker?: string;
-  extra?: ReactNode;
-  children: ReactNode;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
   className?: string;
-}) => (
-  <section className={`rounded-[14px] border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5 ${className}`}>
-    <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-      <div>
-        {kicker ? <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{kicker}</p> : null}
-        <h2 className="text-[15px] font-semibold tracking-tight text-slate-950">{title}</h2>
-      </div>
-      {extra}
-    </div>
-    {children}
-  </section>
-);
-
-const ChartBox = ({ children, height = 240 }: { children: ReactElement; height?: number }) => (
-  <div className="w-full" style={{ height }}>
-    <ResponsiveContainer width="100%" height="100%">
-      {children}
-    </ResponsiveContainer>
-  </div>
-);
-
-const GroupingSwitch = ({ value, onChange }: { value: Grouping; onChange: (value: Grouping) => void }) => (
-  <div className="flex rounded-full bg-slate-100 p-0.5">
-    {(["daily", "weekly", "monthly"] as Grouping[]).map((item) => (
-      <button
-        key={item}
-        type="button"
-        onClick={() => onChange(item)}
-        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${value === item ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+      {label}
+      <select
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        className={`${className} rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none`}
       >
-        {item}
-      </button>
-    ))}
-  </div>
-);
+        {children}
+      </select>
+    </label>
+  );
+}
 
-const SortSelect = ({
+function ChipGroup<T extends string>({
   value,
   onChange,
   options,
 }: {
-  value: string;
-  onChange: (value: string) => void;
-  options: [string, string][];
-}) => (
-  <select value={value} onChange={(event) => onChange(event.target.value)} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700">
-    {options.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-  </select>
-);
-
-const ChartTip = ({
-  active,
-  payload,
-  label,
-  money = true,
-  suffix = "",
-}: {
-  active?: boolean;
-  payload?: { name?: string; value?: number | string; color?: string }[];
-  label?: string;
-  money?: boolean;
-  suffix?: string;
-}) => {
-  if (!active || !payload?.length) return null;
+  value: T;
+  onChange: (value: T) => void;
+  options: [T, string][];
+}) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur">
-      {label ? <p className="mb-1 text-[11px] font-semibold text-slate-400">{label}</p> : null}
-      {payload.map((item) => (
-        <p key={String(item.name)} className="text-xs font-semibold text-slate-800">
-          <span className="mr-2 inline-block h-2 w-2 rounded-full" style={{ background: item.color || "#4f46e5" }} />
-          {item.name}: {money ? inr(Number(item.value)) : `${item.value}${suffix}`}
-        </p>
+    <div className="flex rounded-lg bg-slate-50 p-0.5">
+      {options.map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onChange(id)}
+          className={`rounded-md px-2.5 py-1 text-[11px] font-semibold ${value === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+        >
+          {label}
+        </button>
       ))}
     </div>
   );
-};
+}
 
-const RankingSection = ({
+function RevenueSection({ data, loading }: { data: InsightsPayload; loading: boolean }) {
+  const donut = data.segments.filter(row => row.revenue > 0).map(row => ({
+    name: row.label,
+    value: row.revenue,
+    share: row.share,
+    color: SEGMENT_COLOR[row.key],
+  }));
+  const memberDonut = [
+    { name: "Membership", value: data.membership.memberRevenue, share: data.membership.memberShare, color: "#7c3aed" },
+    { name: "Non-membership", value: data.membership.otherRevenue, share: data.membership.otherShare, color: "#94a3b8" },
+  ].filter(row => row.value > 0);
+
+  return (
+    <section className="space-y-3">
+      <SectionTitle title="Revenue overview" note={loading ? "Updating…" : "Compared with the previous period of the same length"} />
+      <div className="grid gap-3 lg:grid-cols-2">
+        <DonutCard title="By business segment" center={inr(data.totals.revenue)} rows={donut} empty="No billed sales in this range." />
+        <DonutCard title="Membership vs non-membership" center={inr(data.totals.revenue)} rows={memberDonut} empty="No billed sales in this range." />
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {data.segments.map(row => (
+          <article key={row.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg text-white" style={{ background: SEGMENT_COLOR[row.key] }}>
+                  {row.key === "food" ? <Utensils size={15} /> : row.key === "space" ? <Store size={15} /> : <ShoppingBag size={15} />}
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">{row.label}</p>
+                  <p className="text-[11px] text-slate-400">{row.share}% of net sales</p>
+                </div>
+              </div>
+              <Trend value={row.changePct} />
+            </div>
+            <p className="mt-3 text-2xl font-black text-slate-900">{inr(row.revenue)}</p>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
+              <div><dt>Bills</dt><dd className="font-semibold text-slate-800">{row.bills}</dd></div>
+              <div><dt>Average bill</dt><dd className="font-semibold text-slate-800">{inr(row.average)}</dd></div>
+              <div><dt>{row.key === "space" ? "Booked hours" : "Quantity sold"}</dt><dd className="font-semibold text-slate-800">{row.key === "space" ? row.hours : row.qty}</dd></div>
+              <div><dt>{row.key === "space" ? "Bookings" : "Previous period"}</dt><dd className="font-semibold text-slate-800">{row.key === "space" ? row.bookings : inr(row.previousRevenue)}</dd></div>
+            </dl>
+            {row.top[0] ? <p className="mt-3 truncate text-[11px] text-slate-500">Top: <span className="font-semibold text-slate-700">{row.top[0].name}</span></p> : null}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DonutCard({
   title,
-  kicker,
-  chart,
-  color,
-  sort,
-  children,
+  center,
+  rows,
+  empty,
 }: {
   title: string;
-  kicker?: string;
-  chart: { name: string; value: number }[];
-  color: string;
-  sort: ReactNode;
-  children: ReactNode;
-}) => (
-  <section className="rounded-[14px] border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.04)] sm:p-5">
-    <div className="mb-3 flex items-start justify-between gap-2">
-      <div>
-        {kicker ? <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{kicker}</p> : null}
-        <h2 className="text-[15px] font-semibold tracking-tight text-slate-950">{title}</h2>
-      </div>
-      {sort}
-    </div>
-    <ChartBox height={210}>
-      <BarChart data={chart} layout="vertical" margin={{ left: 4, right: 12 }}>
-        <XAxis type="number" hide />
-        <YAxis type="category" dataKey="name" width={72} tick={AXIS} axisLine={false} tickLine={false} />
-        <Tooltip content={(props) => <ChartTip {...props} />} />
-        <Bar dataKey="value" name="Amount" radius={[0, 8, 8, 0]} barSize={12}>
-          {chart.map((row, index) => (
-            <Cell key={row.name} fill={color} fillOpacity={1 - index * 0.08} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ChartBox>
-    {children}
-  </section>
-);
-
-const RankTable = ({
-  headers,
-  rows,
-}: {
-  headers: string[];
-  rows: { key: string; cells: ReactNode[]; rank?: number; onClick?: () => void }[];
-}) => (
-  <div className="mt-3 overflow-x-auto">
-    <table className="w-full min-w-[460px] text-left text-xs">
-      <thead>
-        <tr className="text-[10px] uppercase tracking-[0.12em] text-slate-400">
-          <th className="px-2 py-2 font-semibold">#</th>
-          {headers.map((header) => <th key={header} className="px-2 py-2 font-semibold">{header}</th>)}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, index) => (
-          <tr
-            key={row.key}
-            onClick={row.onClick}
-            className={`border-t border-slate-100 ${row.onClick ? "cursor-pointer hover:bg-slate-50" : ""}`}
-          >
-            <td className="px-2 py-2.5">
-              <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${index === 0 ? "bg-amber-100 text-amber-700" : index === 1 ? "bg-slate-200 text-slate-700" : index === 2 ? "bg-orange-100 text-orange-700" : "text-slate-400"}`}>
-                {row.rank ?? index + 1}
-              </span>
-            </td>
-            {row.cells.map((cell, cellIndex) => (
-              <td key={`${row.key}-${cellIndex}`} className="px-2 py-2.5 text-slate-700">{cell}</td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
-
-const Identity = ({ name, code, tone, icon }: { name: string; code: string; tone: string; icon?: ReactNode }) => (
-  <div className="flex items-center gap-2.5">
-    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${tone}`}>
-      {icon ?? name.slice(0, 1)}
-    </span>
-    <span className="min-w-0">
-      <span className="block truncate font-semibold text-slate-900">{name}</span>
-      <span className="block truncate text-[10px] text-slate-400">{code}</span>
-    </span>
-  </div>
-);
-
-const ShareMeter = ({ value, color }: { value: number; color: string }) => (
-  <div className="flex min-w-[92px] items-center gap-2">
-    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-      <div className="h-full rounded-full" style={{ width: `${Math.min(100, value)}%`, background: color }} />
-    </div>
-    <span className="w-8 text-right text-[11px] font-semibold tabular-nums text-slate-600">{value}%</span>
-  </div>
-);
-
-const Donut = ({
-  data,
-  center,
-  caption,
-}: {
-  data: { name: string; value: number; fill: string }[];
   center: string;
-  caption: string;
-}) => {
-  const total = data.reduce((sum, slice) => sum + slice.value, 0);
+  rows: { name: string; value: number; share: number; color: string }[];
+  empty: string;
+}) {
   return (
-    <div>
-      <div className="relative">
-        <ChartBox height={210}>
-          <PieChart>
-            <Pie data={data} dataKey="value" nameKey="name" innerRadius={62} outerRadius={84} paddingAngle={3} stroke="none">
-              {data.map((slice) => <Cell key={slice.name} fill={slice.fill} />)}
-            </Pie>
-            <Tooltip content={(props) => <ChartTip {...props} />} />
-          </PieChart>
-        </ChartBox>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-sm font-semibold tabular-nums text-slate-950">{center}</span>
-          <span className="text-[10px] uppercase tracking-[0.14em] text-slate-400">{caption}</span>
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+      {rows.length === 0 ? (
+        <p className="py-16 text-center text-sm text-slate-400">{empty}</p>
+      ) : (
+        <div className="mt-2 grid items-center gap-2 sm:grid-cols-[220px_1fr]">
+          <div className="relative h-52">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={rows} dataKey="value" nameKey="name" innerRadius={62} outerRadius={84} paddingAngle={2} stroke="none">
+                  {rows.map(row => <Cell key={row.name} fill={row.color} />)}
+                </Pie>
+                <Tooltip formatter={(value, _name, item) => [inr(Number(value) || 0), `${item?.payload?.share ?? 0}%`]} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Net sales</span>
+              <span className="text-sm font-black text-slate-900">{center}</span>
+            </div>
+          </div>
+          <ul className="space-y-2">
+            {rows.map(row => (
+              <li key={row.name} className="flex items-center justify-between gap-3 text-xs">
+                <span className="flex items-center gap-2 text-slate-600"><span className="h-2.5 w-2.5 rounded-full" style={{ background: row.color }} />{row.name}</span>
+                <span className="font-semibold text-slate-900">{inr(row.value)} · {row.share}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function Trend({ value }: { value: number | null }) {
+  if (value == null) return <span className="text-[11px] font-semibold text-indigo-600">New</span>;
+  const up = value >= 0;
+  return <span className={`text-[11px] font-semibold ${up ? "text-emerald-600" : "text-rose-600"}`}>{up ? "+" : ""}{value}%</span>;
+}
+
+function TopSection({ data }: { data: InsightsPayload }) {
+  const [limit, setLimit] = useState<5 | 10>(5);
+  const [sort, setSort] = useState<"revenue" | "qty">("revenue");
+  const columns: { key: "food" | "store" | "space"; title: string }[] = [
+    { key: "food", title: "Most selling food" },
+    { key: "store", title: "Most selling store products" },
+    { key: "space", title: "Most popular spaces" },
+  ];
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <SectionTitle title="Top performing items" note="Completed final bills only" />
+        <div className="flex gap-2">
+          <ChipGroup value={sort} onChange={setSort} options={[["revenue", "Revenue"], ["qty", "Quantity"]]} />
+          <ChipGroup value={String(limit) as "5" | "10"} onChange={value => setLimit(value === "10" ? 10 : 5)} options={[["5", "Top 5"], ["10", "Top 10"]]} />
         </div>
       </div>
-      <div className="space-y-2">
-        {data.map((slice) => (
-          <div key={slice.name} className="flex items-center gap-2 text-xs">
-            <span className="h-2 w-2 rounded-full" style={{ background: slice.fill }} />
-            <span className="flex-1 text-slate-600">{slice.name}</span>
-            <span className="font-semibold tabular-nums text-slate-800">{inr(slice.value)}</span>
-            <span className="w-8 text-right text-slate-400">{total ? Math.round((slice.value / total) * 100) : 0}%</span>
+      <div className="grid gap-3 lg:grid-cols-3">
+        {columns.map(column => {
+          const rows = [...data.top[column.key]].sort((a, b) => sort === "qty" ? b.qty - a.qty : b.revenue - a.revenue).slice(0, limit);
+          return (
+            <article key={column.key} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <h3 className="px-1 text-sm font-bold text-slate-900">{column.title}</h3>
+              {rows.length === 0 ? <p className="px-1 py-8 text-center text-xs text-slate-400">Nothing sold in this range.</p> : (
+                <ol className="mt-2 space-y-2">
+                  {rows.map((row, index) => <RankRow key={row.name} index={index + 1} row={row} kind={column.key} />)}
+                </ol>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function RankRow({ index, row, kind }: { index: number; row: RankedItem; kind: "food" | "store" | "space" }) {
+  return (
+    <li className="flex items-center gap-2 rounded-xl bg-slate-50 px-2 py-2">
+      <span className="w-4 text-center text-[11px] font-bold text-slate-400">{index}</span>
+      {row.image ? <img src={row.image} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[10px] font-bold text-slate-400">#{index}</span>}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-semibold text-slate-800">{row.name}</p>
+        <p className="truncate text-[10px] text-slate-400">
+          {kind === "store" && row.sku ? `${row.sku} · ` : ""}
+          {kind === "space" ? `${row.bookings || row.orders} bookings · ${row.hours || 0}h` : `${row.qty} sold · ${row.orders} bills`}
+        </p>
+      </div>
+      <span className="text-xs font-bold text-slate-900">{inr(row.revenue)}</span>
+    </li>
+  );
+}
+
+function VisitorSection({
+  query,
+  summary,
+}: {
+  query: InsightQuery;
+  summary: InsightsPayload["visitors"];
+}) {
+  const [bucket, setBucket] = useState<"day" | "week" | "month">("day");
+  const [visits, setVisits] = useState<"all" | "1" | "2" | "3">("all");
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [rows, setRows] = useState<VisitorRow[]>([]);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<VisitorRow | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => { setPage(1); }, [query, bucket, visits, debounced]);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetchVisitors({ ...query, bucket, visits, page, search: debounced })
+      .then(payload => {
+        if (!active) return;
+        setRows(payload.rows || []);
+        setPages(payload.pagination?.pages || 1);
+        setTotal(payload.pagination?.total || 0);
+      })
+      .catch(() => {
+        if (!active) return;
+        setRows([]);
+        setTotal(0);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [query, bucket, visits, page, debounced]);
+
+  const donut = [
+    { name: "First time", value: summary.firstTime, color: "#0284c7" },
+    { name: "Repeat", value: summary.repeat, color: "#7c3aed" },
+  ].filter(row => row.value > 0);
+
+  return (
+    <section className="space-y-3">
+      <SectionTitle title="Visitor analytics" note="One bill is one transaction. A visit is a unique day with a bill." />
+      <div className="grid gap-3 lg:grid-cols-[1fr_280px]">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold text-slate-500">First-time visitors</p>
+            <p className="mt-1 text-3xl font-black text-slate-900">{summary.firstTime}</p>
+            <p className="text-xs text-slate-400">{summary.firstShare}% of {summary.unique} unique customers</p>
+          </article>
+          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold text-slate-500">Repeat visitors</p>
+            <p className="mt-1 text-3xl font-black text-slate-900">{summary.repeat}</p>
+            <p className="text-xs text-slate-400">{summary.repeatShare}% · more than one visit, or a visit before this period</p>
+          </article>
+        </div>
+        <article className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          {donut.length === 0 ? <p className="py-10 text-center text-xs text-slate-400">No visitors.</p> : (
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={donut} dataKey="value" nameKey="name" innerRadius={36} outerRadius={54} stroke="none">
+                    {donut.map(row => <Cell key={row.name} fill={row.color} />)}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </article>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            <ChipGroup value={bucket} onChange={setBucket} options={[["day", "Per day"], ["week", "Per week"], ["month", "Per month"]]} />
+            <ChipGroup value={visits} onChange={setVisits} options={[["all", "All"], ["1", "1 visit"], ["2", "2 visits"], ["3", "3+ visits"]]} />
           </div>
-        ))}
+          <label className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1">
+            <Search size={13} className="text-slate-400" />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Name or phone" className="w-36 bg-transparent text-xs outline-none" />
+          </label>
+        </div>
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full text-left text-xs">
+            <thead className="text-[10px] uppercase tracking-wide text-slate-400">
+              <tr>
+                {["Customer", "Phone", "Visits", "Bills", "First visit", "Last visit", "Spending", "Type"].map(heading => (
+                  <th key={heading} className="px-2 py-2 font-semibold">{heading}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(row => (
+                <tr key={row.key} onClick={() => setSelected(row)} className="cursor-pointer border-t border-slate-100 hover:bg-slate-50">
+                  <td className="px-2 py-2 font-semibold text-slate-800">{row.name}</td>
+                  <td className="px-2 py-2 text-slate-500">{row.phone || "—"}</td>
+                  <td className="px-2 py-2">{row.visits}</td>
+                  <td className="px-2 py-2">{row.bills}</td>
+                  <td className="px-2 py-2">{pretty(row.firstVisit)}</td>
+                  <td className="px-2 py-2">{pretty(row.lastVisit)}</td>
+                  <td className="px-2 py-2 font-semibold">{inr(row.spend)}</td>
+                  <td className="px-2 py-2">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${row.visitType === "Repeat" ? "bg-violet-50 text-violet-700" : "bg-sky-50 text-sky-700"}`}>{row.visitType}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!loading && rows.length === 0 ? <p className="py-8 text-center text-xs text-slate-400">No customers match this frequency.</p> : null}
+          {loading ? <p className="flex items-center justify-center gap-2 py-4 text-xs text-slate-400"><Loader2 size={14} className="animate-spin" /> Loading visitors</p> : null}
+        </div>
+        <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+          <span>{total} customers</span>
+          <div className="flex gap-2">
+            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-lg border border-slate-200 px-2 py-1 disabled:opacity-40">Previous</button>
+            <span>{page} / {pages}</span>
+            <button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)} className="rounded-lg border border-slate-200 px-2 py-1 disabled:opacity-40">Next</button>
+          </div>
+        </div>
+      </div>
+      {selected ? <VisitDialog row={selected} query={query} onClose={() => setSelected(null)} /> : null}
+    </section>
+  );
+}
+
+function VisitDialog({ row, query, onClose }: { row: VisitorRow; query: InsightQuery; onClose: () => void }) {
+  const [detail, setDetail] = useState<VisitHistory | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    fetchVisitHistory(row.key, query)
+      .then(payload => { if (active) setDetail(payload); })
+      .catch(err => { if (active) setError(apiMessage(err)); });
+    return () => { active = false; };
+  }, [row.key, query]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-3 sm:items-center">
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-xl">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">{row.name}</h3>
+            <p className="text-xs text-slate-500">{row.phone || "No phone"} {detail?.customer.member ? "· Membership" : ""}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-500"><X size={16} /></button>
+        </div>
+        {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
+        {!detail && !error ? <p className="mt-6 flex justify-center"><Loader2 className="animate-spin text-slate-400" size={18} /></p> : null}
+        {detail ? (
+          <>
+            <dl className="mt-4 grid grid-cols-2 gap-2 text-xs">
+              <Stat label="Visits in range" value={String(detail.range.visits)} />
+              <Stat label="Bills in range" value={String(detail.range.bills)} />
+              <Stat label="Spent in range" value={inr(detail.range.spend)} />
+              <Stat label="Average per visit" value={inr(detail.range.average)} />
+              <Stat label="First visit ever" value={pretty(detail.lifetime.firstVisit)} />
+              <Stat label="Last visit ever" value={pretty(detail.lifetime.lastVisit)} />
+            </dl>
+            <h4 className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-400">Bills in this range</h4>
+            <ul className="mt-2 space-y-2">
+              {detail.range.billsList.map(bill => (
+                <li key={bill.invoiceCode} className="rounded-xl border border-slate-100 px-3 py-2 text-xs">
+                  <div className="flex justify-between font-semibold text-slate-800"><span>{bill.invoiceCode}</span><span>{inr(bill.amount)}</span></div>
+                  <p className="text-slate-400">{pretty(bill.date)} · {bill.items.join(", ") || "Items"}</p>
+                </li>
+              ))}
+              {detail.range.billsList.length === 0 ? <li className="text-xs text-slate-400">No bills in this range.</li> : null}
+            </ul>
+          </>
+        ) : null}
       </div>
     </div>
   );
-};
+}
 
-const Mini = ({ label, value, tone }: { label: string; value: string; tone?: "green" | "red" }) => (
-  <div className={`rounded-2xl px-3 py-2.5 ${tone === "green" ? "bg-emerald-50" : tone === "red" ? "bg-rose-50" : "bg-slate-50"}`}>
-    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
-    <p className={`mt-1 text-sm font-semibold tabular-nums ${tone === "green" ? "text-emerald-800" : tone === "red" ? "text-rose-800" : "text-slate-900"}`}>{value}</p>
-  </div>
-);
+function Stat({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl bg-slate-50 px-3 py-2"><dt className="text-slate-400">{label}</dt><dd className="font-semibold text-slate-800">{value}</dd></div>;
+}
+
+function PeakSection({ data }: { data: InsightsPayload }) {
+  const [metric, setMetric] = useState<"bills" | "revenue">("bills");
+  const highlight = metric === "bills" ? data.peak.busiestPeriod : data.peak.highestRevenuePeriod;
+  return (
+    <section className="space-y-3 pb-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <SectionTitle title="Peak billing hours" note="Time is taken from when the bill was saved, in India time" />
+        <ChipGroup value={metric} onChange={setMetric} options={[["bills", "Number of bills"], ["revenue", "Revenue"]]} />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Mini icon={<Clock3 size={15} />} label="Most active" value={data.peak.busiestPeriod || "—"} />
+        <Mini icon={<Store size={15} />} label="Highest revenue" value={data.peak.highestRevenuePeriod || "—"} />
+        <Mini icon={<Users size={15} />} label="Total bills" value={String(data.peak.totalBills)} />
+        <Mini icon={<Clock3 size={15} />} label="Average bills / day" value={String(data.peak.averageBillsPerDay)} />
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <ChartCard title="Time of day">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data.peak.periods}>
+              <CartesianGrid stroke="#e2e8f0" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip formatter={(value, name) => [name === "revenue" ? inr(Number(value) || 0) : value, name === "revenue" ? "Revenue" : "Bills"]} />
+              <Bar dataKey={metric} radius={[6, 6, 0, 0]}>
+                {data.peak.periods.map(row => (
+                  <Cell key={row.key} fill={row.label === highlight ? "#4f46e5" : "#cbd5e1"} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title={`Weekday · busiest ${data.peak.busiestDay || "—"}`}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data.peak.weekdays}>
+              <CartesianGrid stroke="#e2e8f0" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip formatter={(value, name) => [name === "revenue" ? inr(Number(value) || 0) : value, name === "revenue" ? "Revenue" : "Bills"]} />
+              <Bar dataKey={metric} radius={[6, 6, 0, 0]}>
+                {data.peak.weekdays.map(row => (
+                  <Cell key={row.day} fill={row.day === data.peak.busiestDay ? "#0f766e" : "#cbd5e1"} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+      <ul className="grid gap-2 sm:grid-cols-4">
+        {data.peak.periods.map(row => (
+          <li key={row.key} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+            <p className="font-bold text-slate-800">{row.label}</p>
+            <p className="text-slate-400">{row.hint}</p>
+            <p className="mt-1 font-semibold text-slate-700">{row.bills} bills · {inr(row.revenue)} · {row.share}%</p>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ChartCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <h3 className="mb-2 text-sm font-bold text-slate-900">{title}</h3>
+      <div className="h-60">{children}</div>
+    </article>
+  );
+}
+
+function Mini({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">{icon}</span>
+      <div>
+        <p className="text-[11px] text-slate-400">{label}</p>
+        <p className="text-sm font-bold text-slate-900">{value}</p>
+      </div>
+    </article>
+  );
+}
+
+function SectionTitle({ title, note }: { title: string; note: string }) {
+  return (
+    <div>
+      <h2 className="text-sm font-bold text-slate-900">{title}</h2>
+      <p className="text-[11px] text-slate-400">{note}</p>
+    </div>
+  );
+}
+
+function Skeleton() {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-40 animate-pulse rounded-2xl bg-slate-200/70" />)}
+    </div>
+  );
+}
 
 export default InsightsAnalyticsScreen;

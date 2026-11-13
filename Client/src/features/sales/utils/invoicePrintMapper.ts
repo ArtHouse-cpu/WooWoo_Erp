@@ -1,5 +1,9 @@
 import type { ThermalPrintProps } from "@/features/sales/components/invoice/ThermalPrint";
 import type { InvoicePdfInput } from "@/features/sales/components/invoice/types";
+import {
+  spaceOfferDetailRows,
+  spaceOfferFromSnapshot,
+} from "@/features/spacebook/spaceOfferLabel";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
@@ -105,6 +109,21 @@ export function mapInvoiceToThermalPrintProps(
       "—",
   );
 
+  const offer = spaceOfferFromSnapshot(invoice.spaceOffer);
+  const storedDetails = Array.isArray(invoice.bookingDetails)
+    ? invoice.bookingDetails
+        .map((row) => ({
+          label: String(row?.label || "").trim(),
+          value: String(row?.value || "").trim(),
+        }))
+        .filter((row) => row.label && row.value)
+    : [];
+  const hasOfferRow = storedDetails.some((row) => row.label.toLowerCase() === "offer");
+  const bookingDetails =
+    offer && !hasOfferRow
+      ? [...storedDetails, ...spaceOfferDetailRows(offer)]
+      : storedDetails;
+
   return {
     documentType,
     invoiceNo: invoiceNo || "—",
@@ -122,5 +141,8 @@ export function mapInvoiceToThermalPrintProps(
     totalDue,
     totalQty,
     extraCharges,
+    bookingDetails,
+    offerLabel: offer?.ruleLabel || "",
+    offerDiscount: offer?.discount || 0,
   };
 }
