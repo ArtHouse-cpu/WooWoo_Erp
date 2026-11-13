@@ -5,10 +5,10 @@ import {ChevronLeft, Search, Share2, MessageCircle, Users, Building} from 'lucid
 import {toast} from 'sonner';
 import {SpaceDetailsModal} from '../../components/spaces/SpaceDetailsModal';
 import {ShareSpaceModal} from '../../components/spaces/ShareSpaceModal';
+import {SpaceBookingModal} from '../../components/spaces/SpaceBookingModal';
 import {ImageCarousel} from '../../components/ui/ImageCarousel';
 import {
   formatInr,
-  spaceBookingUrl,
   copySpaceLink,
   SPACE_WHATSAPP,
 } from '../../components/spaces/spaceActions';
@@ -27,6 +27,7 @@ export default function SpacesMarketplacePage() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<SpaceCard | null>(null);
   const [shareSpace, setShareSpace] = useState<SpaceCard | null>(null);
+  const [bookingSpace, setBookingSpace] = useState<SpaceCard | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -60,8 +61,7 @@ export default function SpacesMarketplacePage() {
   }, [spaces, search, spaceType]);
 
   const handleBook = (space: SpaceCard) => {
-    const url = spaceBookingUrl(space);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    setBookingSpace(space);
   };
 
   const handleShare = async (space: SpaceCard) => {
@@ -206,8 +206,8 @@ export default function SpacesMarketplacePage() {
                           <Users size={11} className="shrink-0 text-emerald-600 stroke-[2.2]" />
                           <span>
                             {space.capacity > 0
-                              ? `Capacity: ${space.capacity} ${space.capacity === 1 ? 'person' : 'people'}`
-                              : 'Capacity: Flexible'}
+                              ? `${space.capacity} ${space.capacity === 1 ? 'person' : 'people'}`
+                              : 'Flexible'}
                           </span>
                         </span>
                       }
@@ -284,6 +284,11 @@ export default function SpacesMarketplacePage() {
         space={shareSpace}
         isOpen={Boolean(shareSpace)}
         onClose={() => setShareSpace(null)}
+      />
+      <SpaceBookingModal
+        space={bookingSpace}
+        isOpen={Boolean(bookingSpace)}
+        onClose={() => setBookingSpace(null)}
       />
     </div>
   );

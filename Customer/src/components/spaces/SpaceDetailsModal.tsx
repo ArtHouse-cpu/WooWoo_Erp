@@ -29,12 +29,11 @@ import {toast} from 'sonner';
 import type {SpaceCard} from '../../services/space.service';
 import {
   formatInr,
-  spaceShareUrl,
   copySpaceLink,
-  SPACE_WHATSAPP,
   MEMBERSHIP_TIERS,
 } from './spaceActions';
 import {ShareSpaceModal} from './ShareSpaceModal';
+import {SpaceBookingModal} from './SpaceBookingModal';
 import {ImageCarousel} from '../ui/ImageCarousel';
 
 function formatDateDisplay(d: Date): string {
@@ -42,15 +41,6 @@ function formatDateDisplay(d: Date): string {
   const month = new Intl.DateTimeFormat('en-GB', {month: 'short'}).format(d);
   const year = d.getFullYear();
   return `${day} ${month} ${year}`;
-}
-
-function getTimeDurationHours(start: string, end: string): number {
-  const [sh = 0, sm = 0] = start.split(':').map(Number);
-  const [eh = 0, em = 0] = end.split(':').map(Number);
-  const sMin = sh * 60 + sm;
-  const eMin = eh * 60 + em;
-  const diffMin = eMin >= sMin ? eMin - sMin : 24 * 60 - sMin + eMin;
-  return Math.max(0.5, Math.round((diffMin / 60) * 10) / 10);
 }
 
 function getCalendarGrid(year: number, month: number) {
@@ -199,6 +189,7 @@ export function SpaceDetailsModal({
   const [startTime, setStartTime] = useState('06:00');
   const [endTime, setEndTime] = useState('09:00');
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   // Reset scroll position to top when switching between Info, Highlights, and Feedback
   useEffect(() => {
@@ -526,14 +517,11 @@ export function SpaceDetailsModal({
   const comparePrice =
     activeSegment === 'weekday' && weekendPrice > weekdayPrice ? weekendPrice : null;
 
-  const durationHours = getTimeDurationHours(startTime, endTime);
-
   // Selected Membership discount auto-calculation
   const selectedTier = MEMBERSHIP_TIERS.find(t => t.id === selectedMembershipId) || null;
   const discountRate = selectedTier ? selectedTier.discountPercent / 100 : 0;
   const unitDiscount = Math.round(activePrice * discountRate);
   const finalUnitPrice = Math.max(0, activePrice - unitDiscount);
-  const estimatedTotal = finalUnitPrice * durationHours;
 
   const handleShare = async () => {
     // Open share modal on mobile screen
@@ -551,28 +539,7 @@ export function SpaceDetailsModal({
   };
 
   const handleBook = () => {
-    const membershipLine = selectedTier
-      ? `Membership: ${selectedTier.name} (${selectedTier.discountPercent}% OFF · Save ₹${formatInr(unitDiscount)}/hr)`
-      : '';
-    const text = [
-      'Hi, I would like to book this space at WooWoo Art House.',
-      space.imageUrl ? `Image: ${space.imageUrl}` : '',
-      `Product name: ${space.name}`,
-      membershipLine,
-      selectedTier
-        ? `Price: ₹${formatInr(finalUnitPrice)}/hr (Base: ₹${formatInr(activePrice)}/hr · ${activeSegment === 'weekday' ? 'Weekday' : 'Weekend'})`
-        : `Price: ₹${formatInr(activePrice)}/hr (${activeSegment === 'weekday' ? 'Weekday' : 'Weekend'})`,
-      `Date: ${formatDateDisplay(selectedDate)}`,
-      `Custom Timing: ${startTime} to ${endTime} (${durationHours} ${durationHours === 1 ? 'hour' : 'hours'})`,
-      `Estimated Rate: ₹${formatInr(estimatedTotal)}`,
-      space.capacity ? `Capacity: Up to ${space.capacity} people` : '',
-      space.spaceType ? `Type: ${space.spaceType}` : '',
-      `Link: ${spaceShareUrl(space.id, selectedTier?.id)}`,
-    ]
-      .filter(Boolean)
-      .join('\n');
-    const waUrl = `https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent(text)}`;
-    window.open(waUrl, '_blank', 'noopener,noreferrer');
+    setShowBookingModal(true);
   };
 
   const monthName = new Intl.DateTimeFormat('en-US', {
@@ -1695,6 +1662,16 @@ export function SpaceDetailsModal({
         space={space}
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
+      />
+
+      <SpaceBookingModal
+        space={space}
+        isOpen={showBookingModal}
+        onClose={() => setShowBookingModal(false)}
+        initialDate={selectedDate}
+        initialStartTime={startTime}
+        initialEndTime={endTime}
+        membershipTier={selectedTier}
       />
     </div>
   );
