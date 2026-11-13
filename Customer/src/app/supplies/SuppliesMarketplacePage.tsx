@@ -1,11 +1,11 @@
 import {useEffect, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import axios from 'axios';
-import {ArrowLeft, Search, Package, ShoppingCart, Share2, ArrowUp} from 'lucide-react';
+import {ChevronLeft, Search, Package, ShoppingCart, Share2, ArrowUp} from 'lucide-react';
 import {toast} from 'sonner';
 import {ProductDetailsModal} from '../../components/supplies/ProductDetailsModal';
-import {ProductPhoto} from '../../components/supplies/ProductPhoto';
 import {ShareProductModal} from '../../components/supplies/ShareProductModal';
+import {ImageCarousel} from '../../components/ui/ImageCarousel';
 import {
   formatInr,
   productQueryUrl,
@@ -114,10 +114,10 @@ export default function SuppliesMarketplacePage() {
           <button
             type="button"
             onClick={() => navigate('/home')}
-            className="rounded-full p-2 text-slate-600 hover:bg-slate-100"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
             aria-label="Back to home"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
           </button>
           <div className="min-w-0">
             <h1 className="truncate font-display text-xl font-bold text-[#111111]">
@@ -182,6 +182,9 @@ export default function SuppliesMarketplacePage() {
               const inStock = product.availability !== 'out_of_stock';
               const originalPrice = getOriginalPrice(product);
 
+              const cardImages =
+                product.images?.length > 0 ? product.images : product.imageUrl ? [product.imageUrl] : [];
+
               return (
                 <div
                   key={product._id}
@@ -190,27 +193,29 @@ export default function SuppliesMarketplacePage() {
                   className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 text-left shadow-xs transition hover:-translate-y-1 hover:shadow-md cursor-pointer"
                 >
                   <div>
-                    {/* Product Photo Container */}
-                    <div className="relative aspect-4/3 w-full overflow-hidden rounded-2xl bg-[#FFF9F3] flex items-center justify-center">
-                      <ProductPhoto
-                        src={product.imageUrl}
-                        alt={product.name}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-
-                      {/* Stock Badge in Right Corner */}
-                      {inStock ? (
-                        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-700 border border-emerald-200/80 shadow-xs">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          In Stock
-                        </span>
-                      ) : (
-                        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-rose-700 border border-rose-200/80 shadow-xs">
-                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                          Out of Stock
-                        </span>
-                      )}
-                    </div>
+                    {/* Product Photo Container with scrollable images */}
+                    <ImageCarousel
+                      images={cardImages}
+                      alt={product.name}
+                      aspectRatio="aspect-4/3"
+                      roundedClassName="rounded-2xl"
+                      onImageClick={() => setSelected(product)}
+                      badge={
+                        inStock ? (
+                          <span className="pointer-events-none absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-700 border border-emerald-200/80 shadow-xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            In Stock
+                          </span>
+                        ) : (
+                          <span className="pointer-events-none absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-rose-700 border border-rose-200/80 shadow-xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+                            Out of Stock
+                          </span>
+                        )
+                      }
+                      showDots={cardImages.length > 1}
+                      showArrows={cardImages.length > 1}
+                    />
 
                     {/* Product Title */}
                     <div className="mt-3">

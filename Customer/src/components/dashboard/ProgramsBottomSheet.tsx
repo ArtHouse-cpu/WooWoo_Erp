@@ -15,23 +15,29 @@ import {
   Package,
   Wallet,
   Clock,
+  HeartHandshake,
+  Award,
+  Ticket,
+  Gift,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CspJoinModal } from "./CspJoinModal";
 import { HapJoinModal } from "./HapJoinModal";
+import { CvpJoinModal, type CvpApplication } from "./CvpJoinModal";
 import { useCspApplication } from "../../hooks/useCspApplication";
 import { useHapApplication } from "../../hooks/useHapApplication";
 import { useMembership } from "../../context/MembershipContext";
+import { useAuthStore } from "../../store/authStore";
 import { cspProductApi, type CspProgramProduct } from "../../services/csp.service";
 import Swal from "sweetalert2";
 
 type ProgramsBottomSheetProps = {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: "csp" | "hap";
+  initialTab?: "all" | "csp" | "hap" | "cvp";
 };
 
-type TabId = "csp" | "hap";
+type TabId = "all" | "csp" | "hap" | "cvp";
 
 type GalleryItem = {
   id: string;
@@ -122,14 +128,54 @@ function HapIllustration() {
       <div className="absolute top-0 left-6 w-5 h-5 rounded-full border border-white bg-slate-200 shadow-2xs overflow-hidden">
         <img
           src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=60&q=80"
+          alt=""
           className="h-full w-full object-cover"
         />
       </div>
       <div className="absolute bottom-1 right-0 w-5 h-5 rounded-full border border-white bg-slate-200 shadow-2xs overflow-hidden">
         <img
           src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=60&q=80"
+          alt=""
           className="h-full w-full object-cover"
         />
+      </div>
+    </div>
+  );
+}
+
+function CvpIllustration() {
+  return (
+    <div className="relative h-20 w-24 sm:h-24 sm:w-28 shrink-0 flex items-center justify-center bg-transparent overflow-visible">
+      {/* Caring hands holding heart in Emerald */}
+      <svg
+        className="w-12 h-12 text-[#059669] relative z-10"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.5}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"
+        />
+      </svg>
+      {/* Floating Volunteer ID Badge */}
+      <div className="absolute -left-1 bottom-1 w-9 h-11 bg-white border border-[#D1FAE5] rounded-md shadow-2xs rotate-[-8deg] flex flex-col justify-between p-1 z-20">
+        <div className="w-3 h-1 bg-emerald-500 rounded-full mx-auto" />
+        <div className="w-5 h-5 rounded-full bg-emerald-100 mx-auto flex items-center justify-center text-[8px] font-black text-emerald-700">
+          ★
+        </div>
+        <div className="text-[5px] text-[#059669] font-black text-center leading-none">
+          VOLUNTEER
+        </div>
+      </div>
+      {/* Floating Handshake & Check */}
+      <div className="absolute top-0 right-2 w-6 h-6 bg-emerald-50 rounded-full border border-emerald-200 shadow-3xs flex items-center justify-center text-[10px] z-20">
+        🤝
+      </div>
+      <div className="absolute bottom-0 right-1 bg-emerald-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] font-black shadow-xs z-20">
+        ✓
       </div>
     </div>
   );
@@ -352,9 +398,10 @@ function CspMemberDashboard({
 export function ProgramsBottomSheet({
   isOpen,
   onClose,
-  initialTab = "csp",
+  initialTab = "all",
 }: ProgramsBottomSheetProps) {
   const navigate = useNavigate();
+  const customer = useAuthStore((state) => state.customer);
   const { isPremium } = useMembership();
   const { application } = useCspApplication();
   const { application: hapApplication, refresh: refreshHap } = useHapApplication();
@@ -364,6 +411,8 @@ export function ProgramsBottomSheet({
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isHapJoinOpen, setIsHapJoinOpen] = useState(false);
+  const [isCvpJoinOpen, setIsCvpJoinOpen] = useState(false);
+  const [cvpApplication, setCvpApplication] = useState<CvpApplication | null>(null);
   const [cspProducts, setCspProducts] = useState<CspProgramProduct[]>([]);
   const [cspProductsLoading, setCspProductsLoading] = useState(false);
 
@@ -386,6 +435,21 @@ export function ProgramsBottomSheet({
       cancelled = true;
     };
   }, [isOpen, application?.status]);
+
+  // Load CVP application from storage
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const raw = localStorage.getItem(`cvp_application_${customer?._id || "guest"}`);
+      if (raw) {
+        setCvpApplication(JSON.parse(raw));
+      } else {
+        setCvpApplication(null);
+      }
+    } catch {
+      setCvpApplication(null);
+    }
+  }, [isOpen, customer?._id]);
 
   // Sync active tab with initialTab prop when modal opens
   useEffect(() => {
@@ -548,6 +612,116 @@ export function ProgramsBottomSheet({
     },
   ];
 
+  const cvpGallery: GalleryItem[] = [
+    {
+      id: "cvp-vid-1",
+      type: "video",
+      image:
+        "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=400&q=80",
+      tag: "COMMUNITY",
+      title: "Join our vibrant crew!",
+      hasPlayButton: true,
+    },
+    {
+      id: "cvp-custom-1",
+      type: "custom",
+      tag: "HIGHLIGHTS",
+      customComponent: () => (
+        <div className="relative h-full w-full bg-gradient-to-br from-[#059669] to-[#047857] p-2.5 flex flex-col justify-between text-left text-white">
+          <div className="space-y-0.5">
+            <p className="text-[8px] font-black uppercase tracking-wider text-emerald-200">
+              Crew Benefits
+            </p>
+            <p className="text-[10px] font-black leading-tight text-white">
+              Learn, Lead & Connect
+            </p>
+          </div>
+          <div className="space-y-1.5 my-auto">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px]">🎨</span>
+              <span className="text-[7.5px] font-bold text-white">Curate Art Shows</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px]">🎟️</span>
+              <span className="text-[7.5px] font-bold text-white">Free Event Passes</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px]">📜</span>
+              <span className="text-[7.5px] font-bold text-white">Official Certificate</span>
+            </div>
+          </div>
+          <p className="text-[7.5px] font-bold text-emerald-100 leading-snug">
+            Be the heartbeat of Woo Woo!
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: "cvp-img-1",
+      type: "image",
+      image:
+        "https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&w=400&q=80",
+      tag: "WORKSHOPS",
+      title: "Hands-on creative mentoring",
+    },
+    {
+      id: "cvp-custom-2",
+      type: "custom",
+      tag: "COMMUNITY",
+      customComponent: () => (
+        <div className="relative h-full w-full bg-white p-2 flex flex-col justify-between text-left border border-slate-100">
+          <div className="flex justify-between items-center">
+            <span className="text-[7px] font-black text-slate-800">
+              Volunteer Network
+            </span>
+            <span className="text-[5px] font-bold text-emerald-600 bg-emerald-50 px-1 py-0.25 rounded-xs">
+              Active Crew
+            </span>
+          </div>
+          <div className="mt-0.5">
+            <span className="text-[10px] font-black text-slate-900 leading-none">
+              100+ Volunteers
+            </span>
+            <p className="text-[5px] font-bold text-slate-400 leading-none">
+              Across 30+ Exhibitions & Events
+            </p>
+          </div>
+          <div className="space-y-0.75 mt-0.5 text-[5.5px]">
+            <div className="flex justify-between items-center leading-none">
+              <div className="flex items-center gap-0.5 min-w-0">
+                <div className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />
+                <span className="text-slate-500 truncate">Event Management</span>
+              </div>
+              <span className="font-extrabold text-slate-800">45%</span>
+            </div>
+            <div className="flex justify-between items-center leading-none">
+              <div className="flex items-center gap-0.5 min-w-0">
+                <div className="w-1 h-1 rounded-full bg-blue-500 shrink-0" />
+                <span className="text-slate-500 truncate">Gallery Guides</span>
+              </div>
+              <span className="font-extrabold text-slate-800">30%</span>
+            </div>
+            <div className="flex justify-between items-center leading-none">
+              <div className="flex items-center gap-0.5 min-w-0">
+                <div className="w-1 h-1 rounded-full bg-purple-500 shrink-0" />
+                <span className="text-slate-500 truncate">Media & Content</span>
+              </div>
+              <span className="font-extrabold text-slate-800">25%</span>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "cvp-img-2",
+      type: "image",
+      image:
+        "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=400&q=80",
+      tag: "EVENTS",
+      title: "Make lifelong artist friends",
+    },
+  ];
+
   return (
     <>
       <AnimatePresence>
@@ -562,13 +736,13 @@ export function ProgramsBottomSheet({
               className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
             />
 
-            {/* Bottom Sheet Panel */}
+            {/* Bottom Sheet Panel with fixed consistent height across all tabs */}
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 26, stiffness: 240 }}
-              className="relative z-10 flex max-h-[95dvh] h-auto w-full max-w-lg flex-col rounded-t-[32px] bg-white shadow-2xl overflow-hidden border-t border-slate-100"
+              className="relative z-10 flex h-[90dvh] min-h-[90dvh] max-h-[92dvh] sm:h-[88vh] sm:min-h-[88vh] sm:max-h-[90vh] w-full max-w-lg flex-col rounded-t-[32px] bg-white shadow-2xl overflow-hidden border-t border-slate-100"
             >
               {/* Top Drag Handle */}
               <div className="flex shrink-0 justify-center py-3">
@@ -578,22 +752,40 @@ export function ProgramsBottomSheet({
               {/* Header Info */}
               <div className="relative shrink-0 px-5 pb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {/* Dynamic color syncing on header icon */}
+                  {/* Dynamic color & icon syncing on header icon */}
                   <div
                     className={`flex h-14 w-14 items-center justify-center rounded-[16px] transition-all duration-350 ${
-                      activeTab === "csp"
+                      activeTab === "all"
+                        ? "bg-slate-900 text-amber-300"
+                        : activeTab === "csp"
                         ? "bg-[#FFF3EB] text-[#EA580C]"
-                        : "bg-[#F5F3FF] text-[#7C3AED]"
+                        : activeTab === "hap"
+                        ? "bg-[#F5F3FF] text-[#7C3AED]"
+                        : "bg-[#ECFDF5] text-[#059669]"
                     }`}
                   >
-                    <Sparkles className="h-7 w-7" strokeWidth={2} />
+                    {activeTab === "all" ? (
+                      <Sparkles className="h-7 w-7" strokeWidth={2} />
+                    ) : activeTab === "csp" ? (
+                      <ShoppingBag className="h-7 w-7" strokeWidth={2} />
+                    ) : activeTab === "hap" ? (
+                      <Users className="h-7 w-7" strokeWidth={2} />
+                    ) : (
+                      <HeartHandshake className="h-7 w-7" strokeWidth={2} />
+                    )}
                   </div>
                   <div className="text-left">
                     <h3 className="text-[19px] font-extrabold tracking-tight text-[#111111] leading-tight">
                       Our Programs
                     </h3>
                     <p className="mt-0.5 text-[12px] font-bold text-[#6B7280]">
-                      Grow, collaborate & earn with us
+                      {activeTab === "all"
+                        ? "Grow, collaborate & earn with us"
+                        : activeTab === "csp"
+                        ? "Sell your creative products with 0 rent"
+                        : activeTab === "hap"
+                        ? "Invite friends & earn recurring commission"
+                        : "Host events & curate art with our crew"}
                     </p>
                   </div>
                 </div>
@@ -609,13 +801,46 @@ export function ProgramsBottomSheet({
                 </button>
               </div>
 
-              {/* Custom Interactive Program Tabs (CSP / HAP) */}
-              <div className="shrink-0 px-5 mb-4 grid grid-cols-2 gap-3">
-                {/* CSP Tab */}
+              {/* Custom Interactive Program Tabs: All -> CSP -> HAP -> CVP */}
+              <div className="shrink-0 px-4 sm:px-5 mb-4 flex items-stretch gap-2 overflow-x-auto scrollbar-none pb-0.5">
+                {/* 1. All Tab (on left side of CSP) */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("all")}
+                  className={`flex items-center gap-2 px-2.5 py-2 rounded-2xl border text-left transition-all duration-200 cursor-pointer min-w-[95px] flex-1 ${
+                    activeTab === "all"
+                      ? "border-slate-800 bg-slate-900 text-white shadow-[0_4px_12px_rgba(15,23,42,0.12)]"
+                      : "border-slate-100 bg-[#FAFAFA] text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
+                      activeTab === "all"
+                        ? "bg-slate-800 text-amber-300"
+                        : "bg-[#E5E7EB] text-slate-500"
+                    }`}
+                  >
+                    <Sparkles className="h-4 w-4" strokeWidth={2.25} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11.5px] font-black leading-none">
+                      All
+                    </div>
+                    <div
+                      className={`mt-0.5 truncate text-[9px] font-bold ${
+                        activeTab === "all" ? "text-slate-300" : "text-slate-400"
+                      }`}
+                    >
+                      All Programs
+                    </div>
+                  </div>
+                </button>
+
+                {/* 2. CSP Tab */}
                 <button
                   type="button"
                   onClick={() => setActiveTab("csp")}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
+                  className={`flex items-center gap-2 px-2.5 py-2 rounded-2xl border text-left transition-all duration-200 cursor-pointer min-w-[95px] flex-1 ${
                     activeTab === "csp"
                       ? "border-[#EA580C]/40 bg-[#FFF8F2] text-[#EA580C] shadow-[0_4px_12px_rgba(234,88,12,0.06)]"
                       : "border-slate-100 bg-[#FAFAFA] text-slate-500 hover:bg-slate-50"
@@ -635,18 +860,20 @@ export function ProgramsBottomSheet({
                       CSP
                     </div>
                     <div
-                      className={`mt-0.5 truncate text-[9px] font-bold ${activeTab === "csp" ? "text-[#C2410C]" : "text-slate-400"}`}
+                      className={`mt-0.5 truncate text-[9px] font-bold ${
+                        activeTab === "csp" ? "text-[#C2410C]" : "text-slate-400"
+                      }`}
                     >
-                      Creative Sailor Program
+                      Creative Sailor
                     </div>
                   </div>
                 </button>
 
-                {/* HAP Tab */}
+                {/* 3. HAP Tab */}
                 <button
                   type="button"
                   onClick={() => setActiveTab("hap")}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer ${
+                  className={`flex items-center gap-2 px-2.5 py-2 rounded-2xl border text-left transition-all duration-200 cursor-pointer min-w-[95px] flex-1 ${
                     activeTab === "hap"
                       ? "border-[#7C3AED]/40 bg-[#F5F3FF] text-[#7C3AED] shadow-[0_4px_12px_rgba(124,58,237,0.06)]"
                       : "border-slate-100 bg-[#FAFAFA] text-slate-500 hover:bg-slate-50"
@@ -666,17 +893,195 @@ export function ProgramsBottomSheet({
                       HAP
                     </div>
                     <div
-                      className={`mt-0.5 truncate text-[9px] font-bold ${activeTab === "hap" ? "text-[#6D28D9]" : "text-slate-400"}`}
+                      className={`mt-0.5 truncate text-[9px] font-bold ${
+                        activeTab === "hap" ? "text-[#6D28D9]" : "text-slate-400"
+                      }`}
                     >
-                      House Affiliate Program
+                      House Affiliate
+                    </div>
+                  </div>
+                </button>
+
+                {/* 4. CVP Tab (on right side of HAP) */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("cvp")}
+                  className={`flex items-center gap-2 px-2.5 py-2 rounded-2xl border text-left transition-all duration-200 cursor-pointer min-w-[95px] flex-1 ${
+                    activeTab === "cvp"
+                      ? "border-[#059669]/40 bg-[#ECFDF5] text-[#059669] shadow-[0_4px_12px_rgba(5,150,105,0.06)]"
+                      : "border-slate-100 bg-[#FAFAFA] text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  <div
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
+                      activeTab === "cvp"
+                        ? "bg-[#D1FAE5] text-[#059669]"
+                        : "bg-[#E5E7EB] text-slate-500"
+                    }`}
+                  >
+                    <HeartHandshake className="h-4 w-4" strokeWidth={2.25} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11.5px] font-black leading-none">
+                      CVP
+                    </div>
+                    <div
+                      className={`mt-0.5 truncate text-[9px] font-bold ${
+                        activeTab === "cvp" ? "text-emerald-700" : "text-slate-400"
+                      }`}
+                    >
+                      Volunteering
                     </div>
                   </div>
                 </button>
               </div>
 
               {/* Scrollable Contents */}
-              <div className="flex-1 overflow-y-auto pb-6">
-                {activeTab === "csp" && enrolled ? (
+              <div className="min-h-0 flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable]">
+                {activeTab === "all" ? (
+                  /* ALL PROGRAMS OVERVIEW TAB */
+                  <div className="space-y-3.5 px-4 sm:px-5 pb-2 text-left">
+                    {/* Ecosystem Welcome Banner */}
+                    <div className="p-4 rounded-[22px] bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white relative overflow-hidden shadow-sm">
+                      <div className="relative z-10">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black tracking-wide uppercase">
+                          <Sparkles className="h-3 w-3" /> Woo Woo Ecosystem
+                        </span>
+                        <h4 className="mt-2 text-[16px] font-black leading-tight text-white">
+                          3 Pathways to Create, Earn & Belong
+                        </h4>
+                        <p className="mt-1 text-[11.5px] font-medium text-slate-300 leading-relaxed">
+                          Whether you want to retail artwork, monetize your network, or co-create cultural events, explore each program below.
+                        </p>
+                      </div>
+                      <div className="absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-indigo-500/10 blur-xl pointer-events-none" />
+                      <div className="absolute top-0 right-10 w-20 h-20 rounded-full bg-amber-500/10 blur-lg pointer-events-none" />
+                    </div>
+
+                    {/* Program 1: CSP */}
+                    <div className="rounded-[22px] border border-orange-100 bg-[#FFFBF8] p-4 shadow-xs transition hover:shadow-md">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FFF0EB] text-[#EA580C]">
+                            <ShoppingBag className="h-5 w-5" strokeWidth={2.2} />
+                          </div>
+                          <div>
+                            <span className="inline-block text-[9.5px] font-black uppercase tracking-wider text-[#EA580C]">
+                              01 · Sell Products
+                            </span>
+                            <h4 className="text-[14px] font-black text-slate-900 leading-tight">
+                              Creative Sailor Program (CSP)
+                            </h4>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="mt-2.5 text-[11.5px] font-medium leading-relaxed text-slate-600">
+                        Display and sell your creative artworks, handmade goods, and art merchandise at WOO WOO Art House with zero rent and zero upfront investment.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <span className="rounded-lg bg-orange-100/70 px-2 py-0.5 text-[10px] font-bold text-[#EA580C]">
+                          Zero Investment
+                        </span>
+                        <span className="rounded-lg bg-orange-100/70 px-2 py-0.5 text-[10px] font-bold text-[#EA580C]">
+                          Zero Rent
+                        </span>
+                        <span className="rounded-lg bg-orange-100/70 px-2 py-0.5 text-[10px] font-bold text-[#EA580C]">
+                          Sell Direct
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("csp")}
+                        className="mt-3.5 flex w-full items-center justify-between rounded-xl bg-white border border-[#FFEDD5] px-3.5 py-2.5 text-[12px] font-extrabold text-[#EA580C] hover:bg-orange-50/50 transition cursor-pointer"
+                      >
+                        <span>Explore CSP Details</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {/* Program 2: HAP */}
+                    <div className="rounded-[22px] border border-purple-100 bg-[#FAF9FF] p-4 shadow-xs transition hover:shadow-md">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#EDE9FE] text-[#7C3AED]">
+                            <Users className="h-5 w-5" strokeWidth={2.2} />
+                          </div>
+                          <div>
+                            <span className="inline-block text-[9.5px] font-black uppercase tracking-wider text-[#7C3AED]">
+                              02 · Refer & Earn
+                            </span>
+                            <h4 className="text-[14px] font-black text-slate-900 leading-tight">
+                              House Affiliate Program (HAP)
+                            </h4>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="mt-2.5 text-[11.5px] font-medium leading-relaxed text-slate-600">
+                        Monetize your network. Share your personalized invite link and earn ongoing recurring commissions on space bookings, events, and memberships.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <span className="rounded-lg bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-[#7C3AED]">
+                          Unlimited Earnings
+                        </span>
+                        <span className="rounded-lg bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-[#7C3AED]">
+                          Monetize Network
+                        </span>
+                        <span className="rounded-lg bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-[#7C3AED]">
+                          Monthly Payouts
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("hap")}
+                        className="mt-3.5 flex w-full items-center justify-between rounded-xl bg-white border border-[#EDE9FE] px-3.5 py-2.5 text-[12px] font-extrabold text-[#7C3AED] hover:bg-purple-50/50 transition cursor-pointer"
+                      >
+                        <span>Explore HAP Details</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {/* Program 3: CVP */}
+                    <div className="rounded-[22px] border border-emerald-100 bg-[#F6FEF9] p-4 shadow-xs transition hover:shadow-md">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#D1FAE5] text-[#059669]">
+                            <HeartHandshake className="h-5 w-5" strokeWidth={2.2} />
+                          </div>
+                          <div>
+                            <span className="inline-block text-[9.5px] font-black uppercase tracking-wider text-[#059669]">
+                              03 · Community & Events
+                            </span>
+                            <h4 className="text-[14px] font-black text-slate-900 leading-tight">
+                              Community Volunteering Program (CVP)
+                            </h4>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="mt-2.5 text-[11.5px] font-medium leading-relaxed text-slate-600">
+                        Experience art from the inside out! Join our energetic crew to help curate exhibitions, guide visitors, coordinate workshops, and gain verified perks.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <span className="rounded-lg bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-[#059669]">
+                          Official Certificate
+                        </span>
+                        <span className="rounded-lg bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-[#059669]">
+                          Free Event Passes
+                        </span>
+                        <span className="rounded-lg bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-[#059669]">
+                          Art House Perks
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("cvp")}
+                        className="mt-3.5 flex w-full items-center justify-between rounded-xl bg-white border border-[#D1FAE5] px-3.5 py-2.5 text-[12px] font-extrabold text-[#059669] hover:bg-emerald-50/50 transition cursor-pointer"
+                      >
+                        <span>Explore CVP Details</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : activeTab === "csp" && enrolled ? (
                   <CspMemberDashboard products={cspProducts} loading={cspProductsLoading} />
                 ) : activeTab === "hap" && hapApproved && hapApplication ? (
                   <HapMemberDashboard
@@ -685,355 +1090,470 @@ export function ProgramsBottomSheet({
                     presence={hapApplication.presence}
                   />
                 ) : (
-                <>
-                {activeTab === "csp" &&
-                (application?.status === "under_review" ||
-                  application?.status === "rejected") ? (
-                  <CspStatusNotice
-                    status={application.status}
-                    reason={application.rejectionReason}
-                  />
-                ) : null}
-                {activeTab === "hap" &&
-                (hapApplication?.status === "under_review" ||
-                  hapApplication?.status === "rejected") ? (
-                  <div
-                    className={`mx-5 mb-4 rounded-2xl border px-3.5 py-3 text-left ${
-                      hapApplication.status === "rejected"
-                        ? "border-rose-200 bg-rose-50"
-                        : "border-amber-200 bg-amber-50"
-                    }`}
-                  >
-                    <span className="inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-700">
-                      {hapApplication.status === "rejected" ? "Rejected" : "Waiting for approval"}
-                    </span>
-                    <p className="mt-2 text-[12px] font-semibold leading-relaxed text-slate-700">
-                      {hapApplication.status === "rejected"
-                        ? hapApplication.rejectionReason?.trim() ||
-                          "No reason was provided. You can apply again."
-                        : "Your HAP application is under review. Please wait for approval."}
-                    </p>
-                  </div>
-                ) : null}
-                {/* Horizontal Gallery */}
-                <div className="px-5 mb-1.5 flex gap-3 overflow-x-auto scrollbar-none py-1">
-                  {(activeTab === "csp" ? cspGallery : hapGallery).map(
-                    (item) => {
-                      if (item.type === "custom" && item.customComponent) {
+                  <>
+                    {/* Status Notice for CSP */}
+                    {activeTab === "csp" &&
+                    (application?.status === "under_review" ||
+                      application?.status === "rejected") ? (
+                      <CspStatusNotice
+                        status={application.status}
+                        reason={application.rejectionReason}
+                      />
+                    ) : null}
+
+                    {/* Status Notice for HAP */}
+                    {activeTab === "hap" &&
+                    (hapApplication?.status === "under_review" ||
+                      hapApplication?.status === "rejected") ? (
+                      <div
+                        className={`mx-5 mb-4 rounded-2xl border px-3.5 py-3 text-left ${
+                          hapApplication.status === "rejected"
+                            ? "border-rose-200 bg-rose-50"
+                            : "border-amber-200 bg-amber-50"
+                        }`}
+                      >
+                        <span className="inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-700">
+                          {hapApplication.status === "rejected" ? "Rejected" : "Waiting for approval"}
+                        </span>
+                        <p className="mt-2 text-[12px] font-semibold leading-relaxed text-slate-700">
+                          {hapApplication.status === "rejected"
+                            ? hapApplication.rejectionReason?.trim() ||
+                              "No reason was provided. You can apply again."
+                            : "Your HAP application is under review. Please wait for approval."}
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {/* Status Notice for CVP */}
+                    {activeTab === "cvp" && cvpApplication ? (
+                      <div className="mx-5 mb-4 rounded-2xl border px-3.5 py-3 text-left border-emerald-200 bg-emerald-50">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-800">
+                            Application Submitted
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsCvpJoinOpen(true)}
+                            className="text-[11px] font-extrabold text-emerald-700 underline hover:text-emerald-800 cursor-pointer"
+                          >
+                            View / Edit Form
+                          </button>
+                        </div>
+                        <p className="mt-2 text-[12px] font-semibold leading-relaxed text-emerald-900">
+                          Thank you {cvpApplication.name}! Your volunteering application as <strong>{cvpApplication.profession || "Volunteer"}</strong> has been submitted. Check WhatsApp for confirmation.
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {/* Horizontal Gallery */}
+                    <div className="px-5 mb-1.5 flex gap-3 overflow-x-auto scrollbar-none py-1">
+                      {(activeTab === "csp"
+                        ? cspGallery
+                        : activeTab === "hap"
+                        ? hapGallery
+                        : cvpGallery
+                      ).map((item) => {
+                        if (item.type === "custom" && item.customComponent) {
+                          return (
+                            <div
+                              key={item.id}
+                              className="relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs"
+                            >
+                              {item.customComponent()}
+                            </div>
+                          );
+                        }
+
                         return (
                           <div
                             key={item.id}
                             className="relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs"
                           >
-                            {item.customComponent()}
+                            <img
+                              src={item.image}
+                              alt={item.tag}
+                              className="h-full w-full object-cover"
+                            />
+
+                            {/* Media Type Badge */}
+                            <div className="absolute left-2.5 top-2.5 rounded-[5px] bg-black/60 px-1.5 py-0.5 text-[7.5px] font-black text-white tracking-wider">
+                              {item.tag}
+                            </div>
+
+                            {/* Pagination or Custom Top Right Badge */}
+                            {item.badge && (
+                              <div className="absolute right-2.5 top-2.5 rounded-[5px] bg-black/60 px-1.5 py-0.5 text-[7.5px] font-black text-white tracking-wider">
+                                {item.badge}
+                              </div>
+                            )}
+
+                            {/* Play Button Overlay */}
+                            {item.hasPlayButton && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/30 text-white border border-white/40 shadow-sm backdrop-blur-xs">
+                                  <Play className="h-3 w-3 fill-white text-white ml-0.5" />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Footer text title */}
+                            {item.title && (
+                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2.5 text-left">
+                                <p className="text-[10px] font-extrabold text-white tracking-wide leading-tight">
+                                  {item.title}
+                                </p>
+                              </div>
+                            )}
                           </div>
                         );
-                      }
-
-                      return (
-                        <div
-                          key={item.id}
-                          className="relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs"
-                        >
-                          <img
-                            src={item.image}
-                            alt={item.tag}
-                            className="h-full w-full object-cover"
-                          />
-
-                          {/* Media Type Badge */}
-                          <div className="absolute left-2.5 top-2.5 rounded-[5px] bg-black/60 px-1.5 py-0.5 text-[7.5px] font-black text-white tracking-wider">
-                            {item.tag}
-                          </div>
-
-                          {/* Pagination or Custom Top Right Badge */}
-                          {item.badge && (
-                            <div className="absolute right-2.5 top-2.5 rounded-[5px] bg-black/60 px-1.5 py-0.5 text-[7.5px] font-black text-white tracking-wider">
-                              {item.badge}
-                            </div>
-                          )}
-
-                          {/* Play Button Overlay */}
-                          {item.hasPlayButton && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/30 text-white border border-white/40 shadow-sm backdrop-blur-xs">
-                                <Play className="h-3 w-3 fill-white text-white ml-0.5" />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Footer text title (e.g. Invite Friends. Earn Unlimited!) */}
-                          {item.title && (
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2.5 text-left">
-                              <p className="text-[10px] font-extrabold text-white tracking-wide leading-tight">
-                                {item.title}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    },
-                  )}
-                </div>
-
-                {/* Pagination Dots */}
-                <div className="flex justify-center gap-1.5 mt-2 mb-4">
-                  {[0, 1, 2, 3, 4].map((idx) => (
-                    <span
-                      key={idx}
-                      className={`h-1.5 w-1.5 rounded-full transition-all duration-200 ${
-                        idx === 0
-                          ? activeTab === "csp"
-                            ? "bg-[#EA580C] w-3"
-                            : "bg-[#7C3AED] w-3"
-                          : "bg-[#E5E7EB]"
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                {/* Statistics Grid */}
-                <div className="grid grid-cols-3 gap-2.5 px-5 mb-4">
-                  {activeTab === "csp" ? (
-                    <>
-                      {/* Stat 1 */}
-                      <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#FFF8F2] border border-[#FFEDD5] text-center">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FFF0EB] text-[#EA580C] mb-2">
-                          <Users className="h-4.5 w-4.5" strokeWidth={2.25} />
-                        </div>
-                        <div className="text-[13px] font-black text-slate-900 leading-none">
-                          50+
-                        </div>
-                        <div className="mt-1 text-[8.5px] font-extrabold text-[#7C2D12] leading-tight">
-                          Creative sailors
-                        </div>
-                      </div>
-                      {/* Stat 2 */}
-                      <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F0FDF4] border border-[#DCFCE7] text-center">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] mb-2">
-                          <IndianRupee
-                            className="h-4.5 w-4.5"
-                            strokeWidth={2.25}
-                          />
-                        </div>
-                        <div className="text-[13px] font-black text-slate-900 leading-none">
-                          ₹25 Lakhs+
-                        </div>
-                        <div className="mt-1 text-[8.5px] font-extrabold text-[#14532D] leading-tight">
-                          Revenue Gen
-                        </div>
-                      </div>
-                      {/* Stat 3 */}
-                      <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] text-center">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DBEAFE] text-[#2563EB] mb-2">
-                          <Target className="h-4.5 w-4.5" strokeWidth={2.25} />
-                        </div>
-                        <div className="text-[13px] font-black text-slate-900 leading-none">
-                          5K+
-                        </div>
-                        <div className="mt-1 text-[8.5px] font-extrabold text-[#1E3A8A] leading-tight">
-                          Customer Leads
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Stat 1 */}
-                      <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F5F3FF] border border-[#EDE9FE] text-center">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EDE9FE] text-[#7C3AED] mb-2">
-                          <Users className="h-4.5 w-4.5" strokeWidth={2.25} />
-                        </div>
-                        <div className="text-[13px] font-black text-slate-900 leading-none">
-                          50+
-                        </div>
-                        <div className="mt-1 text-[8.5px] font-extrabold text-[#4C1D95] leading-tight">
-                          Active Affiliates
-                        </div>
-                        <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
-                          Growing every day
-                        </div>
-                      </div>
-                      {/* Stat 2 */}
-                      <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F0FDF4] border border-[#DCFCE7] text-center">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] mb-2">
-                          <IndianRupee
-                            className="h-4.5 w-4.5"
-                            strokeWidth={2.25}
-                          />
-                        </div>
-                        <div className="text-[13px] font-black text-slate-900 leading-none">
-                          ₹25 Lakhs+
-                        </div>
-                        <div className="mt-1 text-[8.5px] font-extrabold text-[#14532D] leading-tight">
-                          Commission Gen
-                        </div>
-                        <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
-                          From affiliate earnings
-                        </div>
-                      </div>
-                      {/* Stat 3 */}
-                      <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] text-center">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DBEAFE] text-[#2563EB] mb-2">
-                          <Target className="h-4.5 w-4.5" strokeWidth={2.25} />
-                        </div>
-                        <div className="text-[13px] font-black text-slate-900 leading-none">
-                          5K+
-                        </div>
-                        <div className="mt-1 text-[8.5px] font-extrabold text-[#1E3A8A] leading-tight">
-                          Leads Driven
-                        </div>
-                        <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
-                          By our affiliates
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Main Detailed Info Card */}
-                <div className="mx-5 p-4 rounded-[24px] border bg-[#FAFBFD] relative overflow-hidden text-left shadow-2xs border-slate-100">
-                  {/* Info Card Content */}
-                  <div className="flex justify-between items-start gap-4 mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        {/* Number Badge */}
-                        <span
-                          className={`inline-flex items-center justify-center text-[11px] font-black h-5 w-5 rounded-md leading-none ${
-                            activeTab === "csp"
-                              ? "bg-[#EA580C] text-white"
-                              : "bg-[#7C3AED] text-white"
-                          }`}
-                        >
-                          {activeTab === "csp" ? "01" : "02"}
-                        </span>
-                        <h4 className="text-[15px] font-black text-slate-900 leading-none">
-                          {activeTab === "csp"
-                            ? "Creative Sailor Program"
-                            : "House Affiliate Program"}
-                        </h4>
-                      </div>
-
-                      <p className="mt-3.5 text-[11.5px] font-bold text-slate-500 leading-relaxed max-w-[80%] md:max-w-[75%]">
-                        {activeTab === "csp"
-                          ? "A zero-cost opportunity for creative professionals and small businesses to sell their products directly at WOO WOO Art House."
-                          : "Invite, engage & earn! Promote WOO WOO Art House and earn unlimited commission on every activity."}
-                      </p>
+                      })}
                     </div>
 
-                    {/* Conditionally Render Custom Illustrations */}
-                    {activeTab === "csp" ? (
-                      <CspIllustration />
-                    ) : (
-                      <HapIllustration />
-                    )}
-                  </div>
+                    {/* Pagination Dots */}
+                    <div className="flex justify-center gap-1.5 mt-2 mb-4">
+                      {[0, 1, 2, 3, 4].map((idx) => (
+                        <span
+                          key={idx}
+                          className={`h-1.5 w-1.5 rounded-full transition-all duration-200 ${
+                            idx === 0
+                              ? activeTab === "csp"
+                                ? "bg-[#EA580C] w-3"
+                                : activeTab === "hap"
+                                ? "bg-[#7C3AED] w-3"
+                                : "bg-[#059669] w-3"
+                              : "bg-[#E5E7EB]"
+                          }`}
+                        />
+                      ))}
+                    </div>
 
-                  {/* Features Strip */}
-                  <div className="border-t border-slate-100 pt-3.5 flex justify-between items-center gap-2">
-                    {activeTab === "csp" ? (
-                      <>
-                        {/* Feature 1 */}
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                          <div className="h-7 w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
-                            <IndianRupee
-                              className="h-3.5 w-3.5"
-                              strokeWidth={2.25}
-                            />
+                    {/* Statistics Grid */}
+                    <div className="grid grid-cols-3 gap-2.5 px-5 mb-4">
+                      {activeTab === "csp" ? (
+                        <>
+                          {/* Stat 1 */}
+                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#FFF8F2] border border-[#FFEDD5] text-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FFF0EB] text-[#EA580C] mb-2">
+                              <Users className="h-4.5 w-4.5" strokeWidth={2.25} />
+                            </div>
+                            <div className="text-[13px] font-black text-slate-900 leading-none">
+                              50+
+                            </div>
+                            <div className="mt-1 text-[8.5px] font-extrabold text-[#7C2D12] leading-tight">
+                              Creative sailors
+                            </div>
                           </div>
-                          <span className="text-[10px] font-black text-slate-700 leading-none truncate">
-                            Zero Investment
-                          </span>
+                          {/* Stat 2 */}
+                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F0FDF4] border border-[#DCFCE7] text-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] mb-2">
+                              <IndianRupee className="h-4.5 w-4.5" strokeWidth={2.25} />
+                            </div>
+                            <div className="text-[13px] font-black text-slate-900 leading-none">
+                              ₹25 Lakhs+
+                            </div>
+                            <div className="mt-1 text-[8.5px] font-extrabold text-[#14532D] leading-tight">
+                              Revenue Gen
+                            </div>
+                          </div>
+                          {/* Stat 3 */}
+                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] text-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DBEAFE] text-[#2563EB] mb-2">
+                              <Target className="h-4.5 w-4.5" strokeWidth={2.25} />
+                            </div>
+                            <div className="text-[13px] font-black text-slate-900 leading-none">
+                              5K+
+                            </div>
+                            <div className="mt-1 text-[8.5px] font-extrabold text-[#1E3A8A] leading-tight">
+                              Customer Leads
+                            </div>
+                          </div>
+                        </>
+                      ) : activeTab === "hap" ? (
+                        <>
+                          {/* Stat 1 */}
+                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F5F3FF] border border-[#EDE9FE] text-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EDE9FE] text-[#7C3AED] mb-2">
+                              <Users className="h-4.5 w-4.5" strokeWidth={2.25} />
+                            </div>
+                            <div className="text-[13px] font-black text-slate-900 leading-none">
+                              50+
+                            </div>
+                            <div className="mt-1 text-[8.5px] font-extrabold text-[#4C1D95] leading-tight">
+                              Active Affiliates
+                            </div>
+                            <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
+                              Growing every day
+                            </div>
+                          </div>
+                          {/* Stat 2 */}
+                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#F0FDF4] border border-[#DCFCE7] text-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DCFCE7] text-[#16A34A] mb-2">
+                              <IndianRupee className="h-4.5 w-4.5" strokeWidth={2.25} />
+                            </div>
+                            <div className="text-[13px] font-black text-slate-900 leading-none">
+                              ₹25 Lakhs+
+                            </div>
+                            <div className="mt-1 text-[8.5px] font-extrabold text-[#14532D] leading-tight">
+                              Commission Gen
+                            </div>
+                            <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
+                              From affiliate earnings
+                            </div>
+                          </div>
+                          {/* Stat 3 */}
+                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] text-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DBEAFE] text-[#2563EB] mb-2">
+                              <Target className="h-4.5 w-4.5" strokeWidth={2.25} />
+                            </div>
+                            <div className="text-[13px] font-black text-slate-900 leading-none">
+                              5K+
+                            </div>
+                            <div className="mt-1 text-[8.5px] font-extrabold text-[#1E3A8A] leading-tight">
+                              Leads Driven
+                            </div>
+                            <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
+                              By our affiliates
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* CVP Stat 1 */}
+                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#ECFDF5] border border-[#D1FAE5] text-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#D1FAE5] text-[#059669] mb-2">
+                              <Users className="h-4.5 w-4.5" strokeWidth={2.25} />
+                            </div>
+                            <div className="text-[13px] font-black text-slate-900 leading-none">
+                              100+
+                            </div>
+                            <div className="mt-1 text-[8.5px] font-extrabold text-[#065F46] leading-tight">
+                              Active Crew
+                            </div>
+                            <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
+                              Passionate volunteers
+                            </div>
+                          </div>
+                          {/* CVP Stat 2 */}
+                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] text-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DBEAFE] text-[#2563EB] mb-2">
+                              <Ticket className="h-4.5 w-4.5" strokeWidth={2.25} />
+                            </div>
+                            <div className="text-[13px] font-black text-slate-900 leading-none">
+                              30+
+                            </div>
+                            <div className="mt-1 text-[8.5px] font-extrabold text-[#1E3A8A] leading-tight">
+                              Events Hosted
+                            </div>
+                            <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
+                              Exhibitions & shows
+                            </div>
+                          </div>
+                          {/* CVP Stat 3 */}
+                          <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[#FEF3C7] border border-[#FDE68A] text-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#FDE68A] text-[#D97706] mb-2">
+                              <Award className="h-4.5 w-4.5" strokeWidth={2.25} />
+                            </div>
+                            <div className="text-[13px] font-black text-slate-900 leading-none">
+                              100%
+                            </div>
+                            <div className="mt-1 text-[8.5px] font-extrabold text-[#92400E] leading-tight">
+                              Certified Perks
+                            </div>
+                            <div className="mt-1 text-[7.5px] font-bold text-slate-400 leading-none">
+                              Official recognition
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Main Detailed Info Card */}
+                    <div className="mx-5 p-4 rounded-[24px] border bg-[#FAFBFD] relative overflow-hidden text-left shadow-2xs border-slate-100">
+                      {/* Info Card Content */}
+                      <div className="flex justify-between items-start gap-4 mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            {/* Number Badge */}
+                            <span
+                              className={`inline-flex items-center justify-center text-[11px] font-black h-5 w-5 rounded-md leading-none ${
+                                activeTab === "csp"
+                                  ? "bg-[#EA580C] text-white"
+                                  : activeTab === "hap"
+                                  ? "bg-[#7C3AED] text-white"
+                                  : "bg-[#059669] text-white"
+                              }`}
+                            >
+                              {activeTab === "csp" ? "01" : activeTab === "hap" ? "02" : "03"}
+                            </span>
+                            <h4 className="text-[15px] font-black text-slate-900 leading-none">
+                              {activeTab === "csp"
+                                ? "Creative Sailor Program"
+                                : activeTab === "hap"
+                                ? "House Affiliate Program"
+                                : "Community Volunteering Program"}
+                            </h4>
+                          </div>
+
+                          <p className="mt-3.5 text-[11.5px] font-bold text-slate-500 leading-relaxed max-w-[80%] md:max-w-[75%]">
+                            {activeTab === "csp"
+                              ? "A zero-cost opportunity for creative professionals and small businesses to sell their products directly at WOO WOO Art House."
+                              : activeTab === "hap"
+                              ? "Invite, engage & earn! Promote WOO WOO Art House and earn unlimited commission on every activity."
+                              : "Experience art from the inside out! Join our energetic crew of creators, curators, and event hosts at WOO WOO Art House."}
+                          </p>
                         </div>
 
-                        {/* Separator */}
-                        <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+                        {/* Conditionally Render Custom Illustrations */}
+                        {activeTab === "csp" ? (
+                          <CspIllustration />
+                        ) : activeTab === "hap" ? (
+                          <HapIllustration />
+                        ) : (
+                          <CvpIllustration />
+                        )}
+                      </div>
 
-                        {/* Feature 2 */}
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                          <div className="h-7 w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
-                            <Store className="h-3.5 w-3.5" strokeWidth={2.25} />
-                          </div>
-                          <span className="text-[10px] font-black text-slate-700 leading-none truncate">
-                            Zero Rent
-                          </span>
-                        </div>
+                      {/* Features Strip */}
+                      <div className="border-t border-slate-100 pt-3.5 flex justify-between items-center gap-2">
+                        {activeTab === "csp" ? (
+                          <>
+                            {/* Feature 1 */}
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
+                              <div className="h-7 w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
+                                <IndianRupee className="h-3.5 w-3.5" strokeWidth={2.25} />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                                Zero Investment
+                              </span>
+                            </div>
 
-                        {/* Separator */}
-                        <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
 
-                        {/* Feature 3 */}
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                          <div className="h-7 w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
-                            <ShoppingBag
-                              className="h-3.5 w-3.5"
-                              strokeWidth={2.25}
-                            />
-                          </div>
-                          <span className="text-[10px] font-black text-slate-700 leading-none truncate">
-                            Sell Direct
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* Feature 1 */}
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                          <div className="h-7 w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
-                            <IndianRupee
-                              className="h-3.5 w-3.5"
-                              strokeWidth={2.25}
-                            />
-                          </div>
-                          <span className="text-[10px] font-black text-slate-700 leading-none truncate">
-                            Zero Investment
-                          </span>
-                        </div>
+                            {/* Feature 2 */}
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
+                              <div className="h-7 w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
+                                <Store className="h-3.5 w-3.5" strokeWidth={2.25} />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                                Zero Rent
+                              </span>
+                            </div>
 
-                        {/* Separator */}
-                        <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
 
-                        {/* Feature 2 */}
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                          <div className="h-7 w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
-                            <TrendingUp
-                              className="h-3.5 w-3.5"
-                              strokeWidth={2.25}
-                            />
-                          </div>
-                          <span className="text-[10px] font-black text-slate-700 leading-none truncate">
-                            Earn Unlimited
-                          </span>
-                        </div>
+                            {/* Feature 3 */}
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
+                              <div className="h-7 w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
+                                <ShoppingBag className="h-3.5 w-3.5" strokeWidth={2.25} />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                                Sell Direct
+                              </span>
+                            </div>
+                          </>
+                        ) : activeTab === "hap" ? (
+                          <>
+                            {/* Feature 1 */}
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
+                              <div className="h-7 w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
+                                <IndianRupee className="h-3.5 w-3.5" strokeWidth={2.25} />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                                Zero Investment
+                              </span>
+                            </div>
 
-                        {/* Separator */}
-                        <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
 
-                        {/* Feature 3 */}
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                          <div className="h-7 w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
-                            <Users className="h-3.5 w-3.5" strokeWidth={2.25} />
-                          </div>
-                          <span className="text-[10px] font-black text-slate-700 leading-none truncate">
-                            Monetize Network
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-                </>
+                            {/* Feature 2 */}
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
+                              <div className="h-7 w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
+                                <TrendingUp className="h-3.5 w-3.5" strokeWidth={2.25} />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                                Earn Unlimited
+                              </span>
+                            </div>
+
+                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+
+                            {/* Feature 3 */}
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
+                              <div className="h-7 w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
+                                <Users className="h-3.5 w-3.5" strokeWidth={2.25} />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                                Monetize Network
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {/* Feature 1 */}
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
+                              <div className="h-7 w-7 rounded-full bg-[#059669] text-white flex items-center justify-center shrink-0">
+                                <Award className="h-3.5 w-3.5" strokeWidth={2.25} />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                                Official Certificate
+                              </span>
+                            </div>
+
+                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+
+                            {/* Feature 2 */}
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
+                              <div className="h-7 w-7 rounded-full bg-[#059669] text-white flex items-center justify-center shrink-0">
+                                <Ticket className="h-3.5 w-3.5" strokeWidth={2.25} />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                                Free Event Entry
+                              </span>
+                            </div>
+
+                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+
+                            {/* Feature 3 */}
+                            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
+                              <div className="h-7 w-7 rounded-full bg-[#059669] text-white flex items-center justify-center shrink-0">
+                                <Gift className="h-3.5 w-3.5" strokeWidth={2.25} />
+                              </div>
+                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                                Art House Perks
+                              </span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
 
-              {/* Sticky Bottom Actions */}
-              <div className="sticky bottom-0 bg-white border-t border-slate-100 p-4 flex gap-3 z-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {/* Fixed Bottom Actions */}
+              <div className="shrink-0 bg-white border-t border-slate-100 p-4 flex gap-3 z-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 {/* Query More Button */}
                 <button
                   type="button"
+                  onClick={() => {
+                    const text =
+                      activeTab === "all"
+                        ? "Hi! I would like to know more about the Programs at Woo Woo Art House."
+                        : activeTab === "csp"
+                        ? "Hi! I would like to know more about the Creative Sailor Program (CSP) at Woo Woo Art House."
+                        : activeTab === "hap"
+                        ? "Hi! I would like to know more about the House Affiliate Program (HAP) at Woo Woo Art House."
+                        : "Hi! I would like to know more about the Community Volunteering Program (CVP) at Woo Woo Art House.";
+                    window.open(`https://wa.me/918073988123?text=${encodeURIComponent(text)}`, "_blank");
+                  }}
                   className={`flex-1 py-3 px-3 rounded-[16px] border text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                    activeTab === "csp"
+                    activeTab === "all"
+                      ? "border-slate-800 text-slate-800 hover:bg-slate-50"
+                      : activeTab === "csp"
                       ? "border-[#EA580C] text-[#EA580C] hover:bg-[#FFF8F2]"
-                      : "border-[#7C3AED] text-[#7C3AED] hover:bg-[#F5F3FF]"
+                      : activeTab === "hap"
+                      ? "border-[#7C3AED] text-[#7C3AED] hover:bg-[#F5F3FF]"
+                      : "border-[#059669] text-[#059669] hover:bg-[#ECFDF5]"
                   }`}
                 >
                   <MessageSquare className="h-4.5 w-4.5" strokeWidth={2.5} />
@@ -1043,45 +1563,62 @@ export function ProgramsBottomSheet({
                 <button
                   type="button"
                   onClick={() => {
-                    if (activeTab === "csp" && enrolled) {
-                      onClose();
-                      navigate("/programs");
+                    if (activeTab === "all") {
+                      setActiveTab("csp");
+                      return;
+                    }
+                    if (activeTab === "csp") {
+                      if (enrolled) {
+                        onClose();
+                        navigate("/programs");
+                        return;
+                      }
+                      if (!isPremium) {
+                        Swal.fire({
+                          icon: "info",
+                          title: "Premium Membership Required",
+                          text: "Upgrade to Premium to join CSP.",
+                          confirmButtonText: "OK",
+                          confirmButtonColor: "#4F46E5",
+                        });
+                        return;
+                      }
+                      setIsJoinModalOpen(true);
                       return;
                     }
                     if (activeTab === "hap") {
                       setIsHapJoinOpen(true);
                       return;
                     }
-                    if (activeTab === "csp" && !isPremium) {
-                      // keep the programs modal open; do not open the apply form
-                      Swal.fire({
-                        icon: "info",
-                        title: "Premium Membership Required",
-                        text: "Upgrade to Premium to join CSP.",
-                        confirmButtonText: "OK",
-                        confirmButtonColor: "#4F46E5",
-                      });
+                    if (activeTab === "cvp") {
+                      setIsCvpJoinOpen(true);
                       return;
                     }
-                    setIsJoinModalOpen(true);
                   }}
                   className={`flex-1 py-3 px-3 rounded-[16px] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
-                    activeTab === "csp"
+                    activeTab === "all"
+                      ? "bg-slate-900 hover:bg-slate-800"
+                      : activeTab === "csp"
                       ? "bg-[#EA580C] hover:bg-[#D97706]"
-                      : "bg-[#7C3AED] hover:bg-[#6D28D9]"
+                      : activeTab === "hap"
+                      ? "bg-[#7C3AED] hover:bg-[#6D28D9]"
+                      : "bg-[#059669] hover:bg-[#047857]"
                   }`}
                 >
                   <span>
-                    {activeTab === "csp" && enrolled
+                    {activeTab === "all"
+                      ? "Explore Programs"
+                      : activeTab === "csp" && enrolled
                       ? "View programs"
                       : activeTab === "hap" && hapWaiting
-                        ? "Waiting"
-                        : activeTab === "hap" && hapApproved
-                          ? "Joined"
-                          : activeTab === "hap" &&
-                              hapApplication?.status === "rejected"
-                            ? "Apply again"
-                            : "Join Now"}
+                      ? "Waiting"
+                      : activeTab === "hap" && hapApproved
+                      ? "Joined"
+                      : activeTab === "hap" && hapApplication?.status === "rejected"
+                      ? "Apply again"
+                      : activeTab === "cvp" && cvpApplication
+                      ? "Join Now / View Form"
+                      : "Join Now"}
                   </span>
                   <ArrowRight className="h-4.5 w-4.5" strokeWidth={2.5} />
                 </button>
@@ -1100,6 +1637,13 @@ export function ProgramsBottomSheet({
         onClose={() => setIsHapJoinOpen(false)}
         onSubmitted={() => {
           void refreshHap();
+        }}
+      />
+      <CvpJoinModal
+        isOpen={isCvpJoinOpen}
+        onClose={() => setIsCvpJoinOpen(false)}
+        onSubmitted={(app) => {
+          setCvpApplication(app);
         }}
       />
     </>

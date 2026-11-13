@@ -1,11 +1,11 @@
 import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import axios from 'axios';
-import {ArrowLeft, Search, Share2, MessageCircle} from 'lucide-react';
+import {ChevronLeft, Search, Share2, MessageCircle, Users, Building} from 'lucide-react';
 import {toast} from 'sonner';
 import {SpaceDetailsModal} from '../../components/spaces/SpaceDetailsModal';
-import {SpacePhoto} from '../../components/spaces/SpacePhoto';
 import {ShareSpaceModal} from '../../components/spaces/ShareSpaceModal';
+import {ImageCarousel} from '../../components/ui/ImageCarousel';
 import {
   formatInr,
   spaceBookingUrl,
@@ -85,10 +85,10 @@ export default function SpacesMarketplacePage() {
             <button
               type="button"
               onClick={() => navigate('/home')}
-              className="rounded-full p-2 text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
               aria-label="Back to home"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
             </button>
             <div className="min-w-0">
               <h1 className="truncate font-display text-xl font-bold text-[#111111]">Spaces</h1>
@@ -183,17 +183,37 @@ export default function SpacesMarketplacePage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {visible.map(space => (
-              <div
-                key={space.id}
-                onClick={() => setSelected(space)}
-                className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 text-left shadow-xs transition hover:-translate-y-1 hover:shadow-md cursor-pointer"
-              >
-                <div>
-                  {/* Space Image Container */}
-                  <div className="relative aspect-4/3 w-full overflow-hidden rounded-2xl bg-[#FFF9F3] flex items-center justify-center">
-                    <SpacePhoto src={space.imageUrl} alt={space.name} />
-                  </div>
+            {visible.map(space => {
+              const cardImages =
+                space.images?.length > 0 ? space.images : space.imageUrl ? [space.imageUrl] : [];
+
+              return (
+                <div
+                  key={space.id}
+                  onClick={() => setSelected(space)}
+                  className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 text-left shadow-xs transition hover:-translate-y-1 hover:shadow-md cursor-pointer"
+                >
+                  <div>
+                    {/* Space Image Container with scrollable images */}
+                    <ImageCarousel
+                      images={cardImages}
+                      alt={space.name}
+                      aspectRatio="aspect-4/3"
+                      roundedClassName="rounded-2xl"
+                      onImageClick={() => setSelected(space)}
+                      badge={
+                        <span className="pointer-events-none absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-700 border border-emerald-200/80 shadow-xs">
+                          <Users size={11} className="shrink-0 text-emerald-600 stroke-[2.2]" />
+                          <span>
+                            {space.capacity > 0
+                              ? `Capacity: ${space.capacity} ${space.capacity === 1 ? 'person' : 'people'}`
+                              : 'Capacity: Flexible'}
+                          </span>
+                        </span>
+                      }
+                      showDots={cardImages.length > 1}
+                      showArrows={cardImages.length > 1}
+                    />
 
                   {/* Space Title */}
                   <div className="mt-3">
@@ -205,13 +225,13 @@ export default function SpacesMarketplacePage() {
                     </h3>
                   </div>
 
-                  {/* Capacity Badge (At the place of Available) */}
+                  {/* Category Pill */}
                   <div className="mt-1.5 flex items-center">
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-700 border border-emerald-200/60">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      {space.capacity > 0
-                        ? `Capacity: ${space.capacity} ${space.capacity === 1 ? 'person' : 'people'}`
-                        : 'Capacity: Flexible'}
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#F3E8FF] px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-[#7C3AED]">
+                      <Building size={12} className="shrink-0 text-[#7C3AED]" />
+                      <span className="truncate max-w-[120px] sm:max-w-[150px]">
+                        {space.category || space.spaceType || 'Space'}
+                      </span>
                     </span>
                   </div>
 
@@ -251,8 +271,9 @@ export default function SpacesMarketplacePage() {
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
+        </div>
         )}
       </main>
 

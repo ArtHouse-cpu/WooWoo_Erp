@@ -3,7 +3,7 @@ import {useNavigate} from 'react-router-dom';
 import {useForm} from 'react-hook-form';
 import {z} from 'zod';
 import {zodResolver} from '@hookform/resolvers/zod';
-import {Calendar, Gift, Mail, Trash2, User} from 'lucide-react';
+import {Calendar, ChevronLeft, Gift, Mail, Trash2, User} from 'lucide-react';
 import {toast} from 'sonner';
 import Swal from 'sweetalert2';
 import {Button} from '../../components/ui/Button';
@@ -263,6 +263,16 @@ const profileFields = (
   if (!isDesktop) {
     return (
       <div className="min-h-dvh bg-white px-5 pb-10 pt-6">
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
+            aria-label="Go back"
+          >
+            <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+          </button>
+        </div>
         <div className="mb-6 flex items-center gap-3.5">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#DBEAFE] text-[22px] font-bold text-[#1D4ED8]">
             {customer?.profileImage ? (
@@ -302,6 +312,16 @@ const profileFields = (
     <div className="brush-bg min-h-screen px-4 py-8 sm:px-8">
       <div className="mx-auto flex max-w-xl flex-col gap-6">
         <div className="auth-card rounded-[28px] border border-white/80 p-6 sm:p-8">
+          <div className="mb-5">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
+              aria-label="Go back"
+            >
+              <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+            </button>
+          </div>
           <div className="mb-6 flex items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-blue-50 text-2xl font-bold text-brand-blue">
               {customer?.profileImage ? (

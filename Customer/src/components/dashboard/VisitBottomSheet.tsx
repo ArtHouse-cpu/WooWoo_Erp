@@ -201,7 +201,7 @@ export function VisitBottomSheet({isOpen, onClose}: VisitBottomSheetProps) {
                         className="flex-1 flex items-center justify-center gap-1 py-2 px-1.5 rounded-[12px] border border-slate-200 bg-white text-[#111111] text-[11.5px] font-bold shadow-3xs hover:bg-slate-50 transition cursor-pointer min-w-0"
                       >
                         <Phone className="h-3.5 w-3.5 text-[#111111] shrink-0" strokeWidth={2.2} />
-                        <span className="truncate">Call</span>
+                     <span className="hidden min-[420px]:inline text-[11.5px] font-bold text-sky-600">Call</span>
                       </a>
 
                       {/* WhatsApp CTA */}
@@ -216,7 +216,7 @@ export function VisitBottomSheet({isOpen, onClose}: VisitBottomSheetProps) {
                         aria-label="Chat on WhatsApp"
                       >
                         <WhatsAppIcon className="h-3.5 w-3.5 fill-[#25D366] text-[#25D366] shrink-0" />
-                        <span className="hidden min-[420px]:inline text-[11.5px] font-bold text-emerald-700">WhatsApp</span>
+                      
                       </a>
                     </div>
                   </div>

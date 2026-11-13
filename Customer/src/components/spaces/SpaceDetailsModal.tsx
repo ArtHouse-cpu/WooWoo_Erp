@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 import {
   X,
   Share2,
@@ -9,6 +10,7 @@ import {
   Clock,
   Users,
   ChevronDown,
+  ChevronUp,
   ArrowUp,
   ArrowDown,
   Play,
@@ -20,6 +22,8 @@ import {
   ArrowRight,
   Plus,
   Star,
+  Crown,
+  Tag,
 } from 'lucide-react';
 import {toast} from 'sonner';
 import type {SpaceCard} from '../../services/space.service';
@@ -28,9 +32,10 @@ import {
   spaceShareUrl,
   copySpaceLink,
   SPACE_WHATSAPP,
+  MEMBERSHIP_TIERS,
 } from './spaceActions';
-import {SpacePhoto} from './SpacePhoto';
 import {ShareSpaceModal} from './ShareSpaceModal';
+import {ImageCarousel} from '../ui/ImageCarousel';
 
 function formatDateDisplay(d: Date): string {
   const day = d.getDate();
@@ -116,8 +121,11 @@ export function SpaceDetailsModal({
   space: SpaceCard | null;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'info' | 'highlights' | 'feedback'>('info');
   const [activeSegment, setActiveSegment] = useState<'weekday' | 'weekend'>('weekday');
+  const [isDiscountsOpen, setIsDiscountsOpen] = useState(true);
+  const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null);
 
   // Highlights Media state
   const [mediaFilter, setMediaFilter] = useState<'all' | 'photos' | 'videos'>('all');
@@ -185,11 +193,19 @@ export function SpaceDetailsModal({
   const [viewMonth, setViewMonth] = useState<number>(new Date().getMonth());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const calendarRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Custom Timing state
   const [startTime, setStartTime] = useState('06:00');
   const [endTime, setEndTime] = useState('09:00');
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // Reset scroll position to top when switching between Info, Highlights, and Feedback
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!space) return;
@@ -318,6 +334,13 @@ export function SpaceDetailsModal({
 
   const photos = useMemo(() => mediaItems.filter(m => m.type === 'photo'), [mediaItems]);
   const videos = useMemo(() => mediaItems.filter(m => m.type === 'video'), [mediaItems]);
+
+  const infoPhotos = useMemo(() => {
+    if (!space) return [];
+    if (photos.length > 0) return photos.map(p => p.url);
+    const set = [space.imageUrl, ...(space.images || [])].filter(Boolean) as string[];
+    return set.length > 0 ? set : [];
+  }, [photos, space]);
 
   const filteredMedia = useMemo(() => {
     if (mediaFilter === 'photos') return photos;
@@ -504,7 +527,13 @@ export function SpaceDetailsModal({
     activeSegment === 'weekday' && weekendPrice > weekdayPrice ? weekendPrice : null;
 
   const durationHours = getTimeDurationHours(startTime, endTime);
-  const estimatedTotal = activePrice * durationHours;
+
+  // Selected Membership discount auto-calculation
+  const selectedTier = MEMBERSHIP_TIERS.find(t => t.id === selectedMembershipId) || null;
+  const discountRate = selectedTier ? selectedTier.discountPercent / 100 : 0;
+  const unitDiscount = Math.round(activePrice * discountRate);
+  const finalUnitPrice = Math.max(0, activePrice - unitDiscount);
+  const estimatedTotal = finalUnitPrice * durationHours;
 
   const handleShare = async () => {
     // Open share modal on mobile screen
@@ -514,7 +543,7 @@ export function SpaceDetailsModal({
     }
     // Desktop: copy link directly to clipboard
     try {
-      await copySpaceLink(space.id);
+      await copySpaceLink(space.id, selectedTier?.id);
       toast.success('Space link copied to clipboard');
     } catch {
       toast.error('Failed to copy link');
@@ -522,17 +551,23 @@ export function SpaceDetailsModal({
   };
 
   const handleBook = () => {
+    const membershipLine = selectedTier
+      ? `Membership: ${selectedTier.name} (${selectedTier.discountPercent}% OFF · Save ₹${formatInr(unitDiscount)}/hr)`
+      : '';
     const text = [
       'Hi, I would like to book this space at WooWoo Art House.',
       space.imageUrl ? `Image: ${space.imageUrl}` : '',
       `Product name: ${space.name}`,
-      `Price: ₹${formatInr(activePrice)}/hr (${activeSegment === 'weekday' ? 'Weekday' : 'Weekend'})`,
+      membershipLine,
+      selectedTier
+        ? `Price: ₹${formatInr(finalUnitPrice)}/hr (Base: ₹${formatInr(activePrice)}/hr · ${activeSegment === 'weekday' ? 'Weekday' : 'Weekend'})`
+        : `Price: ₹${formatInr(activePrice)}/hr (${activeSegment === 'weekday' ? 'Weekday' : 'Weekend'})`,
       `Date: ${formatDateDisplay(selectedDate)}`,
       `Custom Timing: ${startTime} to ${endTime} (${durationHours} ${durationHours === 1 ? 'hour' : 'hours'})`,
       `Estimated Rate: ₹${formatInr(estimatedTotal)}`,
       space.capacity ? `Capacity: Up to ${space.capacity} people` : '',
       space.spaceType ? `Type: ${space.spaceType}` : '',
-      `Link: ${spaceShareUrl(space.id)}`,
+      `Link: ${spaceShareUrl(space.id, selectedTier?.id)}`,
     ]
       .filter(Boolean)
       .join('\n');
@@ -589,10 +624,10 @@ export function SpaceDetailsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="space-details-title"
-        className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl sm:rounded-[32px] text-left"
+        className="flex h-[90dvh] min-h-[90dvh] max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl sm:h-[85vh] sm:min-h-[85vh] sm:max-h-[90vh] sm:rounded-[32px] text-left"
       >
         {/* Header: Space Name on left, Close button on right */}
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 pt-4 pb-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 pt-4 pb-3">
           <h2
             id="space-details-title"
             className="truncate font-display text-xl sm:text-2xl font-black text-[#111111]"
@@ -610,12 +645,12 @@ export function SpaceDetailsModal({
           </button>
         </div>
 
-        {/* Tab navigation: Info first, then Highlights, then Feedback */}
-        <div className="flex items-center gap-6 border-b border-slate-100 px-5 text-sm font-bold">
+        {/* Tab navigation: Info, Highlights, Feedback equally divided across 3 columns */}
+        <div className="grid grid-cols-3 shrink-0 border-b border-slate-100 text-xs sm:text-sm font-bold">
           <button
             type="button"
             onClick={() => setActiveTab('info')}
-            className={`flex items-center gap-1.5 py-3 border-b-2 transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-3 border-b-2 transition cursor-pointer ${
               activeTab === 'info'
                 ? 'border-[#6344E7] text-[#6344E7]'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
@@ -627,7 +662,7 @@ export function SpaceDetailsModal({
           <button
             type="button"
             onClick={() => setActiveTab('highlights')}
-            className={`flex items-center gap-1.5 py-3 border-b-2 transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-3 border-b-2 transition cursor-pointer ${
               activeTab === 'highlights'
                 ? 'border-[#6344E7] text-[#6344E7]'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
@@ -639,7 +674,7 @@ export function SpaceDetailsModal({
           <button
             type="button"
             onClick={() => setActiveTab('feedback')}
-            className={`flex items-center gap-1.5 py-3 border-b-2 transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-3 border-b-2 transition cursor-pointer ${
               activeTab === 'feedback'
                 ? 'border-[#6344E7] text-[#6344E7]'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
@@ -651,19 +686,26 @@ export function SpaceDetailsModal({
         </div>
 
         {/* Modal Scrollable Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div
+          ref={scrollContainerRef}
+          className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] px-5 py-4 space-y-4"
+        >
           {activeTab === 'info' && (
             <>
-              {/* Space Photo with Carousel indicator */}
-              <div className="relative aspect-16/10 w-full overflow-hidden rounded-2xl bg-[#FFF9F3] flex items-center justify-center shadow-xs">
-                <SpacePhoto src={space.imageUrl} alt={space.name} />
-                {/* Dot pagination indicator */}
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-black/30 backdrop-blur-xs px-2.5 py-1">
-                  <span className="h-2 w-2 rounded-full bg-white shadow-xs" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-white/60" />
-                </div>
-              </div>
+              {/* Space Photo Carousel with scrollable/swipeable images & pagination dots */}
+              <ImageCarousel
+                images={infoPhotos}
+                alt={space.name}
+                aspectRatio="aspect-16/10"
+                roundedClassName="rounded-2xl"
+                onImageClick={idx => {
+                  if (photos.length > 0) {
+                    openPhotoLightbox(photos, idx < photos.length ? idx : 0);
+                  }
+                }}
+                showDots={infoPhotos.length > 1}
+                showArrows={infoPhotos.length > 1}
+              />
 
               {/* Status Badges: Available and Capacity */}
               <div className="flex items-center gap-3 pt-1">
@@ -675,6 +717,124 @@ export function SpaceDetailsModal({
                   <Users size={15} className="text-slate-500" />
                   Up to {space.capacity > 0 ? space.capacity : 1}
                 </span>
+              </div>
+
+              {/* Membership Discounts Card */}
+              <div className="rounded-3xl border border-purple-100 bg-[#FAF9FF] p-3.5 sm:p-4 text-left transition shadow-xs">
+                {/* Header with Crown and Toggle */}
+                <div
+                  onClick={() => setIsDiscountsOpen(v => !v)}
+                  className="flex items-center justify-between gap-3 cursor-pointer select-none"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-50 border border-amber-200/60 shadow-3xs">
+                      <Crown className="h-5 w-5 text-amber-500 fill-amber-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-extrabold text-sm sm:text-base text-[#111111] leading-tight">
+                        Membership Discounts
+                      </h4>
+                      <p className="text-[11px] sm:text-xs font-medium text-slate-500 leading-tight mt-0.5 truncate">
+                        Get exclusive discounts and cashback on space booking
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-purple-100/60 transition cursor-pointer"
+                    aria-label={isDiscountsOpen ? 'Collapse discounts' : 'Expand discounts'}
+                  >
+                    {isDiscountsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  </button>
+                </div>
+
+                {/* Membership List */}
+                {isDiscountsOpen && (
+                  <div className="mt-3.5 space-y-2">
+                    {MEMBERSHIP_TIERS.map(tier => {
+                      const isSelected = selectedMembershipId === tier.id;
+                      const discountAmount = Math.round(activePrice * (tier.discountPercent / 100));
+                      const discountedPrice = Math.max(0, activePrice - discountAmount);
+                      const IconComponent = tier.icon;
+
+                      return (
+                        <div
+                          key={tier.id}
+                          onClick={() =>
+                            setSelectedMembershipId(prev => (prev === tier.id ? null : tier.id))
+                          }
+                          className={`flex items-center justify-between gap-2 rounded-2xl p-2.5 sm:p-3 transition cursor-pointer ${
+                            isSelected
+                              ? 'border-2 border-[#6344E7] bg-white shadow-xs'
+                              : 'border border-slate-100 bg-white hover:border-purple-200'
+                          }`}
+                        >
+                          {/* Left: Icon, Name, Subtitle */}
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tier.iconBg} ${tier.iconColor}`}
+                            >
+                              <IconComponent size={18} className="stroke-[2.2]" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs sm:text-sm font-extrabold text-[#111111] truncate">
+                                {tier.name}
+                              </p>
+                              <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500 mt-0.5 truncate">
+                                Up to {tier.discountPercent}% OFF • {tier.cashbackPercent}% Cashback
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Right: Vertical divider, Savings, Prices, Radio button */}
+                          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                            <div className="h-7 w-px bg-slate-200" />
+                            <div className="text-right">
+                              <p className="text-[11px] sm:text-xs font-bold text-[#6344E7] leading-tight">
+                                Save ₹{formatInr(discountAmount)}
+                              </p>
+                              <div className="flex items-baseline justify-end gap-1 mt-0.5">
+                                <span className="text-xs sm:text-sm font-black text-[#111111]">
+                                  ₹{formatInr(discountedPrice)}
+                                </span>
+                                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 line-through">
+                                  ₹{formatInr(activePrice)}
+                                </span>
+                              </div>
+                            </div>
+                            {/* Radio circle */}
+                            <div
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
+                                isSelected ? 'border-[#6344E7]' : 'border-slate-300'
+                              }`}
+                            >
+                              {isSelected && (
+                                <div className="h-2.5 w-2.5 rounded-full bg-[#6344E7]" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Learn More About Membership link */}
+                    <button
+                      type="button"
+                      onClick={e => {
+                        e.stopPropagation();
+                        onClose();
+                        navigate('/membership');
+                      }}
+                      className="w-full mt-2 flex items-center justify-between rounded-2xl bg-[#F3E8FF] hover:bg-[#E9D5FF] px-3.5 py-2.5 text-[#6344E7] transition active:scale-[0.99] cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 text-xs sm:text-sm font-bold">
+                        <Info size={16} className="shrink-0" />
+                        <span>Learn More About Membership</span>
+                      </div>
+                      <ChevronRight size={16} className="shrink-0" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Date Option (Calendar) & Custom Timing Option */}
@@ -855,16 +1015,31 @@ export function SpaceDetailsModal({
                   </button>
                 </div>
 
-                {/* Price Display */}
-                <div className="mt-2.5 flex items-baseline gap-1.5">
-                  <span className="text-3xl font-black text-[#6344E7] tracking-tight">
-                    ₹{formatInr(activePrice)}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-500">/ hour</span>
-                  {comparePrice && (
-                    <span className="text-sm font-semibold text-slate-400 line-through ml-1.5">
-                      ₹{formatInr(comparePrice)}
+                {/* Price Display with Membership Savings */}
+                <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl sm:text-3xl font-black text-[#6344E7] tracking-tight">
+                      ₹{formatInr(finalUnitPrice)}
                     </span>
+                    <span className="text-xs sm:text-sm font-semibold text-slate-500">/ hour</span>
+                    {selectedTier && activePrice > finalUnitPrice ? (
+                      <span className="text-xs sm:text-sm font-semibold text-slate-400 line-through ml-1.5">
+                        ₹{formatInr(activePrice)}
+                      </span>
+                    ) : comparePrice ? (
+                      <span className="text-xs sm:text-sm font-semibold text-slate-400 line-through ml-1.5">
+                        ₹{formatInr(comparePrice)}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {selectedTier && activePrice > finalUnitPrice && (
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-[#F3E8FF] px-3.5 py-1.5 text-xs font-bold text-[#7C3AED] shadow-3xs">
+                      <Tag size={13} className="shrink-0" />
+                      <span>
+                        You save ₹{formatInr(unitDiscount)} ({selectedTier.discountPercent}%)
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -933,61 +1108,68 @@ export function SpaceDetailsModal({
               </div>
 
               {/* 3-Column Media Grid matching reference screenshot */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
-                {filteredMedia.map(item => (
-                  <div
-                    key={item.id}
-                    onClick={() => {
-                      if (item.type === 'photo') {
-                        const idx = photos.findIndex(p => p.id === item.id);
-                        openPhotoLightbox(photos, idx >= 0 ? idx : 0);
-                      } else {
-                        setPreviewVideo(item);
-                      }
-                    }}
-                    className="group relative aspect-4/3 sm:aspect-square w-full overflow-hidden rounded-xl sm:rounded-2xl bg-slate-100 cursor-pointer shadow-3xs hover:shadow-md transition active:scale-95"
-                  >
-                    {item.type === 'photo' ? (
-                      <img
-                        src={item.url}
-                        alt={item.title || space.name}
-                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="relative h-full w-full bg-slate-900">
-                        {item.poster ? (
-                          <img
-                            src={item.poster}
-                            alt={item.title || space.name}
-                            className="h-full w-full object-cover opacity-85 transition duration-300 group-hover:scale-105"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <video
-                            src={item.url}
-                            preload="metadata"
-                            className="h-full w-full object-cover opacity-85"
-                            muted
-                          />
-                        )}
+              {filteredMedia.length === 0 ? (
+                <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 p-6 text-center text-slate-400">
+                  <ImageIcon className="mb-2 h-8 w-8 text-slate-300" />
+                  <p className="text-sm font-medium text-slate-500">No media available in this category.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                  {filteredMedia.map(item => (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        if (item.type === 'photo') {
+                          const idx = photos.findIndex(p => p.id === item.id);
+                          openPhotoLightbox(photos, idx >= 0 ? idx : 0);
+                        } else {
+                          setPreviewVideo(item);
+                        }
+                      }}
+                      className="group relative aspect-4/3 sm:aspect-square w-full overflow-hidden rounded-xl sm:rounded-2xl bg-slate-100 cursor-pointer shadow-3xs hover:shadow-md transition active:scale-95"
+                    >
+                      {item.type === 'photo' ? (
+                        <img
+                          src={item.url}
+                          alt={item.title || space.name}
+                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="relative h-full w-full bg-slate-900">
+                          {item.poster ? (
+                            <img
+                              src={item.poster}
+                              alt={item.title || space.name}
+                              className="h-full w-full object-cover opacity-85 transition duration-300 group-hover:scale-105"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <video
+                              src={item.url}
+                              preload="metadata"
+                              className="h-full w-full object-cover opacity-85"
+                              muted
+                            />
+                          )}
 
-                        {/* Centered Play Button Overlay */}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-xs shadow-md transition group-hover:scale-110 group-hover:bg-black/75">
-                            <Play size={15} fill="white" className="ml-0.5" />
+                          {/* Centered Play Button Overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-xs shadow-md transition group-hover:scale-110 group-hover:bg-black/75">
+                              <Play size={15} fill="white" className="ml-0.5" />
+                            </div>
+                          </div>
+
+                          {/* Duration Badge Bottom-Right */}
+                          <div className="absolute bottom-1.5 right-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-white backdrop-blur-xs">
+                            {item.duration || '01:24'}
                           </div>
                         </div>
-
-                        {/* Duration Badge Bottom-Right */}
-                        <div className="absolute bottom-1.5 right-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-white backdrop-blur-xs">
-                          {item.duration || '01:24'}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1284,7 +1466,7 @@ export function SpaceDetailsModal({
         </div>
 
         {/* Bottom Actions: Share and Book in 30:70 ratio */}
-        <div className="border-t border-slate-100 bg-white p-4 grid grid-cols-10 gap-2.5 sm:gap-3">
+        <div className="shrink-0 border-t border-slate-100 bg-white p-4 grid grid-cols-10 gap-2.5 sm:gap-3">
           <button
             type="button"
             onClick={handleShare}
