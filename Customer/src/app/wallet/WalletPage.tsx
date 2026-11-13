@@ -505,55 +505,59 @@ export default function WalletPage() {
     return (
       <div className="space-y-6">
         {/* 1. Main Wallet Balance Card */}
-        <div className="relative overflow-hidden rounded-[24px] bg-[#0A0F1D] p-6 text-white shadow-xl">
-          <div className="relative flex flex-row items-center justify-between gap-6">
-            <div className="space-y-1">
-              <p className="text-[12px] font-semibold tracking-wider text-slate-400">Balance</p>
-              <h2 className="text-[36px] font-black leading-none tracking-tight">
+        <div className="relative overflow-hidden rounded-[20px] sm:rounded-[24px] bg-[#0A0F1D] p-4 sm:p-5 text-white shadow-xl">
+          <div className="relative flex flex-row items-center justify-between gap-3 sm:gap-6">
+            <div className="min-w-0 space-y-0.5 sm:space-y-1">
+              <p className="text-[11px] font-semibold tracking-wider text-slate-400">Balance</p>
+              <h2 className="text-[26px] sm:text-[32px] font-black leading-none tracking-tight">
                 {formatInr(data.balances.totalAvailable)}
               </h2>
-              <p className="pt-1 text-[12px] font-medium text-slate-400">
+              <p className="pt-0.5 text-[10.5px] sm:text-[11.5px] font-medium text-slate-400 leading-tight">
                 Withdrawable {formatInr(data.balances.withdrawable)} · Non-withdrawable{' '}
                 {formatInr(data.balances.nonWithdrawable ?? 0)}
               </p>
             </div>
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-6">
+            {/* Action buttons - strictly aligned on same height and level */}
+            <div className="flex items-start gap-3.5 sm:gap-5 shrink-0">
               <div className="flex flex-col items-center">
                 <button
                   type="button"
                   onClick={() => void onWithdraw()}
-                  className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[#EA580C] text-white shadow-[0_6px_20px_rgba(234,88,12,0.35)] transition hover:scale-105 hover:bg-[#F97316] active:scale-95"
+                  className="flex h-10 w-10 sm:h-11 sm:w-11 cursor-pointer items-center justify-center rounded-full bg-[#EA580C] text-white shadow-[0_4px_16px_rgba(234,88,12,0.35)] transition hover:scale-105 hover:bg-[#F97316] active:scale-95"
                   aria-label="Withdraw"
                 >
-                  <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
+                  <ArrowUp className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={2.5} />
                 </button>
-                <span className="mt-2 text-[11px] font-semibold text-slate-300">Withdraw</span>
+                <span className="mt-1.5 text-[10px] sm:text-[11px] font-semibold text-slate-300 whitespace-nowrap text-center">
+                  Withdraw
+                </span>
               </div>
               <div className="flex flex-col items-center">
                 <button
                   type="button"
                   onClick={() => void onAddMoney()}
-                  className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-slate-100 bg-white text-[#111111] shadow-[0_6px_20px_rgba(255,255,255,0.05)] transition hover:scale-105 hover:bg-slate-50 active:scale-95"
+                  className="flex h-10 w-10 sm:h-11 sm:w-11 cursor-pointer items-center justify-center rounded-full border border-slate-100 bg-white text-[#111111] shadow-[0_4px_16px_rgba(255,255,255,0.05)] transition hover:scale-105 hover:bg-slate-50 active:scale-95"
                   aria-label="Add Money"
                 >
-                  <Plus className="h-5 w-5" strokeWidth={2.5} />
+                  <Plus className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={2.5} />
                 </button>
-                <span className="mt-2 text-[11px] font-semibold text-slate-300">Add Money</span>
+                <span className="mt-1.5 text-[10px] sm:text-[11px] font-semibold text-slate-300 whitespace-nowrap text-center">
+                  Add Money
+                </span>
               </div>
             </div>
           </div>
         </div>
 
         {/* 2. Stat Categories Grid */}
-        <div className="rounded-[24px] border border-black/[0.05] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+        <div className="rounded-[20px] sm:rounded-[22px] border border-black/[0.05] bg-white py-2.5 px-3 sm:py-3 sm:px-4 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
           <div className="grid grid-cols-4 divide-x divide-slate-100">
             {stats.map(item => (
-              <div key={item.id} className="flex flex-col items-center justify-center text-center">
-                <item.icon className={`h-6 w-6 ${item.color}`} strokeWidth={1.5} />
-                <p className="mt-2 text-[11px] font-bold text-slate-600">{item.label}</p>
-                <p className={`mt-1 text-[15px] font-extrabold ${item.color}`}>{item.value}</p>
+              <div key={item.id} className="flex flex-col items-center justify-center text-center px-1">
+                <item.icon className={`h-5 w-5 sm:h-5.5 sm:w-5.5 ${item.color}`} strokeWidth={1.5} />
+                <p className="mt-1 text-[9.5px] sm:text-[10px] font-bold text-slate-600 leading-tight">{item.label}</p>
+                <p className={`mt-0.5 text-[13px] sm:text-[14px] font-extrabold leading-tight ${item.color}`}>{item.value}</p>
               </div>
             ))}
           </div>
@@ -572,7 +576,7 @@ export default function WalletPage() {
             </div>
 
             {/* Timeframe Toggle Pills (today, yesterday, this week, this month, lifetime) */}
-            <div className="flex items-center gap-1 overflow-x-auto rounded-[14px] bg-[#F3F4F6] p-1 scrollbar-none">
+            <div className="flex items-center gap-1 overflow-x-auto rounded-[12px] sm:rounded-[14px] bg-[#F3F4F6] p-0.5 sm:p-1 scrollbar-none">
               {TIMEFRAME_OPTIONS.map(option => {
                 const isActive = timeframe === option.id;
                 return (
@@ -580,7 +584,7 @@ export default function WalletPage() {
                     key={option.id}
                     type="button"
                     onClick={() => setTimeframe(option.id)}
-                    className={`rounded-[10px] px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-bold transition-all duration-150 cursor-pointer whitespace-nowrap ${
+                    className={`rounded-[8px] sm:rounded-[10px] px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold transition-all duration-150 cursor-pointer whitespace-nowrap ${
                       isActive
                         ? 'bg-white text-[#111111] shadow-[0_2px_6px_rgba(0,0,0,0.06)]'
                         : 'text-[#6B7280] hover:text-[#111111]'
@@ -593,16 +597,16 @@ export default function WalletPage() {
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-black/[0.05] bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
-            <div className="grid grid-cols-4 divide-x divide-slate-100 py-2.5">
+          <div className="rounded-[20px] sm:rounded-[24px] border border-black/[0.05] bg-white p-1.5 sm:p-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
+            <div className="grid grid-cols-4 divide-x divide-slate-100 py-1.5 sm:py-2">
               {affiliateStats.map(item => (
-                <div key={item.id} className="flex items-center justify-center gap-2 px-1">
-                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${item.bg}`}>
-                    <item.icon className={`h-[16px] w-[16px] ${item.color}`} strokeWidth={2} />
+                <div key={item.id} className="flex items-center justify-center gap-1 sm:gap-1.5 px-0.5 sm:px-1.5 min-w-0">
+                  <div className={`flex h-5.5 w-5.5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-full ${item.bg}`}>
+                    <item.icon className={`h-2.5 w-2.5 sm:h-3 sm:w-3 ${item.color}`} strokeWidth={2.2} />
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[12px] font-black leading-none text-[#111111]">{item.value}</p>
-                    <p className="mt-0.5 text-[9px] font-semibold leading-none text-[#9CA3AF]">{item.label}</p>
+                  <div className="min-w-0 overflow-hidden">
+                    <p className="truncate text-[10px] sm:text-[11.5px] font-black leading-tight text-[#111111]">{item.value}</p>
+                    <p className="mt-0.5 truncate text-[7.5px] sm:text-[9px] font-bold leading-tight text-[#9CA3AF] tracking-tight">{item.label}</p>
                   </div>
                 </div>
               ))}

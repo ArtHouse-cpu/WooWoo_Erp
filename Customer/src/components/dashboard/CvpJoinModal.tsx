@@ -528,7 +528,7 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
                           <Camera className="h-5 w-5" />
                         </div>
                         <span className="mt-2 text-xs font-extrabold text-slate-800">
-                          Take a Selfie / Upload Photo
+                          Upload Photo
                         </span>
                         <span className="text-[10.5px] font-medium text-slate-400 mt-0.5">
                           Tap to open camera or browse gallery
