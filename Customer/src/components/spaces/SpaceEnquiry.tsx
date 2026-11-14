@@ -2,8 +2,9 @@ import {useState} from 'react';
 import {Loader2, Share2} from 'lucide-react';
 import {toast} from 'sonner';
 import type {SpaceCard} from '../../services/space.service';
-import {copySpaceLink, spaceBookingUrl, type MembershipTier} from './spaceActions';
+import {copySpaceLink, type MembershipTier} from './spaceActions';
 import {ShareSpaceModal} from './ShareSpaceModal';
+import {SpaceBookingModal} from './SpaceBookingModal';
 
 export function SpaceEnquiry({
   space,
@@ -14,9 +15,10 @@ export function SpaceEnquiry({
 }) {
   const [sharing, setSharing] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   const handleBook = () => {
-    window.open(spaceBookingUrl(space, membershipTier), '_blank', 'noopener,noreferrer');
+    setShowBookingModal(true);
   };
 
   const handleShare = async () => {
@@ -60,6 +62,13 @@ export function SpaceEnquiry({
         space={space}
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
+      />
+
+      <SpaceBookingModal
+        space={space}
+        isOpen={showBookingModal}
+        onClose={() => setShowBookingModal(false)}
+        membershipTier={membershipTier}
       />
     </div>
   );
