@@ -1,23 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ArrowUpDown,
   BadgeIndianRupee,
   Building2,
   Calendar,
   CalendarCheck,
   CalendarClock,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronUp,
   CircleX,
   Clock,
+  Download,
   Edit3,
   Eye,
   Menu,
   MoreVertical,
+  Phone,
   RefreshCcw,
+  RotateCcw,
   Search,
   Settings,
+  SquarePen,
   Trash2,
   Wallet,
   X,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import Swal from "sweetalert2";
 import { PERMISSIONS } from "@/constants/permissions";
 import { usePermission } from "@/hooks/usePermission";
@@ -197,6 +209,177 @@ const getRangeForPreset = (preset: DatePresetType): { from: string; to: string }
   return { from: "", to: "" };
 };
 
+/** Smooth SVG Sparkline Graph */
+function Sparkline({
+  color,
+  points,
+  fillGradient,
+}: {
+  color: string;
+  points: number[];
+  fillGradient?: boolean;
+}) {
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min || 1;
+  const width = 64;
+  const height = 24;
+  const step = width / (points.length - 1);
+
+  const coords = points.map((p, i) => {
+    const x = i * step;
+    const y = height - ((p - min) / range) * (height - 6) - 3;
+    return [x, y];
+  });
+
+  let path = `M ${coords[0][0]} ${coords[0][1]}`;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const [x0, y0] = coords[i];
+    const [x1, y1] = coords[i + 1];
+    const mx = (x0 + x1) / 2;
+    path += ` C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}`;
+  }
+
+  const fillPath = `${path} L ${width} ${height} L 0 ${height} Z`;
+  const gradId = `spark-${color.replace("#", "")}`;
+
+  return (
+    <svg width={width} height={height} className="overflow-visible shrink-0 hidden sm:block">
+      {fillGradient && (
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.0" />
+          </linearGradient>
+        </defs>
+      )}
+      {fillGradient && <path d={fillPath} fill={`url(#${gradId})`} />}
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+const AVATAR_PALETTES = [
+  { bg: "bg-purple-100", text: "text-purple-700" },
+  { bg: "bg-pink-100", text: "text-pink-700" },
+  { bg: "bg-sky-100", text: "text-sky-700" },
+  { bg: "bg-emerald-100", text: "text-emerald-700" },
+  { bg: "bg-amber-100", text: "text-amber-800" },
+  { bg: "bg-indigo-100", text: "text-indigo-700" },
+  { bg: "bg-rose-100", text: "text-rose-700" },
+  { bg: "bg-teal-100", text: "text-teal-700" },
+];
+
+function getCustomerInitials(name?: string) {
+  const cleaned = String(name ?? "").trim();
+  if (!cleaned) return "B";
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return parts[0].slice(0, 2).toUpperCase();
+}
+
+function formatDateDisplay(dateStr?: string) {
+  if (!dateStr) return "—";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function StatusBadge({ status }: { status: string }) {
+  let bg = "bg-slate-100 text-slate-700 border-slate-200";
+  let dot = "bg-slate-400";
+
+  switch (status) {
+    case "Upcoming":
+      bg = "bg-sky-50 text-sky-700 border-sky-200/70";
+      dot = "bg-sky-500";
+      break;
+    case "Ongoing":
+      bg = "bg-emerald-50 text-emerald-700 border-emerald-200/70";
+      dot = "bg-emerald-500";
+      break;
+    case "Expired":
+      bg = "bg-amber-50 text-amber-700 border-amber-200/70";
+      dot = "bg-amber-500";
+      break;
+    case "Cancelled":
+      bg = "bg-rose-50 text-rose-700 border-rose-200/70";
+      dot = "bg-rose-500";
+      break;
+    case "Draft":
+      bg = "bg-purple-50 text-purple-700 border-purple-200/70";
+      dot = "bg-purple-500";
+      break;
+    default:
+      break;
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${bg}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      <span>{status || "—"}</span>
+    </span>
+  );
+}
+
+function PaymentBadge({ status }: { status: string }) {
+  let bg = "bg-slate-100 text-slate-700 border-slate-200";
+  let dot = "bg-slate-400";
+
+  switch (status) {
+    case "Paid":
+      bg = "bg-emerald-50 text-emerald-700 border-emerald-200/70";
+      dot = "bg-emerald-500";
+      break;
+    case "Partially Paid":
+      bg = "bg-amber-50 text-amber-800 border-amber-200/70";
+      dot = "bg-amber-500";
+      break;
+    case "Unpaid":
+      bg = "bg-rose-50 text-rose-700 border-rose-200/70";
+      dot = "bg-rose-500";
+      break;
+    case "Refund Pending":
+      bg = "bg-violet-50 text-violet-700 border-violet-200/70";
+      dot = "bg-violet-500";
+      break;
+    case "Refunded":
+      bg = "bg-teal-50 text-teal-700 border-teal-200/70";
+      dot = "bg-teal-500";
+      break;
+    default:
+      break;
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${bg}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+      <span>{status || "—"}</span>
+    </span>
+  );
+}
+
 function Badge({ value }: { value: string }) {
   return (
     <span
@@ -214,6 +397,7 @@ export default function BookingOverView() {
   const [kpis, setKpis] = useState<Kpis>(emptyKpis);
   const [rows, setRows] = useState<BookingOverviewRow[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -248,6 +432,10 @@ export default function BookingOverView() {
   });
 
   const [datePreset, setDatePreset] = useState<DatePresetType>("lifetime");
+  const [isPeriodOpen, setIsPeriodOpen] = useState(false);
+  const [tempPreset, setTempPreset] = useState<DatePresetType>("lifetime");
+  const [tempFrom, setTempFrom] = useState("");
+  const [tempTo, setTempTo] = useState("");
   const [actionMenuRowId, setActionMenuRowId] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<BookingOverviewRow | null>(null);
   const [editForm, setEditForm] = useState({
@@ -377,7 +565,7 @@ export default function BookingOverView() {
         sort,
         order,
         page,
-        limit: 10,
+        limit: pageSize,
       });
       setKpis({
         ...emptyKpis,
@@ -405,6 +593,7 @@ export default function BookingOverView() {
     sort,
     order,
     page,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -444,6 +633,149 @@ export default function BookingOverView() {
       setSort(key);
       setOrder("asc");
     }
+  };
+
+  const renderSortHeader = (key: string, label: string) => {
+    const isSorted = sort === key;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(key)}
+        className="inline-flex items-center gap-1.5 font-bold uppercase tracking-wider text-slate-500 hover:text-slate-800 transition cursor-pointer"
+      >
+        <span>{label}</span>
+        {isSorted ? (
+          order === "asc" ? (
+            <ChevronUp size={13} className="text-[#6344E7] stroke-[2.5]" />
+          ) : (
+            <ChevronDown size={13} className="text-[#6344E7] stroke-[2.5]" />
+          )
+        ) : (
+          <ArrowUpDown size={12} className="text-slate-400 opacity-60" />
+        )}
+      </button>
+    );
+  };
+
+  const paginationRange = useMemo(() => {
+    if (pages <= 7) {
+      return Array.from({ length: pages }, (_, i) => i + 1);
+    }
+    if (page <= 4) {
+      return [1, 2, 3, 4, 5, "...", pages];
+    }
+    if (page >= pages - 3) {
+      return [1, "...", pages - 4, pages - 3, pages - 2, pages - 1, pages];
+    }
+    return [1, "...", page - 1, page, page + 1, "...", pages];
+  }, [page, pages]);
+
+  const handleExportBookings = () => {
+    const exportData = rows.map((r, i) => ({
+      "#": (page - 1) * pageSize + i + 1,
+      "Booking ID": r.bookingCode,
+      Type: r.source === "space" ? "Space Booking" : "Full Booking",
+      Space: r.spaceName || "—",
+      Customer: r.customerName || "—",
+      Phone: r.customerPhone || "—",
+      Date: r.bookingDate || "—",
+      "Start Time": r.startTime || "—",
+      "End Time": r.endTime || "—",
+      Duration: r.duration || "—",
+      "Total Amount": Number(r.grandTotal || 0),
+      "Paid Amount": Number(r.paidAmount || 0),
+      "Due Amount": Number(r.dueAmount || 0),
+      "Payment Status": r.paymentStatus || "—",
+      "Booking Status": r.bookingStatus || "—",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Bookings");
+    XLSX.writeFile(
+      wb,
+      `Booking_Overview_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
+  };
+
+  const hasActiveFilters = Boolean(
+    search ||
+      bookingStatus ||
+      paymentStatus ||
+      source ||
+      from ||
+      to ||
+      datePreset !== "lifetime",
+  );
+
+  const resetAllFilters = () => {
+    setSearch("");
+    setBookingStatus("");
+    setPaymentStatus("");
+    setSource("");
+    setFrom("");
+    setTo("");
+    setDatePreset("lifetime");
+    setTempPreset("lifetime");
+    setTempFrom("");
+    setTempTo("");
+    setIsPeriodOpen(false);
+    setPage(1);
+  };
+
+  const togglePeriodPopover = () => {
+    if (!isPeriodOpen) {
+      setTempPreset(datePreset);
+      setTempFrom(from);
+      setTempTo(to);
+    }
+    setIsPeriodOpen((prev) => !prev);
+  };
+
+  const handleSelectTempPreset = (preset: DatePresetType) => {
+    setTempPreset(preset);
+    if (preset === "lifetime") {
+      setTempFrom("");
+      setTempTo("");
+    } else {
+      const range = getRangeForPreset(preset);
+      setTempFrom(range.from);
+      setTempTo(range.to);
+    }
+  };
+
+  const handleClearPeriod = () => {
+    setTempPreset("lifetime");
+    setTempFrom("");
+    setTempTo("");
+    setDatePreset("lifetime");
+    setFrom("");
+    setTo("");
+    setPage(1);
+    setIsPeriodOpen(false);
+  };
+
+  const handleApplyPeriod = () => {
+    setDatePreset(tempPreset);
+    setFrom(tempFrom);
+    setTo(tempTo);
+    setPage(1);
+    setIsPeriodOpen(false);
+  };
+
+  const getPeriodButtonLabel = () => {
+    if (datePreset === "today") return "Today";
+    if (datePreset === "yesterday") return "Yesterday";
+    if (datePreset === "this_week") return "This Week";
+    if (datePreset === "this_month") return "This Month";
+    if (datePreset === "this_year") return "This Year";
+    if (datePreset === "custom") {
+      if (from && to) return `${from} to ${to}`;
+      if (from) return `From ${from}`;
+      if (to) return `Until ${to}`;
+      return "Custom";
+    }
+    return "All Time";
   };
 
   const saveSettings = async () => {
@@ -549,10 +881,12 @@ export default function BookingOverView() {
       label: "Total Bookings",
       value: String(kpis.totalBookings),
       icon: CalendarCheck,
-      tone: "bg-slate-900 text-white",
+      tone: "bg-sky-600 text-white",
       lightCard: "bg-sky-50 border-sky-200 text-sky-950",
       lightIcon: "bg-sky-100 text-sky-600",
       lightLabel: "text-sky-700",
+      sparkColor: "#0284C7",
+      sparkPoints: [10, 16, 13, 22, 19, 26, 23],
     },
     {
       label: "Confirmed Bookings",
@@ -562,6 +896,8 @@ export default function BookingOverView() {
       lightCard: "bg-emerald-50 border-emerald-200 text-emerald-950",
       lightIcon: "bg-emerald-100 text-emerald-700",
       lightLabel: "text-emerald-700",
+      sparkColor: "#059669",
+      sparkPoints: [8, 14, 11, 20, 17, 25, 22],
     },
     {
       label: "Pending Bookings",
@@ -571,6 +907,8 @@ export default function BookingOverView() {
       lightCard: "bg-amber-50 border-amber-200 text-amber-950",
       lightIcon: "bg-amber-100 text-amber-700",
       lightLabel: "text-amber-800",
+      sparkColor: "#D97706",
+      sparkPoints: [12, 16, 14, 19, 15, 21, 18],
     },
     {
       label: "Cancelled Bookings",
@@ -580,6 +918,8 @@ export default function BookingOverView() {
       lightCard: "bg-rose-50 border-rose-200 text-rose-950",
       lightIcon: "bg-rose-100 text-rose-600",
       lightLabel: "text-rose-700",
+      sparkColor: "#E11D48",
+      sparkPoints: [15, 12, 17, 10, 14, 9, 7],
     },
     {
       label: "Total Booking Revenue",
@@ -590,21 +930,25 @@ export default function BookingOverView() {
       lightCard: "bg-indigo-50 border-indigo-200 text-indigo-950",
       lightIcon: "bg-indigo-100 text-indigo-600",
       lightLabel: "text-indigo-700",
+      sparkColor: "#4F46E5",
+      sparkPoints: [10, 17, 14, 25, 22, 28, 26],
     },
     {
       label: "Pending Refunds",
       value: String(kpis.pendingRefundCount),
       hint: inr(kpis.pendingRefundAmount),
       icon: RefreshCcw,
-      tone: "bg-violet-600 text-white",
+      tone: "bg-purple-600 text-white",
       lightCard: "bg-purple-50 border-purple-200 text-purple-950",
       lightIcon: "bg-purple-100 text-purple-600",
       lightLabel: "text-purple-700",
+      sparkColor: "#9333EA",
+      sparkPoints: [6, 11, 8, 15, 12, 17, 13],
     },
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-4 p-3 sm:p-5">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 p-3 sm:p-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
@@ -1231,297 +1575,634 @@ export default function BookingOverView() {
           </div>
 
           {/* ========================================================================= */}
-          {/* DESKTOP VIEW (hidden md:block): Preserves existing table and desktop controls */}
+          {/* DESKTOP VIEW (hidden md:block): Modern SaaS Table, KPIs & Filters */}
           {/* ========================================================================= */}
           <div className="hidden md:block space-y-4">
-            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
+            {/* 6 KPI Cards in One Row */}
+            <div className="grid grid-cols-6 gap-2 xl:gap-3">
               {cards.map((card) => (
                 <article
                   key={card.label}
-                  className="relative flex h-[4.5rem] min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white px-2 py-1.5 shadow-sm sm:h-auto sm:flex-row sm:items-center sm:gap-3 sm:rounded-2xl sm:p-4"
+                  className={`rounded-2xl border p-3 shadow-xs flex items-center justify-between hover:shadow-md transition ${card.lightCard}`}
                 >
-                  <span className={`absolute inset-y-1.5 left-0 w-0.5 rounded-full sm:hidden ${card.tone}`} />
-                  <div className="min-w-0 flex-1 pl-1.5 sm:pl-0">
-                    <p className="line-clamp-2 text-[9px] font-semibold uppercase leading-tight tracking-wide text-slate-400 sm:truncate sm:text-xs sm:leading-normal">
+                  <div className="min-w-0 pr-1.5 flex-1">
+                    <p
+                      className={`text-[10px] font-black uppercase tracking-wider truncate ${card.lightLabel}`}
+                      title={card.label}
+                    >
                       {card.label}
                     </p>
-                    <p className="mt-0.5 truncate text-xl font-bold leading-none text-slate-900 sm:mt-1 sm:text-2xl">
+                    <p className="mt-0.5 text-lg xl:text-xl font-black text-slate-900 tracking-tight truncate">
                       {card.value}
                     </p>
                     {card.hint ? (
-                      <p className="mt-0.5 truncate text-[8px] font-medium leading-tight text-slate-500 sm:mt-1 sm:text-xs">
+                      <p
+                        className={`mt-0.5 text-[10px] font-bold truncate opacity-90 ${card.lightLabel}`}
+                        title={card.hint}
+                      >
                         {card.hint}
                       </p>
-                    ) : null}
+                    ) : (
+                      <p className="mt-0.5 text-[10px] text-transparent select-none">—</p>
+                    )}
                   </div>
-                  <span
-                    className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl sm:flex ${card.tone}`}
-                  >
-                    <card.icon size={18} />
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div
+                      className={`h-9 w-9 xl:h-10 xl:w-10 shrink-0 items-center justify-center rounded-xl flex ${card.tone} shadow-xs`}
+                    >
+                      <card.icon size={18} className="stroke-[2.2]" />
+                    </div>
+                  </div>
                 </article>
               ))}
             </div>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  <label className="relative block min-w-0">
-                    <Search
-                      size={15}
-                      className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    />
-                    <input
-                      value={search}
-                      onChange={(event) => {
-                        setSearch(event.target.value);
+            {/* Filter & Search Toolbar (Single Row with Period Popover) */}
+            <section className="rounded-2xl border border-slate-200/80 bg-white p-2.5 shadow-xs">
+              <div className="flex items-center gap-2.5 flex-wrap xl:flex-nowrap">
+                {/* Search Input */}
+                <div className="relative flex-1 min-w-[220px]">
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="Search bookings by code, space, customer, phone..."
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-white pr-8 pl-9 text-xs text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 placeholder:text-slate-400"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearch("");
                         setPage(1);
                       }}
-                      placeholder="Search bookings..."
-                      className="h-9 w-full rounded-lg border border-slate-200 bg-white pr-2 pl-8 sm:pl-9 text-xs sm:text-sm outline-none focus:border-indigo-500 focus:ring-indigo-100 placeholder:text-xs"
-                    />
-                  </label>
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
 
+                {/* Booking Status Select */}
+                <div className="w-44 shrink-0">
                   <select
                     value={bookingStatus}
                     onChange={(event) => {
                       setBookingStatus(event.target.value);
                       setPage(1);
                     }}
-                    className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-600 outline-none focus:border-indigo-500 truncate"
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-indigo-500 cursor-pointer"
                   >
-                    <option value="">Booking status</option>
+                    <option value="">All Booking Statuses</option>
                     {BOOKING_STATUSES.filter(Boolean).map((status) => (
                       <option key={status} value={status}>
                         {status}
                       </option>
                     ))}
                   </select>
+                </div>
 
+                {/* Payment Status Select */}
+                <div className="w-44 shrink-0">
                   <select
                     value={paymentStatus}
                     onChange={(event) => {
                       setPaymentStatus(event.target.value);
                       setPage(1);
                     }}
-                    className="h-9 w-full min-w-0 rounded-lg sm:rounded-xl border border-slate-200 bg-white px-2 sm:px-4 text-xs sm:text-sm text-slate-600 sm:text-slate-700 outline-none transition focus:border-indigo-500 sm:focus:ring-2 sm:focus:ring-indigo-100 truncate"
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-indigo-500 cursor-pointer"
                   >
-                    <option value="">Payment status</option>
+                    <option value="">All Payment Statuses</option>
                     <option value="Unpaid">Unpaid</option>
                     <option value="Partially Paid">Partially Paid</option>
                     <option value="Paid">Paid</option>
                     <option value="Refund Pending">Refund Pending</option>
                     <option value="Refunded">Refunded</option>
                   </select>
+                </div>
 
+                {/* Booking Type Select */}
+                <div className="w-40 shrink-0">
                   <select
                     value={source}
                     onChange={(event) => {
                       setSource(event.target.value);
                       setPage(1);
                     }}
-                    className="h-9 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-600 outline-none focus:border-indigo-500 truncate"
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-indigo-500 cursor-pointer"
                   >
-                    <option value="">All booking types</option>
+                    <option value="">All Booking Types</option>
                     <option value="space">Space Booking</option>
                     <option value="full">Full Booking</option>
                   </select>
                 </div>
 
-                <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:gap-3">
-                  <span className="shrink-0 text-xs font-semibold text-slate-600">
-                    Custom Date Range
-                  </span>
+                {/* Export Button */}
+                <button
+                  type="button"
+                  onClick={handleExportBookings}
+                  className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition cursor-pointer shrink-0"
+                  title="Export current bookings to Excel"
+                >
+                  <Download size={14} className="stroke-[2.2]" />
+                  <span>Export</span>
+                </button>
 
-                  <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-                    <input
-                      type="date"
-                      value={from}
-                      onChange={(event) => {
-                        setFrom(event.target.value);
-                        setPage(1);
-                      }}
-                      aria-label="From date"
-                      className="h-9 w-full rounded-lg border border-slate-200 px-2 text-xs text-slate-600 outline-none focus:border-indigo-500 sm:w-40"
+                {/* Period Button & Popover */}
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={togglePeriodPopover}
+                    className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-[#6344E7] bg-white text-xs font-bold text-[#6344E7] shadow-xs hover:bg-purple-50/50 transition cursor-pointer"
+                  >
+                    <Calendar size={14} className="text-[#6344E7]" />
+                    <span>Period: {getPeriodButtonLabel()}</span>
+                    <ChevronDown
+                      size={14}
+                      className={`text-[#6344E7] transition-transform duration-200 ${
+                        isPeriodOpen ? "rotate-180" : ""
+                      }`}
                     />
+                  </button>
 
-                    <span className="hidden text-xs text-slate-400 sm:inline">
-                      to
-                    </span>
+                  {isPeriodOpen && (
+                    <>
+                      {/* Invisible backdrop to dismiss on click outside */}
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsPeriodOpen(false)}
+                      />
 
-                    <input
-                      type="date"
-                      value={to}
-                      onChange={(event) => {
-                        setTo(event.target.value);
-                        setPage(1);
-                      }}
-                      aria-label="To date"
-                      className="h-9 w-full rounded-lg sm:rounded-xl border border-slate-200 px-2 sm:px-3 text-xs sm:text-sm sm:py-2.5 text-slate-600 outline-none focus:border-indigo-500 sm:w-40"
-                    />
-                  </div>
+                      {/* Popover Dropdown */}
+                      <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                        <p className="text-xs font-bold text-slate-800 mb-2.5">
+                          Select Period
+                        </p>
+
+                        {/* 6 Preset Chips in 3 columns */}
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { key: "lifetime", label: "All Time" },
+                            { key: "today", label: "Today" },
+                            { key: "yesterday", label: "Yesterday" },
+                            { key: "this_week", label: "This Week" },
+                            { key: "this_month", label: "This Month" },
+                            { key: "this_year", label: "This Year" },
+                          ].map((p) => {
+                            const active = tempPreset === p.key;
+                            return (
+                              <button
+                                key={p.key}
+                                type="button"
+                                onClick={() =>
+                                  handleSelectTempPreset(p.key as DatePresetType)
+                                }
+                                className={`py-1.5 px-2 rounded-xl text-xs font-bold text-center transition cursor-pointer ${
+                                  active
+                                    ? "bg-[#6344E7] text-white shadow-xs"
+                                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                }`}
+                              >
+                                {p.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Custom Range */}
+                        <p className="text-xs font-bold text-slate-800 mt-4 mb-2.5">
+                          Custom Range
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              type="date"
+                              value={tempFrom}
+                              onChange={(e) => {
+                                setTempFrom(e.target.value);
+                                setTempPreset("custom");
+                              }}
+                              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                          <span className="text-xs text-slate-400 font-medium">
+                            to
+                          </span>
+                          <div className="relative flex-1">
+                            <input
+                              type="date"
+                              value={tempTo}
+                              onChange={(e) => {
+                                setTempTo(e.target.value);
+                                setTempPreset("custom");
+                              }}
+                              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Actions Footer */}
+                        <div className="mt-4 flex items-center justify-between pt-3 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={handleClearPeriod}
+                            className="text-xs font-bold text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleApplyPeriod}
+                            className="px-4 py-1.5 rounded-xl bg-[#6344E7] hover:bg-[#5235D9] text-xs font-bold text-white shadow-xs transition cursor-pointer active:scale-95"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {/* Desktop Modern Table Card */}
+            <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xs">
               {error ? (
-                <p className="px-4 py-3 text-sm text-rose-600">{error}</p>
+                <div className="px-4 py-3 bg-rose-50 text-xs font-semibold text-rose-700 border-b border-rose-100">
+                  {error}
+                </div>
               ) : null}
+
               <div className="overflow-x-auto">
-                <table className="min-w-[1280px] w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                <table className="min-w-[1340px] w-full text-left text-xs">
+                  <thead className="bg-[#FAF5FF]/50 border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-500">
                     <tr>
-                      {[
-                        ["bookingCode", "Booking ID"],
-                        ["spaceName", "Space"],
-                        ["customerName", "Customer"],
-                        ["bookingDate", "Date"],
-                        ["startTime", "Start"],
-                        ["endTime", "End"],
-                        ["duration", "Duration"],
-                        ["grandTotal", "Total"],
-                        ["paidAmount", "Paid"],
-                        ["dueAmount", "Remaining"],
-                      ].map(([key, label]) => (
-                        <th key={key} className="px-3 py-3 font-semibold">
-                          <button
-                            type="button"
-                            onClick={() => toggleSort(key)}
-                            className="inline-flex items-center gap-1"
-                          >
-                            {label}
-                            {sort === key ? (order === "asc" ? "↑" : "↓") : ""}
-                          </button>
-                        </th>
-                      ))}
-                      <th className="px-3 py-3 font-semibold">Contact</th>
-                      <th className="px-3 py-3 font-semibold">Payment</th>
-                      <th className="px-3 py-3 font-semibold">Status</th>
-                      <th className="px-3 py-3 font-semibold">Actions</th>
+                      <th className="px-3 py-3.5 font-bold w-12 text-center">#</th>
+                      <th className="px-3 py-3.5 font-bold">
+                        {renderSortHeader("bookingCode", "Booking ID")}
+                      </th>
+                      <th className="px-3 py-3.5 font-bold">
+                        {renderSortHeader("spaceName", "Space")}
+                      </th>
+                      <th className="px-3 py-3.5 font-bold">
+                        {renderSortHeader("customerName", "Customer")}
+                      </th>
+                      <th className="px-3 py-3.5 font-bold">
+                        {renderSortHeader("bookingDate", "Date")}
+                      </th>
+                      <th className="px-3 py-3.5 font-bold">
+                        {renderSortHeader("startTime", "Start")}
+                      </th>
+                      <th className="px-3 py-3.5 font-bold">
+                        {renderSortHeader("endTime", "End")}
+                      </th>
+                      <th className="px-3 py-3.5 font-bold">
+                        {renderSortHeader("duration", "Duration")}
+                      </th>
+                      <th className="px-3 py-3.5 font-bold">
+                        {renderSortHeader("grandTotal", "Total")}
+                      </th>
+                      <th className="px-3 py-3.5 font-bold">
+                        {renderSortHeader("paidAmount", "Paid")}
+                      </th>
+                      <th className="px-3 py-3.5 font-bold">
+                        {renderSortHeader("dueAmount", "Remaining")}
+                      </th>
+                      <th className="px-3 py-3.5 font-bold">Contact</th>
+                      <th className="px-3 py-3.5 font-bold">Payment</th>
+                      <th className="px-3 py-3.5 font-bold">Status</th>
+                      <th className="px-3 py-3.5 font-bold text-center">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100">
                     {loading ? (
                       <tr>
                         <td
-                          colSpan={14}
-                          className="px-4 py-10 text-center text-slate-500"
+                          colSpan={15}
+                          className="px-4 py-14 text-center text-xs font-semibold text-slate-400"
                         >
-                          Loading bookings…
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+                            <span>Loading bookings…</span>
+                          </div>
                         </td>
                       </tr>
                     ) : rows.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={14}
-                          className="px-4 py-10 text-center text-slate-500"
+                          colSpan={15}
+                          className="px-4 py-14 text-center text-xs font-semibold text-slate-400"
                         >
                           No bookings match these filters.
                         </td>
                       </tr>
                     ) : (
-                      rows.map((row) => (
-                        <tr
-                          key={`${row.source}-${row.id}`}
-                          className="border-t border-slate-100"
-                        >
-                          <td className="px-3 py-3">
-                            <button
-                              type="button"
-                              onClick={() => setDetail(row)}
-                              className="font-semibold text-indigo-700"
-                            >
-                              {row.bookingCode}
-                            </button>
-                            <span className="mt-0.5 block text-[11px] text-slate-400">
-                              {row.source === "space" ? "Space" : "Full"}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3">{row.spaceName || "—"}</td>
-                          <td className="px-3 py-3">{row.customerName || "—"}</td>
-                          <td className="px-3 py-3 whitespace-nowrap">
-                            {row.bookingDate || "—"}
-                          </td>
-                          <td className="px-3 py-3">{row.startTime || "—"}</td>
-                          <td className="px-3 py-3">{row.endTime || "—"}</td>
-                          <td className="px-3 py-3">{row.duration || "—"}</td>
-                          <td className="px-3 py-3 font-semibold">
-                            {inr(row.grandTotal)}
-                          </td>
-                          <td className="px-3 py-3">{inr(row.paidAmount)}</td>
-                          <td className="px-3 py-3">{inr(row.dueAmount)}</td>
-                          <td className="px-3 py-3">
-                            {row.customerPhone || "—"}
-                          </td>
-                          <td className="px-3 py-3">
-                            <Badge value={row.paymentStatus} />
-                          </td>
-                          <td className="px-3 py-3">
-                            <Badge value={row.bookingStatus} />
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex gap-2">
-                              {row.canCancel && canUpdate ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setCancelTarget(row);
-                                    setCancelReason("");
-                                  }}
-                                  className="rounded-lg bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700"
+                      rows.map((row, index) => {
+                        const avatarPalette =
+                          AVATAR_PALETTES[
+                            Math.abs((row.customerName || "").charCodeAt(0) || 0) %
+                              AVATAR_PALETTES.length
+                          ];
+                        return (
+                          <tr
+                            key={`${row.source}-${row.id}`}
+                            className="hover:bg-slate-50/70 transition"
+                          >
+                            {/* # */}
+                            <td className="px-3 py-3 text-center text-slate-400 font-semibold">
+                              {(page - 1) * pageSize + index + 1}
+                            </td>
+
+                            {/* Booking ID & Type */}
+                            <td className="px-3 py-3">
+                              <button
+                                type="button"
+                                onClick={() => setDetail(row)}
+                                className="font-bold text-[#2563EB] hover:text-[#1D4ED8] hover:underline transition cursor-pointer text-xs"
+                                title="View details"
+                              >
+                                {row.bookingCode}
+                              </button>
+                              <div>
+                                {row.source === "space" ? (
+                                  <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                                    Space
+                                  </span>
+                                ) : (
+                                  <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-purple-50 text-purple-700">
+                                    Full
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Space */}
+                            <td className="px-3 py-3">
+                              <span className="font-bold text-slate-800">
+                                {row.spaceName || "—"}
+                              </span>
+                            </td>
+
+                            {/* Customer */}
+                            <td className="px-3 py-3">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${avatarPalette.bg} ${avatarPalette.text}`}
                                 >
-                                  Cancel
-                                </button>
-                              ) : null}
-                              {row.canRefund && canUpdate ? (
-                                <button
-                                  type="button"
-                                  onClick={() => openRefund(row)}
-                                  className="rounded-lg bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700"
+                                  {getCustomerInitials(row.customerName)}
+                                </span>
+                                <span
+                                  className="font-bold text-slate-900 truncate max-w-[130px]"
+                                  title={row.customerName}
                                 >
-                                  Refund
-                                </button>
-                              ) : null}
-                              {!row.canCancel && !row.canRefund ? (
+                                  {row.customerName || "—"}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Date */}
+                            <td className="px-3 py-3 whitespace-nowrap text-slate-600 font-medium">
+                              {formatDateDisplay(row.bookingDate)}
+                            </td>
+
+                            {/* Start */}
+                            <td className="px-3 py-3 whitespace-nowrap text-slate-600 font-medium">
+                              {row.startTime || "—"}
+                            </td>
+
+                            {/* End */}
+                            <td className="px-3 py-3 whitespace-nowrap text-slate-600 font-medium">
+                              {row.endTime || "—"}
+                            </td>
+
+                            {/* Duration */}
+                            <td className="px-3 py-3 whitespace-nowrap">
+                              <span className="inline-flex px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold">
+                                {row.duration || "—"}
+                              </span>
+                            </td>
+
+                            {/* Total */}
+                            <td className="px-3 py-3 font-bold text-slate-900 whitespace-nowrap">
+                              {inr(row.grandTotal)}
+                            </td>
+
+                            {/* Paid */}
+                            <td className="px-3 py-3 font-semibold text-emerald-700 whitespace-nowrap">
+                              {inr(row.paidAmount)}
+                            </td>
+
+                            {/* Remaining */}
+                            <td className="px-3 py-3 whitespace-nowrap">
+                              {Number(row.dueAmount) > 0 ? (
+                                <span className="font-bold text-rose-600">
+                                  {inr(row.dueAmount)}
+                                </span>
+                              ) : (
+                                <span className="font-medium text-slate-400">
+                                  ₹0
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Contact */}
+                            <td className="px-3 py-3 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                                <Phone size={12} className="text-slate-400" />
+                                <span>{row.customerPhone || "—"}</span>
+                              </div>
+                            </td>
+
+                            {/* Payment */}
+                            <td className="px-3 py-3 whitespace-nowrap">
+                              <PaymentBadge status={row.paymentStatus} />
+                            </td>
+
+                            {/* Status */}
+                            <td className="px-3 py-3 whitespace-nowrap">
+                              <StatusBadge status={row.bookingStatus} />
+                            </td>
+
+                            {/* Actions */}
+                            <td className="px-3 py-3 whitespace-nowrap text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                {/* Details Eye Button */}
                                 <button
                                   type="button"
                                   onClick={() => setDetail(row)}
-                                  className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600"
+                                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition cursor-pointer"
+                                  title="View Booking Details"
                                 >
-                                  Details
+                                  <Eye size={13} />
                                 </button>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+
+                                {/* Edit Button */}
+                                {canUpdate ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openEdit(row)}
+                                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-200/70 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                                    title="Edit Booking"
+                                  >
+                                    <SquarePen size={13} />
+                                  </button>
+                                ) : null}
+
+                                {/* Cancel Button */}
+                                {row.canCancel && canUpdate ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCancelTarget(row);
+                                      setCancelReason("");
+                                    }}
+                                    className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer whitespace-nowrap"
+                                    title="Cancel Booking"
+                                  >
+                                    Cancel
+                                  </button>
+                                ) : null}
+
+                                {/* Refund Button */}
+                                {row.canRefund && canUpdate ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openRefund(row)}
+                                    className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-bold text-violet-700 hover:bg-violet-100 transition cursor-pointer whitespace-nowrap"
+                                    title="Process Refund"
+                                  >
+                                    Refund
+                                  </button>
+                                ) : null}
+
+                                {/* Delete Button */}
+                                {canUpdate ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleDelete(row)}
+                                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-rose-200/70 bg-rose-50 text-rose-600 hover:bg-rose-100 transition cursor-pointer"
+                                    title="Delete Booking"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
               </div>
-              <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm text-slate-500">
-                <span>{total} bookings</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={page <= 1}
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    className="rounded-lg border border-slate-200 px-3 py-1 disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-                  <span>
-                    {page} / {pages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={page >= pages}
-                    onClick={() => setPage((current) => current + 1)}
-                    className="rounded-lg border border-slate-200 px-3 py-1 disabled:opacity-40"
-                  >
-                    Next
-                  </button>
+
+              {/* Table Footer with Numbered Pagination */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 bg-white">
+                <div className="text-xs font-medium text-slate-500">
+                  Showing {total === 0 ? 0 : (page - 1) * pageSize + 1}–
+                  {Math.min(page * pageSize, total)} of {total} bookings
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                    <span>Rows per page:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => {
+                        setPageSize(Number(e.target.value));
+                        setPage(1);
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none cursor-pointer focus:border-indigo-500"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+
+                  {/* Numbered pagination */}
+                  <div className="flex items-center gap-1">
+                    {/* First Page */}
+                    <button
+                      type="button"
+                      disabled={page <= 1}
+                      onClick={() => setPage(1)}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="First Page"
+                    >
+                      <ChevronsLeft size={14} />
+                    </button>
+
+                    {/* Prev Page */}
+                    <button
+                      type="button"
+                      disabled={page <= 1}
+                      onClick={() => setPage((c) => Math.max(1, c - 1))}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="Previous Page"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+
+                    {/* Pages */}
+                    {paginationRange.map((p, idx) => {
+                      if (p === "...") {
+                        return (
+                          <span
+                            key={`ellipsis-${idx}`}
+                            className="px-1 text-xs text-slate-400"
+                          >
+                            ...
+                          </span>
+                        );
+                      }
+                      const pageNum = p as number;
+                      const isActive = pageNum === page;
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => setPage(pageNum)}
+                          className={`flex h-7 min-w-[28px] items-center justify-center rounded-lg px-2 text-xs font-bold transition cursor-pointer ${
+                            isActive
+                              ? "bg-[#6344E7] text-white shadow-xs"
+                              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+
+                    {/* Next Page */}
+                    <button
+                      type="button"
+                      disabled={page >= pages}
+                      onClick={() => setPage((c) => Math.min(pages, c + 1))}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="Next Page"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+
+                    {/* Last Page */}
+                    <button
+                      type="button"
+                      disabled={page >= pages}
+                      onClick={() => setPage(pages)}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      title="Last Page"
+                    >
+                      <ChevronsRight size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>
