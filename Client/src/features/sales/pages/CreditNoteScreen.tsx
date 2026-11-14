@@ -41,7 +41,9 @@ import {
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
 import Can from "@/components/rbac/Can";
-import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPageClass, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
+import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass, cvpWidePageClass, wideBillingTableProps } from "@/components/tables/cvpTableTheme";
+import { FinanceKpiCards } from "@/components/tables/FinanceKpiCards";
+import { creditNoteFinance } from "@/components/tables/financeSummary";
 import { PERMISSIONS } from "@/constants/permissions";
 import CreateSalesReturnScreen from "./CreateSalesReturnScreen";
 import SalesHeaderNav from "../components/SalesHeaderNav";
@@ -574,7 +576,8 @@ export default function CreditNoteScreen() {
       {
         accessorKey: "shareInvoice",
         header: "Share Invoice",
-        size: 220,
+        size: 120,
+        grow: false,
         Cell: ({ row }: { row: { original: CreditNoteRow } }) => {
           const cn = row.original;
           return (
@@ -648,7 +651,23 @@ export default function CreditNoteScreen() {
       },
     },
     ...cvpMaterialTableProps,
+    ...wideBillingTableProps,
   });
+
+  const creditTotals = useMemo(
+    () =>
+      creditNoteFinance(
+        filteredData.map((row) => ({
+          status: row.status,
+          amount: row.amount,
+          refundedAmount: Number(
+            (row.raw as { refundBreakdown?: { paidAmount?: number } } | undefined)
+              ?.refundBreakdown?.paidAmount || 0,
+          ),
+        })),
+      ),
+    [filteredData],
+  );
 
   const totalAmount = filteredData.reduce((sum, row) => sum + row.amount, 0);
   const finalAmount = filteredData
@@ -1432,15 +1451,23 @@ export default function CreditNoteScreen() {
       {/* DESKTOP VIEW (screens >= md)                                   */}
       {/* 100% UNTOUCHED original layout and functionality               */}
       {/* ============================================================== */}
-      <div className={cvpPageClass}>
+      <div className={cvpWidePageClass}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h1 className={cvpTitleClass}>
               Sales Returns / Credit Notes
             </h1>
             <span className="rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">
               {filteredData.length}
             </span>
+            <FinanceKpiCards
+              total={creditTotals.total}
+              paid={creditTotals.paid}
+              pending={creditTotals.pending}
+              totalHint="Credit note value, excluding cancelled notes"
+              paidHint="Refunds already recorded"
+              pendingHint="Draft refunds that have not been issued"
+            />
           </div>
           <Can permission={PERMISSIONS.CREDIT_NOTE_CREATE}>
             <button
@@ -1544,23 +1571,6 @@ export default function CreditNoteScreen() {
         </div>
 
         <MaterialReactTable table={table} />
-
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs shadow-sm">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="rounded bg-gray-100 px-2 py-1 text-gray-700">
-              Total ₹{" "}
-              {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-            </span>
-            <span className="rounded bg-green-100 px-2 py-1 text-green-700">
-              Final ₹{" "}
-              {finalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-            </span>
-            <span className="rounded bg-slate-100 px-2 py-1 text-slate-700">
-              Draft ₹{" "}
-              {draftAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-        </div>
       </div>
 
       {/* Action Dialog / Bottom Sheet (usable on both desktop & mobile) */}

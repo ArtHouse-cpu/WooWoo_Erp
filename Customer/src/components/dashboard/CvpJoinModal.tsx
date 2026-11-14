@@ -22,6 +22,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import Swal from 'sweetalert2';
 import { useAuthStore } from '../../store/authStore';
+import { cvpApi } from '../../services/cvp.service';
+import { getErrorMessage } from '../../services/axios';
 
 export type CvpApplication = {
   name: string;
@@ -98,6 +100,7 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
+  const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [profession, setProfession] = useState('');
   const [availability, setAvailability] = useState<string[]>(['Morning', 'Evening']);
   const [volunteeredBefore, setVolunteeredBefore] = useState<boolean>(false);
@@ -122,6 +125,7 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
         setName(parsed.name || customer?.name || '');
         setPhone(parsed.phone || customer?.mobile || '');
         setSelfieUrl(parsed.selfieUrl || null);
+        setSelfieFile(null);
         setProfession(parsed.profession || '');
         setAvailability(Array.isArray(parsed.availability) ? parsed.availability : ['Morning', 'Evening']);
         setVolunteeredBefore(Boolean(parsed.volunteeredBefore));
@@ -133,6 +137,7 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
         setName(customer?.name || '');
         setPhone(customer?.mobile || '');
         setSelfieUrl(null);
+        setSelfieFile(null);
         setProfession('');
         setAvailability(['Morning', 'Evening']);
         setVolunteeredBefore(false);
@@ -161,16 +166,27 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
+    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(file.type)) {
       Swal.fire({
         icon: 'warning',
-        title: 'File too large',
-        text: 'Please select a photo smaller than 8MB.',
+        title: 'Invalid file format',
+        text: 'Please select a JPG, PNG, or WebP photo.',
         confirmButtonColor: '#059669',
       });
       return;
     }
 
+    if (file.size > 5 * 1024 * 1024) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'File too large',
+        text: 'Please select a photo smaller than 5MB.',
+        confirmButtonColor: '#059669',
+      });
+      return;
+    }
+
+    setSelfieFile(file);
     const reader = new FileReader();
     reader.onload = () => {
       setSelfieUrl(reader.result as string);
@@ -233,7 +249,16 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
     window.open(url, '_blank');
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const photoFile = async () => {
+    if (selfieFile) return selfieFile;
+    if (!selfieUrl?.startsWith('data:image/')) return null;
+    const response = await fetch(selfieUrl);
+    const blob = await response.blob();
+    const type = /^image\/(jpeg|jpg|png|webp)$/i.test(blob.type) ? blob.type : 'image/jpeg';
+    return new File([blob], 'selfie.jpg', {type});
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -286,10 +311,20 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
       return;
     }
 
+    if (!useAuthStore.getState().accessToken) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Login required',
+        text: 'Log in to your WooWoo account before sending this application.',
+        confirmButtonColor: '#059669',
+      });
+      return;
+    }
+
     setSubmitting(true);
     const newApp: CvpApplication = {
       name: name.trim(),
-      phone: phone.trim(),
+      phone: phone.replace(/\D/g, '').slice(-10),
       selfieUrl: selfieUrl || undefined,
       profession: profession.trim(),
       availability,
@@ -301,18 +336,36 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
     };
 
     try {
+      const photo = await photoFile();
+      if (!photo) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Selfie Required',
+          text: 'Please upload or capture a selfie photo so our community coordinators can recognize you.',
+          confirmButtonColor: '#059669',
+        });
+        return;
+      }
+      await cvpApi.apply({
+        fullName: newApp.name,
+        phone: newApp.phone,
+        profession: newApp.profession,
+        availability: newApp.availability,
+        volunteeredBefore: newApp.volunteeredBefore,
+        events: newApp.eventCount,
+        volunteerType: newApp.eventType,
+        photo,
+      });
       localStorage.setItem(storageKey, JSON.stringify(newApp));
       setExisting(newApp);
       setIsEditing(false);
       onSubmitted?.(newApp);
-
-      // Redirect to WhatsApp
       sendToWhatsApp(newApp);
 
       Swal.fire({
         icon: 'success',
-        title: 'Opening WhatsApp!',
-        text: 'Your volunteering application is ready. Send the prefilled message on WhatsApp to connect with the WooWoo team!',
+        title: 'Application sent',
+        text: 'Your volunteering application is saved. Send the prefilled message on WhatsApp to connect with the WooWoo team.',
         confirmButtonColor: '#059669',
       });
       onClose();
@@ -321,7 +374,7 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
       Swal.fire({
         icon: 'error',
         title: 'Submission Failed',
-        text: 'Could not save application. Please try again.',
+        text: getErrorMessage(err, 'Could not save application. Please try again.'),
         confirmButtonColor: '#059669',
       });
     } finally {
@@ -457,13 +510,6 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
                 /* APPLICATION FORM VIEW */
                 <form id="cvp-join-form" onSubmit={handleSubmit} className="space-y-4">
                   {/* Informational banner */}
-                  <div className="rounded-2xl bg-emerald-50/70 border border-emerald-100 p-3 flex items-start gap-2.5">
-                    <Sparkles className="h-4.5 w-4.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <p className="text-[11.5px] font-semibold text-emerald-900 leading-relaxed">
-                      Complete this quick form. Upon submission, you will be redirected to WhatsApp to confirm your joining with the WooWoo team!
-                    </p>
-                  </div>
-
                   {/* 1. UPLOAD (SELFIE) */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">

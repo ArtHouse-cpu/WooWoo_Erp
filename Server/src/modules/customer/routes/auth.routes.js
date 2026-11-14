@@ -49,6 +49,10 @@ import {
   updateMyHapApplication,
 } from '../../../controllers/hapApplication.controller.js';
 import {
+  createCvpApplication,
+  uploadCvpPhoto,
+} from '../../../controllers/cvpApplication.controller.js';
+import {
   createMyCspProduct,
   deleteMyCspProduct,
   listMyCspProducts,
@@ -150,6 +154,13 @@ router.post(
   authenticateCustomer,
   authorizeCustomer('active'),
   applyHap,
+);
+router.post(
+  '/cvp/apply',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  uploadCvpPhoto.single('photo'),
+  createCvpApplication,
 );
 router.patch(
   '/hap/application',

@@ -41,7 +41,9 @@ import {
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
 import Can from "@/components/rbac/Can";
-import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPageClass, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
+import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass, cvpWidePageClass, wideBillingTableProps } from "@/components/tables/cvpTableTheme";
+import { FinanceKpiCards } from "@/components/tables/FinanceKpiCards";
+import { settledDocumentFinance } from "@/components/tables/financeSummary";
 import { PERMISSIONS } from "@/constants/permissions";
 import CreatePurchaseReturnScreen from "./CreatePurchaseReturnScreen";
 import {
@@ -230,6 +232,8 @@ export default function DebitNoteScreen() {
       {
         accessorKey: "shareInvoice",
         header: "Share Invoice",
+        size: 120,
+        grow: false,
         Cell: ({ row }: { row: { original: DebitNoteRow } }) => {
           const pr = row.original;
           const pdfInput = docForPdf(pr.raw);
@@ -531,6 +535,29 @@ export default function DebitNoteScreen() {
     });
   }, [activeTab, data, search]);
 
+  const debitTotals = useMemo(
+    () =>
+      settledDocumentFinance(
+        filteredData.map((row) => {
+          const amounts = resolvePaidDueAmounts({
+            amount: row.amount,
+            paidAmount: row.raw.paidAmount,
+            dueAmount: row.raw.dueAmount,
+            status: row.raw.status,
+            purchaseType: row.raw.purchaseType,
+            paymentMode: row.raw.paymentMode,
+          });
+          return {
+            status: String(row.raw.status ?? row.status),
+            amount: row.amount,
+            paidAmount: amounts.paidAmount,
+            dueAmount: amounts.dueAmount,
+          };
+        }),
+      ),
+    [filteredData],
+  );
+
   const totalAmount = filteredData.reduce((s, r) => s + r.amount, 0);
   const paidAmount = filteredData
     .filter((r) => r.status.toLowerCase() === "paid")
@@ -622,7 +649,7 @@ export default function DebitNoteScreen() {
 
   const table = useMaterialReactTable({
     columns,
-    data,
+    data: filteredData,
     muiTablePaperProps: {
       elevation: 0,
       style: {
@@ -638,6 +665,7 @@ export default function DebitNoteScreen() {
       },
     },
     ...cvpMaterialTableProps,
+    ...wideBillingTableProps,
   });
   return (
     <div className="min-w-0 space-y-2.5 p-1 sm:space-y-4">
@@ -1279,11 +1307,21 @@ export default function DebitNoteScreen() {
       {/* DESKTOP VIEW (Visible only on desktop: screens >= md / 768px)  */}
       {/* 100% Original unchanged desktop layout, table, and controls   */}
       {/* ============================================================== */}
-      <div className={cvpPageClass}>
+      <div className={cvpWidePageClass}>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
         <h1 className={cvpTitleClass}>
           Purchase Returns / Debit Notes
         </h1>
+        <FinanceKpiCards
+          total={debitTotals.total}
+          paid={debitTotals.paid}
+          pending={debitTotals.pending}
+          totalHint="Debit note value, excluding cancelled notes"
+          paidHint="Vendor credits already settled"
+          pendingHint="Issued notes still unsettled. Drafts are not due"
+        />
+        </div>
         <div className="flex gap-3">
           <Can permission={PERMISSIONS.DEBIT_NOTE_CREATE}>
             <button

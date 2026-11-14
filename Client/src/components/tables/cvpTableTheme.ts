@@ -123,6 +123,40 @@ export const cvpFilterBarClass =
 
 export const cvpPageClass = "mx-auto hidden min-w-0 max-w-7xl space-y-4 px-4 py-5 md:block";
 
+/** Desktop billing pages use the full content width instead of a centered narrow column. */
+export const cvpWidePageClass = "hidden min-w-0 space-y-4 px-5 py-5 md:block";
+
+/** Spread last so columns fill the desktop width without extra horizontal scroll. */
+export const wideBillingTableProps = {
+  layoutMode: "grid" as const,
+  defaultColumn: {
+    minSize: 72,
+    size: 120,
+    grow: true,
+  },
+  muiTableHeadCellProps: {
+    sx: {
+      backgroundColor: "#f8fafc",
+      color: "#94a3b8",
+      fontWeight: 600,
+      fontSize: "10px",
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      padding: "8px 8px",
+      borderBottom: "1px solid #f1f5f9",
+      whiteSpace: "nowrap",
+    },
+  },
+  muiTableBodyCellProps: {
+    sx: {
+      fontSize: "12px",
+      color: "#334155",
+      padding: "7px 8px",
+      borderBottom: "1px solid #f1f5f9",
+    },
+  },
+};
+
 export const cvpWebPageClass = "mx-auto min-w-0 max-w-7xl space-y-4 px-4 py-5";
 
 export const cvpTitleClass = "text-xl font-bold text-slate-900";

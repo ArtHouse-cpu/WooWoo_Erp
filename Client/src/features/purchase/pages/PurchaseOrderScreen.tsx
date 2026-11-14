@@ -41,7 +41,9 @@ import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { useNavigate } from "react-router-dom";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import Can from "@/components/rbac/Can";
-import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPageClass, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
+import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass, cvpWidePageClass, wideBillingTableProps } from "@/components/tables/cvpTableTheme";
+import { FinanceKpiCards } from "@/components/tables/FinanceKpiCards";
+import { settledDocumentFinance } from "@/components/tables/financeSummary";
 import { PERMISSIONS } from "@/constants/permissions";
 import {
   buildWoowooInvoiceWhatsAppMessage,
@@ -637,7 +639,8 @@ export default function PurchaseOrderScreen() {
       {
         accessorKey: "shareInvoice",
         header: "Share Invoice",
-        size: 220,
+        size: 120,
+        grow: false,
         Cell: ({ row }: { row: { original: PurchaseOrderListRow } }) => {
           const pr = row.original;
           const pdfInput = docForPdf(pr.raw);
@@ -819,7 +822,21 @@ export default function PurchaseOrderScreen() {
       },
     },
     ...cvpMaterialTableProps,
+    ...wideBillingTableProps,
   });
+
+  const orderTotals = useMemo(
+    () =>
+      settledDocumentFinance(
+        filteredData.map((row) => ({
+          status: String(row.raw?.status ?? row.status),
+          amount: row.amount,
+          paidAmount: row.paidAmount,
+          dueAmount: row.dueAmount,
+        })),
+      ),
+    [filteredData],
+  );
 
   const totalAmount = filteredData.reduce((s, r) => s + r.amount, 0);
   const paidAmount = filteredData
@@ -1635,15 +1652,23 @@ export default function PurchaseOrderScreen() {
       {/* DESKTOP VIEW (Visible only on desktop: screens >= md / 768px)  */}
       {/* 100% Original unchanged desktop layout, table, and controls   */}
       {/* ============================================================== */}
-      <div className={cvpPageClass}>
+      <div className={cvpWidePageClass}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h1 className={cvpTitleClass}>
             Purchase Order List
           </h1>
           <span className="rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">
             {filteredData.length}
           </span>
+          <FinanceKpiCards
+            total={orderTotals.total}
+            paid={orderTotals.paid}
+            pending={orderTotals.pending}
+            totalHint="Order value, excluding cancelled orders"
+            paidHint="Payments already recorded on orders"
+            pendingHint="Confirmed orders still unpaid. Drafts are not due"
+          />
         </div>
         <Can permission={PERMISSIONS.PURCHASE_ORDER_CREATE}>
           <button
@@ -1744,25 +1769,6 @@ export default function PurchaseOrderScreen() {
       </div>
 
       <MaterialReactTable table={table} />
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs shadow-sm">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="rounded bg-gray-100 px-2 py-1 text-gray-700">
-            Total ₹{" "}
-            {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </span>
-          <span className="rounded bg-green-100 px-2 py-1 text-green-700">
-            Paid ₹{" "}
-            {paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </span>
-          <span className="rounded bg-yellow-100 px-2 py-1 text-yellow-700">
-            Pending ₹{" "}
-            {pendingAmount.toLocaleString("en-IN", {
-              minimumFractionDigits: 2,
-            })}
-          </span>
-        </div>
-      </div>
     </div>
 
       {selectedActionRow && (

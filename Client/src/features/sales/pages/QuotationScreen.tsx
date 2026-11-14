@@ -42,7 +42,9 @@ import {
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
 import Can from "@/components/rbac/Can";
-import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPageClass, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
+import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass, cvpWidePageClass, wideBillingTableProps } from "@/components/tables/cvpTableTheme";
+import { FinanceKpiCards } from "@/components/tables/FinanceKpiCards";
+import { quotationFinance } from "@/components/tables/financeSummary";
 import { PERMISSIONS } from "@/constants/permissions";
 import CreateQuotationScreen from "./CreateQuotationScreen";
 import SalesHeaderNav from "../components/SalesHeaderNav";
@@ -346,6 +348,13 @@ export default function QuotationScreen() {
     () => filteredData.reduce((sum, row) => sum + Number(row.amount || 0), 0),
     [filteredData],
   );
+  const quotationTotals = useMemo(
+    () =>
+      quotationFinance(
+        filteredData.map((row) => ({ status: row.status, amount: Number(row.amount || 0) })),
+      ),
+    [filteredData],
+  );
   const acceptedAmount = useMemo(
     () =>
       filteredData
@@ -564,7 +573,8 @@ export default function QuotationScreen() {
       {
         accessorKey: "shareInvoice",
         header: "Share Quotation",
-        size: 220,
+        size: 120,
+        grow: false,
         Cell: ({ row }: any) => {
           return (
             <div className="flex items-center gap-2">
@@ -600,7 +610,7 @@ export default function QuotationScreen() {
 
   const table = useMaterialReactTable({
     columns,
-    data,
+    data: filteredData,
     state: { isLoading: loading },
     muiTablePaperProps: {
       elevation: 0,
@@ -614,6 +624,7 @@ export default function QuotationScreen() {
       },
     },
     ...cvpMaterialTableProps,
+    ...wideBillingTableProps,
   });
 
   return (
@@ -1270,9 +1281,19 @@ export default function QuotationScreen() {
       {/* DESKTOP VIEW (screens >= md)                                   */}
       {/* 100% UNTOUCHED original layout and functionality               */}
       {/* ============================================================== */}
-      <div className={cvpPageClass}>
+      <div className={cvpWidePageClass}>
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className={cvpTitleClass}>Quotations</h1>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h1 className={cvpTitleClass}>Quotations</h1>
+            <FinanceKpiCards
+              total={quotationTotals.total}
+              paid={quotationTotals.paid}
+              pending={quotationTotals.pending}
+              totalHint="Quoted value, excluding rejected quotations"
+              paidHint="A quotation does not record a payment"
+              pendingHint="Accepted quotations only. Drafts and sent quotes are not due"
+            />
+          </div>
           <div className="flex gap-3">
             <Can permission={PERMISSIONS.QUOTATION_CREATE}>
               <button

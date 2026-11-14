@@ -53,7 +53,9 @@ import {
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
 import Can from "@/components/rbac/Can";
-import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPageClass, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
+import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass, cvpWidePageClass, wideBillingTableProps } from "@/components/tables/cvpTableTheme";
+import { FinanceKpiCards } from "@/components/tables/FinanceKpiCards";
+import { invoiceFinance } from "@/components/tables/financeSummary";
 import { PERMISSIONS } from "@/constants/permissions";
 
 type PosRow = {
@@ -829,7 +831,8 @@ export default function PosScreen() {
       {
         accessorKey: "shareInvoice",
         header: "Share Invoice",
-        size: 220,
+        size: 120,
+        grow: false,
         Cell: ({ row }: { row: { original: PosRow } }) => {
           return (
             <div className="flex items-center gap-2">
@@ -896,6 +899,7 @@ export default function PosScreen() {
     enableFullScreenToggle: false,
     enableHiding: false,
     ...cvpMaterialTableProps,
+    ...wideBillingTableProps,
     enableTopToolbar: false,
     enableStickyHeader: true,
     muiTableBodyRowProps: ({ row }) => ({
@@ -928,11 +932,20 @@ export default function PosScreen() {
     return counts;
   }, [data]);
 
-  const totalAmount = filteredData.reduce((sum, row) => sum + row.amount, 0);
-  const paidAmount = filteredData
-    .filter((row) => row.status === "Paid")
-    .reduce((sum, row) => sum + row.amount, 0);
-    const DueAmount = totalAmount - paidAmount;
+  const invoiceTotals = useMemo(
+    () =>
+      invoiceFinance(
+        filteredData.map((row) => ({
+          status: row.status,
+          amount: row.amount,
+          dueAmount: row.dueAmount,
+        })),
+      ),
+    [filteredData],
+  );
+  const totalAmount = invoiceTotals.total;
+  const paidAmount = invoiceTotals.paid;
+  const DueAmount = invoiceTotals.pending;
     // .filter((row) => row.status === "Pending")
     // .reduce((sum, row) => sum + row.amount, 0);
   const returnedAmount = filteredData.reduce(
@@ -1755,16 +1768,24 @@ export default function PosScreen() {
       {/* DESKTOP VIEW (Visible only on desktop: screens >= md / 768px)  */}
       {/* 100% Original unchanged desktop layout, table, and controls   */}
       {/* ============================================================== */}
-      <div className={cvpPageClass}>
+      <div className={cvpWidePageClass}>
         {/* Header — create actions stay on desktop; mobile uses a cleaner scan layout */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h1 className={cvpTitleClass}>
               Sales
             </h1>
             <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
               {statusCounts.All}
             </span>
+            <FinanceKpiCards
+              total={invoiceTotals.total}
+              paid={invoiceTotals.paid}
+              pending={invoiceTotals.pending}
+              totalHint="Issued invoices, excluding drafts and cancelled bills"
+              paidHint="Recorded payments, including partial payments"
+              pendingHint="Balance still due after those payments"
+            />
           </div>
           <div className="hidden w-full grid-cols-2 gap-2 sm:grid sm:w-auto sm:min-w-[22rem]">
             <Can permission={PERMISSIONS.INVOICE_CREATE}>
@@ -1900,33 +1921,6 @@ export default function PosScreen() {
 
         <div className="table-scroll min-w-0 overflow-hidden rounded-2xl">
           <MaterialReactTable table={table} />
-        </div>
-
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm sm:px-4">
-          <div className="flex min-w-max items-center gap-2 text-xs sm:text-sm">
-            <span className="rounded-lg bg-slate-100 px-2.5 py-1.5 font-medium text-slate-700">
-              Total ₹
-              {totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-            </span>
-            <span className="rounded-lg bg-emerald-50 px-2.5 py-1.5 font-medium text-emerald-700">
-              Paid ₹
-              {paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-            </span>
-            <span className="rounded-lg bg-amber-50 px-2.5 py-1.5 font-medium text-amber-700">
-              Pending ₹
-              {DueAmount.toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-              })}
-            </span>
-            {returnedAmount > 0 ? (
-              <span className="rounded-lg bg-rose-50 px-2.5 py-1.5 font-medium text-rose-700">
-                Returned −₹
-                {returnedAmount.toLocaleString("en-IN", {
-                  minimumFractionDigits: 2,
-                })}
-              </span>
-            ) : null}
-          </div>
         </div>
       </div>
 
