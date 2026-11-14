@@ -3,9 +3,10 @@ import {
   MaterialReactTable,
   useMaterialReactTable,
 } from "material-react-table";
-import { Eye, IndianRupee, MoreHorizontal, SendHorizontal, FileText } from "lucide-react";
+import { Eye, IndianRupee, MoreHorizontal, SendHorizontal } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Can from "@/components/rbac/Can";
+import { cvpMaterialTableProps, cvpActionButtonClass, cvpWebPageClass, cvpPrimaryButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
 import { PERMISSIONS } from "@/constants/permissions";
 
 export default function InvoiceScreen() {
@@ -49,14 +50,14 @@ export default function InvoiceScreen() {
         Cell: () => (
           <div className="flex items-center gap-2">
             <button
-              className="group flex h-8 items-center justify-center gap-1.5 rounded-md bg-white px-2.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-yellow-50 hover:text-yellow-700 hover:ring-yellow-300 focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              className={cvpActionButtonClass}
               title="Add Payment"
             >
               <IndianRupee size={14} className="text-yellow-500 group-hover:text-yellow-600" />
             </button>
 
             <button
-              className="group flex h-8 items-center justify-center gap-1.5 rounded-md bg-white px-2.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-purple-50 hover:text-purple-700 hover:ring-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className={cvpActionButtonClass}
               title="View Invoice"
             >
               <Eye size={14} className="text-purple-500 group-hover:text-purple-600" /> 
@@ -64,7 +65,7 @@ export default function InvoiceScreen() {
             </button>
 
             <button
-              className="group flex h-8 items-center justify-center gap-1.5 rounded-md bg-white px-2.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-emerald-50 hover:text-emerald-700 hover:ring-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className={cvpActionButtonClass}
               title="Send Invoice"
             >
               <SendHorizontal size={14} className="text-emerald-500 group-hover:text-emerald-600" />
@@ -72,7 +73,7 @@ export default function InvoiceScreen() {
             </button>
 
             <button
-              className="flex h-8 w-8 items-center justify-center rounded-md bg-white text-slate-500 shadow-sm ring-1 ring-slate-200 transition-all hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              className={cvpActionButtonClass}
               title="More Actions"
             >
               <MoreHorizontal size={16} />
@@ -204,33 +205,22 @@ export default function InvoiceScreen() {
         borderRadius: "12px 12px 0 0",
       },
     },
-    muiBottomToolbarProps: {
-      sx: {
-        backgroundColor: "#ffffff",
-        borderTop: "1px solid #e2e8f0",
-        borderRadius: "0 0 12px 12px",
-      },
-    },
+    ...cvpMaterialTableProps,
   });
 
   return (
-    <div className="min-h-[calc(100vh-4rem)]">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-              <FileText size={20} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Invoices</h1>
-              <p className="text-sm text-slate-500">Manage your invoices, view status, and create new bills.</p>
-            </div>
+    <div className={cvpWebPageClass}>
+      <div>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className={cvpTitleClass}>Invoices</h1>
+            <p className="mt-1 text-sm text-slate-500">Manage your invoices, view status, and create new bills.</p>
           </div>
           <div className="flex items-center gap-3">
             <Can permission={PERMISSIONS.INVOICE_CREATE}>
               <button
                 onClick={() => navigate("/create-invoice")}
-                className="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:w-auto"
+                className={cvpPrimaryButtonClass}
               >
                 Create Invoice
               </button>
@@ -238,7 +228,7 @@ export default function InvoiceScreen() {
           </div>
         </div>
         
-        <div className="w-full overflow-hidden">
+        <div className="mt-4 w-full overflow-hidden">
           <MaterialReactTable table={table} />
         </div>
       </div>

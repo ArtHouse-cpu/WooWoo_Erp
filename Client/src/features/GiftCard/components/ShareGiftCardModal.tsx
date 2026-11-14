@@ -103,7 +103,7 @@ const ShareGiftCardModal = ({ open, card, onClose, onShareChange }: Props) => {
 
   const shareUrl = token ? buildGiftCardShareUrl(token) : "";
   const shareText = `🎁 You've received a ${card.name || "gift card"} worth ${formatINR(
-    card.currentBalance,
+    card.initialAmount,
   )}!\n\nOpen your gift card: ${shareUrl}\n\nShow the gift card code at the counter to redeem it.`;
   const canNativeShare =
     typeof navigator !== "undefined" && typeof navigator.share === "function";
@@ -214,7 +214,7 @@ const ShareGiftCardModal = ({ open, card, onClose, onShareChange }: Props) => {
                 Share Gift Card
               </h2>
               <p className="text-xs text-gray-500">
-                {card.name} · {formatINR(card.currentBalance)}
+                {card.name} · {formatINR(card.initialAmount)}
               </p>
             </div>
           </div>
@@ -328,7 +328,7 @@ const ShareGiftCardModal = ({ open, card, onClose, onShareChange }: Props) => {
             <div className="px-6 pt-4">
               <p className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-[11px] leading-relaxed text-amber-800">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                Anyone with this link can see the gift card code and use its balance.
+                Anyone with this link can see the gift card code. It can be used once.
                 Share it only with the intended person.
               </p>
             </div>

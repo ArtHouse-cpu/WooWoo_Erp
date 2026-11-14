@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import AuthRoute from "@/routes/AuthRoute";
 import GuestRoute from "@/routes/GuestRoute";
 import PermissionRoute from "@/routes/PermissionRoute";
@@ -45,9 +45,8 @@ import {
   PosScreen,
   QuotationScreen,
   CouponsScreen,
-  BuyOneGetOneScreen,
 } from "@/features/sales";
-import SetOffersScreen from "@/features/marketing/pages/SetOffersScreen";
+import OffersAndDiscountsScreen from "@/features/marketing/offers-and-discounts/OffersAndDiscountsScreen";
 import CreateQuotationScreen from "@/features/sales/pages/CreateQuotationScreen";
 import CreateSubscriptionScreen from "@/features/sales/pages/CreateSubscriptionScreen";
 import SubscriptionScreen from "@/features/sales/pages/SubscriptionScreen";
@@ -139,8 +138,9 @@ export const router = createBrowserRouter([
           },
           { path: "Vendor list", element: <VendorScreen /> },
           { path: "coupons", element: <CouponsScreen /> },
-          { path: "set-offers", element: <SetOffersScreen /> },
-          { path: "buy-one-get-one", element: <BuyOneGetOneScreen /> },
+          { path: "offers-and-discounts", element: <OffersAndDiscountsScreen /> },
+          { path: "set-offers", element: <Navigate to="/offers-and-discounts" replace /> },
+          { path: "buy-one-get-one", element: <Navigate to="/offers-and-discounts?tab=food" replace /> },
           { path: "affiliate-program", element: <AffiliateSectionScreen /> },
           { path: "access", element: <AccessScreen /> },
           { path: "spaces", element: <CreateSpacesScreen /> },

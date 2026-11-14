@@ -30,7 +30,7 @@ const formatDate = (key: string) => {
 const STATUS_COPY: Record<string, { title: string; body: string }> = {
   Used: {
     title: "This gift card has been fully used",
-    body: "There is no balance left on this card.",
+    body: "This code has already been used and cannot be used again.",
   },
   Expired: {
     title: "This gift card has expired",
@@ -181,10 +181,17 @@ const GiftCardView = ({
 
           <div className="relative mt-6">
             <p className="text-[11px] font-medium uppercase tracking-wider text-white/60">
-              {card.usable ? "Available Balance" : "Card Value"}
+              Amount
             </p>
             <p className="mt-0.5 text-4xl font-extrabold tracking-tight">
-              {formatINR(card.usable ? card.currentBalance : card.initialAmount)}
+              {formatINR(card.initialAmount)}
+            </p>
+            <p className="mt-1 text-xs text-white/70">
+              {card.usable
+                ? "Can be used once"
+                : card.status === "Used"
+                  ? "Already used"
+                  : "No longer valid"}
             </p>
           </div>
 
@@ -226,7 +233,7 @@ const GiftCardView = ({
                 { icon: ScanLine, text: "At checkout, show this page or tell the cashier your code." },
                 {
                   icon: CalendarClock,
-                  text: `Use it before ${formatDate(card.expiryDate)}. Any unused balance goes to your store wallet.`,
+                  text: `Use it once before ${formatDate(card.expiryDate)}. It cannot be used again.`,
                 },
               ].map(({ icon: Icon, text }, index) => (
                 <li key={index} className="flex items-start gap-3">

@@ -870,19 +870,23 @@ export default function CheckoutModal({
         setLoadingPromo(false);
       }
 
-      const availableBal = Number(card.currentBalance || 0);
-      const applicableAmount = Math.min(availableBal, currentNetPayable);
+      const faceAmount = Number(card.initialAmount || card.currentBalance || 0);
+      const applicableAmount = Math.min(faceAmount, currentNetPayable);
 
       setGiftCardCode(card.code);
       setGiftCardDiscount(applicableAmount);
-      setGiftCardBalance(availableBal);
+      setGiftCardBalance(faceAmount);
       setGiftCardLabel(card.name || "Gift Card");
 
+      const unused = Math.max(0, faceAmount - applicableAmount);
       await Swal.fire({
         icon: "success",
         title: "Gift Card Applied",
-        text: `${card.code}: -₹${applicableAmount.toFixed(2)} applied (Card balance: ₹${availableBal})`,
-        timer: 2000,
+        text:
+          unused > 0
+            ? `${card.code}: −₹${applicableAmount.toFixed(2)} applied. This code can be used only once, so ₹${unused.toFixed(2)} above this bill is not kept.`
+            : `${card.code}: −₹${applicableAmount.toFixed(2)} applied. This code can be used only once.`,
+        timer: 2600,
         showConfirmButton: false,
       });
       return;
@@ -2047,19 +2051,6 @@ export default function CheckoutModal({
       },
     };
 
-    const leftoverGiftCardAmount = Math.max(0, giftCardBalance - giftCardDiscount);
-    const targetCustomerPhone = customerSearch.trim() || initialCustomerPhone || (selectedCustomer as any)?.mobile || "";
-    const targetCustomerId = selectedCustomer?._id ?? initialCustomerId ?? null;
-
-    if (giftCardCode && leftoverGiftCardAmount > 0 && !targetCustomerPhone && !targetCustomerId) {
-      Swal.fire(
-        "Customer Required",
-        `There is ₹${leftoverGiftCardAmount.toFixed(2)} remaining on this gift card. Please enter the customer's mobile number or select a customer so the remaining balance can be added to their wallet.`,
-        "warning",
-      );
-      return;
-    }
-
     try {
       setSaving(true);
 
@@ -2071,18 +2062,13 @@ export default function CheckoutModal({
         .toUpperCase()}`;
       let giftCardRedeemed = false;
 
-      // The whole card balance is consumed: the bill takes giftCardDiscount and
-      // the leftover moves to the customer's wallet after the sale succeeds.
       const redeemGiftCardForCheckout = async () => {
         if (!usesGiftCard) return;
         await handleRedeemGiftCard({
           code: giftCardCodeUpper,
           amount: roundToPaise(giftCardBalance),
           reference: giftCardRef,
-          note:
-            leftoverGiftCardAmount > 0
-              ? `Checkout: ₹${roundToPaise(giftCardDiscount)} on bill, ₹${roundToPaise(leftoverGiftCardAmount)} to wallet`
-              : "Redeemed at checkout",
+          note: "Used once at checkout",
         });
         giftCardRedeemed = true;
       };
@@ -2098,29 +2084,6 @@ export default function CheckoutModal({
           giftCardRedeemed = false;
         } catch (e) {
           console.error("Failed to reverse gift card redemption", e);
-        }
-      };
-
-      const creditGiftCardLeftover = async (refId: string) => {
-        if (!usesGiftCard) return;
-        if (leftoverGiftCardAmount > 0 && (targetCustomerPhone || targetCustomerId)) {
-          try {
-            await creditWalletCashback({
-              customerId: targetCustomerId,
-              customerPhone: targetCustomerPhone,
-              customerName: customerName.trim() || "Customer",
-              amount: leftoverGiftCardAmount,
-              note: `Remaining balance from Gift Card (${giftCardCode}) transferred to wallet for Invoice #${refId}`,
-              referenceId: refId,
-              createdBy: {
-                m_staff_id: staff.m_staff_id,
-                m_staff_name: staff.m_staff_name,
-                m_staff_email: staff.m_staff_email,
-              },
-            });
-          } catch (e) {
-            console.error("Failed to credit remaining gift card balance to wallet", e);
-          }
         }
       };
 
@@ -2143,7 +2106,6 @@ export default function CheckoutModal({
           await reverseGiftCardRedemption();
           throw error;
         }
-        await creditGiftCardLeftover(giftCardRef);
         return;
       }
 
@@ -2160,8 +2122,6 @@ export default function CheckoutModal({
         throw error;
       }
       const invoiceCode = response?.invoice?.invoiceCode ?? "N/A";
-
-      await creditGiftCardLeftover(invoiceCode);
 
       if (!disableCashback && displayCashbackTotal > 0) {
         try {
@@ -2184,10 +2144,7 @@ export default function CheckoutModal({
         }
       }
 
-      let successMsg = `Invoice ${invoiceCode} saved successfully.`;
-      if (leftoverGiftCardAmount > 0) {
-        successMsg += ` ₹${leftoverGiftCardAmount.toFixed(2)} remaining from Gift Card (${giftCardCode}) was automatically added to the customer's wallet.`;
-      }
+      const successMsg = `Invoice ${invoiceCode} saved successfully.`;
 
       await Swal.fire(
         "Saved",
@@ -2684,7 +2641,7 @@ export default function CheckoutModal({
                         <Gift size={14} className="text-emerald-600" />
                         <span>{giftCardLabel} ({giftCardCode})</span>
                         <span className="text-[11px] font-normal text-emerald-600">
-                          Balance: {formatInr(giftCardBalance)}
+                          One-time · {formatInr(giftCardBalance)}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -2702,11 +2659,8 @@ export default function CheckoutModal({
                       </div>
                     </div>
                     {giftCardBalance > giftCardDiscount && (
-                      <div className="flex items-center gap-1.5 border-t border-emerald-200/70 pt-1.5 text-[11px] font-medium text-emerald-700">
-                        <WalletIcon className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                        <span>
-                          Remaining <strong>{formatInr(giftCardBalance - giftCardDiscount)}</strong> will automatically be credited to the customer's wallet upon checkout.
-                        </span>
+                      <div className="border-t border-emerald-200/70 pt-1.5 text-[11px] font-medium text-emerald-700">
+                        This code can be used only once. {formatInr(giftCardBalance - giftCardDiscount)} above this bill is not kept.
                       </div>
                     )}
                   </div>

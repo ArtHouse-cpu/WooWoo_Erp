@@ -41,6 +41,7 @@ import {
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
 import Can from "@/components/rbac/Can";
+import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPageClass, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
 import { PERMISSIONS } from "@/constants/permissions";
 import CreatePurchaseReturnScreen from "./CreatePurchaseReturnScreen";
 import {
@@ -219,7 +220,7 @@ export default function DebitNoteScreen() {
             <button
               type="button"
               onClick={() => setSelectedActionRow(row.original)}
-              className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+              className={cvpActionButtonClass}
             >
               Actions
             </button>
@@ -336,7 +337,7 @@ export default function DebitNoteScreen() {
               <button
                 type="button"
                 onClick={() => void handleWhatsAppShare()}
-                className="flex items-center gap-1 rounded-md bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200"
+                className={cvpShareButtonClass}
               >
                 <img
                   src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
@@ -347,7 +348,7 @@ export default function DebitNoteScreen() {
               <button
                 type="button"
                 onClick={() => void handleDownloadBill()}
-                className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+                className={cvpActionButtonClass}
               >
                  <Download size={14} />
               </button>
@@ -636,6 +637,7 @@ export default function DebitNoteScreen() {
         WebkitOverflowScrolling: "touch",
       },
     },
+    ...cvpMaterialTableProps,
   });
   return (
     <div className="min-w-0 space-y-2.5 p-1 sm:space-y-4">
@@ -1277,9 +1279,9 @@ export default function DebitNoteScreen() {
       {/* DESKTOP VIEW (Visible only on desktop: screens >= md / 768px)  */}
       {/* 100% Original unchanged desktop layout, table, and controls   */}
       {/* ============================================================== */}
-      <div className="hidden md:block space-y-4">
+      <div className={cvpPageClass}>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold">
+        <h1 className={cvpTitleClass}>
           Purchase Returns / Debit Notes
         </h1>
         <div className="flex gap-3">
@@ -1287,7 +1289,7 @@ export default function DebitNoteScreen() {
             <button
               type="button"
               onClick={() => navigate("/create-purchase-return")}
-              className="w-full rounded bg-black px-3 py-2 text-center text-[14px] font-semibold text-white transition cursor-pointer sm:w-auto"
+              className={cvpPrimaryButtonClass}
             >
               Create Purchase Return/Debit Note
             </button>
@@ -1295,7 +1297,7 @@ export default function DebitNoteScreen() {
         </div>
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className={cvpFilterBarClass}>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <select
             value={datePreset}
@@ -1307,7 +1309,7 @@ export default function DebitNoteScreen() {
               setFromDate(range.from);
               setToDate(range.to);
             }}
-            className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            className={cvpFilterSelectClass}
           >
             {DATE_PRESET_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -1327,7 +1329,7 @@ export default function DebitNoteScreen() {
                 setFromDate(e.target.value);
                 setDatePreset("custom");
               }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+              className={cvpFilterDateClass}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -1342,7 +1344,7 @@ export default function DebitNoteScreen() {
                 setToDate(e.target.value);
                 setDatePreset("custom");
               }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+              className={cvpFilterDateClass}
             />
           </div>
           {(fromDate || toDate || datePreset !== "all") && (
@@ -1353,7 +1355,7 @@ export default function DebitNoteScreen() {
                 setFromDate("");
                 setToDate("");
               }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600"
             >
               Clear
             </button>

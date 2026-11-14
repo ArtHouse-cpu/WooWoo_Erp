@@ -53,6 +53,7 @@ import {
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
 import Can from "@/components/rbac/Can";
+import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPageClass, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
 import { PERMISSIONS } from "@/constants/permissions";
 
 type PosRow = {
@@ -817,7 +818,7 @@ export default function PosScreen() {
                 event.stopPropagation();
                 setSelectedActionRow(row.original);
               }}
-              className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+              className={cvpActionButtonClass}
             >
               <Ellipsis size={18} />
             </button>
@@ -838,7 +839,7 @@ export default function PosScreen() {
                   event.stopPropagation();
                   void handleWhatsAppShare(row.original);
                 }}
-                className="flex items-center gap-1 rounded-md bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200"
+                className={cvpShareButtonClass}
               >
                 <img
                   src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
@@ -853,7 +854,7 @@ export default function PosScreen() {
                   event.stopPropagation();
                   void handleDownloadBill(row.original);
                 }}
-                className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+                className={cvpActionButtonClass}
               >
                 <Download size={14} />
               </button>
@@ -894,50 +895,15 @@ export default function PosScreen() {
     enableDensityToggle: false,
     enableFullScreenToggle: false,
     enableHiding: false,
+    ...cvpMaterialTableProps,
+    enableTopToolbar: false,
     enableStickyHeader: true,
-    muiTableHeadCellProps: {
-      sx: {
-        fontWeight: 700,
-        color: "#374151",
-        fontSize: "11px",
-        letterSpacing: "0.04em",
-        textTransform: "uppercase",
-        backgroundColor: "#f8fafc",
-        borderBottom: "1px solid #e2e8f0",
-        py: 1.5,
-        whiteSpace: "nowrap",
-      },
-    },
-    muiTableBodyCellProps: {
-      sx: {
-        fontSize: "13px",
-        py: 1.75,
-        borderBottom: "1px solid #f1f5f9",
-        whiteSpace: "nowrap",
-      },
-    },
     muiTableBodyRowProps: ({ row }) => ({
       onClick: () => {
         void openInvoiceRow(row.original as PosRow);
       },
-      sx: {
-        cursor: "pointer",
-        transition: "background-color 0.15s ease",
-        "&:hover": {
-          backgroundColor: "#f8fafc",
-        },
-      },
+      sx: { cursor: "pointer" },
     }),
-    muiTablePaperProps: {
-      elevation: 0,
-      square: false,
-      sx: {
-        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
-        border: "1px solid #e2e8f0",
-        borderRadius: "16px",
-        overflow: "hidden",
-      },
-    },
     muiTableContainerProps: {
       sx: {
         maxWidth: "100%",
@@ -1094,8 +1060,7 @@ export default function PosScreen() {
     return segments;
   }, [filteredData]);
 
-  const controlClass =
-    "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+  const controlClass = cvpFilterDateClass;
 
   return (
     <div className="min-w-0 space-y-2.5 p-1 sm:space-y-4">
@@ -1790,11 +1755,11 @@ export default function PosScreen() {
       {/* DESKTOP VIEW (Visible only on desktop: screens >= md / 768px)  */}
       {/* 100% Original unchanged desktop layout, table, and controls   */}
       {/* ============================================================== */}
-      <div className="hidden md:block space-y-2.5 sm:space-y-4">
+      <div className={cvpPageClass}>
         {/* Header — create actions stay on desktop; mobile uses a cleaner scan layout */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 sm:text-2xl">
+            <h1 className={cvpTitleClass}>
               Sales
             </h1>
             <span className="inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-100">
@@ -1805,7 +1770,7 @@ export default function PosScreen() {
             <Can permission={PERMISSIONS.INVOICE_CREATE}>
               <button
                 type="button"
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
                 onClick={() => setPosModalOpen(true)}
               >
                 POS Billing
@@ -1814,7 +1779,7 @@ export default function PosScreen() {
             <Can permission={PERMISSIONS.INVOICE_CREATE}>
               <button
                 type="button"
-                className="h-10 w-full rounded-xl bg-blue-600 px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                className={cvpPrimaryButtonClass + " h-9 w-full"}
                 onClick={() => navigate("/create-invoice")}
               >
                 + Create Invoice
@@ -1860,21 +1825,22 @@ export default function PosScreen() {
         </div>
 
         {/* Compact search + date filter */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm sm:p-4">
-          <div className="flex items-center gap-2">
-            <div className="relative min-w-0 flex-1">
-              <Search
-                size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
+        <div className={cvpFilterBarClass}>
+          <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            Search
+            <span className="flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-2">
+              <Search size={14} className="text-slate-400" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search invoice no., customer…"
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-9 pr-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 sm:h-11 sm:pl-10"
+                className="w-full bg-transparent text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none"
               />
-            </div>
+            </span>
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+            Date
             <select
               value={datePreset}
               onChange={(e) => {
@@ -1885,7 +1851,7 @@ export default function PosScreen() {
                 setFromDate(range.from);
                 setToDate(range.to);
               }}
-              className="h-10 w-[7.75rem] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:h-11 sm:w-40 sm:px-3"
+              className={cvpFilterSelectClass + " w-40"}
               aria-label="Date range"
             >
               {SALES_DATE_PRESET_OPTIONS.map((opt) => (
@@ -1894,7 +1860,7 @@ export default function PosScreen() {
                 </option>
               ))}
             </select>
-          </div>
+          </label>
 
           {datePreset === "custom" ? (
             <div className="mt-2 flex flex-wrap items-center gap-2">

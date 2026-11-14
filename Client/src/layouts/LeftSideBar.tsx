@@ -248,7 +248,7 @@ const MENU_GROUPS: MenuGroup[] = [
     submenu: [
       {
         name: "affiliate",
-        label: "Affiliate",
+        label: "HAP",
         icon: Users,
         path: "/affiliate-program",
       },
@@ -284,16 +284,10 @@ const MENU_GROUPS: MenuGroup[] = [
         path: "/coupons",
       },
       {
-        name: "setOffers",
-        label: "Set Offers",
+        name: "offersAndDiscounts",
+        label: "Offers and discounts",
         icon: Gift,
-        path: "/set-offers",
-      },
-      {
-        name: "buyOneGetOne",
-        label: "Buy 1 Get 1",
-        icon: Gift,
-        path: "/buy-one-get-one",
+        path: "/offers-and-discounts",
       },
       {
         name: "giftcard",

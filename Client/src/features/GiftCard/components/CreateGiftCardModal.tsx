@@ -101,11 +101,9 @@ export default function CreateGiftCardModal({
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [initialAmount, setInitialAmount] = useState<number | "">("");
-  const [currentBalance, setCurrentBalance] = useState<number | "">("");
   const [createdBy, setCreatedBy] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [status, setStatus] = useState<GiftCardData["status"]>("Active");
-  const [balanceTouched, setBalanceTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -114,7 +112,6 @@ export default function CreateGiftCardModal({
       setCode(initialData.code || "");
       setName(initialData.name || "");
       setInitialAmount(initialData.initialAmount ?? 0);
-      setCurrentBalance(initialData.currentBalance ?? 0);
       setCreatedBy(initialData.createdBy || resolvedStaffName);
       setExpiryDate(
         initialData.expiryDate
@@ -122,16 +119,13 @@ export default function CreateGiftCardModal({
           : getDefaultExpiryDate(),
       );
       setStatus(initialData.status || "Active");
-      setBalanceTouched(true);
     } else {
       setCode(generateGiftCardCode(existingCards));
       setName("");
       setInitialAmount("");
-      setCurrentBalance("");
       setCreatedBy(resolvedStaffName);
       setExpiryDate(getDefaultExpiryDate());
       setStatus("Active");
-      setBalanceTouched(false);
     }
   }, [open, initialData, existingCards, resolvedStaffName]);
 
@@ -139,28 +133,18 @@ export default function CreateGiftCardModal({
 
   const isEdit = Boolean(initialData?._id);
 
-  const handleAmountChange = (value: number | "") => {
-    setInitialAmount(value);
-    // If creating and balance hasn't been manually edited, auto-match the amount
-    if (!isEdit && !balanceTouched) {
-      setCurrentBalance(value);
-    }
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
     if (!code.trim() || !name.trim() || initialAmount === "") return;
 
     const amount = Number(initialAmount || 0);
-    const balance =
-      currentBalance === "" ? amount : Number(currentBalance || 0);
     if (amount <= 0) {
       toast.error("Amount must be greater than 0.");
       return;
     }
-    if (balance > amount) {
-      toast.error("Balance cannot be greater than the amount.");
+    if (isEdit && initialData?.status === "Used" && status === "Active") {
+      toast.error("This gift card has already been used and cannot be used again.");
       return;
     }
 
@@ -172,7 +156,7 @@ export default function CreateGiftCardModal({
         code: code.trim(),
         name: name.trim(),
         initialAmount: amount,
-        currentBalance: balance,
+        currentBalance: amount,
         createdBy: createdBy.trim() || resolvedStaffName,
         expiryDate: expiryDate || getDefaultExpiryDate(),
         status,
@@ -258,59 +242,33 @@ export default function CreateGiftCardModal({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* 3. Amount (initialAmount) */}
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-700">
-                Amount (₹) <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-2.5 text-sm font-semibold text-gray-400">
-                  ₹
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  step="1"
-                  value={initialAmount}
-                  onChange={(e) =>
-                    handleAmountChange(
-                      e.target.value === "" ? "" : Number(e.target.value),
-                    )
-                  }
-                  required
-                  className="h-10 w-full rounded-xl border border-gray-300 pl-8 pr-3 text-sm text-gray-900 outline-none transition focus:border-black focus:ring-1 focus:ring-black"
-                  placeholder="2000"
-                />
-              </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-700">
+              Amount (₹) <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-2.5 text-sm font-semibold text-gray-400">
+                ₹
+              </span>
+              <input
+                type="number"
+                min={1}
+                step="1"
+                value={initialAmount}
+                onChange={(e) =>
+                  setInitialAmount(
+                    e.target.value === "" ? "" : Number(e.target.value),
+                  )
+                }
+                required
+                disabled={isEdit && initialData?.status === "Used"}
+                className="h-10 w-full rounded-xl border border-gray-300 pl-8 pr-3 text-sm text-gray-900 outline-none transition focus:border-black focus:ring-1 focus:ring-black disabled:bg-gray-50"
+                placeholder="2000"
+              />
             </div>
-
-            {/* 4. Balance (currentBalance) */}
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-700">
-                Balance (₹) <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-2.5 text-sm font-semibold text-gray-400">
-                  ₹
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  step="1"
-                  value={currentBalance}
-                  onChange={(e) => {
-                    setBalanceTouched(true);
-                    setCurrentBalance(
-                      e.target.value === "" ? "" : Number(e.target.value),
-                    );
-                  }}
-                  required
-                  className="h-10 w-full rounded-xl border border-gray-300 pl-8 pr-3 text-sm text-gray-900 outline-none transition focus:border-black focus:ring-1 focus:ring-black"
-                  placeholder="2000"
-                />
-              </div>
-            </div>
+            <p className="mt-1 text-[11px] text-gray-500">
+              This code can be used once. Any amount above the bill is not kept.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -362,7 +320,9 @@ export default function CreateGiftCardModal({
               }
               className="h-10 w-full rounded-xl border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none transition focus:border-black focus:ring-1 focus:ring-black"
             >
-              <option value="Active">Active</option>
+              {initialData?.status !== "Used" ? (
+                <option value="Active">Active</option>
+              ) : null}
               <option value="Used">Used</option>
               <option value="Expired">Expired</option>
               <option value="Cancelled">Cancelled</option>

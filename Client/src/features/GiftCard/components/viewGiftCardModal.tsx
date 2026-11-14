@@ -177,10 +177,7 @@ const ViewGiftCardModal = ({
 
   const style = STATUS_STYLES[card.status] ?? STATUS_STYLES.Cancelled;
   const initial = Math.max(0, Number(card.initialAmount || 0));
-  const balance = Math.max(0, Number(card.currentBalance || 0));
-  const used = Math.max(0, initial - balance);
-  const remainingPct =
-    initial > 0 ? Math.min(100, (balance / initial) * 100) : 0;
+  const usedOnce = card.status === "Used";
   const days = daysUntil(card.expiryDate);
   const pastExpiry = days != null && days < 0;
 
@@ -262,14 +259,14 @@ const ViewGiftCardModal = ({
   const details = [
     {
       icon: Wallet,
-      label: "Initial Amount",
+      label: "Amount",
       value: formatINR(initial),
       tone: "bg-indigo-50 text-indigo-600",
     },
     {
       icon: Gift,
-      label: "Amount Used",
-      value: formatINR(used),
+      label: "Use",
+      value: usedOnce ? "Already used" : "Once",
       tone: "bg-amber-50 text-amber-600",
     },
     {
@@ -348,12 +345,14 @@ const ViewGiftCardModal = ({
 
             <div className="relative mt-5">
               <p className="text-[11px] font-medium uppercase tracking-wider text-white/60">
-                Available Balance
+                Amount
               </p>
               <p className="mt-0.5 text-3xl font-extrabold tracking-tight">
-                {formatINR(balance)}
+                {formatINR(initial)}
               </p>
-              <p className="text-xs text-white/60">of {formatINR(initial)}</p>
+              <p className="text-xs text-white/60">
+                {usedOnce ? "Already used" : "Can be used once"}
+              </p>
             </div>
 
             <div className="relative mt-5 flex items-end justify-between gap-3">
@@ -387,41 +386,6 @@ const ViewGiftCardModal = ({
                 </p>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Balance usage */}
-        <div className="px-6 pt-5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-gray-700">
-              Balance remaining
-            </span>
-            <span className="font-bold text-gray-900">
-              {remainingPct.toFixed(0)}%
-            </span>
-          </div>
-          <div
-            className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-gray-100"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(remainingPct)}
-            aria-label="Balance remaining"
-          >
-            <div
-              className={`h-full rounded-full transition-all ${
-                remainingPct > 50
-                  ? "bg-emerald-500"
-                  : remainingPct > 20
-                    ? "bg-amber-500"
-                    : "bg-rose-500"
-              }`}
-              style={{ width: `${remainingPct}%` }}
-            />
-          </div>
-          <div className="mt-1.5 flex justify-between text-[11px] text-gray-500">
-            <span>Used {formatINR(used)}</span>
-            <span>Left {formatINR(balance)}</span>
           </div>
         </div>
 
@@ -556,9 +520,9 @@ const ViewGiftCardModal = ({
                         {txn.type === "issue" ? "" : positive ? "+" : "−"}
                         {formatINR(Math.abs(txn.amount))}
                       </p>
-                      <p className="text-[11px] text-gray-500">
-                        Bal {formatINR(txn.balanceAfter)}
-                      </p>
+                      {txn.type === "redeem" ? (
+                        <p className="text-[11px] text-gray-500">Used once</p>
+                      ) : null}
                     </div>
                   </li>
                 );

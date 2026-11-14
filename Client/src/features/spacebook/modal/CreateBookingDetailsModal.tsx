@@ -31,6 +31,7 @@ import {
   Car,
   UtensilsCrossed,
   Download,
+  Send,
 } from "lucide-react";
 import Swal from "sweetalert2";
 // Optional: import jsPDF from "jspdf"; // If you want PDF download
@@ -47,6 +48,7 @@ import {
   handleGetAdditionalServices,
   handleGetFoods,
   handleGetApplicableSpaceOffer,
+  handleSendSpaceBookingQuotation,
   type ApplicableSpaceOffer,
   type AdditionalServiceItem,
   type FoodPayload,
@@ -541,6 +543,19 @@ const bookingHoursLabel = (hours: number) => {
   return `${shown} ${value === 1 ? "Hour" : "Hours"}`;
 };
 
+const inrAmount = (value: number) =>
+  `₹${Math.max(0, Math.round(Number(value) || 0)).toLocaleString("en-IN")}`;
+
+const quotationValidUntil = (value?: string | null) => {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const base = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date();
+  if (Number.isNaN(base.getTime())) return formatDateDisplay(new Date());
+  base.setDate(base.getDate() + 3);
+  return formatDateDisplay(base);
+};
+
 const bookingTimingLabel = (from: string, to: string, slot?: string) => {
   if (slot && slot.includes("-")) return slot;
   return `${formatTimeSlotDisplay(from)} - ${formatTimeSlotDisplay(to)}`;
@@ -742,6 +757,7 @@ const CreateBookingDetailsModal = ({
   const isEdit = Boolean(initialBooking?._id || initialBooking?.id);
   const [savingDraft, setSavingDraft] = useState(false);
   const [downloadingQuote, setDownloadingQuote] = useState(false);
+  const [sendingQuote, setSendingQuote] = useState(false);
   const staff = useAppSelector((state) => state.user);
   const customerSearchRef = useRef<HTMLDivElement>(null);
   const coworkingDateInputRef = useRef<HTMLInputElement>(null);
@@ -4458,6 +4474,135 @@ const CreateBookingDetailsModal = ({
                   <Download size={15} className="text-indigo-600" />
                 )}
                 <span>{downloadingQuote ? "Preparing…" : "Download Quotation"}</span>
+              </button>
+              <button
+                type="button"
+                disabled={sendingQuote || downloadingQuote}
+                onClick={() => {
+                  const digits = phone.replace(/\D/g, "");
+                  if (digits.length < 10) {
+                    toast.warning("Add the customer phone number before sending the quotation.");
+                    return;
+                  }
+                  if (!name.trim() || bookedSpaces.length === 0) {
+                    toast.warning("Add a customer and a space before sending the quotation.");
+                    return;
+                  }
+                  const offer =
+                    !isDurationPlan && dateMode !== "multiple"
+                      ? spaceOfferFromSnapshot(liveOffer)
+                      : null;
+                  const offerOff = offer?.discount || 0;
+                  const spaceCharges = bookedSpaces.reduce(
+                    (sum, space) => sum + (Number(space.lineTotal) || 0),
+                    0,
+                  );
+                  const extraCharges =
+                    selectedServicesList.reduce((sum, service) => sum + service.price * service.qty, 0) +
+                    selectedFoodsList.reduce((sum, food) => sum + food.price * food.qty, 0);
+                  const subtotal = spaceCharges + extraCharges;
+                  const grandTotal = Math.max(0, subtotal - discountAmount - offerOff);
+                  const totalHours = isDurationPlan
+                    ? 18
+                    : dateMode === "multiple"
+                      ? multiDateSlots.reduce(
+                          (sum, slot) =>
+                            sum +
+                            (Number(slot.duration) ||
+                              calcDurationHours(slot.startTime, slot.endTime) ||
+                              0),
+                          0,
+                        )
+                      : singleSlotHours;
+                  const freeHours = offer?.freeHours || 0;
+                  const chargedHours =
+                    offer && Number(liveOffer?.chargeableHours) > 0
+                      ? Number(liveOffer?.chargeableHours)
+                      : Math.max(0, totalHours - freeHours);
+                  const primaryDate =
+                    dateMode === "multiple"
+                      ? multiDateSlots.find((slot) => slot.date)?.date || bookingDate
+                      : isDurationPlan
+                        ? coworkingStartDate || bookingDate
+                        : bookingDate;
+                  const dateLabel =
+                    dateMode === "multiple"
+                      ? multiDateSlots.map((slot) => formatDateDisplay(slot.date)).join(", ")
+                      : isDurationPlan
+                        ? `${formatDateDisplay(coworkingStartDate)} to ${formatDateDisplay(coworkingEndDate)}`
+                        : formatDateDisplay(bookingDate);
+                  const timeLabel = isDurationPlan
+                    ? "06:00 AM - 12:00 AM"
+                    : dateMode === "multiple"
+                      ? multiDateSlots
+                          .map((slot) =>
+                            bookingTimingLabel(slot.startTime, slot.endTime, slot.timeSlot),
+                          )
+                          .join(", ")
+                      : bookingTimingLabel(bookingFrom, bookingTo, timeSlot);
+                  const durationLabel = isDurationPlan
+                    ? `${planDurationCount} ${
+                        planDurationCount === 1
+                          ? planDurationInfo.unitSingular
+                          : planDurationInfo.unitPlural
+                      }`
+                    : bookingHoursLabel(totalHours);
+                  const year = String(primaryDate || "").slice(0, 4) || String(new Date().getFullYear());
+                  const quotationNo = `QTN-${year}-${digits.slice(-4)}`;
+                  const hourly = Number(bookedSpaces[0]?.unitPrice) || 0;
+                  setSendingQuote(true);
+                  void handleSendSpaceBookingQuotation({
+                    phone: digits.slice(-10),
+                    bodyParams: [
+                      name.trim() || "Valued Customer",
+                      "WOOWOO Space",
+                      bookedSpaces.map((space) => space.spaceName || "Space").join(", "),
+                      bookedSpaces.map((space) => space.spaceCode).filter(Boolean).join(", ") || "—",
+                      dateLabel,
+                      timeLabel,
+                      durationLabel,
+                      hourly > 0 ? `${inrAmount(hourly)} / hr` : inrAmount(spaceCharges),
+                      offer?.ruleLabel || "None",
+                      bookingHoursLabel(freeHours),
+                      bookingHoursLabel(chargedHours),
+                      inrAmount(offerOff),
+                      inrAmount(discountAmount),
+                      inrAmount(spaceCharges),
+                      inrAmount(extraCharges),
+                      inrAmount(subtotal),
+                      inrAmount(cashbackAmount),
+                      inrAmount(grandTotal),
+                      quotationNo,
+                      quotationValidUntil(primaryDate),
+                    ],
+                  })
+                    .then((result) => {
+                      if (result.stub || result.delivered === false) {
+                        toast.warning(result.message || "The quotation was not delivered on WhatsApp.");
+                        return;
+                      }
+                      toast.success(result.message || "Quotation sent on WhatsApp.");
+                    })
+                    .catch((err: unknown) => {
+                      const message =
+                        err && typeof err === "object" && "response" in err
+                          ? String(
+                              (err as { response?: { data?: { message?: string } } }).response?.data
+                                ?.message || "",
+                            )
+                          : "";
+                      toast.error(message || (err instanceof Error ? err.message : "Could not send the quotation."));
+                    })
+                    .finally(() => setSendingQuote(false));
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800 shadow-2xs transition hover:bg-emerald-100 disabled:opacity-50 sm:text-sm"
+              >
+                {sendingQuote ? (
+                  <Loader2 size={15} className="animate-spin text-emerald-700" />
+                ) : (
+                  <Send size={15} className="text-emerald-700" />
+                )}
+                <span>{sendingQuote ? "Sending…" : "Send Quotation"}</span>
               </button>
 
               <button

@@ -42,6 +42,7 @@ import {
   resolveHostedInvoiceLink,
 } from "@/utils/whatsappInvoiceShare";
 import Can from "@/components/rbac/Can";
+import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPageClass, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
 import { PERMISSIONS } from "@/constants/permissions";
 import CreateQuotationScreen from "./CreateQuotationScreen";
 import SalesHeaderNav from "../components/SalesHeaderNav";
@@ -552,7 +553,7 @@ export default function QuotationScreen() {
                 event.stopPropagation();
                 setSelectedActionRow(row.original);
               }}
-              className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+              className={cvpActionButtonClass}
             >
              <Ellipsis size={18} />
             </button>
@@ -572,7 +573,7 @@ export default function QuotationScreen() {
                   event.stopPropagation();
                   shareOnWhatsApp(row.original);
                 }}
-                className="flex items-center gap-1 rounded-md bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200"
+                className={cvpShareButtonClass}
               >
                 <img
                   src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
@@ -585,7 +586,7 @@ export default function QuotationScreen() {
                   event.stopPropagation();
                   downloadPdf(row.original);
                 }}
-                className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+                className={cvpActionButtonClass}
               >
                  <Download size={14} />
               </button>
@@ -612,6 +613,7 @@ export default function QuotationScreen() {
         WebkitOverflowScrolling: "touch",
       },
     },
+    ...cvpMaterialTableProps,
   });
 
   return (
@@ -1268,14 +1270,14 @@ export default function QuotationScreen() {
       {/* DESKTOP VIEW (screens >= md)                                   */}
       {/* 100% UNTOUCHED original layout and functionality               */}
       {/* ============================================================== */}
-      <div className="hidden md:block min-w-0 p-1 sm:p-4">
+      <div className={cvpPageClass}>
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">Quotations</h1>
+          <h1 className={cvpTitleClass}>Quotations</h1>
           <div className="flex gap-3">
             <Can permission={PERMISSIONS.QUOTATION_CREATE}>
               <button
                 onClick={() => navigate("/create-quotation")}
-                className="w-full rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-gray-800 sm:w-auto"
+                className={cvpPrimaryButtonClass}
               >
                 Create Quotation
               </button>
@@ -1283,7 +1285,7 @@ export default function QuotationScreen() {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className={cvpFilterBarClass}>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <select
               value={datePreset}
@@ -1295,7 +1297,7 @@ export default function QuotationScreen() {
                 setFromDate(range.from);
                 setToDate(range.to);
               }}
-              className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+              className={cvpFilterSelectClass}
             >
               {DATE_PRESET_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -1315,7 +1317,7 @@ export default function QuotationScreen() {
                   setFromDate(e.target.value);
                   setDatePreset("custom");
                 }}
-                className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+                className={cvpFilterDateClass}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -1330,7 +1332,7 @@ export default function QuotationScreen() {
                   setToDate(e.target.value);
                   setDatePreset("custom");
                 }}
-                className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+                className={cvpFilterDateClass}
               />
             </div>
             {(fromDate || toDate || datePreset !== "all") && (
@@ -1341,7 +1343,7 @@ export default function QuotationScreen() {
                   setFromDate("");
                   setToDate("");
                 }}
-                className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600"
               >
                 Clear
               </button>

@@ -44,6 +44,7 @@ import {
 import CreateSubscriptionScreen from "./CreateSubscriptionScreen";
 import SalesHeaderNav from "../components/SalesHeaderNav";
 import Can from "@/components/rbac/Can";
+import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
 import { PERMISSIONS } from "@/constants/permissions";
 import {
   DATE_PRESET_OPTIONS,
@@ -864,23 +865,21 @@ export default function SubscriptionScreen() {
     () => [
       {
         accessorKey: "customer",
-        header: "Customer",
+        header: "Name",
         Cell: ({ row }: { row: { original: SubscriptionRow } }) => (
-          <div>
-            <div className="font-medium text-gray-800">
-              {row.original.customer}
-            </div>
-            <div className="text-xs text-gray-500">{row.original.phone}</div>
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="truncate font-semibold text-slate-800">{row.original.customer || "—"}</span>
+            <span className="shrink-0 text-slate-500">{row.original.phone || "—"}</span>
           </div>
         ),
-        size: 180,
+        size: 280,
       },
       {
         accessorKey: "amount",
         header: "Amount",
         Cell: ({ row }: { row: { original: SubscriptionRow } }) => (
-          <span className="font-semibold text-gray-800">
-            {`₹ ${row.original.amount.toLocaleString("en-IN", {
+          <span className="font-semibold text-slate-800">
+            {`₹${row.original.amount.toLocaleString("en-IN", {
               minimumFractionDigits: 2,
             })}`}
           </span>
@@ -888,74 +887,21 @@ export default function SubscriptionScreen() {
         size: 120,
       },
       {
-        accessorKey: "dueAmount",
-        header: "Due",
-        Cell: ({ row }: { row: { original: SubscriptionRow } }) => {
-          const due = Number(row.original.dueAmount) || 0;
-          if (due <= 0) {
-            return <span className="text-xs text-slate-400">—</span>;
-          }
-          return (
-            <button
-              type="button"
-              onClick={() => setDueActionRow(row.original)}
-              className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100"
-            >
-              {formatInr(due)}
-            </button>
-          );
-        },
-        size: 120,
-      },
-      {
-        accessorKey: "status",
-        header: "Status",
-        Cell: ({ cell }: { cell: { getValue: () => SubscriptionStatus } }) => {
-          const value = cell.getValue();
-          const badgeClass =
-            value === "completed"
-              ? "bg-yellow-100 text-yellow-700"
-              : value === "active"
-                ? "bg-green-100 text-green-700"
-                : value === "inactive"
-                  ? "bg-amber-100 text-amber-700 border border-amber-200"
-                  : value === "expired"
-                    ? "bg-slate-100 text-slate-700"
-                    : value === "error"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-gray-100 text-gray-700";
-          return (
-            <span
-              className={`px-2.5 py-1 text-xs font-semibold rounded-md ${badgeClass}`}
-            >
-              {value}
-            </span>
-          );
-        },
-        size: 120,
-      },
-      {
         accessorKey: "subscriptionType",
         header: "Subscription",
         Cell: ({ cell }: { cell: { getValue: () => string } }) => {
           const value = cell.getValue();
-
           const badgeClass =
             value === "premium"
-              ? "bg-purple-100 text-purple-700"
+              ? "bg-purple-50 text-purple-700"
               : value === "special"
-                ? "bg-blue-100 text-blue-700"
+                ? "bg-blue-50 text-blue-700"
                 : value === "junior"
-                  ? "bg-orange-100 text-orange-700"
-                  : value === "general"
-                    ? "bg-gray-100 text-gray-700"
-                    : "bg-slate-100 text-slate-600";
-
+                  ? "bg-orange-50 text-orange-700"
+                  : "bg-slate-100 text-slate-600";
           return (
-            <span
-              className={`px-2.5 py-1 text-xs font-semibold rounded-full capitalize tracking-wide ${badgeClass}`}
-            >
-              {value}
+            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${badgeClass}`}>
+              {value || "—"}
             </span>
           );
         },
@@ -963,39 +909,43 @@ export default function SubscriptionScreen() {
       },
       {
         accessorKey: "subscriptionCode",
-        header: "Subscription Invoice",
+        header: "SUB No",
         Cell: ({ row }: { row: { original: SubscriptionRow } }) => (
-          <div>
-            <div className="font-medium text-gray-800">
-              {row.original.subscriptionCode}
-            </div>
-          </div>
+          <span className="font-semibold text-slate-800">{row.original.subscriptionCode || "—"}</span>
         ),
-        size: 160,
+        size: 120,
       },
       {
-        accessorKey: "period",
-        header: "Start Date - End Date",
+        id: "activateDate",
+        header: "Activate",
+        accessorFn: (row: SubscriptionRow) =>
+          row.raw?.startDate ?? row.raw?.invoiceDate ?? row.raw?.createdAt ?? "",
         Cell: ({ row }: { row: { original: SubscriptionRow } }) => (
-          <div>
-            <div className="font-medium text-gray-800">
-              {row.original.period}
-            </div>
-            <div className="text-xs text-gray-500">
-              Repeats every {row.original.repeatEvery} {row.original.repeatUnit}
-            </div>
-          </div>
+          <span className="text-slate-700">
+            {formatDate(row.original.raw?.startDate ?? row.original.raw?.invoiceDate ?? row.original.raw?.createdAt) || "—"}
+          </span>
         ),
-        size: 220,
+        size: 130,
+      },
+      {
+        id: "expiryDate",
+        header: "Expiry",
+        accessorFn: (row: SubscriptionRow) => row.raw?.endDate ?? row.raw?.dueDate ?? "",
+        Cell: ({ row }: { row: { original: SubscriptionRow } }) => (
+          <span className="text-slate-700">
+            {formatDate(row.original.raw?.endDate ?? row.original.raw?.dueDate) || "—"}
+          </span>
+        ),
+        size: 130,
       },
       {
         accessorKey: "actions",
-        header: "Actions",
+        header: "Action",
         Cell: ({ row }: { row: { original: SubscriptionRow } }) => (
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSelectedActionRow(row.original)}
-              className="flex items-center gap-1 rounded-md bg-violet-100 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-200"
+              className={cvpActionButtonClass}
             >
               <Ellipsis size={14} />
             </button>
@@ -1005,7 +955,7 @@ export default function SubscriptionScreen() {
       },
       {
         accessorKey: "shareInvoice",
-        header: "Share Invoice PDF",
+        header: "Share Invoice",
         size: 240,
         Cell: ({ row }: { row: { original: SubscriptionRow } }) => {
           const subscription = row.original;
@@ -1165,7 +1115,7 @@ export default function SubscriptionScreen() {
                 ) : null}
                 <button
                   onClick={handleWhatsAppShare}
-                  className="flex items-center gap-1 rounded-md bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200"
+                  className={cvpShareButtonClass}
                 >
                   <img
                     src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
@@ -1175,7 +1125,7 @@ export default function SubscriptionScreen() {
                 </button>
                 <button
                   onClick={handleDownloadInvoice}
-                  className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+                  className={cvpActionButtonClass}
                 >
                   <Download size={14} />
                 </button>
@@ -1261,6 +1211,28 @@ export default function SubscriptionScreen() {
         WebkitOverflowScrolling: "touch",
       },
     },
+    ...cvpMaterialTableProps,
+    layoutMode: "grid",
+    muiTableHeadCellProps: {
+      sx: {
+        backgroundColor: "#f8fafc",
+        color: "#94a3b8",
+        fontWeight: 600,
+        fontSize: "11px",
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        padding: "14px 16px",
+        borderBottom: "1px solid #f1f5f9",
+      },
+    },
+    muiTableBodyCellProps: {
+      sx: {
+        fontSize: "14px",
+        color: "#334155",
+        padding: "16px",
+        borderBottom: "1px solid #f1f5f9",
+      },
+    },
   });
 
   const statusCounts = useMemo(() => {
@@ -1279,6 +1251,36 @@ export default function SubscriptionScreen() {
     }
     return counts;
   }, [data]);
+
+  const membershipCounts = useMemo(() => {
+    const members = data.filter((row) => row.status !== "cancelled");
+    const byPlan = new Map<string, number>();
+    for (const row of members) {
+      const key = String(row.subscriptionType || "general").toLowerCase();
+      byPlan.set(key, (byPlan.get(key) || 0) + 1);
+    }
+    const known = new Set(memberships.map((plan) => plan.planId));
+    const plans = [
+      ...memberships.map((plan) => ({
+        key: plan.planId,
+        label: plan.displayName,
+        count: byPlan.get(plan.planId) || 0,
+      })),
+      ...[...byPlan.entries()]
+        .filter(([key]) => !known.has(key))
+        .map(([key, count]) => ({
+          key,
+          label: key.charAt(0).toUpperCase() + key.slice(1),
+          count,
+        })),
+    ];
+    return {
+      total: members.length,
+      active: data.filter((row) => row.status === "active").length,
+      expired: data.filter((row) => row.status === "expired").length,
+      plans,
+    };
+  }, [data, memberships]);
 
   const totalDueAmount = useMemo(() => {
     return filteredData.reduce((sum, row) => sum + (row.dueAmount || 0), 0);
@@ -1499,7 +1501,7 @@ export default function SubscriptionScreen() {
             <div className="mt-2 flex items-center gap-2 border-t border-slate-100 pt-2">
               <div className="flex-1">
                 <label className="text-[9px] font-semibold uppercase text-slate-500">
-                  From
+                  From 
                 </label>
                 <input
                   type="date"
@@ -2145,10 +2147,10 @@ export default function SubscriptionScreen() {
       {/* ============================================================== */}
       {/* DESKTOP VIEW (screens >= md)                                   */}
       {/* ============================================================== */}
-      <div className="hidden md:block space-y-4">
+      <div className="hidden min-w-0 space-y-4 px-5 py-5 md:block">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-2">
-          <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">
+          <h1 className={cvpTitleClass}>
             Subscriptions
           </h1>
           <span className="rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">
@@ -2158,7 +2160,7 @@ export default function SubscriptionScreen() {
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           <Can permission={PERMISSIONS.SUBSCRIPTION_CREATE}>
             <button
-              className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 cursor-pointer sm:w-auto"
+              className={cvpPrimaryButtonClass}
               onClick={() => {
                 setModalMode("create");
                 setModalData(null);
@@ -2175,7 +2177,7 @@ export default function SubscriptionScreen() {
             ]}
           >
             <button
-              className="w-full rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 cursor-pointer sm:w-auto"
+              className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800"
               onClick={() => {
                 setModalMode("bulk");
                 setModalData(null);
@@ -2185,6 +2187,36 @@ export default function SubscriptionScreen() {
               + Bulk Create Subscription
             </button>
           </Can>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-stretch gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Membership</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{membershipCounts.total}</p>
+        </div>
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-600">Active</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-700">{membershipCounts.active}</p>
+          </div>
+          <div className="h-8 w-px bg-slate-200" />
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Expired</p>
+            <p className="mt-1 text-2xl font-bold text-slate-700">{membershipCounts.expired}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 self-center rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          {membershipCounts.plans.length === 0 ? (
+            <p className="text-xs text-slate-400">No memberships yet</p>
+          ) : (
+            membershipCounts.plans.map((plan) => (
+              <div key={plan.key} className="min-w-[4.5rem]">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{plan.label}</p>
+                <p className="text-sm font-bold leading-5 text-slate-900">{plan.count}</p>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -2210,7 +2242,7 @@ export default function SubscriptionScreen() {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white p-3">
+      <div className={cvpFilterBarClass}>
         <div className="relative min-w-0 w-full flex-1 sm:min-w-[200px]">
           <Search
             size={16}
@@ -2221,13 +2253,13 @@ export default function SubscriptionScreen() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by transaction, customer, invoice etc..."
-            className="h-10 w-full rounded-md border border-gray-200 pl-9 pr-3 text-sm outline-none focus:border-blue-400"
+            className="h-9 w-full rounded-lg border-0 bg-transparent pl-7 pr-2 text-xs font-semibold text-slate-800 outline-none"
           />
         </div>
         <select
           value={subscriptionTypeFilter}
           onChange={(e) => setSubscriptionTypeFilter(e.target.value)}
-          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-400 bg-white text-gray-700"
+          className={cvpFilterSelectClass}
         >
           <option value="all">All Subscriptions</option>
           {memberships.map((membership) => (
@@ -2239,7 +2271,7 @@ export default function SubscriptionScreen() {
         <select
           value={expiryFilter}
           onChange={(e) => setExpiryFilter(e.target.value)}
-          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-400 bg-white text-gray-700"
+          className={cvpFilterSelectClass}
         >
           <option value="all">Any Expiry</option>
           <option value="day">Expire in a Day</option>
@@ -2252,7 +2284,7 @@ export default function SubscriptionScreen() {
         <select
           value={datePreset}
           onChange={(e) => applyDatePreset(e.target.value as DatePreset)}
-          className="h-10 rounded-md border border-gray-200 px-3 text-sm outline-none focus:border-blue-400 bg-white text-gray-700"
+          className={cvpFilterSelectClass}
         >
           {DATE_PRESET_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -2261,6 +2293,7 @@ export default function SubscriptionScreen() {
           ))}
         </select>
 
+        {datePreset === "custom" ? (
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <div className="flex items-center gap-2">
             <label className="whitespace-nowrap text-xs font-medium text-gray-500">
@@ -2270,11 +2303,8 @@ export default function SubscriptionScreen() {
               type="date"
               value={fromDate}
               max={toDate || undefined}
-              onChange={(e) => {
-                setFromDate(e.target.value);
-                setDatePreset("custom");
-              }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+              onChange={(e) => setFromDate(e.target.value)}
+              className={cvpFilterDateClass}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -2285,28 +2315,24 @@ export default function SubscriptionScreen() {
               type="date"
               value={toDate}
               min={fromDate || undefined}
-              onChange={(e) => {
-                setToDate(e.target.value);
-                setDatePreset("custom");
-              }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+              onChange={(e) => setToDate(e.target.value)}
+              className={cvpFilterDateClass}
             />
           </div>
-          {(fromDate || toDate || datePreset !== "all") && (
-            <button
-              type="button"
-              onClick={() => applyDatePreset("all")}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
-            >
-              Clear
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => applyDatePreset("all")}
+            className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600"
+          >
+            Clear
+          </button>
         </div>
+        ) : null}
       </div>
 
       <MaterialReactTable table={table} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs shadow-sm">
         <div className="flex items-center gap-2 text-sm">
           <span className="rounded bg-gray-100 px-2 py-1 text-gray-700">
             Total ₹{" "}

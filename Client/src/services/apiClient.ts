@@ -2993,6 +2993,19 @@ export const handleRescheduleSpaceBooking = async (
   };
 };
 
+export const handleSendSpaceBookingQuotation = async (payload: {
+  phone: string;
+  bodyParams: string[];
+}) => {
+  const response = await axiosInstance.post("/space-bookings/quotation-whatsapp", payload);
+  return response.data as {
+    success: boolean;
+    delivered?: boolean;
+    stub?: boolean;
+    message?: string;
+  };
+};
+
 export const handleReceiveSpaceBookingPayment = async (
   id: string,
   payload: { amount: number; mode: string; walletType?: string },
@@ -3928,6 +3941,56 @@ export const handleReviewHapApplication = async (
 
 export const handleDeleteHapApplication = async (id: string) => {
   const response = await axiosInstance.delete(`/hap/applications/${id}`);
+  return response.data as { success: boolean; message?: string };
+};
+
+export type CvpApplicationRecord = {
+  _id: string;
+  fullName: string;
+  phone: string;
+  profession: string;
+  photoUrl: string;
+  availability: Array<"Morning" | "Afternoon" | "Evening" | "Night" | "Anytime">;
+  volunteeredBefore: boolean;
+  events: string;
+  volunteerType: "Paid" | "Unpaid" | "Both" | "";
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+const cvpFormConfig = {
+  headers: {"Content-Type": "multipart/form-data"},
+};
+
+export const handleGetCvpApplications = async () => {
+  const response = await axiosInstance.get("/cvp");
+  return response.data as {
+    success: boolean;
+    applications?: CvpApplicationRecord[];
+    message?: string;
+  };
+};
+
+export const handleCreateCvpApplication = async (payload: FormData) => {
+  const response = await axiosInstance.post("/cvp", payload, cvpFormConfig);
+  return response.data as {
+    success: boolean;
+    application?: CvpApplicationRecord;
+    message?: string;
+  };
+};
+
+export const handleUpdateCvpApplication = async (id: string, payload: FormData) => {
+  const response = await axiosInstance.patch(`/cvp/${id}`, payload, cvpFormConfig);
+  return response.data as {
+    success: boolean;
+    application?: CvpApplicationRecord;
+    message?: string;
+  };
+};
+
+export const handleDeleteCvpApplication = async (id: string) => {
+  const response = await axiosInstance.delete(`/cvp/${id}`);
   return response.data as { success: boolean; message?: string };
 };
 

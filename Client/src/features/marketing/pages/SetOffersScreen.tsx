@@ -210,7 +210,7 @@ const SetOffersScreen = () => {
 
         <div className="min-w-0">
           <h1 className="text-lg font-bold text-slate-900 sm:text-2xl">
-            Set Offers
+             Space Offers
           </h1>
 
           {/* Description hidden only on mobile */}

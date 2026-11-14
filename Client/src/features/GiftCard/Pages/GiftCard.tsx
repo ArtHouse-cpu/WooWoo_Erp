@@ -78,14 +78,6 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return err?.response?.data?.message || fallback;
 };
 
-const LIGHT_PALETTES = [
-  { progress: "bg-violet-500", text: "text-violet-700", bg: "bg-violet-50", border: "border-violet-200" },
-  { progress: "bg-sky-500", text: "text-sky-700", bg: "bg-sky-50", border: "border-sky-200" },
-  { progress: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
-  { progress: "bg-amber-500", text: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
-  { progress: "bg-rose-500", text: "text-rose-700", bg: "bg-rose-50", border: "border-rose-200" },
-];
-
 function formatExpiryDate(dateStr?: string): string {
   if (!dateStr) return "-";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
@@ -113,11 +105,12 @@ const GiftCard = () => {
     const total = cards.length;
     const active = cards.filter((c) => c.status === "Active").length;
     const used = cards.filter((c) => c.status === "Used").length;
-    const balance = cards.reduce(
-      (sum, c) => sum + (Number(c.currentBalance) || 0),
+    const activeAmount = cards.reduce(
+      (sum, c) =>
+        sum + (c.status === "Active" ? Number(c.initialAmount) || 0 : 0),
       0,
     );
-    return { total, active, used, balance };
+    return { total, active, used, activeAmount };
   }, [cards]);
 
   const filteredCards = useMemo(() => {
@@ -207,7 +200,6 @@ const GiftCard = () => {
       code: formData.code.trim(),
       name: formData.name.trim(),
       initialAmount: formData.initialAmount,
-      currentBalance: formData.currentBalance,
       createdBy: formData.createdBy || staffName,
       expiryDate: formData.expiryDate,
       status: formData.status,
@@ -230,7 +222,7 @@ const GiftCard = () => {
       });
       if (saved.status !== formData.status) {
         toast.info(
-          `Status set to "${saved.status}" based on balance and expiry.`,
+          `Status set to "${saved.status}" based on expiry.`,
         );
       }
       return true;
@@ -335,18 +327,6 @@ const GiftCard = () => {
       {
         accessorKey: "initialAmount",
         header: "Amount",
-        size: 120,
-
-        Cell: ({ cell }) => (
-          <span className="font-medium text-gray-800">
-            ₹{cell.getValue<number>().toLocaleString("en-IN")}
-          </span>
-        ),
-      },
-
-      {
-        accessorKey: "currentBalance",
-        header: "Balance",
         size: 120,
 
         Cell: ({ cell }) => (
@@ -509,7 +489,7 @@ const GiftCard = () => {
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-95"
             >
               <Plus size={15} />
-              <span>+ Create</span>
+              <span>Create</span>
             </button>
           )}
         </div>
@@ -553,7 +533,7 @@ const GiftCard = () => {
           </div>
         </div>
 
-        {/* Available Balance */}
+        {/* Active gift card amount */}
         <div className="relative min-w-0 overflow-hidden rounded-2xl border border-blue-100/90 bg-blue-50/60 p-2.5 sm:p-3.5 shadow-2xs transition duration-300 hover:shadow-md hover:border-blue-200">
           <CreditCard className="absolute -right-2 -bottom-2 sm:-right-3 sm:-bottom-3 h-14 w-14 sm:h-20 sm:w-20 stroke-[1.2] pointer-events-none text-blue-200/50" />
           <div className="relative z-10 flex items-center gap-2 sm:gap-2.5">
@@ -561,11 +541,11 @@ const GiftCard = () => {
               <CreditCard className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="block truncate text-[10px] sm:text-xs font-bold text-slate-800" title="Total Balance">
-                Total Balance
+              <span className="block truncate text-[10px] sm:text-xs font-bold text-slate-800" title="Active amount">
+                Active amount
               </span>
               <div className="mt-0.5 text-lg sm:text-2xl font-extrabold tabular-nums text-slate-900">
-                ₹{stats.balance.toLocaleString("en-IN")}
+                ₹{stats.activeAmount.toLocaleString("en-IN")}
               </div>
             </div>
           </div>
@@ -651,14 +631,9 @@ const GiftCard = () => {
             </p>
           </div>
         ) : (
-          filteredCards.map((card, index) => {
+          filteredCards.map((card) => {
             const initial = Math.max(0, Number(card.initialAmount || 0));
-            const balance = Math.max(0, Number(card.currentBalance || 0));
-            const remainingPct =
-              initial > 0 ? Math.min(100, (balance / initial) * 100) : 0;
             const isCopied = copiedCode === card.code;
-            const palette = LIGHT_PALETTES[index % LIGHT_PALETTES.length];
-
             return (
               <div
                 key={card._id}
@@ -770,39 +745,19 @@ const GiftCard = () => {
                   </h3>
                 </div>
 
-                {/* Balance & Progress Box (Compact & Light) */}
                 <div className="rounded-xl bg-slate-50/80 p-2 border border-slate-100 text-xs">
                   <div className="flex items-baseline justify-between gap-2">
                     <div>
                       <span className="text-[10px] font-semibold uppercase text-slate-600 block">
-                        Balance
+                        Amount
                       </span>
                       <span className="text-base sm:text-lg font-extrabold text-slate-900 tabular-nums">
-                        ₹{balance.toLocaleString("en-IN")}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] font-semibold uppercase text-slate-600 block">
-                        Initial
-                      </span>
-                      <span className="text-xs font-bold text-slate-700 tabular-nums">
                         ₹{initial.toLocaleString("en-IN")}
                       </span>
                     </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="mt-1.5">
-                    <div className="flex items-center justify-between text-[10px] text-slate-600 mb-0.5">
-                      <span>Remaining</span>
-                      <span className="font-bold">{Math.round(remainingPct)}%</span>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${palette.progress} transition-all duration-300`}
-                        style={{ width: `${remainingPct}%` }}
-                      />
-                    </div>
+                    <span className="text-[10px] font-semibold uppercase text-slate-500">
+                      One-time use
+                    </span>
                   </div>
                 </div>
 

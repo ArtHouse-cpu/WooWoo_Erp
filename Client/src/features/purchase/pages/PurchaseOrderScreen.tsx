@@ -41,6 +41,7 @@ import { usePersistedDateFilter } from "@/utils/rememberDateFilter";
 import { useNavigate } from "react-router-dom";
 import { downloadInvoicePdf, getInvoicePdfBlob } from "@/utils/pdfGenerator";
 import Can from "@/components/rbac/Can";
+import { cvpActionButtonClass, cvpFilterBarClass, cvpFilterDateClass, cvpFilterSelectClass, cvpMaterialTableProps, cvpPageClass, cvpPrimaryButtonClass, cvpShareButtonClass, cvpTitleClass } from "@/components/tables/cvpTableTheme";
 import { PERMISSIONS } from "@/constants/permissions";
 import {
   buildWoowooInvoiceWhatsAppMessage,
@@ -597,7 +598,7 @@ export default function PurchaseOrderScreen() {
             <button
               type="button"
               onClick={() => setSelectedActionRow(row.original)}
-              className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+              className={cvpActionButtonClass}
             >
               Actions
             </button>
@@ -757,7 +758,7 @@ export default function PurchaseOrderScreen() {
               <button
                 type="button"
                 onClick={handleWhatsAppShare}
-                className="flex items-center gap-1 rounded-md bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-200"
+                className={cvpShareButtonClass}
               >
                 <img
                   src="https://cdn-icons-png.flaticon.com/512/733/733585.png"
@@ -768,7 +769,7 @@ export default function PurchaseOrderScreen() {
               <button
                 type="button"
                 onClick={handleDownloadBill}
-                className="flex items-center gap-1 rounded-md bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200"
+                className={cvpActionButtonClass}
               >
                  <Download size={14} />
               </button>
@@ -817,6 +818,7 @@ export default function PurchaseOrderScreen() {
         WebkitOverflowScrolling: "touch",
       },
     },
+    ...cvpMaterialTableProps,
   });
 
   const totalAmount = filteredData.reduce((s, r) => s + r.amount, 0);
@@ -1633,10 +1635,10 @@ export default function PurchaseOrderScreen() {
       {/* DESKTOP VIEW (Visible only on desktop: screens >= md / 768px)  */}
       {/* 100% Original unchanged desktop layout, table, and controls   */}
       {/* ============================================================== */}
-      <div className="hidden md:block space-y-4">
+      <div className={cvpPageClass}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-2">
-          <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">
+          <h1 className={cvpTitleClass}>
             Purchase Order List
           </h1>
           <span className="rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700">
@@ -1646,7 +1648,7 @@ export default function PurchaseOrderScreen() {
         <Can permission={PERMISSIONS.PURCHASE_ORDER_CREATE}>
           <button
             type="button"
-            className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white sm:w-auto"
+            className={cvpPrimaryButtonClass}
             onClick={() => navigate("/create-purchase-order")}
           >
             + Create Order
@@ -1675,7 +1677,7 @@ export default function PurchaseOrderScreen() {
         ))}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className={cvpFilterBarClass}>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <select
             value={datePreset}
@@ -1687,7 +1689,7 @@ export default function PurchaseOrderScreen() {
               setFromDate(range.from);
               setToDate(range.to);
             }}
-            className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+            className={cvpFilterSelectClass}
           >
             {DATE_PRESET_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -1707,7 +1709,7 @@ export default function PurchaseOrderScreen() {
                 setFromDate(e.target.value);
                 setDatePreset("custom");
               }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+              className={cvpFilterDateClass}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -1722,7 +1724,7 @@ export default function PurchaseOrderScreen() {
                 setToDate(e.target.value);
                 setDatePreset("custom");
               }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm text-gray-700 outline-none focus:border-blue-400"
+              className={cvpFilterDateClass}
             />
           </div>
           {(fromDate || toDate || datePreset !== "all") && (
@@ -1733,7 +1735,7 @@ export default function PurchaseOrderScreen() {
                 setFromDate("");
                 setToDate("");
               }}
-              className="h-10 rounded-md border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              className="h-9 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600"
             >
               Clear
             </button>
@@ -1743,7 +1745,7 @@ export default function PurchaseOrderScreen() {
 
       <MaterialReactTable table={table} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs shadow-sm">
         <div className="flex items-center gap-2 text-sm">
           <span className="rounded bg-gray-100 px-2 py-1 text-gray-700">
             Total ₹{" "}
