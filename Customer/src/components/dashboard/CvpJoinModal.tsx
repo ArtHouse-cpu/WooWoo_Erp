@@ -3,7 +3,6 @@ import {
   HeartHandshake,
   Phone,
   User,
-  Sparkles,
   X,
   CheckCircle2,
   Camera,
