@@ -23,6 +23,7 @@ import {
   ChevronRight,
   ChevronsRight,
   Check,
+  Building2,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import Swal from "sweetalert2";
@@ -296,6 +297,11 @@ export default function VendorScreen() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);
   const [showColumnsDropdown, setShowColumnsDropdown] = useState(false);
+
+  const handleToggleKpi = (filter: "all" | "csp") => {
+    setKpiFilter((prev) => (prev === filter ? "all" : filter));
+    setPageIndex(1);
+  };
 
   // Sorting state
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -742,7 +748,11 @@ export default function VendorScreen() {
 
   return (
     <div className="p-3 sm:p-5 space-y-4 max-w-[1600px] mx-auto text-left">
-      {/* Top Header */}
+      {/* ========================================================================= */}
+      {/* DESKTOP WEBVIEW (Hidden on mobile) */}
+      {/* ========================================================================= */}
+      <div className="hidden md:block space-y-4">
+        {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Vendors</h1>
@@ -1559,9 +1569,115 @@ export default function VendorScreen() {
           </div>
         </div>
       </div>
+      </div>
 
-      {/* Mobile Card List View (Small Screens) */}
-      <div className="block md:hidden space-y-2.5">
+      {/* ========================================================================= */}
+      {/* MOBILE VIEW (Restored cleanly to original design) */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Header */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-semibold text-slate-900">Vendors List</h1>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Can permission={PERMISSIONS.VENDOR_CREATE}>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700 shadow-xs transition hover:bg-emerald-100 cursor-pointer"
+                onClick={() => setOpenImportVendorModal(true)}
+                title="Import Spreadsheet"
+              >
+                <FileSpreadsheet size={14} className="shrink-0" />
+              </button>
+              <button
+                type="button"
+                className="whitespace-nowrap rounded-lg bg-black px-3 py-2 text-xs font-semibold text-white transition hover:bg-neutral-900 cursor-pointer"
+                onClick={() => {
+                  setEditingVendor(null);
+                  setOpenCreateVendorModal(true);
+                }}
+              >
+                +Add
+              </button>
+            </Can>
+          </div>
+        </div>
+
+        {/* KPI Cards: Total Vendors & Total CSP */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Total Vendors Card */}
+          <button
+            type="button"
+            onClick={() => handleToggleKpi("all")}
+            className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition-all duration-200 cursor-pointer ${
+              kpiFilter === "all"
+                ? "border-blue-500 bg-blue-50/80 ring-2 ring-blue-400/30 shadow-xs"
+                : "border-slate-200/90 bg-white hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-xs"
+            }`}
+          >
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                kpiFilter === "all"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-blue-50 text-blue-600"
+              }`}
+            >
+              <Building2 size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-bold tracking-tight text-slate-900 leading-none">
+                {loadingVendors ? "..." : totalVendors.toLocaleString("en-IN")}
+              </div>
+              <div className="mt-1 text-[11px] font-semibold text-slate-500 truncate">
+                Total Vendors
+              </div>
+            </div>
+          </button>
+
+          {/* Total CSP Card */}
+          <button
+            type="button"
+            onClick={() => handleToggleKpi("csp")}
+            className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition-all duration-200 cursor-pointer ${
+              kpiFilter === "csp"
+                ? "border-purple-500 bg-purple-50/80 ring-2 ring-purple-400/30 shadow-xs"
+                : "border-slate-200/90 bg-white hover:border-purple-200 hover:bg-purple-50/30 hover:shadow-xs"
+            }`}
+          >
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                kpiFilter === "csp"
+                  ? "bg-purple-600 text-white shadow-xs"
+                  : "bg-purple-50 text-purple-600"
+              }`}
+            >
+              <ShieldCheck size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-bold tracking-tight text-purple-950 leading-none">
+                {loadingVendors ? "..." : totalCsp.toLocaleString("en-IN")}
+              </div>
+              <div className="mt-1 text-[11px] font-semibold text-purple-600/80 truncate">
+                Total CSP
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Mobile Search Input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search vendors..."
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-slate-400"
+          />
+        </div>
+
+        {/* Vendor Cards List */}
         {loadingVendors && sortedData.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
             Loading vendors...
@@ -1571,54 +1687,60 @@ export default function VendorScreen() {
             No vendors found
           </div>
         ) : (
-          paginatedData.map((vendor, index) => {
-            const palette = AVATAR_PALETTES[index % AVATAR_PALETTES.length];
-            const initials = getVendorInitials(vendor.name);
+          paginatedData.map((vendor) => {
             const isActive = vendor.status === "Active" || vendor.isActive !== false;
+            const company = vendor.companyName || vendor.company;
 
             return (
               <div
-                key={vendor._id}
+                key={vendor._id || vendor.id}
                 onClick={() => openVendorDetails(vendor)}
-                className="cursor-pointer rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                className="cursor-pointer rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black uppercase ${palette.bg} ${palette.text}`}
-                    >
-                      {initials}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="truncate text-sm font-bold text-slate-900">
-                          {vendor.name}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-bold text-slate-900">
+                        {vendor.name}
+                      </span>
+                      {vendor.cspLabel && (
+                        <span className="inline-flex rounded-full bg-violet-100 px-2 py-0.2 text-[10px] font-semibold text-violet-700">
+                          {vendor.cspLabel}
                         </span>
-                        {vendor.cspLabel && (
-                          <span className="inline-flex rounded-full bg-violet-100 px-1.5 py-0.2 text-[9px] font-bold text-violet-700">
-                            {vendor.cspLabel}
+                      )}
+                    </div>
+                    {company && company !== "—" && (
+                      <p className="mt-0.5 text-xs font-medium text-slate-600 truncate">
+                        {company}
+                      </p>
+                    )}
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      {vendor.mobile && <span>{vendor.mobile}</span>}
+                      {vendor.city && (
+                        <>
+                          <span>•</span>
+                          <span>{vendor.city}</span>
+                        </>
+                      )}
+                      {vendor.gstin && (
+                        <>
+                          <span>•</span>
+                          <span className="font-mono text-[11px] text-slate-400">
+                            GST: {vendor.gstin}
                           </span>
-                        )}
-                      </div>
-                      {vendor.company && vendor.company !== "—" && (
-                        <p className="mt-0.5 text-xs font-medium text-slate-600 truncate">
-                          {vendor.company}
-                        </p>
+                        </>
                       )}
                     </div>
                   </div>
 
                   <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold inline-flex items-center gap-1 ${
-                      isActive
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60"
-                        : "bg-rose-50 text-rose-700 border border-rose-200/60"
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                      !isActive
+                        ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200/60"
+                        : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60"
                     }`}
                   >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-500" : "bg-rose-500"}`}
-                    />
-                    <span>{isActive ? "Active" : "Inactive"}</span>
+                    {isActive ? "Active" : "Inactive"}
                   </span>
                 </div>
 
@@ -1629,13 +1751,13 @@ export default function VendorScreen() {
                         Total Purchase
                       </span>
                       <span className="text-sm font-bold text-slate-900">
-                        {inr(vendor.totalPurchase)}
+                        ₹{Number(vendor.totalPurchase || 0).toLocaleString("en-IN")}
                       </span>
                     </div>
                     {vendor.outstandingAmount !== undefined && (
                       <div>
                         <span className="block text-[10px] font-medium uppercase text-slate-400">
-                          Due
+                          Due Balance
                         </span>
                         <span
                           className={`text-xs font-bold ${
@@ -1644,7 +1766,7 @@ export default function VendorScreen() {
                               : "text-slate-600"
                           }`}
                         >
-                          {inr(vendor.outstandingAmount)}
+                          ₹{Number(vendor.outstandingAmount || 0).toLocaleString("en-IN")}
                         </span>
                       </div>
                     )}
@@ -1660,7 +1782,7 @@ export default function VendorScreen() {
                         setSelectedVendorForLedger(vendor);
                         setOpenLedgerModal(true);
                       }}
-                      className="cursor-pointer rounded-lg bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100"
+                      className="cursor-pointer rounded-lg bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100 transition"
                       title="View Ledger"
                     >
                       <Eye size={15} />
@@ -1672,7 +1794,7 @@ export default function VendorScreen() {
                           setOpenCreateVendorModal(false);
                           setEditingVendor(vendor);
                         }}
-                        className="cursor-pointer rounded-lg bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100"
+                        className="cursor-pointer rounded-lg bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100 transition"
                         title="Edit Vendor"
                       >
                         <SquarePen size={15} />
@@ -1682,7 +1804,7 @@ export default function VendorScreen() {
                       <button
                         type="button"
                         onClick={() => handleDelete(vendor)}
-                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
+                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100 transition"
                         title="Delete Vendor"
                       >
                         <Trash2 size={15} />
@@ -1706,7 +1828,7 @@ export default function VendorScreen() {
                 type="button"
                 disabled={currentPage === 1}
                 onClick={() => setPageIndex((p) => Math.max(1, p - 1))}
-                className="px-3 py-1 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40 cursor-pointer"
               >
                 Previous
               </button>
@@ -1714,7 +1836,7 @@ export default function VendorScreen() {
                 type="button"
                 disabled={currentPage === totalPages}
                 onClick={() => setPageIndex((p) => Math.min(totalPages, p + 1))}
-                className="px-3 py-1 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40 cursor-pointer"
               >
                 Next
               </button>

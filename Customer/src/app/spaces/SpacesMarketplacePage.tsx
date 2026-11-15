@@ -1,11 +1,25 @@
 import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import axios from 'axios';
-import {ChevronLeft, Search, Share2, MessageCircle, Users, Building} from 'lucide-react';
+import {
+  ChevronLeft,
+  Search,
+  Share2,
+  MessageCircle,
+  Users,
+  Building2,
+  CalendarCheck,
+  LayoutGrid,
+  Crown,
+  Laptop,
+  User,
+  ChevronRight,
+} from 'lucide-react';
 import {toast} from 'sonner';
 import {SpaceDetailsModal} from '../../components/spaces/SpaceDetailsModal';
 import {ShareSpaceModal} from '../../components/spaces/ShareSpaceModal';
 import {SpaceBookingModal} from '../../components/spaces/SpaceBookingModal';
+import {CoworkingBookingModal} from '../../components/spaces/CoworkingBookingModal';
 import {ImageCarousel} from '../../components/ui/ImageCarousel';
 import {
   formatInr,
@@ -18,6 +32,150 @@ import {
   type SpaceCard,
 } from '../../services/space.service';
 
+export const DEFAULT_PASS_IMAGES: Record<string, string> = {
+  day: 'https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2?auto=format&fit=crop&w=800&q=80',
+  weekly: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=800&q=80',
+  monthly: 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80',
+  quarterly: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80',
+  halfyearly: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+  default: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
+};
+
+export function getPassFallbackImage(name: string): string {
+  const lower = (name || '').toLowerCase();
+  if (lower.includes('1 day') || lower.includes('day')) return DEFAULT_PASS_IMAGES.day;
+  if (lower.includes('weekly')) return DEFAULT_PASS_IMAGES.weekly;
+  if (lower.includes('3 month')) return DEFAULT_PASS_IMAGES.quarterly;
+  if (lower.includes('6 month')) return DEFAULT_PASS_IMAGES.halfyearly;
+  if (lower.includes('monthly')) return DEFAULT_PASS_IMAGES.monthly;
+  return DEFAULT_PASS_IMAGES.default;
+}
+
+export function formatPassName(name: string): string {
+  if (!name) return 'Coworking Pass';
+  const lower = name.toLowerCase().trim();
+  if (
+    lower.includes('1 day') ||
+    lower.includes('one day') ||
+    lower.includes('daily') ||
+    lower.includes('day pass')
+  ) {
+    return '1 Day Pass';
+  }
+  if (lower.includes('weekly') || lower.includes('1 week') || lower.includes('7 day')) {
+    return 'Weekly Pass';
+  }
+  if (lower.includes('3 month') || lower.includes('three month') || lower.includes('quarterly')) {
+    return '3 Months Pass';
+  }
+  if (lower.includes('6 month') || lower.includes('six month') || lower.includes('half year')) {
+    return '6 Months Pass';
+  }
+  if (lower.includes('monthly') || lower.includes('1 month') || lower.includes('month pass')) {
+    return 'Monthly Pass';
+  }
+  const cleaned = name.replace(/^(co[- ]?working\s*[-–—:]?\s*)/i, '').trim();
+  return cleaned || name;
+}
+
+export const DEFAULT_COWORKING_PASSES: SpaceCard[] = [
+  {
+    id: 'coworking-1-day-pass',
+    name: '1 Day Pass',
+    category: 'Coworking Pass',
+    spaceType: 'Coworking',
+    description:
+      'Daily access to flexible workstations, high-speed WiFi, hot beverages, and common creative amenities.',
+    capacity: 1,
+    imageUrl:
+      'https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2?auto=format&fit=crop&w=800&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
+    ],
+    videos: [],
+    weekdayPrice: 399,
+    weekendPrice: 399,
+    fromPrice: 399,
+  },
+  {
+    id: 'coworking-weekly-pass',
+    name: 'Weekly Pass',
+    category: 'Coworking Pass',
+    spaceType: 'Coworking',
+    description:
+      '7-day unlimited access to modern coworking spaces, high-speed connectivity, and creative lounge perks.',
+    capacity: 1,
+    imageUrl:
+      'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=800&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=800&q=80',
+    ],
+    videos: [],
+    weekdayPrice: 2599,
+    weekendPrice: 2599,
+    fromPrice: 2599,
+  },
+  {
+    id: 'coworking-monthly-pass',
+    name: 'Monthly Pass',
+    category: 'Coworking Pass',
+    spaceType: 'Coworking',
+    description:
+      'Monthly flexi desk membership with 24/7 access, meeting room credits, and community benefits.',
+    capacity: 1,
+    imageUrl:
+      'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80',
+    ],
+    videos: [],
+    weekdayPrice: 7999,
+    weekendPrice: 7999,
+    fromPrice: 7999,
+  },
+  {
+    id: 'coworking-3-months-pass',
+    name: '3 Months Pass',
+    category: 'Coworking Pass',
+    spaceType: 'Coworking',
+    description:
+      'Quarterly dedicated workstation plan with storage locker, high-speed fiber internet, and boardroom booking credits.',
+    capacity: 1,
+    imageUrl:
+      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+    ],
+    videos: [],
+    weekdayPrice: 19999,
+    weekendPrice: 19999,
+    fromPrice: 19999,
+  },
+  {
+    id: 'coworking-6-months-pass',
+    name: '6 Months Pass',
+    category: 'Coworking Pass',
+    spaceType: 'Coworking',
+    description:
+      'Semi-annual premier pass with priority desk booking, team room access, printing credits, and exclusive discounts.',
+    capacity: 1,
+    imageUrl:
+      'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2?auto=format&fit=crop&w=800&q=80',
+    ],
+    videos: [],
+    weekdayPrice: 39998,
+    weekendPrice: 39998,
+    fromPrice: 39998,
+  },
+];
+
 export default function SpacesMarketplacePage() {
   const navigate = useNavigate();
   const [spaces, setSpaces] = useState<SpaceCard[]>([]);
@@ -28,6 +186,7 @@ export default function SpacesMarketplacePage() {
   const [selected, setSelected] = useState<SpaceCard | null>(null);
   const [shareSpace, setShareSpace] = useState<SpaceCard | null>(null);
   const [bookingSpace, setBookingSpace] = useState<SpaceCard | null>(null);
+  const [coworkingBookingSpace, setCoworkingBookingSpace] = useState<SpaceCard | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -60,8 +219,35 @@ export default function SpacesMarketplacePage() {
     });
   }, [spaces, search, spaceType]);
 
+  const coworkingList = useMemo(() => {
+    const backendCoworking = spaces.filter(
+      s => (s.spaceType || '').toLowerCase() === 'coworking',
+    );
+    const source = backendCoworking.length > 0 ? backendCoworking : DEFAULT_COWORKING_PASSES;
+    const query = search.trim().toLowerCase();
+    const filtered = !query
+      ? [...source]
+      : source.filter(space =>
+          [space.name, space.spaceType, space.description, String(space.fromPrice)]
+            .join(' ')
+            .toLowerCase()
+            .includes(query),
+        );
+    // Sort by price ascending so passes appear in logical order: 1 Day -> Weekly -> Monthly -> 3 Months -> 6 Months
+    return filtered.sort((a, b) => (a.fromPrice || 0) - (b.fromPrice || 0));
+  }, [spaces, search]);
+
   const handleBook = (space: SpaceCard) => {
-    setBookingSpace(space);
+    const isCoworking =
+      spaceType.toLowerCase() === 'coworking' ||
+      (space.spaceType || '').toLowerCase() === 'coworking' ||
+      (space.name || '').toLowerCase().includes('pass') ||
+      (space.name || '').toLowerCase().includes('cowork');
+    if (isCoworking) {
+      setCoworkingBookingSpace(space);
+    } else {
+      setBookingSpace(space);
+    }
   };
 
   const handleShare = async (space: SpaceCard) => {
@@ -118,12 +304,13 @@ export default function SpacesMarketplacePage() {
               className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-slate-400"
             />
           </label>
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3 w-full">
             {[
-              {label: 'All', value: ''},
-              {label: 'Exclusive', value: 'Exclusive'},
-              {label: 'Coworking', value: 'Coworking'},
+              {label: 'All', value: '', icon: LayoutGrid},
+              {label: 'Exclusive', value: 'Exclusive', icon: Crown},
+              {label: 'Coworking', value: 'Coworking', icon: Laptop},
             ].map(tab => {
+              const Icon = tab.icon;
               const active =
                 tab.value === ''
                   ? !spaceType
@@ -133,13 +320,14 @@ export default function SpacesMarketplacePage() {
                   key={tab.label}
                   type="button"
                   onClick={() => setSpaceType(tab.value)}
-                  className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-extrabold transition cursor-pointer ${
+                  className={`flex items-center justify-center gap-1.5 sm:gap-2 rounded-2xl border py-2.5 px-2 text-xs sm:text-sm font-bold transition cursor-pointer shadow-3xs ${
                     active
-                      ? 'border-[#6344E7] bg-[#F3E8FF] text-[#7C3AED] shadow-2xs'
-                      : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                      ? 'border-[#7C3AED] bg-[#F9F5FF] text-[#7C3AED]'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                   }`}
                 >
-                  {tab.label}
+                  <Icon size={16} className={active ? 'text-[#7C3AED]' : 'text-slate-600'} />
+                  <span>{tab.label}</span>
                 </button>
               );
             })}
@@ -148,7 +336,118 @@ export default function SpacesMarketplacePage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
-        {error ? (
+        {spaceType.toLowerCase() === 'coworking' ? (
+          <div>
+            {/* Header: Lavender square with Laptop icon + Coworking Spaces title & subtitle */}
+            <div className="flex items-center gap-3.5 mb-4 sm:mb-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F3E8FF] text-[#7C3AED]">
+                <Laptop size={22} className="stroke-[2.2]" />
+              </div>
+              <div>
+                <h2 className="font-display text-lg sm:text-xl font-black text-[#111111]">
+                  Coworking Spaces
+                </h2>
+                <p className="text-xs sm:text-sm font-semibold text-slate-500">
+                  Flexible workspaces for individuals &amp; teams.
+                </p>
+              </div>
+            </div>
+
+            {/* List of passes */}
+            {coworkingList.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-10 text-center">
+                <p className="text-lg font-extrabold text-[#111111]">No passes found</p>
+                <p className="mt-1 text-sm font-semibold text-slate-500">Try another search.</p>
+              </div>
+            ) : (
+              <div className="space-y-3 sm:space-y-3.5">
+                {coworkingList.map(pass => (
+                  <div
+                    key={pass.id}
+                    onClick={() => setSelected(pass)}
+                    className="group flex items-center gap-3 sm:gap-4 rounded-3xl border border-slate-100 bg-white p-3 sm:p-3.5 shadow-xs transition hover:border-purple-200 hover:shadow-sm cursor-pointer"
+                  >
+                    {/* Left: Thumbnail Image */}
+                    <div className="relative h-18 w-18 sm:h-22 sm:w-28 rounded-2xl overflow-hidden shrink-0 bg-purple-50">
+                      <img
+                        src={pass.imageUrl || pass.images?.[0] || getPassFallbackImage(pass.name)}
+                        alt={formatPassName(pass.name)}
+                        className="h-full w-full object-cover"
+                        onError={e => {
+                          const target = e.currentTarget as HTMLImageElement;
+                          const fallback = getPassFallbackImage(pass.name);
+                          if (target.src !== fallback) {
+                            target.src = fallback;
+                          }
+                        }}
+                      />
+                    </div>
+
+                    {/* Right: 2-Row Stack */}
+                    <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch py-0.5">
+                      {/* Row 1: Title on left, Price on right */}
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <h3
+                          className="font-display font-black text-sm sm:text-base md:text-lg text-[#111111] truncate"
+                          title={pass.name}
+                        >
+                          {formatPassName(pass.name)}
+                        </h3>
+                        <span className="font-display font-black text-base sm:text-xl text-[#111111] tracking-tight shrink-0">
+                          ₹{formatInr(pass.fromPrice)}
+                        </span>
+                      </div>
+
+                      {/* Row 2: Capacity Badge on left, Actions on right */}
+                      <div className="flex items-center justify-between gap-2 mt-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#F3E8FF] px-2 sm:px-2.5 py-0.5 text-[11px] sm:text-xs font-bold text-[#7C3AED] shrink-0">
+                          <User size={12} className="stroke-[2.5]" />
+                          <span>{pass.capacity > 0 ? `${pass.capacity} Person` : '1 Person'}</span>
+                        </span>
+
+                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              void handleShare(pass);
+                            }}
+                            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border border-purple-200 bg-white text-[#7C3AED] hover:bg-purple-50 transition active:scale-95 cursor-pointer shrink-0"
+                            title="Share pass"
+                            aria-label="Share pass"
+                          >
+                            <Share2 size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleBook(pass);
+                            }}
+                            className="inline-flex items-center justify-center rounded-xl sm:rounded-2xl bg-[#6344E7] hover:bg-[#5233D6] px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-bold text-white shadow-3xs transition active:scale-95 cursor-pointer shrink-0"
+                          >
+                            Book
+                          </button>
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setSelected(pass);
+                            }}
+                            className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full border border-purple-200 bg-white text-[#7C3AED] hover:bg-purple-50 transition active:scale-95 cursor-pointer shrink-0"
+                            aria-label="View pass details"
+                          >
+                            <ChevronRight size={14} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : error ? (
           <div className="rounded-3xl border border-red-100 bg-white p-8 text-center">
             <p className="font-bold text-red-600">{error}</p>
             <button
@@ -160,17 +459,22 @@ export default function SpacesMarketplacePage() {
             </button>
           </div>
         ) : loading ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {Array.from({length: 8}).map((_, index) => (
-              <div key={index} className="overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 shadow-xs">
-                <div className="aspect-4/3 w-full animate-pulse rounded-2xl bg-slate-100" />
-                <div className="mt-3 space-y-2">
-                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-100" />
-                  <div className="h-4 w-24 animate-pulse rounded-full bg-slate-100" />
-                  <div className="h-4 w-28 animate-pulse rounded bg-slate-100" />
-                  <div className="flex items-center justify-end gap-1.5 pt-2">
-                    <div className="h-8 w-8 animate-pulse rounded-xl bg-slate-100" />
-                    <div className="h-8 w-16 animate-pulse rounded-xl bg-slate-100" />
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:gap-6">
+            {Array.from({length: 6}).map((_, index) => (
+              <div
+                key={index}
+                className="overflow-hidden rounded-[24px] sm:rounded-[36px] border border-slate-100 bg-white p-2.5 sm:p-4 shadow-xs"
+              >
+                <div className="aspect-4/3 w-full animate-pulse rounded-[18px] sm:rounded-[26px] bg-slate-100" />
+                <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-2.5">
+                  <div className="h-5 sm:h-6 w-3/4 animate-pulse rounded-lg bg-slate-100" />
+                  <div className="h-4 sm:h-5 w-20 sm:w-24 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="h-6 sm:h-8 w-16 sm:w-28 animate-pulse rounded-lg bg-slate-100" />
+                    <div className="flex gap-1.5 sm:gap-2">
+                      <div className="h-7 w-7 sm:h-10 sm:w-10 animate-pulse rounded-full bg-slate-100" />
+                      <div className="h-7 w-14 sm:h-10 sm:w-24 animate-pulse rounded-xl sm:rounded-2xl bg-slate-100" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -182,7 +486,7 @@ export default function SpacesMarketplacePage() {
             <p className="mt-1 text-sm font-semibold text-slate-500">Try another search or filter.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:gap-6">
             {visible.map(space => {
               const cardImages =
                 space.images?.length > 0 ? space.images : space.imageUrl ? [space.imageUrl] : [];
@@ -191,7 +495,7 @@ export default function SpacesMarketplacePage() {
                 <div
                   key={space.id}
                   onClick={() => setSelected(space)}
-                  className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-100 bg-white p-3 text-left shadow-xs transition hover:-translate-y-1 hover:shadow-md cursor-pointer"
+                  className="group flex flex-col justify-between overflow-hidden rounded-[24px] sm:rounded-[36px] border border-slate-100 bg-white p-2.5 sm:p-4 text-left shadow-xs transition hover:-translate-y-1 hover:shadow-md cursor-pointer"
                 >
                   <div>
                     {/* Space Image Container with scrollable images */}
@@ -199,81 +503,92 @@ export default function SpacesMarketplacePage() {
                       images={cardImages}
                       alt={space.name}
                       aspectRatio="aspect-4/3"
-                      roundedClassName="rounded-2xl"
+                      roundedClassName="rounded-[18px] sm:rounded-[26px]"
                       onImageClick={() => setSelected(space)}
                       badge={
-                        <span className="pointer-events-none absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-700 border border-emerald-200/80 shadow-xs">
-                          <Users size={11} className="shrink-0 text-emerald-600 stroke-[2.2]" />
-                          <span>
-                            {space.capacity > 0
-                              ? `${space.capacity} ${space.capacity === 1 ? 'person' : 'people'}`
-                              : 'Flexible'}
+                        <div className="pointer-events-none absolute right-2 top-2 sm:right-3 sm:top-3 z-10">
+                          <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full bg-[#EAF8F1] backdrop-blur-xs px-2 sm:px-3.5 py-0.5 sm:py-1.5 text-[10px] sm:text-sm font-bold text-[#16A34A] shadow-xs">
+                            <Users size={12} className="shrink-0 text-[#16A34A] stroke-[2.2] sm:w-[15px] sm:h-[15px]" />
+                            <span>
+                              {space.capacity > 0
+                                ? `${space.capacity} people`
+                                : 'Flexible'}
+                            </span>
                           </span>
-                        </span>
+                        </div>
                       }
                       showDots={cardImages.length > 1}
                       showArrows={cardImages.length > 1}
                     />
 
-                  {/* Space Title */}
-                  <div className="mt-3">
-                    <h3
-                      className="min-w-0 truncate text-xs sm:text-sm font-extrabold text-[#111111]"
-                      title={space.name}
-                    >
-                      {space.name}
-                    </h3>
-                  </div>
+                    {/* Space Title */}
+                    <div className="mt-2.5 sm:mt-4">
+                      <h3
+                        className="truncate font-display text-sm sm:text-lg lg:text-xl font-black text-[#111827] tracking-tight"
+                        title={space.name}
+                      >
+                        {space.name}
+                      </h3>
+                    </div>
 
-                  {/* Category Pill */}
-                  <div className="mt-1.5 flex items-center">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#F3E8FF] px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-[#7C3AED]">
-                      <Building size={12} className="shrink-0 text-[#7C3AED]" />
-                      <span className="truncate max-w-[120px] sm:max-w-[150px]">
-                        {space.category || space.spaceType || 'Space'}
+                    {/* Category Pill */}
+                    <div className="mt-1.5 sm:mt-2 flex items-center">
+                      <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-2xl bg-[#F3E8FF] px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-sm font-bold text-[#7C3AED]">
+                        <Building2 size={12} className="shrink-0 text-[#7C3AED] sm:w-[15px] sm:h-[15px]" />
+                        <span className="truncate">
+                          {space.category || space.spaceType || 'Studio'}
+                        </span>
                       </span>
-                    </span>
+                    </div>
                   </div>
 
-                  {/* Price (Just below capacity) */}
-                  <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-[11px] sm:text-xs font-semibold text-slate-500">From</span>
-                    <span className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                      ₹{formatInr(space.fromPrice)}
-                    </span>
-                    <span className="text-[11px] sm:text-xs font-medium text-slate-400">/ hour</span>
+                  {/* Bottom Row (Price and Actions) */}
+                  <div className="mt-2.5 sm:mt-5 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 pt-1.5 sm:pt-2 border-t border-slate-50">
+                    <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+                      <div className="min-w-0">
+                        <span className="text-[10px] sm:text-xs font-semibold text-slate-500 block leading-tight">
+                          From
+                        </span>
+                        <div className="flex items-baseline gap-0.5 sm:gap-1 mt-0.5">
+                          <span className="text-sm sm:text-xl lg:text-2xl font-black text-[#111827] tracking-tight">
+                            ₹{formatInr(space.fromPrice)}
+                          </span>
+                          <span className="text-[10px] sm:text-xs font-bold text-slate-500">/hr</span>
+                        </div>
+                      </div>
+                      <div className="h-6 sm:h-8 w-px bg-slate-200 shrink-0 hidden sm:block" />
+                    </div>
+
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          void handleShare(space);
+                        }}
+                        className="flex h-7 w-7 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#7C3AED] transition active:scale-95 cursor-pointer shrink-0"
+                        title="Share space"
+                        aria-label="Share space"
+                      >
+                        <Share2 size={13} className="sm:w-[17px] sm:h-[17px] stroke-[2.2]" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleBook(space);
+                        }}
+                        className="inline-flex items-center justify-center gap-1 sm:gap-2 rounded-xl sm:rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] px-2.5 sm:px-4 py-1.5 sm:py-2.5 text-[11px] sm:text-sm font-bold text-white shadow-xs sm:shadow-md sm:shadow-purple-500/25 transition active:scale-95 cursor-pointer shrink-0"
+                      >
+                        <CalendarCheck size={12} className="sm:w-[17px] sm:h-[17px] stroke-[2.2]" />
+                        <span>Book</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                {/* Action Buttons (Share and Book) */}
-                <div className="mt-3 flex items-center justify-end gap-1.5 pt-2 border-t border-slate-50">
-                  <button
-                    type="button"
-                    onClick={e => {
-                      e.stopPropagation();
-                      void handleShare(space);
-                    }}
-                    className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl border border-purple-200 bg-white text-[#6344E7] hover:bg-purple-50 transition active:scale-95 cursor-pointer shrink-0"
-                    title="Share space"
-                    aria-label="Share space"
-                  >
-                    <Share2 size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={e => {
-                      e.stopPropagation();
-                      handleBook(space);
-                    }}
-                    className="inline-flex items-center justify-center rounded-xl bg-[#6344E7] hover:bg-[#5235D9] px-3.5 sm:px-4 py-1.5 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer shrink-0"
-                  >
-                    Book
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
         )}
       </main>
 
@@ -289,6 +604,11 @@ export default function SpacesMarketplacePage() {
         space={bookingSpace}
         isOpen={Boolean(bookingSpace)}
         onClose={() => setBookingSpace(null)}
+      />
+      <CoworkingBookingModal
+        isOpen={Boolean(coworkingBookingSpace)}
+        onClose={() => setCoworkingBookingSpace(null)}
+        space={coworkingBookingSpace}
       />
     </div>
   );

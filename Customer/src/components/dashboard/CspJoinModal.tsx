@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {closeIfConfirmed} from '../../utils/confirmClose';
 import {
   X,
   Store,
@@ -311,10 +310,8 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
   };
 
   const handleCloseAll = () => {
-    void closeIfConfirmed(() => {
-      setIsSubmitted(false);
-      onClose();
-    });
+    setIsSubmitted(false);
+    onClose();
   };
 
   return (
@@ -326,7 +323,7 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => void closeIfConfirmed(onClose)}
+            onClick={onClose}
             className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
           />
 
@@ -372,7 +369,7 @@ export function CspJoinModal({ isOpen, onClose }: CspJoinModalProps) {
               {/* Close Button */}
               <button
                 type="button"
-                onClick={() => void closeIfConfirmed(onClose)}
+                onClick={onClose}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition cursor-pointer"
                 aria-label="Close"
               >

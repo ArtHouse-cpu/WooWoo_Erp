@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {
   ArrowDown,
@@ -6,7 +6,9 @@ import {
   ArrowUp,
   ArrowUpRight,
   Calendar,
+  ChevronDown,
   ChevronRight,
+  Check,
   Coffee,
   Copy,
   FileText,
@@ -141,6 +143,28 @@ export default function WalletPage() {
   const [data, setData] = useState<WalletDashboard | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [timeframe, setTimeframe] = useState<WalletTimeframe>('lifetime');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [dropdownOpen]);
 
   const loadWallet = async () => {
     setLoading(true);
@@ -565,7 +589,7 @@ export default function WalletPage() {
 
         {/* 3. Affiliate Earnings */}
         <div className="space-y-2.5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h3 className="text-[15px] font-black text-[#111111]">Earnings</h3>
               {timeframe !== 'lifetime' && (
@@ -575,25 +599,56 @@ export default function WalletPage() {
               )}
             </div>
 
-            {/* Timeframe Toggle Pills (today, yesterday, this week, this month, lifetime) */}
-            <div className="flex items-center gap-1 overflow-x-auto rounded-[12px] sm:rounded-[14px] bg-[#F3F4F6] p-0.5 sm:p-1 scrollbar-none">
-              {TIMEFRAME_OPTIONS.map(option => {
-                const isActive = timeframe === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setTimeframe(option.id)}
-                    className={`rounded-[8px] sm:rounded-[10px] px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold transition-all duration-150 cursor-pointer whitespace-nowrap ${
-                      isActive
-                        ? 'bg-white text-[#111111] shadow-[0_2px_6px_rgba(0,0,0,0.06)]'
-                        : 'text-[#6B7280] hover:text-[#111111]'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
+            {/* Timeframe Filter Dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setDropdownOpen(prev => !prev)}
+                className={`flex items-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl border px-3 py-1.5 text-xs font-bold transition cursor-pointer shadow-2xs ${
+                  timeframe !== 'lifetime'
+                    ? 'border-[#EA580C]/40 bg-orange-50/70 text-[#EA580C] hover:bg-orange-100/70'
+                    : 'border-slate-200/90 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+                aria-expanded={dropdownOpen}
+                aria-label="Filter earnings by timeframe"
+              >
+                <Calendar className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${timeframe !== 'lifetime' ? 'text-[#EA580C]' : 'text-slate-500'}`} />
+                <span>{currentTimeframeLabel}</span>
+                <ChevronDown
+                  className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${
+                    dropdownOpen ? 'rotate-180 text-slate-700' : ''
+                  }`}
+                />
+              </button>
+
+              {dropdownOpen && (
+                <div className="absolute right-0 top-full mt-1.5 z-30 w-44 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-xl shadow-slate-200/50 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Select Timeframe
+                  </div>
+                  {TIMEFRAME_OPTIONS.map(option => {
+                    const isSelected = timeframe === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => {
+                          setTimeframe(option.id);
+                          setDropdownOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-xs font-bold transition cursor-pointer ${
+                          isSelected
+                            ? 'bg-orange-50 text-[#EA580C]'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                        {isSelected && <Check size={14} className="text-[#EA580C] stroke-[2.5]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
