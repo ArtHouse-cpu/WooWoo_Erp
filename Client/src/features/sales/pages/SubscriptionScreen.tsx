@@ -1181,19 +1181,6 @@ export default function SubscriptionScreen() {
         minHeight: "56px",
       },
     },
-    muiTableHeadCellProps: {
-      sx: {
-        fontWeight: 700,
-        color: "#111827",
-        fontSize: "12px",
-        backgroundColor: "#f9fafb",
-      },
-    },
-    muiTableBodyCellProps: {
-      sx: {
-        fontSize: "13px",
-      },
-    },
     muiTablePaperProps: {
       elevation: 0,
       square: false,

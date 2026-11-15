@@ -22,6 +22,7 @@ import {
   Compass,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
+import {recordPortalEnquiry} from '../../services/enquiry.service';
 import {
   fetchSpacesByType,
   groupSpacesByName,
@@ -637,15 +638,21 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <span>Book Online</span>
                   </button>
 
-                  <a
-                    href={spaceQueryUrl('Exclusive Space')}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      recordPortalEnquiry({
+                        enquiryType: 'Space',
+                        itemName: 'Exclusive Space',
+                        description: 'Customer asked about exclusive space availability from the customer portal.',
+                      });
+                      window.open(spaceQueryUrl('Exclusive Space'), '_blank', 'noopener,noreferrer');
+                    }}
                     className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
                   >
                     <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
                     <span>Query Now</span>
-                  </a>
+                  </button>
                 </>
               ) : (
                 <>
@@ -658,15 +665,21 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <span>Explore More</span>
                   </button>
 
-                  <a
-                    href={spaceQueryUrl('Coworking')}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      recordPortalEnquiry({
+                        enquiryType: 'Space',
+                        itemName: 'Coworking',
+                        description: 'Customer asked about coworking space availability from the customer portal.',
+                      });
+                      window.open(spaceQueryUrl('Coworking'), '_blank', 'noopener,noreferrer');
+                    }}
                     className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
                   >
                     <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
                     <span>Query Now</span>
-                  </a>
+                  </button>
                 </>
               )}
               </div>

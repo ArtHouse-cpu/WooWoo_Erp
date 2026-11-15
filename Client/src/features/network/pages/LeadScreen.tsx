@@ -81,6 +81,9 @@ const SOURCE_OPTIONS: LeadSources[] = [
   "Reference",
   "Member",
   "Events",
+  "Website",
+  "Customer Portal",
+  "Other",
 ];
 
 const PURPOSE_OPTIONS: LeadPurpose[] = [
@@ -101,6 +104,8 @@ const PURPOSE_OPTIONS: LeadPurpose[] = [
   "Atives",
   "Woorkshop",
   "Exhibition",
+  "Space",
+  "Store",
   "Other",
 ];
 
@@ -209,6 +214,8 @@ const LeadScreen = () => {
         (l.purpose || "").toLowerCase().includes(q) ||
         (l.status || "").toLowerCase().includes(q) ||
         (l.source || "").toLowerCase().includes(q) ||
+        (l.enquiryItem || "").toLowerCase().includes(q) ||
+        (l.reasonNote || "").toLowerCase().includes(q) ||
         (l.assignedTo?.m_staff_name || "").toLowerCase().includes(q),
     );
   }, [leads, mobileSearch]);
@@ -778,6 +785,11 @@ const LeadScreen = () => {
                   </span>
                 )}
             </div>
+            {row.original.enquiryItem && (
+              <span className="block text-[11px] font-medium text-slate-500">
+                {row.original.enquiryType || row.original.purpose}: {row.original.enquiryItem}
+              </span>
+            )}
             {row.original.source && (
               <span className="block text-[11px] text-gray-400">
                 via {row.original.source}

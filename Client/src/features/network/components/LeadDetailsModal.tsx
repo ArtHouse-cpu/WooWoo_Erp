@@ -376,6 +376,14 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({
               <dl className="space-y-3 text-sm">
                 <Detail icon={Hash} label="Lead ID" value={lead.leadId || leadCode(lead._id)} />
                 <Detail icon={User} label="Name" value={lead.name} />
+                {lead.email ? <Detail icon={Globe} label="Email" value={lead.email} /> : null}
+                {lead.enquiryItem ? (
+                  <Detail
+                    icon={Tag}
+                    label={lead.enquiryType || lead.purpose || "Enquiry"}
+                    value={lead.enquiryItem}
+                  />
+                ) : null}
                 <div className="flex items-start gap-2">
                   <Phone size={15} className="mt-0.5 text-slate-400" />
                   <div className="min-w-0 flex-1">

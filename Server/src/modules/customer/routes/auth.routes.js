@@ -33,6 +33,7 @@ import {
   getCustomerProducts,
   upload,
 } from '../../../controllers/product.controller.js';
+import {capturePortalEnquiry} from '../../../controllers/lead.controller.js';
 import {
   getMyActivity,
   getMyActivityDetail,
@@ -154,6 +155,12 @@ router.post(
   authenticateCustomer,
   authorizeCustomer('active'),
   applyHap,
+);
+router.post(
+  '/enquiries',
+  authenticateCustomer,
+  authorizeCustomer('active'),
+  capturePortalEnquiry,
 );
 router.post(
   '/cvp/apply',

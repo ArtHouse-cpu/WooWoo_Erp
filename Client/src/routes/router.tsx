@@ -69,6 +69,7 @@ import ExhibitionTable from "@/features/exhibition-table/ExhibitionTable";
 import BookingOverView from "@/features/BookingOverview/BookingOverView";
 import ActivityTimelineScreen from "@/features/purchase/pages/ActivityTimelineScreen";
 import InsightsAnalyticsScreen from "@/features/purchase/pages/InsightsAnalyticsScreen";
+import DriveScreen from "@/features/drive/DriveScreen";
 
 
 export const router = createBrowserRouter([
@@ -152,6 +153,7 @@ export const router = createBrowserRouter([
           { path: "spaceBooking", element: <SpaceBooking /> },
           { path: "allBookings", element: <AllBookings /> },
           { path: "bookingOverView", element: <BookingOverView /> },
+          { path: "drive", element: <DriveScreen /> },
         ],
       },
     ],

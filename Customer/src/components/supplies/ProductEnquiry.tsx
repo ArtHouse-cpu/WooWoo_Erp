@@ -3,6 +3,7 @@ import {Loader2, MessageCircle, Share2} from 'lucide-react';
 import {toast} from 'sonner';
 import type {CustomerProduct} from '../../services/product.service';
 import {copyProductLink, productQueryUrl} from './productActions';
+import {recordPortalEnquiry} from '../../services/enquiry.service';
 import {ShareProductModal} from './ShareProductModal';
 
 type ProductEnquiryProps = {
@@ -14,6 +15,11 @@ export function ProductEnquiry({product}: ProductEnquiryProps) {
   const [showShareModal, setShowShareModal] = useState(false);
 
   const handleQuery = () => {
+    recordPortalEnquiry({
+      enquiryType: 'Store',
+      itemName: product.name,
+      description: 'Customer asked about this product from the customer portal.',
+    });
     const url = productQueryUrl(product);
     window.open(url, '_blank', 'noopener,noreferrer');
   };

@@ -7,10 +7,11 @@ import {ProductDetailsModal} from '../../components/supplies/ProductDetailsModal
 import {ShareProductModal} from '../../components/supplies/ShareProductModal';
 import {ImageCarousel} from '../../components/ui/ImageCarousel';
 import {
+  copyProductLink,
   formatInr,
   productQueryUrl,
-  copyProductLink,
 } from '../../components/supplies/productActions';
+import {recordPortalEnquiry} from '../../services/enquiry.service';
 import {
   fetchCustomerProducts,
   type CustomerProduct,
@@ -83,6 +84,11 @@ export default function SuppliesMarketplacePage() {
   }, [search, reloadKey]);
 
   const handleBuy = (product: CustomerProduct) => {
+    recordPortalEnquiry({
+      enquiryType: 'Store',
+      itemName: product.name,
+      description: 'Customer asked about buying this product from the customer portal.',
+    });
     const url = productQueryUrl(product);
     window.open(url, '_blank', 'noopener,noreferrer');
   };

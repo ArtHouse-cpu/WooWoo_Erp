@@ -17,6 +17,7 @@ import Swal from 'sweetalert2';
 import {toast} from 'sonner';
 import type {SpaceCard} from '../../services/space.service';
 import {formatInr, SPACE_WHATSAPP} from './spaceActions';
+import {recordPortalEnquiry} from '../../services/enquiry.service';
 
 export interface CoworkingPlan {
   id: string;
@@ -244,6 +245,11 @@ export function CoworkingBookingModal({
       cancelButtonColor: '#94A3B8',
     }).then(result => {
       if (result.isConfirmed) {
+        recordPortalEnquiry({
+          enquiryType: 'Space',
+          itemName: `Coworking · ${currentPlan.subtitle}`,
+          description: `Coworking booking request. Start: ${startsOnStr}. Drink: ${preferredDrink}. Payable: ₹${formatInr(finalPayable)}.`,
+        });
         const message = [
           `*WooWoo CoWorking & Premium Booking Request*`,
           `----------------------------------`,

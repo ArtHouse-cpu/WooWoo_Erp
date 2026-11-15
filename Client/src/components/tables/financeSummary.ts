@@ -14,19 +14,22 @@ const statusOf = (value: unknown) => String(value ?? "").trim().toLowerCase();
 
 const cancelled = (status: string) => status === "cancelled" || status === "canceled";
 
-/** Issued invoices. Drafts and cancelled bills are not payment obligations. */
+/** Issued invoices. Pending is the total of draft bills. */
 export function invoiceFinance(rows: Array<{ status: string; amount: number; dueAmount: number }>): FinanceSummary {
   let total = 0;
   let paid = 0;
   let pending = 0;
   for (const row of rows) {
     const status = statusOf(row.status);
-    if (cancelled(status) || status === "draft") continue;
+    if (cancelled(status)) continue;
     const amount = money(row.amount);
-    const pendingPart = Math.min(amount, money(row.dueAmount));
+    if (status === "draft") {
+      pending += amount;
+      continue;
+    }
+    const due = money(row.dueAmount);
     total += amount;
-    pending += pendingPart;
-    paid += money(amount - pendingPart);
+    paid += money(amount - Math.min(amount, due));
   }
   return { total, paid, pending };
 }

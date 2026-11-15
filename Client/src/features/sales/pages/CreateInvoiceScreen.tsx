@@ -1128,6 +1128,9 @@ export default function CreateInvoiceScreen({
             notes={notes}
             saving={saving}
             onBack={handleBack}
+            onSaveDraft={() => {
+              void handleSaveDraft();
+            }}
             onUpdate={() => {
               if (validateBeforeCheckout()) setOpenCheckout(true);
             }}

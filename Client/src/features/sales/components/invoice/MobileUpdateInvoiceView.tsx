@@ -54,6 +54,7 @@ export type MobileUpdateInvoiceViewProps = {
   saving?: boolean;
   onBack: () => void;
   onUpdate: () => void;
+  onSaveDraft?: () => void;
   onPickCustomer: (customer: any) => void;
   onOpenCreateCustomer: () => void;
   onUpdateItemQty: (id: number, newQty: number) => void;
@@ -97,6 +98,7 @@ export default function MobileUpdateInvoiceView({
   saving = false,
   onBack,
   onUpdate,
+  onSaveDraft,
   onPickCustomer,
   onOpenCreateCustomer,
   onUpdateItemQty,
@@ -702,15 +704,27 @@ export default function MobileUpdateInvoiceView({
             </div>
           </div>
 
-          <button
-            type="button"
-            disabled={saving}
-            onClick={onUpdate}
-            className="flex items-center justify-center gap-1.5 rounded-2xl bg-blue-600 px-7 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 active:scale-95 disabled:opacity-60"
-          >
-            <span>{saving ? "Updating..." : "Update"}</span>
-            <ChevronRight size={18} className="stroke-[2.5]" />
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {onSaveDraft ? (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={onSaveDraft}
+                className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-95 disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save Draft"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={saving}
+              onClick={onUpdate}
+              className="flex items-center justify-center gap-1.5 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 active:scale-95 disabled:opacity-60"
+            >
+              <span>{saving ? "Updating..." : "checkout "}</span>
+              <ChevronRight size={18} className="stroke-[2.5]" />
+            </button>
+          </div>
         </div>
       </div>
 

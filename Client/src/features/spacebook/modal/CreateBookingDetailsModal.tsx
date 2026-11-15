@@ -121,6 +121,7 @@ export type BookingFormPayload = {
   /** Pricing snapshot for checkout (create flow). */
   spaceName?: string;
   spaceCode?: string;
+  spaceCapacity?: number;
   spaceType?: "Exclusive" | "Coworking" | string;
   spaceDay?: string;
   spaceCategory?: string;
@@ -2484,6 +2485,7 @@ const CreateBookingDetailsModal = ({
         "",
       selectedSpaces: bookedSpaces,
       spaceCode,
+      spaceCapacity: Number(selectedSpace?.capacity) || undefined,
       spaceType,
       spaceDay: appliedRate?.kind || pricedSpace?.day || "",
       spaceCategory: selectedSpace?.category || "space",
@@ -2671,6 +2673,7 @@ const CreateBookingDetailsModal = ({
         "",
       selectedSpaces: bookedSpaces,
       spaceCode,
+      spaceCapacity: Number(selectedSpace?.capacity) || undefined,
       spaceType,
       spaceDay: appliedRate?.kind || pricedSpace?.day || "",
       spaceCategory: selectedSpace?.category || "space",

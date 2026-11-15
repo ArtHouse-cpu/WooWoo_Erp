@@ -77,6 +77,15 @@ type PosRow = {
   dueAmount: number;
 };
 
+function recordedInvoiceDue(invoice: any) {
+  const pending = Number(invoice?.pendingAmount);
+  const breakdown = Number(invoice?.paymentBreakdown?.dueAmount);
+  return Math.max(
+    Number.isFinite(pending) && pending > 0 ? pending : 0,
+    Number.isFinite(breakdown) && breakdown > 0 ? breakdown : 0,
+  );
+}
+
 function paymentStatusForWhatsApp(
   raw: Record<string, unknown>,
   rowStatus: PosRow["status"],
@@ -394,18 +403,24 @@ export default function PosScreen() {
         : [];
 
       const rows: PosRow[] = invoices.map((invoice: any, index: number) => {
-        const dueAmount = Number(
-          invoice?.pendingAmount ?? invoice?.paymentBreakdown?.dueAmount ?? 0,
-        );
+        const amount = currentInvoiceTotal(invoice);
+        const recordedDue = recordedInvoiceDue(invoice);
+        const status = toStatus(invoice?.status, recordedDue, invoice?.paymentStatus);
+        const dueAmount =
+          recordedDue > 0
+            ? recordedDue
+            : status === "Pending" || status === "Draft"
+              ? amount
+              : 0;
         const originalAmount = originalInvoiceTotal(invoice);
         const returnedAmount = returnedInvoiceTotal(invoice);
         return {
           id: index + 1,
-          amount: currentInvoiceTotal(invoice),
+          amount,
           originalAmount,
           returnedAmount,
           mode: toMode(invoice?.mode),
-          status: toStatus(invoice?.status, dueAmount, invoice?.paymentStatus),
+          status,
           bill: String(
             invoice?.invoiceCode ??
               `INVVWAH-${invoice?.invoiceNumber ?? index + 1}`,
@@ -506,16 +521,22 @@ export default function PosScreen() {
   const ensurePosRow = (inv: any): PosRow => {
     if (inv && inv.bill && inv._id) return inv;
     const raw = inv?.raw ?? inv;
-    const dueAmount = Number(
-      raw?.pendingAmount ?? raw?.paymentBreakdown?.dueAmount ?? 0,
-    );
+    const amount = currentInvoiceTotal(raw) || Number(raw?.grandTotal ?? raw?.amount ?? 0);
+    const recordedDue = recordedInvoiceDue(raw);
+    const status = toStatus(raw?.status, recordedDue, raw?.paymentStatus);
+    const dueAmount =
+      recordedDue > 0
+        ? recordedDue
+        : status === "Pending" || status === "Draft"
+          ? amount
+          : 0;
     return {
       id: 1,
-      amount: currentInvoiceTotal(raw) || Number(raw?.grandTotal ?? raw?.amount ?? 0),
+      amount,
       originalAmount: originalInvoiceTotal(raw),
       returnedAmount: returnedInvoiceTotal(raw),
       mode: toMode(raw?.mode ?? raw?.paymentMode),
-      status: toStatus(raw?.status, dueAmount, raw?.paymentStatus),
+      status,
       bill: String(raw?.invoiceCode ?? `INVVWAH-${raw?.invoiceNumber ?? 1}`),
       owner: String(raw?.createdBy?.m_staff_name || raw?.salesPersonName || "System"),
       customer: String(raw?.customerName ?? raw?.customer ?? ""),
@@ -891,7 +912,6 @@ export default function PosScreen() {
     state: {
       isLoading: loading,
     },
-    enableTopToolbar: false,
     enablePagination: true,
     enableBottomToolbar: true,
     enableColumnActions: false,
@@ -932,17 +952,23 @@ export default function PosScreen() {
     return counts;
   }, [data]);
 
-  const invoiceTotals = useMemo(
-    () =>
-      invoiceFinance(
-        filteredData.map((row) => ({
-          status: row.status,
-          amount: row.amount,
-          dueAmount: row.dueAmount,
-        })),
-      ),
-    [filteredData],
-  );
+  const invoiceTotals = useMemo(() => {
+    const visible = invoiceFinance(
+      filteredData.map((row) => ({
+        status: row.status,
+        amount: row.amount,
+        dueAmount: row.dueAmount,
+      })),
+    );
+    const allDues = invoiceFinance(
+      data.map((row) => ({
+        status: row.status,
+        amount: row.amount,
+        dueAmount: row.dueAmount,
+      })),
+    );
+    return { ...visible, pending: allDues.pending };
+  }, [data, filteredData]);
   const totalAmount = invoiceTotals.total;
   const paidAmount = invoiceTotals.paid;
   const DueAmount = invoiceTotals.pending;
@@ -1784,7 +1810,7 @@ export default function PosScreen() {
               pending={invoiceTotals.pending}
               totalHint="Issued invoices, excluding drafts and cancelled bills"
               paidHint="Recorded payments, including partial payments"
-              pendingHint="Balance still due after those payments"
+              pendingHint="Total of draft bills"
             />
           </div>
           <div className="hidden w-full grid-cols-2 gap-2 sm:grid sm:w-auto sm:min-w-[22rem]">

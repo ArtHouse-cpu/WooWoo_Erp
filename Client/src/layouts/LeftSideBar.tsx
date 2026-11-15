@@ -32,6 +32,7 @@ import {
   ChartNoAxesCombined,
   TimerIcon,
   GitGraphIcon,
+  HardDrive,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -304,6 +305,19 @@ const MENU_GROUPS: MenuGroup[] = [
     ],
   },
   {
+    key: "drive",
+    label: "Drive",
+    icon: HardDrive,
+    submenu: [
+      {
+        name: "myDrive",
+        label: "My Drive",
+        icon: HardDrive,
+        path: "/drive",
+      },
+    ],
+  },
+  {
     key: "Company",
     label: "Company",
     icon: Network,
@@ -411,6 +425,11 @@ export default function LeftSideBar({
       "/purchase-orders",
       "/debit-notes",
     ].includes(currentPath);
+
+    if (currentPath === "/drive") {
+      setActiveMenu("drive");
+      setOpenMenu("drive");
+    }
 
     if (isSalesRoute || isPurchaseRoute) {
       setActiveMenu("bills");

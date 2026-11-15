@@ -4,6 +4,7 @@ import {
   handleCreateCvpApplication,
   handleDeleteCvpApplication,
   handleGetCvpApplications,
+  handleReviewCvpApplication,
   handleUpdateCvpApplication,
   type CvpApplicationRecord,
 } from "@/services/apiClient";
@@ -21,6 +22,7 @@ type Volunteer = {
   volunteeredBefore: boolean;
   events: string;
   volunteerType: VolunteerType | null;
+  status: "under_review" | "approved" | "rejected";
   appliedOn: string;
 };
 
@@ -134,6 +136,7 @@ const toVolunteer = (row: CvpApplicationRecord): Volunteer => ({
   volunteeredBefore: Boolean(row.volunteeredBefore),
   events: row.volunteeredBefore ? String(row.events || "") : "",
   volunteerType: row.volunteeredBefore && row.volunteerType ? row.volunteerType : null,
+  status: row.status || "under_review",
   appliedOn: appliedDay(row.createdAt),
 });
 
@@ -201,9 +204,31 @@ export default function CvpScreen() {
     return list;
   }, [rows, search, slot, experience, sort, period]);
 
+  const counts = useMemo(() => {
+    let approved = 0;
+    let rejected = 0;
+    let applied = 0;
+    for (const row of filtered) {
+      if (row.status === "approved") approved += 1;
+      else if (row.status === "rejected") rejected += 1;
+      else applied += 1;
+    }
+    return { total: filtered.length, approved, rejected, applied };
+  }, [filtered]);
+
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pages);
   const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const approve = async (row: Volunteer) => {
+    try {
+      await handleReviewCvpApplication(row.id, "approved");
+      setSelected(current => current?.id === row.id ? { ...current, status: "approved" } : current);
+      await load();
+    } catch (err) {
+      setError(apiMessage(err));
+    }
+  };
 
   const remove = async (row: Volunteer) => {
     if (!window.confirm(`Delete ${row.name}'s application?`)) return;
@@ -220,7 +245,15 @@ export default function CvpScreen() {
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:px-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Community Volunteer Program</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-900">Community Volunteer Program</h1>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <KpiChip label="Total" value={counts.total} hint="All applications in the current filters" className="border-slate-200 bg-white text-slate-900" />
+              <KpiChip label="Approved" value={counts.approved} hint="Approved applications" className="border-emerald-200 bg-emerald-50 text-emerald-700" />
+              <KpiChip label="Rejected" value={counts.rejected} hint="Rejected applications" className="border-rose-200 bg-rose-50 text-rose-700" />
+              <KpiChip label="Applied" value={counts.applied} hint="Submitted and still waiting for approval" className="border-amber-200 bg-amber-50 text-amber-800" />
+            </div>
+          </div>
           <p className="mt-1 text-sm text-slate-500">Review, update, and remove volunteer applications.</p>
         </div>
         <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
@@ -269,7 +302,7 @@ export default function CvpScreen() {
           <table className="min-w-[920px] w-full text-left text-xs">
             <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
               <tr>
-                {["Profile", "Name", "Phone", "Profession", "Availability", "Previous experience", "Events", "Type", "Applied on", "Action"].map(heading => (
+                {["Profile", "Name", "Phone", "Profession", "Availability", "Previous experience", "Events", "Type", "Status", "Applied on", "Action"].map(heading => (
                   <th key={heading} className="px-3 py-2.5 font-semibold">{heading}</th>
                 ))}
               </tr>
@@ -285,9 +318,19 @@ export default function CvpScreen() {
                   <td className="px-3 py-2"><Badge tone={row.volunteeredBefore ? "yes" : "no"}>{row.volunteeredBefore ? "Yes" : "No"}</Badge></td>
                   <td className="px-3 py-2 text-slate-700">{row.events || "—"}</td>
                   <td className="px-3 py-2 text-slate-700">{row.volunteerType || "—"}</td>
+                  <td className="px-3 py-2">
+                    <Badge tone={row.status === "approved" ? "yes" : row.status === "rejected" ? "no" : "neutral"}>
+                      {row.status === "approved" ? "Approved" : row.status === "rejected" ? "Rejected" : "Waiting"}
+                    </Badge>
+                  </td>
                   <td className="px-3 py-2 text-slate-500">{pretty(row.appliedOn)}</td>
                   <td className="px-3 py-2">
                     <div className="flex gap-1">
+                      {row.status === "approved" ? (
+                        <span className="rounded-lg bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">Approved</span>
+                      ) : (
+                        <button type="button" onClick={() => void approve(row)} className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">Approve</button>
+                      )}
                       <button type="button" onClick={() => setSelected(row)} className="rounded-lg border border-slate-200 px-2.5 py-1 font-semibold text-slate-700">View</button>
                       <button type="button" onClick={() => { setEditing(row); setFormOpen(true); }} className="rounded-lg border border-slate-200 px-2.5 py-1 font-semibold text-slate-700">Edit</button>
                       <button type="button" onClick={() => void remove(row)} className="rounded-lg border border-rose-200 px-2.5 py-1 font-semibold text-rose-700">Delete</button>
@@ -333,8 +376,17 @@ export default function CvpScreen() {
           onSaved={load}
         />
       ) : null}
-      {selected ? <Details volunteer={selected} onClose={() => setSelected(null)} onDelete={() => void remove(selected)} onEdit={() => { setEditing(selected); setSelected(null); setFormOpen(true); }} /> : null}
+      {selected ? <Details volunteer={selected} onClose={() => setSelected(null)} onDelete={() => void remove(selected)} onApprove={() => void approve(selected)} onEdit={() => { setEditing(selected); setSelected(null); setFormOpen(true); }} /> : null}
     </div>
+  );
+}
+
+function KpiChip({ label, value, hint, className }: { label: string; value: number; hint: string; className: string }) {
+  return (
+    <span title={hint} className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 ${className}`}>
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="text-xs font-bold tabular-nums">{value}</span>
+    </span>
   );
 }
 
@@ -540,7 +592,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="block text-xs font-semibold text-slate-700">{label}<div className="mt-1">{children}</div></label>;
 }
 
-function Details({ volunteer, onClose, onEdit, onDelete }: { volunteer: Volunteer; onClose: () => void; onEdit: () => void; onDelete: () => void }) {
+function Details({ volunteer, onClose, onEdit, onDelete, onApprove }: { volunteer: Volunteer; onClose: () => void; onEdit: () => void; onDelete: () => void; onApprove: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-3 sm:items-center">
       <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
@@ -560,10 +612,16 @@ function Details({ volunteer, onClose, onEdit, onDelete }: { volunteer: Voluntee
           <Info label="Previous experience" value={volunteer.volunteeredBefore ? "Yes" : "No"} />
           <Info label="Events" value={volunteer.events || "—"} />
           <Info label="Volunteering type" value={volunteer.volunteerType || "—"} />
+          <Info label="Status" value={volunteer.status === "approved" ? "Approved" : volunteer.status === "rejected" ? "Rejected" : "Waiting for approval"} />
         </dl>
         <p className="mt-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">Availability</p>
         <div className="mt-1 flex flex-wrap gap-1">{volunteer.availability.map(item => <Badge key={item}>{item}</Badge>)}</div>
         <div className="mt-4 flex gap-2">
+          {volunteer.status === "approved" ? (
+            <span className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">Approved</span>
+          ) : (
+            <button type="button" onClick={onApprove} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white">Approve</button>
+          )}
           <button type="button" onClick={onEdit} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700">Edit</button>
           <button type="button" onClick={onDelete} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700">Delete</button>
         </div>

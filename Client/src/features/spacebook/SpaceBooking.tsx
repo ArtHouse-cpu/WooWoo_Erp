@@ -57,6 +57,7 @@ import RescheduleBookingModal from "./modal/RescheduleBookingModal";
 import {
   handleCreateInvoice,
   handleCreateSpaceBooking,
+  handleSendBookingConfirmationWhatsApp,
   handleDeleteSpaceBooking,
   handleGetSpaceBookings,
   handleGetBookingPaymentSettings,
@@ -111,6 +112,26 @@ const getAvatarColor = (name: string) => {
   }
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 };
+
+const confirmClock = (time24: string) => {
+  const [hourText, minuteText] = String(time24 || "").split(":");
+  let hour = Number(hourText);
+  const minute = Number(minuteText) || 0;
+  if (!Number.isFinite(hour)) return time24 || "—";
+  if (hour === 24) hour = 0;
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+};
+
+const confirmHours = (hours: number) => {
+  const value = Math.round((Number(hours) || 0) * 100) / 100;
+  const shown = Number.isInteger(value) ? String(value) : String(value);
+  return `${shown} ${value === 1 ? "Hour" : "Hours"}`;
+};
+
+const confirmInr = (value: number) =>
+  `₹${Math.max(0, Math.round(Number(value) || 0)).toLocaleString("en-IN")}`;
 
 const formatDateDisplay = (value?: string | Date | null) => {
   if (!value) return "—";
@@ -1026,6 +1047,51 @@ const SpaceBook = () => {
           0,
         ),
       });
+
+      const phoneDigits = String(
+        payment.customerPhone || pendingCheckout.customerPhone || "",
+      ).replace(/\D/g, "");
+      if (phoneDigits.length >= 10) {
+        const servicesTotal = (pendingCheckout.selectedServices || []).reduce(
+          (sum, service) => sum + Number(service.price || 0) * Number(service.qty || 0),
+          0,
+        );
+        const foodTotal = (pendingCheckout.foods || []).reduce(
+          (sum, food) => sum + Number(food.price || 0) * Number(food.qty || 0),
+          0,
+        );
+        const spaceCharges = (pendingCheckout.selectedSpaces || []).reduce(
+          (sum, space) => sum + Number(space.lineTotal || 0),
+          0,
+        ) || Math.max(0, Number(pendingCheckout.subTotal || 0) - servicesTotal);
+        const bookingRef =
+          invoiceCode ||
+          `BK-${String(reservedBookingId || "").slice(-4).toUpperCase() || "BOOK"}`;
+        void handleSendBookingConfirmationWhatsApp({
+          phone: phoneDigits.slice(-10),
+          bodyParams: [
+            payment.customerName?.trim() || pendingCheckout.customerName || "Guest",
+            bookingRef,
+            pendingCheckout.spaceName || pendingCheckout.selectedSpaces?.[0]?.spaceName || "Space",
+            pendingCheckout.spaceCode || pendingCheckout.selectedSpaces?.[0]?.spaceCode || "—",
+            formatDateDisplay(pendingCheckout.bookingDate),
+            `${confirmClock(pendingCheckout.startTime)} - ${confirmClock(pendingCheckout.endTime)}`,
+            confirmHours(Number(pendingCheckout.durationHours || 0)),
+            String(Number(pendingCheckout.spaceCapacity) || 0),
+            confirmInr(spaceCharges),
+            `-${confirmInr(offerDiscount)}`,
+            `-${confirmInr(membershipDiscount)}`,
+            confirmInr(servicesTotal + foodTotal),
+            confirmInr(payment.finalAmount),
+            offer?.ruleLabel || "None",
+            confirmHours(Number(offer?.freeHours || 0)),
+            confirmInr(payment.cashbackTotal),
+            "WOOWOO Art House",
+          ],
+        }).catch(() => {
+          toast.warning("Booking confirmed, but the WhatsApp confirmation was not sent.");
+        });
+      }
 
       setOpenCheckout(false);
       setPendingCheckout(null);

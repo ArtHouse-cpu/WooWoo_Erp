@@ -14,8 +14,6 @@ import {
   Sunset,
   Moon,
   Zap,
-  MessageCircle,
-  ArrowRight,
   RefreshCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,8 +40,6 @@ type Props = {
   onClose: () => void;
   onSubmitted?: (application: CvpApplication) => void;
 };
-
-const WOOWOO_WHATSAPP = '918073988123';
 
 const POPULAR_PROFESSIONS = [
   'Student',
@@ -217,37 +213,6 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
     setAvailability(next);
   };
 
-  // Format WhatsApp message & redirect
-  const sendToWhatsApp = (appData: CvpApplication) => {
-    const timeSlots = appData.availability.filter((a) => a !== 'Anytime');
-    const availText = appData.availability.includes('Anytime')
-      ? 'Anytime (Fully Flexible)'
-      : timeSlots.length > 0
-      ? timeSlots.join(', ')
-      : 'Flexible';
-
-    const pastText = appData.volunteeredBefore
-      ? `Yes (${appData.eventCount || '1–2 Events'}, ${appData.eventType || 'Unpaid'})`
-      : 'No (First-time Volunteer)';
-
-    const lines = [
-      '🎨 *WooWoo Art House — Community Volunteering Program (CVP)*',
-      '',
-      `👤 *Name:* ${appData.name}`,
-      `📱 *Phone:* ${appData.phone}`,
-      `💼 *Profession:* ${appData.profession}`,
-      `⏰ *Availability:* ${availText}`,
-      `🤝 *Volunteered Before:* ${pastText}`,
-      appData.selfieUrl ? '📸 *Selfie:* Uploaded (I will also share it below)' : '📸 *Selfie:* Will share in chat',
-      '',
-      'Excited to join the community crew and assist at upcoming exhibitions & events! 🚀',
-    ];
-
-    const message = lines.join('\n');
-    const url = `https://wa.me/${WOOWOO_WHATSAPP}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-  };
-
   const photoFile = async () => {
     if (selfieFile) return selfieFile;
     if (!selfieUrl?.startsWith('data:image/')) return null;
@@ -359,15 +324,6 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
       setExisting(newApp);
       setIsEditing(false);
       onSubmitted?.(newApp);
-      sendToWhatsApp(newApp);
-
-      Swal.fire({
-        icon: 'success',
-        title: 'Application sent',
-        text: 'Your volunteering application is saved. Send the prefilled message on WhatsApp to connect with the WooWoo team.',
-        confirmButtonColor: '#059669',
-      });
-      onClose();
     } catch (err) {
       console.error('Failed to save CVP application:', err);
       Swal.fire({
@@ -442,7 +398,7 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
                       </span>
                     </div>
                     <p className="mt-2 text-xs font-semibold leading-relaxed text-emerald-900">
-                      Your CVP application is active! Tap below to chat directly with the team on WhatsApp or update your details.
+                      Please wait for approval within 24–48 hours. Our team will contact you soon.
                     </p>
                   </div>
 
@@ -487,14 +443,6 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
 
                   {/* Action Buttons for Existing */}
                   <div className="space-y-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => sendToWhatsApp(existing)}
-                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#059669] py-3 text-sm font-extrabold text-white shadow-xs hover:bg-[#047857] transition cursor-pointer"
-                    >
-                      <MessageCircle className="h-4.5 w-4.5" />
-                      <span>Chat on WhatsApp</span>
-                    </button>
                     <button
                       type="button"
                       onClick={() => setIsEditing(true)}
@@ -822,9 +770,7 @@ export function CvpJoinModal({ isOpen, onClose, onSubmitted }: Props) {
                   disabled={submitting}
                   className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#059669] py-3 text-sm font-extrabold text-white shadow-xs hover:bg-[#047857] transition cursor-pointer disabled:opacity-60"
                 >
-                  <MessageCircle className="h-4.5 w-4.5" />
-                  <span>{submitting ? 'Redirecting…' : 'Submit & Redirect to WhatsApp'}</span>
-                  <ArrowRight className="h-4 w-4" />
+                  <span>{submitting ? 'Submitting…' : 'Submit'}</span>
                 </button>
               )}
             </div>

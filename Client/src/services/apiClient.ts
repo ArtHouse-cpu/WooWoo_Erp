@@ -2995,6 +2995,22 @@ export const handleRescheduleSpaceBooking = async (
   };
 };
 
+export const handleSendBookingConfirmationWhatsApp = async (payload: {
+  phone: string;
+  bodyParams: string[];
+}) => {
+  const response = await axiosInstance.post(
+    "/space-bookings/booking-confirm-whatsapp",
+    payload,
+  );
+  return response.data as {
+    success: boolean;
+    delivered?: boolean;
+    stub?: boolean;
+    message?: string;
+  };
+};
+
 export const handleSendSpaceBookingQuotation = async (payload: {
   phone: string;
   bodyParams: string[];
@@ -3956,6 +3972,7 @@ export type CvpApplicationRecord = {
   volunteeredBefore: boolean;
   events: string;
   volunteerType: "Paid" | "Unpaid" | "Both" | "";
+  status?: "under_review" | "approved" | "rejected";
   createdAt?: string;
   updatedAt?: string;
 };
@@ -3988,6 +4005,18 @@ export const handleUpdateCvpApplication = async (id: string, payload: FormData) 
     success: boolean;
     application?: CvpApplicationRecord;
     message?: string;
+  };
+};
+
+export const handleReviewCvpApplication = async (
+  id: string,
+  status: "under_review" | "approved" | "rejected",
+) => {
+  const response = await axiosInstance.patch(`/cvp/${id}/review`, { status });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    application?: CvpApplicationRecord;
   };
 };
 
@@ -5249,7 +5278,10 @@ export type LeadSources =
   | "Walk-in"
   | "Reference"
   | "Member"
-  | "Events";
+  | "Events"
+  | "Website"
+  | "Customer Portal"
+  | "Other";
 
 export type LeadPurpose =
   | "Events"
@@ -5269,6 +5301,8 @@ export type LeadPurpose =
   | "Atives"
   | "Woorkshop"
   | "Exhibition"
+  | "Space"
+  | "Store"
   | "Other";
 
 export type LeadLabel = {
@@ -5288,6 +5322,8 @@ export type LeadItem = {
   status: LeadStatus;
   source?: string;
   purpose?: string;
+  enquiryType?: "" | "Space" | "Store";
+  enquiryItem?: string;
   deadline?: string;
   reasonNote?: string;
   url?: string;

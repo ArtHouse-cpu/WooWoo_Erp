@@ -28,6 +28,7 @@ import {
   type MembershipTier,
 } from './spaceActions';
 import {SpacePhoto} from './SpacePhoto';
+import {recordPortalEnquiry} from '../../services/enquiry.service';
 
 export interface SpaceBookingModalProps {
   space: SpaceCard | null;
@@ -273,6 +274,11 @@ export function SpaceBookingModal({
     messageLines.push('*Please contact me for assistance.*');
 
     const fullMessage = messageLines.join('\n');
+    recordPortalEnquiry({
+      enquiryType: 'Space',
+      itemName: space.name,
+      description: `Booking request. Purpose: ${trimmedPurpose}. Date: ${formattedDate}. Timing: ${timingText}. Guests: ${guestsText}. Pricing: ${pricingText}.`,
+    });
     const waUrl = `https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent(fullMessage)}`;
 
     window.open(waUrl, '_blank', 'noopener,noreferrer');

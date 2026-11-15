@@ -55,6 +55,7 @@ const COMMON_SOURCES = [
   "Member",
   "Events",
   "Website",
+  "Customer Portal",
   "Other",
 ];
 
@@ -77,8 +78,9 @@ const PURPOSE_OPTIONS = [
   "Atives",
   "Woorkshop",
   "Exhibition",
+  "Space",
+  "Store",
   "Other",
-  ,
 ];
 
 const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
