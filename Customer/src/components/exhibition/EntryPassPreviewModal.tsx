@@ -1,5 +1,4 @@
 import {useEffect, useRef, useState} from 'react';
-import {closeIfConfirmed} from '../../utils/confirmClose';
 import {createPortal} from 'react-dom';
 import {toast} from 'sonner';
 import {CheckCircle2, Download, FileDown, ImageDown, Loader2, Plus, Printer, X} from 'lucide-react';
@@ -61,7 +60,7 @@ export default function EntryPassPreviewModal({open, passes, onClose, onNewReque
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') void closeIfConfirmed(onClose);
+      if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -132,7 +131,7 @@ export default function EntryPassPreviewModal({open, passes, onClose, onNewReque
         <div className="relative w-full max-w-3xl rounded-[28px] bg-[#f3ece2] p-4 shadow-2xl sm:p-7 print:max-w-none print:rounded-none print:bg-white print:p-0 print:shadow-none">
           <button
             type="button"
-            onClick={() => void closeIfConfirmed(onClose)}
+            onClick={onClose}
             className="absolute right-3 top-3 rounded-full bg-white/70 p-2 text-[#57534e] transition hover:bg-white hover:text-[#1c1917] print:hidden"
             aria-label="Close"
           >

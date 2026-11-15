@@ -525,15 +525,17 @@ export default function Customer360Modal({
               <button
                 type="button"
                 onClick={() => void closeIfConfirmed(onClose)}
-                className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-rose-50 border border-rose-200/90 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                className="inline-flex shrink-0 items-center justify-center gap-1 rounded-xl bg-rose-50 border border-rose-200/90 p-2 sm:px-3 sm:py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 hover:border-rose-300 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                title="Close"
               >
-                <X size={14} className="text-rose-600" /> Close
+                <X size={15} className="text-rose-600 shrink-0" />
+                <span className="hidden sm:inline">Close</span>
               </button>
             </div>
           </div>
 
-          {/* Quick Action buttons row (scrollable on mobile) */}
-          <div className="mt-2.5 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-none sm:mt-3 sm:flex-wrap">
+          {/* Quick Action buttons row (hidden on mobile, visible on sm+) */}
+          <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-none sm:mt-3 sm:flex-wrap">
             {canPath("/create-pos") || canPath("/pos") || canPath("/create-invoice") ? (
               <button
                 type="button"

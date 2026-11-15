@@ -13,6 +13,7 @@ import {
   ChevronUp,
   ArrowUp,
   ArrowDown,
+  ArrowUpDown,
   Play,
   ChevronLeft,
   ChevronRight,
@@ -23,7 +24,33 @@ import {
   Plus,
   Star,
   Crown,
-  Tag,
+  RefreshCw,
+  FileText,
+  CheckSquare,
+  PartyPopper,
+  Drama,
+  Palette,
+  MoreHorizontal,
+  GraduationCap,
+  Mic,
+  Wifi,
+  Volume2,
+  AirVent,
+  Projector,
+  Armchair,
+  Sofa,
+  Send,
+  Pencil,
+  Camera,
+  Check,
+  Clapperboard,
+  Coffee,
+  Gift,
+  Code,
+  Briefcase,
+  Newspaper,
+  BookOpen,
+  Gamepad2,
 } from 'lucide-react';
 import {toast} from 'sonner';
 import type {SpaceCard} from '../../services/space.service';
@@ -34,13 +61,83 @@ import {
 } from './spaceActions';
 import {ShareSpaceModal} from './ShareSpaceModal';
 import {SpaceBookingModal} from './SpaceBookingModal';
+import {CoworkingBookingModal} from './CoworkingBookingModal';
 import {ImageCarousel} from '../ui/ImageCarousel';
+
+export const COWORKING_PLANS = [
+  {
+    id: 'day',
+    name: '1 Day Pass',
+    regularPrice: 399,
+    memberPrice: 319,
+    savings: 80,
+  },
+  {
+    id: 'weekly',
+    name: 'Weekly Pass',
+    regularPrice: 2599,
+    memberPrice: 2079,
+    savings: 520,
+  },
+  {
+    id: 'monthly',
+    name: 'Monthly Pass',
+    regularPrice: 7999,
+    memberPrice: 5999,
+    savings: 2000,
+  },
+  {
+    id: '3months',
+    name: '3 Months Pass',
+    regularPrice: 19999,
+    memberPrice: 13999,
+    savings: 6000,
+  },
+  {
+    id: '6months',
+    name: '6 Months Pass',
+    regularPrice: 39998,
+    memberPrice: 27999,
+    savings: 12000,
+  },
+];
+
+export const COWORKING_INFO_PHOTOS = [
+  'https://images.unsplash.com/photo-1527192491265-7e15c55b1ed2?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=1200&q=80',
+  'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80',
+];
 
 function formatDateDisplay(d: Date): string {
   const day = d.getDate();
   const month = new Intl.DateTimeFormat('en-GB', {month: 'short'}).format(d);
   const year = d.getFullYear();
   return `${day} ${month} ${year}`;
+}
+
+function formatTime12(time24: string): string {
+  if (!time24) return '06:00 AM';
+  const [hStr, mStr] = time24.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr ? mStr.padStart(2, '0') : '00';
+  if (isNaN(h)) return time24;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h.toString().padStart(2, '0')}:${m} ${ampm}`;
+}
+
+function getDurationHours(start: string, end: string): number {
+  if (!start || !end) return 3;
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let startMinutes = sh * 60 + (sm || 0);
+  let endMinutes = eh * 60 + (em || 0);
+  if (endMinutes <= startMinutes) endMinutes += 24 * 60;
+  const diffHours = (endMinutes - startMinutes) / 60;
+  return Math.round(diffHours * 10) / 10;
 }
 
 function getCalendarGrid(year: number, month: number) {
@@ -86,6 +183,79 @@ function getCalendarGrid(year: number, month: number) {
   return cells;
 }
 
+function ReviewIcon({ className = 'h-6 w-6' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+      <polygon
+        points="12 7.5 13.09 9.7 15.5 10.05 13.75 11.76 14.16 14.16 12 13.02 9.84 14.16 10.25 11.76 8.5 10.05 10.91 9.7 12 7.5"
+        fill="currentColor"
+        stroke="none"
+      />
+    </svg>
+  );
+}
+
+function ClocheIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 4v2" />
+      <path d="M4 17h16" />
+      <path d="M4 17c0-4.4 3.6-8 8-8s8 3.6 8 8" />
+      <line x1="2" y1="19.5" x2="22" y2="19.5" />
+    </svg>
+  );
+}
+
+function RatingSlider({
+  value,
+  onChange,
+  min = 1,
+  max = 5,
+  step = 0.1,
+}: {
+  value: number;
+  onChange: (val: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+}) {
+  const percentage = Math.max(0, Math.min(100, ((value - min) / (max - min)) * 100));
+
+  return (
+    <div className="relative flex-1 flex items-center min-w-0">
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        className="w-full h-2.5 sm:h-3 rounded-full appearance-none cursor-pointer accent-[#7C3AED] focus:outline-none"
+        style={{
+          background: `linear-gradient(to right, #7C3AED 0%, #7C3AED ${percentage}%, #E2E8F0 ${percentage}%, #E2E8F0 100%)`,
+        }}
+      />
+    </div>
+  );
+}
+
 type MediaModalItem = {
   id: string;
   type: 'photo' | 'video';
@@ -93,15 +263,29 @@ type MediaModalItem = {
   poster?: string;
   duration?: string;
   title?: string;
+  category?: 'parties' | 'shows' | 'meetings' | 'workshops' | 'more';
+  order?: number;
 };
 
 type FeedbackReview = {
   id: string;
   name: string;
-  avatar: string;
+  avatar?: string;
+  avatarInitial?: string;
   rating: number;
+  serviceRating?: number;
+  cleanlinessRating?: number;
+  ambienceRating?: number;
   date: string;
   comment: string;
+  media?: Array<{
+    id: string;
+    type: 'photo' | 'video';
+    url: string;
+    poster?: string;
+    duration?: string;
+    title?: string;
+  }>;
 };
 
 export function SpaceDetailsModal({
@@ -113,12 +297,20 @@ export function SpaceDetailsModal({
 }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'info' | 'highlights' | 'feedback'>('info');
-  const [activeSegment, setActiveSegment] = useState<'weekday' | 'weekend'>('weekday');
-  const [isDiscountsOpen, setIsDiscountsOpen] = useState(true);
+  const [activeSegment, setActiveSegment] = useState<'weekday' | 'weekend'>('weekend');
+  const [isDiscountsOpen, setIsDiscountsOpen] = useState(false);
   const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsActiveTab, setTermsActiveTab] = useState<'disclaimer' | 'guidelines' | 'tcs'>('disclaimer');
+  const [showMorePurposes, setShowMorePurposes] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const timePickerRef = useRef<HTMLDivElement | null>(null);
 
   // Highlights Media state
-  const [mediaFilter, setMediaFilter] = useState<'all' | 'photos' | 'videos'>('all');
+  const [mediaCategory, setMediaCategory] = useState<'all' | 'parties' | 'shows' | 'meetings' | 'workshops' | 'more'>('all');
+  const [mediaSortOrder, setMediaSortOrder] = useState<'recent' | 'oldest'>('recent');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const sortDropdownRef = useRef<HTMLDivElement | null>(null);
   const [activeLightboxPhotos, setActiveLightboxPhotos] = useState<MediaModalItem[]>([]);
   const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
   const [previewVideo, setPreviewVideo] = useState<MediaModalItem | null>(null);
@@ -132,48 +324,125 @@ export function SpaceDetailsModal({
   const [feedbackFilter, setFeedbackFilter] = useState<'all' | 'photos' | 'videos' | 'reviews'>('all');
   const [showAddFeedbackModal, setShowAddFeedbackModal] = useState(false);
   const [newFeedbackName, setNewFeedbackName] = useState('');
-  const [newFeedbackRating, setNewFeedbackRating] = useState(5);
+  const [newFeedbackRating, setNewFeedbackRating] = useState(4.8);
   const [newFeedbackComment, setNewFeedbackComment] = useState('');
+  const [newFeedbackService, setNewFeedbackService] = useState(4.9);
+  const [newFeedbackCleanliness, setNewFeedbackCleanliness] = useState(4.8);
+  const [newFeedbackAmbience, setNewFeedbackAmbience] = useState(4.7);
+  const [wouldBookAgain, setWouldBookAgain] = useState<boolean>(true);
+  const [wouldRecommend, setWouldRecommend] = useState<boolean>(true);
+  const [reviewMediaList, setReviewMediaList] = useState<
+    Array<{
+      id: string;
+      type: 'photo' | 'video';
+      url: string;
+      poster?: string;
+      duration?: string;
+    }>
+  >([
+    {
+      id: 'att-1',
+      type: 'photo',
+      url: 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80',
+    },
+    {
+      id: 'att-2',
+      type: 'video',
+      url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      poster: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80',
+      duration: '0:56',
+    },
+    {
+      id: 'att-3',
+      type: 'photo',
+      url: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80',
+    },
+  ]);
+  const reviewFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'top' | 'service' | 'cleanliness' | 'ambience'>('all');
+  const [reviewSortOrder, setReviewSortOrder] = useState<'recent' | 'highest' | 'lowest'>('recent');
+  const [showReviewSortDropdown, setShowReviewSortDropdown] = useState(false);
+  const reviewSortRef = useRef<HTMLDivElement | null>(null);
+
   const [reviews, setReviews] = useState<FeedbackReview[]>([
+    {
+      id: 'rev-riya',
+      name: 'Riya Sharma',
+      avatarInitial: 'R',
+      rating: 5.0,
+      serviceRating: 5.0,
+      cleanlinessRating: 5.0,
+      ambienceRating: 5.0,
+      date: '2 days ago',
+      comment:
+        'Amazing space! Perfect for our team meeting. Clean, well-managed and the setup was just right. Highly recommended!',
+      media: [
+        {
+          id: 'riya-med-1',
+          type: 'photo',
+          url: 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80',
+          title: 'Courtyard setup',
+        },
+        {
+          id: 'riya-med-2',
+          type: 'photo',
+          url: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80',
+          title: 'Auditorium stage',
+        },
+        {
+          id: 'riya-med-3',
+          type: 'video',
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+          poster: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80',
+          duration: '0:56',
+          title: 'Dining setup tour',
+        },
+      ],
+    },
+    {
+      id: 'rev-aman',
+      name: 'Aman Verma',
+      avatarInitial: 'A',
+      rating: 4.0,
+      serviceRating: 4.0,
+      cleanlinessRating: 4.0,
+      ambienceRating: 4.0,
+      date: '5 days ago',
+      comment: 'Great experience! The space is versatile and the team is very supportive.',
+    },
     {
       id: 'rev-1',
       name: 'Rohit Sharma',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      rating: 5,
-      date: 'Yesterday',
+      avatarInitial: 'R',
+      rating: 5.0,
+      serviceRating: 5.0,
+      cleanlinessRating: 4.9,
+      ambienceRating: 5.0,
+      date: '1 week ago',
       comment: 'Amazing space! Clean, cozy and perfect for work and meetings. 🌟',
     },
     {
       id: 'rev-2',
       name: 'Priya Sharma',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-      rating: 5,
-      date: '2 days ago',
+      avatarInitial: 'P',
+      rating: 5.0,
+      serviceRating: 4.8,
+      cleanlinessRating: 5.0,
+      ambienceRating: 4.9,
+      date: '2 weeks ago',
       comment: 'The natural lighting and creative vibe here is unmatched. Will book again!',
     },
     {
       id: 'rev-3',
       name: 'Ananya Deshmukh',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-      rating: 5,
-      date: 'Last week',
+      avatarInitial: 'A',
+      rating: 5.0,
+      serviceRating: 4.9,
+      cleanlinessRating: 4.8,
+      ambienceRating: 4.8,
+      date: '3 weeks ago',
       comment: 'Calm, productive, and comfortable for long creative sessions. Staff is super supportive.',
-    },
-    {
-      id: 'rev-4',
-      name: 'Rahul Mehta',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-      rating: 5,
-      date: '3 days ago',
-      comment: 'Hosted our fluid art workshop here. Smooth setup and great atmosphere.',
-    },
-    {
-      id: 'rev-5',
-      name: 'Sneha Patel',
-      avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&q=80',
-      rating: 5,
-      date: '2 weeks ago',
-      comment: 'Loved the artisanal coffee and quiet nook to get deep focus work done.',
     },
   ]);
 
@@ -190,6 +459,48 @@ export function SpaceDetailsModal({
   const [endTime, setEndTime] = useState('09:00');
   const [showShareModal, setShowShareModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showCoworkingBookingModal, setShowCoworkingBookingModal] = useState(false);
+
+  // Coworking specific states
+  const isCoworking = useMemo(() => {
+    if (!space) return false;
+    const typeStr = (space.spaceType || '').toLowerCase();
+    const catStr = (space.category || '').toLowerCase();
+    const nameStr = (space.name || '').toLowerCase();
+    return (
+      typeStr === 'coworking' ||
+      catStr.includes('cowork') ||
+      nameStr.includes('pass') ||
+      nameStr.includes('cowork')
+    );
+  }, [space]);
+
+  const [selectedPlanTier, setSelectedPlanTier] = useState<'regular' | 'premium'>('regular');
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('day');
+  const [bookingPassOverride, setBookingPassOverride] = useState<SpaceCard | null>(null);
+
+  useEffect(() => {
+    if (!space) return;
+    const lower = (space.name || '').toLowerCase();
+    if (lower.includes('weekly')) {
+      setSelectedPlanId('weekly');
+    } else if (lower.includes('3 month')) {
+      setSelectedPlanId('3months');
+    } else if (lower.includes('6 month')) {
+      setSelectedPlanId('6months');
+    } else if (lower.includes('monthly')) {
+      setSelectedPlanId('monthly');
+    } else {
+      setSelectedPlanId('day');
+    }
+    setSelectedPlanTier('regular');
+    setBookingPassOverride(null);
+  }, [space]);
+
+  const handleBookCoworkingPlan = () => {
+    if (!space) return;
+    setShowCoworkingBookingModal(true);
+  };
 
   // Reset scroll position to top when switching between Info, Highlights, and Feedback
   useEffect(() => {
@@ -202,14 +513,22 @@ export function SpaceDetailsModal({
     if (!space) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        if (showAddFeedbackModal) {
+        if (showTermsModal) {
+          setShowTermsModal(false);
+        } else if (showAddFeedbackModal) {
           setShowAddFeedbackModal(false);
+        } else if (showSortDropdown) {
+          setShowSortDropdown(false);
+        } else if (showReviewSortDropdown) {
+          setShowReviewSortDropdown(false);
         } else if (activeLightboxIndex !== null) {
           setActiveLightboxIndex(null);
         } else if (previewVideo !== null) {
           setPreviewVideo(null);
         } else if (showDatePicker) {
           setShowDatePicker(false);
+        } else if (showTimePicker) {
+          setShowTimePicker(false);
         } else {
           onClose();
         }
@@ -217,127 +536,144 @@ export function SpaceDetailsModal({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [space, onClose, showDatePicker, activeLightboxIndex, previewVideo, showAddFeedbackModal]);
+  }, [space, onClose, showDatePicker, showTimePicker, showTermsModal, showSortDropdown, showReviewSortDropdown, activeLightboxIndex, previewVideo, showAddFeedbackModal]);
 
-  // Close calendar popover on outside click
+  // Close calendar, time and sort popovers on outside click
   useEffect(() => {
-    if (!showDatePicker) return;
+    if (!showDatePicker && !showTimePicker && !showSortDropdown && !showReviewSortDropdown) return;
     const onClickOutside = (event: MouseEvent) => {
-      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (showDatePicker && calendarRef.current && !calendarRef.current.contains(target)) {
         setShowDatePicker(false);
+      }
+      if (showTimePicker && timePickerRef.current && !timePickerRef.current.contains(target)) {
+        setShowTimePicker(false);
+      }
+      if (showSortDropdown && sortDropdownRef.current && !sortDropdownRef.current.contains(target)) {
+        setShowSortDropdown(false);
+      }
+      if (showReviewSortDropdown && reviewSortRef.current && !reviewSortRef.current.contains(target)) {
+        setShowReviewSortDropdown(false);
       }
     };
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
-  }, [showDatePicker]);
+  }, [showDatePicker, showTimePicker, showSortDropdown, showReviewSortDropdown]);
 
-  // Highlights media aggregation for this specific space.name (called unconditionally for hooks compliance)
-  const mediaItems = useMemo<MediaModalItem[]>(() => {
-    if (!space) return [];
-    const items: MediaModalItem[] = [];
-
-    // 1. Gather all actual photos for this space
-    const photoUrls = [
-      space.imageUrl,
-      ...(Array.isArray(space.images) ? space.images : []),
-    ].filter(Boolean) as string[];
-    const uniquePhotos = Array.from(new Set(photoUrls));
-
-    uniquePhotos.forEach((url, i) => {
-      items.push({
-        id: `photo-${i}-${url}`,
+  // Highlights media aggregation matching reference UI (media_1794653412858_f89dae6b.jpg)
+  const highlightMedia = useMemo<MediaModalItem[]>(() => {
+    const spaceName = space?.name || 'Space';
+    return [
+      {
+        id: 'hl-party-1',
         type: 'photo',
-        url,
-        title: `${space.name} - View ${i + 1}`,
-      });
-    });
-
-    // 2. Gather all actual videos for this space
-    const videoUrls = Array.isArray(space.videos) ? space.videos : [];
-    const uniqueVideos = Array.from(new Set(videoUrls));
-
-    uniqueVideos.forEach((url, i) => {
-      items.push({
-        id: `video-${i}-${url}`,
-        type: 'video',
-        url,
-        poster: uniquePhotos[0] || undefined,
-        duration: '01:24',
-        title: `${space.name} - Video Tour ${i + 1}`,
-      });
-    });
-
-    // 3. Fallback / supplementary media so the 3-column grid is always rich and complete
-    // matching the reference mockup (media_1794413845792_bf5e2719.jpg)
-    if (items.length < 6) {
-      const supplementaryMedia: MediaModalItem[] = [
-        {
-          id: 'supp-photo-1',
-          type: 'photo',
-          url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
-          title: `${space.name} Studio`,
-        },
-        {
-          id: 'supp-video-1',
-          type: 'video',
-          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-          poster: 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80',
-          duration: '01:24',
-          title: `${space.name} Tour`,
-        },
-        {
-          id: 'supp-photo-2',
-          type: 'photo',
-          url: 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&w=800&q=80',
-          title: `${space.name} Workspace`,
-        },
-        {
-          id: 'supp-photo-3',
-          type: 'photo',
-          url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80',
-          title: `${space.name} Ambient Corner`,
-        },
-        {
-          id: 'supp-photo-4',
-          type: 'photo',
-          url: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=800&q=80',
-          title: `${space.name} Art Lounge`,
-        },
-        {
-          id: 'supp-video-2',
-          type: 'video',
-          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
-          poster: 'https://images.unsplash.com/photo-1497215842964-222b430dc094?auto=format&fit=crop&w=800&q=80',
-          duration: '02:10',
-          title: `${space.name} Walkthrough`,
-        },
-      ];
-
-      for (const fallback of supplementaryMedia) {
-        if (!items.some(it => it.url === fallback.url)) {
-          items.push(fallback);
-        }
-      }
-    }
-
-    return items;
+        category: 'parties',
+        url: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80',
+        title: `${spaceName} - Celebrations & Parties`,
+        order: 1,
+      },
+      {
+        id: 'hl-show-1',
+        type: 'photo',
+        category: 'shows',
+        url: 'https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&w=800&q=80',
+        title: `${spaceName} - Outdoor Movie Screening`,
+        order: 2,
+      },
+      {
+        id: 'hl-meeting-1',
+        type: 'photo',
+        category: 'meetings',
+        url: 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=800&q=80',
+        title: `${spaceName} - Garden Meetings & Networking`,
+        order: 3,
+      },
+      {
+        id: 'hl-show-2',
+        type: 'photo',
+        category: 'shows',
+        url: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=800&q=80',
+        title: `${spaceName} - Live Stage & Performances`,
+        order: 4,
+      },
+      {
+        id: 'hl-workshop-1',
+        type: 'photo',
+        category: 'workshops',
+        url: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=800&q=80',
+        title: `${spaceName} - Creative Painting Workshops`,
+        order: 5,
+      },
+      {
+        id: 'hl-more-1',
+        type: 'photo',
+        category: 'more',
+        url: 'https://images.unsplash.com/photo-1585647347384-2593bc35786b?auto=format&fit=crop&w=800&q=80',
+        title: `${spaceName} - Open-Air Gatherings`,
+        order: 6,
+      },
+      {
+        id: 'hl-party-2',
+        type: 'photo',
+        category: 'parties',
+        url: 'https://images.unsplash.com/photo-1527529482837-4698179dc6ce?auto=format&fit=crop&w=800&q=80',
+        title: `${spaceName} - Banquet & Dinner Setup`,
+        order: 7,
+      },
+      {
+        id: 'hl-party-3',
+        type: 'photo',
+        category: 'parties',
+        url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80',
+        title: `${spaceName} - Night Music & Dancing`,
+        order: 8,
+      },
+    ];
   }, [space]);
 
-  const photos = useMemo(() => mediaItems.filter(m => m.type === 'photo'), [mediaItems]);
-  const videos = useMemo(() => mediaItems.filter(m => m.type === 'video'), [mediaItems]);
+  const categoryFilteredMedia = useMemo(() => {
+    if (mediaCategory === 'all') return highlightMedia;
+    return highlightMedia.filter(m => m.category === mediaCategory);
+  }, [highlightMedia, mediaCategory]);
+
+  const sortedMedia = useMemo(() => {
+    const list = [...categoryFilteredMedia];
+    if (mediaSortOrder === 'recent') {
+      return list.sort((a, b) => (a.order || 0) - (b.order || 0));
+    } else {
+      return list.sort((a, b) => (b.order || 0) - (a.order || 0));
+    }
+  }, [categoryFilteredMedia, mediaSortOrder]);
 
   const infoPhotos = useMemo(() => {
     if (!space) return [];
-    if (photos.length > 0) return photos.map(p => p.url);
+    if (isCoworking) {
+      const dbPhotos = [space.imageUrl, ...(space.images || [])].filter(Boolean) as string[];
+      return dbPhotos.length > 0 ? dbPhotos : COWORKING_INFO_PHOTOS;
+    }
     const set = [space.imageUrl, ...(space.images || [])].filter(Boolean) as string[];
     return set.length > 0 ? set : [];
-  }, [photos, space]);
+  }, [space, isCoworking]);
 
-  const filteredMedia = useMemo(() => {
-    if (mediaFilter === 'photos') return photos;
-    if (mediaFilter === 'videos') return videos;
-    return mediaItems;
-  }, [mediaFilter, mediaItems, photos, videos]);
+  const filteredReviews = useMemo(() => {
+    let list = [...reviews];
+    if (reviewFilter === 'top') {
+      list = list.filter(r => r.rating >= 4.8);
+    } else if (reviewFilter === 'service') {
+      list = list.filter(r => (r.serviceRating ?? r.rating) >= 4.5);
+    } else if (reviewFilter === 'cleanliness') {
+      list = list.filter(r => (r.cleanlinessRating ?? r.rating) >= 4.5);
+    } else if (reviewFilter === 'ambience') {
+      list = list.filter(r => (r.ambienceRating ?? r.rating) >= 4.5);
+    }
+
+    if (reviewSortOrder === 'highest') {
+      list.sort((a, b) => b.rating - a.rating);
+    } else if (reviewSortOrder === 'lowest') {
+      list.sort((a, b) => a.rating - b.rating);
+    }
+    return list;
+  }, [reviews, reviewFilter, reviewSortOrder]);
 
   // Visitor Photos for Feedback tab (matching the 24 photos shown in the reference screenshot)
   const visitorPhotos = useMemo<MediaModalItem[]>(() => {
@@ -486,28 +822,53 @@ export function SpaceDetailsModal({
 
   if (!space) return null;
 
+  const handleFilesAdded = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newItems: Array<{
+      id: string;
+      type: 'photo' | 'video';
+      url: string;
+      poster?: string;
+      duration?: string;
+    }> = [];
+
+    Array.from(files).forEach((file, i) => {
+      const url = URL.createObjectURL(file);
+      const isVideo = file.type.startsWith('video');
+      newItems.push({
+        id: `upload-${Date.now()}-${i}`,
+        type: isVideo ? 'video' : 'photo',
+        url,
+        poster: isVideo ? undefined : url,
+        duration: isVideo ? '0:45' : undefined,
+      });
+    });
+
+    setReviewMediaList(prev => [...prev, ...newItems]);
+    toast.success(`${files.length} media item(s) attached`);
+  };
+
   const handleAddFeedbackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const name = newFeedbackName.trim();
-    const comment = newFeedbackComment.trim();
-    if (!name || !comment) {
-      toast.error('Please enter your name and review');
-      return;
-    }
+    const name = newFeedbackName.trim() || 'You';
+    const comment =
+      newFeedbackComment.trim() || 'Amazing experience! Clean, well-managed and perfect setup.';
     const newReview: FeedbackReview = {
       id: `review-${Date.now()}`,
       name,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+      avatarInitial: name.charAt(0).toUpperCase() || 'U',
       rating: newFeedbackRating,
+      serviceRating: newFeedbackService,
+      cleanlinessRating: newFeedbackCleanliness,
+      ambienceRating: newFeedbackAmbience,
       date: 'Just now',
       comment,
+      media: reviewMediaList.length > 0 ? [...reviewMediaList] : undefined,
     };
     setReviews(prev => [newReview, ...prev]);
-    setNewFeedbackName('');
-    setNewFeedbackComment('');
-    setNewFeedbackRating(5);
     setShowAddFeedbackModal(false);
-    toast.success('Thank you for your feedback!');
+    toast.success('Thank you for sharing your experience!');
   };
 
   // Prices
@@ -593,34 +954,51 @@ export function SpaceDetailsModal({
         aria-labelledby="space-details-title"
         className="flex h-[90dvh] min-h-[90dvh] max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl sm:h-[85vh] sm:min-h-[85vh] sm:max-h-[90vh] sm:rounded-[32px] text-left"
       >
-        {/* Header: Space Name on left, Close button on right */}
+        {/* Header: Space Name and Capacity badge on left, Terms button and Close button on right */}
         <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 pt-4 pb-3">
-          <h2
-            id="space-details-title"
-            className="truncate font-display text-xl sm:text-2xl font-black text-[#111111]"
-            title={space.name}
-          >
-            {space.name}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition cursor-pointer"
-            aria-label="Close space details"
-          >
-            <X className="h-4.5 w-4.5" />
-          </button>
+          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+            <h2
+              id="space-details-title"
+              className="truncate font-display text-lg sm:text-xl md:text-2xl font-black text-[#111111]"
+              title={isCoworking ? 'CoWorking Space' : space.name}
+            >
+              {isCoworking ? 'CoWorking Space' : space.name}
+            </h2>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F3E8FF] px-2.5 sm:px-3 py-1 text-xs font-bold text-[#7C3AED] shrink-0">
+              <Users size={13} className="stroke-[2.5]" />
+              <span>{isCoworking ? '1 Person' : `Up to ${space.capacity > 0 ? space.capacity : 60}`}</span>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowTermsModal(true)}
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#6344E7] hover:bg-purple-50 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
+            >
+              <FileText className="h-4 w-4" />
+              <span>Terms</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              aria-label="Close space details"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Tab navigation: Info, Highlights, Feedback equally divided across 3 columns */}
-        <div className="grid grid-cols-3 shrink-0 border-b border-slate-100 text-xs sm:text-sm font-bold">
+        {/* Tab navigation: Info, Highlights, Feedback */}
+        <div className="grid grid-cols-3 shrink-0 px-5 pt-3 pb-2 text-xs sm:text-sm font-bold gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('info')}
-            className={`flex items-center justify-center gap-1.5 py-3 border-b-2 transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl transition cursor-pointer font-bold ${
               activeTab === 'info'
-                ? 'border-[#6344E7] text-[#6344E7]'
-                : 'border-transparent text-slate-400 hover:text-slate-600'
+                ? 'bg-[#F3E8FF] text-[#7C3AED] shadow-3xs'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Info size={16} />
@@ -629,10 +1007,10 @@ export function SpaceDetailsModal({
           <button
             type="button"
             onClick={() => setActiveTab('highlights')}
-            className={`flex items-center justify-center gap-1.5 py-3 border-b-2 transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl transition cursor-pointer font-bold ${
               activeTab === 'highlights'
-                ? 'border-[#6344E7] text-[#6344E7]'
-                : 'border-transparent text-slate-400 hover:text-slate-600'
+                ? 'bg-[#F3E8FF] text-[#7C3AED] shadow-3xs'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Sparkles size={16} />
@@ -641,10 +1019,10 @@ export function SpaceDetailsModal({
           <button
             type="button"
             onClick={() => setActiveTab('feedback')}
-            className={`flex items-center justify-center gap-1.5 py-3 border-b-2 transition cursor-pointer ${
+            className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl transition cursor-pointer font-bold ${
               activeTab === 'feedback'
-                ? 'border-[#6344E7] text-[#6344E7]'
-                : 'border-transparent text-slate-400 hover:text-slate-600'
+                ? 'bg-[#F3E8FF] text-[#7C3AED] shadow-3xs'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <MessageSquare size={16} />
@@ -660,34 +1038,308 @@ export function SpaceDetailsModal({
           {activeTab === 'info' && (
             <>
               {/* Space Photo Carousel with scrollable/swipeable images & pagination dots */}
-              <ImageCarousel
-                images={infoPhotos}
-                alt={space.name}
-                aspectRatio="aspect-16/10"
-                roundedClassName="rounded-2xl"
-                onImageClick={idx => {
-                  if (photos.length > 0) {
-                    openPhotoLightbox(photos, idx < photos.length ? idx : 0);
+              <div className="relative">
+                <ImageCarousel
+                  images={infoPhotos}
+                  alt={space.name}
+                  aspectRatio="aspect-16/10"
+                  roundedClassName="rounded-2xl"
+                  onImageClick={idx => {
+                    if (infoPhotos.length > 0) {
+                      openPhotoLightbox(
+                        infoPhotos.map((url, i) => ({
+                          id: `info-photo-${i}`,
+                          type: 'photo',
+                          url,
+                          title: space.name,
+                        })),
+                        idx < infoPhotos.length ? idx : 0,
+                      );
+                    }
+                  }}
+                  showDots={infoPhotos.length > 1}
+                  showArrows={infoPhotos.length > 1}
+                  badge={
+                    <div className="absolute bottom-2.5 left-2.5 z-20 pointer-events-none">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 backdrop-blur-xs px-3 py-1 text-xs font-bold text-emerald-700 shadow-md border border-emerald-100">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        Available
+                      </span>
+                    </div>
                   }
-                }}
-                showDots={infoPhotos.length > 1}
-                showArrows={infoPhotos.length > 1}
-              />
+                />
+              </div>
 
-              {/* Status Badges: Available and Capacity */}
-              <div className="flex items-center gap-3 pt-1">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-200/60">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  Available
-                </span>
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600">
-                  <Users size={15} className="text-slate-500" />
-                  Up to {space.capacity > 0 ? space.capacity : 1}
-                </span>
+              {isCoworking ? (
+                <>
+                  {/* Operating Hours & Free Tea/Coffee Card */}
+                  <div className="rounded-2xl border border-purple-100/70 bg-[#FAF7FF] p-3 sm:p-3.5 grid grid-cols-2 divide-x divide-purple-100 text-left shadow-3xs">
+                    {/* Operating hours */}
+                    <div className="flex items-center gap-2.5 sm:gap-3 pr-2">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                        <Clock size={18} className="stroke-[2.2]" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-display font-black text-xs sm:text-sm text-[#111111] leading-tight truncate">
+                          8:00 AM – 10:00 PM
+                        </p>
+                        <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                          All 7 Days
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Free Tea/Coffee */}
+                    <div className="flex items-center gap-2.5 sm:gap-3 pl-3 sm:pl-4">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-[#7C3AED]">
+                        <Coffee size={18} className="stroke-[2.2]" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-display font-black text-xs sm:text-sm text-[#111111] leading-tight truncate">
+                          FREE Tea/Coffee
+                        </p>
+                        <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                          2 Times / Day
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cashback Banner */}
+                  <div className="rounded-2xl border border-purple-100 bg-[#FAF7FF] p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-3xs cursor-pointer hover:bg-purple-50/70 transition">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 shadow-3xs">
+                        <Gift size={20} className="stroke-[2.2]" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-display font-black text-xs sm:text-sm text-[#6344E7] leading-tight">
+                          ₹500 Cashback on Monthly &amp; Above Plans
+                        </h4>
+                        <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 leading-snug truncate">
+                          Redeem on inhouse food orders, supplies shopping, space bookings.
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight size={18} className="text-slate-400 shrink-0" />
+                  </div>
+
+                  {/* Best For Section */}
+                  <div>
+                    <h4 className="font-display font-black text-sm text-[#111111] mb-2">
+                      Best For
+                    </h4>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      {[
+                        {label: 'Artists', icon: Mic},
+                        {label: 'Designers', icon: Clapperboard},
+                        {label: 'Techies', icon: Code},
+                        {label: 'Students', icon: GraduationCap},
+                        {label: 'Corporate Professionals', icon: Briefcase},
+                      ].map((item, idx) => {
+                        const Icon = item.icon;
+                        return (
+                          <span
+                            key={idx}
+                            className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-2xl border border-purple-100 bg-[#FBF9FF] px-3 py-1.5 text-xs font-bold text-[#6344E7]"
+                          >
+                            <Icon size={13} className="text-[#6344E7] shrink-0" />
+                            <span>{item.label}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Amenities Section */}
+                  <div>
+                    <h4 className="font-display font-black text-sm text-[#111111] mb-2">
+                      Amenities
+                    </h4>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                        <Wifi size={14} className="text-slate-600 shrink-0" />
+                        <span>WiFi</span>
+                        <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-700">
+                          FREE
+                        </span>
+                      </span>
+                      <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                        <Newspaper size={14} className="text-slate-600 shrink-0" />
+                        <span>Daily Newspaper</span>
+                      </span>
+                      <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                        <BookOpen size={14} className="text-slate-600 shrink-0" />
+                        <span>In-house Books</span>
+                      </span>
+                      <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                        <Gamepad2 size={14} className="text-slate-600 shrink-0" />
+                        <span>Games</span>
+                      </span>
+                      <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                        <Armchair size={14} className="text-slate-600 shrink-0" />
+                        <span>Flexible Sitting</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Choose Your Plan Section */}
+                  <div>
+                    <h4 className="font-display font-black text-sm sm:text-base text-[#111111] mb-2.5">
+                      Choose Your Plan
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                      {/* Regular Pricing Card */}
+                      <div className="rounded-2xl border border-purple-100 bg-white overflow-hidden shadow-xs flex flex-col justify-between">
+                        <div>
+                          <div className="bg-[#F3E8FF] py-2 px-2.5 text-center">
+                            <span className="font-display font-black text-xs sm:text-sm text-[#6344E7] block">
+                              Regular Pricing
+                            </span>
+                          </div>
+                          <div className="divide-y divide-purple-50/80 p-1 sm:p-1.5">
+                            {COWORKING_PLANS.map(plan => {
+                              const isSelected =
+                                selectedPlanTier === 'regular' && selectedPlanId === plan.id;
+                              return (
+                                <div
+                                  key={plan.id}
+                                  onClick={() => {
+                                    setSelectedPlanTier('regular');
+                                    setSelectedPlanId(plan.id);
+                                  }}
+                                  className={`flex items-center justify-between p-1.5 sm:p-2 rounded-xl transition cursor-pointer select-none ${
+                                    isSelected ? 'bg-[#FAF5FF]' : 'hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                                    <div
+                                      className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                        isSelected
+                                          ? 'border-[#7C3AED] bg-white'
+                                          : 'border-slate-300 bg-white'
+                                      }`}
+                                    >
+                                      {isSelected && (
+                                        <div className="h-2 w-2 rounded-full bg-[#7C3AED]" />
+                                      )}
+                                    </div>
+                                    <span className="font-bold text-[11px] sm:text-xs text-[#111111] truncate">
+                                      {plan.name}
+                                    </span>
+                                  </div>
+                                  <span className="font-display font-black text-[11px] sm:text-xs text-[#111111] shrink-0">
+                                    ₹{formatInr(plan.regularPrice)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Premium Member Pricing Card */}
+                      <div className="rounded-2xl border border-amber-200 bg-[#FFFDF5] overflow-hidden shadow-xs flex flex-col justify-between">
+                        <div>
+                          <div className="bg-[#FEF08A]/70 py-2 px-2.5 text-center flex items-center justify-center gap-1">
+                            <Crown size={13} className="text-amber-700 fill-amber-700 shrink-0" />
+                            <span className="font-display font-black text-xs sm:text-sm text-[#854D0E] truncate">
+                              Premium Member Pricing
+                            </span>
+                          </div>
+                          <div className="divide-y divide-amber-100/60 p-1 sm:p-1.5">
+                            {COWORKING_PLANS.map(plan => {
+                              const isSelected =
+                                selectedPlanTier === 'premium' && selectedPlanId === plan.id;
+                              return (
+                                <div
+                                  key={plan.id}
+                                  onClick={() => {
+                                    setSelectedPlanTier('premium');
+                                    setSelectedPlanId(plan.id);
+                                  }}
+                                  className={`flex items-center justify-between p-1.5 sm:p-2 rounded-xl transition cursor-pointer select-none ${
+                                    isSelected ? 'bg-[#FEF9C3]/50' : 'hover:bg-amber-50/40'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                                    <div
+                                      className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                        isSelected
+                                          ? 'border-[#7C3AED] bg-white'
+                                          : 'border-slate-300 bg-white'
+                                      }`}
+                                    >
+                                      {isSelected && (
+                                        <div className="h-2 w-2 rounded-full bg-[#7C3AED]" />
+                                      )}
+                                    </div>
+                                    <span className="font-bold text-[11px] sm:text-xs text-[#111111] truncate">
+                                      {plan.name}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <span className="font-display font-black text-[11px] sm:text-xs text-[#111111]">
+                                      ₹{formatInr(plan.memberPrice)}
+                                    </span>
+                                    <span className="rounded-md bg-emerald-100 px-1 py-0.5 text-[8.5px] sm:text-[9.5px] font-bold text-emerald-700">
+                                      Save ₹{formatInr(plan.savings)}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Bottom Perks Banner inside Member card */}
+                        <div className="border-t border-amber-200/80 bg-amber-50/60 p-2 sm:p-2.5 flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <Sparkles size={12} className="text-amber-600 shrink-0" />
+                            <p className="text-[9px] sm:text-[10px] font-semibold text-amber-900 leading-tight line-clamp-2">
+                              Enjoy upto 40% discount &amp; 5% cashback on food, supplies and space bookings.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsDiscountsOpen(true)}
+                            className="inline-flex items-center gap-0.5 rounded-full border border-purple-300 bg-white px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-[#7C3AED] hover:bg-purple-50 transition shrink-0 cursor-pointer"
+                          >
+                            <span>Benefits</span>
+                            <ChevronRight size={10} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* 4 Metric KPI Cards (Green Theme) */}
+              <div className="rounded-2xl border border-[#DCFCE7] bg-[#F0FDF4]/70 p-3 sm:p-3.5 grid grid-cols-4 divide-x divide-emerald-200/60 text-center">
+                <div className="flex flex-col items-center justify-center px-1">
+                  <Calendar className="h-5 w-5 text-emerald-600 mb-1" />
+                  <span className="text-base sm:text-lg font-black text-[#111111] leading-tight">50+</span>
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-600 mt-0.5">Bookings</span>
+                </div>
+                <div className="flex flex-col items-center justify-center px-1">
+                  <Clock className="h-5 w-5 text-emerald-600 mb-1" />
+                  <span className="text-base sm:text-lg font-black text-[#111111] leading-tight">1.5K+</span>
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-600 mt-0.5">Hours Booked</span>
+                </div>
+                <div className="flex flex-col items-center justify-center px-1">
+                  <Users className="h-5 w-5 text-emerald-600 mb-1" />
+                  <span className="text-base sm:text-lg font-black text-[#111111] leading-tight">5K+</span>
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-600 mt-0.5">People Served</span>
+                </div>
+                <div className="flex flex-col items-center justify-center px-1">
+                  <RefreshCw className="h-5 w-5 text-emerald-600 mb-1" />
+                  <span className="text-base sm:text-lg font-black text-[#111111] leading-tight">30%+</span>
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-600 mt-0.5">Repeat Bookings</span>
+                </div>
               </div>
 
               {/* Membership Discounts Card */}
-              <div className="rounded-3xl border border-purple-100 bg-[#FAF9FF] p-3.5 sm:p-4 text-left transition shadow-xs">
+              <div className="rounded-2xl border border-purple-100 bg-[#FAF9FF] p-3.5 sm:p-4 text-left transition shadow-3xs">
                 {/* Header with Crown and Toggle */}
                 <div
                   onClick={() => setIsDiscountsOpen(v => !v)}
@@ -702,7 +1354,7 @@ export function SpaceDetailsModal({
                         Membership Discounts
                       </h4>
                       <p className="text-[11px] sm:text-xs font-medium text-slate-500 leading-tight mt-0.5 truncate">
-                        Get exclusive discounts and cashback on space booking
+                        Get exclusive discounts and cashback on space bookings.
                       </p>
                     </div>
                   </div>
@@ -804,29 +1456,100 @@ export function SpaceDetailsModal({
                 )}
               </div>
 
-              {/* Date Option (Calendar) & Custom Timing Option */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                {/* Dates Selector with Calendar Popover */}
-                <div className="relative" ref={calendarRef}>
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
-                    <Calendar size={14} className="text-slate-500" />
-                    <span>Dates</span>
-                  </label>
+              {/* Best For Section */}
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-sm sm:text-base text-[#111111]">Best For</h4>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
+                    <PartyPopper size={14} className="text-[#6344E7]" />
+                    Parties
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
+                    <Drama size={14} className="text-[#6344E7]" />
+                    Shows
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
+                    <Users size={14} className="text-[#6344E7]" />
+                    Meetings
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
+                    <GraduationCap size={14} className="text-[#6344E7]" />
+                    Workshops
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
+                    <Mic size={14} className="text-[#6344E7]" />
+                    Podcasts
+                  </span>
+                  {showMorePurposes && (
+                    <>
+                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
+                        <Clapperboard size={14} className="text-[#6344E7]" />
+                        Photo & Film Shoots
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
+                        <Sparkles size={14} className="text-[#6344E7]" />
+                        Art Exhibitions
+                      </span>
+                    </>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setShowDatePicker(v => !v)}
-                    className="flex w-full h-10 items-center justify-between gap-1.5 rounded-2xl border border-slate-200 bg-[#F8FAFC] px-3 text-xs font-bold text-slate-800 transition hover:bg-slate-100 cursor-pointer"
+                    onClick={() => setShowMorePurposes(v => !v)}
+                    className="inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-bold text-[#6344E7] hover:bg-purple-50 transition cursor-pointer"
                   >
-                    <div className="flex items-center gap-2 truncate">
-                      <Calendar size={14} className="text-[#6344E7] shrink-0" />
-                      <span className="truncate">{formatDateDisplay(selectedDate)}</span>
-                    </div>
-                    <ChevronDown size={14} className="text-slate-400 shrink-0" />
+                    {showMorePurposes ? 'Show Less' : '+ More'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Amenities Section */}
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-sm sm:text-base text-[#111111]">Amenities</h4>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                    <Wifi size={14} className="text-slate-600" />
+                    <span>WiFi</span>
+                    <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-700">FREE</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                    <Volume2 size={14} className="text-slate-600" />
+                    <span>Speaker</span>
+                    <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-700">FREE</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                    <AirVent size={14} className="text-slate-600" />
+                    <span>Air Conditioned</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                    <Projector size={14} className="text-slate-600" />
+                    <span>Projector</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                    <Armchair size={14} className="text-slate-600" />
+                    <span>Flexible Setup</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Date and Time Selectors - always in the same row */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-1">
+                {/* Dates Selector with Calendar Popover */}
+                <div className="relative" ref={calendarRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDatePicker(v => !v);
+                      setShowTimePicker(false);
+                    }}
+                    className="flex w-full h-11 sm:h-12 items-center gap-1.5 sm:gap-2.5 rounded-2xl border border-slate-200 bg-[#F8FAFC] px-2.5 sm:px-3.5 text-xs sm:text-sm font-bold text-slate-800 transition hover:bg-slate-100 cursor-pointer"
+                  >
+                    <Calendar size={16} className="text-[#6344E7] shrink-0" />
+                    <span className="truncate">{formatDateDisplay(selectedDate)}</span>
                   </button>
 
                   {/* Calendar Dropdown Popover */}
                   {showDatePicker && (
-                    <div className="absolute left-0 top-full z-40 mt-1 w-72 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                    <div className="absolute left-0 top-full z-40 mt-1 w-72 max-w-[calc(100vw-40px)] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
                       {/* Calendar Header with Month/Year and navigation arrows */}
                       <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
                         <div className="flex items-center gap-1">
@@ -919,49 +1642,109 @@ export function SpaceDetailsModal({
                   )}
                 </div>
 
-                {/* Time Slot / Custom Timing */}
-                <div>
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-600 mb-1">
-                    <Clock size={14} className="text-slate-500" />
-                    <span>Time Slot </span>
-                  </label>
-                  <div className="flex h-10 items-center justify-between gap-1.5 rounded-2xl border border-slate-200 bg-[#F8FAFC] px-3 focus-within:border-[#6344E7] focus-within:bg-white transition">
-                    {/* Start Time Input */}
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <input
-                        type="time"
-                        value={startTime}
-                        onChange={e => setStartTime(e.target.value)}
-                        className="w-full bg-transparent text-xs font-extrabold text-slate-800 outline-none cursor-pointer"
-                        title="Start Time"
-                      />
-                      {/* <Clock size={14} className="text-slate-400 shrink-0 pointer-events-none" /> */}
+                {/* Timing Selector with Popover */}
+                <div className="relative" ref={timePickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTimePicker(v => !v);
+                      setShowDatePicker(false);
+                    }}
+                    className="flex w-full h-11 sm:h-12 items-center justify-between rounded-2xl border border-slate-200 bg-[#F8FAFC] px-2.5 sm:px-3.5 text-xs sm:text-sm font-bold text-slate-800 transition hover:bg-slate-100 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5 sm:gap-2.5 truncate">
+                      <Clock size={16} className="text-[#6344E7] shrink-0" />
+                      <span className="truncate">
+                        {formatTime12(startTime)} – {formatTime12(endTime)}
+                      </span>
                     </div>
+                    <ChevronDown size={15} className="text-slate-400 shrink-0" />
+                  </button>
 
-                    <span className="text-[11px] font-bold text-slate-400 shrink-0 px-1">to</span>
+                  {/* Time Picker Dropdown Popover */}
+                  {showTimePicker && (
+                    <div className="absolute right-0 top-full z-40 mt-1 w-72 max-w-[calc(100vw-40px)] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+                      <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                        <span className="text-xs font-extrabold text-slate-900">Select Time Slot</span>
+                        <span className="text-[11px] font-bold text-[#6344E7]">{getDurationHours(startTime, endTime)} hrs</span>
+                      </div>
 
-                    {/* End Time Input */}
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <input
-                        type="time"
-                        value={endTime}
-                        onChange={e => setEndTime(e.target.value)}
-                        className="w-full bg-transparent text-xs font-extrabold text-slate-800 outline-none cursor-pointer"
-                        title="End Time"
-                      />
-                      {/* <Clock size={14} className="text-slate-400 shrink-0 pointer-events-none" /> */}
+                      {/* Timing Presets */}
+                      <div className="py-2.5 space-y-1.5 border-b border-slate-100">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Popular Slots</p>
+                        <div className="grid grid-cols-2 gap-1.5 text-xs">
+                          {[
+                            { label: '06:00 – 09:00 AM', start: '06:00', end: '09:00' },
+                            { label: '09:00 – 12:00 PM', start: '09:00', end: '12:00' },
+                            { label: '12:00 – 03:00 PM', start: '12:00', end: '15:00' },
+                            { label: '03:00 – 06:00 PM', start: '15:00', end: '18:00' },
+                            { label: '06:00 – 09:00 PM', start: '18:00', end: '21:00' },
+                            { label: '06:00 – 11:00 PM', start: '18:00', end: '23:00' },
+                          ].map(slot => (
+                            <button
+                              key={slot.label}
+                              type="button"
+                              onClick={() => {
+                                setStartTime(slot.start);
+                                setEndTime(slot.end);
+                                setShowTimePicker(false);
+                              }}
+                              className={`px-2 py-1.5 rounded-lg text-left text-[11px] font-bold transition cursor-pointer ${
+                                startTime === slot.start && endTime === slot.end
+                                  ? 'bg-[#6344E7] text-white'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              {slot.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Custom Start & End time inputs */}
+                      <div className="pt-2.5 space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Custom Timing</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Start Time</label>
+                            <input
+                              type="time"
+                              value={startTime}
+                              onChange={e => setStartTime(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 bg-[#F8FAFC] px-2.5 py-1.5 text-xs font-extrabold text-slate-800 outline-none focus:border-[#6344E7]"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 block mb-0.5">End Time</label>
+                            <input
+                              type="time"
+                              value={endTime}
+                              onChange={e => setEndTime(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 bg-[#F8FAFC] px-2.5 py-1.5 text-xs font-extrabold text-slate-800 outline-none focus:border-[#6344E7]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowTimePicker(false)}
+                        className="mt-3 w-full rounded-xl bg-[#6344E7] py-2 text-xs font-bold text-white hover:bg-[#5235D9] transition cursor-pointer"
+                      >
+                        Done
+                      </button>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
               {/* Weekday & Weekend Segmented Control & Price Display */}
-              <div className="pt-2">
+              <div className="flex items-center justify-between gap-3 pt-2">
                 <div className="inline-flex items-center rounded-full bg-slate-100 p-1">
                   <button
                     type="button"
                     onClick={() => setActiveSegment('weekday')}
-                    className={`rounded-full px-5 py-1.5 text-xs font-bold transition cursor-pointer ${
+                    className={`rounded-full px-5 py-2 text-xs sm:text-sm font-bold transition cursor-pointer ${
                       activeSegment === 'weekday'
                         ? 'bg-[#6344E7] text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
@@ -972,7 +1755,7 @@ export function SpaceDetailsModal({
                   <button
                     type="button"
                     onClick={() => setActiveSegment('weekend')}
-                    className={`rounded-full px-5 py-1.5 text-xs font-bold transition cursor-pointer ${
+                    className={`rounded-full px-5 py-2 text-xs sm:text-sm font-bold transition cursor-pointer ${
                       activeSegment === 'weekend'
                         ? 'bg-[#6344E7] text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
@@ -982,32 +1765,16 @@ export function SpaceDetailsModal({
                   </button>
                 </div>
 
-                {/* Price Display with Membership Savings */}
-                <div className="mt-3 flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-baseline gap-1.5">
+                <div className="text-right">
+                  <div className="flex items-baseline justify-end gap-1">
                     <span className="text-2xl sm:text-3xl font-black text-[#6344E7] tracking-tight">
-                      ₹{formatInr(finalUnitPrice)}
+                      ₹{formatInr(finalUnitPrice || activePrice)}
                     </span>
-                    <span className="text-xs sm:text-sm font-semibold text-slate-500">/ hour</span>
-                    {selectedTier && activePrice > finalUnitPrice ? (
-                      <span className="text-xs sm:text-sm font-semibold text-slate-400 line-through ml-1.5">
-                        ₹{formatInr(activePrice)}
-                      </span>
-                    ) : comparePrice ? (
-                      <span className="text-xs sm:text-sm font-semibold text-slate-400 line-through ml-1.5">
-                        ₹{formatInr(comparePrice)}
-                      </span>
-                    ) : null}
+                    <span className="text-xs sm:text-sm font-bold text-slate-500">/ hour</span>
                   </div>
-
-                  {selectedTier && activePrice > finalUnitPrice && (
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-[#F3E8FF] px-3.5 py-1.5 text-xs font-bold text-[#7C3AED] shadow-3xs">
-                      <Tag size={13} className="shrink-0" />
-                      <span>
-                        You save ₹{formatInr(unitDiscount)} ({selectedTier.discountPercent}%)
-                      </span>
-                    </div>
-                  )}
+                  <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">
+                    Regular pricing: ₹{formatInr(comparePrice || Math.round((finalUnitPrice || activePrice) * 1.25))} / hour
+                  </p>
                 </div>
               </div>
 
@@ -1022,117 +1789,184 @@ export function SpaceDetailsModal({
                   </p>
                 </div>
               )}
+                </>
+              )}
             </>
           )}
 
           {activeTab === 'highlights' && (
-            <div className="space-y-3.5 py-1">
-              {/* Media Header & Filter Tabs */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-purple-100 text-[#6344E7]">
-                    <Sparkles size={16} />
+            <div className="space-y-4 py-1 text-left">
+              {/* Media Section Header */}
+              <div className="flex items-center justify-between gap-3">
+                {/* Left: Lavender Square Icon + Title + Count */}
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F3E8FF] text-[#7C3AED]">
+                    <ImageIcon size={22} className="stroke-[2.2]" />
                   </div>
-                  <h3 className="text-sm sm:text-base font-extrabold text-[#111111]">Media</h3>
+                  <div>
+                    <h3 className="font-display text-lg sm:text-xl font-black text-[#111111] leading-tight">
+                      Media
+                    </h3>
+                    <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                      {sortedMedia.length} items
+                    </p>
+                  </div>
                 </div>
 
-                {/* Filter Pills */}
-                <div className="flex items-center gap-1.5 overflow-x-auto">
+                {/* Right: Sort Button with Dropdown */}
+                <div className="relative" ref={sortDropdownRef}>
                   <button
                     type="button"
-                    onClick={() => setMediaFilter('all')}
-                    className={`rounded-full px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-bold transition cursor-pointer ${
-                      mediaFilter === 'all'
-                        ? 'bg-[#F3E8FF] text-[#7C3AED] shadow-2xs'
-                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                    }`}
+                    onClick={() => setShowSortDropdown(v => !v)}
+                    className="flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-3xs hover:bg-slate-50 transition cursor-pointer"
                   >
-                    All ({mediaItems.length})
+                    <ArrowUpDown size={14} className="stroke-[2.2] text-slate-600" />
+                    <span>{mediaSortOrder === 'recent' ? 'Recent to Oldest' : 'Oldest to Recent'}</span>
+                    <ChevronDown size={14} className="stroke-[2.2] text-slate-500" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setMediaFilter('photos')}
-                    className={`rounded-full px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-bold transition cursor-pointer ${
-                      mediaFilter === 'photos'
-                        ? 'bg-[#F3E8FF] text-[#7C3AED] shadow-2xs'
-                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    Photos ({photos.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMediaFilter('videos')}
-                    className={`rounded-full px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-bold transition cursor-pointer ${
-                      mediaFilter === 'videos'
-                        ? 'bg-[#F3E8FF] text-[#7C3AED] shadow-2xs'
-                        : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    Videos ({videos.length})
-                  </button>
+
+                  {showSortDropdown && (
+                    <div className="absolute right-0 top-full mt-1.5 z-30 w-44 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMediaSortOrder('recent');
+                          setShowSortDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
+                          mediaSortOrder === 'recent'
+                            ? 'bg-[#F3E8FF] text-[#7C3AED]'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        Recent to Oldest
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMediaSortOrder('oldest');
+                          setShowSortDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
+                          mediaSortOrder === 'oldest'
+                            ? 'bg-[#F3E8FF] text-[#7C3AED]'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        Oldest to Recent
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* 3-Column Media Grid matching reference screenshot */}
-              {filteredMedia.length === 0 ? (
+              {/* Filter Pills Row */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {/* All (8) */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory('all')}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'all'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span>All ({highlightMedia.length})</span>
+                </button>
+
+                {/* Parties (3) */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory(c => (c === 'parties' ? 'all' : 'parties'))}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'parties'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <PartyPopper size={14} className={mediaCategory === 'parties' ? 'text-white' : 'text-[#7C3AED]'} />
+                  <span>Parties (3)</span>
+                </button>
+
+                {/* Shows (2) */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory(c => (c === 'shows' ? 'all' : 'shows'))}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'shows'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Drama size={14} className={mediaCategory === 'shows' ? 'text-white' : 'text-[#7C3AED]'} />
+                  <span>Shows (2)</span>
+                </button>
+
+                {/* Meetings (1) */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory(c => (c === 'meetings' ? 'all' : 'meetings'))}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'meetings'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Users size={14} className={mediaCategory === 'meetings' ? 'text-white' : 'text-[#7C3AED]'} />
+                  <span>Meetings (1)</span>
+                </button>
+
+                {/* Workshops (1) */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory(c => (c === 'workshops' ? 'all' : 'workshops'))}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'workshops'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Palette size={14} className={mediaCategory === 'workshops' ? 'text-white' : 'text-[#7C3AED]'} />
+                  <span>Workshops (1)</span>
+                </button>
+
+                {/* More ⌵ */}
+                <button
+                  type="button"
+                  onClick={() => setMediaCategory(c => (c === 'more' ? 'all' : 'more'))}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                    mediaCategory === 'more'
+                      ? 'bg-[#6344E7] text-white shadow-xs'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <MoreHorizontal size={14} className={mediaCategory === 'more' ? 'text-white' : 'text-[#7C3AED]'} />
+                  <span>More</span>
+                  <ChevronDown size={13} className={mediaCategory === 'more' ? 'text-white' : 'text-slate-500'} />
+                </button>
+              </div>
+
+              {/* 3-Column Highlights Media Grid */}
+              {sortedMedia.length === 0 ? (
                 <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 p-6 text-center text-slate-400">
                   <ImageIcon className="mb-2 h-8 w-8 text-slate-300" />
                   <p className="text-sm font-medium text-slate-500">No media available in this category.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
-                  {filteredMedia.map(item => (
+                <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                  {sortedMedia.map((item, idx) => (
                     <div
                       key={item.id}
-                      onClick={() => {
-                        if (item.type === 'photo') {
-                          const idx = photos.findIndex(p => p.id === item.id);
-                          openPhotoLightbox(photos, idx >= 0 ? idx : 0);
-                        } else {
-                          setPreviewVideo(item);
-                        }
-                      }}
-                      className="group relative aspect-4/3 sm:aspect-square w-full overflow-hidden rounded-xl sm:rounded-2xl bg-slate-100 cursor-pointer shadow-3xs hover:shadow-md transition active:scale-95"
+                      onClick={() => openPhotoLightbox(sortedMedia, idx)}
+                      className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-slate-100 cursor-pointer shadow-3xs hover:shadow-md transition active:scale-95"
                     >
-                      {item.type === 'photo' ? (
-                        <img
-                          src={item.url}
-                          alt={item.title || space.name}
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="relative h-full w-full bg-slate-900">
-                          {item.poster ? (
-                            <img
-                              src={item.poster}
-                              alt={item.title || space.name}
-                              className="h-full w-full object-cover opacity-85 transition duration-300 group-hover:scale-105"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <video
-                              src={item.url}
-                              preload="metadata"
-                              className="h-full w-full object-cover opacity-85"
-                              muted
-                            />
-                          )}
-
-                          {/* Centered Play Button Overlay */}
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-xs shadow-md transition group-hover:scale-110 group-hover:bg-black/75">
-                              <Play size={15} fill="white" className="ml-0.5" />
-                            </div>
-                          </div>
-
-                          {/* Duration Badge Bottom-Right */}
-                          <div className="absolute bottom-1.5 right-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] sm:text-[11px] font-bold text-white backdrop-blur-xs">
-                            {item.duration || '01:24'}
-                          </div>
-                        </div>
-                      )}
+                      <img
+                        src={item.url}
+                        alt={item.title || space.name}
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
                     </div>
                   ))}
                 </div>
@@ -1145,21 +1979,9 @@ export function SpaceDetailsModal({
               {/* Header: Title, subtitle, and + Add Feedback button */}
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <h3 className="font-display text-lg sm:text-xl font-black text-[#111111]">
-                    Visitor Feedback
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Photos, videos and reviews from our visitors.
-                  </p>
+                 
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAddFeedbackModal(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-[#6344E7] hover:bg-[#5235D9] px-3.5 py-2 text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer shrink-0"
-                >
-                  <Plus size={14} className="stroke-[2.5]" />
-                  <span>Add Feedback</span>
-                </button>
+              
               </div>
 
               {/* Category Pills (Photos, Videos, Reviews) */}
@@ -1328,116 +2150,370 @@ export function SpaceDetailsModal({
                 </div>
               )}
 
-              {/* Reviews & Testimonials Section */}
+              {/* Reviews Section matching reference mockup (media_1794654455716_8cbdeb1d.jpg) */}
               {(feedbackFilter === 'all' || feedbackFilter === 'reviews') && (
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-50 text-[#6344E7]">
-                        <Quote size={13} />
+                <div className="space-y-4 pt-2">
+                  {/* Reviews Header: Left icon + title, Right + Add Review button */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F3E8FF] text-[#7C3AED]">
+                        <ReviewIcon className="h-6 w-6 stroke-[2.2]" />
                       </div>
-                      <h4 className="text-sm font-extrabold text-[#111111]">Reviews & Testimonials</h4>
+                      <h3 className="font-display text-xl sm:text-2xl font-black text-[#111111] leading-tight">
+                        Reviews
+                      </h3>
                     </div>
+
                     <button
                       type="button"
-                      onClick={() => setFeedbackFilter(f => (f === 'reviews' ? 'all' : 'reviews'))}
-                      className="flex items-center gap-1 text-xs font-bold text-[#6344E7] hover:underline cursor-pointer"
+                      onClick={() => setShowAddFeedbackModal(true)}
+                      className="flex items-center gap-1.5 rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-purple-500/20 transition active:scale-95 cursor-pointer shrink-0"
                     >
-                      <span>{feedbackFilter === 'reviews' ? 'Show Less' : 'View All'}</span>
-                      <ArrowRight size={13} />
+                      <Plus size={15} className="stroke-[2.5]" />
+                      <span>Add Review</span>
                     </button>
                   </div>
 
-                  {/* Horizontal Scroll / Carousel if 'all', or vertical list if 'reviews' */}
-                  {feedbackFilter === 'reviews' ? (
-                    <div className="space-y-2.5">
-                      {reviews.map(item => (
+                  {/* Rating Breakdown Summary Card */}
+                  <div className="rounded-3xl border border-purple-100/70 bg-[#FAF9FF] p-4 sm:p-5 grid grid-cols-4 divide-x divide-slate-100/90 shadow-3xs text-center">
+                    {/* Overall Rating */}
+                    <div className="flex flex-col items-center justify-center px-1">
+                      <div className="flex items-center gap-1 text-3xl sm:text-4xl font-black text-[#111111] leading-none">
+                        <span>4.8</span>
+                        <Star size={24} className="fill-amber-400 text-amber-400 shrink-0" />
+                      </div>
+                      <span className="font-extrabold text-xs sm:text-sm text-[#111111] mt-2 leading-tight">
+                        Overall Rating
+                      </span>
+                      <span className="text-[10px] sm:text-xs text-slate-400 font-semibold mt-0.5">
+                        from 53 reviews
+                      </span>
+                    </div>
+
+                    {/* Service */}
+                    <div className="flex flex-col items-center justify-center px-1">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg text-[#7C3AED]">
+                        <ClocheIcon className="h-6 w-6" />
+                      </div>
+                      <div className="flex items-center gap-1 text-base sm:text-lg font-black text-[#111111] mt-1 leading-none">
+                        <span>4.9</span>
+                        <Star size={14} className="fill-amber-400 text-amber-400 shrink-0" />
+                      </div>
+                      <span className="text-xs text-slate-500 font-bold mt-1">
+                        Service
+                      </span>
+                    </div>
+
+                    {/* Cleanliness */}
+                    <div className="flex flex-col items-center justify-center px-1">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg text-[#7C3AED]">
+                        <Sparkles size={22} className="stroke-[2.2]" />
+                      </div>
+                      <div className="flex items-center gap-1 text-base sm:text-lg font-black text-[#111111] mt-1 leading-none">
+                        <span>4.8</span>
+                        <Star size={14} className="fill-amber-400 text-amber-400 shrink-0" />
+                      </div>
+                      <span className="text-xs text-slate-500 font-bold mt-1">
+                        Cleanliness
+                      </span>
+                    </div>
+
+                    {/* Ambience */}
+                    <div className="flex flex-col items-center justify-center px-1">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg text-[#7C3AED]">
+                        <Sofa size={22} className="stroke-[2.2]" />
+                      </div>
+                      <div className="flex items-center gap-1 text-base sm:text-lg font-black text-[#111111] mt-1 leading-none">
+                        <span>4.7</span>
+                        <Star size={14} className="fill-amber-400 text-amber-400 shrink-0" />
+                      </div>
+                      <span className="text-xs text-slate-500 font-bold mt-1">
+                        Ambience
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Filter Pills & Sort Dropdown */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none flex-1">
+                      {/* Top Rated */}
+                      <button
+                        type="button"
+                        onClick={() => setReviewFilter(f => (f === 'top' ? 'all' : 'top'))}
+                        className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                          reviewFilter === 'top'
+                            ? 'bg-[#6344E7] text-white shadow-xs'
+                            : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Star
+                          size={13}
+                          className={reviewFilter === 'top' ? 'fill-white text-white' : 'text-[#7C3AED]'}
+                        />
+                        <span>Top Rated</span>
+                      </button>
+
+                      {/* Service */}
+                      <button
+                        type="button"
+                        onClick={() => setReviewFilter(f => (f === 'service' ? 'all' : 'service'))}
+                        className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                          reviewFilter === 'service'
+                            ? 'bg-[#6344E7] text-white shadow-xs'
+                            : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <ClocheIcon
+                          className={`h-3.5 w-3.5 ${reviewFilter === 'service' ? 'text-white' : 'text-[#7C3AED]'}`}
+                        />
+                        <span>Service</span>
+                      </button>
+
+                      {/* Cleanliness */}
+                      <button
+                        type="button"
+                        onClick={() => setReviewFilter(f => (f === 'cleanliness' ? 'all' : 'cleanliness'))}
+                        className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                          reviewFilter === 'cleanliness'
+                            ? 'bg-[#6344E7] text-white shadow-xs'
+                            : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Sparkles
+                          size={13}
+                          className={reviewFilter === 'cleanliness' ? 'text-white' : 'text-[#7C3AED]'}
+                        />
+                        <span>Cleanliness</span>
+                      </button>
+
+                      {/* Ambience */}
+                      <button
+                        type="button"
+                        onClick={() => setReviewFilter(f => (f === 'ambience' ? 'all' : 'ambience'))}
+                        className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                          reviewFilter === 'ambience'
+                            ? 'bg-[#6344E7] text-white shadow-xs'
+                            : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Sofa
+                          size={13}
+                          className={reviewFilter === 'ambience' ? 'text-white' : 'text-[#7C3AED]'}
+                        />
+                        <span>Ambience</span>
+                      </button>
+                    </div>
+
+                    {/* Sort button with dropdown */}
+                    <div className="relative shrink-0" ref={reviewSortRef}>
+                      <button
+                        type="button"
+                        onClick={() => setShowReviewSortDropdown(v => !v)}
+                        className="flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-3xs hover:bg-slate-50 transition cursor-pointer"
+                      >
+                        <ArrowUpDown size={13} className="text-slate-600" />
+                        <span>
+                          {reviewSortOrder === 'recent'
+                            ? 'Recent'
+                            : reviewSortOrder === 'highest'
+                            ? 'Highest'
+                            : 'Lowest'}
+                        </span>
+                        <ChevronDown size={13} className="text-slate-500" />
+                      </button>
+
+                      {showReviewSortDropdown && (
+                        <div className="absolute right-0 top-full mt-1.5 z-30 w-36 rounded-2xl border border-slate-100 bg-white p-1.5 shadow-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReviewSortOrder('recent');
+                              setShowReviewSortDropdown(false);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${
+                              reviewSortOrder === 'recent'
+                                ? 'bg-[#F3E8FF] text-[#7C3AED]'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            Recent
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReviewSortOrder('highest');
+                              setShowReviewSortDropdown(false);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${
+                              reviewSortOrder === 'highest'
+                                ? 'bg-[#F3E8FF] text-[#7C3AED]'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            Highest Rated
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReviewSortOrder('lowest');
+                              setShowReviewSortDropdown(false);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer ${
+                              reviewSortOrder === 'lowest'
+                                ? 'bg-[#F3E8FF] text-[#7C3AED]'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            Lowest Rated
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Reviews List */}
+                  <div className="space-y-3">
+                    {filteredReviews.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-slate-400">
+                        <p className="text-xs font-medium">No reviews found matching this filter.</p>
+                      </div>
+                    ) : (
+                      filteredReviews.map(item => (
                         <div
                           key={item.id}
-                          className="rounded-2xl border border-slate-100 bg-[#FAFBFD] p-3.5 space-y-2 text-left shadow-3xs"
+                          className="rounded-3xl border border-slate-100 bg-white p-4 sm:p-5 space-y-3 text-left shadow-3xs hover:shadow-xs transition"
                         >
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={item.avatar}
-                              alt={item.name}
-                              className="h-10 w-10 rounded-full object-cover shrink-0 border border-slate-200"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                                {item.name}
-                              </p>
-                              <div className="flex items-center gap-0.5 text-amber-400 text-xs mt-0.5">
-                                {Array.from({length: 5}).map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    size={12}
-                                    fill={i < item.rating ? 'currentColor' : 'none'}
-                                    className={i < item.rating ? 'text-amber-400' : 'text-slate-200'}
-                                  />
-                                ))}
+                          {/* Header: Avatar, Name & Ratings Badges, and More Options */}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 min-w-0">
+                              {/* Round Avatar */}
+                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#F3E8FF] text-[#7C3AED] font-black text-base shadow-3xs">
+                                {item.avatarInitial || item.name.charAt(0).toUpperCase()}
+                              </div>
+
+                              <div className="min-w-0 flex-1 space-y-1">
+                                {/* Name and Badges Row (Single Line) */}
+                                <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none flex-nowrap pb-0.5">
+                                  <h4 className="font-black text-sm sm:text-base text-[#111111] leading-tight shrink-0 whitespace-nowrap">
+                                    {item.name}
+                                  </h4>
+
+                                  {/* Overall Rating Badge */}
+                                  <div className="shrink-0 whitespace-nowrap inline-flex items-center gap-1 rounded-lg bg-amber-50 border border-amber-200/60 px-1.5 sm:px-2 py-0.5 text-xs font-black text-slate-800">
+                                    <span>{Number(item.rating).toFixed(1)}</span>
+                                    <Star size={11} className="fill-amber-400 text-amber-400" />
+                                  </div>
+
+                                  {/* Service Badge */}
+                                  <div className="shrink-0 whitespace-nowrap inline-flex items-center gap-1 rounded-lg bg-[#FAF5FF] border border-purple-200/60 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-slate-600">
+                                    <ClocheIcon className="h-3.5 w-3.5 text-[#7C3AED]" />
+                                    <span>
+                                      Service <strong className="font-black text-slate-900">{Number(item.serviceRating ?? item.rating).toFixed(1)}</strong>
+                                    </span>
+                                  </div>
+
+                                  {/* Cleanliness Badge */}
+                                  <div className="shrink-0 whitespace-nowrap inline-flex items-center gap-1 rounded-lg bg-[#FAF5FF] border border-purple-200/60 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-slate-600">
+                                    <Sparkles size={12} className="text-[#7C3AED]" />
+                                    <span>
+                                      Cleanliness <strong className="font-black text-slate-900">{Number(item.cleanlinessRating ?? item.rating).toFixed(1)}</strong>
+                                    </span>
+                                  </div>
+
+                                  {/* Ambience Badge */}
+                                  <div className="shrink-0 whitespace-nowrap inline-flex items-center gap-1 rounded-lg bg-[#FAF5FF] border border-purple-200/60 px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-slate-600">
+                                    <Sofa size={12} className="text-[#7C3AED]" />
+                                    <span>
+                                      Ambience <strong className="font-black text-slate-900">{Number(item.ambienceRating ?? item.rating).toFixed(1)}</strong>
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Date */}
+                                <p className="text-[11px] font-semibold text-slate-400">
+                                  {item.date}
+                                </p>
                               </div>
                             </div>
-                            <span className="text-[10px] text-slate-400 font-medium shrink-0">
-                              {item.date}
-                            </span>
+
+                            {/* More Options */}
+                            <button
+                              type="button"
+                              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition cursor-pointer shrink-0"
+                              aria-label="Review options"
+                            >
+                              <MoreHorizontal size={18} />
+                            </button>
                           </div>
-                          <p className="text-xs text-slate-600 leading-relaxed italic">
-                            “{item.comment}”
+
+                          {/* Comment Text */}
+                          <p className="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed">
+                            {item.comment}
                           </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
-                      {reviews.map(item => (
-                        <div
-                          key={item.id}
-                          className="w-[84%] sm:w-[78%] shrink-0 snap-center rounded-2xl border border-slate-100 bg-[#FAFBFD] p-3.5 space-y-2 text-left shadow-3xs"
-                        >
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={item.avatar}
-                              alt={item.name}
-                              className="h-10 w-10 rounded-full object-cover shrink-0 border border-slate-200"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                                {item.name}
-                              </p>
-                              <div className="flex items-center gap-0.5 text-amber-400 text-xs mt-0.5">
-                                {Array.from({length: 5}).map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    size={12}
-                                    fill={i < item.rating ? 'currentColor' : 'none'}
-                                    className={i < item.rating ? 'text-amber-400' : 'text-slate-200'}
+
+                          {/* Attached Media Thumbnails */}
+                          {Array.isArray(item.media) && item.media.length > 0 && (
+                            <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-1">
+                              {item.media.map((med, mIdx) => (
+                                <div
+                                  key={med.id || mIdx}
+                                  onClick={() => {
+                                    if (med.type === 'photo') {
+                                      const photoItems = item.media!
+                                        .filter(m => m.type === 'photo')
+                                        .map((m, pIdx) => ({
+                                          id: m.id || `rev-photo-${pIdx}`,
+                                          type: 'photo' as const,
+                                          url: m.url,
+                                          title: `${item.name}'s photo`,
+                                        }));
+                                      const targetIdx = photoItems.findIndex(p => p.url === med.url);
+                                      openPhotoLightbox(photoItems, targetIdx >= 0 ? targetIdx : 0);
+                                    } else {
+                                      setPreviewVideo({
+                                        id: med.id,
+                                        type: 'video',
+                                        url: med.url,
+                                        poster: med.poster,
+                                        title: `${item.name}'s video tour`,
+                                      });
+                                    }
+                                  }}
+                                  className="group relative aspect-[4/3] w-full overflow-hidden rounded-xl sm:rounded-2xl bg-slate-900 cursor-pointer shadow-3xs hover:shadow-md transition active:scale-95"
+                                >
+                                  <img
+                                    src={med.poster || med.url}
+                                    alt={med.title || 'Review media'}
+                                    className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                                    loading="lazy"
                                   />
-                                ))}
-                              </div>
+
+                                  {med.type === 'video' && (
+                                    <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-md bg-black/75 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-xs">
+                                      <Play size={10} fill="white" />
+                                      <span>{med.duration || '0:56'}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                            <span className="text-[10px] text-slate-400 font-medium shrink-0">
-                              {item.date}
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-600 leading-relaxed italic line-clamp-3">
-                            “{item.comment}”
-                          </p>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* Bottom Actions: Share and Book in 30:70 ratio */}
-        <div className="shrink-0 border-t border-slate-100 bg-white p-4 grid grid-cols-10 gap-2.5 sm:gap-3">
+        {/* Bottom Actions: Share and Book */}
+        <div className="shrink-0 border-t border-slate-100 bg-white p-4 flex items-center gap-3">
           <button
             type="button"
             onClick={handleShare}
-            className="col-span-3 flex h-12 sm:h-13 items-center justify-center gap-1.5 rounded-2xl border border-purple-200 bg-white text-[#6344E7] hover:bg-purple-50 transition active:scale-95 cursor-pointer shadow-xs"
+            className="flex h-12 sm:h-13 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 sm:px-8 text-[#6344E7] hover:bg-purple-50/50 transition active:scale-95 cursor-pointer shadow-3xs"
             title="Share space"
             aria-label="Share space"
           >
@@ -1446,10 +2522,10 @@ export function SpaceDetailsModal({
           </button>
           <button
             type="button"
-            onClick={handleBook}
-            className="col-span-7 flex h-12 sm:h-13 items-center justify-center gap-2 rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] text-white text-base font-bold shadow-md shadow-purple-500/25 transition active:scale-95 cursor-pointer"
+            onClick={isCoworking ? handleBookCoworkingPlan : handleBook}
+            className="flex-1 flex h-12 sm:h-13 items-center justify-center gap-2 rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] text-white text-base font-bold shadow-md shadow-purple-500/25 transition active:scale-95 cursor-pointer"
           >
-            <span>Book</span>
+            <span>{isCoworking ? 'Book Now' : 'Book'}</span>
           </button>
         </div>
       </div>
@@ -1570,88 +2646,346 @@ export function SpaceDetailsModal({
         </div>
       )}
 
-      {/* Add Feedback Modal */}
+      {/* Share Your Experience / Review Modal matching reference mockup (media_1794655857465_ea7cb2e4.jpg) */}
       {showAddFeedbackModal && (
         <div
           className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4"
           onClick={() => setShowAddFeedbackModal(false)}
         >
           <div
-            className="w-full max-w-md rounded-t-[32px] sm:rounded-[28px] bg-white p-5 shadow-2xl text-left animate-in fade-in slide-in-from-bottom duration-200"
+            className="w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-t-[32px] sm:rounded-[32px] bg-white p-4 sm:p-6 shadow-2xl text-left animate-in fade-in slide-in-from-bottom duration-200 space-y-4"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-display text-base sm:text-lg font-bold text-slate-900">
-                Share Your Experience
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowAddFeedbackModal(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
+            {/* Top drawer grab handle (Mobile) */}
+            <div className="w-12 h-1 rounded-full bg-slate-300 mx-auto -mt-1 mb-2 sm:hidden" />
 
-            <form onSubmit={handleAddFeedbackSubmit} className="mt-4 space-y-3.5">
-              <div>
-                <label className="text-xs font-bold text-slate-600 block mb-1">
-                  Rating
-                </label>
-                <div className="flex items-center gap-1.5">
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setNewFeedbackRating(star)}
-                      className="p-1 text-amber-400 hover:scale-110 transition cursor-pointer"
-                    >
-                      <Star
-                        size={22}
-                        fill={star <= newFeedbackRating ? 'currentColor' : 'none'}
-                        className={star <= newFeedbackRating ? 'text-amber-400' : 'text-slate-200'}
-                      />
-                    </button>
-                  ))}
-                  <span className="text-xs font-bold text-slate-500 ml-1.5">
-                    {newFeedbackRating} / 5
-                  </span>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#F3E8FF] text-[#7C3AED]">
+                  <ReviewIcon className="h-6 w-6 stroke-[2.2]" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-display text-lg sm:text-2xl font-black text-[#111111] leading-tight">
+                    Share Your Experience
+                  </h3>
+                  <p className="text-xs sm:text-sm font-medium text-slate-500 mt-0.5 truncate">
+                    Help others by rating your experience at our space.
+                  </p>
                 </div>
               </div>
 
+              <button
+                type="button"
+                onClick={() => setShowAddFeedbackModal(false)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 transition cursor-pointer"
+                aria-label="Close review modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddFeedbackSubmit} className="space-y-4">
+              {/* Overall Experience Slider Card */}
+              <div className="rounded-3xl border border-purple-100/70 bg-[#FAF9FF] p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-3xs">
+                <div className="shrink-0 leading-tight">
+                  <span className="font-black text-sm sm:text-base text-[#111111] block">
+                    Overall
+                  </span>
+                  <span className="font-black text-sm sm:text-base text-[#111111] block">
+                    Experience <span className="text-red-500">*</span>
+                  </span>
+                </div>
+
+                {/* Slider + Tick Labels */}
+                <div className="flex-1 min-w-0">
+                  <RatingSlider
+                    value={newFeedbackRating}
+                    onChange={setNewFeedbackRating}
+                    min={1}
+                    max={5}
+                    step={0.1}
+                  />
+                  <div className="flex justify-between text-[10px] sm:text-[11px] font-bold text-slate-400 pt-1.5 px-0.5">
+                    <div className="flex flex-col items-center">
+                      <span>1</span>
+                      <span className="text-[9px] font-semibold text-slate-400">Poor</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span>2</span>
+                      <span className="text-[9px] font-semibold text-slate-400">Fair</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span>3</span>
+                      <span className="text-[9px] font-semibold text-slate-400">Good</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span>4</span>
+                      <span className="text-[9px] font-semibold text-slate-400">Very Good</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span>5</span>
+                      <span className="text-[9px] font-semibold text-slate-400">Excellent</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Score Pill with 3 Radiating Sparkles */}
+                <div className="relative shrink-0 flex items-center justify-center self-end sm:self-center">
+                  <div className="absolute -top-3.5 right-6 flex items-center gap-1 text-[#7C3AED]">
+                    <span className="h-2 w-0.5 rounded-full bg-[#7C3AED] -rotate-45" />
+                    <span className="h-2.5 w-0.5 rounded-full bg-[#7C3AED] -translate-y-0.5" />
+                    <span className="h-2 w-0.5 rounded-full bg-[#7C3AED] rotate-45" />
+                  </div>
+                  <div className="rounded-2xl border border-purple-100 bg-white px-3.5 py-2 shadow-xs flex items-baseline">
+                    <span className="font-black text-xl sm:text-2xl text-[#111111]">
+                      {Number(newFeedbackRating).toFixed(1)}
+                    </span>
+                    <span className="text-xs font-bold text-slate-400 ml-1">/ 5</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rate the Key Areas */}
               <div>
-                <label className="text-xs font-bold text-slate-600 block mb-1">
-                  Your Name
-                </label>
+                <h4 className="font-black text-sm sm:text-base text-[#111111] mb-2.5">
+                  Rate the Key Areas
+                </h4>
+                <div className="divide-y divide-slate-100/90 rounded-3xl border border-slate-100 bg-[#FAF9FF]/40 p-3 sm:p-4 space-y-3 shadow-3xs">
+                  {/* Service */}
+                  <div className="flex items-center gap-3 pt-1">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F3E8FF] text-[#7C3AED]">
+                      <ClocheIcon className="h-4 w-4" />
+                    </div>
+                    <span className="font-bold text-xs sm:text-sm text-[#111111] w-20 sm:w-24 shrink-0">
+                      Service
+                    </span>
+                    <RatingSlider
+                      value={newFeedbackService}
+                      onChange={setNewFeedbackService}
+                      min={1}
+                      max={5}
+                      step={0.1}
+                    />
+                    <div className="rounded-xl border border-slate-100 bg-white px-2.5 py-1 text-xs font-black text-[#111111] shrink-0 min-w-[54px] text-center shadow-3xs">
+                      {Number(newFeedbackService).toFixed(1)} / 5
+                    </div>
+                  </div>
+
+                  {/* Cleanliness */}
+                  <div className="flex items-center gap-3 pt-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F3E8FF] text-[#7C3AED]">
+                      <Sparkles size={16} className="stroke-[2.2]" />
+                    </div>
+                    <span className="font-bold text-xs sm:text-sm text-[#111111] w-20 sm:w-24 shrink-0">
+                      Cleanliness
+                    </span>
+                    <RatingSlider
+                      value={newFeedbackCleanliness}
+                      onChange={setNewFeedbackCleanliness}
+                      min={1}
+                      max={5}
+                      step={0.1}
+                    />
+                    <div className="rounded-xl border border-slate-100 bg-white px-2.5 py-1 text-xs font-black text-[#111111] shrink-0 min-w-[54px] text-center shadow-3xs">
+                      {Number(newFeedbackCleanliness).toFixed(1)} / 5
+                    </div>
+                  </div>
+
+                  {/* Ambience */}
+                  <div className="flex items-center gap-3 pt-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F3E8FF] text-[#7C3AED]">
+                      <Sofa size={16} className="stroke-[2.2]" />
+                    </div>
+                    <span className="font-bold text-xs sm:text-sm text-[#111111] w-20 sm:w-24 shrink-0">
+                      Ambience
+                    </span>
+                    <RatingSlider
+                      value={newFeedbackAmbience}
+                      onChange={setNewFeedbackAmbience}
+                      min={1}
+                      max={5}
+                      step={0.1}
+                    />
+                    <div className="rounded-xl border border-slate-100 bg-white px-2.5 py-1 text-xs font-black text-[#111111] shrink-0 min-w-[54px] text-center shadow-3xs">
+                      {Number(newFeedbackAmbience).toFixed(1)} / 5
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reviewer Name */}
+              <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 focus-within:border-[#6344E7] transition shadow-3xs">
                 <input
                   type="text"
-                  required
                   value={newFeedbackName}
                   onChange={e => setNewFeedbackName(e.target.value)}
-                  placeholder="e.g. Rohit Sharma"
-                  className="w-full rounded-xl border border-slate-200 bg-[#F8FAFC] px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-[#6344E7] focus:bg-white"
+                  placeholder="Your Name (e.g. Riya Sharma)"
+                  className="w-full text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none bg-transparent font-medium"
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-slate-600 block mb-1">
-                  Your Review
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  value={newFeedbackComment}
-                  onChange={e => setNewFeedbackComment(e.target.value)}
-                  placeholder="What did you love about this space?"
-                  className="w-full rounded-xl border border-slate-200 bg-[#F8FAFC] p-3 text-xs font-medium text-slate-800 outline-none focus:border-[#6344E7] focus:bg-white resize-none"
-                />
+              {/* Textarea for Experience */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-3.5 focus-within:border-[#6344E7] transition shadow-3xs">
+                <div className="flex items-start gap-2">
+                  <Pencil size={15} className="text-slate-400 mt-0.5 shrink-0" />
+                  <textarea
+                    rows={3}
+                    maxLength={500}
+                    value={newFeedbackComment}
+                    onChange={e => setNewFeedbackComment(e.target.value)}
+                    placeholder="Tell us about your experience..."
+                    className="w-full text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none resize-none bg-transparent"
+                  />
+                </div>
+                <div className="text-[11px] font-semibold text-slate-400 text-right mt-1">
+                  {newFeedbackComment.length} / 500
+                </div>
               </div>
 
+              {/* Photos / Videos Row */}
+              <div className="flex items-center gap-2.5 overflow-x-auto scrollbar-none py-1">
+                {/* Hidden File Input */}
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,video/*"
+                  className="hidden"
+                  ref={reviewFileInputRef}
+                  onChange={handleFilesAdded}
+                />
+
+                {/* Add Button */}
+                <button
+                  type="button"
+                  onClick={() => reviewFileInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center w-28 sm:w-32 h-20 sm:h-22 rounded-2xl border-2 border-dashed border-[#A855F7]/70 bg-[#FAF5FF] text-[#7C3AED] hover:bg-[#F3E8FF] transition cursor-pointer shrink-0 p-2"
+                >
+                  <Camera size={22} className="stroke-[2.2] text-[#7C3AED] mb-1" />
+                  <span className="font-bold text-[10px] sm:text-[11px] text-[#111111] leading-tight text-center">
+                    Add Photos / Videos
+                  </span>
+                  <span className="text-[9px] font-semibold text-slate-400 mt-0.5">
+                    (Optional)
+                  </span>
+                </button>
+
+                {/* Attached Previews */}
+                {reviewMediaList.map(med => (
+                  <div
+                    key={med.id}
+                    className="relative w-28 sm:w-32 h-20 sm:h-22 rounded-2xl overflow-hidden bg-slate-900 shrink-0 shadow-3xs group"
+                  >
+                    <img
+                      src={med.poster || med.url}
+                      alt="Preview"
+                      className="h-full w-full object-cover"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setReviewMediaList(prev => prev.filter(m => m.id !== med.id))
+                      }
+                      className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition cursor-pointer shadow-xs"
+                      aria-label="Remove media"
+                    >
+                      <X size={12} className="stroke-[2.5]" />
+                    </button>
+
+                    {med.type === 'video' && (
+                      <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-md bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-xs">
+                        <Play size={8} fill="white" />
+                        <span>{med.duration || '0:56'}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Question Row 1: Would you book again? */}
+              <div className="rounded-2xl border border-slate-100 bg-[#FAF9FF]/60 p-2.5 sm:p-3 flex items-center justify-between gap-3 shadow-3xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F3E8FF] text-[#7C3AED]">
+                    <Calendar size={16} className="stroke-[2.2]" />
+                  </div>
+                  <span className="font-bold text-xs sm:text-sm text-[#111111]">
+                    Would you book again?
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setWouldBookAgain(true)}
+                    className={`flex items-center gap-1 rounded-xl px-4 py-1.5 text-xs font-bold transition cursor-pointer ${
+                      wouldBookAgain
+                        ? 'bg-[#7C3AED] text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {wouldBookAgain && <Check size={12} className="stroke-[3]" />}
+                    <span>Yes</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWouldBookAgain(false)}
+                    className={`flex items-center gap-1 rounded-xl px-4 py-1.5 text-xs font-bold transition cursor-pointer ${
+                      !wouldBookAgain
+                        ? 'bg-[#7C3AED] text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>No</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Question Row 2: Would you recommend? */}
+              <div className="rounded-2xl border border-slate-100 bg-[#FAF9FF]/60 p-2.5 sm:p-3 flex items-center justify-between gap-3 shadow-3xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F3E8FF] text-[#7C3AED]">
+                    <Users size={16} className="stroke-[2.2]" />
+                  </div>
+                  <span className="font-bold text-xs sm:text-sm text-[#111111] leading-tight">
+                    Would you recommend this space to your friends / family / colleagues?
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setWouldRecommend(true)}
+                    className={`flex items-center gap-1 rounded-xl px-4 py-1.5 text-xs font-bold transition cursor-pointer ${
+                      wouldRecommend
+                        ? 'bg-[#7C3AED] text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {wouldRecommend && <Check size={12} className="stroke-[3]" />}
+                    <span>Yes</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWouldRecommend(false)}
+                    className={`flex items-center gap-1 rounded-xl px-4 py-1.5 text-xs font-bold transition cursor-pointer ${
+                      !wouldRecommend
+                        ? 'bg-[#7C3AED] text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>No</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full rounded-xl bg-[#6344E7] py-3 text-xs sm:text-sm font-bold text-white shadow-md shadow-purple-500/25 hover:bg-[#5235D9] transition active:scale-95 cursor-pointer"
+                className="w-full rounded-2xl bg-gradient-to-r from-[#6344E7] to-[#7C3AED] hover:from-[#5235D9] hover:to-[#6D28D9] py-3.5 sm:py-4 text-sm sm:text-base font-bold text-white shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 transition active:scale-98 cursor-pointer mt-2"
               >
-                Submit Feedback
+                <Send size={18} className="-rotate-12 stroke-[2.2]" />
+                <span>Submit Review</span>
               </button>
             </form>
           </div>
@@ -1665,14 +2999,186 @@ export function SpaceDetailsModal({
       />
 
       <SpaceBookingModal
-        space={space}
+        space={bookingPassOverride || space}
         isOpen={showBookingModal}
-        onClose={() => setShowBookingModal(false)}
+        onClose={() => {
+          setShowBookingModal(false);
+          setBookingPassOverride(null);
+        }}
         initialDate={selectedDate}
         initialStartTime={startTime}
         initialEndTime={endTime}
         membershipTier={selectedTier}
       />
+
+      <CoworkingBookingModal
+        isOpen={showCoworkingBookingModal}
+        onClose={() => setShowCoworkingBookingModal(false)}
+        space={space}
+        initialPlanId={selectedPlanId}
+        initialStartDate={selectedDate}
+      />
+
+      {/* Space Booking Terms Modal */}
+      {showTermsModal && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4"
+          onClick={() => setShowTermsModal(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-t-[32px] sm:rounded-[32px] bg-white p-5 sm:p-6 shadow-2xl text-left animate-in fade-in slide-in-from-bottom duration-200 space-y-3.5"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Top drag handle indicator */}
+            <div className="h-1.5 w-12 bg-slate-300 rounded-full mx-auto mb-2" />
+
+            {/* Header: Title and Close button */}
+            <div className="flex items-center justify-between pb-1">
+              <h3 className="font-display text-xl sm:text-2xl font-black text-[#111827]">
+                Space Booking Terms
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-slate-500 hover:bg-slate-200 transition cursor-pointer"
+                aria-label="Close terms"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* 3 Segmented Tabs: Disclaimer, Guidelines, T&Cs */}
+            <div className="grid grid-cols-3 gap-2 pt-1 pb-1">
+              <button
+                type="button"
+                onClick={() => setTermsActiveTab('disclaimer')}
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+                  termsActiveTab === 'disclaimer'
+                    ? 'bg-[#6344E7] text-white shadow-md shadow-purple-500/20'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Info size={16} />
+                <span>Disclaimer</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTermsActiveTab('guidelines')}
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+                  termsActiveTab === 'guidelines'
+                    ? 'bg-[#6344E7] text-white shadow-md shadow-purple-500/20'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <CheckSquare size={16} />
+                <span>Guidelines</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTermsActiveTab('tcs')}
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+                  termsActiveTab === 'tcs'
+                    ? 'bg-[#6344E7] text-white shadow-md shadow-purple-500/20'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <FileText size={16} />
+                <span>T&Cs</span>
+              </button>
+            </div>
+
+            {/* Lavender Content Box */}
+            <div className="rounded-3xl bg-[#F6F2FF] border border-purple-100/80 p-5 sm:p-6 text-left">
+              {termsActiveTab === 'disclaimer' && (
+                <>
+                  <div className="mb-3.5 text-[#6344E7]">
+                    <Info className="h-6 w-6 stroke-[2.2]" />
+                  </div>
+                  <ul className="space-y-3 text-xs sm:text-sm text-slate-800 font-medium leading-relaxed">
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span>Images are for reference only. Actual setup, layout, and decor may vary.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span>Space availability is subject to confirmation at the time of booking.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span>Pricing, offers, and amenities are subject to change without prior notice.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span>We are not liable for any loss, damage, or injury during the event.</span>
+                    </li>
+                  </ul>
+                </>
+              )}
+
+              {termsActiveTab === 'guidelines' && (
+                <>
+                  <div className="mb-3.5 text-[#6344E7]">
+                    <CheckSquare className="h-6 w-6 stroke-[2.2]" />
+                  </div>
+                  <ul className="space-y-3 text-xs sm:text-sm text-slate-800 font-medium leading-relaxed">
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span><strong>Pure Vegetarian Food Only:</strong> Non-vegetarian food, eggs, and alcohol are strictly prohibited inside the premises.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span><strong>Timings & Buffer:</strong> Entry is permitted 10 minutes prior to slot. Setup and wrap-up must be completed within the reserved hours.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span><strong>Sound & Noise:</strong> Loud music or heavy amplification must adhere to residential silence guidelines and conclude by 10:00 PM.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span><strong>Cleanliness & Care:</strong> Please treat art fixtures and equipment with respect. Any damages will be billed at actual replacement cost.</span>
+                    </li>
+                  </ul>
+                </>
+              )}
+
+              {termsActiveTab === 'tcs' && (
+                <>
+                  <div className="mb-3.5 text-[#6344E7]">
+                    <FileText className="h-6 w-6 stroke-[2.2]" />
+                  </div>
+                  <ul className="space-y-3 text-xs sm:text-sm text-slate-800 font-medium leading-relaxed">
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span><strong>Rescheduling Policy:</strong> Rescheduling requests made at least 48 hours prior to the slot are accommodated free of charge based on slot availability.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span><strong>Cancellation Policy:</strong> Cancellations made at least 48 hours prior receive an 80% refund or booking credit; non-refundable within 48 hours.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span><strong>Security & Conduct:</strong> Organizers and guests must maintain decorum and cooperate with security personnel throughout the event.</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#6344E7] mt-2 shrink-0" />
+                      <span><strong>Non-Transferable:</strong> Bookings cannot be sub-leased or transferred to external third parties without prior written approval.</span>
+                    </li>
+                  </ul>
+                </>
+              )}
+            </div>
+
+            {/* Bottom confirmation button */}
+            <button
+              type="button"
+              onClick={() => setShowTermsModal(false)}
+              className="w-full rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] py-3 text-xs sm:text-sm font-bold text-white transition cursor-pointer shadow-md shadow-purple-500/20"
+            >
+              I Understand
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

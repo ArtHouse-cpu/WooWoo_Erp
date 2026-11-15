@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { closeIfConfirmed } from "../utils/confirmClose";
 import { ThermalPrint, type ThermalPrintProps } from "./ThermalPrint";
 
 /** Must match `[data-invoice-pdf-root]` width in ThermalPrint (A4 @ 96dpi). */
@@ -68,7 +67,7 @@ export function InvoicePreviewModal({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") void closeIfConfirmed(onClose);
+      if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -110,7 +109,7 @@ export function InvoicePreviewModal({
           </button>
           <button
             type="button"
-            onClick={() => void closeIfConfirmed(onClose)}
+            onClick={onClose}
             className="rounded-lg bg-white/10 px-3 py-2 text-[12px] font-extrabold text-white transition hover:bg-white/20"
           >
             Close

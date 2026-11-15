@@ -24,6 +24,7 @@ import {
   ChevronRight,
   ChevronsRight,
   Check,
+  MoreVertical,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import Swal from "sweetalert2";
@@ -35,6 +36,7 @@ import CustomerDetailsModal from "@/features/network/components/CustomerDetailsM
 import Customer360Modal from "@/features/network/components/Customer360Modal";
 import Can from "@/components/rbac/Can";
 import { PERMISSIONS } from "@/constants/permissions";
+import { billingMembershipFromCustomer } from "@/features/sales/utils/membershipInvoiceUtils";
 import {
   customerPayloadToFormData,
   handleCreateCustomer,
@@ -89,6 +91,21 @@ function initials(name?: string) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
   return parts[0].slice(0, 2).toUpperCase();
+}
+
+function formatJoinedDate(dateStr?: string) {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "";
+  }
 }
 
 /** Smooth SVG Sparkline Graph */
@@ -204,6 +221,12 @@ export default function CustomerScreen() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsCustomer, setDetailsCustomer] = useState<CustomerRow | null>(null);
   const [customer360, setCustomer360] = useState<CustomerRow | null>(null);
+  const [actionMenuCustomerId, setActionMenuCustomerId] = useState<string | null>(null);
+
+  const handleToggleKpi = (filter: "all" | "visited_today") => {
+    setKpiFilter((prev) => (prev === filter ? "all" : filter));
+    setPageIndex(1);
+  };
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -551,7 +574,9 @@ export default function CustomerScreen() {
 
   return (
     <div className="p-3 sm:p-5 space-y-4 max-w-[1600px] mx-auto text-left">
-      {/* Top Header */}
+      {/* DESKTOP WEBVIEW (Hidden on mobile) */}
+      <div className="hidden md:block space-y-4">
+        {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#F5F3FF] text-[#7C3AED] shadow-xs">
@@ -1315,9 +1340,117 @@ export default function CustomerScreen() {
           </div>
         </div>
       </div>
+      </div>
 
-      {/* Mobile Card List View (Small Screens) */}
-      <div className="block md:hidden space-y-2.5">
+      {/* ========================================================================= */}
+      {/* MOBILE VIEW (Restored cleanly to original design) */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Header */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-semibold text-slate-900">Customers</h1>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Can permission={PERMISSIONS.CUSTOMER_CREATE}>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700 shadow-xs transition hover:bg-emerald-100 cursor-pointer"
+                onClick={() => setOpenImportModal(true)}
+                title="Import Spreadsheet"
+              >
+                <FileSpreadsheet size={14} className="shrink-0" />
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-blue-700 active:scale-95 cursor-pointer"
+                onClick={() => setOpenCreateCustomerModal(true)}
+              >
+                <span>+Add</span>
+              </button>
+            </Can>
+          </div>
+        </div>
+
+        {/* KPI Cards: Total Customers & Visited Today */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Total Customers Card */}
+          <button
+            type="button"
+            onClick={() => handleToggleKpi("all")}
+            className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition-all duration-200 cursor-pointer ${
+              kpiFilter === "all"
+                ? "border-blue-500 bg-blue-50/80 ring-2 ring-blue-400/30 shadow-xs"
+                : "border-slate-200/90 bg-white hover:border-blue-200 hover:bg-blue-50/30 hover:shadow-xs"
+            }`}
+          >
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                kpiFilter === "all"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-blue-50 text-blue-600"
+              }`}
+            >
+              <Users size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-bold tracking-tight text-slate-900 leading-none">
+                {loadingCustomers && !totalCustomersCount && rowCount === 0
+                  ? "..."
+                  : (totalCustomersCount || rowCount).toLocaleString("en-IN")}
+              </div>
+              <div className="mt-1 text-[11px] font-semibold text-slate-500 truncate">
+                Total Customers
+              </div>
+            </div>
+          </button>
+
+          {/* Visited Today Card */}
+          <button
+            type="button"
+            onClick={() => handleToggleKpi("visited_today")}
+            className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition-all duration-200 cursor-pointer ${
+              kpiFilter === "visited_today"
+                ? "border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-400/30 shadow-xs"
+                : "border-slate-200/90 bg-white hover:border-emerald-200 hover:bg-emerald-50/30 hover:shadow-xs"
+            }`}
+          >
+            <div
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                kpiFilter === "visited_today"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "bg-emerald-50 text-emerald-600"
+              }`}
+            >
+              <UserCheck size={18} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-base font-bold tracking-tight text-emerald-950 leading-none">
+                {loadingCustomers && visitedTodayCount === 0
+                  ? "..."
+                  : visitedTodayCount.toLocaleString("en-IN")}
+              </div>
+              <div className="mt-1 text-[11px] font-semibold text-emerald-700/80 truncate">
+                Visited Today
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Mobile Search Input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search customers..."
+            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs outline-none focus:border-slate-400"
+          />
+        </div>
+
+        {/* Customer Cards List */}
         {loadingCustomers && processedCustomers.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-xs text-slate-400">
             Loading customers...
@@ -1329,113 +1462,162 @@ export default function CustomerScreen() {
         ) : (
           processedCustomers.map((customer, idx) => {
             const palette = AVATAR_PALETTES[idx % AVATAR_PALETTES.length];
-            const membershipRaw = (customer.membershipType || "none").toLowerCase();
-            const isMember =
-              membershipRaw !== "none" && membershipRaw !== "" && !customer.membershipExpired;
             const membershipLabel =
-              membershipRaw === "none"
-                ? "Member"
-                : membershipRaw.charAt(0).toUpperCase() + membershipRaw.slice(1);
-            const userInitials = initials(customer.name);
+              billingMembershipFromCustomer(customer) ||
+              customer.membershipType ||
+              "Visitor";
+            const joined = formatJoinedDate(customer.createdAt);
             const phoneNum = String(customer.mobile || customer.whatsappNumber || "").trim();
+            const hasPhone = Boolean(phoneNum && phoneNum !== "—" && phoneNum !== "-");
+            const customerKey = customer._id || String(idx);
 
             return (
               <div
-                key={customer._id || `m-cust-${idx}`}
-                onClick={() => setCustomer360(customer)}
-                className="cursor-pointer rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs transition hover:border-slate-300 active:bg-slate-50/70"
+                key={customerKey}
+                onClick={() => {
+                  setCustomer360(customer);
+                }}
+                className="group relative flex flex-col justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs transition hover:border-blue-300 hover:shadow-md cursor-pointer active:scale-[0.99]"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black uppercase ${palette.bg} ${palette.text}`}
-                    >
-                      {userInitials}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-bold text-slate-900 truncate">
+                {/* Top: Avatar + Name + Membership + Joined Date */}
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${palette.bg} ${palette.text}`}
+                  >
+                    {initials(customer.name)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4
+                        className="text-sm font-bold text-slate-900 truncate transition group-hover:text-blue-600"
+                        title={customer.name}
+                      >
                         {customer.name || "Unnamed Customer"}
                       </h4>
-                      {phoneNum && (
-                        <p className="mt-0.5 text-xs text-slate-500 font-medium">
-                          {phoneNum}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {isMember ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/60">
-                      <Crown size={10} className="text-emerald-600 fill-emerald-600/20" />
-                      <span>{membershipLabel}</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                      Non-Member
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                  <div className="flex items-center gap-4 text-xs">
-                    <div>
-                      <span className="block text-[10px] font-medium uppercase text-slate-400">
-                        Wallet
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        ₹{Number(customer.walletAmount || 0).toLocaleString("en-IN")}
+                      <span className="inline-flex items-center rounded-full bg-violet-50 px-2.5 py-0.5 text-[10px] font-semibold text-violet-700 ring-1 ring-inset ring-violet-200/70">
+                        {membershipLabel}
                       </span>
                     </div>
-                    {Number(customer.dueAmount || 0) > 0 && (
-                      <div>
-                        <span className="block text-[10px] font-medium uppercase text-slate-400">
-                          Due
-                        </span>
-                        <span className="text-xs font-bold text-rose-600">
-                          ₹{Number(customer.dueAmount).toLocaleString("en-IN")}
-                        </span>
-                      </div>
+                    {joined && (
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        Joined {joined}
+                      </p>
                     )}
                   </div>
+                </div>
 
-                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                {/* Bottom: Phone Direct Contact + 3 Dots Action Menu */}
+                <div
+                  className="flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {hasPhone ? (
+                    <a
+                      href={`tel:${phoneNum.replace(/[^0-9+]/g, "")}`}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
+                      title={`Call ${phoneNum}`}
+                    >
+                      <Phone size={13} className="shrink-0 fill-emerald-600/20 text-emerald-600" />
+                      <span>{phoneNum}</span>
+                    </a>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                      <Phone size={12} className="text-slate-300" />
+                      <span>No phone</span>
+                    </span>
+                  )}
+
+                  {/* 3-Dots Action Menu */}
+                  <div className="relative shrink-0">
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedCustomer(customer);
-                        setOpenLedgerModal(true);
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActionMenuCustomerId(
+                          actionMenuCustomerId === customerKey ? null : customerKey,
+                        );
                       }}
-                      className="cursor-pointer rounded-lg bg-indigo-50 p-1.5 text-indigo-700 hover:bg-indigo-100"
-                      title="View Ledger"
+                      className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition active:scale-95 cursor-pointer"
+                      aria-label="Customer actions"
                     >
-                      <Eye size={15} />
+                      <MoreVertical size={16} />
                     </button>
-                    <Can permission={PERMISSIONS.CUSTOMER_UPDATE}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          setEditOpen(true);
-                        }}
-                        className="cursor-pointer rounded-lg bg-emerald-50 p-1.5 text-emerald-700 hover:bg-emerald-100"
-                        title="Edit Customer"
-                      >
-                        <SquarePen size={15} />
-                      </button>
-                    </Can>
-                    <Can permission={PERMISSIONS.CUSTOMER_DELETE}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const id = customer._id;
-                          if (id) void handleDelete(id);
-                        }}
-                        className="cursor-pointer rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100"
-                        title="Delete Customer"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </Can>
+
+                    {actionMenuCustomerId === customerKey && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-30"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActionMenuCustomerId(null);
+                          }}
+                        />
+                        <div
+                          className="absolute right-0 bottom-full z-40 mb-1.5 w-40 rounded-xl border border-slate-100 bg-white py-1 text-left shadow-xl animate-in fade-in zoom-in-95 duration-100"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActionMenuCustomerId(null);
+                              setSelectedCustomer(null);
+                              setOpenLedgerModal(false);
+                              setCustomer360(customer);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                          >
+                            <Eye size={14} className="text-slate-400" />
+                            <span>View 360 Details</span>
+                          </button>
+                          <Can permission={PERMISSIONS.CUSTOMER_UPDATE}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActionMenuCustomerId(null);
+                                setDetailsOpen(false);
+                                setSelectedCustomer(customer);
+                                setEditOpen(true);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                            >
+                              <SquarePen size={14} className="text-slate-400" />
+                              <span>Edit Customer</span>
+                            </button>
+                          </Can>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActionMenuCustomerId(null);
+                              setDetailsOpen(false);
+                              setDetailsCustomer(null);
+                              setSelectedCustomer(customer);
+                              setOpenLedgerModal(true);
+                            }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                          >
+                            <FileSpreadsheet size={14} className="text-slate-400" />
+                            <span>View Ledger</span>
+                          </button>
+                          <Can permission={PERMISSIONS.CUSTOMER_DELETE}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActionMenuCustomerId(null);
+                                if (customer._id) void handleDelete(customer._id);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer"
+                            >
+                              <Trash2 size={14} className="text-rose-500" />
+                              <span>Delete Customer</span>
+                            </button>
+                          </Can>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1454,7 +1636,7 @@ export default function CustomerScreen() {
                 type="button"
                 disabled={pageIndex === 1}
                 onClick={() => setPageIndex((p) => Math.max(1, p - 1))}
-                className="px-3 py-1 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40 cursor-pointer"
               >
                 Previous
               </button>
@@ -1462,7 +1644,7 @@ export default function CustomerScreen() {
                 type="button"
                 disabled={pageIndex === totalPages}
                 onClick={() => setPageIndex((p) => Math.min(totalPages, p + 1))}
-                className="px-3 py-1 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40 cursor-pointer"
               >
                 Next
               </button>

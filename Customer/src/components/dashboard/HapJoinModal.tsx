@@ -2,7 +2,6 @@ import {useEffect, useState, type FormEvent, type ReactNode} from 'react';
 import {ChevronDown, Clock, Link2, Users, X} from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 import Swal from 'sweetalert2';
-import {closeIfConfirmed} from '../../utils/confirmClose';
 import {useAuthStore} from '../../store/authStore';
 import {
   HAP_PROFESSIONS,
@@ -149,7 +148,7 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
               </div>
               <button
                 type="button"
-                onClick={() => void closeIfConfirmed(onClose)}
+                onClick={onClose}
                 className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100"
                 aria-label="Close"
               >
