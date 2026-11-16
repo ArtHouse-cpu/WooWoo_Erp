@@ -1,7 +1,7 @@
 import {api} from './axios';
 import {useAuthStore} from '../store/authStore';
 
-export type PortalEnquiryType = 'Space' | 'Store';
+export type PortalEnquiryType = 'Space' | 'Store' | 'Service';
 
 const recentSubmissions = new Map<string, number>();
 

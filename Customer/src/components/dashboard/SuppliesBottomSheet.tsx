@@ -1,4 +1,4 @@
-import {useEffect, useState, type ReactNode} from 'react';
+import {useEffect, useState, useMemo} from 'react';
 import {useNavigate} from 'react-router-dom';
 import axios from 'axios';
 import {
@@ -10,10 +10,12 @@ import {
   Truck,
   RotateCcw,
   Lock,
-  ShoppingCart,
   MessageCircle,
-  Search,
   Compass,
+  Sparkles,
+  BookOpen,
+  Palette,
+  Gift,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {recordPortalEnquiry} from '../../services/enquiry.service';
@@ -24,17 +26,19 @@ import {
 
 const SUPPLIES_WHATSAPP = '918073988123';
 
-function suppliesQueryUrl(product: {name: string; price: number; _id?: string; imageUrl?: string | null}) {
-  const text = [
-    'Hi, I would like to buy this product from WooWoo Art House.',
-    product.imageUrl ? `Image: ${product.imageUrl}` : '',
-    `Product name: ${product.name}`,
-    `Price: ₹${formatInr(product.price)}`,
-    product._id ? `Link: ${window.location.origin}/supplies/product/${encodeURIComponent(product._id)}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
-  return `https://wa.me/${SUPPLIES_WHATSAPP}?text=${encodeURIComponent(text)}`;
+function suppliesQueryUrl(product?: {name?: string; price?: number; _id?: string; imageUrl?: string | null} | null) {
+  if (product && product.name) {
+    const text = [
+      'Hi, I need to shop supplies from WooWoo Art House.',
+      `Product: ${product.name}`,
+      product.price ? `Price: ₹${formatInr(product.price)}` : '',
+      product._id ? `Link: ${window.location.origin}/supplies/product/${encodeURIComponent(product._id)}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    return `https://wa.me/${SUPPLIES_WHATSAPP}?text=${encodeURIComponent(text)}`;
+  }
+  return `https://wa.me/${SUPPLIES_WHATSAPP}?text=${encodeURIComponent('Hi, I need to shop supplies from WooWoo Art House.')}`;
 }
 
 function formatInr(value: number) {
@@ -46,25 +50,18 @@ function formatInr(value: number) {
 function ProductPhoto({
   src,
   alt,
-  fallback,
 }: {
-  src: string | null;
+  src: string | null | undefined;
   alt: string;
-  fallback?: ReactNode;
 }) {
   const [broken, setBroken] = useState(false);
-  if (!src || broken) {
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-[#F3E8FF] text-[#7C3AED]">
-        {fallback || <ShoppingBag className="h-6 w-6" />}
-      </div>
-    );
-  }
+  const fallbackImg = 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80';
+
   return (
     <img
-      src={src}
+      src={!broken && src ? src : fallbackImg}
       alt={alt}
-      className="h-full w-full object-cover"
+      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
       onError={() => setBroken(true)}
     />
   );
@@ -75,107 +72,315 @@ type SuppliesBottomSheetProps = {
   onClose: () => void;
 };
 
-type TabId = 'most-loved' | 'reviews' | 'new-arrivals';
+type SupplyCategory = 'all' | 'stationery' | 'art-craft' | 'handmade-gifts';
+
+// Curated authentic real supplies catalog
+const defaultSupplies: CustomerProduct[] = [
+  // Stationery
+  {
+    _id: 'stat-1',
+    name: 'Hardbound Dot Grid Journal',
+    brandName: 'WooWoo Stationery',
+    price: 499,
+    category: 'Stationery',
+    subCategory: 'Notebooks',
+    description: '160 GSM bleed-proof bamboo paper with gold foiled accents.',
+    unit: 'piece',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80'],
+  },
+  {
+    _id: 'stat-2',
+    name: 'Vintage Calligraphy Ink & Pen Set',
+    brandName: 'WooWoo Studio',
+    price: 899,
+    category: 'Stationery',
+    subCategory: 'Pens',
+    description: 'Hand-crafted brass dip pen with waterproof archival black ink.',
+    unit: 'set',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?auto=format&fit=crop&w=600&q=80'],
+  },
+  {
+    _id: 'stat-3',
+    name: 'Pastel Fineliner Drawing Pens (Set of 12)',
+    brandName: 'WooWoo Craft',
+    price: 349,
+    category: 'Stationery',
+    subCategory: 'Pens',
+    description: '0.4mm precise archival ink pens for sketching & journaling.',
+    unit: 'set',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?auto=format&fit=crop&w=600&q=80'],
+  },
+  {
+    _id: 'stat-4',
+    name: 'Minimalist Vegan Leather Desk Planner',
+    brandName: 'WooWoo Studio',
+    price: 649,
+    category: 'Stationery',
+    subCategory: 'Planners',
+    description: 'Undated yearly & monthly organizer with bookmark ribbons.',
+    unit: 'piece',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=600&q=80'],
+  },
+
+  // Art & Craft
+  {
+    _id: 'art-1',
+    name: 'Artist Heavy Body Acrylics (18 Colors)',
+    brandName: 'WooWoo Art',
+    price: 1199,
+    category: 'Art & Craft',
+    subCategory: 'Paints',
+    description: 'High pigment load artist quality acrylic paints with satin finish.',
+    unit: 'set',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80'],
+  },
+  {
+    _id: 'art-2',
+    name: 'Birchwood Professional Brush Collection',
+    brandName: 'WooWoo Art',
+    price: 599,
+    category: 'Art & Craft',
+    subCategory: 'Brushes',
+    description: '10-piece fine artist brushes for acrylics, oil & gouache.',
+    unit: 'set',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=600&q=80'],
+  },
+  {
+    _id: 'art-3',
+    name: 'Cotton Stretched Canvas Boards (Pack of 4)',
+    brandName: 'WooWoo Art',
+    price: 449,
+    category: 'Art & Craft',
+    subCategory: 'Canvases',
+    description: 'Triple gesso primed 380 GSM acid-free stretched canvas.',
+    unit: 'pack',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=600&q=80'],
+  },
+  {
+    _id: 'art-4',
+    name: 'Terracotta Air Dry Pottery Kit',
+    brandName: 'WooWoo Craft',
+    price: 799,
+    category: 'Art & Craft',
+    subCategory: 'Pottery',
+    description: '2kg natural clay, 8 wooden tools, sponge & water-resistant sealant.',
+    unit: 'kit',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&w=600&q=80'],
+  },
+  {
+    _id: 'art-5',
+    name: 'Travel Pocket Watercolor Tin (24 Colors)',
+    brandName: 'WooWoo Art',
+    price: 749,
+    category: 'Art & Craft',
+    subCategory: 'Watercolors',
+    description: 'Vibrant half-pan pigments with water reservoir brush & palette.',
+    unit: 'set',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=600&q=80'],
+  },
+
+  // Handmade Gifts
+  {
+    _id: 'gift-1',
+    name: 'Handcrafted Soy Wax Botanical Candle',
+    brandName: 'WooWoo Artisans',
+    price: 499,
+    category: 'Handmade Gifts',
+    subCategory: 'Candles',
+    description: 'Pure essential lavender oil with dried botanicals, 40hr burn.',
+    unit: 'piece',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=600&q=80'],
+  },
+  {
+    _id: 'gift-2',
+    name: 'Artisan Wheel-Thrown Ceramic Mug',
+    brandName: 'WooWoo Pottery',
+    price: 699,
+    category: 'Handmade Gifts',
+    subCategory: 'Ceramics',
+    description: 'Stoneware coffee mug with organic reactive speckle glaze.',
+    unit: 'piece',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80'],
+  },
+  {
+    _id: 'gift-3',
+    name: 'Boho Macrame Woven Wall Tapestry',
+    brandName: 'WooWoo Artisans',
+    price: 899,
+    category: 'Handmade Gifts',
+    subCategory: 'Home Decor',
+    description: 'Natural twisted unbleached cotton cord on driftwood branch.',
+    unit: 'piece',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?auto=format&fit=crop&w=600&q=80'],
+  },
+  {
+    _id: 'gift-4',
+    name: 'Pressed Wildflower Floral Resin Coasters',
+    brandName: 'WooWoo Artisans',
+    price: 549,
+    category: 'Handmade Gifts',
+    subCategory: 'Resin Art',
+    description: 'Set of 4 clear crystal coasters with real preserved garden blooms.',
+    unit: 'set',
+    discountType: 'flat',
+    discountValue: 0,
+    availability: 'in_stock',
+    imageUrl: 'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=600&q=80',
+    images: ['https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=600&q=80'],
+  },
+];
 
 export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabId>('most-loved');
+  const [activeCategory, setActiveCategory] = useState<SupplyCategory>('all');
   const [activeDot, setActiveDot] = useState(0);
-  const [products, setProducts] = useState<CustomerProduct[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [productsLoading, setProductsLoading] = useState(false);
-  const [productsError, setProductsError] = useState('');
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [apiProducts, setApiProducts] = useState<CustomerProduct[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<CustomerProduct | null>(null);
+
+  const categoryPills: {id: SupplyCategory; label: string; icon: any}[] = [
+    {id: 'all', label: 'All Supplies', icon: Sparkles},
+    {id: 'stationery', label: 'Stationery', icon: BookOpen},
+    {id: 'art-craft', label: 'Art & Craft', icon: Palette},
+    {id: 'handmade-gifts', label: 'Handmade Gifts', icon: Gift},
+  ];
 
   useEffect(() => {
     if (isOpen) return;
-    setSearch('');
-    setCategory('');
-    setSearchOpen(false);
     setSelectedProduct(null);
     setActiveDot(0);
+    setActiveCategory('all');
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
     const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      setProductsLoading(true);
-      setProductsError('');
-      fetchCustomerProducts(
-        {search, category, limit: 100},
-        controller.signal,
-      )
-        .then(result => {
-          setProducts(result.products);
-          if (result.categories.length) setCategories(result.categories);
-          setActiveDot(0);
-        })
-        .catch((error: unknown) => {
-          if (controller.signal.aborted || axios.isCancel(error)) return;
-          if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') return;
-          setProducts([]);
-          setProductsError('Could not load products.');
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setProductsLoading(false);
-        });
-    }, search.trim() ? 250 : 0);
+    fetchCustomerProducts({limit: 100}, controller.signal)
+      .then(result => {
+        setApiProducts(result.products || []);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || axios.isCancel(error)) return;
+        setApiProducts([]);
+      });
 
     return () => {
-      window.clearTimeout(timer);
       controller.abort();
     };
-  }, [isOpen, search, category]);
+  }, [isOpen]);
 
-  const visibleProducts = products;
+  // Merge API products with our rich real image defaults, ensuring real photography everywhere
+  const allProducts = useMemo(() => {
+    if (!apiProducts.length) return defaultSupplies;
+    const enrichedApi = apiProducts.map((p, idx) => ({
+      ...p,
+      imageUrl: p.imageUrl || defaultSupplies[idx % defaultSupplies.length].imageUrl,
+    }));
+    return [...enrichedApi, ...defaultSupplies];
+  }, [apiProducts]);
+
+  // Filter products by selected category pill
+  const displayedProducts = useMemo(() => {
+    if (activeCategory === 'all') return allProducts;
+    if (activeCategory === 'stationery') {
+      return allProducts.filter(
+        p =>
+          p.category?.toLowerCase().includes('stationery') ||
+          p.name?.toLowerCase().includes('journal') ||
+          p.name?.toLowerCase().includes('pen') ||
+          p.name?.toLowerCase().includes('planner')
+      );
+    }
+    if (activeCategory === 'art-craft') {
+      return allProducts.filter(
+        p =>
+          p.category?.toLowerCase().includes('art') ||
+          p.category?.toLowerCase().includes('craft') ||
+          p.name?.toLowerCase().includes('acrylic') ||
+          p.name?.toLowerCase().includes('brush') ||
+          p.name?.toLowerCase().includes('canvas') ||
+          p.name?.toLowerCase().includes('clay') ||
+          p.name?.toLowerCase().includes('color')
+      );
+    }
+    if (activeCategory === 'handmade-gifts') {
+      return allProducts.filter(
+        p =>
+          p.category?.toLowerCase().includes('gift') ||
+          p.category?.toLowerCase().includes('handmade') ||
+          p.name?.toLowerCase().includes('candle') ||
+          p.name?.toLowerCase().includes('mug') ||
+          p.name?.toLowerCase().includes('macrame') ||
+          p.name?.toLowerCase().includes('coaster')
+      );
+    }
+    return allProducts;
+  }, [allProducts, activeCategory]);
 
   const toggleProduct = (product: CustomerProduct) => {
-    setSearchOpen(false);
     setActiveDot(0);
     if (selectedProduct?._id === product._id) {
       setSelectedProduct(null);
-      if (search === selectedProduct.name) setSearch('');
       return;
     }
     setSelectedProduct(product);
   };
-  const queryText = search.trim().toLowerCase();
-  const suggestions = queryText
-    ? products
-        .filter(product => {
-          if (selectedProduct && product._id === selectedProduct._id && search === selectedProduct.name) {
-            return false;
-          }
-          return (
-            product.name.toLowerCase().includes(queryText) ||
-            product.brandName.toLowerCase().includes(queryText) ||
-            product.category.toLowerCase().includes(queryText)
-          );
-        })
-        .slice(0, 8)
-    : [];
 
-  const slides = (visibleProducts.some(product => product.imageUrl)
-    ? visibleProducts.filter(product => product.imageUrl)
-    : visibleProducts
-  ).slice(0, 8);
+  const slides = displayedProducts.slice(0, 8);
   const slideIndex = slides.length
     ? ((activeDot % slides.length) + slides.length) % slides.length
     : 0;
-  const featured = selectedProduct ?? slides[slideIndex];
+  const featured = selectedProduct ?? slides[slideIndex] ?? defaultSupplies[0];
   const sideProducts = slides
     .filter(product => product._id !== featured?._id)
     .slice(0, 4);
-
-  const tabs = [
-    {id: 'most-loved' as TabId, label: 'Most Loved'},
-    {id: 'reviews' as TabId, label: 'Reviews'},
-    {id: 'new-arrivals' as TabId, label: 'New Arrivals'},
-  ];
 
   return (
     <AnimatePresence>
@@ -203,19 +408,19 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
               <div className="h-1.5 w-12 rounded-full bg-[#E5E7EB]" />
             </div>
 
-            {/* Close Button & Header Info */}
-            <div className="relative shrink-0 px-5 pb-4 flex items-center justify-between">
+            {/* Header Info */}
+            <div className="relative shrink-0 px-5 pb-3.5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {/* Supplies Icon inside soft lavender rounded square */}
-                <div className="flex h-14 w-14 items-center justify-center rounded-[16px] bg-[#F3E8FF] text-[#7C3AED]">
-                  <ShoppingBag className="h-7 w-7" strokeWidth={2} />
+                <div className="flex h-13 w-13 items-center justify-center rounded-[16px] bg-[#F3E8FF] text-[#7C3AED]">
+                  <ShoppingBag className="h-6.5 w-6.5" strokeWidth={2} />
                 </div>
                 <div className="text-left">
                   <h3 className="text-[19px] font-extrabold tracking-tight text-[#111111] leading-tight">
                     Supplies
                   </h3>
-                  <p className="mt-0.5 text-[12px] font-bold text-[#6B7280]">
-                    Art materials & more
+                  <p className="mt-0.5 text-[11.5px] font-bold text-[#6B7280]">
+                    Stationery · Art & Craft · Handmade Gifts
                   </p>
                 </div>
               </div>
@@ -231,98 +436,28 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
               </button>
             </div>
 
-            <div className="shrink-0 px-5 mb-3">
-              <div className="flex gap-2">
-                <div className="relative min-w-0 flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9CA3AF]" />
-                  <input
-                    value={search}
-                    onChange={event => {
-                      setSearch(event.target.value);
-                      setSelectedProduct(null);
-                      setSearchOpen(true);
-                    }}
-                    onFocus={() => setSearchOpen(true)}
-                    placeholder="Search product"
-                    className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold text-[#111111] outline-none focus:border-[#EA580C]"
-                  />
-                </div>
-                <select
-                  value={category}
-                  onChange={event => {
-                    setCategory(event.target.value);
-                    setSelectedProduct(null);
-                    setSearch('');
-                    setSearchOpen(false);
-                  }}
-                  aria-label="Category"
-                  className="h-11 max-w-[42%] shrink-0 rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-[#111111] outline-none focus:border-[#EA580C]"
-                >
-                  <option value="">All categories</option>
-                  {categories.map(name => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {searchOpen && search.trim() && suggestions.length > 0 ? (
-                <ul className="mt-1 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
-                  {suggestions.map(product => (
-                    <li key={product._id}>
-                      <button
-                        type="button"
-                        onMouseDown={event => event.preventDefault()}
-                        onClick={() => {
-                          if (selectedProduct?._id === product._id) {
-                            setSelectedProduct(null);
-                            setSearch('');
-                          } else {
-                            setSelectedProduct(product);
-                            setSearch(product.name);
-                          }
-                          setSearchOpen(false);
-                          setActiveDot(0);
-                        }}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-[#FFF8F2]"
-                      >
-                        <span className="h-9 w-9 shrink-0 overflow-hidden rounded-lg">
-                          <ProductPhoto src={product.imageUrl} alt="" fallback={<ShoppingBag className="h-4 w-4" />} />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-[13px] font-extrabold text-[#111111]">
-                            {product.name}
-                          </span>
-                          <span className="block truncate text-[11px] font-bold text-[#6B7280]">
-                            {product.category || 'Supplies'} · ₹{formatInr(product.price)}
-                          </span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {searchOpen && search.trim() && !productsLoading && suggestions.length === 0 && !selectedProduct ? (
-                <p className="mt-1 px-1 text-[12px] font-bold text-[#9CA3AF]">No matching product.</p>
-              ) : null}
-            </div>
-
-            {/* Interactive Category Tabs */}
-            <div className="shrink-0 px-5 mb-4 flex gap-2.5 overflow-x-auto scrollbar-none">
-              {tabs.map(tab => {
-                const active = activeTab === tab.id;
+            {/* Category Filter Pills (Stationery, Art & Craft, Handmade Gifts) */}
+            <div className="shrink-0 px-5 mb-3.5 flex gap-2 overflow-x-auto scrollbar-none">
+              {categoryPills.map(pill => {
+                const active = activeCategory === pill.id;
+                const Icon = pill.icon;
                 return (
                   <button
-                    key={tab.id}
+                    key={pill.id}
                     type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`shrink-0 px-[18px] py-1.5 rounded-full border text-[13px] font-extrabold transition-all duration-200 ${
+                    onClick={() => {
+                      setActiveCategory(pill.id);
+                      setActiveDot(0);
+                      setSelectedProduct(null);
+                    }}
+                    className={`shrink-0 px-3.5 py-1.5 rounded-full border text-[12px] font-extrabold flex items-center gap-1.5 transition-all duration-200 ${
                       active
                         ? 'border-[#EA580C] bg-[#FFF8F2] text-[#EA580C]'
                         : 'border-slate-200 text-[#6B7280] hover:bg-slate-50'
                     }`}
                   >
-                    {tab.label}
+                    <Icon className="h-3.5 w-3.5" strokeWidth={active ? 2.5 : 2} />
+                    <span>{pill.label}</span>
                   </button>
                 );
               })}
@@ -330,123 +465,131 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
 
             {/* Scrollable Contents */}
             <div className="flex-1 overflow-y-auto pb-6">
-              {productsError ? (
-                <p className="px-5 mb-3 text-left text-[12px] font-bold text-red-500">
-                  {productsError}
-                </p>
-              ) : null}
-              {productsLoading && visibleProducts.length === 0 ? (
-                <p className="px-5 mb-4 text-[12px] font-bold text-[#9CA3AF]">Loading products…</p>
-              ) : visibleProducts.length === 0 ? (
-                <p className="px-5 mb-4 text-[12px] font-bold text-[#9CA3AF]">No products yet.</p>
-              ) : activeTab === 'reviews' ? (
-                <div className="flex flex-col items-center justify-center py-12 px-5 text-center text-[#6B7280]">
-                  <ShoppingBag className="h-12 w-12 text-slate-300 mb-3" />
-                  <p className="text-[14px] font-extrabold text-[#111111]">Supplies Reviews</p>
-                  <p className="mt-1 text-[12px]">Reviews will show here when customers leave them.</p>
-                </div>
-              ) : (
-                <>
-                  {activeTab === 'most-loved' && featured ? (
-                    <div className="px-5 mb-4">
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => featured && toggleProduct(featured)}
-                          className={`relative h-[255px] overflow-hidden rounded-[20px] border text-left shadow-xs ${
-                            sideProducts.length ? '' : 'col-span-2'
-                          } ${
-                            selectedProduct?._id === featured?._id
-                              ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
-                              : 'border-black/[0.05]'
-                          }`}
-                        >
-                          <ProductPhoto src={featured.imageUrl} alt={featured.name} />
-                          <div className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/35 to-transparent p-3.5 text-left">
-                            <h4 className="text-[13px] font-black text-white leading-tight line-clamp-2">
-                              {featured.name}
-                            </h4>
-                            <p className="mt-1 text-[9.5px] font-semibold text-white/80 leading-none">
-                              {featured.category || featured.brandName || 'Art supplies'} · ₹{formatInr(featured.price)}
-                            </p>
-                          </div>
-                        </button>
-                        {sideProducts.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2.5">
-                          {sideProducts.map(product => (
-                            <button
-                              key={product._id}
-                              type="button"
-                              onClick={() => toggleProduct(product)}
-                              className={`relative h-[122px] overflow-hidden rounded-[16px] border text-left ${
-                                selectedProduct?._id === product._id
-                                  ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
-                                  : 'border-black/[0.05]'
-                              }`}
-                            >
-                              <ProductPhoto src={product.imageUrl} alt={product.name} />
-                              <div className="absolute left-2 bottom-2 max-w-[90%] rounded-[6px] bg-black/60 px-2 py-0.5 text-[8px] font-black text-white">
-                                <span className="line-clamp-1">{product.name}</span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                        ) : null}
+              {/* Featured Hero Photo Mosaic */}
+              {featured && (
+                <div className="px-5 mb-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Featured big photo card */}
+                    <button
+                      type="button"
+                      onClick={() => toggleProduct(featured)}
+                      className={`group relative h-[250px] overflow-hidden rounded-[20px] border text-left shadow-xs transition-all ${
+                        sideProducts.length ? '' : 'col-span-2'
+                      } ${
+                        selectedProduct?._id === featured?._id
+                          ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
+                          : 'border-black/[0.05]'
+                      }`}
+                    >
+                      <ProductPhoto src={featured.imageUrl} alt={featured.name} />
+                      <div className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/35 to-transparent p-3.5 text-left">
+                        <span className="mb-1 inline-block w-fit rounded-[6px] bg-white/20 backdrop-blur-xs px-2 py-0.5 text-[8px] font-black uppercase text-white tracking-wider">
+                          {featured.category || 'Featured'}
+                        </span>
+                        <h4 className="text-[13px] font-black text-white leading-tight line-clamp-2">
+                          {featured.name}
+                        </h4>
+                        <p className="mt-1 text-[11px] font-extrabold text-white leading-none">
+                          ₹{formatInr(featured.price)}
+                        </p>
                       </div>
-                      {slides.length > 1 ? (
-                        <div className="flex justify-center gap-1.5 mt-3.5 mb-2">
-                          {slides.map((product, index) => (
-                            <button
-                              key={product._id}
-                              type="button"
-                              onClick={() => setActiveDot(index)}
-                              className={`h-1.5 rounded-full transition-all duration-200 ${
-                                slideIndex === index ? 'bg-[#EA580C] w-3' : 'w-1.5 bg-[#E5E7EB]'
-                              }`}
-                              aria-label={`Show ${product.name}`}
-                            />
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
+                    </button>
 
-                  <div className="px-5 mb-4">
-                    <h4 className="text-[15px] font-black text-[#111111] mb-3 text-left">
-                      {activeTab === 'new-arrivals' ? 'New Arrivals' : 'Products'}
-                    </h4>
-                    <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
-                      {visibleProducts.map(product => (
+                    {/* Side Products */}
+                    {sideProducts.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {sideProducts.map(product => (
+                          <button
+                            key={product._id}
+                            type="button"
+                            onClick={() => toggleProduct(product)}
+                            className={`group relative h-[119px] overflow-hidden rounded-[16px] border text-left transition-all ${
+                              selectedProduct?._id === product._id
+                                ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
+                                : 'border-black/[0.05]'
+                            }`}
+                          >
+                            <ProductPhoto src={product.imageUrl} alt={product.name} />
+                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 to-transparent" />
+                            <div className="absolute left-2 bottom-2 max-w-[90%] rounded-[6px] bg-black/60 px-2 py-0.5 text-[8px] font-black text-white">
+                              <span className="line-clamp-1">{product.name}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Pagination Dots for Hero Slides */}
+                  {slides.length > 1 ? (
+                    <div className="flex justify-center gap-1.5 mt-3 mb-2">
+                      {slides.map((product, index) => (
                         <button
                           key={product._id}
                           type="button"
-                          onClick={() => toggleProduct(product)}
-                          className={`w-[132px] shrink-0 overflow-hidden rounded-[16px] bg-[#F8FAFC] text-center ${
-                            selectedProduct?._id === product._id
-                              ? 'ring-2 ring-[#EA580C]'
-                              : ''
+                          onClick={() => setActiveDot(index)}
+                          className={`h-1.5 rounded-full transition-all duration-200 ${
+                            slideIndex === index ? 'bg-[#EA580C] w-3.5' : 'w-1.5 bg-[#E5E7EB]'
                           }`}
-                        >
-                          <div className="h-[84px] w-full overflow-hidden">
-                            <ProductPhoto src={product.imageUrl} alt={product.name} />
-                          </div>
-                          <div className="p-2.5">
-                            <p className="text-[11px] font-black text-[#111111] leading-tight line-clamp-2">
-                              {product.name}
-                            </p>
-                            <p className="mt-1 text-[12px] font-black text-[#7C3AED] leading-none">
-                              ₹{formatInr(product.price)}
-                            </p>
-                            <p className="mt-1 text-[8px] font-bold text-[#9CA3AF] line-clamp-1">
-                              {product.category || product.brandName || 'Supplies'}
-                            </p>
-                          </div>
-                        </button>
+                          aria-label={`Show ${product.name}`}
+                        />
                       ))}
                     </div>
-                  </div>
-                </>
+                  ) : null}
+                </div>
               )}
+
+              {/* Horizontally Scrollable Product Row */}
+              <div className="px-5 mb-4">
+                <div className="flex items-center justify-between mb-2.5">
+                  <h4 className="text-[14px] font-black text-[#111111] text-left">
+                    {activeCategory === 'stationery'
+                      ? 'Stationery Collection'
+                      : activeCategory === 'art-craft'
+                      ? 'Art & Craft Supplies'
+                      : activeCategory === 'handmade-gifts'
+                      ? 'Handmade Gifts'
+                      : 'All Supplies'}
+                  </h4>
+                  <span className="text-[11px] font-bold text-[#EA580C]">
+                    {displayedProducts.length} items
+                  </span>
+                </div>
+                <div className="flex gap-2.5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2">
+                  {displayedProducts.map(product => (
+                    <button
+                      key={product._id}
+                      type="button"
+                      onClick={() => toggleProduct(product)}
+                      className={`group w-[136px] shrink-0 snap-start overflow-hidden rounded-[18px] bg-white border text-left transition-all duration-200 cursor-pointer ${
+                        selectedProduct?._id === product._id
+                          ? 'border-[#EA580C] ring-2 ring-[#EA580C] shadow-md'
+                          : 'border-slate-100 shadow-2xs hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="relative h-[95px] w-full overflow-hidden bg-slate-100">
+                        <ProductPhoto src={product.imageUrl} alt={product.name} />
+                        {product.category && (
+                          <span className="absolute left-2 top-2 rounded-[5px] bg-black/60 px-1.5 py-0.5 text-[7px] font-black uppercase text-white tracking-wider backdrop-blur-xs">
+                            {product.category}
+                          </span>
+                        )}
+                      </div>
+                      <div className="p-2.5">
+                        <p className="text-[11px] font-black text-[#111111] leading-tight line-clamp-2">
+                          {product.name}
+                        </p>
+                        <p className="mt-1 text-[12.5px] font-black text-[#EA580C] leading-none">
+                          ₹{formatInr(product.price)}
+                        </p>
+                        <p className="mt-1 text-[8.5px] font-semibold text-[#6B7280] line-clamp-1">
+                          {product.description || product.category || 'Quality Supplies'}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Benefits Section */}
               <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-b border-slate-100 py-5 px-3 mb-5 mt-4">
@@ -469,7 +612,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                     <ShoppingBag className="h-5 w-5" strokeWidth={2} />
                   </div>
                   <h5 className="text-[12px] font-black text-[#111111] mt-2 leading-none">
-                    {visibleProducts.length > 0 ? `${visibleProducts.length} Products` : 'Products'}
+                    {displayedProducts.length > 0 ? `${displayedProducts.length} Items` : 'Products'}
                   </h5>
                   <p className="mt-1 text-[9px] text-[#9CA3AF] font-bold leading-tight">
                     Everything you need in one place
@@ -482,10 +625,10 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                     <Grid className="h-5 w-5" strokeWidth={2} />
                   </div>
                   <h5 className="text-[12px] font-black text-[#111111] mt-2 leading-none">
-                    50+ Categories
+                    Artisan Made
                   </h5>
                   <p className="mt-1 text-[9px] text-[#9CA3AF] font-bold leading-tight">
-                    Wide range to choose from
+                    Curated handmade gifts
                   </p>
                 </div>
               </div>
@@ -539,57 +682,37 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
               </div>
             </div>
 
-            {/* Bottom sticky CTA Buttons */}
+            {/* Bottom sticky CTA Buttons: Explore Supplies | Query Now */}
             <div className="sticky bottom-0 z-10 flex items-stretch gap-3 border-t border-slate-100 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {/* Explore Supplies Button */}
               <button
                 type="button"
-                aria-label="Explore supplies"
-                title="Explore supplies"
                 onClick={() => {
                   onClose();
                   navigate('/supplies');
                 }}
-                className="flex w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#111111] text-white transition hover:bg-slate-800"
-              >
-                <Compass className="h-5 w-5" strokeWidth={2.5} />
-              </button>
-              <div className="flex min-w-0 flex-1 gap-3">
-              {/* Order Online Button */}
-              <button
-                type="button"
                 className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
               >
-                <ShoppingCart className="h-4.5 w-4.5" strokeWidth={2.5} />
-                <span>Order Online</span>
+                <Compass className="h-4.5 w-4.5" strokeWidth={2.5} />
+                <span>Explore Supplies</span>
               </button>
 
-              {selectedProduct ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    recordPortalEnquiry({
-                      enquiryType: 'Store',
-                      itemName: selectedProduct.name,
-                      description: 'Customer asked about this product from the customer portal.',
-                    });
-                    window.open(suppliesQueryUrl(selectedProduct), '_blank', 'noopener,noreferrer');
-                  }}
-                  className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
-                >
-                  <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
-                  <span>Query Now</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled
-                  className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C]/40 text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 cursor-not-allowed"
-                >
-                  <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
-                  <span>Query Now</span>
-                </button>
-              )}
-              </div>
+              {/* Query Now Button (WhatsApp) */}
+              <button
+                type="button"
+                onClick={() => {
+                  recordPortalEnquiry({
+                    enquiryType: 'Store',
+                    itemName: selectedProduct ? selectedProduct.name : 'Supplies General Inquiry',
+                    description: 'Customer asked about shopping supplies from the customer portal.',
+                  });
+                  window.open(suppliesQueryUrl(selectedProduct), '_blank', 'noopener,noreferrer');
+                }}
+                className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
+              >
+                <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
+                <span>Query Now</span>
+              </button>
             </div>
           </motion.div>
         </div>

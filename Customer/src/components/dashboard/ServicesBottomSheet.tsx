@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useState, useRef, useMemo} from 'react';
 import {
   X,
   Calendar,
@@ -12,9 +12,10 @@ import {
   Sparkles,
   Clock,
   Lock,
-  Store,
+  MessageCircle,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
+import {ServiceQueryModal, type ServiceTypeCategory} from './ServiceQueryModal';
 
 type ServicesBottomSheetProps = {
   isOpen: boolean;
@@ -33,6 +34,27 @@ type ServiceItem = {
 export function ServicesBottomSheet({isOpen, onClose}: ServicesBottomSheetProps) {
   const [activeTab, setActiveTab] = useState<TabId>('creative-events');
   const [activeDot, setActiveDot] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [isQueryModalOpen, setIsQueryModalOpen] = useState(false);
+  const [selectedServiceForQuery, setSelectedServiceForQuery] = useState<{
+    category: ServiceTypeCategory;
+    name: string;
+  }>({
+    category: 'birthday',
+    name: '',
+  });
+
+  const openQueryModal = (name = '', cat?: ServiceTypeCategory) => {
+    const category: ServiceTypeCategory =
+      cat ||
+      (activeTab === 'classes'
+        ? 'classes'
+        : activeTab === 'photo-framing'
+        ? 'framing'
+        : 'birthday');
+    setSelectedServiceForQuery({category, name});
+    setIsQueryModalOpen(true);
+  };
 
   const tabs = [
     {id: 'creative-events' as TabId, label: 'Creative Events', icon: Calendar},
@@ -90,6 +112,88 @@ export function ServicesBottomSheet({isOpen, onClose}: ServicesBottomSheetProps)
       mediaType: 'image',
     },
   ];
+
+  const servicesMap: Record<TabId, ServiceItem[]> = {
+    'creative-events': creativeEventsServices,
+    'classes': [
+      {
+        id: 'c1',
+        title: 'Beginners Pottery Wheel Course',
+        image: 'https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&w=300&q=80',
+        mediaType: 'video',
+      },
+      {
+        id: 'c2',
+        title: 'Master Oil & Canvas Painting',
+        image: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=300&q=80',
+        mediaType: 'video',
+      },
+      {
+        id: 'c3',
+        title: 'Hand Calligraphy & Lettering',
+        image: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=300&q=80',
+        mediaType: 'image',
+      },
+      {
+        id: 'c4',
+        title: 'Digital Illustration on iPad',
+        image: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=300&q=80',
+        mediaType: 'image',
+      },
+    ],
+    'photo-framing': [
+      {
+        id: 'f1',
+        title: 'Custom Natural Teak Wood Framing',
+        image: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=300&q=80',
+        mediaType: 'image',
+      },
+      {
+        id: 'f2',
+        title: 'Minimal Museum Glass Float Frame',
+        image: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=300&q=80',
+        mediaType: 'image',
+      },
+      {
+        id: 'f3',
+        title: 'Heavy Gallery Canvas Stretcher Bars',
+        image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=300&q=80',
+        mediaType: 'image',
+      },
+      {
+        id: 'f4',
+        title: 'Architectural Shadowbox Acrylic Frame',
+        image: 'https://images.unsplash.com/photo-1499783300057-475a43b27b6a?auto=format&fit=crop&w=300&q=80',
+        mediaType: 'image',
+      },
+    ],
+  };
+
+  const displayedServices = useMemo(() => {
+    return servicesMap[activeTab] || creativeEventsServices;
+  }, [activeTab]);
+
+  const dotsCount = Math.min(5, displayedServices.length);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const {scrollLeft, scrollWidth, clientWidth} = scrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) return;
+    const progress = scrollLeft / maxScroll;
+    const dotIndex = Math.min(dotsCount - 1, Math.max(0, Math.round(progress * (dotsCount - 1))));
+    setActiveDot(dotIndex);
+  };
+
+  const scrollToDot = (idx: number) => {
+    setActiveDot(idx);
+    if (!scrollRef.current) return;
+    const {scrollWidth, clientWidth} = scrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) return;
+    const targetScroll = (idx / (dotsCount - 1)) * maxScroll;
+    scrollRef.current.scrollTo({left: targetScroll, behavior: 'smooth'});
+  };
 
   return (
     <AnimatePresence>
@@ -172,7 +276,11 @@ export function ServicesBottomSheet({isOpen, onClose}: ServicesBottomSheetProps)
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setActiveDot(0);
+                      scrollRef.current?.scrollTo({left: 0, behavior: 'auto'});
+                    }}
                     className={`shrink-0 px-[16px] py-1.5 rounded-full border text-[13px] font-extrabold flex items-center gap-1.5 transition-all duration-200 ${
                       active
                         ? 'border-[#EA580C] bg-[#FFF8F2] text-[#EA580C]'
@@ -188,17 +296,22 @@ export function ServicesBottomSheet({isOpen, onClose}: ServicesBottomSheetProps)
 
             {/* Scrollable Contents */}
             <div className="flex-1 overflow-y-auto pb-6">
-              {activeTab === 'creative-events' ? (
+              {displayedServices.length > 0 ? (
                 <>
-                  {/* Responsive 4-Column Image Grid */}
-                  <div className="px-5 mb-4">
-                    <div className="grid grid-cols-4 gap-2">
-                      {creativeEventsServices.map(service => {
+                  {/* Horizontally Scrollable Service Cards */}
+                  <div className="mb-4">
+                    <div
+                      ref={scrollRef}
+                      onScroll={handleScroll}
+                      className="flex gap-2.5 overflow-x-auto scrollbar-none snap-x snap-mandatory px-5 pb-2 pt-0.5"
+                    >
+                      {displayedServices.map(service => {
                         const isVideo = service.mediaType === 'video';
                         return (
                           <div
                             key={service.id}
-                            className="relative h-[120px] overflow-hidden rounded-[16px] border border-black/[0.05] shadow-2xs group cursor-pointer"
+                            onClick={() => openQueryModal(service.title)}
+                            className="relative h-[155px] w-[120px] sm:h-[170px] sm:w-[130px] shrink-0 snap-start overflow-hidden rounded-[18px] border border-black/[0.05] shadow-2xs group cursor-pointer"
                           >
                             <img
                               src={service.image}
@@ -206,16 +319,16 @@ export function ServicesBottomSheet({isOpen, onClose}: ServicesBottomSheetProps)
                               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                             />
                             {/* Overlay content */}
-                            <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/30 to-transparent p-2 text-left">
+                            <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/90 via-black/35 to-transparent p-2.5 text-left">
                               {/* Media Icon Indicator */}
-                              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white border border-white/40 mb-1 backdrop-blur-xs">
+                              <div className="flex h-6.5 w-6.5 items-center justify-center rounded-full bg-white/20 text-white border border-white/40 mb-1.5 backdrop-blur-xs">
                                 {isVideo ? (
                                   <Play className="h-2.5 w-2.5 fill-white text-white ml-0.5" />
                                 ) : (
                                   <ImageIcon className="h-2.5 w-2.5 text-white" />
                                 )}
                               </div>
-                              <p className="text-[7.5px] sm:text-[8px] font-black text-white leading-tight line-clamp-2">
+                              <p className="text-[8.5px] sm:text-[9px] font-black text-white leading-tight line-clamp-2">
                                 {service.title}
                               </p>
                             </div>
@@ -225,19 +338,21 @@ export function ServicesBottomSheet({isOpen, onClose}: ServicesBottomSheetProps)
                     </div>
 
                     {/* Pagination Dots */}
-                    <div className="flex justify-center gap-1.5 mt-4 mb-2">
-                      {[0, 1, 2, 3, 4].map(idx => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setActiveDot(idx)}
-                          className={`h-1.5 w-1.5 rounded-full transition-all duration-200 ${
-                            activeDot === idx ? 'bg-[#EA580C] w-3' : 'bg-[#E5E7EB]'
-                          }`}
-                          aria-label={`Go to slide ${idx + 1}`}
-                        />
-                      ))}
-                    </div>
+                    {dotsCount > 1 && (
+                      <div className="flex justify-center gap-1.5 mt-3 mb-2">
+                        {Array.from({length: dotsCount}).map((_, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => scrollToDot(idx)}
+                            className={`h-1.5 rounded-full transition-all duration-200 ${
+                              activeDot === idx ? 'bg-[#EA580C] w-3.5' : 'bg-[#E5E7EB] w-1.5'
+                            }`}
+                            aria-label={`Go to slide ${idx + 1}`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
@@ -347,24 +462,34 @@ export function ServicesBottomSheet({isOpen, onClose}: ServicesBottomSheetProps)
               {/* Book Now Button */}
               <button
                 type="button"
+                onClick={() => openQueryModal()}
                 className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
               >
                 <Calendar className="h-4.5 w-4.5" strokeWidth={2.5} />
                 <span>Book Now</span>
               </button>
 
-              {/* Visit Today Button */}
+              {/* Query Now Button (Replaces Visit Today) */}
               <button
                 type="button"
+                onClick={() => openQueryModal()}
                 className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
               >
-                <Store className="h-4.5 w-4.5" strokeWidth={2.5} />
-                <span>Visit Today</span>
+                <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
+                <span>Query Now</span>
               </button>
             </div>
           </motion.div>
         </div>
       )}
+
+      {/* Service Query Lead Modal */}
+      <ServiceQueryModal
+        isOpen={isQueryModalOpen}
+        onClose={() => setIsQueryModalOpen(false)}
+        initialCategory={selectedServiceForQuery.category}
+        initialServiceName={selectedServiceForQuery.name}
+      />
     </AnimatePresence>
   );
 }

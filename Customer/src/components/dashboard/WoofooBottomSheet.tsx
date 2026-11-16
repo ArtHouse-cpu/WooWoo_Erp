@@ -386,6 +386,13 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
               {/* Visit Today Button */}
               <button
                 type="button"
+                onClick={() =>
+                  window.open(
+                    'https://www.instagram.com/p/Dft-yx6EZML/?img_index=16&cplk=MXVwNnVtNmtmeDlscw==',
+                    '_blank',
+                    'noopener,noreferrer'
+                  )
+                }
                 className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
               >
                 <Store className="h-4.5 w-4.5" strokeWidth={2.5} />

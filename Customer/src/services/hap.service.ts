@@ -14,6 +14,32 @@ export const HAP_PROFESSIONS = [
   'Other',
 ] as const;
 
+export const HAP_NETWORK_RANGES = [
+  '20+',
+  '50+',
+  '100+',
+  '250+',
+  '500+',
+  '1,000+',
+  '2,500+',
+  '5,000+',
+  '10,000+',
+  '25,000+',
+  '50,000+',
+  '100,000+',
+  '500,000+',
+  '1M+',
+] as const;
+
+export const HAP_PROMOTION_CHANNELS = [
+  'Instagram',
+  'WhatsApp',
+  'Offline Community',
+  'College / Campus',
+  'Word of Mouth',
+  'Other',
+] as const;
+
 export type HapApplication = {
   _id: string;
   customerId: string;
@@ -21,9 +47,10 @@ export type HapApplication = {
   email?: string;
   mobile?: string;
   profession: string;
-  networkSize: number;
-  payoutDetail: string;
+  networkSize: number | string;
+  payoutDetail?: string;
   presence: string;
+  promotionChannels?: string[];
   status: HapApplicationStatus;
   rejectionReason?: string;
   createdAt?: string;
@@ -32,9 +59,10 @@ export type HapApplication = {
 export type HapApplyPayload = {
   customerId: string;
   profession: string;
-  networkSize: number;
-  payoutDetail: string;
+  networkSize: string | number;
+  payoutDetail?: string;
   presence: string;
+  promotionChannels?: string[];
 };
 
 export const hapApi = {

@@ -459,21 +459,21 @@ export default function SpacesMarketplacePage() {
             </button>
           </div>
         ) : loading ? (
-          <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:gap-6">
+          <div className="grid grid-cols-2 gap-2 min-[360px]:gap-3 sm:gap-5 lg:gap-6">
             {Array.from({length: 6}).map((_, index) => (
               <div
                 key={index}
-                className="overflow-hidden rounded-[24px] sm:rounded-[36px] border border-slate-100 bg-white p-2.5 sm:p-4 shadow-xs"
+                className="overflow-hidden rounded-[20px] min-[360px]:rounded-[24px] sm:rounded-[36px] border border-slate-100 bg-white p-2 min-[360px]:p-2.5 sm:p-4 shadow-xs"
               >
-                <div className="aspect-4/3 w-full animate-pulse rounded-[18px] sm:rounded-[26px] bg-slate-100" />
-                <div className="mt-3 sm:mt-4 space-y-2 sm:space-y-2.5">
-                  <div className="h-5 sm:h-6 w-3/4 animate-pulse rounded-lg bg-slate-100" />
-                  <div className="h-4 sm:h-5 w-20 sm:w-24 animate-pulse rounded-xl bg-slate-100" />
-                  <div className="flex items-center justify-between pt-2">
-                    <div className="h-6 sm:h-8 w-16 sm:w-28 animate-pulse rounded-lg bg-slate-100" />
-                    <div className="flex gap-1.5 sm:gap-2">
-                      <div className="h-7 w-7 sm:h-10 sm:w-10 animate-pulse rounded-full bg-slate-100" />
-                      <div className="h-7 w-14 sm:h-10 sm:w-24 animate-pulse rounded-xl sm:rounded-2xl bg-slate-100" />
+                <div className="aspect-4/3 w-full animate-pulse rounded-[16px] min-[360px]:rounded-[18px] sm:rounded-[26px] bg-slate-100" />
+                <div className="mt-2.5 sm:mt-4 space-y-2 sm:space-y-2.5">
+                  <div className="h-4 sm:h-6 w-3/4 animate-pulse rounded-lg bg-slate-100" />
+                  <div className="h-3.5 sm:h-5 w-16 sm:w-24 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="flex flex-nowrap items-center justify-between pt-1.5 sm:pt-2 gap-1 sm:gap-2">
+                    <div className="h-5 sm:h-8 w-12 sm:w-28 animate-pulse rounded-lg bg-slate-100" />
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                      <div className="h-6 w-6 min-[360px]:h-7 min-[360px]:w-7 sm:h-10 sm:w-10 animate-pulse rounded-full bg-slate-100" />
+                      <div className="h-6 w-11 min-[360px]:h-7 min-[360px]:w-14 sm:h-10 sm:w-24 animate-pulse rounded-lg sm:rounded-2xl bg-slate-100" />
                     </div>
                   </div>
                 </div>
@@ -486,7 +486,7 @@ export default function SpacesMarketplacePage() {
             <p className="mt-1 text-sm font-semibold text-slate-500">Try another search or filter.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:gap-6">
+          <div className="grid grid-cols-2 gap-2 min-[360px]:gap-3 sm:gap-5 lg:gap-6">
             {visible.map(space => {
               const cardImages =
                 space.images?.length > 0 ? space.images : space.imageUrl ? [space.imageUrl] : [];
@@ -495,7 +495,7 @@ export default function SpacesMarketplacePage() {
                 <div
                   key={space.id}
                   onClick={() => setSelected(space)}
-                  className="group flex flex-col justify-between overflow-hidden rounded-[24px] sm:rounded-[36px] border border-slate-100 bg-white p-2.5 sm:p-4 text-left shadow-xs transition hover:-translate-y-1 hover:shadow-md cursor-pointer"
+                  className="group flex flex-col justify-between overflow-hidden rounded-[20px] min-[360px]:rounded-[24px] sm:rounded-[36px] border border-slate-100 bg-white p-2 min-[360px]:p-2.5 sm:p-4 text-left shadow-xs transition hover:-translate-y-1 hover:shadow-md cursor-pointer"
                 >
                   <div>
                     {/* Space Image Container with scrollable images */}
@@ -503,12 +503,12 @@ export default function SpacesMarketplacePage() {
                       images={cardImages}
                       alt={space.name}
                       aspectRatio="aspect-4/3"
-                      roundedClassName="rounded-[18px] sm:rounded-[26px]"
+                      roundedClassName="rounded-[16px] min-[360px]:rounded-[18px] sm:rounded-[26px]"
                       onImageClick={() => setSelected(space)}
                       badge={
-                        <div className="pointer-events-none absolute right-2 top-2 sm:right-3 sm:top-3 z-10">
-                          <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full bg-[#EAF8F1] backdrop-blur-xs px-2 sm:px-3.5 py-0.5 sm:py-1.5 text-[10px] sm:text-sm font-bold text-[#16A34A] shadow-xs">
-                            <Users size={12} className="shrink-0 text-[#16A34A] stroke-[2.2] sm:w-[15px] sm:h-[15px]" />
+                        <div className="pointer-events-none absolute right-1.5 top-1.5 sm:right-3 sm:top-3 z-10">
+                          <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full bg-[#EAF8F1] backdrop-blur-xs px-1.5 min-[360px]:px-2 sm:px-3.5 py-0.5 sm:py-1.5 text-[9px] min-[360px]:text-[10px] sm:text-sm font-bold text-[#16A34A] shadow-xs">
+                            <Users size={11} className="shrink-0 text-[#16A34A] stroke-[2.2] sm:w-[15px] sm:h-[15px]" />
                             <span>
                               {space.capacity > 0
                                 ? `${space.capacity} people`
@@ -522,9 +522,9 @@ export default function SpacesMarketplacePage() {
                     />
 
                     {/* Space Title */}
-                    <div className="mt-2.5 sm:mt-4">
+                    <div className="mt-2 sm:mt-4">
                       <h3
-                        className="truncate font-display text-sm sm:text-lg lg:text-xl font-black text-[#111827] tracking-tight"
+                        className="truncate font-display text-xs min-[360px]:text-sm sm:text-lg lg:text-xl font-black text-[#111827] tracking-tight"
                         title={space.name}
                       >
                         {space.name}
@@ -532,9 +532,9 @@ export default function SpacesMarketplacePage() {
                     </div>
 
                     {/* Category Pill */}
-                    <div className="mt-1.5 sm:mt-2 flex items-center">
-                      <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-2xl bg-[#F3E8FF] px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-sm font-bold text-[#7C3AED]">
-                        <Building2 size={12} className="shrink-0 text-[#7C3AED] sm:w-[15px] sm:h-[15px]" />
+                    <div className="mt-1 sm:mt-2 flex items-center">
+                      <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-md min-[360px]:rounded-lg sm:rounded-2xl bg-[#F3E8FF] px-1.5 min-[360px]:px-2 sm:px-3 py-0.5 sm:py-1 text-[9px] min-[360px]:text-[10px] sm:text-sm font-bold text-[#7C3AED]">
+                        <Building2 size={11} className="shrink-0 text-[#7C3AED] sm:w-[15px] sm:h-[15px]" />
                         <span className="truncate">
                           {space.category || space.spaceType || 'Studio'}
                         </span>
@@ -542,35 +542,35 @@ export default function SpacesMarketplacePage() {
                     </div>
                   </div>
 
-                  {/* Bottom Row (Price and Actions) */}
-                  <div className="mt-2.5 sm:mt-5 flex flex-wrap items-center justify-between gap-1.5 sm:gap-2 pt-1.5 sm:pt-2 border-t border-slate-50">
-                    <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+                  {/* Bottom Row (Price and Actions) - Always 1 row, never wraps */}
+                  <div className="mt-2 sm:mt-5 flex flex-nowrap items-center justify-between gap-1 sm:gap-2 pt-1.5 sm:pt-2 border-t border-slate-50 min-w-0">
+                    <div className="flex items-center gap-1 sm:gap-2.5 min-w-0 flex-1">
                       <div className="min-w-0">
-                        <span className="text-[10px] sm:text-xs font-semibold text-slate-500 block leading-tight">
+                        <span className="text-[9px] min-[360px]:text-[10px] sm:text-xs font-semibold text-slate-500 block leading-tight">
                           From
                         </span>
-                        <div className="flex items-baseline gap-0.5 sm:gap-1 mt-0.5">
-                          <span className="text-sm sm:text-xl lg:text-2xl font-black text-[#111827] tracking-tight">
+                        <div className="flex items-baseline gap-0.5 mt-0.5 min-w-0">
+                          <span className="text-[11px] min-[360px]:text-xs min-[400px]:text-sm sm:text-xl lg:text-2xl font-black text-[#111827] tracking-tight truncate leading-tight">
                             ₹{formatInr(space.fromPrice)}
                           </span>
-                          <span className="text-[10px] sm:text-xs font-bold text-slate-500">/hr</span>
+                          <span className="text-[8px] min-[360px]:text-[9px] min-[400px]:text-[10px] sm:text-xs font-bold text-slate-500 shrink-0 leading-tight">/hr</span>
                         </div>
                       </div>
                       <div className="h-6 sm:h-8 w-px bg-slate-200 shrink-0 hidden sm:block" />
                     </div>
 
-                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                    <div className="flex items-center gap-1 min-[360px]:gap-1.5 sm:gap-2 shrink-0">
                       <button
                         type="button"
                         onClick={e => {
                           e.stopPropagation();
                           void handleShare(space);
                         }}
-                        className="flex h-7 w-7 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#7C3AED] transition active:scale-95 cursor-pointer shrink-0"
+                        className="flex h-6 w-6 min-[360px]:h-7 min-[360px]:w-7 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#7C3AED] transition active:scale-95 cursor-pointer shrink-0"
                         title="Share space"
                         aria-label="Share space"
                       >
-                        <Share2 size={13} className="sm:w-[17px] sm:h-[17px] stroke-[2.2]" />
+                        <Share2 className="w-2.5 h-2.5 min-[360px]:w-3 min-[360px]:h-3 sm:w-[17px] sm:h-[17px] stroke-[2.2]" />
                       </button>
                       <button
                         type="button"
@@ -578,9 +578,9 @@ export default function SpacesMarketplacePage() {
                           e.stopPropagation();
                           handleBook(space);
                         }}
-                        className="inline-flex items-center justify-center gap-1 sm:gap-2 rounded-xl sm:rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] px-2.5 sm:px-4 py-1.5 sm:py-2.5 text-[11px] sm:text-sm font-bold text-white shadow-xs sm:shadow-md sm:shadow-purple-500/25 transition active:scale-95 cursor-pointer shrink-0"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg min-[360px]:rounded-xl sm:rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] px-1.5 min-[360px]:px-2.5 sm:px-4 py-1 min-[360px]:py-1.5 sm:py-2.5 text-[9px] min-[360px]:text-[11px] sm:text-sm font-bold text-white shadow-xs sm:shadow-md sm:shadow-purple-500/25 transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
                       >
-                        <CalendarCheck size={12} className="sm:w-[17px] sm:h-[17px] stroke-[2.2]" />
+                        <CalendarCheck className="w-2.5 h-2.5 min-[360px]:w-3 min-[360px]:h-3 sm:w-[17px] sm:h-[17px] stroke-[2.2]" />
                         <span>Book</span>
                       </button>
                     </div>
