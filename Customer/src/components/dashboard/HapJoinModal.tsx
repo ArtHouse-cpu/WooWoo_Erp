@@ -1,10 +1,12 @@
 import {useEffect, useState, type FormEvent, type ReactNode} from 'react';
-import {ChevronDown, Clock, Link2, Users, X} from 'lucide-react';
+import {Check, ChevronDown, Clock, Globe, Users, X} from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 import Swal from 'sweetalert2';
 import {useAuthStore} from '../../store/authStore';
 import {
+  HAP_NETWORK_RANGES,
   HAP_PROFESSIONS,
+  HAP_PROMOTION_CHANNELS,
   hapApi,
   type HapApplication,
 } from '../../services/hap.service';
@@ -19,8 +21,11 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
   const customer = useAuthStore(state => state.customer);
   const [profession, setProfession] = useState('');
   const [networkSize, setNetworkSize] = useState('');
-  const [payoutDetail, setPayoutDetail] = useState('');
   const [presence, setPresence] = useState('');
+  const [promotionChannels, setPromotionChannels] = useState<string[]>([
+    'Instagram',
+    'WhatsApp',
+  ]);
   const [existing, setExisting] = useState<HapApplication | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -29,8 +34,8 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
     if (!isOpen) return;
     setProfession('');
     setNetworkSize('');
-    setPayoutDetail('');
     setPresence('');
+    setPromotionChannels(['Instagram', 'WhatsApp']);
     let cancelled = false;
     setLoading(true);
     hapApi
@@ -42,8 +47,13 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
         if (row?.status === 'rejected') {
           setProfession(row.profession || '');
           setNetworkSize(row.networkSize ? String(row.networkSize) : '');
-          setPayoutDetail(row.payoutDetail || '');
           setPresence(row.presence || '');
+          if (
+            Array.isArray(row.promotionChannels) &&
+            row.promotionChannels.length > 0
+          ) {
+            setPromotionChannels(row.promotionChannels);
+          }
         }
       })
       .catch(() => {
@@ -60,6 +70,14 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
   const waiting = existing?.status === 'under_review';
   const approved = existing?.status === 'approved';
 
+  const togglePromotionChannel = (channel: string) => {
+    setPromotionChannels(prev =>
+      prev.includes(channel)
+        ? prev.filter(c => c !== channel)
+        : [...prev, channel],
+    );
+  };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (waiting || approved) return;
@@ -72,24 +90,15 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
       });
       return;
     }
-    const size = Number(networkSize);
     if (!profession) {
       Swal.fire({icon: 'warning', title: 'Select a profession', confirmButtonColor: '#7C3AED'});
       return;
     }
-    if (!Number.isInteger(size) || size < 1) {
+    if (!networkSize) {
       Swal.fire({
         icon: 'warning',
-        title: 'Enter your network size',
-        text: 'Use a whole number of at least 1.',
-        confirmButtonColor: '#7C3AED',
-      });
-      return;
-    }
-    if (payoutDetail.trim().length < 4) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'UPI ID or account number is required',
+        title: 'Select network size',
+        text: 'Please select your network size range from the dropdown.',
         confirmButtonColor: '#7C3AED',
       });
       return;
@@ -97,7 +106,17 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
     if (presence.trim().length < 3) {
       Swal.fire({
         icon: 'warning',
-        title: 'Website or social media is required',
+        title: 'Portfolio / Profile link required',
+        text: 'Please enter your Atives Prosite URL, Instagram URL, or other profile URL.',
+        confirmButtonColor: '#7C3AED',
+      });
+      return;
+    }
+    if (promotionChannels.length === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Promotion channels required',
+        text: "Please select at least one way you'll promote WooWoo.",
         confirmButtonColor: '#7C3AED',
       });
       return;
@@ -108,9 +127,9 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
       const {data} = await hapApi.apply({
         customerId: customer._id,
         profession,
-        networkSize: size,
-        payoutDetail: payoutDetail.trim(),
+        networkSize,
         presence: presence.trim(),
+        promotionChannels,
       });
       setExisting(data.data);
       onSubmitted?.(data.data);
@@ -149,7 +168,7 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100"
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 cursor-pointer"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
@@ -178,13 +197,18 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
                     <dl className="mt-4 space-y-2 text-left text-xs">
                       <Detail label="Profession" value={existing.profession} />
                       <Detail label="Network size" value={String(existing.networkSize)} />
-                      <Detail label="UPI / account" value={existing.payoutDetail} />
-                      <Detail label="Website / social" value={existing.presence} />
+                      <Detail label="Portfolio / Profile" value={existing.presence} />
+                      {existing.promotionChannels?.length ? (
+                        <Detail
+                          label="Promote via"
+                          value={existing.promotionChannels.join(', ')}
+                        />
+                      ) : null}
                     </dl>
                   ) : null}
                 </div>
               ) : (
-                <form id="hap-join-form" onSubmit={handleSubmit} className="space-y-3">
+                <form id="hap-join-form" onSubmit={handleSubmit} className="space-y-3.5">
                   {existing?.status === 'rejected' ? (
                     <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700">
                       Previous application was rejected.
@@ -195,12 +219,13 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
                     </div>
                   ) : null}
 
+                  {/* 1. Profession */}
                   <Field label="Profession">
                     <div className="relative">
                       <select
                         value={profession}
                         onChange={event => setProfession(event.target.value)}
-                        className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500"
+                        className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500 cursor-pointer shadow-2xs"
                       >
                         <option value="">Select profession</option>
                         {HAP_PROFESSIONS.map(item => (
@@ -213,39 +238,72 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
                     </div>
                   </Field>
 
+                  {/* 2. Network Size (Dropdown Range) */}
                   <Field label="Network size">
-                    <input
-                      inputMode="numeric"
-                      value={networkSize}
-                      onChange={event =>
-                        setNetworkSize(event.target.value.replace(/[^\d]/g, ''))
-                      }
-                      placeholder="How many people can you reach?"
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500"
-                    />
-                  </Field>
-
-                  <Field label="UPI ID or account number">
-                    <input
-                      value={payoutDetail}
-                      onChange={event => setPayoutDetail(event.target.value)}
-                      placeholder="name@upi or account number"
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500"
-                      autoComplete="off"
-                    />
-                  </Field>
-
-                  <Field label="Website or social media">
                     <div className="relative">
-                      <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <select
+                        value={networkSize}
+                        onChange={event => setNetworkSize(event.target.value)}
+                        className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500 cursor-pointer shadow-2xs"
+                      >
+                        <option value="">Select network size range</option>
+                        {HAP_NETWORK_RANGES.map(range => (
+                          <option key={range} value={range}>
+                            {range}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    </div>
+                  </Field>
+
+                  {/* 3. Portfolio / Website / Profile */}
+                  <Field label="Portfolio / Website / Profile">
+                    <div className="relative">
+                      <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <input
                         value={presence}
                         onChange={event => setPresence(event.target.value)}
-                        placeholder="https:// or @handle"
-                        className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500"
+                        placeholder="Atives Prosite URL / Instagram URL / Other URL"
+                        className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500 placeholder:text-slate-400 shadow-2xs"
                       />
                     </div>
                   </Field>
+
+                  {/* 4. How you'll promote (Multiple checks) */}
+                  <div>
+                    <label className="block mb-1.5 text-xs font-bold text-slate-600">
+                      How you'll promote <span className="text-violet-600 font-semibold">(select all that apply)</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {HAP_PROMOTION_CHANNELS.map(channel => {
+                        const selected = promotionChannels.includes(channel);
+                        return (
+                          <button
+                            key={channel}
+                            type="button"
+                            onClick={() => togglePromotionChannel(channel)}
+                            className={`flex items-center gap-2 rounded-xl border p-2.5 text-xs font-bold transition text-left cursor-pointer ${
+                              selected
+                                ? 'border-violet-600 bg-violet-50/80 text-violet-900 shadow-2xs'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition ${
+                                selected
+                                  ? 'bg-violet-600 border-violet-600 text-white'
+                                  : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              {selected && <Check className="h-3 w-3 stroke-[3]" />}
+                            </div>
+                            <span className="truncate">{channel}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </form>
               )}
             </div>
@@ -255,7 +313,7 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full rounded-2xl bg-[#7C3AED] py-3 text-sm font-extrabold text-white"
+                  className="w-full rounded-2xl bg-[#7C3AED] py-3 text-sm font-extrabold text-white cursor-pointer"
                 >
                   Close
                 </button>
@@ -264,7 +322,7 @@ export function HapJoinModal({isOpen, onClose, onSubmitted}: Props) {
                   type="submit"
                   form="hap-join-form"
                   disabled={submitting}
-                  className="w-full rounded-2xl bg-[#7C3AED] py-3 text-sm font-extrabold text-white disabled:opacity-60"
+                  className="w-full rounded-2xl bg-[#7C3AED] py-3 text-sm font-extrabold text-white disabled:opacity-60 cursor-pointer shadow-sm hover:bg-[#6D28D9] transition active:scale-98"
                 >
                   {submitting ? 'Submitting…' : 'Submit application'}
                 </button>

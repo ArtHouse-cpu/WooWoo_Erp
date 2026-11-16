@@ -3926,9 +3926,10 @@ export type HapApplicationRecord = {
   email?: string;
   mobile?: string;
   profession?: string;
-  networkSize?: number;
+  networkSize?: number | string;
   payoutDetail?: string;
   presence?: string;
+  promotionChannels?: string[];
   status?: "under_review" | "approved" | "rejected";
   rejectionReason?: string;
   createdAt?: string;

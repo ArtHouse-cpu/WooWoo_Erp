@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   X,
@@ -222,11 +222,14 @@ function HapMemberDashboard({
   profession,
   presence,
 }: {
-  networkSize: number;
+  networkSize: number | string;
   profession: string;
   presence: string;
 }) {
-  const size = Number(networkSize) > 0 ? Number(networkSize).toLocaleString("en-IN") : "0";
+  const size =
+    Number(networkSize) > 0
+      ? Number(networkSize).toLocaleString("en-IN")
+      : String(networkSize || "0");
   const kpis = [
     { label: "Network Size", value: size, icon: Users, tone: "bg-[#F5F3FF] text-[#7C3AED]" },
     { label: "Total Earnings", value: "₹0", icon: IndianRupee, tone: "bg-[#FFF8F2] text-[#EA580C]" },
@@ -409,6 +412,28 @@ export function ProgramsBottomSheet({
   const hapWaiting = hapApplication?.status === "under_review";
   const hapApproved = hapApplication?.status === "approved";
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  const [activeGalleryDot, setActiveGalleryDot] = useState(0);
+  const galleryScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleGalleryScroll = () => {
+    if (!galleryScrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = galleryScrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) return;
+    const progress = scrollLeft / maxScroll;
+    const dotIndex = Math.min(4, Math.max(0, Math.round(progress * 4)));
+    setActiveGalleryDot(dotIndex);
+  };
+
+  const scrollToGalleryDot = (idx: number) => {
+    setActiveGalleryDot(idx);
+    if (!galleryScrollRef.current) return;
+    const { scrollWidth, clientWidth } = galleryScrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) return;
+    const targetScroll = (idx / 4) * maxScroll;
+    galleryScrollRef.current.scrollTo({ left: targetScroll, behavior: "smooth" });
+  };
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [isHapJoinOpen, setIsHapJoinOpen] = useState(false);
   const [isCvpJoinOpen, setIsCvpJoinOpen] = useState(false);
@@ -457,6 +482,11 @@ export function ProgramsBottomSheet({
       setActiveTab(initialTab);
     }
   }, [isOpen, initialTab]);
+
+  useEffect(() => {
+    setActiveGalleryDot(0);
+    galleryScrollRef.current?.scrollTo({ left: 0 });
+  }, [activeTab]);
 
   const cspGallery: GalleryItem[] = [
     {
@@ -950,9 +980,7 @@ export function ProgramsBottomSheet({
                         <h4 className="mt-2 text-[16px] font-black leading-tight text-white">
                           3 Pathways to Create, Earn & Belong
                         </h4>
-                        <p className="mt-1 text-[11.5px] font-medium text-slate-300 leading-relaxed">
-                          Whether you want to retail artwork, monetize your network, or co-create cultural events, explore each program below.
-                        </p>
+      
                       </div>
                       <div className="absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-indigo-500/10 blur-xl pointer-events-none" />
                       <div className="absolute top-0 right-10 w-20 h-20 rounded-full bg-amber-500/10 blur-lg pointer-events-none" />
@@ -975,9 +1003,7 @@ export function ProgramsBottomSheet({
                           </div>
                         </div>
                       </div>
-                      <p className="mt-2.5 text-[11.5px] font-medium leading-relaxed text-slate-600">
-                        Display and sell your creative artworks, handmade goods, and art merchandise at WOO WOO Art House with zero rent and zero upfront investment.
-                      </p>
+                     
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <span className="rounded-lg bg-orange-100/70 px-2 py-0.5 text-[10px] font-bold text-[#EA580C]">
                           Zero Investment
@@ -1016,9 +1042,7 @@ export function ProgramsBottomSheet({
                           </div>
                         </div>
                       </div>
-                      <p className="mt-2.5 text-[11.5px] font-medium leading-relaxed text-slate-600">
-                        Monetize your network. Share your personalized invite link and earn ongoing recurring commissions on space bookings, events, and memberships.
-                      </p>
+                     
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <span className="rounded-lg bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-[#7C3AED]">
                           Unlimited Earnings
@@ -1057,9 +1081,7 @@ export function ProgramsBottomSheet({
                           </div>
                         </div>
                       </div>
-                      <p className="mt-2.5 text-[11.5px] font-medium leading-relaxed text-slate-600">
-                        Experience art from the inside out! Join our energetic crew to help curate exhibitions, guide visitors, coordinate workshops, and gain verified perks.
-                      </p>
+                     
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         <span className="rounded-lg bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-[#059669]">
                           Official Certificate
@@ -1146,7 +1168,11 @@ export function ProgramsBottomSheet({
                     ) : null}
 
                     {/* Horizontal Gallery */}
-                    <div className="px-5 mb-1.5 flex gap-3 overflow-x-auto scrollbar-none py-1">
+                    <div
+                      ref={galleryScrollRef}
+                      onScroll={handleGalleryScroll}
+                      className="px-5 mb-1.5 flex gap-3 overflow-x-auto scrollbar-none py-1 snap-x snap-mandatory"
+                    >
                       {(activeTab === "csp"
                         ? cspGallery
                         : activeTab === "hap"
@@ -1157,7 +1183,7 @@ export function ProgramsBottomSheet({
                           return (
                             <div
                               key={item.id}
-                              className="relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs"
+                              className="relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs"
                             >
                               {item.customComponent()}
                             </div>
@@ -1167,7 +1193,7 @@ export function ProgramsBottomSheet({
                         return (
                           <div
                             key={item.id}
-                            className="relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs"
+                            className="relative h-[160px] w-[110px] sm:h-[180px] sm:w-[120px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-black/[0.05] shadow-xs"
                           >
                             <img
                               src={item.image}
@@ -1212,17 +1238,20 @@ export function ProgramsBottomSheet({
                     {/* Pagination Dots */}
                     <div className="flex justify-center gap-1.5 mt-2 mb-4">
                       {[0, 1, 2, 3, 4].map((idx) => (
-                        <span
+                        <button
                           key={idx}
-                          className={`h-1.5 w-1.5 rounded-full transition-all duration-200 ${
-                            idx === 0
+                          type="button"
+                          onClick={() => scrollToGalleryDot(idx)}
+                          className={`h-1.5 rounded-full transition-all duration-200 ${
+                            activeGalleryDot === idx
                               ? activeTab === "csp"
-                                ? "bg-[#EA580C] w-3"
+                                ? "bg-[#EA580C] w-3.5"
                                 : activeTab === "hap"
-                                ? "bg-[#7C3AED] w-3"
-                                : "bg-[#059669] w-3"
-                              : "bg-[#E5E7EB]"
+                                ? "bg-[#7C3AED] w-3.5"
+                                : "bg-[#059669] w-3.5"
+                              : "bg-[#E5E7EB] w-1.5"
                           }`}
+                          aria-label={`Go to slide ${idx + 1}`}
                         />
                       ))}
                     </div>

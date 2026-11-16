@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useState, useRef, useMemo} from 'react';
 import {
   X,
   Calendar,
@@ -38,6 +38,7 @@ type EventItem = {
 export function EventsBottomSheet({isOpen, onClose}: EventsBottomSheetProps) {
   const [activeTab, setActiveTab] = useState<TabId>('workshops');
   const [activeDot, setActiveDot] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const tabs = [
     {id: 'workshops' as TabId, label: 'Workshops', icon: Scissors},
@@ -92,6 +93,136 @@ export function EventsBottomSheet({isOpen, onClose}: EventsBottomSheetProps) {
       image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=300&q=80',
     },
   ];
+
+  const allEventsMap: Record<TabId, EventItem[]> = {
+    workshops: eventsList,
+    exhibitions: [
+      {
+        id: '2',
+        title: 'Contemporary Art Exhibition',
+        category: 'Exhibition',
+        location: 'Mumbai, Maharashtra',
+        image: 'https://images.unsplash.com/photo-1499783300057-475a43b27b6a?auto=format&fit=crop&w=300&q=80',
+      },
+      {
+        id: 'e2',
+        title: 'Modern Sculptures & Installations',
+        category: 'Exhibition',
+        location: 'Bangalore, Karnataka',
+        image: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=300&q=80',
+      },
+      {
+        id: 'e3',
+        title: 'Fine Art Photography Showcase',
+        category: 'Exhibition',
+        location: 'Delhi, NCR',
+        image: 'https://images.unsplash.com/photo-1452587925148-ce544e77e70d?auto=format&fit=crop&w=300&q=80',
+      },
+      {
+        id: 'e4',
+        title: 'Indian Heritage Canvas Expo',
+        category: 'Exhibition',
+        location: 'Pune, Maharashtra',
+        image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=300&q=80',
+      },
+    ],
+    shows: [
+      {
+        id: '3',
+        title: 'Live Dance Performance',
+        category: 'Show',
+        location: 'Delhi, NCR',
+        image: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=300&q=80',
+      },
+      {
+        id: '5',
+        title: 'Acoustic Music Evening',
+        category: 'Show',
+        location: 'Hyderabad, Telangana',
+        image: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&w=300&q=80',
+      },
+      {
+        id: 's3',
+        title: 'Indie Fusion Band Spotlight',
+        category: 'Show',
+        location: 'Bangalore, Karnataka',
+        image: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?auto=format&fit=crop&w=300&q=80',
+      },
+      {
+        id: 's4',
+        title: 'Poetry & Spoken Word Night',
+        category: 'Show',
+        location: 'Mumbai, Maharashtra',
+        image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=300&q=80',
+      },
+    ],
+    meetups: [
+      {
+        id: '6',
+        title: 'Artists Networking Meetup',
+        category: 'Meetup',
+        location: 'Bangalore, Karnataka',
+        image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=300&q=80',
+      },
+      {
+        id: 'm2',
+        title: 'Sunday Urban Sketch Crawl',
+        category: 'Meetup',
+        location: 'Pune, Maharashtra',
+        image: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=300&q=80',
+      },
+      {
+        id: 'm3',
+        title: 'Creative Coffee & Collab Circle',
+        category: 'Meetup',
+        location: 'Delhi, NCR',
+        image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=300&q=80',
+      },
+    ],
+    seminars: [
+      {
+        id: 'sem1',
+        title: 'Art Business & Monetization 101',
+        category: 'Workshop',
+        location: 'Online Live Masterclass',
+        image: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=300&q=80',
+      },
+      {
+        id: 'sem2',
+        title: 'Digital Tools for Modern Illustrators',
+        category: 'Workshop',
+        location: 'Bangalore, Karnataka',
+        image: 'https://images.unsplash.com/photo-1542744094-24638eff58bb?auto=format&fit=crop&w=300&q=80',
+      },
+    ],
+    more: eventsList,
+  };
+
+  const displayedEvents = useMemo(() => {
+    return allEventsMap[activeTab] || eventsList;
+  }, [activeTab]);
+
+  const dotsCount = Math.min(5, displayedEvents.length);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const {scrollLeft, scrollWidth, clientWidth} = scrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) return;
+    const progress = scrollLeft / maxScroll;
+    const dotIndex = Math.min(dotsCount - 1, Math.max(0, Math.round(progress * (dotsCount - 1))));
+    setActiveDot(dotIndex);
+  };
+
+  const scrollToDot = (idx: number) => {
+    setActiveDot(idx);
+    if (!scrollRef.current) return;
+    const {scrollWidth, clientWidth} = scrollRef.current;
+    const maxScroll = scrollWidth - clientWidth;
+    if (maxScroll <= 0) return;
+    const targetScroll = (idx / (dotsCount - 1)) * maxScroll;
+    scrollRef.current.scrollTo({left: targetScroll, behavior: 'smooth'});
+  };
 
   const getCategoryBadgeColor = (category: string) => {
     switch (category) {
@@ -171,7 +302,11 @@ export function EventsBottomSheet({isOpen, onClose}: EventsBottomSheetProps) {
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setActiveDot(0);
+                      scrollRef.current?.scrollTo({left: 0, behavior: 'auto'});
+                    }}
                     className={`shrink-0 px-[16px] py-1.5 rounded-full border text-[13px] font-extrabold flex items-center gap-1.5 transition-all duration-200 ${
                       active
                         ? 'border-[#EA580C] bg-[#FFF8F2] text-[#EA580C]'
@@ -187,15 +322,19 @@ export function EventsBottomSheet({isOpen, onClose}: EventsBottomSheetProps) {
 
             {/* Scrollable Contents */}
             <div className="flex-1 overflow-y-auto pb-6">
-              {activeTab === 'workshops' ? (
+              {displayedEvents.length > 0 ? (
                 <>
-                  {/* 3-Column Responsive Event Card Grid */}
-                  <div className="px-5 mb-4">
-                    <div className="grid grid-cols-3 gap-2">
-                      {eventsList.map(event => (
+                  {/* Horizontally Scrollable Event Cards */}
+                  <div className="mb-4">
+                    <div
+                      ref={scrollRef}
+                      onScroll={handleScroll}
+                      className="flex gap-2.5 overflow-x-auto scrollbar-none snap-x snap-mandatory px-5 pb-2 pt-0.5"
+                    >
+                      {displayedEvents.map(event => (
                         <div
                           key={event.id}
-                          className="relative h-[155px] overflow-hidden rounded-[16px] border border-black/[0.05] shadow-2xs group cursor-pointer"
+                          className="relative h-[165px] w-[122px] sm:h-[180px] sm:w-[135px] shrink-0 snap-start overflow-hidden rounded-[18px] border border-black/[0.05] shadow-2xs group cursor-pointer"
                         >
                           <img
                             src={event.image}
@@ -208,19 +347,19 @@ export function EventsBottomSheet({isOpen, onClose}: EventsBottomSheetProps) {
                           </div>
 
                           {/* Overlay content */}
-                          <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/95 via-black/35 to-transparent p-2 text-left">
+                          <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/95 via-black/40 to-transparent p-2.5 text-left">
                             {/* Circular Play Icon */}
-                            <div className="flex h-6.5 w-6.5 items-center justify-center rounded-full bg-white/20 text-white border border-white/40 mb-1 backdrop-blur-xs">
-                              <Play className="h-2.5 w-2.5 fill-white text-white ml-0.5" />
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white border border-white/40 mb-1.5 backdrop-blur-xs">
+                              <Play className="h-3 w-3 fill-white text-white ml-0.5" />
                             </div>
 
                             {/* Event Title */}
-                            <p className="text-[8px] sm:text-[8.5px] font-black text-white leading-tight line-clamp-2 mb-1">
+                            <p className="text-[9px] sm:text-[9.5px] font-black text-white leading-tight line-clamp-2 mb-1">
                               {event.title}
                             </p>
 
                             {/* Location row */}
-                            <div className="flex items-center gap-0.5 text-[6.5px] sm:text-[7px] font-bold text-white/90">
+                            <div className="flex items-center gap-0.5 text-[7px] sm:text-[7.5px] font-bold text-white/90">
                               <MapPin className="h-2 w-2 text-white/80 shrink-0" strokeWidth={2.5} />
                               <span className="truncate">{event.location}</span>
                             </div>
@@ -230,19 +369,21 @@ export function EventsBottomSheet({isOpen, onClose}: EventsBottomSheetProps) {
                     </div>
 
                     {/* Pagination Dots */}
-                    <div className="flex justify-center gap-1.5 mt-4 mb-2">
-                      {[0, 1, 2, 3, 4].map(idx => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setActiveDot(idx)}
-                          className={`h-1.5 w-1.5 rounded-full transition-all duration-200 ${
-                            activeDot === idx ? 'bg-[#EA580C] w-3' : 'bg-[#E5E7EB]'
-                          }`}
-                          aria-label={`Go to slide ${idx + 1}`}
-                        />
-                      ))}
-                    </div>
+                    {dotsCount > 1 && (
+                      <div className="flex justify-center gap-1.5 mt-3 mb-2">
+                        {Array.from({length: dotsCount}).map((_, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => scrollToDot(idx)}
+                            className={`h-1.5 rounded-full transition-all duration-200 ${
+                              activeDot === idx ? 'bg-[#EA580C] w-3.5' : 'bg-[#E5E7EB] w-1.5'
+                            }`}
+                            aria-label={`Go to slide ${idx + 1}`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
