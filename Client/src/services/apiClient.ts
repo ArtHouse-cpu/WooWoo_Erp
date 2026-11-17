@@ -2466,6 +2466,9 @@ export type SpaceBookingPayload = {
   dueAmount?: number;
   paymentStatus?: "full" | "partial" | "";
   paymentMode?: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  couponCode?: string;
   originalAmount?: number;
   payments?: Array<{
     kind: "payment" | "refund";

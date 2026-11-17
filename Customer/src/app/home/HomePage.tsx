@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {useNavigate} from 'react-router-dom';
 import {DashboardSidebar} from '../../components/dashboard/DashboardSidebar';
 import {TopNavbar, MobileHeader} from '../../components/dashboard/TopNavbar';
 import {HeroBanner, ProfileAsideCard} from '../../components/dashboard/HeroBanner';
@@ -18,7 +19,6 @@ import {HelpSupportBottomSheet} from '../../components/dashboard/HelpSupportBott
 import {VisitBottomSheet} from '../../components/dashboard/VisitBottomSheet';
 import {ShareBottomSheet} from '../../components/dashboard/ShareBottomSheet';
 import {NotificationsBottomSheet} from '../../components/dashboard/NotificationsBottomSheet';
-import {ProgramsBottomSheet} from '../../components/dashboard/ProgramsBottomSheet';
 
 export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -31,13 +31,7 @@ export default function HomePage() {
   const [visitOpen, setVisitOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [programsOpen, setProgramsOpen] = useState(false);
-  const [selectedProgram, setSelectedProgram] = useState<'all' | 'csp' | 'hap' | 'cvp'>('all');
-
-  const handleProgramClick = (tab: 'all' | 'csp' | 'hap' | 'cvp') => {
-    setSelectedProgram(tab);
-    setProgramsOpen(true);
-  };
+  const navigate = useNavigate();
 
   const handleActionClick = (id: string) => {
     if (id === 'help') {
@@ -61,7 +55,7 @@ export default function HomePage() {
     } else if (id === 'cafe') {
       setWoofooOpen(true);
     } else if (id === 'programs') {
-      handleProgramClick('all');
+      navigate('/ourprograms');
     }
   };
  
@@ -129,7 +123,6 @@ export default function HomePage() {
       <VisitBottomSheet isOpen={visitOpen} onClose={() => setVisitOpen(false)} />
       <ShareBottomSheet isOpen={shareOpen} onClose={() => setShareOpen(false)} />
       <NotificationsBottomSheet isOpen={notificationsOpen} onClose={() => setNotificationsOpen(false)} />
-      <ProgramsBottomSheet isOpen={programsOpen} onClose={() => setProgramsOpen(false)} initialTab={selectedProgram} />
     </div>
   );
 }

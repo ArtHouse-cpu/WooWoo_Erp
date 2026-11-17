@@ -60,7 +60,7 @@ import {
   MEMBERSHIP_TIERS,
 } from './spaceActions';
 import {ShareSpaceModal} from './ShareSpaceModal';
-import {SpaceBookingModal} from './SpaceBookingModal';
+import {CustomerSpaceCheckout} from './CustomerSpaceCheckout';
 import {CoworkingBookingModal} from './CoworkingBookingModal';
 import {ImageCarousel} from '../ui/ImageCarousel';
 
@@ -2492,7 +2492,7 @@ export function SpaceDetailsModal({
             onClick={isCoworking ? handleBookCoworkingPlan : handleBook}
             className="flex-1 flex h-12 sm:h-13 items-center justify-center gap-2 rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] text-white text-base font-bold shadow-md shadow-purple-500/25 transition active:scale-95 cursor-pointer"
           >
-            <span>{isCoworking ? 'Book Now' : 'Book'}</span>
+            <span>Book Now</span>
           </button>
         </div>
       </div>
@@ -2965,7 +2965,7 @@ export function SpaceDetailsModal({
         onClose={() => setShowShareModal(false)}
       />
 
-      <SpaceBookingModal
+      <CustomerSpaceCheckout
         space={bookingPassOverride || space}
         isOpen={showBookingModal}
         onClose={() => {
@@ -2975,7 +2975,6 @@ export function SpaceDetailsModal({
         initialDate={selectedDate}
         initialStartTime={startTime}
         initialEndTime={endTime}
-        membershipTier={selectedTier}
       />
 
       <CoworkingBookingModal

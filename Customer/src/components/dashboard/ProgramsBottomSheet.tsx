@@ -35,6 +35,8 @@ type ProgramsBottomSheetProps = {
   isOpen: boolean;
   onClose: () => void;
   initialTab?: "all" | "csp" | "hap" | "cvp";
+  /** Full page at /ourprograms instead of a phone sheet. */
+  asPage?: boolean;
 };
 
 type TabId = "all" | "csp" | "hap" | "cvp";
@@ -402,6 +404,7 @@ export function ProgramsBottomSheet({
   isOpen,
   onClose,
   initialTab = "all",
+  asPage = false,
 }: ProgramsBottomSheetProps) {
   const navigate = useNavigate();
   const customer = useAuthStore((state) => state.customer);
@@ -755,9 +758,10 @@ export function ProgramsBottomSheet({
   return (
     <>
       <AnimatePresence>
-        {isOpen && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center">
+        {(asPage || isOpen) && (
+          <div className={asPage ? "min-h-dvh bg-[#FAFBFD]" : "fixed inset-0 z-50 flex items-end justify-center"}>
             {/* Backdrop Overlay */}
+            {asPage ? null : (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -765,22 +769,29 @@ export function ProgramsBottomSheet({
               onClick={onClose}
               className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
             />
+            )}
 
             {/* Bottom Sheet Panel with fixed consistent height across all tabs */}
             <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
+              initial={asPage ? false : { y: "100%" }}
+              animate={asPage ? undefined : { y: 0 }}
+              exit={asPage ? undefined : { y: "100%" }}
               transition={{ type: "spring", damping: 26, stiffness: 240 }}
-              className="relative z-10 flex h-[90dvh] min-h-[90dvh] max-h-[92dvh] sm:h-[88vh] sm:min-h-[88vh] sm:max-h-[90vh] w-full max-w-lg flex-col rounded-t-[32px] bg-white shadow-2xl overflow-hidden border-t border-slate-100"
+              className={
+                asPage
+                  ? "relative z-10 mx-auto flex min-h-dvh w-full max-w-6xl flex-col bg-[#FAFBFD]"
+                  : "relative z-10 flex h-[90dvh] min-h-[90dvh] max-h-[92dvh] sm:h-[88vh] sm:min-h-[88vh] sm:max-h-[90vh] w-full max-w-lg flex-col rounded-t-[32px] bg-white shadow-2xl overflow-hidden border-t border-slate-100"
+              }
             >
               {/* Top Drag Handle */}
+              {asPage ? null : (
               <div className="flex shrink-0 justify-center py-3">
                 <div className="h-1.5 w-12 rounded-full bg-[#E5E7EB]" />
               </div>
+              )}
 
               {/* Header Info */}
-              <div className="relative shrink-0 px-5 pb-4 flex items-center justify-between">
+              <div className={`relative shrink-0 px-5 pb-4 flex items-center justify-between ${asPage ? "bg-white pt-5 md:px-8" : ""}`}>
                 <div className="flex items-center gap-3">
                   {/* Dynamic color & icon syncing on header icon */}
                   <div
@@ -832,7 +843,7 @@ export function ProgramsBottomSheet({
               </div>
 
               {/* Custom Interactive Program Tabs: All -> CSP -> HAP -> CVP */}
-              <div className="shrink-0 px-4 sm:px-5 mb-4 flex items-stretch gap-2 overflow-x-auto scrollbar-none pb-0.5">
+              <div className={`shrink-0 px-4 sm:px-5 mb-4 flex items-stretch gap-2 overflow-x-auto scrollbar-none pb-0.5 ${asPage ? "bg-white md:mx-auto md:w-full md:max-w-3xl md:px-8" : ""}`}>
                 {/* 1. All Tab (on left side of CSP) */}
                 <button
                   type="button"
@@ -970,9 +981,9 @@ export function ProgramsBottomSheet({
               <div className="min-h-0 flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable]">
                 {activeTab === "all" ? (
                   /* ALL PROGRAMS OVERVIEW TAB */
-                  <div className="space-y-3.5 px-4 sm:px-5 pb-2 text-left">
+                  <div className={asPage ? "mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pb-8 text-left md:grid-cols-3 md:px-8" : "space-y-3.5 px-4 sm:px-5 pb-2 text-left"}>
                     {/* Ecosystem Welcome Banner */}
-                    <div className="p-4 rounded-[22px] bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white relative overflow-hidden shadow-sm">
+                    <div className={`p-4 rounded-[22px] bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white relative overflow-hidden shadow-sm ${asPage ? "md:col-span-3" : ""}`}>
                       <div className="relative z-10">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black tracking-wide uppercase">
                           <Sparkles className="h-3 w-3" /> Woo Woo Ecosystem
@@ -1560,7 +1571,7 @@ export function ProgramsBottomSheet({
               </div>
 
               {/* Fixed Bottom Actions */}
-              <div className="shrink-0 bg-white border-t border-slate-100 p-4 flex gap-3 z-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <div className={`shrink-0 bg-white border-t border-slate-100 p-4 flex gap-3 z-10 pb-[max(1rem,env(safe-area-inset-bottom))] ${asPage ? "sticky bottom-0 md:mx-auto md:w-full md:max-w-3xl" : ""}`}>
                 {/* Query More Button */}
                 <button
                   type="button"

@@ -33,6 +33,8 @@ import RefundTermsPage from './app/legal/RefundTermsPage';
 import {useAuthStore} from './store/authStore';
 import {getPostAuthPath} from './utils/onboarding';
 import ProgramsPage from './app/programs/ProgramsPage';
+import OurProgramsPage from './app/programs/OurProgramsPage';
+import MyBookingsPage from './app/bookings/MyBookingsPage';
 import CspProgramPage from './app/programs/CspProgramPage';
 import ActivityPage from './app/activity/ActivityPage';
 import PublicInvoicePage from './app/activity/PublicInvoicePage';
@@ -95,6 +97,8 @@ export default function App() {
                 <Route path="/settings" element={<ProfilePage />} />
                 <Route path="/membership" element={<MembershipOnboardingPage />} />
                 <Route path="/programs" element={<ProgramsPage />} />
+                <Route path="/ourprograms" element={<OurProgramsPage />} />
+                <Route path="/booking" element={<MyBookingsPage />} />
                 <Route path="/csp-program" element={<CspProgramPage />} />
                 <Route path="/activities" element={<ActivityPage />} />
 

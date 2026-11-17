@@ -28,7 +28,7 @@ type HomeSidebarProps = {
 
 const navItems = [
   {to: '/home', label: 'Home', icon: Home},
-  {to: '/programs', label: 'Programs', icon: Sparkles},
+  {to: '/ourprograms', label: 'Programs', icon: Sparkles},
   {to: '/profile', label: 'My Profile', icon: User},
   {to: '/membership', label: 'Memberships', icon: CreditCard},
   {to: '/profile', label: 'Orders & Bookings', icon: CalendarDays, soft: true},

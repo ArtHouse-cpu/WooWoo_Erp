@@ -2346,6 +2346,14 @@ const SpaceBook = () => {
               </div>
 
               <BookingSummaryRenderer booking={selectedBooking} />
+              {selectedBooking.razorpayPaymentId || selectedBooking.couponCode ? (
+                <div className="rounded-xl border border-slate-100 bg-white px-3 py-2 text-xs text-slate-600">
+                  {selectedBooking.paymentMode ? <p>Payment method: {selectedBooking.paymentMode}</p> : null}
+                  {selectedBooking.razorpayPaymentId ? <p>Razorpay payment: {selectedBooking.razorpayPaymentId}</p> : null}
+                  {selectedBooking.razorpayOrderId ? <p>Razorpay order: {selectedBooking.razorpayOrderId}</p> : null}
+                  {selectedBooking.couponCode ? <p>Coupon: {selectedBooking.couponCode}</p> : null}
+                </div>
+              ) : null}
 
               <div className="flex flex-wrap gap-2">
                   <button
