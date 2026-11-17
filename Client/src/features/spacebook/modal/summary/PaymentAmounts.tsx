@@ -2,8 +2,6 @@ const inr = (value: number) =>
   `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
 export default function PaymentAmounts({
-  totalPrice,
-  payPrice,
   paidPrice,
   pendingPrice,
   paymentMethod,
@@ -15,29 +13,21 @@ export default function PaymentAmounts({
   paymentMethod?: string;
 }) {
   return (
-    <div className="space-y-1.5 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
-      <div className="flex items-center justify-between text-slate-600">
-        <span>Total price</span>
-        <span className="font-semibold text-slate-900">{inr(totalPrice)}</span>
-      </div>
-      <div className="flex items-center justify-between text-slate-600">
-        <span>Pay price</span>
-        <span className="font-semibold text-slate-900">{inr(payPrice)}</span>
-      </div>
-      <div className="flex items-center justify-between text-slate-600">
-        <span>Paid price</span>
-        <span className="font-semibold text-emerald-700">{inr(paidPrice)}</span>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between rounded-xl border border-emerald-100/80 bg-emerald-50/90 px-3 py-2 text-xs font-semibold text-emerald-700">
+        <span>Paid</span>
+        <span>{inr(paidPrice)}</span>
       </div>
       {pendingPrice >= 1 ? (
-        <div className="flex items-center justify-between border-t border-slate-200 pt-1.5 font-semibold text-amber-700">
-          <span>Pending price</span>
+        <div className="flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+          <span>Balance due</span>
           <span>{inr(pendingPrice)}</span>
         </div>
       ) : null}
       {paymentMethod ? (
-        <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-1.5 text-slate-600">
+        <div className="flex items-center justify-between gap-3 px-1 text-[11px] text-slate-500">
           <span>Payment method</span>
-          <span className="text-right font-semibold text-slate-900">{paymentMethod}</span>
+          <span className="font-semibold text-slate-800">{paymentMethod}</span>
         </div>
       ) : null}
     </div>

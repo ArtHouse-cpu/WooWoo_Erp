@@ -2681,6 +2681,9 @@ export type BookingOverviewRow = {
   startTime: string;
   endTime: string;
   duration: string;
+  durationHours?: number;
+  spaceType?: string;
+  category?: "Paid" | "Free";
   grandTotal: number;
   paidAmount: number;
   dueAmount: number;
@@ -2715,6 +2718,51 @@ export type BookingOverviewRow = {
       by?: { m_staff_name?: string | null };
     }>;
   };
+};
+
+export type SpaceUtilization = {
+  from: string;
+  to: string;
+  dayHours: number;
+  days: number;
+  spaceCount: number;
+  availableHours: number;
+  bookedHours: number;
+  utilizedHours: number;
+  utilization: number;
+  paidHours: number;
+  paidBookings: number;
+  freeHours: number;
+  freeBookings: number;
+  daysSeries: Array<{
+    date: string;
+    paidHours: number;
+    freeHours: number;
+    availableHours: number;
+    bookings: number;
+  }>;
+  spaceTypes: Array<{
+    spaceType: string;
+    bookings: number;
+    hours: number;
+    paidHours: number;
+    freeHours: number;
+    share: number;
+  }>;
+  rows: Array<{
+    id: string;
+    bookingCode: string;
+    customerName: string;
+    spaceName: string;
+    spaceType: string;
+    bookingDate: string;
+    startTime: string;
+    endTime: string;
+    durationHours: number;
+    category: "Paid" | "Free";
+    paymentStatus: string;
+    grandTotal: number;
+  }>;
 };
 
 export const handleGetBookingPaymentSettings = async () => {
@@ -2762,6 +2810,7 @@ export const handleGetBookingOverview = async (params?: {
       pendingRefundAmount: number;
     };
     bookings: BookingOverviewRow[];
+    utilization?: SpaceUtilization;
     pagination: { page: number; limit: number; total: number; pages: number };
   };
 };

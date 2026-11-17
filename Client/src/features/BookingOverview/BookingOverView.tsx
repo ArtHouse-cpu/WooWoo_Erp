@@ -46,7 +46,9 @@ import {
   type BookingOverviewRow,
   type BookingPaymentSettings,
   type SpaceBookingStatus,
+  type SpaceUtilization,
 } from "@/services/apiClient";
+import SpaceUtilizationPanel from "./SpaceUtilization";
 import { previewBookingPayment } from "./paymentRule";
 
 const BOOKING_STATUSES = [
@@ -395,6 +397,7 @@ export default function BookingOverView() {
   const canUpdate = can(PERMISSIONS.SPACE_BOOKING_UPDATE);
   const [tab, setTab] = useState<"overview" | "settings">("overview");
   const [kpis, setKpis] = useState<Kpis>(emptyKpis);
+  const [utilization, setUtilization] = useState<SpaceUtilization | null>(null);
   const [rows, setRows] = useState<BookingOverviewRow[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -572,6 +575,7 @@ export default function BookingOverView() {
         ...(data.kpis || {}),
         pendingAmount: Number(data.kpis?.pendingAmount) || 0,
       });
+      setUtilization(data.utilization || null);
       setRows(data.bookings || []);
       setPages(data.pagination?.pages || 1);
       setTotal(data.pagination?.total || 0);
@@ -1175,6 +1179,7 @@ export default function BookingOverView() {
         </section>
       ) : (
         <>
+          <SpaceUtilizationPanel data={utilization} cardsOnly />
           {/* ========================================================================= */}
           {/* MOBILE VIEW (block md:hidden): Date Filter, 6 Light Pastel Cards, Search, 3 Dropdowns, Image Cards */}
           {/* ========================================================================= */}

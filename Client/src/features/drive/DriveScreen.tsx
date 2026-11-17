@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { useAppSelector } from "@/store/hooks";
+import DriveUploadModal, { type DriveUploadItem } from "./DriveUploadModal";
 import {
   Folder,
   FolderPlus,
@@ -24,7 +26,8 @@ type DriveFile = {
   name: string;
   folderId: string;
   size: number;
-  kind: "image" | "sheet" | "doc";
+  kind: "image" | "video" | "sheet" | "doc" | "link";
+  tags?: string[];
   starred: boolean;
   addedAt: string;
 };
@@ -75,7 +78,7 @@ const formatSize = (bytes: number) => {
 };
 
 const fileIcon = (kind: DriveFile["kind"]) => {
-  if (kind === "image") return ImageIcon;
+  if (kind === "image" || kind === "video") return ImageIcon;
   if (kind === "sheet") return FileSpreadsheet;
   return FileText;
 };
@@ -87,6 +90,8 @@ export default function DriveScreen() {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [section, setSection] = useState<"drive" | "recent" | "starred">("drive");
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const staffName = useAppSelector((state) => state.user.m_staff_name) || "You";
 
   const used = files.reduce((sum, file) => sum + file.size, 0);
   const usedPercent = Math.min(100, Math.round((used / STORAGE_LIMIT) * 100));
@@ -120,24 +125,29 @@ export default function DriveScreen() {
     setFolderId(null);
   };
 
-  const uploadFiles = (list: FileList | null) => {
-    if (!list?.length) return;
-    const target = folderId || folders[0]?.id || "plans";
-    const next = Array.from(list).map((file) => ({
-      id: `file-${Date.now()}-${file.name}`,
-      name: file.name,
-      folderId: target,
-      size: file.size,
-      kind: file.type.startsWith("image/")
-        ? "image" as const
-        : file.name.endsWith(".xls") || file.name.endsWith(".xlsx") || file.name.endsWith(".csv")
-          ? "sheet" as const
-          : "doc" as const,
+  const saveUpload = (items: DriveUploadItem[], segment: string, tags: string[]) => {
+    const existing = folders.find(
+      (folder) => folder.name.toLowerCase() === segment.trim().toLowerCase(),
+    );
+    const targetId = existing?.id || `folder-${Date.now()}`;
+    if (!existing && segment.trim()) {
+      setFolders((current) => [...current, { id: targetId, name: segment.trim() }]);
+    }
+    const stamp = new Date().toISOString();
+    const next: DriveFile[] = items.map((item, index) => ({
+      id: `file-${Date.now()}-${index}`,
+      name: item.name,
+      folderId: targetId,
+      size: item.size,
+      kind: item.kind,
+      tags,
       starred: false,
-      addedAt: new Date().toISOString(),
+      addedAt: stamp,
     }));
     setFiles((current) => [...next, ...current]);
     setSection("drive");
+    setFolderId(targetId);
+    setUploadOpen(false);
   };
 
   return (
@@ -158,19 +168,14 @@ export default function DriveScreen() {
             <FolderPlus size={15} />
             New folder
           </button>
-          <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white">
+          <button
+            type="button"
+            onClick={() => setUploadOpen(true)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-violet-600 px-3 text-xs font-semibold text-white"
+          >
             <Upload size={15} />
             Upload
-            <input
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(event) => {
-                uploadFiles(event.target.files);
-                event.target.value = "";
-              }}
-            />
-          </label>
+          </button>
         </div>
       </div>
 
@@ -285,6 +290,9 @@ export default function DriveScreen() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-slate-800">{file.name}</p>
                         <p className="text-xs text-slate-500">{formatSize(file.size)}</p>
+                        {file.tags && file.tags.length > 0 ? (
+                          <p className="truncate text-[11px] text-violet-600">{file.tags.join(" · ")}</p>
+                        ) : null}
                       </div>
                     </div>
                     <div className="mt-3 flex justify-end gap-1">
@@ -353,6 +361,14 @@ export default function DriveScreen() {
           )}
         </section>
       </div>
+      {uploadOpen ? (
+        <DriveUploadModal
+          folders={folders.map((folder) => folder.name)}
+          uploaderName={staffName}
+          onClose={() => setUploadOpen(false)}
+          onUpload={saveUpload}
+        />
+      ) : null}
     </div>
   );
 }

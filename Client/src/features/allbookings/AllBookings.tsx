@@ -165,6 +165,111 @@ const paymentLabel = (status?: string) => {
   return status;
 };
 
+const inr = (value: number) =>
+  `₹${(Number(value) || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: Number.isInteger(Number(value) || 0) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+const MoneyRow = ({
+  label,
+  value,
+  strong,
+  tone,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+  tone?: "paid" | "due" | "discount";
+}) => (
+  <div className="flex items-center justify-between gap-3 text-sm">
+    <span className={strong ? "font-bold text-slate-900" : "text-slate-500"}>{label}</span>
+    <span
+      className={`font-semibold tabular-nums ${
+        tone === "paid"
+          ? "text-emerald-700"
+          : tone === "due"
+            ? "text-rose-700"
+            : tone === "discount"
+              ? "text-violet-700"
+              : strong
+                ? "text-slate-900"
+                : "text-slate-800"
+      }`}
+    >
+      {value}
+    </span>
+  </div>
+);
+
+function BookingAmountBreakdown({ booking }: { booking: AllBookingRow }) {
+  const services = booking.services || [];
+  const foods = booking.foods || [];
+  const lineTotal = (price: number, qty: number) =>
+    Math.max(0, Number(price) || 0) * Math.max(0, Number(qty) || 0);
+  const servicesTotal = services.reduce((sum, line) => sum + lineTotal(line.price, line.qty), 0);
+  const foodTotal = foods.reduce((sum, line) => sum + lineTotal(line.price, line.qty), 0);
+  const ratedSpace =
+    Math.max(0, Number(booking.unitPrice) || 0) *
+    Math.max(0, Number(booking.durationHours) || 0) *
+    Math.max(1, Number(booking.spaceQty) || 1);
+  const storedSub = Math.max(0, Number(booking.subTotal) || 0);
+  const spaceTotal =
+    ratedSpace > 0 ? ratedSpace : Math.max(0, storedSub - servicesTotal - foodTotal);
+  const subTotal = storedSub > 0 ? storedSub : spaceTotal + servicesTotal + foodTotal;
+  const discount = Math.max(0, Number(booking.membershipDiscount) || 0);
+  const total = Math.max(0, Number(booking.grandTotal) || Math.max(0, subTotal - discount));
+  const paid = Math.max(0, Number(booking.paidAmount) || 0);
+  const due = Math.max(0, Number(booking.dueAmount) || Math.max(0, total - paid));
+  const hours = Number(booking.durationHours) || 0;
+  const spaceLabel = [
+    booking.spaceName || "Space",
+    hours > 0 ? `${hours}h` : "",
+    Number(booking.spaceQty) > 1 ? `× ${booking.spaceQty}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+        Amount breakdown
+      </p>
+      <div className="mt-2 space-y-2">
+        {booking.spaceId || spaceTotal > 0 ? (
+          <MoneyRow label={spaceLabel} value={inr(spaceTotal)} />
+        ) : null}
+        {services.map((line, index) => (
+          <MoneyRow
+            key={`service-${line.refId || index}`}
+            label={`${line.label} × ${line.qty}`}
+            value={inr(lineTotal(line.price, line.qty))}
+          />
+        ))}
+        {foods.map((line, index) => (
+          <MoneyRow
+            key={`food-${line.refId || index}`}
+            label={`${line.label} × ${line.qty}`}
+            value={inr(lineTotal(line.price, line.qty))}
+          />
+        ))}
+      </div>
+      <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-3">
+        <MoneyRow label="Subtotal" value={inr(subTotal)} />
+        {discount > 0 ? (
+          <MoneyRow label="Membership discount" value={`-${inr(discount)}`} tone="discount" />
+        ) : null}
+        {Number(booking.cashbackTotal) > 0 ? (
+          <MoneyRow label="Cashback" value={inr(Number(booking.cashbackTotal) || 0)} />
+        ) : null}
+        <MoneyRow label="Total" value={inr(total)} strong />
+        <MoneyRow label="Paid" value={inr(paid)} tone="paid" strong />
+        <MoneyRow label="Balance due" value={inr(due)} tone={due > 0 ? "due" : undefined} />
+      </div>
+    </div>
+  );
+}
+
 const DetailLine = ({ label, value }: { label: string; value?: string }) => {
   if (!value) return null;
   return (
@@ -364,6 +469,10 @@ const persistBooking = async (
         qty: food.qty,
       })),
       notes: payload.notes,
+      subTotal: payload.subTotal,
+      membershipDiscount: payload.discountAmount,
+      cashbackTotal: payload.cashbackAmount,
+      grandTotal: payload.lineTotal,
       status,
       ...(paymentStatus ? { paymentStatus } : {}),
       ...(paymentAmounts
@@ -383,6 +492,7 @@ const persistBooking = async (
           ...body,
           spaceId: space.spaceId,
           notes: [payload.notes, space.spaceName].filter(Boolean).join(" | "),
+          grandTotal: space.lineTotal,
           paidAmount: space.lineTotal,
           dueAmount: 0,
         });
@@ -1120,49 +1230,16 @@ const persistBooking = async (
               <DetailLine label="Email" value={selected.customerEmail} />
               <DetailLine
                 label="Membership"
-                value={selected.customer?.membershipType}
+                value={selected.membershipType || selected.customer?.membershipType}
               />
               <DetailLine label="Space" value={selected.spaceDetails} />
-              <DetailLine label="Services" value={selected.serviceDetails} />
-              <DetailLine label="Food" value={selected.foodDetails} />
               <DetailLine label="Date" value={formatDate(selected.bookingDate)} />
               <DetailLine label="Time" value={selected.timeLabel} />
-              <DetailLine
-                label="Membership discount"
-                value={
-                  selected.membershipDiscount
-                    ? `₹${Number(selected.membershipDiscount).toLocaleString("en-IN")}`
-                    : ""
-                }
-              />
               <DetailLine label="Status" value={selected.status} />
               <DetailLine label="Payment" value={paymentLabel(selected.paymentStatus)} />
-              <DetailLine
-                label="Paid"
-                value={
-                  selected.paymentStatus
-                    ? `₹${Number(selected.paidAmount || 0).toLocaleString("en-IN")}`
-                    : ""
-                }
-              />
-              <DetailLine
-                label="Balance due"
-                value={
-                  selected.paymentStatus === "partial"
-                    ? `₹${Number(selected.dueAmount || 0).toLocaleString("en-IN")}`
-                    : ""
-                }
-              />
-              <DetailLine
-                label="Amount"
-                value={
-                  selected.grandTotal
-                    ? `₹${Number(selected.grandTotal).toLocaleString("en-IN")}`
-                    : ""
-                }
-              />
               <DetailLine label="Created" value={formatDateTime(selected.createdAt)} />
             </div>
+            <BookingAmountBreakdown booking={selected} />
             {selected.notes ? (
               <p className="mt-4 text-left text-sm text-slate-600">{selected.notes}</p>
             ) : null}

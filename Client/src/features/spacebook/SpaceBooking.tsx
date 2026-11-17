@@ -16,7 +16,6 @@ import {
   Clock,
   Phone,
   Building2,
-  Layers,
   AlertTriangle,
   RotateCcw,
   CheckCircle2,
@@ -44,7 +43,9 @@ import {
   ExclusiveMultipleDatesSummaryCard,
   ExclusiveSingleDateSummaryCard,
   type SelectedServiceItem,
+  type SummaryFoodItem,
 } from "./modal/summary";
+import type { SummaryBookedSpace } from "./modal/summary/SelectedSpacesSummary";
 import {
   getBookingConflictMessage,
   getBusinessToday,
@@ -265,6 +266,8 @@ const BookingSummaryRenderer = ({
           name: snap.spaceName || booking.spaceName || "Space",
           spaceCode: snap.spaceCode || booking.spaceCode || "",
           imageUrl: snap.spaceImageUrl || (booking.space as any)?.imageUrl || null,
+          images: snap.spaceImageUrl ? [snap.spaceImageUrl] : undefined,
+          capacity: snap.spaceCapacity || booking.spaceCapacity || (booking.space as any)?.capacity,
           price: snap.unitPrice || booking.unitPrice || 0,
           spaceType: snap.spaceType || booking.spaceType || "",
           category: snap.spaceCategory || booking.spaceCategory || "",
@@ -273,12 +276,17 @@ const BookingSummaryRenderer = ({
       : {
           name: booking.spaceName || "Space",
           spaceCode: booking.spaceCode || "",
-          imageUrl: null,
+          imageUrl: (booking.space as any)?.imageUrl || null,
+          capacity: booking.spaceCapacity || (booking.space as any)?.capacity,
           price: booking.unitPrice || 0,
           spaceType: booking.spaceType || "",
           category: booking.spaceCategory || "",
           day: booking.spaceDay || "",
         });
+  const foods = (Array.isArray(snap?.foods) ? snap.foods : []) as SummaryFoodItem[];
+  const bookedSpaces = (
+    Array.isArray(snap?.selectedSpaces) ? snap.selectedSpaces : booking.selectedSpaces || []
+  ) as SummaryBookedSpace[];
 
   const spaceQty = booking.spaceQty || snap?.spaceQty || 1;
   const selectedServices = (snap?.selectedServices ||
@@ -315,8 +323,8 @@ const BookingSummaryRenderer = ({
       snap?.unitPrice ?? booking.unitPrice ?? Number(booking.space?.price || 0);
 
     return (
-      <div className="w-full max-w-sm mx-auto text-left">
-        <CoworkingSummaryCard
+    <div className="w-full text-left">
+      <CoworkingSummaryCard
           space={resolvedSpace}
           spaceQty={spaceQty}
           startDate={startDate}
@@ -330,6 +338,8 @@ const BookingSummaryRenderer = ({
           packageMultiplier={packageMultiplier}
           unitPrice={unitPrice}
           selectedServices={selectedServices}
+          foods={foods}
+          bookedSpaces={bookedSpaces}
           discountAmount={discountAmount}
           cashbackAmount={cashbackAmount}
           formatDateDisplay={formatDateDisplay}
@@ -357,13 +367,14 @@ const BookingSummaryRenderer = ({
       snap?.unitPrice ?? booking.unitPrice ?? Number(booking.space?.price || 800);
 
     return (
-      <div className="w-full max-w-sm mx-auto text-left">
-        <ExclusiveMultipleDatesSummaryCard
+    <div className="w-full text-left">
+      <ExclusiveMultipleDatesSummaryCard
           space={resolvedSpace}
           spaceQty={spaceQty}
           slots={slots}
           hourlyRate={hourlyRate}
           selectedServices={selectedServices}
+          foods={foods}
           discountAmount={discountAmount}
           cashbackAmount={cashbackAmount}
           formatDateDisplay={formatDateDisplay}
@@ -384,7 +395,7 @@ const BookingSummaryRenderer = ({
   const offer = bookingOffer(booking);
 
   return (
-    <div className="w-full max-w-sm mx-auto text-left">
+    <div className="w-full text-left">
       <ExclusiveSingleDateSummaryCard
         space={resolvedSpace}
         spaceQty={spaceQty}
@@ -393,9 +404,11 @@ const BookingSummaryRenderer = ({
         duration={duration}
         hourlyRate={hourlyRate}
         selectedServices={selectedServices}
+        foods={foods}
+        bookedSpaces={bookedSpaces}
         discountAmount={discountAmount}
         cashbackAmount={cashbackAmount}
-        offerFreeHours={Number(offer?.freeHours || 0)}
+        offerFreeHours={Number(offer?.freeHours || snap?.offerFreeHours || 0)}
         offerDiscount={Number(offer?.discount || 0)}
         offerName={offer?.offerName || ""}
         offerMinimumHours={Number(offer?.minimumHours || 0)}
@@ -2332,90 +2345,9 @@ const SpaceBook = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5">
-                  <span className="block text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                    Space
-                  </span>
-                  <div className="mt-1 flex items-center gap-2 font-semibold text-slate-800">
-                    <Layers size={16} className="shrink-0 text-indigo-500" />
-                    <span className="truncate">
-                      {spaceDisplayName(selectedBooking)}
-                    </span>
-                  </div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5">
-                  <span className="block text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                    Date
-                  </span>
-                  <div className="mt-1 flex items-center gap-2 font-semibold text-slate-800">
-                    <Calendar size={16} className="shrink-0 text-indigo-500" />
-                    <span>
-                      {formatDateDisplay(selectedBooking.bookingDate)}
-                    </span>
-                  </div>
-                </div>
-                <div className="col-span-2 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5">
-                  <span className="block text-[11px] font-medium uppercase tracking-wider text-slate-400">
-                    Time
-                  </span>
-                  <div className="mt-1 flex items-center gap-2 font-semibold text-slate-800">
-                    <Clock size={16} className="shrink-0 text-indigo-500" />
-                    <span className="font-mono text-xs tabular-nums">
-                      {selectedBooking.bookingTime ||
-                        `${selectedBooking.startTime} - ${selectedBooking.endTime}`}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <BookingSummaryRenderer booking={selectedBooking} />
 
-              <div className="rounded-xl border border-slate-100 bg-white p-3.5 text-xs text-slate-600">
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Billing
-                </p>
-                <p>Original amount: ₹{Number(selectedBooking.originalAmount || selectedBooking.grandTotal || 0).toLocaleString("en-IN")}</p>
-                <p>Rescheduled amount: ₹{Number(selectedBooking.grandTotal || 0).toLocaleString("en-IN")}</p>
-                <p>Amount paid: ₹{Number(selectedBooking.status === "Draft" ? 0 : selectedBooking.paidAmount || 0).toLocaleString("en-IN")}</p>
-                <p>
-                  Refund / wallet adjustment: ₹
-                  {(selectedBooking.payments || [])
-                    .filter((row) => row.kind === "refund")
-                    .reduce((sum, row) => sum + Number(row.amount || 0), 0)
-                    .toLocaleString("en-IN")}
-                </p>
-                <p>Pending amount: ₹{(Number(selectedBooking.dueAmount || 0) < 1 ? 0 : Number(selectedBooking.dueAmount || 0)).toLocaleString("en-IN")}</p>
-                {bookingOffer(selectedBooking) ? (
-                  <div className="mt-3 space-y-1 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-violet-900">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-violet-500">Offer used</p>
-                    <p className="font-bold">{offerRuleText(bookingOffer(selectedBooking)!)}</p>
-                    {bookingOffer(selectedBooking)?.offerName ? (
-                      <p>Offer name: {bookingOffer(selectedBooking)?.offerName}</p>
-                    ) : null}
-                    <p>Free hours: {Number(bookingOffer(selectedBooking)?.freeHours || 0)}</p>
-                    <p>Hours charged: {Number(bookingOffer(selectedBooking)?.chargeableHours || 0)}</p>
-                    <p>
-                      Offer discount: ₹
-                      {Number(bookingOffer(selectedBooking)?.discount || 0).toLocaleString("en-IN")}
-                    </p>
-                  </div>
-                ) : null}
-                <p>
-                  Payment status:{" "}
-                  {selectedBooking.status === "Draft"
-                    ? "Not paid"
-                    : Number(selectedBooking.dueAmount || 0) < 1
-                    ? "Paid"
-                    : Number(selectedBooking.paidAmount || 0) > 0
-                      ? "Partially Paid"
-                      : "Pending"}
-                </p>
-                <p>
-                  Payment method:{" "}
-                  <span className="font-semibold text-slate-800">
-                    {bookingPaymentMethod(selectedBooking)}
-                  </span>
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -2448,7 +2380,6 @@ const SpaceBook = () => {
                   >
                     View Payment History
                   </button>
-                </div>
               </div>
 
               {selectedBooking.notes && (
@@ -2462,12 +2393,6 @@ const SpaceBook = () => {
                 </div>
               )}
 
-              <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 flex flex-col items-center">
-                <div className="mb-2 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Booking Summary Card
-                </div>
-                <BookingSummaryRenderer booking={selectedBooking} />
-              </div>
             </div>
 
             <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">

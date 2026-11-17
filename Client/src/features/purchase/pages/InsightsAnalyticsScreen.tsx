@@ -23,6 +23,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import SpaceUtilizationPanel from "@/features/BookingOverview/SpaceUtilization";
+import { handleGetBookingOverview, type SpaceUtilization } from "@/services/apiClient";
 import {
   fetchInsights,
   fetchVisitHistory,
@@ -77,6 +79,7 @@ const InsightsAnalyticsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [spaceUse, setSpaceUse] = useState<SpaceUtilization | null>(null);
 
   const query = useMemo<InsightQuery>(
     () => ({ preset, from, to, segment, membership }),
@@ -101,6 +104,19 @@ const InsightsAnalyticsScreen = () => {
       });
     return () => controller.abort();
   }, [query, canLoad, reloadKey]);
+
+  useEffect(() => {
+    if (!data?.range?.from || !data.range.to) return;
+    const controller = new AbortController();
+    handleGetBookingOverview({ from: data.range.from, to: data.range.to, limit: 1 })
+      .then(payload => {
+        if (!controller.signal.aborted) setSpaceUse(payload.utilization || null);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setSpaceUse(null);
+      });
+    return () => controller.abort();
+  }, [data?.range?.from, data?.range?.to]);
 
   const reset = () => {
     setPreset("today");
@@ -130,7 +146,11 @@ const InsightsAnalyticsScreen = () => {
             <RefreshCw size={14} /> Refresh
           </button>
         </div>
-      </header>
+        </header>
+        <section className="space-y-2">
+          <h2 className="text-sm font-bold text-slate-900">Space booking utilization</h2>
+          <SpaceUtilizationPanel data={spaceUse} />
+        </section>
 
       <section className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
         <FilterSelect

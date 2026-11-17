@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Download,
@@ -226,60 +226,39 @@ function whenDate(value?: string | null) {
   });
 }
 
-/** Smooth SVG Sparkline Graph */
-function Sparkline({
-  color,
-  points,
-  fillGradient,
+function VendorKpi({
+  icon,
+  iconClass,
+  label,
+  value,
+  change,
+  changeClass,
+  className = "",
 }: {
-  color: string;
-  points: number[];
-  fillGradient?: boolean;
+  icon: ReactNode;
+  iconClass: string;
+  label: string;
+  value: string;
+  change: string;
+  changeClass: string;
+  className?: string;
 }) {
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const range = max - min || 1;
-  const width = 64;
-  const height = 24;
-  const step = width / (points.length - 1);
-
-  const coords = points.map((p, i) => {
-    const x = i * step;
-    const y = height - ((p - min) / range) * (height - 6) - 3;
-    return [x, y];
-  });
-
-  let path = `M ${coords[0][0]} ${coords[0][1]}`;
-  for (let i = 0; i < coords.length - 1; i++) {
-    const [x0, y0] = coords[i];
-    const [x1, y1] = coords[i + 1];
-    const mx = (x0 + x1) / 2;
-    path += ` C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}`;
-  }
-
-  const fillPath = `${path} L ${width} ${height} L 0 ${height} Z`;
-  const gradId = `grad-${color.replace("#", "")}`;
-
   return (
-    <svg width={width} height={height} className="overflow-visible shrink-0">
-      {fillGradient && (
-        <defs>
-          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.0" />
-          </linearGradient>
-        </defs>
-      )}
-      {fillGradient && <path d={fillPath} fill={`url(#${gradId})`} />}
-      <path
-        d={path}
-        fill="none"
-        stroke={color}
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <div className={`rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs ${className}`}>
+      <div className="flex items-center gap-1.5">
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconClass}`}>
+          {icon}
+        </span>
+        <span className="min-w-0 truncate text-xs font-semibold text-slate-500">{label}</span>
+        <span className="ml-auto shrink-0 text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
+          {value}
+        </span>
+      </div>
+      <div className="mt-1.5 flex items-center gap-2 pl-8">
+        <span className={`rounded-full px-1.5 text-[10px] font-bold ${changeClass}`}>{change}</span>
+        <span className="text-[10px] font-medium text-slate-400">vs last month</span>
+      </div>
+    </div>
   );
 }
 
@@ -802,117 +781,48 @@ export default function VendorScreen() {
         </div>
       </div>
 
-      {/* 5 KPI Metric Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {/* Card 1: Total Vendors */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs flex items-center justify-between">
-          <div className="min-w-0 pr-2">
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#F5F3FF] text-[#7C3AED]">
-                <Store size={15} />
-              </div>
-              <span className="text-xs font-semibold text-slate-500 truncate">Total Vendors</span>
-            </div>
-            <div className="mt-1.5 flex items-baseline gap-2">
-              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                {loadingVendors ? "..." : totalVendors.toLocaleString("en-IN")}
-              </span>
-              <span className="inline-flex items-center text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded-full">
-                ↑ +8.7%
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">vs last month</span>
-          </div>
-          <Sparkline color="#7C3AED" points={[10, 18, 14, 25, 20, 28, 24]} />
-        </div>
-
-        {/* Card 2: Total CSP */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs flex items-center justify-between">
-          <div className="min-w-0 pr-2">
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#ECFDF5] text-[#059669]">
-                <ShieldCheck size={15} />
-              </div>
-              <span className="text-xs font-semibold text-slate-500 truncate">Total CSP</span>
-            </div>
-            <div className="mt-1.5 flex items-baseline gap-2">
-              <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                {loadingVendors ? "..." : totalCsp.toLocaleString("en-IN")}
-              </span>
-              <span className="inline-flex items-center text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded-full">
-                ↑ +12.5%
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">vs last month</span>
-          </div>
-          <Sparkline color="#059669" points={[8, 14, 11, 20, 18, 25, 22]} />
-        </div>
-
-        {/* Card 3: Total Purchase */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs flex items-center justify-between">
-          <div className="min-w-0 pr-2">
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#EFF6FF] text-[#2563EB]">
-                <ShoppingCart size={15} />
-              </div>
-              <span className="text-xs font-semibold text-slate-500 truncate">Total Purchase</span>
-            </div>
-            <div className="mt-1.5 flex items-baseline gap-2">
-              <span className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight truncate">
-                {loadingVendors ? "..." : inr(totalPurchaseSum)}
-              </span>
-              <span className="inline-flex items-center text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded-full">
-                ↑ +24.8%
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">vs last month</span>
-          </div>
-          <Sparkline color="#2563EB" points={[10, 12, 16, 15, 22, 19, 28]} fillGradient />
-        </div>
-
-        {/* Card 4: Total Paid */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs flex items-center justify-between">
-          <div className="min-w-0 pr-2">
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FFFBEB] text-[#D97706]">
-                <Wallet size={15} />
-              </div>
-              <span className="text-xs font-semibold text-slate-500 truncate">Total Paid</span>
-            </div>
-            <div className="mt-1.5 flex items-baseline gap-2">
-              <span className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight truncate">
-                {loadingVendors ? "..." : inr(totalPaidSum)}
-              </span>
-              <span className="inline-flex items-center text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded-full">
-                ↑ +24.8%
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">vs last month</span>
-          </div>
-          <Sparkline color="#D97706" points={[8, 12, 14, 18, 17, 24, 26]} />
-        </div>
-
-        {/* Card 5: Pending Payments */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-xs flex items-center justify-between col-span-2 md:col-span-1">
-          <div className="min-w-0 pr-2">
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FFF1F2] text-[#E11D48]">
-                <Hourglass size={15} />
-              </div>
-              <span className="text-xs font-semibold text-slate-500 truncate">Pending Payments</span>
-            </div>
-            <div className="mt-1.5 flex items-baseline gap-2">
-              <span className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight truncate">
-                {loadingVendors ? "..." : inr(pendingPaymentsSum)}
-              </span>
-              <span className="inline-flex items-center text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded-full">
-                0.0%
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">vs last month</span>
-          </div>
-          <Sparkline color="#E11D48" points={[15, 15, 14, 14, 15, 13, 14]} />
-        </div>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+        <VendorKpi
+          icon={<Store size={15} />}
+          iconClass="bg-[#F5F3FF] text-[#7C3AED]"
+          label="Total Vendors"
+          value={loadingVendors ? "..." : totalVendors.toLocaleString("en-IN")}
+          change="↑ +8.7%"
+          changeClass="bg-emerald-50 text-emerald-600"
+        />
+        <VendorKpi
+          icon={<ShieldCheck size={15} />}
+          iconClass="bg-[#ECFDF5] text-[#059669]"
+          label="Total CSP"
+          value={loadingVendors ? "..." : totalCsp.toLocaleString("en-IN")}
+          change="↑ +12.5%"
+          changeClass="bg-emerald-50 text-emerald-600"
+        />
+        <VendorKpi
+          icon={<ShoppingCart size={15} />}
+          iconClass="bg-[#EFF6FF] text-[#2563EB]"
+          label="Total Purchase"
+          value={loadingVendors ? "..." : inr(totalPurchaseSum)}
+          change="↑ +24.8%"
+          changeClass="bg-emerald-50 text-emerald-600"
+        />
+        <VendorKpi
+          icon={<Wallet size={15} />}
+          iconClass="bg-[#FFFBEB] text-[#D97706]"
+          label="Total Paid"
+          value={loadingVendors ? "..." : inr(totalPaidSum)}
+          change="↑ +24.8%"
+          changeClass="bg-emerald-50 text-emerald-600"
+        />
+        <VendorKpi
+          icon={<Hourglass size={15} />}
+          iconClass="bg-[#FFF1F2] text-[#E11D48]"
+          label="Pending Payments"
+          value={loadingVendors ? "..." : inr(pendingPaymentsSum)}
+          change="0.0%"
+          changeClass="bg-slate-100 text-slate-600"
+          className="col-span-2 md:col-span-1"
+        />
       </div>
 
       {/* Filter Tabs & Search / Action Row */}
