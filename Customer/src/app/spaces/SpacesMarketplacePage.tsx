@@ -470,10 +470,10 @@ export default function SpacesMarketplacePage() {
                   <div className="h-4 sm:h-6 w-3/4 animate-pulse rounded-lg bg-slate-100" />
                   <div className="h-3.5 sm:h-5 w-16 sm:w-24 animate-pulse rounded-xl bg-slate-100" />
                   <div className="flex flex-nowrap items-center justify-between pt-1.5 sm:pt-2 gap-1 sm:gap-2">
-                    <div className="h-5 sm:h-8 w-12 sm:w-28 animate-pulse rounded-lg bg-slate-100" />
-                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                      <div className="h-6 w-6 min-[360px]:h-7 min-[360px]:w-7 sm:h-10 sm:w-10 animate-pulse rounded-full bg-slate-100" />
-                      <div className="h-6 w-11 min-[360px]:h-7 min-[360px]:w-14 sm:h-10 sm:w-24 animate-pulse rounded-lg sm:rounded-2xl bg-slate-100" />
+                    <div className="h-4 sm:h-6 w-12 sm:w-20 animate-pulse rounded bg-slate-100" />
+                    <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                      <div className="h-5 w-5 sm:h-7 sm:w-7 animate-pulse rounded-full bg-slate-100" />
+                      <div className="h-5 w-10 sm:h-7 sm:w-14 animate-pulse rounded-md sm:rounded-xl bg-slate-100" />
                     </div>
                   </div>
                 </div>
@@ -542,26 +542,30 @@ export default function SpacesMarketplacePage() {
                     </div>
                   </div>
 
-                  {/* Price stays fully visible; share stays tight so it does not crowd the amount */}
-                  <div className="mt-2 sm:mt-5 flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1.5 sm:gap-2 pt-1.5 sm:pt-2 border-t border-slate-50">
-                    <div className="shrink-0">
-                      <span className="text-[9px] min-[360px]:text-[10px] sm:text-xs font-semibold text-slate-500 block leading-none">
+                  {/* Price stays fully visible; share & book are compact so price never crowds or truncates */}
+                  <div className="mt-2 sm:mt-4 flex items-center justify-between gap-1 pt-1.5 sm:pt-2 border-t border-slate-50 min-w-0">
+                    <div className="min-w-0 shrink-0">
+                      <span className="text-[8px] min-[360px]:text-[9px] sm:text-xs font-semibold text-slate-500 block leading-tight">
                         From
                       </span>
-                      <p className="mt-0.5 whitespace-nowrap text-[13px] min-[360px]:text-sm sm:text-xl lg:text-2xl font-black leading-none tracking-tight text-[#111827]">
-                        ₹{formatInr(space.fromPrice)}
-                        <span className="ml-0.5 text-[9px] min-[360px]:text-[10px] sm:text-xs font-bold text-slate-500">/hr</span>
-                      </p>
+                      <div className="flex items-baseline gap-0.5 mt-0.5">
+                        <span className="text-[11px] min-[360px]:text-xs min-[400px]:text-sm sm:text-lg lg:text-xl font-black leading-tight tracking-tight text-[#111827] whitespace-nowrap">
+                          ₹{formatInr(space.fromPrice)}
+                        </span>
+                        <span className="text-[7.5px] min-[360px]:text-[8.5px] sm:text-xs font-bold text-slate-500 shrink-0">
+                          /hr
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                    <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                       <button
                         type="button"
                         onClick={e => {
                           e.stopPropagation();
                           void handleShare(space);
                         }}
-                        className="flex h-5 w-5 min-[360px]:h-6 min-[360px]:w-6 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-[#F3E8FF] p-0.5 hover:bg-[#E9D5FF] text-[#7C3AED] transition active:scale-95 cursor-pointer shrink-0"
+                        className="flex h-5 w-5 sm:h-7 sm:w-7 items-center justify-center rounded-full bg-[#F3E8FF] hover:bg-[#E9D5FF] text-[#7C3AED] transition active:scale-95 cursor-pointer shrink-0"
                         title="Share space"
                         aria-label="Share space"
                       >
@@ -573,9 +577,9 @@ export default function SpacesMarketplacePage() {
                           e.stopPropagation();
                           handleBook(space);
                         }}
-                        className="inline-flex items-center justify-center gap-1 rounded-lg min-[360px]:rounded-xl sm:rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] px-1.5 min-[360px]:px-2.5 sm:px-4 py-1 min-[360px]:py-1.5 sm:py-2.5 text-[9px] min-[360px]:text-[11px] sm:text-sm font-bold text-white shadow-xs sm:shadow-md sm:shadow-purple-500/25 transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
+                        className="inline-flex items-center justify-center gap-0.5 sm:gap-1 rounded-md sm:rounded-xl bg-[#6344E7] hover:bg-[#5235D9] px-1.5 sm:px-3 py-1 sm:py-1.5 text-[8.5px] min-[360px]:text-[9.5px] sm:text-xs font-bold text-white shadow-xs transition active:scale-95 cursor-pointer shrink-0 whitespace-nowrap"
                       >
-                        <CalendarCheck className="w-2.5 h-2.5 min-[360px]:w-3 min-[360px]:h-3 sm:w-[17px] sm:h-[17px] stroke-[2.2]" />
+                        <CalendarCheck className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 stroke-[2.2]" />
                         <span>Book</span>
                       </button>
                     </div>
