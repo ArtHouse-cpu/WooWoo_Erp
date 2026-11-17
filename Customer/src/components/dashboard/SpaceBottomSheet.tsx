@@ -13,42 +13,18 @@ import {
   Users,
   BookOpen,
   Ellipsis,
-  Star,
-  Shield,
-  Wifi,
-  Sofa,
   MessageCircle,
   Book,
   Compass,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
-import {recordPortalEnquiry} from '../../services/enquiry.service';
 import {
   fetchSpacesByType,
   groupSpacesByName,
   type SpaceCard,
 } from '../../services/space.service';
 import {SpaceDetailsModal} from '../spaces/SpaceDetailsModal';
-
-const SPACE_WHATSAPP = '918073988123';
-
-function spaceQueryUrl(section: 'Exclusive Space' | 'Coworking') {
-  const text = `Hi, I have a query about ${section} at WooWoo Art House.`;
-  return `https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent(text)}`;
-}
-
-function formatInr(value: number) {
-  return Math.max(0, Number(value) || 0).toLocaleString('en-IN', {
-    maximumFractionDigits: 0,
-  });
-}
-
-function dayPriceLine(card: SpaceCard) {
-  const parts: string[] = [];
-  if (card.weekdayPrice != null) parts.push(`Weekday ₹${formatInr(card.weekdayPrice)}`);
-  if (card.weekendPrice != null) parts.push(`Weekend ₹${formatInr(card.weekendPrice)}`);
-  return parts.join(' · ');
-}
+import {SpaceQueryModal} from './SpaceQueryModal';
 
 function SpacePhoto({
   src,
@@ -177,14 +153,13 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
   const [activeDot, setActiveDot] = useState(0);
   const [exclusiveSpaces, setExclusiveSpaces] = useState<SpaceCard[]>([]);
   const [coworkingSpaces, setCoworkingSpaces] = useState<SpaceCard[]>([]);
-  const [spacesLoading, setSpacesLoading] = useState(false);
   const [spacesError, setSpacesError] = useState('');
   const [detailSpace, setDetailSpace] = useState<SpaceCard | null>(null);
+  const [isQueryModalOpen, setIsQueryModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     const controller = new AbortController();
-    setSpacesLoading(true);
     setSpacesError('');
 
     Promise.all([
@@ -201,9 +176,6 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
         setExclusiveSpaces([]);
         setCoworkingSpaces([]);
         setSpacesError('Could not load spaces.');
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setSpacesLoading(false);
       });
 
     return () => controller.abort();
@@ -358,63 +330,6 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     onSelect={setActiveDot}
                     onOpen={setDetailSpace}
                   />
-
-                  {/* Available Spaces Section */}
-                  <div className="mb-5">
-                    <h4 className="text-[15px] font-black text-[#111111] px-5 mb-3 text-left">
-                      Available Spaces
-                    </h4>
-                    {spacesLoading ? (
-                      <p className="px-5 text-[12px] font-bold text-[#9CA3AF]">Loading spaces…</p>
-                    ) : exclusiveSpaces.length === 0 ? (
-                      <p className="px-5 text-[12px] font-bold text-[#9CA3AF]">No exclusive spaces yet.</p>
-                    ) : (
-                      <div className="px-5 flex gap-2 overflow-x-auto scrollbar-none">
-                        {exclusiveSpaces.map(space => (
-                          <button
-                            type="button"
-                            key={space.id}
-                            onClick={() => setDetailSpace(space)}
-                            className="w-[132px] shrink-0 overflow-hidden rounded-[16px] border border-transparent text-center flex flex-col bg-[#F8FAFC] shadow-2xs"
-                          >
-                            <div className="h-[84px] w-full overflow-hidden">
-                              <SpacePhoto
-                                src={space.imageUrl}
-                                alt={space.name}
-                                fallback={<Building className="h-5 w-5" />}
-                              />
-                            </div>
-                            <div className="flex flex-1 flex-col items-center justify-between p-2.5">
-                            <div className="my-1.5 w-full">
-                              <p className="text-[11px] font-black text-[#111111] leading-tight line-clamp-2">
-                                {space.name}
-                              </p>
-                              <p className="text-[8.5px] font-bold text-[#4B5563] leading-none mt-0.5">
-                                {space.capacity > 0
-                                  ? `Upto ${space.capacity} People`
-                                  : space.category || 'Exclusive'}
-                              </p>
-                            </div>
-                            <p className="text-[7.5px] text-[#9CA3AF] font-bold leading-tight line-clamp-2">
-                              {space.description || dayPriceLine(space) || 'Available to book'}
-                            </p>
-                            </div>
-                          </button>
-                        ))}
-                        <div className="w-[108px] shrink-0 rounded-[16px] p-2.5 text-center flex flex-col justify-between min-h-[120px] bg-[#FFF0EB] border border-[#FFEDD5] shadow-2xs">
-                          <p className="text-[9.5px] font-black text-[#EA580C] leading-none mt-0.5">Pricing</p>
-                          <div>
-                            <p className="text-[7px] font-bold text-[#9CA3AF] leading-none">Starts at</p>
-                            <p className="text-[16px] font-black text-[#111111] my-0.5 leading-none">
-                              ₹{formatInr(Math.min(...exclusiveSpaces.map(space => space.fromPrice)))}
-                            </p>
-                            <p className="text-[7.5px] font-bold text-[#9CA3AF] leading-none">/day</p>
-                          </div>
-                          <div />
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 </>
               ) : (
                 <>
@@ -453,149 +368,10 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     onSelect={setActiveDot}
                     onOpen={setDetailSpace}
                   />
-
-                  {/* Coworking Pass Section */}
-                  <div className="mb-5">
-                    <h4 className="text-[15px] font-black text-[#111111] px-5 mb-3 text-left">
-                      Coworking
-                    </h4>
-                    {spacesLoading ? (
-                      <p className="px-5 text-[12px] font-bold text-[#9CA3AF]">Loading spaces…</p>
-                    ) : coworkingSpaces.length === 0 ? (
-                      <p className="px-5 text-[12px] font-bold text-[#9CA3AF]">No coworking spaces yet.</p>
-                    ) : (
-                      <div className="px-5 flex gap-2 overflow-x-auto scrollbar-none pb-1">
-                        {coworkingSpaces.map(space => {
-                          const lowest = Math.min(...coworkingSpaces.map(item => item.fromPrice));
-                          const featured = space.fromPrice === lowest;
-                          return (
-                            <button
-                              type="button"
-                              key={space.id}
-                              onClick={() => setDetailSpace(space)}
-                              className={`relative w-[140px] shrink-0 overflow-hidden rounded-[16px] text-center flex flex-col shadow-2xs ${
-                                featured
-                                  ? 'border border-[#EA580C] bg-[#FFF0EB]'
-                                  : 'border border-slate-100 bg-[#F8FAFC]'
-                              }`}
-                            >
-                              <div className="relative h-[84px] w-full overflow-hidden">
-                                <SpacePhoto
-                                  src={space.imageUrl}
-                                  alt={space.name}
-                                  fallback={<Laptop className="h-5 w-5" />}
-                                />
-                              </div>
-                              {featured ? (
-                                <div className="absolute left-2 top-2 bg-[#EA580C] text-white text-[7px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap">
-                                  Starts at
-                                </div>
-                              ) : null}
-                              <div className="my-1.5 w-full px-2">
-                                <p className="text-[11px] font-black text-[#111111] leading-tight line-clamp-2">
-                                  {space.name}
-                                </p>
-                                <p className={`text-[13px] font-black my-0.5 leading-none ${featured ? 'text-[#EA580C]' : 'text-[#111111]'}`}>
-                                  ₹{formatInr(space.fromPrice)}
-                                </p>
-                              </div>
-                              <p className="text-[7.5px] text-[#9CA3AF] font-bold leading-tight line-clamp-2">
-                                {dayPriceLine(space) || space.category || 'Coworking'}
-                              </p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
                 </>
               )}
 
-              {/* Benefits Section */}
-              {activeTab === 'exclusive-space' ? (
-                <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-b border-slate-100 py-5 px-3 mb-5 mt-4">
-                  {/* Benefit 1 */}
-                  {/* <div className="flex flex-col items-center text-center px-1">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFF0EB] text-[#EA580C]">
-                      <Star className="h-5 w-5 fill-[#EA580C] text-[#EA580C]" strokeWidth={2} />
-                    </div>
-                    <h5 className="text-[12px] font-black text-[#111111] mt-2.5 leading-none">
-                      Premium Ambience
-                    </h5>
-                    <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
-                      Inspiring creative spaces
-                    </p>
-                  </div> */}
-
-                  {/* Benefit 2 */}
-                  {/* <div className="flex flex-col items-center text-center px-1">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#E8F8EF] text-[#15803D]">
-                      <Calendar className="h-5 w-5 text-[#15803D]" strokeWidth={2} />
-                    </div>
-                    <h5 className="text-[12px] font-black text-[#111111] mt-2.5 leading-none">
-                      Instant Booking
-                    </h5>
-                    <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
-                      Real-time availability
-                    </p>
-                  </div> */}
-
-                  {/* Benefit 3 */}
-                  {/* <div className="flex flex-col items-center text-center px-1">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F3E8FF] text-[#7C3AED]">
-                      <Shield className="h-5 w-5 text-[#7C3AED]" strokeWidth={2} />
-                    </div>
-                    <h5 className="text-[12px] font-black text-[#111111] mt-2.5 leading-none">
-                      Safe & Hassle-free
-                    </h5>
-                    <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
-                      Verified, well-managed spaces
-                    </p>
-                  </div> */}
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-b border-slate-100 py-5 px-3 mb-5 mt-4">
-                  {/* Benefit 1 */}
-                  {/* <div className="flex flex-col items-center text-center px-1">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFF0EB] text-[#EA580C]">
-                      <Star className="h-5 w-5 text-[#EA580C]" strokeWidth={2} />
-                    </div>
-                    <h5 className="text-[12px] font-black text-[#111111] mt-2.5 leading-none">
-                      Inspiring Environment
-                    </h5>
-                    <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
-                      Designed for creatives
-                    </p>
-                  </div> */}
-
-                  {/* Benefit 2 */}
-                  {/* <div className="flex flex-col items-center text-center px-1">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#E8F8EF] text-[#15803D]">
-                      <Wifi className="h-5 w-5 text-[#15803D]" strokeWidth={2} />
-                    </div>
-                    <h5 className="text-[12px] font-black text-[#111111] mt-2.5 leading-none">
-                      High Speed Wi-Fi
-                    </h5>
-                    <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
-                      Stay connected always
-                    </p>
-                  </div> */}
-
-                  {/* Benefit 3 */}
-                  {/* <div className="flex flex-col items-center text-center px-1">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F3E8FF] text-[#7C3AED]">
-                      <Sofa className="h-5 w-5 text-[#7C3AED]" strokeWidth={2} />
-                    </div>
-                    <h5 className="text-[12px] font-black text-[#111111] mt-2.5 leading-none">
-                      Tea & Coffee
-                    </h5>
-                    <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
-                      On the house
-                    </p>
-                  </div> */}
-                </div>
-              )}
-
+              {/* Benefits Section - commented out */}
             </div>
 
             {/* Bottom sticky CTA Buttons */}
@@ -616,25 +392,23 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <Compass className="h-5 w-5" strokeWidth={2.5} />
                   </button>
                   <div className="flex min-w-0 flex-1 gap-3">
-                    {/* Book Online Button */}
-                    <button
-                      type="button"
-                      className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
-                    >
-                      <Calendar className="h-4.5 w-4.5" strokeWidth={2.5} />
-                      <span>Book Online</span>
-                    </button>
-
+                    {/* Explore Space Button (Refactored from Book Online) */}
                     <button
                       type="button"
                       onClick={() => {
-                        recordPortalEnquiry({
-                          enquiryType: 'Space',
-                          itemName: 'Exclusive Space',
-                          description: 'Customer asked about exclusive space availability from the customer portal.',
-                        });
-                        window.open(spaceQueryUrl('Exclusive Space'), '_blank', 'noopener,noreferrer');
+                        onClose();
+                        navigate('/spaces');
                       }}
+                      className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
+                    >
+                      <Compass className="h-4.5 w-4.5" strokeWidth={2.5} />
+                      <span>Explore Space</span>
+                    </button>
+
+                    {/* Query Now - Opens Space Lead Form without selecting specific space */}
+                    <button
+                      type="button"
+                      onClick={() => setIsQueryModalOpen(true)}
                       className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
                     >
                       <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
@@ -644,7 +418,7 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                 </>
               ) : (
                 <div className="flex min-w-0 flex-1 gap-3">
-                  {/* Explore More Button (Coworking Section - Compass button removed) */}
+                  {/* Explore Plans Button */}
                   <button
                     type="button"
                     onClick={() => {
@@ -653,20 +427,14 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     }}
                     className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
                   >
-                    <Calendar className="h-4.5 w-4.5" strokeWidth={2.5} />
+                    <Compass className="h-4.5 w-4.5" strokeWidth={2.5} />
                     <span>Explore Plans</span>
                   </button>
 
+                  {/* Query Now - Opens Space Lead Form without selecting specific space */}
                   <button
                     type="button"
-                    onClick={() => {
-                      recordPortalEnquiry({
-                        enquiryType: 'Space',
-                        itemName: 'Coworking',
-                        description: 'Customer asked about coworking space availability from the customer portal.',
-                      });
-                      window.open(spaceQueryUrl('Coworking'), '_blank', 'noopener,noreferrer');
-                    }}
+                    onClick={() => setIsQueryModalOpen(true)}
                     className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
                   >
                     <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
@@ -679,6 +447,13 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
           {detailSpace ? (
             <SpaceDetailsModal space={detailSpace} onClose={() => setDetailSpace(null)} />
           ) : null}
+
+          {/* Space Query Lead Modal without requiring specific space selection */}
+          <SpaceQueryModal
+            isOpen={isQueryModalOpen}
+            onClose={() => setIsQueryModalOpen(false)}
+            initialSpaceType={activeTab === 'exclusive-space' ? 'Exclusive Space' : 'Coworking'}
+          />
         </div>
       )}
     </AnimatePresence>
