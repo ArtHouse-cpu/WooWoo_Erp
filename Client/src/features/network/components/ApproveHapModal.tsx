@@ -19,6 +19,7 @@ export type HapApplicationDetails = {
   networkSize: string;
   payoutDetail: string;
   presence: string;
+  promotionChannels?: string[];
   avatarInitials: string;
   avatarBg?: string;
   avatarText?: string;
@@ -114,10 +115,12 @@ const ApproveHapModal = ({
             <DetailRow icon={<Phone className="h-4 w-4" />} label="Phone" value={application.phoneNumber} />
             <DetailRow icon={<Briefcase className="h-4 w-4" />} label="Profession" value={application.profession} />
             <DetailRow icon={<Users className="h-4 w-4" />} label="Network size" value={application.networkSize} />
-            <DetailRow icon={<Wallet className="h-4 w-4" />} label="UPI / account" value={application.payoutDetail} />
+            {application.payoutDetail ? (
+              <DetailRow icon={<Wallet className="h-4 w-4" />} label="UPI / account" value={application.payoutDetail} />
+            ) : null}
             <DetailRow
               icon={<Link2 className="h-4 w-4" />}
-              label="Website / social"
+              label="Portfolio / Profile"
               value={
                 href ? (
                   <a href={href} target="_blank" rel="noreferrer" className="text-violet-700 hover:underline">
@@ -128,6 +131,13 @@ const ApproveHapModal = ({
                 )
               }
             />
+            {application.promotionChannels && application.promotionChannels.length > 0 ? (
+              <DetailRow
+                icon={<Users className="h-4 w-4" />}
+                label="Promotion"
+                value={application.promotionChannels.join(", ")}
+              />
+            ) : null}
             <DetailRow icon={<User className="h-4 w-4" />} label="Submitted" value={application.submittedAt || "—"} />
           </div>
         </div>

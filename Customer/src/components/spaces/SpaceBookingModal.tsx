@@ -18,6 +18,7 @@ import {
   Minus,
   Check,
   ShieldCheck,
+  ChevronDown,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import type {SpaceCard} from '../../services/space.service';
@@ -145,6 +146,7 @@ export function SpaceBookingModal({
   membershipTier,
 }: SpaceBookingModalProps) {
   const [purpose, setPurpose] = useState('Show');
+  const [customPurpose, setCustomPurpose] = useState('');
   const [guestCount, setGuestCount] = useState<number>(60);
   const [bookingDate, setBookingDate] = useState<string>('');
   const [startTime, setStartTime] = useState('06:00');
@@ -160,6 +162,7 @@ export function SpaceBookingModal({
     if (!isOpen || !space) return;
 
     setPurpose('Show');
+    setCustomPurpose('');
     setGuestCount(space.capacity > 0 ? space.capacity : 60);
     setBookingDate(toIsoDate(initialDate));
     setStartTime(initialStartTime || '06:00');
@@ -232,12 +235,16 @@ export function SpaceBookingModal({
     e.preventDefault();
     if (!space) return;
 
-    const trimmedPurpose = purpose.trim() || 'Show';
+    const trimmedPurpose =
+      purpose.toLowerCase() === 'other'
+        ? (customPurpose.trim() || 'Other')
+        : (purpose.trim() || 'Show');
     const formattedDate = formatDisplayDate(bookingDate);
     const durationText = `${durationHours} ${durationHours === 1 ? 'hour' : 'hours'}`;
     const timingText = `${startTime} to ${endTime} (${durationText})`;
     const pricingText = `₹${formatInr(calculatedTotal)}`;
-    const guestsText = `Up to ${guestCount} ${guestCount === 1 ? 'person' : 'people'}`;
+    const effectiveGuests = Math.max(1, guestCount || 1);
+    const guestsText = `Up to ${effectiveGuests} ${effectiveGuests === 1 ? 'person' : 'people'}`;
     const spaceLink = spaceShareUrl(space.id, membershipTier?.id);
 
     // Build additional section
@@ -381,99 +388,99 @@ export function SpaceBookingModal({
                 </div>
               </div>
 
-              {/* Field 1: Purpose */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Purpose <span className="text-rose-500">*</span>
-                </label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {POPULAR_PURPOSES.map(p => {
-                    const active = purpose.toLowerCase() === p.toLowerCase();
-                    return (
-                      <button
-                        type="button"
-                        key={p}
-                        onClick={() => setPurpose(p)}
-                        className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer ${
-                          active
-                            ? 'bg-[#6344E7] text-white shadow-xs'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    );
-                  })}
-                </div>
-                <input
-                  type="text"
-                  value={purpose}
-                  onChange={e => setPurpose(e.target.value)}
-                  placeholder="e.g. Show, Workshop, Shoot, Birthday Party"
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-[#6344E7] focus:outline-hidden focus:ring-2 focus:ring-[#6344E7]/20"
-                />
-              </div>
-
-              {/* Field 2: Guest Count */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                    <Users size={14} className="text-slate-500" />
-                    <span>Guest Count <span className="text-rose-500">*</span></span>
+              {/* Field 1 & 2: Purpose and Guest Count in 50:50 ratio */}
+              <div className="grid grid-cols-2 gap-3 items-start">
+                {/* Purpose Column */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 truncate">
+                    Purpose <span className="text-rose-500">*</span>
                   </label>
-                  {space.capacity > 0 && (
-                    <span className="text-[11px] font-semibold text-slate-500">
-                      Space Capacity: Up to {space.capacity}
-                    </span>
-                  )}
+                  <div className="relative">
+                    <select
+                      value={purpose}
+                      onChange={e => setPurpose(e.target.value)}
+                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-8 text-xs sm:text-sm font-bold text-slate-900 focus:border-[#6344E7] focus:outline-hidden focus:ring-2 focus:ring-[#6344E7]/20 cursor-pointer shadow-2xs"
+                    >
+                      {POPULAR_PURPOSES.map(p => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
+                      <ChevronDown size={15} className="stroke-[2.5]" />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+
+                {/* Guest Count Column */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="flex items-center gap-1 text-xs font-bold text-slate-700 truncate">
+                      <Users size={13} className="text-slate-500 shrink-0" />
+                      <span>Guest Count <span className="text-rose-500">*</span></span>
+                    </label>
+                    {space.capacity > 0 && (
+                      <span className="text-[10px] font-semibold text-slate-400 truncate hidden sm:inline">
+                        Max {space.capacity}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-1 w-full">
                     <button
                       type="button"
-                      onClick={() => handleGuestCountChange(-5)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-700 shadow-2xs hover:bg-slate-100 transition cursor-pointer"
-                      title="Decrease by 5"
+                      onClick={() => handleGuestCountChange(-1)}
+                      className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-white text-slate-700 shadow-2xs hover:bg-slate-100 transition cursor-pointer shrink-0"
+                      title="Decrease guest count"
+                      aria-label="Decrease guest count"
                     >
-                      <Minus size={14} />
+                      <Minus size={14} strokeWidth={2.5} />
                     </button>
                     <input
                       type="number"
                       min={1}
-                      max={1000}
-                      value={guestCount}
-                      onChange={e => setGuestCount(Math.max(1, Number(e.target.value) || 1))}
-                      className="w-16 bg-transparent text-center text-sm font-black text-slate-900 focus:outline-hidden"
+                      max={space.capacity > 0 ? space.capacity * 2 : 1000}
+                      value={guestCount === 0 ? '' : guestCount}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === '') {
+                          setGuestCount(0);
+                        } else {
+                          const num = parseInt(val, 10);
+                          if (!isNaN(num)) setGuestCount(Math.max(1, num));
+                        }
+                      }}
+                      onBlur={() => {
+                        if (guestCount < 1) setGuestCount(1);
+                      }}
+                      placeholder="1"
+                      className="w-full flex-1 bg-transparent text-center text-xs sm:text-sm font-black text-slate-900 focus:outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
                     />
                     <button
                       type="button"
-                      onClick={() => handleGuestCountChange(5)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-700 shadow-2xs hover:bg-slate-100 transition cursor-pointer"
-                      title="Increase by 5"
+                      onClick={() => handleGuestCountChange(1)}
+                      className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-white text-slate-700 shadow-2xs hover:bg-slate-100 transition cursor-pointer shrink-0"
+                      title="Increase guest count"
+                      aria-label="Increase guest count"
                     >
-                      <Plus size={14} />
+                      <Plus size={14} strokeWidth={2.5} />
                     </button>
                   </div>
-
-                  {/* Preset quick chips */}
-                  <div className="flex flex-wrap gap-1">
-                    {[10, 25, 50, space.capacity || 60].filter((v, i, a) => a.indexOf(v) === i).map(n => (
-                      <button
-                        type="button"
-                        key={n}
-                        onClick={() => setGuestCount(n)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
-                          guestCount === n
-                            ? 'bg-purple-100 text-[#6344E7] border border-purple-300'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {n}
-                      </button>
-                    ))}
-                  </div>
                 </div>
+
+                {/* If "Other" is selected, open placeholder input spanning across */}
+                {purpose.toLowerCase() === 'other' && (
+                  <div className="col-span-2 -mt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <input
+                      type="text"
+                      value={customPurpose}
+                      onChange={e => setCustomPurpose(e.target.value)}
+                      placeholder="Specify your purpose (e.g. Photography, Dance, Workshop, Podcast...)"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-900 focus:border-[#6344E7] focus:outline-hidden focus:ring-2 focus:ring-[#6344E7]/20 placeholder:text-slate-400 shadow-2xs"
+                      autoFocus
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Field 3: Date */}
@@ -565,12 +572,17 @@ export function SpaceBookingModal({
                   Additional Add-ons
                 </h4>
 
-                {/* Additional Services */}
+                {/* Additional Services - Sideways scroll & select */}
                 <div className="mb-3">
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Services
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Services
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-medium">
+                      Scroll sideways to select
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-2 pt-0.5 -mx-1 px-1">
                     {AVAILABLE_SERVICES.map(srv => {
                       const Icon = srv.icon;
                       const isSelected = selectedServices.includes(srv.label);
@@ -579,9 +591,9 @@ export function SpaceBookingModal({
                           type="button"
                           key={srv.id}
                           onClick={() => toggleService(srv.label)}
-                          className={`flex items-center gap-2.5 p-2 rounded-xl border text-left transition cursor-pointer ${
+                          className={`flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 text-left transition cursor-pointer whitespace-nowrap ${
                             isSelected
-                              ? 'bg-purple-50/80 border-[#6344E7] text-[#6344E7]'
+                              ? 'bg-purple-50/90 border-[#6344E7] text-[#6344E7] shadow-2xs'
                               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                           }`}
                         >
@@ -592,7 +604,7 @@ export function SpaceBookingModal({
                           >
                             {isSelected ? <Check size={12} strokeWidth={3} /> : <Icon size={12} />}
                           </div>
-                          <span className="text-xs font-semibold truncate">{srv.label}</span>
+                          <span className="text-xs font-semibold">{srv.label}</span>
                         </button>
                       );
                     })}
@@ -629,13 +641,18 @@ export function SpaceBookingModal({
                     </label>
                   </div>
 
-                  {/* Food items when enabled */}
+                  {/* Food items when enabled - sideways scroll & select */}
                   {includeFood && (
                     <div className="mt-3 pt-2.5 border-t border-emerald-100/80">
-                      <span className="block text-[11px] font-bold text-slate-700 mb-1.5">
-                        Select food items:
-                      </span>
-                      <div className="grid grid-cols-2 gap-1.5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="block text-[11px] font-bold text-slate-700">
+                          Select food items:
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          Scroll sideways
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1.5 -mx-1 px-1">
                         {FOOD_OPTIONS.map(item => {
                           const isSelected = selectedFoodItems.includes(item.label);
                           return (
@@ -643,7 +660,7 @@ export function SpaceBookingModal({
                               type="button"
                               key={item.id}
                               onClick={() => toggleFoodItem(item.label)}
-                              className={`flex items-center gap-2 p-2 rounded-xl border text-left transition cursor-pointer ${
+                              className={`flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 text-left transition cursor-pointer whitespace-nowrap ${
                                 isSelected
                                   ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
                                   : 'bg-white text-slate-700 border-emerald-200/60 hover:bg-emerald-50/50'
@@ -658,7 +675,7 @@ export function SpaceBookingModal({
                               >
                                 {isSelected && <Check size={10} strokeWidth={3} />}
                               </div>
-                              <span className="text-xs font-semibold truncate">{item.label}</span>
+                              <span className="text-xs font-semibold">{item.label}</span>
                             </button>
                           );
                         })}
@@ -677,9 +694,8 @@ export function SpaceBookingModal({
                   <Send size={16} />
                   <span>Book on WhatsApp · ₹{formatInr(calculatedTotal)}</span>
                 </button>
-                <p className="mt-1.5 text-center text-[10px] text-slate-400">
-                  You will be redirected to WooWoo Art House WhatsApp with your booking details prefilled.
-                </p>
+               
+               
               </div>
             </form>
           </motion.div>

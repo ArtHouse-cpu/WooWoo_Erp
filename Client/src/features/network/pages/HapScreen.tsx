@@ -40,6 +40,7 @@ type ApplicationRow = {
   networkSize: string;
   payoutDetail: string;
   presence: string;
+  promotionChannels?: string[];
   status: StatusFilter;
   avatarInitials: string;
   avatarBg: string;
@@ -90,6 +91,7 @@ function mapRow(row: HapApplicationRecord, index: number): ApplicationRow {
     networkSize: row.networkSize ? String(row.networkSize) : "",
     payoutDetail: row.payoutDetail || "",
     presence: row.presence || "",
+    promotionChannels: row.promotionChannels || [],
     status:
       row.status === "approved" || row.status === "rejected"
         ? row.status

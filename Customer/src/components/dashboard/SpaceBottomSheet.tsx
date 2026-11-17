@@ -261,34 +261,20 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     Space
                   </h3>
                   <p className="mt-0.5 text-[12px] font-bold text-[#6B7280]">
-                    Book studio space
+                    Reserve space for any occassion
                   </p>
                 </div>
               </div>
 
-              {/* Header Right: Help Button & Close Button */}
-              <div className="flex items-center gap-2">
-                <a
-                  href={`https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent(
-                    'Hi WooWoo Art House, I need some help regarding spaces.',
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-[13px] border border-emerald-500 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 hover:border-emerald-600 transition active:scale-95 cursor-pointer shadow-3xs"
-                  title="Help on WhatsApp"
-                >
-                  <MessageCircle className="h-4 w-4 text-emerald-600 stroke-[2.2]" />
-                  <span>Help</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB]"
-                  aria-label="Close sheet"
-                >
-                  <X className="h-4.5 w-4.5" strokeWidth={2.5} />
-                </button>
-              </div>
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB]"
+                aria-label="Close sheet"
+              >
+                <X className="h-4.5 w-4.5" strokeWidth={2.5} />
+              </button>
             </div>
 
             {/* Exclusive Space & Coworking Main Tabs */}
@@ -614,55 +600,61 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
 
             {/* Bottom sticky CTA Buttons */}
             <div className="sticky bottom-0 z-10 flex items-stretch gap-3 border-t border-slate-100 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <button
-                type="button"
-                aria-label="Explore spaces"
-                title="Explore spaces"
-                onClick={() => {
-                  onClose();
-                  navigate('/spaces');
-                }}
-                className="flex w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#111111] text-white transition hover:bg-slate-800"
-              >
-                <Compass className="h-5 w-5" strokeWidth={2.5} />
-              </button>
-              <div className="flex min-w-0 flex-1 gap-3">
               {activeTab === 'exclusive-space' ? (
                 <>
-                  {/* Book Online Button */}
+                  {/* Compass Button (Kept in Exclusive Space only) */}
                   <button
                     type="button"
-                    className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
+                    aria-label="Explore spaces"
+                    title="Explore spaces"
+                    onClick={() => {
+                      onClose();
+                      navigate('/spaces');
+                    }}
+                    className="flex w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#111111] text-white transition hover:bg-slate-800"
                   >
-                    <Calendar className="h-4.5 w-4.5" strokeWidth={2.5} />
-                    <span>Book Online</span>
+                    <Compass className="h-5 w-5" strokeWidth={2.5} />
                   </button>
+                  <div className="flex min-w-0 flex-1 gap-3">
+                    {/* Book Online Button */}
+                    <button
+                      type="button"
+                      className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
+                    >
+                      <Calendar className="h-4.5 w-4.5" strokeWidth={2.5} />
+                      <span>Book Online</span>
+                    </button>
 
+                    <button
+                      type="button"
+                      onClick={() => {
+                        recordPortalEnquiry({
+                          enquiryType: 'Space',
+                          itemName: 'Exclusive Space',
+                          description: 'Customer asked about exclusive space availability from the customer portal.',
+                        });
+                        window.open(spaceQueryUrl('Exclusive Space'), '_blank', 'noopener,noreferrer');
+                      }}
+                      className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
+                    >
+                      <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
+                      <span>Query Now</span>
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex min-w-0 flex-1 gap-3">
+                  {/* Explore More Button (Coworking Section - Compass button removed) */}
                   <button
                     type="button"
                     onClick={() => {
-                      recordPortalEnquiry({
-                        enquiryType: 'Space',
-                        itemName: 'Exclusive Space',
-                        description: 'Customer asked about exclusive space availability from the customer portal.',
-                      });
-                      window.open(spaceQueryUrl('Exclusive Space'), '_blank', 'noopener,noreferrer');
+                      onClose();
+                      navigate('/spaces');
                     }}
-                    className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
-                  >
-                    <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
-                    <span>Query Now</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Explore More Button */}
-                  <button
-                    type="button"
                     className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
                   >
                     <Calendar className="h-4.5 w-4.5" strokeWidth={2.5} />
-                    <span>Explore More</span>
+                    <span>Explore Plans</span>
                   </button>
 
                   <button
@@ -680,9 +672,8 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
                     <span>Query Now</span>
                   </button>
-                </>
+                </div>
               )}
-              </div>
             </div>
           </motion.div>
           {detailSpace ? (

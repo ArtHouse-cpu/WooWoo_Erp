@@ -475,7 +475,6 @@ export function SpaceDetailsModal({
     );
   }, [space]);
 
-  const [selectedPlanTier, setSelectedPlanTier] = useState<'regular' | 'premium'>('regular');
   const [selectedPlanId, setSelectedPlanId] = useState<string>('day');
   const [bookingPassOverride, setBookingPassOverride] = useState<SpaceCard | null>(null);
 
@@ -493,7 +492,6 @@ export function SpaceDetailsModal({
     } else {
       setSelectedPlanId('day');
     }
-    setSelectedPlanTier('regular');
     setBookingPassOverride(null);
   }, [space]);
 
@@ -955,37 +953,37 @@ export function SpaceDetailsModal({
         className="flex h-[90dvh] min-h-[90dvh] max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl sm:h-[85vh] sm:min-h-[85vh] sm:max-h-[90vh] sm:rounded-[32px] text-left"
       >
         {/* Header: Space Name and Capacity badge on left, Terms button and Close button on right */}
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 pt-4 pb-3">
-          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-3.5 sm:px-5 pt-3.5 sm:pt-4 pb-2.5 sm:pb-3 gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1 pr-1 sm:pr-2">
             <h2
               id="space-details-title"
-              className="truncate font-display text-lg sm:text-xl md:text-2xl font-black text-[#111111]"
+              className="truncate font-display text-xs min-[340px]:text-sm sm:text-xl md:text-2xl font-black text-[#111111] leading-tight"
               title={isCoworking ? 'CoWorking Space' : space.name}
             >
               {isCoworking ? 'CoWorking Space' : space.name}
             </h2>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F3E8FF] px-2.5 sm:px-3 py-1 text-xs font-bold text-[#7C3AED] shrink-0">
-              <Users size={13} className="stroke-[2.5]" />
+            <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full bg-[#F3E8FF] px-2 sm:px-3 py-0.5 sm:py-1 text-[10.5px] sm:text-xs font-bold text-[#7C3AED] shrink-0 whitespace-nowrap">
+              <Users size={11} className="sm:w-[13px] sm:h-[13px] stroke-[2.5]" />
               <span>{isCoworking ? '1 Person' : `Up to ${space.capacity > 0 ? space.capacity : 60}`}</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setShowTermsModal(true)}
-              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#6344E7] hover:bg-purple-50 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-bold text-[#6344E7] hover:bg-purple-50 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl transition cursor-pointer shrink-0"
             >
-              <FileText className="h-4 w-4" />
+              <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               <span>Terms</span>
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full text-slate-700 hover:bg-slate-100 transition cursor-pointer"
               aria-label="Close space details"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
           </div>
         </div>
@@ -1187,127 +1185,96 @@ export function SpaceDetailsModal({
                     <h4 className="font-display font-black text-sm sm:text-base text-[#111111] mb-2.5">
                       Choose Your Plan
                     </h4>
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                      {/* Regular Pricing Card */}
-                      <div className="rounded-2xl border border-purple-100 bg-white overflow-hidden shadow-xs flex flex-col justify-between">
-                        <div>
-                          <div className="bg-[#F3E8FF] py-2 px-2.5 text-center">
-                            <span className="font-display font-black text-xs sm:text-sm text-[#6344E7] block">
-                              Regular Pricing
-                            </span>
-                          </div>
-                          <div className="divide-y divide-purple-50/80 p-1 sm:p-1.5">
-                            {COWORKING_PLANS.map(plan => {
-                              const isSelected =
-                                selectedPlanTier === 'regular' && selectedPlanId === plan.id;
-                              return (
-                                <div
-                                  key={plan.id}
-                                  onClick={() => {
-                                    setSelectedPlanTier('regular');
-                                    setSelectedPlanId(plan.id);
-                                  }}
-                                  className={`flex items-center justify-between p-1.5 sm:p-2 rounded-xl transition cursor-pointer select-none ${
-                                    isSelected ? 'bg-[#FAF5FF]' : 'hover:bg-slate-50'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                                    <div
-                                      className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                        isSelected
-                                          ? 'border-[#7C3AED] bg-white'
-                                          : 'border-slate-300 bg-white'
-                                      }`}
-                                    >
-                                      {isSelected && (
-                                        <div className="h-2 w-2 rounded-full bg-[#7C3AED]" />
-                                      )}
-                                    </div>
-                                    <span className="font-bold text-[11px] sm:text-xs text-[#111111] truncate">
-                                      {plan.name}
-                                    </span>
-                                  </div>
-                                  <span className="font-display font-black text-[11px] sm:text-xs text-[#111111] shrink-0">
-                                    ₹{formatInr(plan.regularPrice)}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
+                    <div className="rounded-2xl border border-purple-100 bg-white overflow-hidden shadow-xs">
+                      {/* Table Header */}
+                      <div className="flex items-center justify-between bg-[#F8FAFC] border-b border-slate-100 px-3 sm:px-4 py-2.5 text-[11px] sm:text-xs font-bold text-slate-500">
+                        <span className="font-extrabold text-slate-700">Plan</span>
+                        <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+                          <span className="text-right w-16 sm:w-20 text-slate-600">Regular</span>
+                          <div className="h-3.5 w-px bg-slate-300 shrink-0" />
+                          <span className="text-right min-w-[90px] sm:min-w-[110px] flex items-center justify-end gap-1 text-amber-800">
+                            <Crown size={12} className="text-amber-600 fill-amber-600 shrink-0" />
+                            <span>Membership Price</span>
+                          </span>
                         </div>
                       </div>
 
-                      {/* Premium Member Pricing Card */}
-                      <div className="rounded-2xl border border-amber-200 bg-[#FFFDF5] overflow-hidden shadow-xs flex flex-col justify-between">
-                        <div>
-                          <div className="bg-[#FEF08A]/70 py-2 px-2.5 text-center flex items-center justify-center gap-1">
-                            <Crown size={13} className="text-amber-700 fill-amber-700 shrink-0" />
-                            <span className="font-display font-black text-xs sm:text-sm text-[#854D0E] truncate">
-                              Premium Member Pricing
-                            </span>
-                          </div>
-                          <div className="divide-y divide-amber-100/60 p-1 sm:p-1.5">
-                            {COWORKING_PLANS.map(plan => {
-                              const isSelected =
-                                selectedPlanTier === 'premium' && selectedPlanId === plan.id;
-                              return (
+                      {/* Plans List */}
+                      <div className="divide-y divide-purple-50/80">
+                        {COWORKING_PLANS.map(plan => {
+                          const isSelected = selectedPlanId === plan.id;
+                          return (
+                            <div
+                              key={plan.id}
+                              onClick={() => {
+                                setSelectedPlanId(plan.id);
+                              }}
+                              className={`flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 transition cursor-pointer select-none ${
+                                isSelected ? 'bg-[#FAF5FF]' : 'hover:bg-slate-50'
+                              }`}
+                            >
+                              {/* Plan Name with Radio */}
+                              <div className="flex items-center gap-2 min-w-0 pr-2">
                                 <div
-                                  key={plan.id}
-                                  onClick={() => {
-                                    setSelectedPlanTier('premium');
-                                    setSelectedPlanId(plan.id);
-                                  }}
-                                  className={`flex items-center justify-between p-1.5 sm:p-2 rounded-xl transition cursor-pointer select-none ${
-                                    isSelected ? 'bg-[#FEF9C3]/50' : 'hover:bg-amber-50/40'
+                                  className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                                    isSelected
+                                      ? 'border-[#7C3AED] bg-white'
+                                      : 'border-slate-300 bg-white'
                                   }`}
                                 >
-                                  <div className="flex items-center gap-1.5 min-w-0 pr-1">
-                                    <div
-                                      className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                        isSelected
-                                          ? 'border-[#7C3AED] bg-white'
-                                          : 'border-slate-300 bg-white'
-                                      }`}
-                                    >
-                                      {isSelected && (
-                                        <div className="h-2 w-2 rounded-full bg-[#7C3AED]" />
-                                      )}
-                                    </div>
-                                    <span className="font-bold text-[11px] sm:text-xs text-[#111111] truncate">
-                                      {plan.name}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-1 shrink-0">
-                                    <span className="font-display font-black text-[11px] sm:text-xs text-[#111111]">
-                                      ₹{formatInr(plan.memberPrice)}
-                                    </span>
-                                    <span className="rounded-md bg-emerald-100 px-1 py-0.5 text-[8.5px] sm:text-[9.5px] font-bold text-emerald-700">
-                                      Save ₹{formatInr(plan.savings)}
-                                    </span>
-                                  </div>
+                                  {isSelected && (
+                                    <div className="h-2 w-2 rounded-full bg-[#7C3AED]" />
+                                  )}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </div>
+                                <span
+                                  className={`text-xs sm:text-sm font-bold truncate ${
+                                    isSelected ? 'text-[#7C3AED] font-extrabold' : 'text-[#111111]'
+                                  }`}
+                                >
+                                  {plan.name}
+                                </span>
+                              </div>
 
-                        {/* Bottom Perks Banner inside Member card */}
-                        <div className="border-t border-amber-200/80 bg-amber-50/60 p-2 sm:p-2.5 flex items-center justify-between gap-1.5">
-                          <div className="flex items-center gap-1 min-w-0">
-                            <Sparkles size={12} className="text-amber-600 shrink-0" />
-                            <p className="text-[9px] sm:text-[10px] font-semibold text-amber-900 leading-tight line-clamp-2">
-                              Enjoy upto 40% discount &amp; 5% cashback on food, supplies and space bookings.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setIsDiscountsOpen(true)}
-                            className="inline-flex items-center gap-0.5 rounded-full border border-purple-300 bg-white px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-[#7C3AED] hover:bg-purple-50 transition shrink-0 cursor-pointer"
-                          >
-                            <span>Benefits</span>
-                            <ChevronRight size={10} strokeWidth={2.5} />
-                          </button>
+                              {/* Prices Divided by Line */}
+                              <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+                                {/* Regular Price */}
+                                <div className="text-right w-16 sm:w-20">
+                                  <span className="font-display font-black text-xs sm:text-sm text-slate-800">
+                                    ₹{formatInr(plan.regularPrice)}
+                                  </span>
+                                </div>
+
+                                {/* Dividing Line */}
+                                <div className="h-4 sm:h-5 w-px bg-slate-200 shrink-0" />
+
+                                {/* Member Price */}
+                                <div className="text-right min-w-[90px] sm:min-w-[110px]">
+                                  <span className="font-display font-black text-xs sm:text-sm text-[#854D0E]">
+                                    ₹{formatInr(plan.memberPrice)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Bottom Perks Banner */}
+                      <div className="border-t border-amber-200/80 bg-amber-50/60 p-2 sm:p-2.5 flex items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Sparkles size={13} className="text-amber-600 shrink-0" />
+                          <p className="text-[9.5px] sm:text-[11px] font-semibold text-amber-900 leading-tight">
+                            Enjoy upto 40% discount &amp; 5% cashback on food, supplies and space bookings.
+                          </p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsDiscountsOpen(true)}
+                          className="inline-flex items-center gap-0.5 rounded-full border border-purple-300 bg-white px-2 py-0.5 text-[9.5px] sm:text-[10.5px] font-bold text-[#7C3AED] hover:bg-purple-50 transition shrink-0 cursor-pointer"
+                        >
+                          <span>Benefits</span>
+                          <ChevronRight size={10} strokeWidth={2.5} />
+                        </button>
                       </div>
                     </div>
                   </div>
