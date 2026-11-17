@@ -515,7 +515,7 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
               {activeTab === 'exclusive-space' ? (
                 <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-b border-slate-100 py-5 px-3 mb-5 mt-4">
                   {/* Benefit 1 */}
-                  <div className="flex flex-col items-center text-center px-1">
+                  {/* <div className="flex flex-col items-center text-center px-1">
                     <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFF0EB] text-[#EA580C]">
                       <Star className="h-5 w-5 fill-[#EA580C] text-[#EA580C]" strokeWidth={2} />
                     </div>
@@ -525,10 +525,10 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
                       Inspiring creative spaces
                     </p>
-                  </div>
+                  </div> */}
 
                   {/* Benefit 2 */}
-                  <div className="flex flex-col items-center text-center px-1">
+                  {/* <div className="flex flex-col items-center text-center px-1">
                     <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#E8F8EF] text-[#15803D]">
                       <Calendar className="h-5 w-5 text-[#15803D]" strokeWidth={2} />
                     </div>
@@ -538,10 +538,10 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
                       Real-time availability
                     </p>
-                  </div>
+                  </div> */}
 
                   {/* Benefit 3 */}
-                  <div className="flex flex-col items-center text-center px-1">
+                  {/* <div className="flex flex-col items-center text-center px-1">
                     <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F3E8FF] text-[#7C3AED]">
                       <Shield className="h-5 w-5 text-[#7C3AED]" strokeWidth={2} />
                     </div>
@@ -551,12 +551,12 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
                       Verified, well-managed spaces
                     </p>
-                  </div>
+                  </div> */}
                 </div>
               ) : (
                 <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-b border-slate-100 py-5 px-3 mb-5 mt-4">
                   {/* Benefit 1 */}
-                  <div className="flex flex-col items-center text-center px-1">
+                  {/* <div className="flex flex-col items-center text-center px-1">
                     <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FFF0EB] text-[#EA580C]">
                       <Star className="h-5 w-5 text-[#EA580C]" strokeWidth={2} />
                     </div>
@@ -566,10 +566,10 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
                       Designed for creatives
                     </p>
-                  </div>
+                  </div> */}
 
                   {/* Benefit 2 */}
-                  <div className="flex flex-col items-center text-center px-1">
+                  {/* <div className="flex flex-col items-center text-center px-1">
                     <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#E8F8EF] text-[#15803D]">
                       <Wifi className="h-5 w-5 text-[#15803D]" strokeWidth={2} />
                     </div>
@@ -579,10 +579,10 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
                       Stay connected always
                     </p>
-                  </div>
+                  </div> */}
 
                   {/* Benefit 3 */}
-                  <div className="flex flex-col items-center text-center px-1">
+                  {/* <div className="flex flex-col items-center text-center px-1">
                     <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#F3E8FF] text-[#7C3AED]">
                       <Sofa className="h-5 w-5 text-[#7C3AED]" strokeWidth={2} />
                     </div>
@@ -592,7 +592,7 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
                       On the house
                     </p>
-                  </div>
+                  </div> */}
                 </div>
               )}
 
