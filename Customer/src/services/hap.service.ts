@@ -36,7 +36,6 @@ export const HAP_PROMOTION_CHANNELS = [
   'WhatsApp',
   'Offline Community',
   'College / Campus',
-  'Word of Mouth',
   'Other',
 ] as const;
 
