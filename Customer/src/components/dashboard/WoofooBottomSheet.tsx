@@ -9,6 +9,7 @@ import {
   Heart,
   Leaf,
   Store,
+  UtensilsCrossed,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 
@@ -59,35 +60,6 @@ type MomentCard = {
   image: string;
   height: string;
 };
-
-function ScooterIcon({className, ...props}: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      {...props}
-    >
-      {/* Back wheel */}
-      <circle cx="6" cy="18" r="2" />
-      {/* Front wheel */}
-      <circle cx="18" cy="18" r="2" />
-      {/* Chassis / Frame */}
-      <path d="M6 18h4.5l2.5-4h4.5v4" />
-      {/* Handlebars */}
-      <path d="M17.5 14L16 8h-2" />
-      {/* Seat/Box */}
-      <rect x="4" y="10" width="5" height="4" rx="1" />
-    </svg>
-  );
-}
 
 export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
   const [activeCategory, setActiveCategory] = useState<CategoryId>('all');
@@ -399,13 +371,20 @@ export function WoofooBottomSheet({isOpen, onClose}: WoofooBottomSheetProps) {
                 <span>Visit Today</span>
               </button>
 
-              {/* Order Online Button */}
+              {/* View Menu Button */}
               <button
                 type="button"
+                onClick={() =>
+                  window.open(
+                    'https://www.instagram.com/p/Dft-yx6EZML/?img_index=16&cplk=MXVwNnVtNmtmeDlscw==',
+                    '_blank',
+                    'noopener,noreferrer'
+                  )
+                }
                 className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
               >
-                <ScooterIcon className="h-4.5 w-4.5" strokeWidth={2.5} />
-                <span>Order Online</span>
+                <UtensilsCrossed className="h-4.5 w-4.5" strokeWidth={2.5} />
+                <span>View Menu</span>
               </button>
             </div>
           </motion.div>

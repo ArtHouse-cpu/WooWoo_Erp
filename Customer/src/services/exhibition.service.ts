@@ -1,8 +1,11 @@
 import axios from 'axios';
 import type {EntryPass, PassPerson} from '../components/exhibition/entryPass';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:3000';
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8000'
+).replace(/\/$/, '');
 
 const publicApi = axios.create({
   baseURL: `${API_BASE_URL}/public/exhibition`,
