@@ -1,5 +1,5 @@
 import {useEffect, useState, type ReactNode} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {useNavigate, useLocation} from 'react-router-dom';
 import axios from 'axios';
 import {
   X,
@@ -23,7 +23,7 @@ import {
   groupSpacesByName,
   type SpaceCard,
 } from '../../services/space.service';
-import {SpaceDetailsModal} from '../spaces/SpaceDetailsModal';
+import {SpaceDetailsModal, type SpaceDetailsModalState} from '../spaces/SpaceDetailsModal';
 import {SpaceQueryModal} from './SpaceQueryModal';
 
 function SpacePhoto({
@@ -149,13 +149,62 @@ type PillItem = {
 
 export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<TabId>('exclusive-space');
   const [activeDot, setActiveDot] = useState(0);
   const [exclusiveSpaces, setExclusiveSpaces] = useState<SpaceCard[]>([]);
   const [coworkingSpaces, setCoworkingSpaces] = useState<SpaceCard[]>([]);
   const [spacesError, setSpacesError] = useState('');
   const [detailSpace, setDetailSpace] = useState<SpaceCard | null>(null);
+  const [detailModalState, setDetailModalState] = useState<SpaceDetailsModalState | null>(null);
   const [isQueryModalOpen, setIsQueryModalOpen] = useState(false);
+
+  useEffect(() => {
+    let restoreData: {
+      spaceData?: SpaceCard;
+      modalState?: SpaceDetailsModalState;
+    } | null = null;
+
+    if (location.state?.restoreCoworkingModal && location.state?.spaceData) {
+      restoreData = {
+        spaceData: location.state.spaceData,
+        modalState: location.state.modalState,
+      };
+    } else {
+      try {
+        const stored = sessionStorage.getItem('coworking_modal_restore');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.spaceData) {
+            restoreData = {
+              spaceData: parsed.spaceData,
+              modalState: parsed.modalState,
+            };
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse coworking_modal_restore in SpaceBottomSheet', e);
+      }
+    }
+
+    if (restoreData?.spaceData) {
+      setActiveTab('coworking');
+      setDetailSpace(restoreData.spaceData);
+      if (restoreData.modalState) {
+        setDetailModalState(restoreData.modalState);
+      }
+      try {
+        sessionStorage.removeItem('coworking_modal_restore');
+      } catch {}
+    }
+  }, [location, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setDetailSpace(null);
+      setDetailModalState(null);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -430,14 +479,23 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
             </div>
           </motion.div>
           {detailSpace ? (
-            <SpaceDetailsModal space={detailSpace} onClose={() => setDetailSpace(null)} />
+            <SpaceDetailsModal
+              space={detailSpace}
+              initialState={detailModalState}
+              onClose={() => {
+                setDetailSpace(null);
+                setDetailModalState(null);
+                try {
+                  sessionStorage.removeItem('coworking_modal_restore');
+                } catch {}
+              }}
+            />
           ) : null}
 
           {/* Space Query Lead Modal without requiring specific space selection */}
           <SpaceQueryModal
             isOpen={isQueryModalOpen}
             onClose={() => setIsQueryModalOpen(false)}
-            initialSpaceType={activeTab === 'exclusive-space' ? 'Exclusive Space' : 'Coworking'}
           />
         </div>
       )}

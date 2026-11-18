@@ -288,25 +288,41 @@ type FeedbackReview = {
   }>;
 };
 
+export type SpaceDetailsModalState = {
+  activeTab?: 'info' | 'highlights' | 'feedback';
+  selectedPlanId?: string;
+  selectedPriceType?: 'regular' | 'membership';
+  selectedDate?: string | Date;
+  activeSegment?: 'weekday' | 'weekend';
+  startTime?: string;
+  endTime?: string;
+  isDiscountsOpen?: boolean;
+  selectedMembershipId?: string | null;
+  mediaCategory?: 'all' | 'parties' | 'shows' | 'meetings' | 'workshops' | 'more';
+  feedbackFilter?: 'all' | 'photos' | 'videos' | 'reviews';
+};
+
 export function SpaceDetailsModal({
   space,
   onClose,
+  initialState,
 }: {
   space: SpaceCard | null;
   onClose: () => void;
+  initialState?: SpaceDetailsModalState | null;
 }) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'info' | 'highlights' | 'feedback'>('info');
-  const [activeSegment, setActiveSegment] = useState<'weekday' | 'weekend'>('weekend');
-  const [isDiscountsOpen, setIsDiscountsOpen] = useState(false);
-  const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'info' | 'highlights' | 'feedback'>(initialState?.activeTab || 'info');
+  const [activeSegment, setActiveSegment] = useState<'weekday' | 'weekend'>(initialState?.activeSegment || 'weekend');
+  const [isDiscountsOpen, setIsDiscountsOpen] = useState(initialState?.isDiscountsOpen ?? false);
+  const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(initialState?.selectedMembershipId ?? null);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsActiveTab, setTermsActiveTab] = useState<'disclaimer' | 'guidelines' | 'tcs'>('disclaimer');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const timePickerRef = useRef<HTMLDivElement | null>(null);
 
   // Highlights Media state
-  const [mediaCategory, setMediaCategory] = useState<'all' | 'parties' | 'shows' | 'meetings' | 'workshops' | 'more'>('all');
+  const [mediaCategory, setMediaCategory] = useState<'all' | 'parties' | 'shows' | 'meetings' | 'workshops' | 'more'>(initialState?.mediaCategory || 'all');
   const [mediaSortOrder, setMediaSortOrder] = useState<'recent' | 'oldest'>('recent');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const sortDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -320,7 +336,7 @@ export function SpaceDetailsModal({
   };
 
   // Feedback Tab state
-  const [feedbackFilter, setFeedbackFilter] = useState<'all' | 'photos' | 'videos' | 'reviews'>('all');
+  const [feedbackFilter, setFeedbackFilter] = useState<'all' | 'photos' | 'videos' | 'reviews'>(initialState?.feedbackFilter || 'all');
   const [showAddFeedbackModal, setShowAddFeedbackModal] = useState(false);
   const [newFeedbackName, setNewFeedbackName] = useState('');
   const [newFeedbackRating, setNewFeedbackRating] = useState(4.8);
@@ -446,16 +462,34 @@ export function SpaceDetailsModal({
   ]);
 
   // Date selection state
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [viewYear, setViewYear] = useState<number>(new Date().getFullYear());
-  const [viewMonth, setViewMonth] = useState<number>(new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    if (initialState?.selectedDate) {
+      const d = new Date(initialState.selectedDate);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return new Date();
+  });
+  const [viewYear, setViewYear] = useState<number>(() => {
+    if (initialState?.selectedDate) {
+      const d = new Date(initialState.selectedDate);
+      if (!isNaN(d.getTime())) return d.getFullYear();
+    }
+    return new Date().getFullYear();
+  });
+  const [viewMonth, setViewMonth] = useState<number>(() => {
+    if (initialState?.selectedDate) {
+      const d = new Date(initialState.selectedDate);
+      if (!isNaN(d.getTime())) return d.getMonth();
+    }
+    return new Date().getMonth();
+  });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const calendarRef = useRef<HTMLDivElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Custom Timing state
-  const [startTime, setStartTime] = useState('06:00');
-  const [endTime, setEndTime] = useState('09:00');
+  const [startTime, setStartTime] = useState(initialState?.startTime || '06:00');
+  const [endTime, setEndTime] = useState(initialState?.endTime || '09:00');
   const [showShareModal, setShowShareModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showCoworkingBookingModal, setShowCoworkingBookingModal] = useState(false);
@@ -474,12 +508,17 @@ export function SpaceDetailsModal({
     );
   }, [space]);
 
-  const [selectedPlanId, setSelectedPlanId] = useState<string>('day');
-  const [selectedPriceType, setSelectedPriceType] = useState<'regular' | 'membership'>('membership');
+  const [selectedPlanId, setSelectedPlanId] = useState<string>(initialState?.selectedPlanId || 'day');
+  const [selectedPriceType, setSelectedPriceType] = useState<'regular' | 'membership'>(initialState?.selectedPriceType || 'membership');
   const [bookingPassOverride, setBookingPassOverride] = useState<SpaceCard | null>(null);
+  const isRestoredRef = useRef(Boolean(initialState));
 
   useEffect(() => {
     if (!space) return;
+    if (isRestoredRef.current) {
+      isRestoredRef.current = false;
+      return;
+    }
     const lower = (space.name || '').toLowerCase();
     if (lower.includes('weekly')) {
       setSelectedPlanId('weekly');
@@ -495,6 +534,71 @@ export function SpaceDetailsModal({
     setSelectedPriceType('membership');
     setBookingPassOverride(null);
   }, [space]);
+
+  useEffect(() => {
+    if (!initialState) return;
+    if (initialState.activeTab) setActiveTab(initialState.activeTab);
+    if (initialState.selectedPlanId) setSelectedPlanId(initialState.selectedPlanId);
+    if (initialState.selectedPriceType) setSelectedPriceType(initialState.selectedPriceType);
+    if (initialState.activeSegment) setActiveSegment(initialState.activeSegment);
+    if (initialState.startTime) setStartTime(initialState.startTime);
+    if (initialState.endTime) setEndTime(initialState.endTime);
+    if (typeof initialState.isDiscountsOpen === 'boolean') setIsDiscountsOpen(initialState.isDiscountsOpen);
+    if (initialState.selectedMembershipId !== undefined) setSelectedMembershipId(initialState.selectedMembershipId);
+    if (initialState.mediaCategory) setMediaCategory(initialState.mediaCategory);
+    if (initialState.feedbackFilter) setFeedbackFilter(initialState.feedbackFilter);
+    if (initialState.selectedDate) {
+      const d = new Date(initialState.selectedDate);
+      if (!isNaN(d.getTime())) {
+        setSelectedDate(d);
+        setViewYear(d.getFullYear());
+        setViewMonth(d.getMonth());
+      }
+    }
+  }, [initialState]);
+
+  const handleNavigateToMembership = (showBenefits: boolean = true) => {
+    if (!space) return;
+    const currentModalState: SpaceDetailsModalState = {
+      activeTab,
+      selectedPlanId,
+      selectedPriceType,
+      selectedDate: selectedDate instanceof Date ? selectedDate.toISOString() : String(selectedDate),
+      activeSegment,
+      startTime,
+      endTime,
+      isDiscountsOpen,
+      selectedMembershipId,
+      mediaCategory,
+      feedbackFilter,
+    };
+
+    const returnUrl = window.location.pathname + window.location.search;
+    const restorePayload = {
+      returnUrl,
+      spaceData: space,
+      modalState: currentModalState,
+    };
+
+    try {
+      sessionStorage.setItem('coworking_modal_restore', JSON.stringify(restorePayload));
+    } catch (e) {
+      console.error('Failed to save coworking modal restore state', e);
+    }
+
+    onClose();
+    const targetUrl = showBenefits
+      ? '/membership?plan=premium&benefits=true'
+      : '/membership';
+    navigate(targetUrl, {
+      state: {
+        fromCoworkingModal: true,
+        returnUrl,
+        spaceData: space,
+        modalState: currentModalState,
+      },
+    });
+  };
 
   const handleBookCoworkingPlan = () => {
     if (!space) return;
@@ -1197,7 +1301,7 @@ export function SpaceDetailsModal({
                           <div className="h-3.5 w-px bg-slate-200 shrink-0" />
                           <span className="text-center w-[104px] sm:w-34 flex items-center justify-center gap-1 text-amber-800 font-extrabold">
                             <Crown size={12} className="text-amber-600 fill-amber-600 shrink-0" />
-                            <span>Membership Price</span>
+                            <span>Premium</span>
                           </span>
                         </div>
                       </div>
@@ -1320,10 +1424,7 @@ export function SpaceDetailsModal({
                         </div>
                         <button
                           type="button"
-                          onClick={() => {
-                            onClose();
-                            navigate('/membership?plan=premium&benefits=true');
-                          }}
+                          onClick={() => handleNavigateToMembership(true)}
                           className="inline-flex items-center gap-0.5 rounded-full border border-purple-300 bg-white px-2 py-0.5 text-[9.5px] sm:text-[10.5px] font-bold text-[#7C3AED] hover:bg-purple-50 transition shrink-0 cursor-pointer"
                         >
                           <span>Benefits</span>
@@ -1478,8 +1579,7 @@ export function SpaceDetailsModal({
                       type="button"
                       onClick={e => {
                         e.stopPropagation();
-                        onClose();
-                        navigate('/membership');
+                        handleNavigateToMembership(false);
                       }}
                       className="w-full mt-2 flex items-center justify-between rounded-2xl bg-[#F3E8FF] hover:bg-[#E9D5FF] px-3.5 py-2.5 text-[#6344E7] transition active:scale-[0.99] cursor-pointer"
                     >

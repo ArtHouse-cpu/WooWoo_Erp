@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {useNavigate, useLocation} from 'react-router-dom';
 import axios from 'axios';
 import {
   ChevronLeft,
@@ -16,7 +16,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import {toast} from 'sonner';
-import {SpaceDetailsModal} from '../../components/spaces/SpaceDetailsModal';
+import {SpaceDetailsModal, type SpaceDetailsModalState} from '../../components/spaces/SpaceDetailsModal';
 import {ShareSpaceModal} from '../../components/spaces/ShareSpaceModal';
 import {CustomerSpaceCheckout} from '../../components/spaces/CustomerSpaceCheckout';
 import {CoworkingBookingModal} from '../../components/spaces/CoworkingBookingModal';
@@ -178,16 +178,57 @@ export const DEFAULT_COWORKING_PASSES: SpaceCard[] = [
 
 export default function SpacesMarketplacePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [spaces, setSpaces] = useState<SpaceCard[]>([]);
   const [search, setSearch] = useState('');
   const [spaceType, setSpaceType] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<SpaceCard | null>(null);
+  const [initialModalState, setInitialModalState] = useState<SpaceDetailsModalState | null>(null);
   const [shareSpace, setShareSpace] = useState<SpaceCard | null>(null);
   const [bookingSpace, setBookingSpace] = useState<SpaceCard | null>(null);
   const [coworkingBookingSpace, setCoworkingBookingSpace] = useState<SpaceCard | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let restoreData: {
+      spaceData?: SpaceCard;
+      modalState?: SpaceDetailsModalState;
+    } | null = null;
+
+    if (location.state?.restoreCoworkingModal && location.state?.spaceData) {
+      restoreData = {
+        spaceData: location.state.spaceData,
+        modalState: location.state.modalState,
+      };
+    } else {
+      try {
+        const stored = sessionStorage.getItem('coworking_modal_restore');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.spaceData) {
+            restoreData = {
+              spaceData: parsed.spaceData,
+              modalState: parsed.modalState,
+            };
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse coworking_modal_restore in SpacesMarketplacePage', e);
+      }
+    }
+
+    if (restoreData?.spaceData) {
+      setSelected(restoreData.spaceData);
+      if (restoreData.modalState) {
+        setInitialModalState(restoreData.modalState);
+      }
+      try {
+        sessionStorage.removeItem('coworking_modal_restore');
+      } catch {}
+    }
+  }, [location]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -592,7 +633,17 @@ export default function SpacesMarketplacePage() {
       </main>
 
       {selected ? (
-        <SpaceDetailsModal space={selected} onClose={() => setSelected(null)} />
+        <SpaceDetailsModal
+          space={selected}
+          initialState={initialModalState}
+          onClose={() => {
+            setSelected(null);
+            setInitialModalState(null);
+            try {
+              sessionStorage.removeItem('coworking_modal_restore');
+            } catch {}
+          }}
+        />
       ) : null}
       <ShareSpaceModal
         space={shareSpace}

@@ -120,12 +120,17 @@ export default function SpaceUtilizationPanel({
   const chartDays = data.daysSeries.map(point => ({ ...point, availableHours: dayHours }));
 
   const kpiGrid = (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
-      {cards.map(card => (
-        <article key={card.label} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-xs">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{card.label}</p>
-          <p className="mt-1 text-xl font-black tracking-tight text-slate-900">{card.value}</p>
-          <p className="mt-0.5 text-[11px] font-medium leading-snug text-violet-700" title={card.hint}>{card.hint}</p>
+    <div className="grid grid-cols-2 gap-2 sm:gap-2.5 lg:grid-cols-5">
+      {cards.map((card, idx) => (
+        <article
+          key={card.label}
+          className={`rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:px-3 sm:py-2.5 shadow-xs ${
+            idx === cards.length - 1 ? "col-span-2 lg:col-span-1" : ""
+          }`}
+        >
+          <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wide text-slate-400">{card.label}</p>
+          <p className="mt-0.5 sm:mt-1 text-lg sm:text-xl font-black tracking-tight text-slate-900">{card.value}</p>
+          <p className="mt-0.5 text-[10px] sm:text-[11px] font-medium leading-snug text-violet-700 truncate" title={card.hint}>{card.hint}</p>
         </article>
       ))}
     </div>
@@ -138,11 +143,11 @@ export default function SpaceUtilizationPanel({
       {kpiGrid}
 
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.8fr)]">
-        <article className="rounded-2xl border border-slate-200 bg-white p-3 shadow-xs">
+        <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Day-wise booked hours</h3>
-              <p className="text-[11px] text-slate-500">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900">Day-wise booked hours</h3>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 leading-snug">
                 Each day is open {hoursLabel(dayHours)} (6:00 AM to midnight). This filter is {openFormula} open, and {hoursLabel(data.bookedHours)} is booked. The purple line is the {hoursLabel(dayHours)} day. Green is paid, grey is free.
               </p>
             </div>
@@ -152,18 +157,19 @@ export default function SpaceUtilizationPanel({
               </button>
             ) : null}
           </div>
-          <div className="h-64">
+          <div className="h-48 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
                 data={chartDays}
+                margin={{ top: 8, right: 6, left: -20, bottom: 0 }}
                 onClick={state => {
                   const date = state?.activePayload?.[0]?.payload?.date;
                   if (date) setDay(current => (current === date ? "" : date));
                 }}
               >
                 <CartesianGrid stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="date" tickFormatter={pretty} tick={{ fontSize: 10, fill: "#64748b" }} interval="preserveStartEnd" />
-                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} width={36} />
+                <XAxis dataKey="date" tickFormatter={pretty} tick={{ fontSize: 9, fill: "#64748b" }} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 9, fill: "#64748b" }} width={28} />
                 <Tooltip
                   formatter={(value, name) => [hoursLabel(Number(value)), name]}
                   labelFormatter={label => pretty(String(label))}
@@ -176,17 +182,17 @@ export default function SpaceUtilizationPanel({
           </div>
         </article>
 
-        <article className="rounded-2xl border border-slate-200 bg-white p-3 shadow-xs">
-          <h3 className="text-sm font-bold text-slate-900">Space types</h3>
-          <p className="text-[11px] text-slate-500">Share of booked hours</p>
+        <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
+          <h3 className="text-xs sm:text-sm font-bold text-slate-900">Space types</h3>
+          <p className="text-[10px] sm:text-[11px] text-slate-500">Share of booked hours</p>
           {data.spaceTypes.length === 0 ? (
             <p className="py-10 text-center text-xs text-slate-400">No bookings in this period.</p>
           ) : (
-            <div className="mt-2 grid grid-cols-[140px_minmax(0,1fr)] items-center gap-2">
-              <div className="h-36">
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-[140px_minmax(0,1fr)] items-center gap-2">
+              <div className="h-32 sm:h-36">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={data.spaceTypes} dataKey="hours" nameKey="spaceType" innerRadius={38} outerRadius={58} paddingAngle={2}>
+                    <Pie data={data.spaceTypes} dataKey="hours" nameKey="spaceType" innerRadius={34} outerRadius={52} paddingAngle={2}>
                       {data.spaceTypes.map((item, index) => (
                         <Cell key={item.spaceType} fill={TYPE_COLORS[index % TYPE_COLORS.length]} />
                       ))}
@@ -195,9 +201,9 @@ export default function SpaceUtilizationPanel({
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <ul className="space-y-1.5">
+              <ul className="space-y-1.5 max-h-48 sm:max-h-none overflow-y-auto">
                 {data.spaceTypes.map((item, index) => (
-                  <li key={item.spaceType} className="text-[11px]">
+                  <li key={item.spaceType} className="text-[10px] sm:text-[11px]">
                     <div className="flex items-center justify-between gap-2">
                       <span className="flex min-w-0 items-center gap-1.5 font-semibold text-slate-700">
                         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TYPE_COLORS[index % TYPE_COLORS.length] }} />
@@ -205,7 +211,7 @@ export default function SpaceUtilizationPanel({
                       </span>
                       <span className="shrink-0 text-slate-500">{item.share}%</span>
                     </div>
-                    <p className="pl-3.5 text-slate-500">
+                    <p className="pl-3.5 text-slate-500 truncate">
                       {(item.spaces || []).join(', ') || item.spaceType}
                     </p>
                     <p className="pl-3.5 text-slate-400">
@@ -219,29 +225,31 @@ export default function SpaceUtilizationPanel({
         </article>
       </div>
 
-      <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">
-          <h3 className="text-sm font-bold text-slate-900">
+      <article className="overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200 bg-white shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 border-b border-slate-100 p-2.5 sm:px-3 sm:py-2">
+          <h3 className="text-xs sm:text-sm font-bold text-slate-900 shrink-0">
             {day ? `Bookings on ${pretty(day)}` : "Booking details"}
           </h3>
-          <input
-            value={query}
-            onChange={event => setQuery(event.target.value)}
-            placeholder="Search customer, space, or booking"
-            className="h-8 min-w-[180px] flex-1 rounded-lg border border-slate-200 px-2 text-xs outline-none focus:border-violet-400"
-          />
-          <select
-            value={category}
-            onChange={event => setCategory(event.target.value as "all" | "Paid" | "Free")}
-            className="h-8 rounded-lg border border-slate-200 px-2 text-xs font-semibold text-slate-700"
-          >
-            <option value="all">Paid and free</option>
-            <option value="Paid">Paid</option>
-            <option value="Free">Free</option>
-          </select>
+          <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
+            <input
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Search customer, space, or booking"
+              className="h-8 flex-1 rounded-lg border border-slate-200 px-2 text-xs outline-none focus:border-violet-400"
+            />
+            <select
+              value={category}
+              onChange={event => setCategory(event.target.value as "all" | "Paid" | "Free")}
+              className="h-8 shrink-0 rounded-lg border border-slate-200 px-2 text-xs font-semibold text-slate-700"
+            >
+              <option value="all">Paid and free</option>
+              <option value="Paid">Paid</option>
+              <option value="Free">Free</option>
+            </select>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-[980px] w-full text-left text-xs">
+        <div className="overflow-x-auto -mx-px">
+          <table className="min-w-[850px] sm:min-w-[980px] w-full text-left text-xs">
             <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="px-2 py-2">#</th>

@@ -1,5 +1,5 @@
-import {useState} from 'react';
-import {useNavigate} from 'react-router-dom';
+import {useEffect, useState} from 'react';
+import {useNavigate, useLocation} from 'react-router-dom';
 import {DashboardSidebar} from '../../components/dashboard/DashboardSidebar';
 import {TopNavbar, MobileHeader} from '../../components/dashboard/TopNavbar';
 import {HeroBanner, ProfileAsideCard} from '../../components/dashboard/HeroBanner';
@@ -32,6 +32,23 @@ export default function HomePage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.restoreCoworkingModal) {
+      setSpaceOpen(true);
+      return;
+    }
+    try {
+      const stored = sessionStorage.getItem('coworking_modal_restore');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.spaceData && (parsed.returnUrl === '/' || parsed.returnUrl === '/home' || parsed.returnUrl?.startsWith('/?'))) {
+          setSpaceOpen(true);
+        }
+      }
+    } catch {}
+  }, [location]);
 
   const handleActionClick = (id: string) => {
     if (id === 'help') {
