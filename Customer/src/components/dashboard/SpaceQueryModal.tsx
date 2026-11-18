@@ -244,9 +244,7 @@ export function SpaceQueryModal({
                   <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                     Space Enquiry &amp; Availability
                   </h3>
-                  <p className="text-[11.5px] sm:text-xs font-semibold text-slate-500">
-                    Tell us your plan — our concierge will find the right fit
-                  </p>
+                  
                 </div>
               </div>
 

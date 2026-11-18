@@ -1879,91 +1879,93 @@ export function SpaceDetailsModal({
               </div>
 
               {/* Filter Pills Row */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                {/* All (8) */}
-                <button
-                  type="button"
-                  onClick={() => setMediaCategory('all')}
-                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                    mediaCategory === 'all'
-                      ? 'bg-[#6344E7] text-white shadow-xs'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <span>All ({highlightMedia.length})</span>
-                </button>
+              {!isCoworking && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                  {/* All (8) */}
+                  <button
+                    type="button"
+                    onClick={() => setMediaCategory('all')}
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                      mediaCategory === 'all'
+                        ? 'bg-[#6344E7] text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>All ({highlightMedia.length})</span>
+                  </button>
 
-                {/* Parties (3) */}
-                <button
-                  type="button"
-                  onClick={() => setMediaCategory(c => (c === 'parties' ? 'all' : 'parties'))}
-                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                    mediaCategory === 'parties'
-                      ? 'bg-[#6344E7] text-white shadow-xs'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <PartyPopper size={14} className={mediaCategory === 'parties' ? 'text-white' : 'text-[#7C3AED]'} />
-                  <span>Parties (3)</span>
-                </button>
+                  {/* Parties (3) */}
+                  <button
+                    type="button"
+                    onClick={() => setMediaCategory(c => (c === 'parties' ? 'all' : 'parties'))}
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                      mediaCategory === 'parties'
+                        ? 'bg-[#6344E7] text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <PartyPopper size={14} className={mediaCategory === 'parties' ? 'text-white' : 'text-[#7C3AED]'} />
+                    <span>Parties (3)</span>
+                  </button>
 
-                {/* Shows (2) */}
-                <button
-                  type="button"
-                  onClick={() => setMediaCategory(c => (c === 'shows' ? 'all' : 'shows'))}
-                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                    mediaCategory === 'shows'
-                      ? 'bg-[#6344E7] text-white shadow-xs'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <Drama size={14} className={mediaCategory === 'shows' ? 'text-white' : 'text-[#7C3AED]'} />
-                  <span>Shows (2)</span>
-                </button>
+                  {/* Shows (2) */}
+                  <button
+                    type="button"
+                    onClick={() => setMediaCategory(c => (c === 'shows' ? 'all' : 'shows'))}
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                      mediaCategory === 'shows'
+                        ? 'bg-[#6344E7] text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Drama size={14} className={mediaCategory === 'shows' ? 'text-white' : 'text-[#7C3AED]'} />
+                    <span>Shows (2)</span>
+                  </button>
 
-                {/* Meetings (1) */}
-                <button
-                  type="button"
-                  onClick={() => setMediaCategory(c => (c === 'meetings' ? 'all' : 'meetings'))}
-                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                    mediaCategory === 'meetings'
-                      ? 'bg-[#6344E7] text-white shadow-xs'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <Users size={14} className={mediaCategory === 'meetings' ? 'text-white' : 'text-[#7C3AED]'} />
-                  <span>Meetings (1)</span>
-                </button>
+                  {/* Meetings (1) */}
+                  <button
+                    type="button"
+                    onClick={() => setMediaCategory(c => (c === 'meetings' ? 'all' : 'meetings'))}
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                      mediaCategory === 'meetings'
+                        ? 'bg-[#6344E7] text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Users size={14} className={mediaCategory === 'meetings' ? 'text-white' : 'text-[#7C3AED]'} />
+                    <span>Meetings (1)</span>
+                  </button>
 
-                {/* Workshops (1) */}
-                <button
-                  type="button"
-                  onClick={() => setMediaCategory(c => (c === 'workshops' ? 'all' : 'workshops'))}
-                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                    mediaCategory === 'workshops'
-                      ? 'bg-[#6344E7] text-white shadow-xs'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <Palette size={14} className={mediaCategory === 'workshops' ? 'text-white' : 'text-[#7C3AED]'} />
-                  <span>Workshops (1)</span>
-                </button>
+                  {/* Workshops (1) */}
+                  <button
+                    type="button"
+                    onClick={() => setMediaCategory(c => (c === 'workshops' ? 'all' : 'workshops'))}
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                      mediaCategory === 'workshops'
+                        ? 'bg-[#6344E7] text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Palette size={14} className={mediaCategory === 'workshops' ? 'text-white' : 'text-[#7C3AED]'} />
+                    <span>Workshops (1)</span>
+                  </button>
 
-                {/* More ⌵ */}
-                <button
-                  type="button"
-                  onClick={() => setMediaCategory(c => (c === 'more' ? 'all' : 'more'))}
-                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
-                    mediaCategory === 'more'
-                      ? 'bg-[#6344E7] text-white shadow-xs'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <MoreHorizontal size={14} className={mediaCategory === 'more' ? 'text-white' : 'text-[#7C3AED]'} />
-                  <span>More</span>
-                  <ChevronDown size={13} className={mediaCategory === 'more' ? 'text-white' : 'text-slate-500'} />
-                </button>
-              </div>
+                  {/* More ⌵ */}
+                  <button
+                    type="button"
+                    onClick={() => setMediaCategory(c => (c === 'more' ? 'all' : 'more'))}
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
+                      mediaCategory === 'more'
+                        ? 'bg-[#6344E7] text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <MoreHorizontal size={14} className={mediaCategory === 'more' ? 'text-white' : 'text-[#7C3AED]'} />
+                    <span>More</span>
+                    <ChevronDown size={13} className={mediaCategory === 'more' ? 'text-white' : 'text-slate-500'} />
+                  </button>
+                </div>
+              )}
 
               {/* 3-Column Highlights Media Grid */}
               {sortedMedia.length === 0 ? (
