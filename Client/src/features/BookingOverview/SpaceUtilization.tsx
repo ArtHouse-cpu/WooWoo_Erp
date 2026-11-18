@@ -105,13 +105,19 @@ export default function SpaceUtilizationPanel({
     .slice(0, 3)
     .map(item => `${item.spaceType} ${hoursLabel(item.hours)}`)
     .join(" · ");
+  const dayCount = Math.max(0, Number(data.days) || 0);
+  const dayHours = Number(data.dayHours) || 18;
+  const openHours = dayCount * dayHours;
+  const bookedShare = openHours > 0 ? Math.round((data.bookedHours / openHours) * 1000) / 10 : 0;
+  const openFormula = `${hoursLabel(dayHours)} × ${dayCount} day${dayCount === 1 ? "" : "s"} = ${hoursLabel(openHours)}`;
   const cards = [
-    { label: "Hours booked", value: hoursLabel(data.bookedHours), hint: `${data.rows.length} bookings` },
-    { label: "Space utilization", value: `${data.utilization}%`, hint: `${hoursLabel(data.utilizedHours)} of ${hoursLabel(data.availableHours)}` },
+    { label: "Open hours", value: hoursLabel(openHours), hint: openFormula },
+    { label: "Hours booked", value: hoursLabel(data.bookedHours), hint: `${bookedShare}% of open hours · ${data.rows.length} bookings` },
     { label: "Paid bookings", value: hoursLabel(data.paidHours), hint: `${data.paidBookings} paid` },
     { label: "Free bookings", value: hoursLabel(data.freeHours), hint: `${data.freeBookings} free` },
     { label: "Space types", value: String(data.spaceTypes.length), hint: typeHint || "None booked" },
   ];
+  const chartDays = data.daysSeries.map(point => ({ ...point, availableHours: dayHours }));
 
   const kpiGrid = (
     <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
@@ -119,7 +125,7 @@ export default function SpaceUtilizationPanel({
         <article key={card.label} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-xs">
           <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{card.label}</p>
           <p className="mt-1 text-xl font-black tracking-tight text-slate-900">{card.value}</p>
-          <p className="mt-0.5 truncate text-[11px] font-medium text-violet-700" title={card.hint}>{card.hint}</p>
+          <p className="mt-0.5 text-[11px] font-medium leading-snug text-violet-700" title={card.hint}>{card.hint}</p>
         </article>
       ))}
     </div>
@@ -137,7 +143,7 @@ export default function SpaceUtilizationPanel({
             <div>
               <h3 className="text-sm font-bold text-slate-900">Day-wise booked hours</h3>
               <p className="text-[11px] text-slate-500">
-                Green is paid, grey is free. The purple line is open capacity, {data.dayHours}h × {data.spaceCount} spaces.
+                Each day is open {hoursLabel(dayHours)} (6:00 AM to midnight). This filter is {openFormula} open, and {hoursLabel(data.bookedHours)} is booked. The purple line is the {hoursLabel(dayHours)} day. Green is paid, grey is free.
               </p>
             </div>
             {day ? (
@@ -149,7 +155,7 @@ export default function SpaceUtilizationPanel({
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
-                data={data.daysSeries}
+                data={chartDays}
                 onClick={state => {
                   const date = state?.activePayload?.[0]?.payload?.date;
                   if (date) setDay(current => (current === date ? "" : date));
@@ -164,7 +170,7 @@ export default function SpaceUtilizationPanel({
                 />
                 <Bar dataKey="paidHours" name="Paid hours" stackId="booked" fill={PAID} radius={[0, 0, 0, 0]} />
                 <Bar dataKey="freeHours" name="Free hours" stackId="booked" fill={FREE} radius={[3, 3, 0, 0]} />
-                <Line dataKey="availableHours" name="Available hours" stroke={PURPLE} strokeWidth={2} dot={false} />
+                <Line dataKey="availableHours" name="Open hours" stroke={PURPLE} strokeWidth={2} dot={false} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -199,6 +205,9 @@ export default function SpaceUtilizationPanel({
                       </span>
                       <span className="shrink-0 text-slate-500">{item.share}%</span>
                     </div>
+                    <p className="pl-3.5 text-slate-500">
+                      {(item.spaces || []).join(', ') || item.spaceType}
+                    </p>
                     <p className="pl-3.5 text-slate-400">
                       {item.bookings} bookings · {hoursLabel(item.hours)} · {hoursLabel(item.paidHours)} paid · {hoursLabel(item.freeHours)} free
                     </p>

@@ -17,6 +17,7 @@ export type DriveUploadItem = {
   name: string;
   size: number;
   kind: "image" | "video" | "sheet" | "doc" | "link";
+  previewUrl?: string;
 };
 
 type Tab = "media" | "document" | "url";
@@ -83,12 +84,14 @@ export default function DriveUploadModal({
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<LocalFile[]>([]);
+  const handedOff = useRef(false);
   filesRef.current = files;
 
   const segments = Array.from(new Set([...folders, ...EXTRA_SEGMENTS]));
 
   useEffect(() => {
     return () => {
+      if (handedOff.current) return;
       filesRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
     };
   }, []);
@@ -183,11 +186,13 @@ export default function DriveUploadModal({
       setError(tab === "media" ? "Choose at least one image or video." : "Choose at least one document.");
       return;
     }
+    handedOff.current = true;
     onUpload(
       files.map((item) => ({
         name: files.length === 1 ? title.trim() : `${title.trim()} – ${item.file.name}`,
         size: item.file.size,
         kind: fileKind(item.file, tab),
+        previewUrl: item.previewUrl,
       })),
       segment,
       tags,

@@ -70,6 +70,15 @@ import BookingOverView from "@/features/BookingOverview/BookingOverView";
 import ActivityTimelineScreen from "@/features/purchase/pages/ActivityTimelineScreen";
 import InsightsAnalyticsScreen from "@/features/purchase/pages/InsightsAnalyticsScreen";
 import DriveScreen from "@/features/drive/DriveScreen";
+import {
+  EventsDashboardPage,
+  OrdersPage,
+  AttendeesPage,
+  CheckInPage,
+  DiscountsPage,
+  AnalyticsPage,
+  EventSettingsPage,
+} from "@/features/events";
 
 
 export const router = createBrowserRouter([
@@ -120,6 +129,13 @@ export const router = createBrowserRouter([
           { path: "invoices", element: <InvoiceScreen /> },
           { path: "payments", element: <PaymentScreen /> },
           { path: "wallet", element: <WalletScreen /> },
+          { path: "events", element: <EventsDashboardPage /> },
+          { path: "events/orders", element: <OrdersPage /> },
+          { path: "events/attendees", element: <AttendeesPage /> },
+          { path: "events/check-in", element: <CheckInPage /> },
+          { path: "events/discounts", element: <DiscountsPage /> },
+          { path: "events/analytics", element: <AnalyticsPage /> },
+          { path: "events/settings", element: <EventSettingsPage /> },
           { path: "exhibitiontable", element: <ExhibitionTable/> },
           { path: "giftcard", element: <GiftCard /> },
           { path: "quotations", element: <QuotationScreen /> },

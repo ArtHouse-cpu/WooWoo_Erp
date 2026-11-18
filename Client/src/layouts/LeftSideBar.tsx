@@ -33,6 +33,8 @@ import {
   TimerIcon,
   GitGraphIcon,
   HardDrive,
+  ScanLine,
+  Settings,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
@@ -96,6 +98,55 @@ const MENU_GROUPS: MenuGroup[] = [
         icon: ChartNoAxesCombined,
         path: "/allBookings",
       },
+    ],
+  },
+  {
+    key: "eventManagement",
+    label: "Event Management",
+    icon: Sparkles,
+    submenu: [
+      {
+        name: "events",
+        label: "Events",
+        icon: CalendarCheck,
+        path: "/events",
+       },
+      // {
+      //   name: "orders",
+      //   label: "Orders",
+      //   icon: Receipt,
+      //   path: "/events/orders",
+      // },
+      // {
+      //   name: "attendees",
+      //   label: "Attendees",
+      //   icon: Users,
+      //   path: "/events/attendees",
+      // },
+      // {
+      //   name: "checkIn",
+      //   label: "Check-in / Entry Management",
+      //   icon: ScanLine,
+      //   path: "/events/check-in",
+      // },
+      // {
+      //   name: "discounts",
+      //   label: "Discounts & Coupons",
+      //   icon: Percent,
+      //   path: "/events/discounts",
+      // },
+      // {
+      //   name: "analytics",
+      //   label: "Analytics",
+      //   icon: ChartNoAxesCombined,
+      //   path: "/events/analytics",
+      // },
+      // {
+      //   name: "settings",
+      //   label: "Settings",
+      //   icon: Settings,
+      //   path: "/events/settings",
+      // },
     ],
   },
   {
@@ -353,21 +404,7 @@ const MENU_GROUPS: MenuGroup[] = [
 ];
 
 const TOP_LINKS: TopLink[] = [
-  // { key: "foodBill", label: "Food Billing", icon: Utensils, path: "/foodBill" },
-  // { key: "expenses", label: "Expense", icon: BadgeIndianRupee, path: "/expenses" },
-  // { key: "staffCommission", label: "Staff Commission", icon: CircleDollarSign , path: "/staffCommission" },
-  // { key: "spaceBooking", label: "Space Booking", icon: CalendarCheck  , path: "/spaceBooking" },
-  // { key: "announcement", label: "Announcements", icon: Megaphone , path: "/announcements" },
-  // { key: "wallet", label: "Wallet", icon: Wallet, path: "/wallet" },
-  // { key: "giftcard", label: "Gift Card", icon: Gift , path: "/giftcard" },
-  // { key: "coupons", label: "Coupons", icon: Percent, path: "/coupons" },
-  {
-    key: "exhibition",
-    label: "Exhibition",
-    icon: Sparkles,
-    path: "/exhibitiontable",
-  },
-  // { key: "access", label: "Access", icon: ShieldUser, path: "/access" },
+  // Refactored Exhibition into Event Management folder
 ];
 
 /**
@@ -429,6 +466,23 @@ export default function LeftSideBar({
     if (currentPath === "/drive") {
       setActiveMenu("drive");
       setOpenMenu("drive");
+    }
+
+    if (currentPath.startsWith("/events")) {
+      setActiveMenu("eventManagement");
+      setOpenMenu("eventManagement");
+      const matched = [
+        { path: "/events/orders", name: "orders" },
+        { path: "/events/attendees", name: "attendees" },
+        { path: "/events/check-in", name: "checkIn" },
+        { path: "/events/discounts", name: "discounts" },
+        { path: "/events/analytics", name: "analytics" },
+        { path: "/events/settings", name: "settings" },
+        { path: "/events", name: "events" },
+      ].find((m) => currentPath === m.path);
+      if (matched) {
+        setActiveSubmenu(matched.name);
+      }
     }
 
     if (isSalesRoute || isPurchaseRoute) {

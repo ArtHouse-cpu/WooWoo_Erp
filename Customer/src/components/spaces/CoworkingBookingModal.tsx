@@ -782,33 +782,7 @@ export function CoworkingBookingModal({
                 </span>
               </div>
 
-              {/* Row 1: Premium Membership */}
-              <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FEF3C7] text-[#D97706] shrink-0 shadow-2xs">
-                    <Crown className="h-5 w-5 fill-[#D97706] stroke-[2]" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs sm:text-sm font-black text-[#3B0764] leading-tight truncate">
-                      Premium Membership
-                    </div>
-                    <div className="text-[11px] text-slate-500 font-semibold leading-tight mt-0.5">
-                      Validity: 365 Days
-                    </div>
-                  </div>
-                </div>
-
-                <div className="h-7 w-[1px] bg-slate-200 shrink-0" />
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <Calendar className="h-4.5 w-4.5 text-[#6344E7] stroke-[2]" />
-                  <span className="text-xs sm:text-[13px] font-bold text-slate-900">
-                    {startsOnStr} – {expiresOnStr}
-                  </span>
-                </div>
-              </div>
-
-              {/* Row 2: CoWorking Plan */}
+              {/* CoWorking Plan */}
               <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FEF3C7] text-[#B45309] shrink-0 shadow-2xs">

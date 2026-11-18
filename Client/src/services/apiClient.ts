@@ -2751,6 +2751,7 @@ export type SpaceUtilization = {
     paidHours: number;
     freeHours: number;
     share: number;
+    spaces?: string[];
   }>;
   rows: Array<{
     id: string;

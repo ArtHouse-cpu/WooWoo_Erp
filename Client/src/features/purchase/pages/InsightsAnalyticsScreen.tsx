@@ -131,18 +131,58 @@ const InsightsAnalyticsScreen = () => {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Insights & Analytics</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            Net sales from final bills, split into Food, Space, and Store. Drafts, cancellations, and membership-plan sales are left out.
-          </p>
           <p className="mt-1 text-xs text-slate-400">
             {data ? `${pretty(data.range.from)} – ${pretty(data.range.to)} · Updated ${new Date(data.generatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : "Select a date range"}
           </p>
         </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={reset} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
+        <div className="flex flex-wrap items-end justify-end gap-2">
+          <FilterSelect
+            label="Date"
+            value={preset}
+            onChange={value => setPreset(value as InsightPreset)}
+            className="w-36"
+          >
+            {PRESETS.map(item => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
+          </FilterSelect>
+          {preset === "custom" ? (
+            <>
+              <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                From
+                <input type="date" value={from} onChange={event => setFrom(event.target.value)} className="w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                To
+                <input type="date" value={to} onChange={event => setTo(event.target.value)} className="w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
+              </label>
+            </>
+          ) : null}
+          <FilterSelect
+            label="Segment"
+            value={segment}
+            onChange={value => setSegment(value as InsightSegment)}
+            className="w-36"
+          >
+            <option value="all">All segments</option>
+            <option value="food">Food</option>
+            <option value="space">Space</option>
+            <option value="store">Store</option>
+          </FilterSelect>
+          <FilterSelect
+            label="Membership"
+            value={membership}
+            onChange={value => setMembership(value as InsightMembership)}
+            className="w-40"
+          >
+            <option value="all">All customers</option>
+            <option value="member">Membership</option>
+            <option value="nonmember">Non-membership</option>
+          </FilterSelect>
+          <button type="button" onClick={reset} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600">
             <RotateCcw size={14} /> Reset
           </button>
-          <button type="button" onClick={() => setReloadKey(key => key + 1)} className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
+          <button type="button" onClick={() => setReloadKey(key => key + 1)} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white">
             <RefreshCw size={14} /> Refresh
           </button>
         </div>
@@ -151,52 +191,6 @@ const InsightsAnalyticsScreen = () => {
           <h2 className="text-sm font-bold text-slate-900">Space booking utilization</h2>
           <SpaceUtilizationPanel data={spaceUse} />
         </section>
-
-      <section className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        <FilterSelect
-          label="Date"
-          value={preset}
-          onChange={value => setPreset(value as InsightPreset)}
-          className="w-40"
-        >
-          {PRESETS.map(item => (
-            <option key={item.id} value={item.id}>{item.label}</option>
-          ))}
-        </FilterSelect>
-        {preset === "custom" ? (
-          <>
-            <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-              From
-              <input type="date" value={from} onChange={event => setFrom(event.target.value)} className="w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
-            </label>
-            <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-              To
-              <input type="date" value={to} onChange={event => setTo(event.target.value)} className="w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
-            </label>
-          </>
-        ) : null}
-        <FilterSelect
-          label="Segment"
-          value={segment}
-          onChange={value => setSegment(value as InsightSegment)}
-          className="w-36"
-        >
-          <option value="all">All segments</option>
-          <option value="food">Food</option>
-          <option value="space">Space</option>
-          <option value="store">Store</option>
-        </FilterSelect>
-        <FilterSelect
-          label="Membership"
-          value={membership}
-          onChange={value => setMembership(value as InsightMembership)}
-          className="w-44"
-        >
-          <option value="all">All customers</option>
-          <option value="member">Membership</option>
-          <option value="nonmember">Non-membership</option>
-        </FilterSelect>
-      </section>
 
       {error ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>

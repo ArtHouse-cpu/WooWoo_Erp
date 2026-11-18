@@ -959,6 +959,95 @@ export default function BookingOverView() {
             Booking Overview
           </h1>
         </div>
+        <div className="flex items-center gap-2">
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={togglePeriodPopover}
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-[#6344E7] bg-white text-xs font-bold text-[#6344E7] shadow-xs hover:bg-purple-50/50 transition cursor-pointer"
+          >
+            <Calendar size={14} className="text-[#6344E7]" />
+            <span>Period: {getPeriodButtonLabel()}</span>
+            <ChevronDown
+              size={14}
+              className={`text-[#6344E7] transition-transform duration-200 ${
+                isPeriodOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+          {isPeriodOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsPeriodOpen(false)} />
+              <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl z-50">
+                <p className="text-xs font-bold text-slate-800 mb-2.5">Select Period</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { key: "lifetime", label: "All Time" },
+                    { key: "today", label: "Today" },
+                    { key: "yesterday", label: "Yesterday" },
+                    { key: "this_week", label: "This Week" },
+                    { key: "this_month", label: "This Month" },
+                    { key: "this_year", label: "This Year" },
+                  ].map((p) => {
+                    const active = tempPreset === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => handleSelectTempPreset(p.key as DatePresetType)}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-bold text-center transition cursor-pointer ${
+                          active
+                            ? "bg-[#6344E7] text-white shadow-xs"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs font-bold text-slate-800 mt-4 mb-2.5">Custom Range</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={tempFrom}
+                    onChange={(e) => {
+                      setTempFrom(e.target.value);
+                      setTempPreset("custom");
+                    }}
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500"
+                  />
+                  <span className="text-xs text-slate-400 font-medium">to</span>
+                  <input
+                    type="date"
+                    value={tempTo}
+                    onChange={(e) => {
+                      setTempTo(e.target.value);
+                      setTempPreset("custom");
+                    }}
+                    className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="mt-4 flex items-center justify-between pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleClearPeriod}
+                    className="text-xs font-bold text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApplyPeriod}
+                    className="px-4 py-1.5 rounded-xl bg-[#6344E7] hover:bg-[#5235D9] text-xs font-bold text-white shadow-xs transition cursor-pointer"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
         <div className="flex rounded-xl bg-slate-100 p-1">
           <button
             type="button"
@@ -985,6 +1074,7 @@ export default function BookingOverView() {
             <Settings size={15} />
             <span className="hidden sm:inline">Settings</span>
           </button>
+        </div>
         </div>
       </div>
 
@@ -1720,120 +1810,6 @@ export default function BookingOverView() {
                   <span>Export</span>
                 </button>
 
-                {/* Period Button & Popover */}
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={togglePeriodPopover}
-                    className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-[#6344E7] bg-white text-xs font-bold text-[#6344E7] shadow-xs hover:bg-purple-50/50 transition cursor-pointer"
-                  >
-                    <Calendar size={14} className="text-[#6344E7]" />
-                    <span>Period: {getPeriodButtonLabel()}</span>
-                    <ChevronDown
-                      size={14}
-                      className={`text-[#6344E7] transition-transform duration-200 ${
-                        isPeriodOpen ? "rotate-180" : ""
-                      }`}
-                    />
-                  </button>
-
-                  {isPeriodOpen && (
-                    <>
-                      {/* Invisible backdrop to dismiss on click outside */}
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setIsPeriodOpen(false)}
-                      />
-
-                      {/* Popover Dropdown */}
-                      <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl border border-slate-100 bg-white p-4 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-150">
-                        <p className="text-xs font-bold text-slate-800 mb-2.5">
-                          Select Period
-                        </p>
-
-                        {/* 6 Preset Chips in 3 columns */}
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { key: "lifetime", label: "All Time" },
-                            { key: "today", label: "Today" },
-                            { key: "yesterday", label: "Yesterday" },
-                            { key: "this_week", label: "This Week" },
-                            { key: "this_month", label: "This Month" },
-                            { key: "this_year", label: "This Year" },
-                          ].map((p) => {
-                            const active = tempPreset === p.key;
-                            return (
-                              <button
-                                key={p.key}
-                                type="button"
-                                onClick={() =>
-                                  handleSelectTempPreset(p.key as DatePresetType)
-                                }
-                                className={`py-1.5 px-2 rounded-xl text-xs font-bold text-center transition cursor-pointer ${
-                                  active
-                                    ? "bg-[#6344E7] text-white shadow-xs"
-                                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                                }`}
-                              >
-                                {p.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Custom Range */}
-                        <p className="text-xs font-bold text-slate-800 mt-4 mb-2.5">
-                          Custom Range
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <div className="relative flex-1">
-                            <input
-                              type="date"
-                              value={tempFrom}
-                              onChange={(e) => {
-                                setTempFrom(e.target.value);
-                                setTempPreset("custom");
-                              }}
-                              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500"
-                            />
-                          </div>
-                          <span className="text-xs text-slate-400 font-medium">
-                            to
-                          </span>
-                          <div className="relative flex-1">
-                            <input
-                              type="date"
-                              value={tempTo}
-                              onChange={(e) => {
-                                setTempTo(e.target.value);
-                                setTempPreset("custom");
-                              }}
-                              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-2 text-xs font-medium text-slate-700 outline-none focus:border-indigo-500"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Actions Footer */}
-                        <div className="mt-4 flex items-center justify-between pt-3 border-t border-slate-100">
-                          <button
-                            type="button"
-                            onClick={handleClearPeriod}
-                            className="text-xs font-bold text-slate-600 hover:text-slate-900 transition cursor-pointer"
-                          >
-                            Clear
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleApplyPeriod}
-                            className="px-4 py-1.5 rounded-xl bg-[#6344E7] hover:bg-[#5235D9] text-xs font-bold text-white shadow-xs transition cursor-pointer active:scale-95"
-                          >
-                            Apply
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
               </div>
             </section>
 
