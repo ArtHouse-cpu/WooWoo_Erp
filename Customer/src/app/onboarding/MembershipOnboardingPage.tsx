@@ -484,6 +484,51 @@ export default function MembershipOnboardingPage() {
 
   const isOnboarding = location.pathname.startsWith("/onboarding");
 
+  const handleBack = () => {
+    let restoreData: {
+      returnUrl?: string;
+      spaceData?: any;
+      modalState?: any;
+    } | null = null;
+
+    if (location.state?.fromCoworkingModal && location.state?.spaceData) {
+      restoreData = {
+        returnUrl: location.state.returnUrl || '/spaces',
+        spaceData: location.state.spaceData,
+        modalState: location.state.modalState,
+      };
+    } else {
+      try {
+        const stored = sessionStorage.getItem('coworking_modal_restore');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed?.spaceData) {
+            restoreData = parsed;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse coworking modal restore data', e);
+      }
+    }
+
+    if (restoreData && restoreData.spaceData) {
+      navigate(restoreData.returnUrl || '/spaces', {
+        state: {
+          restoreCoworkingModal: true,
+          spaceData: restoreData.spaceData,
+          modalState: restoreData.modalState,
+        },
+      });
+      return;
+    }
+
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate("/home");
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<"plans" | "insights">(() => {
     if (requestedPlan) return "plans";
     if (isOnboarding) return "plans";
@@ -701,7 +746,7 @@ export default function MembershipOnboardingPage() {
               <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate("/home")}
+                  onClick={handleBack}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
                   aria-label="Go back"
                 >
@@ -890,7 +935,16 @@ export default function MembershipOnboardingPage() {
         plan={selectedPlan}
         open={benefitsOpen}
         alreadyOwned={selectedOwned}
-        onClose={() => setBenefitsOpen(false)}
+        onClose={() => {
+          setBenefitsOpen(false);
+          const hasCoworkingRestore = Boolean(
+            location.state?.fromCoworkingModal ||
+            sessionStorage.getItem('coworking_modal_restore')
+          );
+          if (showBenefitsParam && hasCoworkingRestore) {
+            handleBack();
+          }
+        }}
         onContinue={() => {
           if (selectedOwned) return;
           setBenefitsOpen(false);

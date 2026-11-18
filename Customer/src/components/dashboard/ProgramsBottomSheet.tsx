@@ -19,6 +19,7 @@ import {
   Award,
   Ticket,
   Gift,
+  LayoutDashboard,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CspJoinModal } from "./CspJoinModal";
@@ -408,11 +409,11 @@ export function ProgramsBottomSheet({
 }: ProgramsBottomSheetProps) {
   const navigate = useNavigate();
   const customer = useAuthStore((state) => state.customer);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { isPremium } = useMembership();
-  const { application } = useCspApplication();
-  const { application: hapApplication, refresh: refreshHap } = useHapApplication();
+  const { application, loaded: cspLoaded, refresh: refreshCsp } = useCspApplication();
+  const { application: hapApplication, loaded: hapLoaded, refresh: refreshHap } = useHapApplication();
   const enrolled = application?.status === "approved";
-  const hapWaiting = hapApplication?.status === "under_review";
   const hapApproved = hapApplication?.status === "approved";
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
 
@@ -457,6 +458,7 @@ export function ProgramsBottomSheet({
   const [isHapJoinOpen, setIsHapJoinOpen] = useState(false);
   const [isCvpJoinOpen, setIsCvpJoinOpen] = useState(false);
   const [cvpApplication, setCvpApplication] = useState<CvpApplication | null>(null);
+  const [cvpLoaded, setCvpLoaded] = useState(false);
   const [cspProducts, setCspProducts] = useState<CspProgramProduct[]>([]);
   const [cspProductsLoading, setCspProductsLoading] = useState(false);
 
@@ -484,7 +486,9 @@ export function ProgramsBottomSheet({
   useEffect(() => {
     if (!isOpen) return;
     try {
-      const raw = localStorage.getItem(`cvp_application_${customer?._id || "guest"}`);
+      const raw =
+        localStorage.getItem(`cvp_application_${customer?._id || "guest"}`) ||
+        (customer?._id ? localStorage.getItem("cvp_application_guest") : null);
       if (raw) {
         setCvpApplication(JSON.parse(raw));
       } else {
@@ -492,8 +496,69 @@ export function ProgramsBottomSheet({
       }
     } catch {
       setCvpApplication(null);
+    } finally {
+      setCvpLoaded(true);
     }
   }, [isOpen, customer?._id]);
+
+  // Independent enrollment checks for CSP, HAP, and CVP
+  const isCspJoined = Boolean(
+    isAuthenticated &&
+      customer?._id &&
+      cspLoaded &&
+      application &&
+      (application.status === "approved" || application.status === "under_review")
+  );
+
+  const isHapJoined = Boolean(
+    isAuthenticated &&
+      customer?._id &&
+      hapLoaded &&
+      hapApplication &&
+      (hapApplication.status === "approved" || hapApplication.status === "under_review")
+  );
+
+  const isCvpJoined = Boolean(
+    isAuthenticated &&
+      customer?._id &&
+      cvpLoaded &&
+      cvpApplication &&
+      (cvpApplication.status === "approved" || cvpApplication.status === "under_review")
+  );
+
+  const isCurrentProgramJoined =
+    activeTab === "csp"
+      ? isCspJoined
+      : activeTab === "hap"
+      ? isHapJoined
+      : activeTab === "cvp"
+      ? isCvpJoined
+      : false;
+
+  const handleOpenDashboard = (tab: "csp" | "hap" | "cvp") => {
+    if (tab === "csp") {
+      if (!asPage) {
+        onClose();
+      }
+      navigate("/programs");
+    } else if (tab === "hap") {
+      if (!asPage) {
+        onClose();
+      }
+      navigate("/program/hap");
+      if (activeTab !== "hap") {
+        handleTabClick("hap");
+      }
+    } else if (tab === "cvp") {
+      if (!asPage) {
+        onClose();
+      }
+      navigate("/program/cvp");
+      if (activeTab !== "cvp") {
+        handleTabClick("cvp");
+      }
+    }
+  };
 
   // Sync active tab with initialTab prop when modal opens
   useEffect(() => {
@@ -1424,96 +1489,96 @@ export function ProgramsBottomSheet({
 
               {/* Fixed Bottom Actions */}
               <div className="shrink-0 bg-white border-t border-slate-100 px-4 pt-3 pb-[max(0.85rem,env(safe-area-inset-bottom))] sm:p-4 flex gap-3 z-10">
-                {/* Query More Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const text =
-                      activeTab === "all"
-                        ? "Hi! I would like to know more about the Programs at Woo Woo Art House."
-                        : activeTab === "csp"
-                        ? "Hi! I would like to know more about the Creative Sailor Program (CSP) at Woo Woo Art House."
+                {isCurrentProgramJoined ? (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDashboard(activeTab as "csp" | "hap" | "cvp")}
+                    className={`w-full py-3 px-4 rounded-[16px] text-white text-[14px] font-extrabold flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer ${
+                      activeTab === "csp"
+                        ? "bg-[#EA580C] hover:bg-[#D97706]"
                         : activeTab === "hap"
-                        ? "Hi! I would like to know more about the House Affiliate Program (HAP) at Woo Woo Art House."
-                        : "Hi! I would like to know more about the Community Volunteering Program (CVP) at Woo Woo Art House.";
-                    window.open(`https://wa.me/918073988123?text=${encodeURIComponent(text)}`, "_blank");
-                  }}
-                  className={`flex-1 py-3 px-3 rounded-[16px] border text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                    activeTab === "all"
-                      ? "border-slate-800 text-slate-800 hover:bg-slate-50"
-                      : activeTab === "csp"
-                      ? "border-[#EA580C] text-[#EA580C] hover:bg-[#FFF8F2]"
-                      : activeTab === "hap"
-                      ? "border-[#7C3AED] text-[#7C3AED] hover:bg-[#F5F3FF]"
-                      : "border-[#059669] text-[#059669] hover:bg-[#ECFDF5]"
-                  }`}
-                >
-                  <MessageSquare className="h-4.5 w-4.5" strokeWidth={2.5} />
-                  <span>Query More</span>
-                </button>
+                        ? "bg-[#7C3AED] hover:bg-[#6D28D9]"
+                        : "bg-[#059669] hover:bg-[#047857]"
+                    }`}
+                  >
+                    <LayoutDashboard className="h-4.5 w-4.5" strokeWidth={2.2} />
+                    <span>Open Dashboard</span>
+                  </button>
+                ) : (
+                  <>
+                    {/* Query Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const text =
+                          activeTab === "all"
+                            ? "Hi! I would like to know more about the Programs at Woo Woo Art House."
+                            : activeTab === "csp"
+                            ? "Hi! I would like to know more about the Creative Sailor Program (CSP) at Woo Woo Art House."
+                            : activeTab === "hap"
+                            ? "Hi! I would like to know more about the House Affiliate Program (HAP) at Woo Woo Art House."
+                            : "Hi! I would like to know more about the Community Volunteering Program (CVP) at Woo Woo Art House.";
+                        window.open(`https://wa.me/918073988123?text=${encodeURIComponent(text)}`, "_blank");
+                      }}
+                      className={`flex-1 py-3 px-3 rounded-[16px] border text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                        activeTab === "all"
+                          ? "border-slate-800 text-slate-800 hover:bg-slate-50"
+                          : activeTab === "csp"
+                          ? "border-[#EA580C] text-[#EA580C] hover:bg-[#FFF8F2]"
+                          : activeTab === "hap"
+                          ? "border-[#7C3AED] text-[#7C3AED] hover:bg-[#F5F3FF]"
+                          : "border-[#059669] text-[#059669] hover:bg-[#ECFDF5]"
+                      }`}
+                    >
+                      <MessageSquare className="h-4.5 w-4.5" strokeWidth={2.5} />
+                      <span>{activeTab === "all" ? "Query More" : "Query"}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (activeTab === "all") {
-                      handleTabClick("csp");
-                      return;
-                    }
-                    if (activeTab === "csp") {
-                      if (enrolled) {
-                        onClose();
-                        navigate("/programs");
-                        return;
-                      }
-                      if (!isPremium) {
-                        Swal.fire({
-                          icon: "info",
-                          title: "Premium Membership Required",
-                          text: "Upgrade to Premium to join CSP.",
-                          confirmButtonText: "OK",
-                          confirmButtonColor: "#4F46E5",
-                        });
-                        return;
-                      }
-                      setIsJoinModalOpen(true);
-                      return;
-                    }
-                    if (activeTab === "hap") {
-                      setIsHapJoinOpen(true);
-                      return;
-                    }
-                    if (activeTab === "cvp") {
-                      setIsCvpJoinOpen(true);
-                      return;
-                    }
-                  }}
-                  className={`flex-1 py-3 px-3 rounded-[16px] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
-                    activeTab === "all"
-                      ? "bg-slate-900 hover:bg-slate-800"
-                      : activeTab === "csp"
-                      ? "bg-[#EA580C] hover:bg-[#D97706]"
-                      : activeTab === "hap"
-                      ? "bg-[#7C3AED] hover:bg-[#6D28D9]"
-                      : "bg-[#059669] hover:bg-[#047857]"
-                  }`}
-                >
-                  <span>
-                    {activeTab === "all"
-                      ? "Explore Programs"
-                      : activeTab === "csp" && enrolled
-                      ? "View programs"
-                      : activeTab === "hap" && hapWaiting
-                      ? "Waiting"
-                      : activeTab === "hap" && hapApproved
-                      ? "Joined"
-                      : activeTab === "hap" && hapApplication?.status === "rejected"
-                      ? "Apply again"
-                      : activeTab === "cvp" && cvpApplication
-                      ? "Join Now "
-                      : "Join Now"}
-                  </span>
-                  <ArrowRight className="h-4.5 w-4.5" strokeWidth={2.5} />
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activeTab === "all") {
+                          handleTabClick("csp");
+                          return;
+                        }
+                        if (activeTab === "csp") {
+                          if (!isPremium) {
+                            Swal.fire({
+                              icon: "info",
+                              title: "Premium Membership Required",
+                              text: "Upgrade to Premium to join CSP.",
+                              confirmButtonText: "OK",
+                              confirmButtonColor: "#4F46E5",
+                            });
+                            return;
+                          }
+                          setIsJoinModalOpen(true);
+                          return;
+                        }
+                        if (activeTab === "hap") {
+                          setIsHapJoinOpen(true);
+                          return;
+                        }
+                        if (activeTab === "cvp") {
+                          setIsCvpJoinOpen(true);
+                          return;
+                        }
+                      }}
+                      className={`flex-1 py-3 px-3 rounded-[16px] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                        activeTab === "all"
+                          ? "bg-slate-900 hover:bg-slate-800"
+                          : activeTab === "csp"
+                          ? "bg-[#EA580C] hover:bg-[#D97706]"
+                          : activeTab === "hap"
+                          ? "bg-[#7C3AED] hover:bg-[#6D28D9]"
+                          : "bg-[#059669] hover:bg-[#047857]"
+                      }`}
+                    >
+                      <span>{activeTab === "all" ? "Explore Programs" : "Join / Apply"}</span>
+                      <ArrowRight className="h-4.5 w-4.5" strokeWidth={2.5} />
+                    </button>
+                  </>
+                )}
               </div>
             </motion.div>
           </div>
@@ -1522,7 +1587,10 @@ export function ProgramsBottomSheet({
 
       <CspJoinModal
         isOpen={isJoinModalOpen && activeTab === "csp"}
-        onClose={() => setIsJoinModalOpen(false)}
+        onClose={() => {
+          setIsJoinModalOpen(false);
+          void refreshCsp();
+        }}
       />
       <HapJoinModal
         isOpen={isHapJoinOpen}
@@ -1536,6 +1604,7 @@ export function ProgramsBottomSheet({
         onClose={() => setIsCvpJoinOpen(false)}
         onSubmitted={(app) => {
           setCvpApplication(app);
+          setCvpLoaded(true);
         }}
       />
     </>

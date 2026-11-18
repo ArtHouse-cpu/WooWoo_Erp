@@ -127,20 +127,20 @@ const InsightsAnalyticsScreen = () => {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+    <div className="mx-auto max-w-7xl space-y-4 sm:space-y-5 px-3 py-3 sm:px-6 sm:py-5">
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Insights & Analytics</h1>
-          <p className="mt-1 text-xs text-slate-400">
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900">Insights & Analytics</h1>
+          <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-xs text-slate-400">
             {data ? `${pretty(data.range.from)} – ${pretty(data.range.to)} · Updated ${new Date(data.generatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}` : "Select a date range"}
           </p>
         </div>
-        <div className="flex flex-wrap items-end justify-end gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-2 w-full sm:w-auto">
           <FilterSelect
             label="Date"
             value={preset}
             onChange={value => setPreset(value as InsightPreset)}
-            className="w-36"
+            className="w-full sm:w-36"
           >
             {PRESETS.map(item => (
               <option key={item.id} value={item.id}>{item.label}</option>
@@ -148,13 +148,13 @@ const InsightsAnalyticsScreen = () => {
           </FilterSelect>
           {preset === "custom" ? (
             <>
-              <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              <label className="flex flex-col gap-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-slate-400 w-full sm:w-auto">
                 From
-                <input type="date" value={from} onChange={event => setFrom(event.target.value)} className="w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
+                <input type="date" value={from} onChange={event => setFrom(event.target.value)} className="w-full sm:w-36 h-9 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
               </label>
-              <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              <label className="flex flex-col gap-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-slate-400 w-full sm:w-auto">
                 To
-                <input type="date" value={to} onChange={event => setTo(event.target.value)} className="w-36 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
+                <input type="date" value={to} onChange={event => setTo(event.target.value)} className="w-full sm:w-36 h-9 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none" />
               </label>
             </>
           ) : null}
@@ -162,7 +162,7 @@ const InsightsAnalyticsScreen = () => {
             label="Segment"
             value={segment}
             onChange={value => setSegment(value as InsightSegment)}
-            className="w-36"
+            className="w-full sm:w-36"
           >
             <option value="all">All segments</option>
             <option value="food">Food</option>
@@ -173,30 +173,32 @@ const InsightsAnalyticsScreen = () => {
             label="Membership"
             value={membership}
             onChange={value => setMembership(value as InsightMembership)}
-            className="w-40"
+            className="w-full sm:w-40 col-span-2 sm:col-span-1"
           >
             <option value="all">All customers</option>
             <option value="member">Membership</option>
             <option value="nonmember">Non-membership</option>
           </FilterSelect>
-          <button type="button" onClick={reset} className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600">
-            <RotateCcw size={14} /> Reset
-          </button>
-          <button type="button" onClick={() => setReloadKey(key => key + 1)} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white">
-            <RefreshCw size={14} /> Refresh
-          </button>
+          <div className="col-span-2 sm:col-span-1 flex items-center gap-2 w-full sm:w-auto pt-1 sm:pt-0">
+            <button type="button" onClick={reset} className="flex-1 sm:flex-initial inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition active:scale-95">
+              <RotateCcw size={14} /> Reset
+            </button>
+            <button type="button" onClick={() => setReloadKey(key => key + 1)} className="flex-1 sm:flex-initial inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white transition active:scale-95">
+              <RefreshCw size={14} /> Refresh
+            </button>
+          </div>
         </div>
-        </header>
-        <section className="space-y-2">
-          <h2 className="text-sm font-bold text-slate-900">Space booking utilization</h2>
-          <SpaceUtilizationPanel data={spaceUse} />
-        </section>
+      </header>
+      <section className="space-y-2">
+        <h2 className="text-xs sm:text-sm font-bold text-slate-900">Space booking utilization</h2>
+        <SpaceUtilizationPanel data={spaceUse} />
+      </section>
 
       {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+        <div className="rounded-xl sm:rounded-2xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm text-rose-700">{error}</div>
       ) : null}
       {preset === "custom" && !canLoad ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">Choose a start and end date.</div>
+        <div className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-xs sm:text-sm text-slate-500">Choose a start and end date.</div>
       ) : null}
 
       {loading && !data ? <Skeleton /> : null}
@@ -216,7 +218,7 @@ function FilterSelect({
   label,
   value,
   onChange,
-  className = "w-36",
+  className = "w-full sm:w-36",
   children,
 }: {
   label: string;
@@ -226,12 +228,12 @@ function FilterSelect({
   children: ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+    <label className="flex flex-col gap-1 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-slate-400">
       {label}
       <select
         value={value}
         onChange={event => onChange(event.target.value)}
-        className={`${className} rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none`}
+        className={`${className} h-9 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold normal-case tracking-normal text-slate-800 outline-none`}
       >
         {children}
       </select>
@@ -249,13 +251,15 @@ function ChipGroup<T extends string>({
   options: [T, string][];
 }) {
   return (
-    <div className="flex rounded-lg bg-slate-50 p-0.5">
+    <div className="flex rounded-lg bg-slate-100 p-0.5">
       {options.map(([id, label]) => (
         <button
           key={id}
           type="button"
           onClick={() => onChange(id)}
-          className={`rounded-md px-2.5 py-1 text-[11px] font-semibold ${value === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+          className={`rounded-md px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-[11px] font-semibold transition ${
+            value === id ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
+          }`}
         >
           {label}
         </button>
@@ -279,33 +283,38 @@ function RevenueSection({ data, loading }: { data: InsightsPayload; loading: boo
   return (
     <section className="space-y-3">
       <SectionTitle title="Revenue overview" note={loading ? "Updating…" : "Compared with the previous period of the same length"} />
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-2">
         <DonutCard title="By business segment" center={inr(data.totals.revenue)} rows={donut} empty="No billed sales in this range." />
         <DonutCard title="Membership vs non-membership" center={inr(data.totals.revenue)} rows={memberDonut} empty="No billed sales in this range." />
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        {data.segments.map(row => (
-          <article key={row.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+        {data.segments.map((row, idx) => (
+          <article
+            key={row.key}
+            className={`rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-xs ${
+              idx === data.segments.length - 1 ? "sm:col-span-2 lg:col-span-1" : ""
+            }`}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg text-white" style={{ background: SEGMENT_COLOR[row.key] }}>
-                  {row.key === "food" ? <Utensils size={15} /> : row.key === "space" ? <Store size={15} /> : <ShoppingBag size={15} />}
+                <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: SEGMENT_COLOR[row.key] }}>
+                  {row.key === "food" ? <Utensils size={14} /> : row.key === "space" ? <Store size={14} /> : <ShoppingBag size={14} />}
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-slate-900">{row.label}</p>
-                  <p className="text-[11px] text-slate-400">{row.share}% of net sales</p>
+                  <p className="text-xs sm:text-sm font-bold text-slate-900">{row.label}</p>
+                  <p className="text-[10px] sm:text-[11px] text-slate-400">{row.share}% of net sales</p>
                 </div>
               </div>
               <Trend value={row.changePct} />
             </div>
-            <p className="mt-3 text-2xl font-black text-slate-900">{inr(row.revenue)}</p>
-            <dl className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
+            <p className="mt-2 sm:mt-3 text-xl sm:text-2xl font-black text-slate-900">{inr(row.revenue)}</p>
+            <dl className="mt-2 sm:mt-3 grid grid-cols-2 gap-1.5 sm:gap-2 text-[10px] sm:text-[11px] text-slate-500">
               <div><dt>Bills</dt><dd className="font-semibold text-slate-800">{row.bills}</dd></div>
               <div><dt>Average bill</dt><dd className="font-semibold text-slate-800">{inr(row.average)}</dd></div>
               <div><dt>{row.key === "space" ? "Booked hours" : "Quantity sold"}</dt><dd className="font-semibold text-slate-800">{row.key === "space" ? row.hours : row.qty}</dd></div>
               <div><dt>{row.key === "space" ? "Bookings" : "Previous period"}</dt><dd className="font-semibold text-slate-800">{row.key === "space" ? row.bookings : inr(row.previousRevenue)}</dd></div>
             </dl>
-            {row.top[0] ? <p className="mt-3 truncate text-[11px] text-slate-500">Top: <span className="font-semibold text-slate-700">{row.top[0].name}</span></p> : null}
+            {row.top[0] ? <p className="mt-2.5 sm:mt-3 truncate text-[10px] sm:text-[11px] text-slate-500">Top: <span className="font-semibold text-slate-700">{row.top[0].name}</span></p> : null}
           </article>
         ))}
       </div>
@@ -325,31 +334,34 @@ function DonutCard({
   empty: string;
 }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+    <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-xs">
+      <h3 className="text-xs sm:text-sm font-bold text-slate-900">{title}</h3>
       {rows.length === 0 ? (
-        <p className="py-16 text-center text-sm text-slate-400">{empty}</p>
+        <p className="py-10 sm:py-16 text-center text-xs sm:text-sm text-slate-400">{empty}</p>
       ) : (
-        <div className="mt-2 grid items-center gap-2 sm:grid-cols-[220px_1fr]">
-          <div className="relative h-52">
+        <div className="mt-2 grid items-center gap-2 sm:grid-cols-[200px_1fr] md:grid-cols-[220px_1fr]">
+          <div className="relative h-44 sm:h-52">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={rows} dataKey="value" nameKey="name" innerRadius={62} outerRadius={84} paddingAngle={2} stroke="none">
+                <Pie data={rows} dataKey="value" nameKey="name" innerRadius={52} outerRadius={72} paddingAngle={2} stroke="none">
                   {rows.map(row => <Cell key={row.name} fill={row.color} />)}
                 </Pie>
                 <Tooltip formatter={(value, _name, item) => [inr(Number(value) || 0), `${item?.payload?.share ?? 0}%`]} />
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Net sales</span>
-              <span className="text-sm font-black text-slate-900">{center}</span>
+              <span className="text-[9px] sm:text-[10px] font-semibold uppercase tracking-wide text-slate-400">Net sales</span>
+              <span className="text-xs sm:text-sm font-black text-slate-900">{center}</span>
             </div>
           </div>
-          <ul className="space-y-2">
+          <ul className="space-y-1.5 sm:space-y-2">
             {rows.map(row => (
-              <li key={row.name} className="flex items-center justify-between gap-3 text-xs">
-                <span className="flex items-center gap-2 text-slate-600"><span className="h-2.5 w-2.5 rounded-full" style={{ background: row.color }} />{row.name}</span>
-                <span className="font-semibold text-slate-900">{inr(row.value)} · {row.share}%</span>
+              <li key={row.name} className="flex items-center justify-between gap-2 sm:gap-3 text-[11px] sm:text-xs">
+                <span className="flex items-center gap-1.5 sm:gap-2 text-slate-600 truncate">
+                  <span className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full shrink-0" style={{ background: row.color }} />
+                  <span className="truncate">{row.name}</span>
+                </span>
+                <span className="font-semibold text-slate-900 shrink-0">{inr(row.value)} · {row.share}%</span>
               </li>
             ))}
           </ul>
@@ -375,21 +387,21 @@ function TopSection({ data }: { data: InsightsPayload }) {
   ];
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <SectionTitle title="Top performing items" note="Completed final bills only" />
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <ChipGroup value={sort} onChange={setSort} options={[["revenue", "Revenue"], ["qty", "Quantity"]]} />
           <ChipGroup value={String(limit) as "5" | "10"} onChange={value => setLimit(value === "10" ? 10 : 5)} options={[["5", "Top 5"], ["10", "Top 10"]]} />
         </div>
       </div>
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-3">
         {columns.map(column => {
           const rows = [...data.top[column.key]].sort((a, b) => sort === "qty" ? b.qty - a.qty : b.revenue - a.revenue).slice(0, limit);
           return (
-            <article key={column.key} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <h3 className="px-1 text-sm font-bold text-slate-900">{column.title}</h3>
+            <article key={column.key} className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
+              <h3 className="px-1 text-xs sm:text-sm font-bold text-slate-900">{column.title}</h3>
               {rows.length === 0 ? <p className="px-1 py-8 text-center text-xs text-slate-400">Nothing sold in this range.</p> : (
-                <ol className="mt-2 space-y-2">
+                <ol className="mt-2 space-y-1.5 sm:space-y-2">
                   {rows.map((row, index) => <RankRow key={row.name} index={index + 1} row={row} kind={column.key} />)}
                 </ol>
               )}
@@ -403,9 +415,15 @@ function TopSection({ data }: { data: InsightsPayload }) {
 
 function RankRow({ index, row, kind }: { index: number; row: RankedItem; kind: "food" | "store" | "space" }) {
   return (
-    <li className="flex items-center gap-2 rounded-xl bg-slate-50 px-2 py-2">
-      <span className="w-4 text-center text-[11px] font-bold text-slate-400">{index}</span>
-      {row.image ? <img src={row.image} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[10px] font-bold text-slate-400">#{index}</span>}
+    <li className="flex items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl bg-slate-50 px-2 py-1.5 sm:py-2">
+      <span className="w-3.5 sm:w-4 text-center text-[10px] sm:text-[11px] font-bold text-slate-400 shrink-0">{index}</span>
+      {row.image ? (
+        <img src={row.image} alt="" className="h-8 w-8 sm:h-9 sm:w-9 rounded-md sm:rounded-lg object-cover shrink-0" />
+      ) : (
+        <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-md sm:rounded-lg bg-white text-[9px] sm:text-[10px] font-bold text-slate-400 shrink-0">
+          #{index}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-semibold text-slate-800">{row.name}</p>
         <p className="truncate text-[10px] text-slate-400">
@@ -413,7 +431,7 @@ function RankRow({ index, row, kind }: { index: number; row: RankedItem; kind: "
           {kind === "space" ? `${row.bookings || row.orders} bookings · ${row.hours || 0}h` : `${row.qty} sold · ${row.orders} bills`}
         </p>
       </div>
-      <span className="text-xs font-bold text-slate-900">{inr(row.revenue)}</span>
+      <span className="text-xs font-bold text-slate-900 shrink-0">{inr(row.revenue)}</span>
     </li>
   );
 }
@@ -472,25 +490,31 @@ function VisitorSection({
   return (
     <section className="space-y-3">
       <SectionTitle title="Visitor analytics" note="One bill is one transaction. A visit is a unique day with a bill." />
-      <div className="grid gap-3 lg:grid-cols-[1fr_280px]">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold text-slate-500">First-time visitors</p>
-            <p className="mt-1 text-3xl font-black text-slate-900">{summary.firstTime}</p>
-            <p className="text-xs text-slate-400">{summary.firstShare}% of {summary.unique} unique customers</p>
+      <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-[1fr_280px]">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-4 shadow-xs">
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 truncate">First-time visitors</p>
+            <p className="mt-0.5 sm:mt-1 text-xl sm:text-3xl font-black text-slate-900">{summary.firstTime}</p>
+            <p className="mt-0.5 text-[9px] sm:text-xs text-slate-400 line-clamp-2 leading-tight">
+              {summary.firstShare}% of {summary.unique} unique customers
+            </p>
           </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs font-semibold text-slate-500">Repeat visitors</p>
-            <p className="mt-1 text-3xl font-black text-slate-900">{summary.repeat}</p>
-            <p className="text-xs text-slate-400">{summary.repeatShare}% · more than one visit, or a visit before this period</p>
+          <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-4 shadow-xs">
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 truncate">Repeat visitors</p>
+            <p className="mt-0.5 sm:mt-1 text-xl sm:text-3xl font-black text-slate-900">{summary.repeat}</p>
+            <p className="mt-0.5 text-[9px] sm:text-xs text-slate-400 line-clamp-2 leading-tight">
+              {summary.repeatShare}% · more than one visit
+            </p>
           </article>
         </div>
-        <article className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-          {donut.length === 0 ? <p className="py-10 text-center text-xs text-slate-400">No visitors.</p> : (
-            <div className="h-36">
+        <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
+          {donut.length === 0 ? (
+            <p className="py-6 sm:py-10 text-center text-xs text-slate-400">No visitors.</p>
+          ) : (
+            <div className="h-28 sm:h-36">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={donut} dataKey="value" nameKey="name" innerRadius={36} outerRadius={54} stroke="none">
+                  <Pie data={donut} dataKey="value" nameKey="name" innerRadius={30} outerRadius={48} stroke="none">
                     {donut.map(row => <Cell key={row.name} fill={row.color} />)}
                   </Pie>
                   <Tooltip />
@@ -501,19 +525,19 @@ function VisitorSection({
         </article>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap gap-2">
+      <div className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
             <ChipGroup value={bucket} onChange={setBucket} options={[["day", "Per day"], ["week", "Per week"], ["month", "Per month"]]} />
             <ChipGroup value={visits} onChange={setVisits} options={[["all", "All"], ["1", "1 visit"], ["2", "2 visits"], ["3", "3+ visits"]]} />
           </div>
-          <label className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1">
-            <Search size={13} className="text-slate-400" />
-            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Name or phone" className="w-36 bg-transparent text-xs outline-none" />
+          <label className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-1 w-full sm:w-auto">
+            <Search size={13} className="text-slate-400 shrink-0" />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Name or phone" className="w-full sm:w-36 bg-transparent text-xs outline-none" />
           </label>
         </div>
-        <div className="mt-3 overflow-x-auto">
-          <table className="min-w-full text-left text-xs">
+        <div className="mt-3 overflow-x-auto -mx-1 sm:mx-0">
+          <table className="min-w-[620px] sm:min-w-full text-left text-xs">
             <thead className="text-[10px] uppercase tracking-wide text-slate-400">
               <tr>
                 {["Customer", "Phone", "Visits", "Bills", "First visit", "Last visit", "Spending", "Type"].map(heading => (
@@ -541,7 +565,7 @@ function VisitorSection({
           {!loading && rows.length === 0 ? <p className="py-8 text-center text-xs text-slate-400">No customers match this frequency.</p> : null}
           {loading ? <p className="flex items-center justify-center gap-2 py-4 text-xs text-slate-400"><Loader2 size={14} className="animate-spin" /> Loading visitors</p> : null}
         </div>
-        <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
           <span>{total} customers</span>
           <div className="flex gap-2">
             <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-lg border border-slate-200 px-2 py-1 disabled:opacity-40">Previous</button>
@@ -567,20 +591,20 @@ function VisitDialog({ row, query, onClose }: { row: VisitorRow; query: InsightQ
   }, [row.key, query]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-3 sm:items-center">
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-2 sm:p-3 sm:items-center">
+      <div className="max-h-[90vh] sm:max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white p-3.5 sm:p-4 shadow-xl">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-bold text-slate-900">{row.name}</h3>
-            <p className="text-xs text-slate-500">{row.phone || "No phone"} {detail?.customer.member ? "· Membership" : ""}</p>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 truncate">{row.name}</h3>
+            <p className="text-[11px] sm:text-xs text-slate-500 truncate">{row.phone || "No phone"} {detail?.customer.member ? "· Membership" : ""}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-500"><X size={16} /></button>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 shrink-0"><X size={16} /></button>
         </div>
         {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
         {!detail && !error ? <p className="mt-6 flex justify-center"><Loader2 className="animate-spin text-slate-400" size={18} /></p> : null}
         {detail ? (
           <>
-            <dl className="mt-4 grid grid-cols-2 gap-2 text-xs">
+            <dl className="mt-3 sm:mt-4 grid grid-cols-2 gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
               <Stat label="Visits in range" value={String(detail.range.visits)} />
               <Stat label="Bills in range" value={String(detail.range.bills)} />
               <Stat label="Spent in range" value={inr(detail.range.spend)} />
@@ -588,12 +612,15 @@ function VisitDialog({ row, query, onClose }: { row: VisitorRow; query: InsightQ
               <Stat label="First visit ever" value={pretty(detail.lifetime.firstVisit)} />
               <Stat label="Last visit ever" value={pretty(detail.lifetime.lastVisit)} />
             </dl>
-            <h4 className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-400">Bills in this range</h4>
-            <ul className="mt-2 space-y-2">
+            <h4 className="mt-3 sm:mt-4 text-[10px] sm:text-xs font-bold uppercase tracking-wide text-slate-400">Bills in this range</h4>
+            <ul className="mt-2 space-y-1.5 sm:space-y-2">
               {detail.range.billsList.map(bill => (
-                <li key={bill.invoiceCode} className="rounded-xl border border-slate-100 px-3 py-2 text-xs">
-                  <div className="flex justify-between font-semibold text-slate-800"><span>{bill.invoiceCode}</span><span>{inr(bill.amount)}</span></div>
-                  <p className="text-slate-400">{pretty(bill.date)} · {bill.items.join(", ") || "Items"}</p>
+                <li key={bill.invoiceCode} className="rounded-xl border border-slate-100 p-2 sm:px-3 sm:py-2 text-[11px] sm:text-xs">
+                  <div className="flex justify-between font-semibold text-slate-800">
+                    <span className="truncate">{bill.invoiceCode}</span>
+                    <span className="shrink-0">{inr(bill.amount)}</span>
+                  </div>
+                  <p className="text-slate-400 truncate">{pretty(bill.date)} · {bill.items.join(", ") || "Items"}</p>
                 </li>
               ))}
               {detail.range.billsList.length === 0 ? <li className="text-xs text-slate-400">No bills in this range.</li> : null}
@@ -606,7 +633,12 @@ function VisitDialog({ row, query, onClose }: { row: VisitorRow; query: InsightQ
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl bg-slate-50 px-3 py-2"><dt className="text-slate-400">{label}</dt><dd className="font-semibold text-slate-800">{value}</dd></div>;
+  return (
+    <div className="rounded-xl bg-slate-50 p-2 sm:px-3 sm:py-2">
+      <dt className="text-[10px] sm:text-xs text-slate-400">{label}</dt>
+      <dd className="font-semibold text-slate-800 text-xs sm:text-sm">{value}</dd>
+    </div>
+  );
 }
 
 function PeakSection({ data }: { data: InsightsPayload }) {
@@ -614,25 +646,25 @@ function PeakSection({ data }: { data: InsightsPayload }) {
   const highlight = metric === "bills" ? data.peak.busiestPeriod : data.peak.highestRevenuePeriod;
   return (
     <section className="space-y-3 pb-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <SectionTitle title="Peak billing hours" note="Time is taken from when the bill was saved, in India time" />
         <ChipGroup value={metric} onChange={setMetric} options={[["bills", "Number of bills"], ["revenue", "Revenue"]]} />
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <Mini icon={<Clock3 size={15} />} label="Most active" value={data.peak.busiestPeriod || "—"} />
         <Mini icon={<Store size={15} />} label="Highest revenue" value={data.peak.highestRevenuePeriod || "—"} />
         <Mini icon={<Users size={15} />} label="Total bills" value={String(data.peak.totalBills)} />
         <Mini icon={<Clock3 size={15} />} label="Average bills / day" value={String(data.peak.averageBillsPerDay)} />
       </div>
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid gap-2.5 sm:gap-3 lg:grid-cols-2">
         <ChartCard title="Time of day">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.peak.periods}>
+            <BarChart data={data.peak.periods} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} />
+              <YAxis tick={{ fontSize: 10 }} width={28} allowDecimals={false} />
               <Tooltip formatter={(value, name) => [name === "revenue" ? inr(Number(value) || 0) : value, name === "revenue" ? "Revenue" : "Bills"]} />
-              <Bar dataKey={metric} radius={[6, 6, 0, 0]}>
+              <Bar dataKey={metric} radius={[5, 5, 0, 0]}>
                 {data.peak.periods.map(row => (
                   <Cell key={row.key} fill={row.label === highlight ? "#4f46e5" : "#cbd5e1"} />
                 ))}
@@ -642,12 +674,12 @@ function PeakSection({ data }: { data: InsightsPayload }) {
         </ChartCard>
         <ChartCard title={`Weekday · busiest ${data.peak.busiestDay || "—"}`}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.peak.weekdays}>
+            <BarChart data={data.peak.weekdays} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
               <CartesianGrid stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 10 }} interval={0} />
+              <YAxis tick={{ fontSize: 10 }} width={28} allowDecimals={false} />
               <Tooltip formatter={(value, name) => [name === "revenue" ? inr(Number(value) || 0) : value, name === "revenue" ? "Revenue" : "Bills"]} />
-              <Bar dataKey={metric} radius={[6, 6, 0, 0]}>
+              <Bar dataKey={metric} radius={[5, 5, 0, 0]}>
                 {data.peak.weekdays.map(row => (
                   <Cell key={row.day} fill={row.day === data.peak.busiestDay ? "#0f766e" : "#cbd5e1"} />
                 ))}
@@ -656,12 +688,15 @@ function PeakSection({ data }: { data: InsightsPayload }) {
           </ResponsiveContainer>
         </ChartCard>
       </div>
-      <ul className="grid gap-2 sm:grid-cols-4">
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {data.peak.periods.map(row => (
-          <li key={row.key} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
-            <p className="font-bold text-slate-800">{row.label}</p>
-            <p className="text-slate-400">{row.hint}</p>
-            <p className="mt-1 font-semibold text-slate-700">{row.bills} bills · {inr(row.revenue)} · {row.share}%</p>
+          <li key={row.key} className="rounded-xl border border-slate-200 bg-white p-2.5 sm:px-3 sm:py-2 text-xs">
+            <p className="font-bold text-slate-800 text-xs sm:text-sm">{row.label}</p>
+            <p className="text-[10px] sm:text-xs text-slate-400">{row.hint}</p>
+            <p className="mt-1 font-semibold text-slate-700 text-[10px] sm:text-xs leading-tight">
+              {row.bills} bills · {inr(row.revenue)}
+            </p>
+            <p className="text-[10px] sm:text-xs font-bold text-indigo-600">{row.share}%</p>
           </li>
         ))}
       </ul>
@@ -671,20 +706,22 @@ function PeakSection({ data }: { data: InsightsPayload }) {
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-      <h3 className="mb-2 text-sm font-bold text-slate-900">{title}</h3>
-      <div className="h-60">{children}</div>
+    <article className="rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-xs">
+      <h3 className="mb-2 text-xs sm:text-sm font-bold text-slate-900">{title}</h3>
+      <div className="h-48 sm:h-60">{children}</div>
     </article>
   );
 }
 
 function Mini({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <article className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">{icon}</span>
-      <div>
-        <p className="text-[11px] text-slate-400">{label}</p>
-        <p className="text-sm font-bold text-slate-900">{value}</p>
+    <article className="flex items-center gap-2 sm:gap-3 rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-2.5 sm:px-3 sm:py-3 shadow-xs">
+      <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[10px] sm:text-[11px] text-slate-400">{label}</p>
+        <p className="truncate text-xs sm:text-sm font-bold text-slate-900">{value}</p>
       </div>
     </article>
   );
@@ -693,16 +730,16 @@ function Mini({ icon, label, value }: { icon: ReactNode; label: string; value: s
 function SectionTitle({ title, note }: { title: string; note: string }) {
   return (
     <div>
-      <h2 className="text-sm font-bold text-slate-900">{title}</h2>
-      <p className="text-[11px] text-slate-400">{note}</p>
+      <h2 className="text-xs sm:text-sm font-bold text-slate-900">{title}</h2>
+      <p className="text-[10px] sm:text-[11px] text-slate-400">{note}</p>
     </div>
   );
 }
 
 function Skeleton() {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      {Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-40 animate-pulse rounded-2xl bg-slate-200/70" />)}
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-32 sm:h-40 animate-pulse rounded-xl sm:rounded-2xl bg-slate-200/70" />)}
     </div>
   );
 }
