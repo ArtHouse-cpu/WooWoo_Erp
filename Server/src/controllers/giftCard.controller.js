@@ -26,19 +26,21 @@ const staffFromReq = req => ({
 const todayKey = () => nowInBusinessTz().dateKey;
 const keyToDate = key => new Date(`${key}T00:00:00Z`);
 
-/** A card is usable once. Zero value means it has been used. Expiry still wins after that day. */
-const resolveStatus = ({requested, balance, expiryKey}) => {
+/** A card is usable once. Zero value means it has been used. Expiry still wins after that day, unless expiryType is never. */
+const resolveStatus = ({requested, balance, expiryKey, expiryType}) => {
   if (requested === 'Cancelled') return 'Cancelled';
+  if (requested === 'Inactive') return 'Inactive';
   if (balance <= 0) return 'Used';
-  if (expiryKey && expiryKey < todayKey()) return 'Expired';
+  if (expiryType !== 'never' && expiryKey && expiryKey < todayKey()) return 'Expired';
   if (requested === 'Expired') return 'Expired';
-  return 'Active';
+  return requested === 'Inactive' ? 'Inactive' : 'Active';
 };
 
 const serializeGiftCard = (doc, {withTransactions = false} = {}) => {
   const plain = typeof doc?.toObject === 'function' ? doc.toObject() : {...doc};
   const initialAmount = Number(plain.initialAmount || 0);
   const currentBalance = Number(plain.currentBalance || 0);
+  const expiryType = plain.expiryType || (plain.expiryDate ? 'custom' : 'never');
   const result = {
     _id: String(plain._id),
     id: String(plain._id),
@@ -47,7 +49,13 @@ const serializeGiftCard = (doc, {withTransactions = false} = {}) => {
     initialAmount,
     currentBalance,
     amountUsed: roundMoney(Math.max(0, initialAmount - currentBalance)),
-    expiryDate: toDateKey(plain.expiryDate) || '',
+    expiryType,
+    expiryDate: plain.expiryDate ? toDateKey(plain.expiryDate) || '' : '',
+    customer: plain.customer ? String(plain.customer) : null,
+    customerId: plain.customerId || '',
+    customerName: plain.customerName || '',
+    customerMobile: plain.customerMobile || '',
+    customerEmail: plain.customerEmail || '',
     status: plain.status,
     createdBy: plain.createdByName || plain.createdBy?.m_staff_name || '',
     createdByStaff: plain.createdBy || null,
@@ -78,7 +86,7 @@ const generateGiftCardCode = async () => {
   return `${prefix}${String(max + 1).padStart(3, '0')}`;
 };
 
-/** Mark overdue / emptied Active cards so list results reflect reality. */
+/** Mark overdue / emptied Active cards so list results reflect reality. Only expire non-never cards with past date. */
 const syncGiftCardStatuses = async () => {
   try {
     const todayStart = keyToDate(todayKey());
@@ -88,7 +96,12 @@ const syncGiftCardStatuses = async () => {
         {$set: {status: 'Used'}},
       ),
       GiftCard.updateMany(
-        {status: 'Active', currentBalance: {$gt: 0}, expiryDate: {$lt: todayStart}},
+        {
+          status: 'Active',
+          currentBalance: {$gt: 0},
+          expiryType: {$ne: 'never'},
+          expiryDate: {$ne: null, $lt: todayStart},
+        },
         {$set: {status: 'Expired'}},
       ),
     ]);
@@ -134,10 +147,49 @@ const buildPayload = (body = {}, {partial = false} = {}) => {
     }
   }
 
-  if (!partial || body.expiryDate !== undefined) {
-    const key = toDateKey(body.expiryDate);
-    if (!key) errors.push('A valid expiry date is required.');
-    else payload.expiryKey = key;
+  // Expiry configuration: 'never' or 'custom'
+  const rawExpiryType = body.expiryType !== undefined ? String(body.expiryType).trim().toLowerCase() : undefined;
+  if (rawExpiryType === 'never') {
+    payload.expiryType = 'never';
+    payload.expiryKey = null;
+  } else if (rawExpiryType === 'custom') {
+    payload.expiryType = 'custom';
+    if (!partial || body.expiryDate !== undefined) {
+      const key = toDateKey(body.expiryDate);
+      if (!key) errors.push('A valid expiry date is required when choosing a specific date.');
+      else payload.expiryKey = key;
+    }
+  } else if (!partial || body.expiryDate !== undefined) {
+    if (body.expiryDate) {
+      const key = toDateKey(body.expiryDate);
+      if (!key) errors.push('A valid expiry date is required.');
+      else {
+        payload.expiryKey = key;
+        payload.expiryType = 'custom';
+      }
+    } else {
+      payload.expiryType = 'never';
+      payload.expiryKey = null;
+    }
+  }
+
+  // Customer assignment fields
+  if (body.customer !== undefined) {
+    payload.customer = body.customer && mongoose.Types.ObjectId.isValid(String(body.customer))
+      ? new mongoose.Types.ObjectId(String(body.customer))
+      : null;
+  }
+  if (body.customerId !== undefined) {
+    payload.customerId = String(body.customerId ?? '').trim() || null;
+  }
+  if (body.customerName !== undefined) {
+    payload.customerName = String(body.customerName ?? '').trim();
+  }
+  if (body.customerMobile !== undefined) {
+    payload.customerMobile = String(body.customerMobile ?? '').trim();
+  }
+  if (body.customerEmail !== undefined) {
+    payload.customerEmail = String(body.customerEmail ?? '').trim().toLowerCase();
   }
 
   if (body.status !== undefined) {
@@ -170,7 +222,7 @@ export const createGiftCard = async (req, res) => {
       return res.status(400).json({success: false, message: errors[0], errors});
     }
 
-    if (payload.expiryKey < todayKey()) {
+    if (payload.expiryType !== 'never' && payload.expiryKey && payload.expiryKey < todayKey()) {
       return res.status(400).json({
         success: false,
         message: 'Expiry date cannot be in the past.',
@@ -180,6 +232,7 @@ export const createGiftCard = async (req, res) => {
     const amount = payload.initialAmount;
     const staff = staffFromReq(req);
     const autoCode = !payload.code;
+    const expiryType = payload.expiryType || (payload.expiryKey ? 'custom' : 'never');
 
     for (let attempt = 0; attempt < MAX_CODE_RETRIES; attempt++) {
       const code = payload.code || (await generateGiftCardCode());
@@ -189,11 +242,18 @@ export const createGiftCard = async (req, res) => {
           name: payload.name,
           initialAmount: amount,
           currentBalance: amount,
-          expiryDate: keyToDate(payload.expiryKey),
+          expiryType,
+          expiryDate: payload.expiryKey ? keyToDate(payload.expiryKey) : null,
+          customer: payload.customer || null,
+          customerId: payload.customerId || null,
+          customerName: payload.customerName || '',
+          customerMobile: payload.customerMobile || '',
+          customerEmail: payload.customerEmail || '',
           status: resolveStatus({
             requested: payload.status,
             balance: amount,
             expiryKey: payload.expiryKey,
+            expiryType,
           }),
           createdByName: payload.createdByName || staff.m_staff_name || '',
           createdBy: staff,
@@ -250,7 +310,14 @@ export const getGiftCards = async (req, res) => {
     const s = String(search).trim();
     if (s) {
       const rx = {$regex: escapeRegex(s), $options: 'i'};
-      query.$or = [{code: rx}, {name: rx}, {createdByName: rx}];
+      query.$or = [
+        {code: rx},
+        {name: rx},
+        {createdByName: rx},
+        {customerName: rx},
+        {customerMobile: rx},
+        {customerId: rx},
+      ];
     }
 
     const cards = await GiftCard.find(query)
@@ -298,7 +365,7 @@ export const getGiftCardById = async (req, res) => {
   }
 };
 
-/** Checkout lookup: returns the card plus whether it can be redeemed right now. */
+/** Checkout lookup: returns the card plus whether it can be redeemed right now. Supports customer restriction check. */
 export const getGiftCardByCode = async (req, res) => {
   try {
     const code = normalizeCode(req.params.code);
@@ -320,6 +387,27 @@ export const getGiftCardByCode = async (req, res) => {
       reason = `This gift card is ${card.status.toLowerCase()}.`;
     } else if (card.currentBalance <= 0) {
       reason = 'This gift card has already been used.';
+    } else if (card.expiryType !== 'never' && card.expiryDate && toDateKey(card.expiryDate) < todayKey()) {
+      reason = 'This gift card has expired.';
+    }
+
+    // Customer assignment validation if the card is assigned to a specific customer
+    const hasCustomerRestriction = Boolean(card.customer || card.customerId || card.customerMobile);
+    if (!reason && hasCustomerRestriction) {
+      const requestedCustomer = String(req.query.customerId || req.query.customer || '').trim();
+      const requestedPhone = String(req.query.customerPhone || req.query.phone || '').trim().replace(/\D/g, '').slice(-10);
+
+      const cardCustomerId = String(card.customer?._id || card.customer || card.customerId || '').trim();
+      const cardMobile = String(card.customerMobile || '').trim().replace(/\D/g, '').slice(-10);
+
+      const idMatches = requestedCustomer && (cardCustomerId === requestedCustomer || String(card.customerId) === requestedCustomer);
+      const phoneMatches = requestedPhone && cardMobile && cardMobile === requestedPhone;
+
+      if (requestedCustomer || requestedPhone) {
+        if (!idMatches && !phoneMatches) {
+          reason = `This gift card is exclusively assigned to ${card.customerName || card.customerMobile || 'another customer'} and cannot be redeemed for this customer.`;
+        }
+      }
     }
 
     return res.status(200).json({
@@ -373,7 +461,8 @@ export const updateGiftCard = async (req, res) => {
     }
 
     const staff = staffFromReq(req);
-    const expiryKey = payload.expiryKey ?? toDateKey(card.expiryDate);
+    const expiryType = payload.expiryType ?? card.expiryType ?? (card.expiryDate ? 'custom' : 'never');
+    const expiryKey = payload.expiryKey ?? (expiryType === 'never' ? null : toDateKey(card.expiryDate));
     const nextAmount = alreadyUsed
       ? card.initialAmount
       : payload.initialAmount ?? card.initialAmount;
@@ -381,13 +470,27 @@ export const updateGiftCard = async (req, res) => {
     if (payload.code) card.code = payload.code;
     if (payload.name !== undefined) card.name = payload.name;
     if (payload.createdByName !== undefined) card.createdByName = payload.createdByName;
-    if (payload.expiryKey) card.expiryDate = keyToDate(payload.expiryKey);
+    
+    card.expiryType = expiryType;
+    if (expiryType === 'never') {
+      card.expiryDate = null;
+    } else if (payload.expiryKey) {
+      card.expiryDate = keyToDate(payload.expiryKey);
+    }
+
+    if (payload.customer !== undefined) card.customer = payload.customer;
+    if (payload.customerId !== undefined) card.customerId = payload.customerId;
+    if (payload.customerName !== undefined) card.customerName = payload.customerName;
+    if (payload.customerMobile !== undefined) card.customerMobile = payload.customerMobile;
+    if (payload.customerEmail !== undefined) card.customerEmail = payload.customerEmail;
+
     card.initialAmount = nextAmount;
     if (!alreadyUsed) card.currentBalance = nextAmount;
     card.status = resolveStatus({
       requested: payload.status ?? card.status,
       balance: card.currentBalance,
       expiryKey,
+      expiryType,
     });
     card.updatedBy = staff;
 
@@ -414,7 +517,7 @@ export const updateGiftCard = async (req, res) => {
 
 /**
  * Uses an Active, unexpired card exactly once. The whole amount is consumed
- * in one update, so the same code cannot be applied again.
+ * in one update, so the same code cannot be applied again. Enforces customer restriction.
  */
 export const redeemGiftCard = async (req, res) => {
   try {
@@ -428,12 +531,66 @@ export const redeemGiftCard = async (req, res) => {
 
     const todayStart = keyToDate(todayKey());
     const staff = staffFromReq(req);
+
+    // First check existing card for status, expiry, and customer restriction
+    const targetCard = await GiftCard.findOne({code}).lean();
+    if (!targetCard) {
+      return res.status(404).json({success: false, message: `Gift card "${code}" not found.`});
+    }
+
+    if (targetCard.status === 'Used') {
+      return res.status(400).json({
+        success: false,
+        code: 'NOT_REDEEMABLE',
+        message: 'This gift card has already been used.',
+      });
+    }
+    if (targetCard.status !== 'Active') {
+      return res.status(400).json({
+        success: false,
+        code: 'NOT_REDEEMABLE',
+        message: `This gift card is ${targetCard.status.toLowerCase()}.`,
+      });
+    }
+    if (targetCard.expiryType !== 'never' && targetCard.expiryDate && toDateKey(targetCard.expiryDate) < todayKey()) {
+      return res.status(400).json({
+        success: false,
+        code: 'NOT_REDEEMABLE',
+        message: 'This gift card has expired.',
+      });
+    }
+
+    // Customer assignment validation
+    const hasCustomerRestriction = Boolean(targetCard.customer || targetCard.customerId || targetCard.customerMobile);
+    if (hasCustomerRestriction) {
+      const redeemingCustomer = String(req.body?.customerId || req.body?.customer || '').trim();
+      const redeemingPhone = String(req.body?.customerPhone || req.body?.phone || '').trim().replace(/\D/g, '').slice(-10);
+
+      const cardCustomerId = String(targetCard.customer?._id || targetCard.customer || targetCard.customerId || '').trim();
+      const cardMobile = String(targetCard.customerMobile || '').trim().replace(/\D/g, '').slice(-10);
+
+      const idMatches = redeemingCustomer && (cardCustomerId === redeemingCustomer || String(targetCard.customerId) === redeemingCustomer);
+      const phoneMatches = redeemingPhone && cardMobile && cardMobile === redeemingPhone;
+
+      if (!idMatches && !phoneMatches) {
+        return res.status(403).json({
+          success: false,
+          code: 'CUSTOMER_MISMATCH',
+          message: `This gift card is exclusively assigned to ${targetCard.customerName || targetCard.customerMobile || 'another customer'} and cannot be redeemed.`,
+        });
+      }
+    }
+
     const updated = await GiftCard.findOneAndUpdate(
       {
         code,
         status: 'Active',
-        expiryDate: {$gte: todayStart},
         currentBalance: {$gt: 0},
+        $or: [
+          {expiryType: 'never'},
+          {expiryDate: null},
+          {expiryDate: {$gte: todayStart}},
+        ],
       },
       [
         {
@@ -466,18 +623,10 @@ export const redeemGiftCard = async (req, res) => {
     );
 
     if (!updated) {
-      const card = await GiftCard.findOne({code}).select('status expiryDate').lean();
-      if (!card) {
-        return res.status(404).json({success: false, message: `Gift card "${code}" not found.`});
-      }
-      let message = 'This gift card cannot be used.';
-      if (card.status === 'Used') message = 'This gift card has already been used.';
-      else if (card.status !== 'Active') message = `This gift card is ${card.status.toLowerCase()}.`;
-      else if (toDateKey(card.expiryDate) < todayKey()) message = 'This gift card has expired.';
       return res.status(400).json({
         success: false,
         code: 'NOT_REDEEMABLE',
-        message,
+        message: 'This gift card cannot be used.',
       });
     }
 
@@ -704,15 +853,17 @@ export const getPublicGiftCard = async (req, res) => {
     if (!SHARE_TOKEN_RE.test(token)) return notFound();
 
     const card = await GiftCard.findOne({shareToken: token})
-      .select('code name initialAmount currentBalance expiryDate status')
+      .select('code name initialAmount currentBalance expiryType expiryDate status')
       .lean();
     if (!card) return notFound();
 
-    const expiryKey = toDateKey(card.expiryDate) || '';
+    const isNever = card.expiryType === 'never' || !card.expiryDate;
+    const expiryKey = isNever ? '' : (toDateKey(card.expiryDate) || '');
     const status = resolveStatus({
       requested: card.status,
       balance: Number(card.currentBalance || 0),
       expiryKey,
+      expiryType: card.expiryType,
     });
     const usable = status === 'Active';
 
@@ -723,7 +874,8 @@ export const getPublicGiftCard = async (req, res) => {
         code: usable ? card.code : `${card.code.slice(0, 3)}••••••`,
         initialAmount: Number(card.initialAmount || 0),
         currentBalance: usable ? Number(card.currentBalance || 0) : 0,
-        expiryDate: expiryKey,
+        expiryType: card.expiryType || (card.expiryDate ? 'custom' : 'never'),
+        expiryDate: isNever ? 'Never Expires' : expiryKey,
         status,
         usable,
       },

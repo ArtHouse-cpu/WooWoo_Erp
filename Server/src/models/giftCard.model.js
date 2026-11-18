@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-export const GIFT_CARD_STATUSES = ['Active', 'Used', 'Expired', 'Cancelled'];
+export const GIFT_CARD_STATUSES = ['Active', 'Inactive', 'Used', 'Expired', 'Cancelled'];
 export const GIFT_CARD_TXN_TYPES = ['issue', 'redeem', 'refund', 'adjust'];
 
 const staffSchema = new mongoose.Schema(
@@ -50,11 +50,46 @@ const giftCardSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
-    /** Last valid day (stored as UTC midnight of the calendar date). */
+    /** Expiry option: 'never' means card remains valid indefinitely, 'custom' requires expiryDate */
+    expiryType: {
+      type: String,
+      enum: ['never', 'custom'],
+      default: 'custom',
+    },
+    /** Last valid day (stored as UTC midnight of the calendar date). Null if expiryType is 'never'. */
     expiryDate: {
       type: Date,
-      required: true,
+      default: null,
       index: true,
+    },
+    /** Assigned customer details for customer-specific gift card restrictions */
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Customer',
+      default: null,
+      index: true,
+    },
+    customerId: {
+      type: String,
+      default: null,
+      trim: true,
+      index: true,
+    },
+    customerName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    customerMobile: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    customerEmail: {
+      type: String,
+      default: '',
+      trim: true,
     },
     status: {
       type: String,
@@ -81,6 +116,7 @@ const giftCardSchema = new mongoose.Schema(
 
 giftCardSchema.index({createdAt: -1});
 giftCardSchema.index({name: 1});
+giftCardSchema.index({customerName: 1});
 giftCardSchema.index(
   {shareToken: 1},
   {unique: true, partialFilterExpression: {shareToken: {$type: 'string'}}},

@@ -6,6 +6,7 @@ import AllBooking from '../models/allBooking.model.js';
 import Subscription from '../models/subscription.model.js';
 import Membership from '../models/membership.model.js';
 import Wallet from '../models/wallet.model.js';
+import GiftCard from '../models/giftCard.model.js';
 import {cspProgramForCustomer} from './csp.controller.js';
 
 const LIMIT = 250;
@@ -169,7 +170,7 @@ export const getCustomer360 = async (req, res) => {
 
     const byIdentity = identityMatch(customer);
     const byContact = identityMatch(customer, {idField: ''});
-    const [invoices, spaceBookings, fullBookings, subscriptions, wallet] = await Promise.all([
+    const [invoices, spaceBookings, fullBookings, subscriptions, wallet, giftCards] = await Promise.all([
       Invoice.find(byIdentity)
         .select('invoiceCode invoiceDate grandTotal subTotal discountTotal membershipDiscount coupon referral manualDiscount membershipType pendingAmount paymentStatus status mode items paymentBreakdown paymentHistory createdAt')
         .sort({createdAt: -1})
@@ -191,6 +192,16 @@ export const getCustomer360 = async (req, res) => {
         .limit(LIMIT)
         .lean(),
       Wallet.findOne({customerId: customer._id}).select('walletAmount transactions').lean(),
+      GiftCard.find({
+        $or: [
+          {customer: customer._id},
+          ...(customer.customerId ? [{customerId: customer.customerId}] : []),
+          ...(customer.mobile ? [{customerMobile: customer.mobile}] : []),
+        ],
+      })
+        .select('code name initialAmount currentBalance expiryType expiryDate status createdAt')
+        .sort({createdAt: -1})
+        .lean(),
     ]);
 
     const purchases = invoices.map(mapPurchase);
@@ -379,6 +390,10 @@ export const getCustomer360 = async (req, res) => {
       bookings,
       memberships,
       walletTransactions,
+      giftCards: (giftCards || []).map(g => ({
+        ...g,
+        amountUsed: roundMoney(Math.max(0, (g.initialAmount || 0) - (g.currentBalance || 0))),
+      })),
       timeline,
       program: {
         csp: await cspProgramForCustomer(customer._id),

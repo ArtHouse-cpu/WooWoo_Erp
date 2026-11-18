@@ -14,12 +14,16 @@ import {
   CreditCard,
   Eye,
   Gift,
+  Infinity as InfinityIcon,
   Pencil,
   Plus,
+  Power,
+  PowerOff,
   RefreshCw,
   Search,
   Share2,
   Trash2,
+  User,
   Wallet,
   X,
 } from "lucide-react";
@@ -52,8 +56,14 @@ export type GiftCardData = {
   initialAmount: number;
   currentBalance: number;
   createdBy: string;
+  expiryType?: "never" | "custom";
   expiryDate: string;
-  status: "Active" | "Used" | "Expired" | "Cancelled";
+  status: "Active" | "Inactive" | "Used" | "Expired" | "Cancelled";
+  customer?: string | null;
+  customerId?: string | null;
+  customerName?: string | null;
+  customerMobile?: string | null;
+  customerEmail?: string | null;
   createdAt?: string;
   transactions?: GiftCardTransaction[];
   isShared?: boolean;
@@ -66,8 +76,14 @@ const toGiftCardData = (record: GiftCardRecord): GiftCardData => ({
   initialAmount: Number(record.initialAmount || 0),
   currentBalance: Number(record.currentBalance || 0),
   createdBy: record.createdBy || "",
+  expiryType: record.expiryType || (record.expiryDate ? "custom" : "never"),
   expiryDate: record.expiryDate || "",
   status: record.status,
+  customer: record.customer || null,
+  customerId: record.customerId || null,
+  customerName: record.customerName || "",
+  customerMobile: record.customerMobile || "",
+  customerEmail: record.customerEmail || "",
   createdAt: record.createdAt,
   transactions: record.transactions,
   isShared: Boolean(record.isShared),
@@ -104,13 +120,16 @@ const GiftCard = () => {
   const stats = useMemo(() => {
     const total = cards.length;
     const active = cards.filter((c) => c.status === "Active").length;
+    const neverExpires = cards.filter(
+      (c) => c.expiryType === "never" || !c.expiryDate,
+    ).length;
     const used = cards.filter((c) => c.status === "Used").length;
     const activeAmount = cards.reduce(
       (sum, c) =>
         sum + (c.status === "Active" ? Number(c.initialAmount) || 0 : 0),
       0,
     );
-    return { total, active, used, activeAmount };
+    return { total, active, neverExpires, used, activeAmount };
   }, [cards]);
 
   const filteredCards = useMemo(() => {
@@ -121,7 +140,10 @@ const GiftCard = () => {
       return (
         card.code.toLowerCase().includes(q) ||
         card.name.toLowerCase().includes(q) ||
-        card.createdBy.toLowerCase().includes(q)
+        card.createdBy.toLowerCase().includes(q) ||
+        (card.customerName && card.customerName.toLowerCase().includes(q)) ||
+        (card.customerMobile && card.customerMobile.toLowerCase().includes(q)) ||
+        (card.customerId && card.customerId.toLowerCase().includes(q))
       );
     });
   }, [cards, search, statusFilter]);
@@ -201,8 +223,14 @@ const GiftCard = () => {
       name: formData.name.trim(),
       initialAmount: formData.initialAmount,
       createdBy: formData.createdBy || staffName,
-      expiryDate: formData.expiryDate,
+      expiryType: formData.expiryType,
+      expiryDate: formData.expiryType === "never" ? "" : formData.expiryDate,
       status: formData.status,
+      customer: formData.customer || null,
+      customerId: formData.customerId || null,
+      customerName: formData.customerName || "",
+      customerMobile: formData.customerMobile || "",
+      customerEmail: formData.customerEmail || "",
     };
 
     try {
@@ -309,6 +337,42 @@ const GiftCard = () => {
     setShareCard(card);
   };
 
+  const handleToggleActive = (card: GiftCardData) => {
+    const isCurrentlyActive = card.status === "Active";
+    const newStatus = isCurrentlyActive ? "Inactive" : "Active";
+    const actionText = isCurrentlyActive ? "Deactivate" : "Activate";
+
+    Swal.fire({
+      title: `${actionText} Gift Card?`,
+      text: isCurrentlyActive
+        ? `Deactivating "${card.name || card.code}" will prevent it from being redeemed at checkout until reactivated.`
+        : `Activating "${card.name || card.code}" will make it redeemable again.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: isCurrentlyActive ? "#eab308" : "#16a34a",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: `Yes, ${actionText}!`,
+      showLoaderOnConfirm: true,
+      preConfirm: async () => {
+        try {
+          await handleUpdateGiftCard(card._id, { status: newStatus });
+          return true;
+        } catch (error) {
+          Swal.showValidationMessage(
+            getErrorMessage(error, `Could not ${actionText.toLowerCase()} gift card.`),
+          );
+          return false;
+        }
+      },
+    }).then((result) => {
+      if (!result.isConfirmed) return;
+      setCards((prev) =>
+        prev.map((c) => (c._id === card._id ? { ...c, status: newStatus } : c)),
+      );
+      toast.success(`Gift card ${actionText.toLowerCase()}d successfully.`);
+    });
+  };
+
   // Table Columns
   const columns = useMemo<MRT_ColumnDef<GiftCardData>[]>(
     () => [
@@ -316,21 +380,81 @@ const GiftCard = () => {
         accessorKey: "code",
         header: "Gift Card Code",
         size: 160,
+        Cell: ({ row }) => (
+          <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-gray-900">
+            <span>{row.original.code}</span>
+            <button
+              type="button"
+              onClick={(e) => void handleCopyCode(row.original.code, e)}
+              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition"
+              title="Copy Code"
+            >
+              {copiedCode === row.original.code ? (
+                <Check size={13} className="text-emerald-600" />
+              ) : (
+                <Copy size={13} />
+              )}
+            </button>
+          </div>
+        ),
       },
 
       {
         accessorKey: "name",
-        header: "Name",
-        size: 200,
+        header: "Gift Card Name",
+        size: 180,
+      },
+
+      {
+        accessorKey: "customerName",
+        header: "Customer Name",
+        size: 180,
+        Cell: ({ row }) => {
+          const name = row.original.customerName;
+          const customerId = row.original.customerId;
+          if (!name && !customerId) {
+            return (
+              <span className="text-xs text-gray-400 italic">Unassigned</span>
+            );
+          }
+          return (
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
+                {name ? name.slice(0, 2).toUpperCase() : "CU"}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-gray-900 truncate max-w-[130px]">
+                  {name || "Customer"}
+                </span>
+                {customerId && (
+                  <span className="text-[10px] text-gray-500">ID: {customerId}</span>
+                )}
+              </div>
+            </div>
+          );
+        },
+      },
+
+      {
+        accessorKey: "customerMobile",
+        header: "Customer Mobile",
+        size: 140,
+        Cell: ({ row }) => {
+          const mobile = row.original.customerMobile;
+          return mobile ? (
+            <span className="text-xs font-medium text-gray-700">{mobile}</span>
+          ) : (
+            <span className="text-xs text-gray-400 italic">—</span>
+          );
+        },
       },
 
       {
         accessorKey: "initialAmount",
         header: "Amount",
         size: 120,
-
         Cell: ({ cell }) => (
-          <span className="font-medium text-gray-800">
+          <span className="font-semibold text-gray-900">
             ₹{cell.getValue<number>().toLocaleString("en-IN")}
           </span>
         ),
@@ -339,40 +463,70 @@ const GiftCard = () => {
       {
         accessorKey: "createdBy",
         header: "Created By",
-        size: 160,
+        size: 140,
       },
 
       {
         accessorKey: "expiryDate",
-        header: "Expiry Date",
-        size: 140,
+        header: "Expiry Date / Validity",
+        size: 160,
+        Cell: ({ row }) => {
+          const isNever =
+            row.original.expiryType === "never" || !row.original.expiryDate;
+          if (isNever) {
+            return (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                <InfinityIcon size={13} strokeWidth={2.5} />
+                <span>Never Expires</span>
+              </span>
+            );
+          }
 
-        Cell: ({ cell }) => {
-          const date = cell.getValue<string>();
-          if (!date) return "-";
-          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-          return m ? `${m[3]}/${m[2]}/${m[1]}` : date;
+          const dateStr = row.original.expiryDate;
+          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+          const displayDate = m ? `${m[3]}/${m[2]}/${m[1]}` : dateStr;
+
+          const today = new Date().toISOString().split("T")[0];
+          const isExpired = dateStr < today;
+          const diffDays = Math.ceil(
+            (new Date(dateStr).getTime() - new Date().getTime()) /
+              (1000 * 60 * 60 * 24),
+          );
+          const isExpiringSoon = !isExpired && diffDays <= 7 && diffDays >= 0;
+
+          return (
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-gray-900">{displayDate}</span>
+              {isExpired ? (
+                <span className="text-[10px] font-semibold text-red-600">Expired</span>
+              ) : isExpiringSoon ? (
+                <span className="text-[10px] font-semibold text-amber-600">
+                  Expiring in {diffDays} {diffDays === 1 ? "day" : "days"}
+                </span>
+              ) : null}
+            </div>
+          );
         },
       },
 
       {
         accessorKey: "status",
         header: "Status",
-        size: 120,
-
+        size: 110,
         Cell: ({ cell }) => {
           const status = cell.getValue<GiftCardData["status"]>();
-
           return (
             <span
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                 status === "Active"
-                  ? "bg-green-100 text-green-700"
-                  : status === "Used"
-                    ? "bg-blue-100 text-blue-700"
-                    : status === "Expired"
-                      ? "bg-red-100 text-red-700"
-                      : "bg-gray-100 text-gray-700"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : status === "Inactive"
+                    ? "bg-amber-100 text-amber-700"
+                    : status === "Used"
+                      ? "bg-blue-100 text-blue-700"
+                      : status === "Expired"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-gray-100 text-gray-700"
               }`}
             >
               {status}
@@ -381,33 +535,73 @@ const GiftCard = () => {
         },
       },
 
+      {
+        accessorKey: "createdAt",
+        header: "Created Date",
+        size: 130,
+        Cell: ({ cell }) => {
+          const val = cell.getValue<string>();
+          if (!val) return "—";
+          const d = new Date(val);
+          return Number.isNaN(d.getTime())
+            ? val
+            : d.toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              });
+        },
+      },
+
       // Actions
       {
         id: "actions",
         header: "Actions",
-        size: 150,
+        size: 160,
         enableSorting: false,
         enableColumnFilter: false,
-
         Cell: ({ row }) => (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => void handleView(row.original)}
-              className="cursor-pointer rounded p-2 text-blue-600 transition hover:bg-blue-50"
-              title="View"
+              className="cursor-pointer rounded p-1.5 text-blue-600 transition hover:bg-blue-50"
+              title="View Details"
             >
-              <Eye size={18} />
+              <Eye size={17} />
             </button>
 
             {canUpdate && (
               <button
                 type="button"
                 onClick={() => openEdit(row.original)}
-                className="cursor-pointer rounded p-2 text-green-600 transition hover:bg-green-50"
-                title="Edit"
+                className="cursor-pointer rounded p-1.5 text-emerald-600 transition hover:bg-emerald-50"
+                title="Edit Gift Card"
               >
-                <Pencil size={18} />
+                <Pencil size={17} />
+              </button>
+            )}
+
+            {canUpdate && row.original.status !== "Used" && (
+              <button
+                type="button"
+                onClick={() => handleToggleActive(row.original)}
+                className={`cursor-pointer rounded p-1.5 transition ${
+                  row.original.status === "Active"
+                    ? "text-amber-600 hover:bg-amber-50"
+                    : "text-emerald-600 hover:bg-emerald-50"
+                }`}
+                title={
+                  row.original.status === "Active"
+                    ? "Deactivate Gift Card"
+                    : "Activate Gift Card"
+                }
+              >
+                {row.original.status === "Active" ? (
+                  <PowerOff size={17} />
+                ) : (
+                  <Power size={17} />
+                )}
               </button>
             )}
 
@@ -415,10 +609,10 @@ const GiftCard = () => {
               <button
                 type="button"
                 onClick={() => handleDelete(row.original)}
-                className="cursor-pointer rounded p-2 text-red-600 transition hover:bg-red-50"
-                title="Delete"
+                className="cursor-pointer rounded p-1.5 text-red-600 transition hover:bg-red-50"
+                title="Delete Gift Card"
               >
-                <Trash2 size={18} />
+                <Trash2 size={17} />
               </button>
             )}
           </div>
@@ -426,7 +620,7 @@ const GiftCard = () => {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canUpdate, canDelete],
+    [canUpdate, canDelete, copiedCode],
   );
 
   // MRT Table

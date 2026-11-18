@@ -8,7 +8,10 @@ import {
   Download,
   Gift,
   History,
+  Infinity,
   Loader2,
+  Mail,
+  Phone,
   Pencil,
   Share2,
   ShoppingBag,
@@ -81,6 +84,11 @@ const STATUS_STYLES: Record<
     pill: "bg-emerald-100 text-emerald-700 ring-emerald-200",
     dot: "bg-emerald-500",
     card: "from-slate-900 via-indigo-950 to-violet-900",
+  },
+  Inactive: {
+    pill: "bg-amber-100 text-amber-700 ring-amber-200",
+    dot: "bg-amber-500",
+    card: "from-slate-700 via-slate-800 to-amber-950",
   },
   Used: {
     pill: "bg-blue-100 text-blue-700 ring-blue-200",
@@ -178,11 +186,14 @@ const ViewGiftCardModal = ({
   const style = STATUS_STYLES[card.status] ?? STATUS_STYLES.Cancelled;
   const initial = Math.max(0, Number(card.initialAmount || 0));
   const usedOnce = card.status === "Used";
-  const days = daysUntil(card.expiryDate);
+  const isNeverExpires = card.expiryType === "never" || !card.expiryDate;
+  const days = isNeverExpires ? null : daysUntil(card.expiryDate);
   const pastExpiry = days != null && days < 0;
 
   const expiryNote =
-    days == null
+    isNeverExpires
+      ? "Never Expires"
+      : days == null
       ? ""
       : days < 0
         ? `Expired ${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} ago`
@@ -382,10 +393,72 @@ const ViewGiftCardModal = ({
                   Valid Till
                 </p>
                 <p className="text-sm font-semibold">
-                  {formatDate(card.expiryDate)}
+                  {isNeverExpires ? (
+                    <span className="inline-flex items-center gap-1 text-amber-300">
+                      <Infinity size={15} /> Never Expires
+                    </span>
+                  ) : (
+                    formatDate(card.expiryDate)
+                  )}
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Assigned Customer */}
+        <div className="px-6 pt-4">
+          <div className="rounded-2xl border border-gray-100 bg-gray-50/70 p-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 font-bold text-sm">
+                  {card.customerName ? card.customerName.charAt(0).toUpperCase() : <UserRound size={18} />}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-gray-900 truncate">
+                      {card.customerName || "Unassigned / All Customers"}
+                    </p>
+                    {card.customerId && (
+                      <span className="shrink-0 rounded bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-violet-700">
+                        {card.customerId}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 truncate">
+                    {card.customerName
+                      ? "Restricted to this customer only"
+                      : "Legacy card — redeemable by any customer"}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                  card.customerName
+                    ? "bg-violet-100 text-violet-700"
+                    : "bg-gray-200 text-gray-600"
+                }`}
+              >
+                {card.customerName ? "Customer Specific" : "General"}
+              </span>
+            </div>
+
+            {(card.customerMobile || card.customerEmail) && (
+              <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-gray-200/60 pt-2.5 text-xs text-gray-600">
+                {card.customerMobile && (
+                  <div className="flex items-center gap-1.5">
+                    <Phone size={13} className="text-gray-400 shrink-0" />
+                    <span className="font-medium text-gray-800">{card.customerMobile}</span>
+                  </div>
+                )}
+                {card.customerEmail && (
+                  <div className="flex items-center gap-1.5">
+                    <Mail size={13} className="text-gray-400 shrink-0" />
+                    <span className="truncate font-medium text-gray-800">{card.customerEmail}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -417,7 +490,9 @@ const ViewGiftCardModal = ({
         <div className="px-6 pt-3">
           <div
             className={`flex items-center gap-3 rounded-2xl border p-3 ${
-              pastExpiry
+              isNeverExpires
+                ? "border-emerald-200 bg-emerald-50/60"
+                : pastExpiry
                 ? "border-rose-200 bg-rose-50"
                 : days != null && days <= 30
                   ? "border-amber-200 bg-amber-50"
@@ -426,19 +501,21 @@ const ViewGiftCardModal = ({
           >
             <span
               className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                pastExpiry
+                isNeverExpires
+                  ? "bg-emerald-100 text-emerald-600"
+                  : pastExpiry
                   ? "bg-rose-100 text-rose-600"
                   : "bg-violet-50 text-violet-600"
               }`}
             >
-              <CalendarClock size={17} />
+              {isNeverExpires ? <Infinity size={17} /> : <CalendarClock size={17} />}
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
                 Expiry Date
               </p>
               <p className="text-sm font-semibold text-gray-900">
-                {formatDate(card.expiryDate)}
+                {isNeverExpires ? "Never Expires" : formatDate(card.expiryDate)}
               </p>
             </div>
             {expiryNote && (
@@ -456,7 +533,7 @@ const ViewGiftCardModal = ({
             )}
           </div>
 
-          {pastExpiry && card.status === "Active" && (
+          {!isNeverExpires && pastExpiry && card.status === "Active" && (
             <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-rose-600">
               <AlertTriangle size={13} />
               This card is marked Active but its expiry date has passed.

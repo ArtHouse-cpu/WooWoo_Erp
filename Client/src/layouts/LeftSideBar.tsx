@@ -129,24 +129,24 @@ const MENU_GROUPS: MenuGroup[] = [
       //   icon: ScanLine,
       //   path: "/events/check-in",
       // },
-      // {
-      //   name: "discounts",
-      //   label: "Discounts & Coupons",
-      //   icon: Percent,
-      //   path: "/events/discounts",
-      // },
+      {
+        name: "discounts",
+        label: "Discounts & Coupons",
+        icon: Percent,
+        path: "/events/discounts",
+      },
       // {
       //   name: "analytics",
       //   label: "Analytics",
       //   icon: ChartNoAxesCombined,
       //   path: "/events/analytics",
       // },
-      // {
-      //   name: "settings",
-      //   label: "Settings",
-      //   icon: Settings,
-      //   path: "/events/settings",
-      // },
+      {
+        name: "settings",
+        label: "Settings",
+        icon: Settings,
+        path: "/events/settings",
+      },
     ],
   },
   {

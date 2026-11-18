@@ -850,7 +850,7 @@ export const handleValidateCoupon = async (payload: {
   return response.data;
 };
 
-export type GiftCardStatus = "Active" | "Used" | "Expired" | "Cancelled";
+export type GiftCardStatus = "Active" | "Inactive" | "Used" | "Expired" | "Cancelled";
 
 export type GiftCardTransaction = {
   _id: string;
@@ -871,9 +871,16 @@ export type GiftCardRecord = {
   initialAmount: number;
   currentBalance: number;
   amountUsed: number;
-  /** YYYY-MM-DD */
+  /** 'never' | 'custom' */
+  expiryType?: "never" | "custom";
+  /** YYYY-MM-DD or empty if never expires */
   expiryDate: string;
   status: GiftCardStatus;
+  customer?: string | null;
+  customerId?: string | null;
+  customerName?: string | null;
+  customerMobile?: string | null;
+  customerEmail?: string | null;
   createdBy: string;
   createdAt?: string;
   updatedAt?: string;
@@ -888,7 +895,13 @@ export type GiftCardPayload = {
   name: string;
   initialAmount: number;
   currentBalance?: number;
-  expiryDate: string;
+  expiryType?: "never" | "custom";
+  expiryDate?: string;
+  customer?: string | null;
+  customerId?: string | null;
+  customerName?: string | null;
+  customerMobile?: string | null;
+  customerEmail?: string | null;
   status?: GiftCardStatus;
   createdBy?: string;
   adjustmentNote?: string;
@@ -939,6 +952,7 @@ export const handleDeleteGiftCard = async (
 
 export const handleLookupGiftCard = async (
   code: string,
+  params?: { customerId?: string; customerPhone?: string },
 ): Promise<{
   success: boolean;
   redeemable: boolean;
@@ -947,6 +961,7 @@ export const handleLookupGiftCard = async (
 }> => {
   const response = await axiosInstance.get(
     `/gift-cards/code/${encodeURIComponent(code.trim())}`,
+    { params },
   );
   return response.data;
 };
@@ -954,6 +969,8 @@ export const handleLookupGiftCard = async (
 export const handleRedeemGiftCard = async (payload: {
   code: string;
   amount: number;
+  customerId?: string;
+  customerPhone?: string;
   reference?: string;
   note?: string;
 }): Promise<{

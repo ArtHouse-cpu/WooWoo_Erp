@@ -387,7 +387,7 @@ const createCustomer = async (req, res) => {
 };
 
 const CUSTOMER_LIST_PROJECTION =
-  'name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId membershipPurchase priority walletAmount closingBalance cashbackBalance affiliateBalance withdrawable nonWithdrawable referralCode referredBy status createdAt updatedAt createdBy';
+  'customerId profileImage name mobile email whatsappNumber AlternateMobile companyName gstin address city state pincode country membershipType membershipPlanId membershipPurchase priority walletAmount closingBalance cashbackBalance affiliateBalance withdrawable nonWithdrawable referralCode referredBy status createdAt updatedAt createdBy';
 
 /** Build list filter — avoid broad case-insensitive $or scans when possible. */
 const buildCustomerListQuery = searchRaw => {
@@ -418,6 +418,7 @@ const buildCustomerListQuery = searchRaw => {
   const prefix = new RegExp(`^${escaped}`, 'i');
 
   query.$or = [
+    { customerId: contains },
     { name: prefix },
     { mobile: contains },
     { email: contains },

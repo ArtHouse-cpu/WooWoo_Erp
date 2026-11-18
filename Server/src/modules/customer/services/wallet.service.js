@@ -3,6 +3,7 @@ import Wallet from '../../../models/wallet.model.js';
 import WalletWithdrawal from '../../../models/walletWithdrawal.model.js';
 import AffiliateCommission from '../../../models/affiliateCommission.model.js';
 import CommissionLedger from '../../../models/commissionLedger.model.js';
+import GiftCard from '../../../models/giftCard.model.js';
 import {getReferralDashboard} from './referral.service.js';
 import {resolveTwoBuckets} from '../../../utils/walletBuckets.js';
 
@@ -51,6 +52,7 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
     withdrawals,
     referral,
     referralsThisMonth,
+    giftCards,
   ] = await Promise.all([
     Wallet.findOne({customerId}).lean(),
     AffiliateCommission.find({inviter: customerId})
@@ -68,6 +70,16 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
       isDeleted: {$ne: true},
       createdAt: {$gte: monthStart},
     }),
+    GiftCard.find({
+      $or: [
+        {customer: customerId},
+        ...(customer.customerId ? [{customerId: customer.customerId}] : []),
+        ...(customer.mobile ? [{customerMobile: customer.mobile}] : []),
+      ],
+    })
+      .select('code name initialAmount currentBalance expiryType expiryDate status createdAt')
+      .sort({createdAt: -1})
+      .lean(),
   ]);
 
   const usePrimaryCommissions = commissions.length > 0;
@@ -289,6 +301,10 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
     },
     categories,
     transactions,
+    giftCards: (giftCards || []).map(g => ({
+      ...g,
+      amountUsed: Math.round(Math.max(0, (Number(g.initialAmount) || 0) - (Number(g.currentBalance) || 0)) * 100) / 100,
+    })),
     referral: {
       referralCode: referral.referralCode,
       shareUrl: referral.shareUrl,

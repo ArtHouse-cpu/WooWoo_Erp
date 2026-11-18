@@ -846,7 +846,10 @@ export default function CheckoutModal({
       setLoadingPromo(true);
       let card: GiftCardRecord;
       try {
-        const lookup = await handleLookupGiftCard(code);
+        const lookup = await handleLookupGiftCard(code, {
+          customerId: selectedCustomer?._id || initialCustomerId || undefined,
+          customerPhone: customerSearch.trim() || initialCustomerPhone || undefined,
+        });
         if (!lookup.redeemable) {
           Swal.fire(
             "Cannot Apply",
@@ -2069,6 +2072,8 @@ export default function CheckoutModal({
           amount: roundToPaise(giftCardBalance),
           reference: giftCardRef,
           note: "Used once at checkout",
+          customerId: selectedCustomer?._id || initialCustomerId || undefined,
+          customerPhone: customerSearch.trim() || initialCustomerPhone || undefined,
         });
         giftCardRedeemed = true;
       };
