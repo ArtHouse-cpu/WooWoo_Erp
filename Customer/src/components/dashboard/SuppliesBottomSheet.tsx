@@ -6,10 +6,6 @@ import {
   ShoppingBag,
   Tag,
   Grid,
-  ShieldCheck,
-  Truck,
-  RotateCcw,
-  Lock,
   MessageCircle,
   Compass,
   Sparkles,
@@ -612,7 +608,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                     <ShoppingBag className="h-5 w-5" strokeWidth={2} />
                   </div>
                   <h5 className="text-[12px] font-black text-[#111111] mt-2 leading-none">
-                    {displayedProducts.length > 0 ? `${displayedProducts.length} Items` : 'Products'}
+                    5k+
                   </h5>
                   <p className="mt-1 text-[9px] text-[#9CA3AF] font-bold leading-tight">
                     Everything you need in one place
@@ -625,59 +621,11 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                     <Grid className="h-5 w-5" strokeWidth={2} />
                   </div>
                   <h5 className="text-[12px] font-black text-[#111111] mt-2 leading-none">
-                    Artisan Made
+                   50+ (Categories)
                   </h5>
                   <p className="mt-1 text-[9px] text-[#9CA3AF] font-bold leading-tight">
                     Curated handmade gifts
                   </p>
-                </div>
-              </div>
-
-              {/* Trust Features Peach Strip */}
-              <div className="mx-5 p-3 rounded-[16px] bg-[#FFF7ED] border border-[#FFEDD5] flex items-center justify-between gap-1">
-                {/* Genuine Products */}
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[9px] font-extrabold text-[#111111] leading-tight text-left">
-                    <div>Genuine</div>
-                    <div className="text-[#EA580C]">Products</div>
-                  </div>
-                </div>
-
-                {/* Separator */}
-                <div className="h-6 w-[1px] bg-[#FFEDD5]" />
-
-                {/* Fast Delivery */}
-                <div className="flex items-center gap-1.5">
-                  <Truck className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[9px] font-extrabold text-[#111111] leading-tight text-left">
-                    <div>Fast</div>
-                    <div className="text-[#EA580C]">Delivery</div>
-                  </div>
-                </div>
-
-                {/* Separator */}
-                <div className="h-6 w-[1px] bg-[#FFEDD5]" />
-
-                {/* Easy Returns */}
-                <div className="flex items-center gap-1.5">
-                  <RotateCcw className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[9px] font-extrabold text-[#111111] leading-tight text-left">
-                    <div>Easy</div>
-                    <div className="text-[#EA580C]">Returns</div>
-                  </div>
-                </div>
-
-                {/* Separator */}
-                <div className="h-6 w-[1px] bg-[#FFEDD5]" />
-
-                {/* Secure Payments */}
-                <div className="flex items-center gap-1.5">
-                  <Lock className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[9px] font-extrabold text-[#111111] leading-tight text-left">
-                    <div>Secure</div>
-                    <div className="text-[#EA580C]">Payments</div>
-                  </div>
                 </div>
               </div>
             </div>

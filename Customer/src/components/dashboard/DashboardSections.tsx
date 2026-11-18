@@ -61,11 +61,11 @@ export function ExploreGrid({onItemClick}: {onItemClick?: (id: string) => void})
 
               {/* Content Area */}
               <div className="relative flex flex-1 flex-col justify-between p-3 pt-4 sm:p-4 sm:pt-6">
-                <div className="min-w-0 pr-6 sm:pr-8">
+                <div className="min-w-0 pr-1 sm:pr-7">
                   <p className="truncate text-[14px] font-black text-[#111111] sm:text-[15px] leading-tight">
                     {item.title}
                   </p>
-                  <p className="mt-1 truncate text-[11px] font-bold text-[#4B5563] sm:text-[12px] leading-snug">
+                  <p className="mt-1 truncate whitespace-nowrap text-[9px] font-bold text-[#4B5563] tracking-tight leading-snug sm:text-[11px] lg:text-[12px]">
                     {item.subtitle}
                   </p>
                 </div>

@@ -1,14 +1,10 @@
 import {useEffect, useState, type FormEvent} from 'react';
 import {
   X,
-  Calendar,
-  Clock,
-  MapPin,
   Users,
   Sparkles,
   Building,
   Laptop,
-  PartyPopper,
   Volume2,
   Video,
   Projector,
@@ -16,9 +12,8 @@ import {
   Wifi,
   Utensils,
   Send,
-  User,
-  Phone,
   Compass,
+  ChevronDown,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 import Swal from 'sweetalert2';
@@ -51,6 +46,9 @@ const POPULAR_PURPOSES = [
   'Shoots & Media',
   'Meetups & Seminars',
   'Coworking & Study',
+  'Exhibition & Gallery',
+  'Birthday / Celebration',
+  'Private Gathering',
   'Other',
 ];
 
@@ -62,14 +60,15 @@ const TIME_SLOTS = [
   {id: 'fullday', label: 'Full Day (10:00 AM – 10:00 PM)'},
 ];
 
-const AMENITIES = [
+const ADDITIONAL_SERVICES = [
   {id: 'sound', label: 'Sound System & Mic', icon: Volume2},
   {id: 'projector', label: 'Projector & Screen', icon: Projector},
-  {id: 'shoot', label: 'Media / Video Shoot Setup', icon: Video},
-  {id: 'lighting', label: 'Special Ambient Lighting', icon: SunMedium},
+  {id: 'shoot', label: 'Media / Video Setup', icon: Video},
+  {id: 'lighting', label: 'Ambient Lighting', icon: SunMedium},
   {id: 'wifi', label: 'High-Speed Wi-Fi', icon: Wifi},
-  {id: 'food', label: 'Veg Catering / Snacks', icon: Utensils},
 ];
+
+const FOOD_OPTIONS = ['Starter', 'Drinks', 'Main Course', 'Quick Bites'];
 
 const SPACE_WHATSAPP = '918073988123';
 
@@ -83,13 +82,13 @@ export function SpaceQueryModal({
   const [spaceType, setSpaceType] = useState<SpaceTypeSelection>(initialSpaceType);
   const [purpose, setPurpose] = useState(POPULAR_PURPOSES[0]);
   const [customPurpose, setCustomPurpose] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [city, setCity] = useState(CITIES[0]);
   const [date, setDate] = useState('');
   const [timeSlot, setTimeSlot] = useState(TIME_SLOTS[0].label);
   const [guestsCount, setGuestsCount] = useState(15);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [foodVegRequired, setFoodVegRequired] = useState(false);
+  const [selectedFoodItems, setSelectedFoodItems] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -99,14 +98,12 @@ export function SpaceQueryModal({
   useEffect(() => {
     if (!isOpen) return;
     setSpaceType(initialSpaceType);
-    setName(customer?.name || '');
-    setPhone(customer?.mobile || '');
     if (!date) {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       setDate(tomorrow.toISOString().split('T')[0]);
     }
-  }, [isOpen, initialSpaceType, customer]);
+  }, [isOpen, initialSpaceType]);
 
   const toggleAmenity = (label: string) => {
     setSelectedAmenities(prev =>
@@ -114,29 +111,14 @@ export function SpaceQueryModal({
     );
   };
 
+  const toggleFoodItem = (item: string) => {
+    setSelectedFoodItems(prev =>
+      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    );
+  };
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-
-    if (!name.trim()) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Name Required',
-        text: 'Please enter your name.',
-        confirmButtonColor: '#EA580C',
-      });
-      return;
-    }
-
-    if (!/^\d{10}$/.test(cleanPhone)) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Valid Phone Required',
-        text: 'Please provide a valid 10-digit WhatsApp number.',
-        confirmButtonColor: '#EA580C',
-      });
-      return;
-    }
 
     if (!date) {
       Swal.fire({
@@ -153,16 +135,26 @@ export function SpaceQueryModal({
     const effectivePurpose =
       purpose === 'Other' ? (customPurpose.trim() || 'General Purpose') : purpose;
 
+    const foodSummary = foodVegRequired
+      ? `Yes${selectedFoodItems.length > 0 ? ` (${selectedFoodItems.join(', ')})` : ' (Details to be discussed)'}`
+      : 'No';
+
+    const customerName = customer?.name?.trim();
+    const customerPhone = customer?.mobile ? customer.mobile.replace(/\D/g, '').slice(-10) : '';
+
     const summaryLines = [
       `Space Type: ${spaceType}`,
       `Purpose: ${effectivePurpose}`,
       `City: ${city}`,
       `Date: ${date}`,
       `Time: ${timeSlot}`,
-      `Guests: Up to ${guestsCount} people`,
-      selectedAmenities.length > 0 ? `Amenities: ${selectedAmenities.join(', ')}` : null,
+      `Total Guests: ${guestsCount}`,
+      selectedAmenities.length > 0 ? `Additional Services: ${selectedAmenities.join(', ')}` : null,
+      `Food (Only Veg): ${foodSummary}`,
       notes.trim() ? `Notes: ${notes.trim()}` : null,
-      `Contact: ${name.trim()} (${cleanPhone})`,
+      customerName || customerPhone
+        ? `Customer: ${customerName || ''}${customerPhone ? ` (${customerPhone})` : ''}`
+        : null,
     ].filter(Boolean);
 
     const fullDescription = summaryLines.join('\n');
@@ -183,13 +175,16 @@ export function SpaceQueryModal({
       `• *City:* ${city}`,
       `• *Preferred Date:* ${date}`,
       `• *Preferred Time:* ${timeSlot}`,
-      `• *Expected Guests:* Up to ${guestsCount} people`,
+      `• *Total Guests:* ${guestsCount}`,
       ...(selectedAmenities.length > 0
-        ? [`• *Required Amenities:* ${selectedAmenities.join(', ')}`]
+        ? [`• *Additional Services:* ${selectedAmenities.join(', ')}`]
         : []),
+      `• *Food (Only Veg):* ${foodSummary}`,
       ...(notes.trim() ? [`• *Notes / Requests:* ${notes.trim()}`] : []),
       '━━━━━━━━━━━━━━━━━━━━',
-      `• *Customer:* ${name.trim()} (${cleanPhone})`,
+      ...(customerName || customerPhone
+        ? [`• *Customer:* ${customerName || ''}${customerPhone ? ` (${customerPhone})` : ''}`]
+        : []),
       '',
       '*Please connect with me regarding availability and options.*',
     ];
@@ -246,10 +241,10 @@ export function SpaceQueryModal({
                   <Compass className="h-5 w-5 stroke-[2.2]" />
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-black text-[#111111] tracking-tight">
-                    Space Enquiry & Availability
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                    Space Enquiry &amp; Availability
                   </h3>
-                  <p className="text-[11px] sm:text-xs font-semibold text-[#6B7280]">
+                  <p className="text-[11.5px] sm:text-xs font-semibold text-slate-500">
                     Tell us your plan — our concierge will find the right fit
                   </p>
                 </div>
@@ -266,10 +261,10 @@ export function SpaceQueryModal({
             </div>
 
             {/* Modal Form Scrollable Area */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-5 text-left">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4 sm:space-y-4.5 text-left">
               {/* 1. Space Type Preference */}
               <div>
-                <label className="block text-[12px] font-black uppercase tracking-wider text-[#6B7280] mb-2">
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2">
                   Space Type Preference
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -292,8 +287,8 @@ export function SpaceQueryModal({
                         }`}
                       >
                         <Icon className="h-4.5 w-4.5 mb-1 stroke-[2.2]" />
-                        <span className="text-[12px] font-extrabold leading-tight">{tab.label}</span>
-                        <span className="text-[9px] font-medium text-slate-500 mt-0.5 leading-none">
+                        <span className="text-[12.5px] font-extrabold leading-tight">{tab.label}</span>
+                        <span className="text-[9.5px] font-medium text-slate-500 mt-0.5 leading-none">
                           {tab.desc}
                         </span>
                       </button>
@@ -302,101 +297,44 @@ export function SpaceQueryModal({
                 </div>
               </div>
 
-              {/* 2. Purpose */}
+              {/* 2. Purpose (Dropdown) */}
               <div>
-                <label className="block text-[12px] font-black uppercase tracking-wider text-[#6B7280] mb-2">
-                  What Are You Planning?
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                  Purpose
                 </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {POPULAR_PURPOSES.map(p => {
-                    const isSelected = purpose === p;
-                    return (
-                      <button
-                        type="button"
-                        key={p}
-                        onClick={() => setPurpose(p)}
-                        className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition cursor-pointer ${
-                          isSelected
-                            ? 'border-[#EA580C] bg-[#EA580C] text-white shadow-xs'
-                            : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
+                <div className="relative">
+                  <select
+                    value={purpose}
+                    onChange={e => setPurpose(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-[13px] font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white cursor-pointer appearance-none pr-9 text-slate-800"
+                  >
+                    {POPULAR_PURPOSES.map(p => (
+                      <option key={p} value={p}>
                         {p}
-                      </button>
-                    );
-                  })}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
 
                 {purpose === 'Other' && (
-                  <div className="mt-2.5">
+                  <div className="mt-2">
                     <input
                       type="text"
                       value={customPurpose}
                       onChange={e => setCustomPurpose(e.target.value)}
                       placeholder="Please specify your event / purpose..."
-                      className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C]"
+                      className="w-full px-3.5 py-2.5 text-[13px] font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800"
                     />
                   </div>
                 )}
               </div>
 
-              {/* 3. Expected Guests Count */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-[#EA580C] shadow-2xs">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-extrabold text-[#111111]">Expected People / Guests</p>
-                      <p className="text-[10px] font-medium text-slate-500">Approximate attendee count</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setGuestsCount(prev => Math.max(1, prev - 5))}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-black cursor-pointer"
-                    >
-                      -
-                    </button>
-                    <span className="w-12 text-center text-sm font-black text-[#111111]">
-                      {guestsCount}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setGuestsCount(prev => prev + 5)}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-black cursor-pointer"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex gap-1.5 mt-2.5 pt-2 border-t border-slate-200/60">
-                  {[1, 5, 15, 30, 50, 100].map(cnt => (
-                    <button
-                      type="button"
-                      key={cnt}
-                      onClick={() => setGuestsCount(cnt)}
-                      className={`flex-1 py-1 text-[10px] font-bold rounded-lg border transition ${
-                        guestsCount === cnt
-                          ? 'border-[#EA580C] bg-[#EA580C] text-white'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      {cnt}{cnt >= 100 ? '+' : ''}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 4. Date & Time */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* 3. Select Date | Select Time Slot in Same Row */}
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1.5">
-                    <Calendar className="inline-block h-3.5 w-3.5 mr-1 text-[#EA580C]" /> Preferred Date
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1.5 truncate">
+                    Select Date
                   </label>
                   <input
                     type="date"
@@ -404,58 +342,98 @@ export function SpaceQueryModal({
                     value={date}
                     onChange={e => setDate(e.target.value)}
                     required
-                    className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white"
+                    className="w-full px-3 py-2.5 text-[12.5px] sm:text-[13px] font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1.5">
-                    <Clock className="inline-block h-3.5 w-3.5 mr-1 text-[#EA580C]" /> Preferred Time Slot
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1.5 truncate">
+                    Select Time Slot
                   </label>
+                  <div className="relative">
+                    <select
+                      value={timeSlot}
+                      onChange={e => setTimeSlot(e.target.value)}
+                      className="w-full px-3 py-2.5 text-[12.5px] sm:text-[13px] font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white cursor-pointer appearance-none pr-8 truncate text-slate-800"
+                    >
+                      {TIME_SLOTS.map(slot => (
+                        <option key={slot.id} value={slot.label}>
+                          {slot.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Total Guests */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[#EA580C] shadow-2xs">
+                      <Users className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-extrabold text-slate-900 leading-tight">Total Guests</p>
+                      <p className="text-[10.5px] font-medium text-slate-500 leading-tight">Number of attendees</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setGuestsCount(prev => Math.max(1, prev - 1))}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-black cursor-pointer text-base active:scale-95 transition"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      value={guestsCount}
+                      onChange={e => setGuestsCount(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-14 text-center text-[13px] font-black text-slate-900 bg-white border border-slate-200 rounded-xl py-1 focus:outline-hidden focus:border-[#EA580C]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setGuestsCount(prev => prev + 1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-black cursor-pointer text-base active:scale-95 transition"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 5. Your City / Location (Dropdown) */}
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
+                  Your City / Location
+                </label>
+                <div className="relative">
                   <select
-                    value={timeSlot}
-                    onChange={e => setTimeSlot(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white"
+                    value={city}
+                    onChange={e => setCity(e.target.value)}
+                    className="w-full px-3.5 py-2.5 text-[13px] font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white cursor-pointer appearance-none pr-9 text-slate-800"
                   >
-                    {TIME_SLOTS.map(slot => (
-                      <option key={slot.id} value={slot.label}>
-                        {slot.label}
+                    {CITIES.map(c => (
+                      <option key={c} value={c}>
+                        {c}
                       </option>
                     ))}
                   </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
 
-              {/* 5. City */}
+              {/* 6. Additional Services (One Row Scrollable) */}
               <div>
-                <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1.5">
-                  <MapPin className="inline-block h-3.5 w-3.5 mr-1 text-[#EA580C]" /> Your City / Location
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-2">
+                  Additional Services (Optional)
                 </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {CITIES.map(c => (
-                    <button
-                      type="button"
-                      key={c}
-                      onClick={() => setCity(c)}
-                      className={`py-1.5 px-1 text-[11px] font-bold rounded-xl border text-center transition cursor-pointer truncate ${
-                        city === c
-                          ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C]'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                      }`}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 6. Amenities / Requirements */}
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-2">
-                  <PartyPopper className="inline-block h-3.5 w-3.5 mr-1 text-[#EA580C]" /> Amenities & Setup (Optional)
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {AMENITIES.map(amenity => {
+                <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+                  {ADDITIONAL_SERVICES.map(amenity => {
                     const Icon = amenity.icon;
                     const isChecked = selectedAmenities.includes(amenity.label);
                     return (
@@ -463,23 +441,23 @@ export function SpaceQueryModal({
                         type="button"
                         key={amenity.id}
                         onClick={() => toggleAmenity(amenity.label)}
-                        className={`flex items-center gap-2 p-2 rounded-xl border text-left transition cursor-pointer ${
+                        className={`flex items-center gap-2 py-2 px-3 rounded-xl border text-left transition shrink-0 cursor-pointer ${
                           isChecked
-                            ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C]'
+                            ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C] shadow-xs'
                             : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                         }`}
                       >
                         <div
-                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border ${
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border text-[10px] font-bold ${
                             isChecked
-                              ? 'border-[#EA580C] bg-[#EA580C] text-white text-[10px] font-bold'
+                              ? 'border-[#EA580C] bg-[#EA580C] text-white'
                               : 'border-slate-300 bg-white'
                           }`}
                         >
                           {isChecked ? '✓' : ''}
                         </div>
                         <Icon className="h-3.5 w-3.5 shrink-0" />
-                        <span className="text-[11px] font-semibold leading-tight line-clamp-1">
+                        <span className="text-[12px] font-bold whitespace-nowrap">
                           {amenity.label}
                         </span>
                       </button>
@@ -488,45 +466,97 @@ export function SpaceQueryModal({
                 </div>
               </div>
 
-              {/* 7. Contact Details */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-3">
-                <p className="text-[11px] font-black uppercase tracking-wider text-[#6B7280]">
-                  Your Contact Information
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-600 mb-1">
-                      <User className="inline-block h-3 w-3 mr-0.5 text-slate-500" /> Full Name
-                    </label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      placeholder="Your Name"
-                      required
-                      className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C]"
-                    />
+              {/* 7. Food (Only Veg) */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-3.5 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-2xs">
+                      <Utensils className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-extrabold text-slate-900 leading-tight">Food (Only Veg)</p>
+                      <p className="text-[10.5px] font-medium text-slate-500 leading-tight">Require catering or snacks?</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-600 mb-1">
-                      <Phone className="inline-block h-3 w-3 mr-0.5 text-slate-500" /> WhatsApp Number
-                    </label>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={e => setPhone(e.target.value)}
-                      placeholder="10-digit number"
-                      required
-                      maxLength={10}
-                      className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C]"
-                    />
+
+                  {/* Yes / No Toggle */}
+                  <div className="flex rounded-xl bg-slate-200/80 p-0.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFoodVegRequired(false);
+                        setSelectedFoodItems([]);
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        !foodVegRequired
+                          ? 'bg-white text-slate-900 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      No
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFoodVegRequired(true);
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        foodVegRequired
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Yes
+                    </button>
                   </div>
                 </div>
+
+                {/* If Yes: Starter, Drinks, Main Course, Quick Bites */}
+                {foodVegRequired && (
+                  <motion.div
+                    initial={{opacity: 0, height: 0}}
+                    animate={{opacity: 1, height: 'auto'}}
+                    exit={{opacity: 0, height: 0}}
+                    className="pt-2 border-t border-slate-200/60"
+                  >
+                    <p className="text-[11px] font-bold text-slate-600 mb-2">
+                      Select Required Veg Food Categories:
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {FOOD_OPTIONS.map(opt => {
+                        const isSelected = selectedFoodItems.includes(opt);
+                        return (
+                          <button
+                            type="button"
+                            key={opt}
+                            onClick={() => toggleFoodItem(opt)}
+                            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-[12px] font-bold transition cursor-pointer ${
+                              isSelected
+                                ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-2xs'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                            }`}
+                          >
+                            <div
+                              className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border text-[9px] font-black ${
+                                isSelected
+                                  ? 'border-emerald-600 bg-emerald-600 text-white'
+                                  : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              {isSelected ? '✓' : ''}
+                            </div>
+                            <span className="truncate">{opt}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                )}
               </div>
 
               {/* 8. Additional Notes */}
               <div>
-                <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1">
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
                   Additional Notes or Specific Requests
                 </label>
                 <textarea
@@ -534,23 +564,21 @@ export function SpaceQueryModal({
                   onChange={e => setNotes(e.target.value)}
                   rows={2}
                   placeholder="e.g. Need acoustic setup, specific stage decoration, extended hours..."
-                  className="w-full px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C]"
+                  className="w-full px-3.5 py-2.5 text-[13px] font-semibold rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] text-slate-800 placeholder:text-slate-400"
                 />
               </div>
 
-              {/* 9. Submit Button */}
+              {/* 9. Submit Button: "Submit Query" */}
               <div className="pt-2 pb-1">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#EA580C] to-[#D97706] hover:from-[#D97706] hover:to-[#EA580C] text-white text-sm font-extrabold flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition active:scale-[0.99] cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#EA580C] to-[#D97706] hover:from-[#D97706] hover:to-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition active:scale-[0.99] cursor-pointer"
                 >
                   <Send className="h-4 w-4" />
-                  <span>Submit Space Enquiry via WhatsApp</span>
+                  <span>Submit Query</span>
                 </button>
-                <p className="text-center text-[10px] font-semibold text-slate-400 mt-2">
-                  No instant charge · Direct response from WooWoo Art House concierge
-                </p>
+               
               </div>
             </form>
           </motion.div>
@@ -559,4 +587,5 @@ export function SpaceQueryModal({
     </AnimatePresence>
   );
 }
+
 export default SpaceQueryModal;

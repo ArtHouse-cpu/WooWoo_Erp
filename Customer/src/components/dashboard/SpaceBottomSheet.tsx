@@ -377,45 +377,30 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
             {/* Bottom sticky CTA Buttons */}
             <div className="sticky bottom-0 z-10 flex items-stretch gap-3 border-t border-slate-100 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               {activeTab === 'exclusive-space' ? (
-                <>
-                  {/* Compass Button (Kept in Exclusive Space only) */}
+                <div className="flex min-w-0 flex-1 gap-3">
+                  {/* Explore Space Button */}
                   <button
                     type="button"
-                    aria-label="Explore spaces"
-                    title="Explore spaces"
                     onClick={() => {
                       onClose();
                       navigate('/spaces');
                     }}
-                    className="flex w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#111111] text-white transition hover:bg-slate-800"
+                    className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
                   >
-                    <Compass className="h-5 w-5" strokeWidth={2.5} />
+                    <Compass className="h-4.5 w-4.5" strokeWidth={2.5} />
+                    <span>Explore Space</span>
                   </button>
-                  <div className="flex min-w-0 flex-1 gap-3">
-                    {/* Explore Space Button (Refactored from Book Online) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        navigate('/spaces');
-                      }}
-                      className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
-                    >
-                      <Compass className="h-4.5 w-4.5" strokeWidth={2.5} />
-                      <span>Explore Space</span>
-                    </button>
 
-                    {/* Query Now - Opens Space Lead Form without selecting specific space */}
-                    <button
-                      type="button"
-                      onClick={() => setIsQueryModalOpen(true)}
-                      className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
-                    >
-                      <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
-                      <span>Query Now</span>
-                    </button>
-                  </div>
-                </>
+                  {/* Query Now - Opens Space Lead Form without selecting specific space */}
+                  <button
+                    type="button"
+                    onClick={() => setIsQueryModalOpen(true)}
+                    className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
+                  >
+                    <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
+                    <span>Query Now</span>
+                  </button>
+                </div>
               ) : (
                 <div className="flex min-w-0 flex-1 gap-3">
                   {/* Explore Plans Button */}

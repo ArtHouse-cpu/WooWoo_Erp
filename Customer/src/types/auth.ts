@@ -114,6 +114,12 @@ export interface WalletDashboard {
     referralCode: string;
     shareUrl: string;
     shareMessage: string;
+    discount?: {
+      enabled?: boolean;
+      type?: 'percentage' | 'fixed';
+      value?: number;
+      displayText?: string;
+    };
   };
   updatedAt: string;
 }

@@ -65,7 +65,7 @@ export function VisitBottomSheet({isOpen, onClose}: VisitBottomSheetProps) {
       reviewsCount: 126,
       image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=500&q=80',
       phone: '+918073988123',
-      mapsUrl: 'https://maps.app.goo.gl/F8Tj2rj2CuLCu5Nh8?g_st=aw',
+      mapsUrl: 'https://www.google.com/maps/place/WOOWOO+ART+HOUSE_Bhilai/@21.2133019,81.3200552,17z/data=!3m1!4b1!4m6!3m5!1s0x3a293daeddd12653:0x455418f03593f8ce!8m2!3d21.2132969!4d81.3226301!16s%2Fg%2F11p5kctqkc?entry=ttu&g_ep=EgoyMDI2MTExNS4wIKXMDSoASAFQAw%3D%3D',
     },
     // {
     //   id: 'raipur',

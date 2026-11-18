@@ -134,10 +134,9 @@ export default function PublicProductPage() {
                 <p className="font-semibold text-slate-500">{product.brandName}</p>
               ) : null}
               <p className="text-2xl font-extrabold">₹{formatInr(product.price)}</p>
-              <p className="text-sm font-bold text-slate-500">
-                {product.availability === 'out_of_stock' ? 'Out of stock' : 'In stock'}
-                {product.unit ? ` · ${product.unit}` : ''}
-              </p>
+              {product.unit ? (
+                <p className="text-sm font-bold text-slate-500">{product.unit}</p>
+              ) : null}
               <p className="text-sm leading-6 text-slate-600">
                 {product.description || 'Ask us about this product and we will share the details.'}
               </p>

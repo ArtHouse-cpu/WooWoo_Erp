@@ -415,6 +415,22 @@ export function ProgramsBottomSheet({
   const hapWaiting = hapApplication?.status === "under_review";
   const hapApproved = hapApplication?.status === "approved";
   const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+
+  const handleTabClick = (tab: TabId) => {
+    setActiveTab(tab);
+    if (
+      asPage ||
+      window.location.pathname.startsWith("/program") ||
+      window.location.pathname.startsWith("/ourprograms")
+    ) {
+      if (tab === "all") {
+        navigate("/ourprograms", { replace: true });
+      } else {
+        navigate(`/program/${tab}`, { replace: true });
+      }
+    }
+  };
+
   const [activeGalleryDot, setActiveGalleryDot] = useState(0);
   const galleryScrollRef = useRef<HTMLDivElement>(null);
 
@@ -759,9 +775,8 @@ export function ProgramsBottomSheet({
     <>
       <AnimatePresence>
         {(asPage || isOpen) && (
-          <div className={asPage ? "min-h-dvh bg-[#FAFBFD]" : "fixed inset-0 z-50 flex items-end justify-center"}>
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
             {/* Backdrop Overlay */}
-            {asPage ? null : (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -769,64 +784,32 @@ export function ProgramsBottomSheet({
               onClick={onClose}
               className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
             />
-            )}
 
-            {/* Bottom Sheet Panel with fixed consistent height across all tabs */}
+            {/* Bottom Sheet Panel with dynamic content-driven height */}
             <motion.div
-              initial={asPage ? false : { y: "100%" }}
-              animate={asPage ? undefined : { y: 0 }}
-              exit={asPage ? undefined : { y: "100%" }}
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 26, stiffness: 240 }}
-              className={
-                asPage
-                  ? "relative z-10 mx-auto flex min-h-dvh w-full max-w-6xl flex-col bg-[#FAFBFD]"
-                  : "relative z-10 flex h-[90dvh] min-h-[90dvh] max-h-[92dvh] sm:h-[88vh] sm:min-h-[88vh] sm:max-h-[90vh] w-full max-w-lg flex-col rounded-t-[32px] bg-white shadow-2xl overflow-hidden border-t border-slate-100"
-              }
+              className="relative z-10 flex max-h-[90dvh] h-auto w-full max-w-lg flex-col rounded-t-[32px] bg-white shadow-2xl overflow-hidden border-t border-slate-100"
             >
               {/* Top Drag Handle */}
-              {asPage ? null : (
-              <div className="flex shrink-0 justify-center py-3">
+              <div className="flex shrink-0 justify-center py-2.5">
                 <div className="h-1.5 w-12 rounded-full bg-[#E5E7EB]" />
               </div>
-              )}
 
               {/* Header Info */}
-              <div className={`relative shrink-0 px-5 pb-4 flex items-center justify-between ${asPage ? "bg-white pt-5 md:px-8" : ""}`}>
+              <div className="relative shrink-0 px-5 pb-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {/* Dynamic color & icon syncing on header icon */}
-                  <div
-                    className={`flex h-14 w-14 items-center justify-center rounded-[16px] transition-all duration-350 ${
-                      activeTab === "all"
-                        ? "bg-slate-900 text-amber-300"
-                        : activeTab === "csp"
-                        ? "bg-[#FFF3EB] text-[#EA580C]"
-                        : activeTab === "hap"
-                        ? "bg-[#F5F3FF] text-[#7C3AED]"
-                        : "bg-[#ECFDF5] text-[#059669]"
-                    }`}
-                  >
-                    {activeTab === "all" ? (
-                      <Sparkles className="h-7 w-7" strokeWidth={2} />
-                    ) : activeTab === "csp" ? (
-                      <ShoppingBag className="h-7 w-7" strokeWidth={2} />
-                    ) : activeTab === "hap" ? (
-                      <Users className="h-7 w-7" strokeWidth={2} />
-                    ) : (
-                      <HeartHandshake className="h-7 w-7" strokeWidth={2} />
-                    )}
+                  <div className="flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-[18px] bg-[#0A0F1D] text-amber-300 shadow-sm">
+                    <Sparkles className="h-6 w-6 sm:h-6.5 sm:w-6.5 text-amber-300" strokeWidth={2.2} />
                   </div>
                   <div className="text-left">
-                    <h3 className="text-[19px] font-extrabold tracking-tight text-[#111111] leading-tight">
+                    <h3 className="text-[19px] sm:text-[20px] font-black tracking-tight text-[#111111] leading-tight">
                       Our Programs
                     </h3>
-                    <p className="mt-0.5 text-[12px] font-bold text-[#6B7280]">
-                      {activeTab === "all"
-                        ? "Grow, collaborate & earn with us"
-                        : activeTab === "csp"
-                        ? "Sell your creative products with 0 rent"
-                        : activeTab === "hap"
-                        ? "Invite friends & earn recurring commission"
-                        : "Host events & curate art with our crew"}
+                    <p className="mt-0.5 text-[12.5px] font-medium text-[#6B7280]">
+                      Grow, collaborate &amp; earn with us
                     </p>
                   </div>
                 </div>
@@ -835,283 +818,152 @@ export function ProgramsBottomSheet({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB] cursor-pointer"
+                  className="flex h-8 w-8 sm:h-8.5 sm:w-8.5 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB] cursor-pointer"
                   aria-label="Close sheet"
                 >
                   <X className="h-4.5 w-4.5" strokeWidth={2.5} />
                 </button>
               </div>
 
-              {/* Custom Interactive Program Tabs: All -> CSP -> HAP -> CVP */}
-              <div className={`shrink-0 px-4 sm:px-5 mb-4 flex items-stretch gap-2 overflow-x-auto scrollbar-none pb-0.5 ${asPage ? "bg-white md:mx-auto md:w-full md:max-w-3xl md:px-8" : ""}`}>
-                {/* 1. All Tab (on left side of CSP) */}
+              {/* Sleek Program Category Pills: All -> CSP -> HAP -> CVP */}
+              <div className="shrink-0 px-4 sm:px-5 mb-3 flex items-center gap-2 sm:gap-2.5 overflow-x-auto scrollbar-none pb-0.5">
+                {/* 1. All */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("all")}
-                  className={`flex items-center gap-2 px-2.5 py-2 rounded-2xl border text-left transition-all duration-200 cursor-pointer min-w-[95px] flex-1 ${
+                  onClick={() => handleTabClick("all")}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-black transition-all duration-200 cursor-pointer shrink-0 ${
                     activeTab === "all"
-                      ? "border-slate-800 bg-slate-900 text-white shadow-[0_4px_12px_rgba(15,23,42,0.12)]"
-                      : "border-slate-100 bg-[#FAFAFA] text-slate-500 hover:bg-slate-50"
+                      ? "bg-[#0A0F1D] text-white border border-[#0A0F1D] shadow-[0_2px_8px_rgba(10,15,29,0.25)] ring-2 ring-indigo-500/20"
+                      : "bg-[#F9FAFB] text-slate-700 border border-slate-200/90 hover:bg-slate-100"
                   }`}
                 >
-                  <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
-                      activeTab === "all"
-                        ? "bg-slate-800 text-amber-300"
-                        : "bg-[#E5E7EB] text-slate-500"
-                    }`}
-                  >
-                    <Sparkles className="h-4 w-4" strokeWidth={2.25} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[11.5px] font-black leading-none">
-                      All
-                    </div>
-                    <div
-                      className={`mt-0.5 truncate text-[9px] font-bold ${
-                        activeTab === "all" ? "text-slate-300" : "text-slate-400"
-                      }`}
-                    >
-                      All Programs
-                    </div>
-                  </div>
+                  <Sparkles className={`h-4 w-4 ${activeTab === "all" ? "text-amber-400" : "text-slate-600"}`} strokeWidth={2.2} />
+                  <span>All</span>
                 </button>
 
-                {/* 2. CSP Tab */}
+                {/* 2. CSP */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("csp")}
-                  className={`flex items-center gap-2 px-2.5 py-2 rounded-2xl border text-left transition-all duration-200 cursor-pointer min-w-[95px] flex-1 ${
+                  onClick={() => handleTabClick("csp")}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-black transition-all duration-200 cursor-pointer shrink-0 ${
                     activeTab === "csp"
-                      ? "border-[#EA580C]/40 bg-[#FFF8F2] text-[#EA580C] shadow-[0_4px_12px_rgba(234,88,12,0.06)]"
-                      : "border-slate-100 bg-[#FAFAFA] text-slate-500 hover:bg-slate-50"
+                      ? "bg-[#0A0F1D] text-white border border-[#0A0F1D] shadow-[0_2px_8px_rgba(10,15,29,0.25)] ring-2 ring-indigo-500/20"
+                      : "bg-[#F9FAFB] text-slate-700 border border-slate-200/90 hover:bg-slate-100"
                   }`}
                 >
-                  <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
-                      activeTab === "csp"
-                        ? "bg-[#FFEDD5] text-[#EA580C]"
-                        : "bg-[#E5E7EB] text-slate-500"
-                    }`}
-                  >
-                    <ShoppingBag className="h-4 w-4" strokeWidth={2.25} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[11.5px] font-black leading-none">
-                      CSP
-                    </div>
-                    <div
-                      className={`mt-0.5 truncate text-[9px] font-bold ${
-                        activeTab === "csp" ? "text-[#C2410C]" : "text-slate-400"
-                      }`}
-                    >
-                      Creative Sailor
-                    </div>
-                  </div>
+                  <ShoppingBag className={`h-4 w-4 ${activeTab === "csp" ? "text-amber-400" : "text-slate-600"}`} strokeWidth={2.2} />
+                  <span>CSP</span>
                 </button>
 
-                {/* 3. HAP Tab */}
+                {/* 3. HAP */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("hap")}
-                  className={`flex items-center gap-2 px-2.5 py-2 rounded-2xl border text-left transition-all duration-200 cursor-pointer min-w-[95px] flex-1 ${
+                  onClick={() => handleTabClick("hap")}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-black transition-all duration-200 cursor-pointer shrink-0 ${
                     activeTab === "hap"
-                      ? "border-[#7C3AED]/40 bg-[#F5F3FF] text-[#7C3AED] shadow-[0_4px_12px_rgba(124,58,237,0.06)]"
-                      : "border-slate-100 bg-[#FAFAFA] text-slate-500 hover:bg-slate-50"
+                      ? "bg-[#0A0F1D] text-white border border-[#0A0F1D] shadow-[0_2px_8px_rgba(10,15,29,0.25)] ring-2 ring-indigo-500/20"
+                      : "bg-[#F9FAFB] text-slate-700 border border-slate-200/90 hover:bg-slate-100"
                   }`}
                 >
-                  <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
-                      activeTab === "hap"
-                        ? "bg-[#EDE9FE] text-[#7C3AED]"
-                        : "bg-[#E5E7EB] text-slate-500"
-                    }`}
-                  >
-                    <Users className="h-4 w-4" strokeWidth={2.25} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[11.5px] font-black leading-none">
-                      HAP
-                    </div>
-                    <div
-                      className={`mt-0.5 truncate text-[9px] font-bold ${
-                        activeTab === "hap" ? "text-[#6D28D9]" : "text-slate-400"
-                      }`}
-                    >
-                      House Affiliate
-                    </div>
-                  </div>
+                  <Users className={`h-4 w-4 ${activeTab === "hap" ? "text-amber-400" : "text-slate-600"}`} strokeWidth={2.2} />
+                  <span>HAP</span>
                 </button>
 
-                {/* 4. CVP Tab (on right side of HAP) */}
+                {/* 4. CVP */}
                 <button
                   type="button"
-                  onClick={() => setActiveTab("cvp")}
-                  className={`flex items-center gap-2 px-2.5 py-2 rounded-2xl border text-left transition-all duration-200 cursor-pointer min-w-[95px] flex-1 ${
+                  onClick={() => handleTabClick("cvp")}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-black transition-all duration-200 cursor-pointer shrink-0 ${
                     activeTab === "cvp"
-                      ? "border-[#059669]/40 bg-[#ECFDF5] text-[#059669] shadow-[0_4px_12px_rgba(5,150,105,0.06)]"
-                      : "border-slate-100 bg-[#FAFAFA] text-slate-500 hover:bg-slate-50"
+                      ? "bg-[#0A0F1D] text-white border border-[#0A0F1D] shadow-[0_2px_8px_rgba(10,15,29,0.25)] ring-2 ring-indigo-500/20"
+                      : "bg-[#F9FAFB] text-slate-700 border border-slate-200/90 hover:bg-slate-100"
                   }`}
                 >
-                  <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
-                      activeTab === "cvp"
-                        ? "bg-[#D1FAE5] text-[#059669]"
-                        : "bg-[#E5E7EB] text-slate-500"
-                    }`}
-                  >
-                    <HeartHandshake className="h-4 w-4" strokeWidth={2.25} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[11.5px] font-black leading-none">
-                      CVP
-                    </div>
-                    <div
-                      className={`mt-0.5 truncate text-[9px] font-bold ${
-                        activeTab === "cvp" ? "text-emerald-700" : "text-slate-400"
-                      }`}
-                    >
-                      Volunteering
-                    </div>
-                  </div>
+                  <HeartHandshake className={`h-4 w-4 ${activeTab === "cvp" ? "text-amber-400" : "text-slate-600"}`} strokeWidth={2.2} />
+                  <span>CVP</span>
                 </button>
               </div>
 
-              {/* Scrollable Contents */}
-              <div className="min-h-0 flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable]">
+              {/* Scrollable Contents - Non-rigid content-driven height */}
+              <div className={`min-h-0 overflow-y-auto flex-initial ${activeTab === "all" ? "pb-2" : "pb-5"} [scrollbar-gutter:stable]`}>
                 {activeTab === "all" ? (
                   /* ALL PROGRAMS OVERVIEW TAB */
-                  <div className={asPage ? "mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 pb-8 text-left md:grid-cols-3 md:px-8" : "space-y-3.5 px-4 sm:px-5 pb-2 text-left"}>
+                  <div className="space-y-3 px-4 sm:px-5 pb-1 text-left">
                     {/* Ecosystem Welcome Banner */}
-                    <div className={`p-4 rounded-[22px] bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white relative overflow-hidden shadow-sm ${asPage ? "md:col-span-3" : ""}`}>
+                    <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-r from-[#0C1033] via-[#1B114F] to-[#450A7C] p-5 sm:p-6 text-white shadow-md">
+                      {/* Decorative flowing wave glow in background */}
+                      <div className="absolute inset-0 pointer-events-none opacity-40 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-indigo-500/50 via-purple-600/30 to-transparent" />
+                      <div className="absolute -bottom-8 -right-8 w-44 h-44 rounded-full bg-purple-500/30 blur-2xl pointer-events-none" />
+
                       <div className="relative z-10">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black tracking-wide uppercase">
-                          <Sparkles className="h-3 w-3" /> Woo Woo Ecosystem
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-[10.5px] font-black tracking-wider uppercase backdrop-blur-md border border-white/10">
+                          <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                          <span>WOO WOO ECOSYSTEM</span>
                         </span>
-                        <h4 className="mt-2 text-[16px] font-black leading-tight text-white">
-                          3 Pathways to Create, Earn & Belong
+                        <h4 className="mt-2.5 sm:mt-3 text-[19px] sm:text-[22px] font-black leading-tight text-white tracking-tight">
+                          3 Pathways to Create, Earn &amp; Belong
                         </h4>
-      
                       </div>
-                      <div className="absolute -right-6 -bottom-6 w-28 h-28 rounded-full bg-indigo-500/10 blur-xl pointer-events-none" />
-                      <div className="absolute top-0 right-10 w-20 h-20 rounded-full bg-amber-500/10 blur-lg pointer-events-none" />
                     </div>
 
-                    {/* Program 1: CSP */}
-                    <div className="rounded-[22px] border border-orange-100 bg-[#FFFBF8] p-4 shadow-xs transition hover:shadow-md">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FFF0EB] text-[#EA580C]">
-                            <ShoppingBag className="h-5 w-5" strokeWidth={2.2} />
-                          </div>
-                          <div>
-                            <span className="inline-block text-[9.5px] font-black uppercase tracking-wider text-[#EA580C]">
-                              01 · Sell Products
-                            </span>
-                            <h4 className="text-[14px] font-black text-slate-900 leading-tight">
-                              Creative Sailor Program (CSP)
-                            </h4>
-                          </div>
-                        </div>
-                      </div>
-                     
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        <span className="rounded-lg bg-orange-100/70 px-2 py-0.5 text-[10px] font-bold text-[#EA580C]">
-                          Zero Investment
-                        </span>
-                        <span className="rounded-lg bg-orange-100/70 px-2 py-0.5 text-[10px] font-bold text-[#EA580C]">
-                          Zero Rent
-                        </span>
-                        <span className="rounded-lg bg-orange-100/70 px-2 py-0.5 text-[10px] font-bold text-[#EA580C]">
-                          Sell Direct
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("csp")}
-                        className="mt-3.5 flex w-full items-center justify-between rounded-xl bg-white border border-[#FFEDD5] px-3.5 py-2.5 text-[12px] font-extrabold text-[#EA580C] hover:bg-orange-50/50 transition cursor-pointer"
+                    {/* 3 Pathways Cards Row */}
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3.5">
+                      {/* Card 1: CSP */}
+                      <div
+                        onClick={() => handleTabClick("csp")}
+                        className="relative rounded-[22px] sm:rounded-[26px] border border-[#FED7AA]/90 bg-[#FFF8F2] p-3 sm:p-4.5 flex flex-col items-center text-center shadow-xs hover:shadow-md transition-all cursor-pointer group active:scale-[0.98]"
                       >
-                        <span>Explore CSP Details</span>
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
-                    </div>
+                        <span className="absolute top-2 sm:top-2.5 right-2 sm:right-2.5 rounded-full bg-[#EA580C] px-2 sm:px-2.5 py-0.5 text-[8.5px] sm:text-[10px] font-black text-white shadow-2xs whitespace-nowrap">
+                          Sell Products
+                        </span>
+                        <div className="flex h-14 w-14 sm:h-18 sm:w-18 items-center justify-center rounded-full bg-[#FFEADB]/80 text-[#EA580C] mt-4 sm:mt-5 mb-2.5 sm:mb-3 shadow-3xs group-hover:scale-105 transition-transform">
+                          <ShoppingBag className="h-6 w-6 sm:h-8 sm:w-8 text-[#EA580C]" strokeWidth={2.2} />
+                        </div>
+                        <h4 className="text-[12px] sm:text-[14.5px] font-black text-slate-900 leading-tight">
+                          Creative Sailor<br />Program (CSP)
+                        </h4>
+                        <p className="mt-1.5 sm:mt-2 text-[10px] sm:text-[11.5px] font-semibold text-slate-500 leading-snug">
+                          Sell products with<br />zero investment
+                        </p>
+                      </div>
 
-                    {/* Program 2: HAP */}
-                    <div className="rounded-[22px] border border-purple-100 bg-[#FAF9FF] p-4 shadow-xs transition hover:shadow-md">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#EDE9FE] text-[#7C3AED]">
-                            <Users className="h-5 w-5" strokeWidth={2.2} />
-                          </div>
-                          <div>
-                            <span className="inline-block text-[9.5px] font-black uppercase tracking-wider text-[#7C3AED]">
-                              02 · Refer & Earn
-                            </span>
-                            <h4 className="text-[14px] font-black text-slate-900 leading-tight">
-                              House Affiliate Program (HAP)
-                            </h4>
-                          </div>
-                        </div>
-                      </div>
-                     
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        <span className="rounded-lg bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-[#7C3AED]">
-                          Unlimited Earnings
-                        </span>
-                        <span className="rounded-lg bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-[#7C3AED]">
-                          Monetize Network
-                        </span>
-                        <span className="rounded-lg bg-purple-100/70 px-2 py-0.5 text-[10px] font-bold text-[#7C3AED]">
-                          Monthly Payouts
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("hap")}
-                        className="mt-3.5 flex w-full items-center justify-between rounded-xl bg-white border border-[#EDE9FE] px-3.5 py-2.5 text-[12px] font-extrabold text-[#7C3AED] hover:bg-purple-50/50 transition cursor-pointer"
+                      {/* Card 2: HAP */}
+                      <div
+                        onClick={() => handleTabClick("hap")}
+                        className="relative rounded-[22px] sm:rounded-[26px] border border-[#DDD6FE]/90 bg-[#F8F5FF] p-3 sm:p-4.5 flex flex-col items-center text-center shadow-xs hover:shadow-md transition-all cursor-pointer group active:scale-[0.98]"
                       >
-                        <span>Explore HAP Details</span>
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
-                    </div>
+                        <span className="absolute top-2 sm:top-2.5 right-2 sm:right-2.5 rounded-full bg-[#6366F1] px-2 sm:px-2.5 py-0.5 text-[8.5px] sm:text-[10px] font-black text-white shadow-2xs whitespace-nowrap">
+                          Refer &amp; Earn
+                        </span>
+                        <div className="flex h-14 w-14 sm:h-18 sm:w-18 items-center justify-center rounded-full bg-[#EDE9FE]/80 text-[#7C3AED] mt-4 sm:mt-5 mb-2.5 sm:mb-3 shadow-3xs group-hover:scale-105 transition-transform">
+                          <Users className="h-6 w-6 sm:h-8 sm:w-8 text-[#7C3AED]" strokeWidth={2.2} />
+                        </div>
+                        <h4 className="text-[12px] sm:text-[14.5px] font-black text-slate-900 leading-tight">
+                          House Affiliate<br />Program (HAP)
+                        </h4>
+                        <p className="mt-1.5 sm:mt-2 text-[10px] sm:text-[11.5px] font-semibold text-slate-500 leading-snug">
+                          Earn unlimited<br />rewards &amp; payouts
+                        </p>
+                      </div>
 
-                    {/* Program 3: CVP */}
-                    <div className="rounded-[22px] border border-emerald-100 bg-[#F6FEF9] p-4 shadow-xs transition hover:shadow-md">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#D1FAE5] text-[#059669]">
-                            <HeartHandshake className="h-5 w-5" strokeWidth={2.2} />
-                          </div>
-                          <div>
-                            <span className="inline-block text-[9.5px] font-black uppercase tracking-wider text-[#059669]">
-                              03 · Community & Events
-                            </span>
-                            <h4 className="text-[14px] font-black text-slate-900 leading-tight">
-                              Community Volunteering Program (CVP)
-                            </h4>
-                          </div>
-                        </div>
-                      </div>
-                     
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        <span className="rounded-lg bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-[#059669]">
-                          Official Certificate
-                        </span>
-                        <span className="rounded-lg bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-[#059669]">
-                          Free Event Passes
-                        </span>
-                        <span className="rounded-lg bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-[#059669]">
-                          Art House Perks
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("cvp")}
-                        className="mt-3.5 flex w-full items-center justify-between rounded-xl bg-white border border-[#D1FAE5] px-3.5 py-2.5 text-[12px] font-extrabold text-[#059669] hover:bg-emerald-50/50 transition cursor-pointer"
+                      {/* Card 3: CVP */}
+                      <div
+                        onClick={() => handleTabClick("cvp")}
+                        className="relative rounded-[22px] sm:rounded-[26px] border border-[#BBF7D0]/90 bg-[#F2FCF5] p-3 sm:p-4.5 flex flex-col items-center text-center shadow-xs hover:shadow-md transition-all cursor-pointer group active:scale-[0.98]"
                       >
-                        <span>Explore CVP Details</span>
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
+                        <span className="absolute top-2 sm:top-2.5 right-2 sm:right-2.5 rounded-full bg-[#15803D] px-2 sm:px-2.5 py-0.5 text-[8.5px] sm:text-[10px] font-black text-white shadow-2xs whitespace-nowrap">
+                          Volunteer
+                        </span>
+                        <div className="flex h-14 w-14 sm:h-18 sm:w-18 items-center justify-center rounded-full bg-[#DCFCE7]/80 text-[#16A34A] mt-4 sm:mt-5 mb-2.5 sm:mb-3 shadow-3xs group-hover:scale-105 transition-transform">
+                          <HeartHandshake className="h-6 w-6 sm:h-8 sm:w-8 text-[#16A34A]" strokeWidth={2.2} />
+                        </div>
+                        <h4 className="text-[12px] sm:text-[14.5px] font-black text-slate-900 leading-tight">
+                          Community Volunteering<br />Program (CVP)
+                        </h4>
+                        <p className="mt-1.5 sm:mt-2 text-[10px] sm:text-[11.5px] font-semibold text-slate-500 leading-snug">
+                          Get official recognition<br />&amp; event benefits
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ) : activeTab === "csp" && enrolled ? (
@@ -1454,39 +1306,39 @@ export function ProgramsBottomSheet({
                       </div>
 
                       {/* Features Strip */}
-                      <div className="border-t border-slate-100 pt-3.5 flex justify-between items-center gap-2">
+                      <div className="border-t border-slate-100 pt-3.5 flex justify-between items-center gap-1 sm:gap-2">
                         {activeTab === "csp" ? (
                           <>
                             {/* Feature 1 */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-7 w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
+                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
                                 <IndianRupee className="h-3.5 w-3.5" strokeWidth={2.25} />
                               </div>
-                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
                                 Zero Investment
                               </span>
                             </div>
 
-                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+                            <div className="h-5 w-[1px] bg-slate-100 shrink-0" />
 
                             {/* Feature 2 */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-7 w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
+                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
                                 <Store className="h-3.5 w-3.5" strokeWidth={2.25} />
                               </div>
-                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
                                 Zero Rent
                               </span>
                             </div>
 
-                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+                            <div className="h-5 w-[1px] bg-slate-100 shrink-0" />
 
                             {/* Feature 3 */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-7 w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
+                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0">
                                 <ShoppingBag className="h-3.5 w-3.5" strokeWidth={2.25} />
                               </div>
-                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
                                 Sell Direct
                               </span>
                             </div>
@@ -1495,34 +1347,34 @@ export function ProgramsBottomSheet({
                           <>
                             {/* Feature 1 */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-7 w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
+                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
                                 <IndianRupee className="h-3.5 w-3.5" strokeWidth={2.25} />
                               </div>
-                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
                                 Zero Investment
                               </span>
                             </div>
 
-                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+                            <div className="h-5 w-[1px] bg-slate-100 shrink-0" />
 
                             {/* Feature 2 */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-7 w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
+                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
                                 <TrendingUp className="h-3.5 w-3.5" strokeWidth={2.25} />
                               </div>
-                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
                                 Earn Unlimited
                               </span>
                             </div>
 
-                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+                            <div className="h-5 w-[1px] bg-slate-100 shrink-0" />
 
                             {/* Feature 3 */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-7 w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
+                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#7C3AED] text-white flex items-center justify-center shrink-0">
                                 <Users className="h-3.5 w-3.5" strokeWidth={2.25} />
                               </div>
-                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
                                 Monetize Network
                               </span>
                             </div>
@@ -1531,34 +1383,34 @@ export function ProgramsBottomSheet({
                           <>
                             {/* Feature 1 */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-7 w-7 rounded-full bg-[#059669] text-white flex items-center justify-center shrink-0">
+                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#059669] text-white flex items-center justify-center shrink-0">
                                 <Award className="h-3.5 w-3.5" strokeWidth={2.25} />
                               </div>
-                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
                                 Official Certificate
                               </span>
                             </div>
 
-                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+                            <div className="h-5 w-[1px] bg-slate-100 shrink-0" />
 
                             {/* Feature 2 */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-7 w-7 rounded-full bg-[#059669] text-white flex items-center justify-center shrink-0">
+                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#059669] text-white flex items-center justify-center shrink-0">
                                 <Ticket className="h-3.5 w-3.5" strokeWidth={2.25} />
                               </div>
-                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
                                 Free Event Entry
                               </span>
                             </div>
 
-                            <div className="h-4 w-[1px] bg-slate-100 shrink-0" />
+                            <div className="h-5 w-[1px] bg-slate-100 shrink-0" />
 
                             {/* Feature 3 */}
                             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-center">
-                              <div className="h-7 w-7 rounded-full bg-[#059669] text-white flex items-center justify-center shrink-0">
+                              <div className="h-6.5 w-6.5 sm:h-7 sm:w-7 rounded-full bg-[#059669] text-white flex items-center justify-center shrink-0">
                                 <Gift className="h-3.5 w-3.5" strokeWidth={2.25} />
                               </div>
-                              <span className="text-[10px] font-black text-slate-700 leading-none truncate">
+                              <span className="text-[9px] sm:text-[10px] font-black text-slate-700 leading-tight">
                                 Art House Perks
                               </span>
                             </div>
@@ -1571,7 +1423,7 @@ export function ProgramsBottomSheet({
               </div>
 
               {/* Fixed Bottom Actions */}
-              <div className={`shrink-0 bg-white border-t border-slate-100 p-4 flex gap-3 z-10 pb-[max(1rem,env(safe-area-inset-bottom))] ${asPage ? "sticky bottom-0 md:mx-auto md:w-full md:max-w-3xl" : ""}`}>
+              <div className="shrink-0 bg-white border-t border-slate-100 px-4 pt-3 pb-[max(0.85rem,env(safe-area-inset-bottom))] sm:p-4 flex gap-3 z-10">
                 {/* Query More Button */}
                 <button
                   type="button"
@@ -1604,7 +1456,7 @@ export function ProgramsBottomSheet({
                   type="button"
                   onClick={() => {
                     if (activeTab === "all") {
-                      setActiveTab("csp");
+                      handleTabClick("csp");
                       return;
                     }
                     if (activeTab === "csp") {
@@ -1657,7 +1509,7 @@ export function ProgramsBottomSheet({
                       : activeTab === "hap" && hapApplication?.status === "rejected"
                       ? "Apply again"
                       : activeTab === "cvp" && cvpApplication
-                      ? "Join Now / View Form"
+                      ? "Join Now "
                       : "Join Now"}
                   </span>
                   <ArrowRight className="h-4.5 w-4.5" strokeWidth={2.5} />
