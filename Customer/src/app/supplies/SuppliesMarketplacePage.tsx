@@ -185,7 +185,6 @@ export default function SuppliesMarketplacePage() {
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {products.map((product, index) => {
-              const inStock = product.availability !== 'out_of_stock';
               const originalPrice = getOriginalPrice(product);
 
               const cardImages =
@@ -206,19 +205,6 @@ export default function SuppliesMarketplacePage() {
                       aspectRatio="aspect-4/3"
                       roundedClassName="rounded-2xl"
                       onImageClick={() => setSelected(product)}
-                      badge={
-                        inStock ? (
-                          <span className="pointer-events-none absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-emerald-700 border border-emerald-200/80 shadow-xs">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            In Stock
-                          </span>
-                        ) : (
-                          <span className="pointer-events-none absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-white/95 backdrop-blur-xs px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-rose-700 border border-rose-200/80 shadow-xs">
-                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                            Out of Stock
-                          </span>
-                        )
-                      }
                       showDots={cardImages.length > 1}
                       showArrows={cardImages.length > 1}
                     />

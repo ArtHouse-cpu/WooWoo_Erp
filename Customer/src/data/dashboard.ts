@@ -53,8 +53,8 @@ export const dashboardNav: NavItem[] = [
 export const exploreItems = [
   {
     id: 'store',
-    title: 'Store',
-    subtitle: 'Art supplies',
+    title: 'Supplies',
+    subtitle: 'Get materials | FREE 1st Shopping',
     gradient: 'from-[#F3E8FF] to-[#EDE9FE]',
     iconColor: 'text-[#7C3AED]',
     icon: ShoppingBag,
@@ -62,7 +62,7 @@ export const exploreItems = [
   {
     id: 'space',
     title: 'Space',
-    subtitle: 'Book studio',
+    subtitle: 'Book space | 1st hr FREE',
     gradient: 'from-[#FFEDD5] to-[#FED7AA]',
     iconColor: 'text-[#EA580C]',
     icon: MapPin,
@@ -89,7 +89,7 @@ export const exploreItemsDesktop = [
   {
     id: 'store',
     title: 'Supplies',
-    subtitle: 'Art materials & more',
+    subtitle: 'Get materials | FREE 1st Shopping',
     icon: ShoppingBag,
     iconBg: 'bg-[#F3E8FF]',
     iconColor: 'text-[#7C3AED]',
@@ -98,7 +98,7 @@ export const exploreItemsDesktop = [
   {
     id: 'space',
     title: 'Space',
-    subtitle: 'Book studio space',
+    subtitle: 'Book space | 1st hr FREE',
     icon: MapPin,
     iconBg: 'bg-[#FFEDD5]',
     iconColor: 'text-[#EA580C]',

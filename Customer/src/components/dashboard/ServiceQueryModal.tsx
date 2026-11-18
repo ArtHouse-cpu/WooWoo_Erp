@@ -1,8 +1,6 @@
 import {useEffect, useState, type FormEvent} from 'react';
 import {
   X,
-  Calendar,
-  Clock,
   MapPin,
   Users,
   Baby,
@@ -12,8 +10,6 @@ import {
   GraduationCap,
   Frame,
   Send,
-  User,
-  Phone,
   ChevronDown,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
@@ -41,14 +37,55 @@ const CITIES = [
   'Dhamtari',
 ];
 
-const TIME_SLOTS = [
-  {id: 'morning', label: 'Morning', time: '10:00 AM – 01:00 PM'},
-  {id: 'afternoon', label: 'Afternoon', time: '01:00 PM – 05:00 PM'},
-  {id: 'evening', label: 'Evening', time: '05:00 PM – 08:00 PM'},
-  {id: 'night', label: 'Night', time: '08:00 PM onwards'},
-];
-
 const SERVICES_WHATSAPP = '918073988123';
+
+/** Calculates duration in hours between 24-hr times "HH:MM" */
+const calcDurationHours = (from: string, to: string) => {
+  if (!from || !to) return 0;
+  const [fh, fm = 0] = from.split(':').map(Number);
+  let [th, tm = 0] = to.split(':').map(Number);
+  if (Number.isNaN(fh) || Number.isNaN(th)) return 0;
+  const startM = fh * 60 + (Number.isNaN(fm) ? 0 : fm);
+  let endM = th * 60 + (Number.isNaN(tm) ? 0 : tm);
+  if (endM === 0 && startM > 0) endM = 24 * 60;
+  if (th === 24) endM = 24 * 60 + (Number.isNaN(tm) ? 0 : tm);
+  return Math.max(0, Math.round(((endM - startM) / 60) * 10) / 10);
+};
+
+/** Formats 24-hr "HH:MM" into 12-hr AM/PM format (e.g. "09:00 AM") */
+const formatTimeSlotDisplay = (time24: string) => {
+  if (!time24) return '06:00 AM';
+  const [hStr, mStr] = time24.split(':');
+  let h = Number(hStr);
+  const m = Number(mStr) || 0;
+  if (Number.isNaN(h)) h = 6;
+  if (h === 24) h = 0;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+};
+
+/** Generates quick slot presets for the given duration */
+const getQuickSlotsForDuration = (hours: number) => {
+  const dur = Math.max(1, Math.min(18, Math.round(hours || 1)));
+  const slots: {label: string; start: string; end: string}[] = [];
+  const candidateStarts = [9, 12, 15, 18, 20].filter(s => s + dur <= 24);
+  if (candidateStarts.length === 0 && 6 + dur <= 24) {
+    candidateStarts.push(6);
+  }
+
+  candidateStarts.forEach(startH => {
+    const endH = startH + dur;
+    const startStr = `${String(startH).padStart(2, '0')}:00`;
+    const endStr = endH === 24 ? '24:00' : `${String(endH).padStart(2, '0')}:00`;
+    slots.push({
+      label: `${formatTimeSlotDisplay(startStr)} – ${formatTimeSlotDisplay(endStr)}`,
+      start: startStr,
+      end: endStr,
+    });
+  });
+  return slots;
+};
 
 export function ServiceQueryModal({
   isOpen,
@@ -60,14 +97,14 @@ export function ServiceQueryModal({
 
   const [category, setCategory] = useState<ServiceTypeCategory>(initialCategory);
   const [serviceName, setServiceName] = useState(initialServiceName);
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [city, setCity] = useState(CITIES[0]);
   const [date, setDate] = useState('');
-  const [timeSlot, setTimeSlot] = useState(TIME_SLOTS[0].label);
+  const [durationHours, setDurationHours] = useState(3);
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('12:00');
 
-  // Guest counters
-  const [personsCount, setPersonsCount] = useState(2);
+  // Guest counters (Adults & Kids)
+  const [adultsCount, setAdultsCount] = useState(2);
   const [kidsCount, setKidsCount] = useState(0);
 
   // Classes specific
@@ -90,47 +127,109 @@ export function ServiceQueryModal({
     if (!isOpen) return;
     setCategory(initialCategory);
     setServiceName(initialServiceName);
-    setName(customer?.name || '');
-    setPhone(customer?.mobile || '');
     if (!date) {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       setDate(tomorrow.toISOString().split('T')[0]);
     }
-  }, [isOpen, initialCategory, initialServiceName, customer]);
+  }, [isOpen, initialCategory, initialServiceName]);
+
+  const currentDuration = calcDurationHours(startTime, endTime);
+  const isValidTimeRange = currentDuration >= 1;
+  const formattedSlotRange = `${formatTimeSlotDisplay(startTime)} – ${formatTimeSlotDisplay(endTime)}`;
+
+  // Handle hours stepper change
+  const handleDurationChange = (newDur: number) => {
+    const safeDur = Math.max(1, Math.min(18, newDur));
+    setDurationHours(safeDur);
+
+    const [sh = 9, sm = 0] = startTime.split(':').map(Number);
+    let startM = sh * 60 + sm;
+    let endM = startM + Math.round(safeDur * 60);
+
+    if (endM > 24 * 60) {
+      startM = Math.max(6 * 60, 24 * 60 - Math.round(safeDur * 60));
+      endM = startM + Math.round(safeDur * 60);
+      const newStartH = Math.floor(startM / 60);
+      const newStartM = startM % 60;
+      setStartTime(
+        `${String(newStartH).padStart(2, '0')}:${String(newStartM).padStart(2, '0')}`
+      );
+    }
+
+    const newEndH = Math.floor(endM / 60);
+    const newEndM = endM % 60;
+    setEndTime(
+      `${String(newEndH === 24 ? '24' : newEndH).padStart(2, '0')}:${String(newEndM).padStart(2, '0')}`
+    );
+  };
+
+  // Handle custom start time change
+  const handleStartTimeChange = (newStart: string) => {
+    setStartTime(newStart);
+    if (!newStart) return;
+
+    const [sh = 6, sm = 0] = newStart.split(':').map(Number);
+    const startM = sh * 60 + sm;
+    let endM = startM + Math.round(durationHours * 60);
+
+    if (endM > 24 * 60) {
+      endM = 24 * 60;
+      const dur = Math.max(0.5, Math.round(((endM - startM) / 60) * 10) / 10);
+      setDurationHours(dur);
+    }
+
+    const endH = Math.floor(endM / 60);
+    const endMin = endM % 60;
+    setEndTime(
+      `${String(endH === 24 ? '24' : endH).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`
+    );
+  };
+
+  // Handle custom end time change
+  const handleEndTimeChange = (newEnd: string) => {
+    const effectiveEnd = newEnd === '00:00' ? '24:00' : newEnd;
+    setEndTime(effectiveEnd);
+
+    const dur = calcDurationHours(startTime, effectiveEnd);
+    if (dur >= 1) {
+      setDurationHours(dur);
+    }
+  };
+
+  // Handle quick slot preset click
+  const handleSelectQuickSlot = (start: string, end: string) => {
+    setStartTime(start);
+    setEndTime(end);
+    const dur = calcDurationHours(start, end);
+    if (dur >= 1) {
+      setDurationHours(dur);
+    }
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
 
-    if (!name.trim()) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Name Required',
-        text: 'Please enter your name.',
-        confirmButtonColor: '#EA580C',
-      });
-      return;
-    }
+    if (category === 'birthday') {
+      if (!date) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Date Required',
+          text: 'Please pick your preferred date.',
+          confirmButtonColor: '#EA580C',
+        });
+        return;
+      }
 
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    if (!/^\d{10}$/.test(cleanPhone)) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Valid Phone Required',
-        text: 'Please enter a valid 10-digit mobile number.',
-        confirmButtonColor: '#EA580C',
-      });
-      return;
-    }
-
-    if (!date) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Date Required',
-        text: 'Please pick your preferred date.',
-        confirmButtonColor: '#EA580C',
-      });
-      return;
+      if (!isValidTimeRange || durationHours < 1) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Invalid Time Slot',
+          text: 'Please ensure your end time is after start time with at least 1 hour duration.',
+          confirmButtonColor: '#EA580C',
+        });
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -158,12 +257,20 @@ export function ServiceQueryModal({
         ? 'Photography'
         : 'Other Art';
 
+    const cleanPhone = (customer?.mobile || '').replace(/\D/g, '').slice(-10);
+    const customerDisplayName = (customer?.name || '').trim();
+
+    const durationLabel = `${durationHours} ${durationHours === 1 ? 'Hour' : 'Hours'}`;
+    const timeSlotSummary = `${formattedSlotRange} (${durationLabel})`;
+
     // Summary description for DB lead
     const summaryLines = [
       `Service: ${categoryLabel} ${serviceName ? `(${serviceName})` : ''}`,
-      `City: ${city}`,
-      `Date: ${date} | Time: ${timeSlot}`,
-      `Guests: ${personsCount} Persons, ${kidsCount} Kids`,
+      category === 'birthday' ? `City: ${city}` : null,
+      category === 'birthday' ? `Date: ${date}` : null,
+      category === 'birthday' ? `Hours Required: ${durationLabel}` : null,
+      category === 'birthday' ? `Time Slot: ${timeSlotSummary}` : null,
+      category === 'birthday' ? `Guests: ${adultsCount} Adults, ${kidsCount} Kids` : null,
       category === 'classes'
         ? `Classes: ${classSubjectLabel} | Level: ${skillLevel} | Schedule: ${schedule}`
         : null,
@@ -171,7 +278,7 @@ export function ServiceQueryModal({
         ? `Framing: ${framingTypeLabel} | Quantity: ${framingQuantity}`
         : null,
       notes.trim() ? `Notes: ${notes.trim()}` : null,
-      `Contact: ${name.trim()} (${cleanPhone})`,
+      customerDisplayName ? `Customer: ${customerDisplayName}${cleanPhone ? ` (${cleanPhone})` : ''}` : null,
     ].filter(Boolean);
 
     const fullDescription = summaryLines.join('\n');
@@ -179,7 +286,7 @@ export function ServiceQueryModal({
     // 1. Record lead enquiry in backend
     recordPortalEnquiry({
       enquiryType: 'Service',
-      itemName: `${categoryLabel} - ${city}`,
+      itemName: `${categoryLabel}${category === 'birthday' ? ` - ${city}` : ''}`,
       description: fullDescription,
     });
 
@@ -188,10 +295,15 @@ export function ServiceQueryModal({
       '🎨 *WooWoo Art House - Service Enquiry*',
       '━━━━━━━━━━━━━━━━━━━━',
       `• *Service:* ${categoryLabel}${serviceName ? ` - ${serviceName}` : ''}`,
-      `• *City:* ${city}`,
-      `• *Date:* ${date}`,
-      `• *Time:* ${timeSlot}`,
-      `• *People Count:* ${personsCount} Persons · ${kidsCount} Kids`,
+      ...(category === 'birthday'
+        ? [
+            `• *City:* ${city}`,
+            `• *Date:* ${date}`,
+            `• *Hours Required:* ${durationLabel}`,
+            `• *Preferred Time:* ${timeSlotSummary}`,
+            `• *Guests:* ${adultsCount} Adults · ${kidsCount} Kids`,
+          ]
+        : []),
       ...(category === 'classes'
         ? [
             `• *Class Type:* ${classSubjectLabel}`,
@@ -206,8 +318,12 @@ export function ServiceQueryModal({
           ]
         : []),
       ...(notes.trim() ? [`• *Special Requests:* ${notes.trim()}`] : []),
-      '━━━━━━━━━━━━━━━━━━━━',
-      `• *Customer:* ${name.trim()} (${cleanPhone})`,
+      ...((customerDisplayName || cleanPhone)
+        ? [
+            '━━━━━━━━━━━━━━━━━━━━',
+            `• *Customer:* ${customerDisplayName || 'Customer'}${cleanPhone ? ` (${cleanPhone})` : ''}`,
+          ]
+        : []),
     ];
 
     const waUrl = `https://wa.me/${SERVICES_WHATSAPP}?text=${encodeURIComponent(
@@ -229,6 +345,8 @@ export function ServiceQueryModal({
     });
   };
 
+  const quickSlots = getQuickSlotsForDuration(durationHours);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -248,7 +366,7 @@ export function ServiceQueryModal({
             animate={{y: 0}}
             exit={{y: '100%'}}
             transition={{type: 'spring', damping: 26, stiffness: 240}}
-            className="relative z-10 flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-[32px] sm:rounded-[32px] bg-white shadow-2xl overflow-hidden border border-slate-100"
+            className="relative z-10 flex w-full max-w-lg max-h-[92dvh] flex-col rounded-t-[32px] sm:rounded-[32px] bg-white shadow-2xl overflow-hidden border border-slate-100"
           >
             {/* Mobile Drag Indicator */}
             <div className="flex shrink-0 justify-center pt-3 pb-1 sm:hidden">
@@ -256,24 +374,24 @@ export function ServiceQueryModal({
             </div>
 
             {/* Modal Header */}
-            <div className="flex shrink-0 items-center justify-between px-5 pt-3 pb-3 border-b border-slate-100">
+            <div className="flex shrink-0 items-center justify-between px-5 pt-3 pb-3 border-b border-slate-100 bg-gradient-to-r from-orange-50/60 via-white to-white">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FFF0EB] text-[#EA580C]">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#FFF0EB] text-[#EA580C] shadow-xs">
                   <Sparkles className="h-5 w-5" strokeWidth={2.2} />
                 </div>
                 <div>
-                  <h3 className="text-[17px] font-black tracking-tight text-[#111111] leading-tight">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
                     Service Enquiry
                   </h3>
-                  <p className="text-[11px] font-semibold text-[#6B7280] leading-none mt-0.5">
-                    Select service, timing & location
+                  <p className="text-xs font-normal text-slate-500 leading-none mt-0.5">
+                    Select service, timing &amp; location
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB]"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition cursor-pointer"
                 aria-label="Close modal"
               >
                 <X className="h-4.5 w-4.5" strokeWidth={2.5} />
@@ -281,405 +399,468 @@ export function ServiceQueryModal({
             </div>
 
             {/* Modal Form Scrollable Area */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4 text-left">
-              {/* Category Segmented Selector */}
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-2">
-                  Select Service
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCategory('birthday')}
-                    className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition-all ${
-                      category === 'birthday'
-                        ? 'border-[#EA580C] bg-[#FFF8F2] text-[#EA580C] ring-1 ring-[#EA580C]'
-                        : 'border-slate-200 bg-white text-[#4B5563] hover:bg-slate-50'
-                    }`}
-                  >
-                    <PartyPopper className="h-5 w-5 mb-1" />
-                    <span className="text-[11px] font-black leading-tight">Birthday Event</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setCategory('classes')}
-                    className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition-all ${
-                      category === 'classes'
-                        ? 'border-[#EA580C] bg-[#FFF8F2] text-[#EA580C] ring-1 ring-[#EA580C]'
-                        : 'border-slate-200 bg-white text-[#4B5563] hover:bg-slate-50'
-                    }`}
-                  >
-                    <GraduationCap className="h-5 w-5 mb-1" />
-                    <span className="text-[11px] font-black leading-tight">Classes</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setCategory('framing')}
-                    className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition-all ${
-                      category === 'framing'
-                        ? 'border-[#EA580C] bg-[#FFF8F2] text-[#EA580C] ring-1 ring-[#EA580C]'
-                        : 'border-slate-200 bg-white text-[#4B5563] hover:bg-slate-50'
-                    }`}
-                  >
-                    <Frame className="h-5 w-5 mb-1" />
-                    <span className="text-[11px] font-black leading-tight">Photo Framing</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* City Selection */}
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1.5">
-                  City Location *
-                </label>
-                <div className="relative">
-                  <MapPin className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#EA580C]" />
-                  <select
-                    value={city}
-                    onChange={e => setCity(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-[13px] font-bold text-[#111111] appearance-none outline-none focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C]"
-                  >
-                    {CITIES.map(c => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                </div>
-              </div>
-
-              {/* Date & Time Slot Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Date Picker */}
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col justify-between overflow-y-auto p-5 text-left">
+              <div className="space-y-4">
+                {/* Category Segmented Selector */}
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1.5">
-                    Preferred Date *
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                    Select Service
                   </label>
-                  <div className="relative">
-                    <Calendar className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      type="date"
-                      min={todayIso}
-                      value={date}
-                      onChange={e => setDate(e.target.value)}
-                      required
-                      className="w-full h-11 rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-[13px] font-bold text-[#111111] outline-none focus:border-[#EA580C]"
-                    />
-                  </div>
-                </div>
-
-                {/* Time Slot Picker */}
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1.5">
-                    Preferred Time *
-                  </label>
-                  <div className="relative">
-                    <Clock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <select
-                      value={timeSlot}
-                      onChange={e => setTimeSlot(e.target.value)}
-                      className="w-full h-11 rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-[13px] font-bold text-[#111111] appearance-none outline-none focus:border-[#EA580C]"
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCategory('birthday')}
+                      className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition cursor-pointer ${
+                        category === 'birthday'
+                          ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C] shadow-xs'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                      }`}
                     >
-                      {TIME_SLOTS.map(slot => (
-                        <option key={slot.id} value={slot.label}>
-                          {slot.label} ({slot.time})
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <PartyPopper className="h-5 w-5 mb-1" />
+                      <span className="text-xs font-semibold leading-tight">Birthday Event</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCategory('classes')}
+                      className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition cursor-pointer ${
+                        category === 'classes'
+                          ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C] shadow-xs'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <GraduationCap className="h-5 w-5 mb-1" />
+                      <span className="text-xs font-semibold leading-tight">Classes</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setCategory('framing')}
+                      className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition cursor-pointer ${
+                        category === 'framing'
+                          ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C] shadow-xs'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <Frame className="h-5 w-5 mb-1" />
+                      <span className="text-xs font-semibold leading-tight">Photo Framing</span>
+                    </button>
                   </div>
                 </div>
-              </div>
 
-              {/* People Count: Persons & Kids */}
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1.5">
-                  Guest Count
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Persons / Adults */}
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50/50">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-[#EA580C]" />
-                      <span className="text-[12px] font-black text-[#111111]">Persons</span>
+                {/* Birthday Event: City, Date & Hours Required, Time Slot, and Guest Count */}
+                {category === 'birthday' && (
+                  <>
+                    {/* City Selection */}
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                        City Location <span className="text-[#EA580C]">*</span>
+                      </label>
+                      <div className="relative">
+                        <MapPin className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#EA580C]" />
+                        <select
+                          value={city}
+                          onChange={e => setCity(e.target.value)}
+                          className="w-full h-[42px] rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-xs font-semibold text-slate-800 appearance-none outline-none focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
+                        >
+                          {CITIES.map(c => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPersonsCount(prev => Math.max(1, prev - 1))}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100"
-                      >
-                        -
-                      </button>
-                      <span className="w-5 text-center text-[13px] font-black text-[#111111]">
-                        {personsCount}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setPersonsCount(prev => prev + 1)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Kids */}
-                  <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50/50">
-                    <div className="flex items-center gap-2">
-                      <Baby className="h-4 w-4 text-[#7C3AED]" />
-                      <span className="text-[12px] font-black text-[#111111]">Kids</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setKidsCount(prev => Math.max(0, prev - 1))}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100"
-                      >
-                        -
-                      </button>
-                      <span className="w-5 text-center text-[13px] font-black text-[#111111]">
-                        {kidsCount}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setKidsCount(prev => prev + 1)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-100"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                    {/* Date & Hours Required in Same Row */}
+                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 truncate">
+                          Select Date <span className="text-[#EA580C]">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          min={todayIso}
+                          value={date}
+                          onChange={e => setDate(e.target.value)}
+                          required
+                          className="w-full h-[42px] px-3 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800 cursor-pointer"
+                        />
+                      </div>
 
-              {/* DYNAMIC SECTION 1: Classes & Courses */}
-              {category === 'classes' && (
-                <div className="p-3.5 rounded-2xl bg-[#FFF8F2] border border-[#FFEDD5] space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Palette className="h-4 w-4 text-[#EA580C]" />
-                    <h4 className="text-[12px] font-black uppercase tracking-wider text-[#EA580C]">
-                      Class Specifics
-                    </h4>
-                  </div>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 truncate">
+                          Hours Required <span className="text-[#EA580C]">*</span>
+                        </label>
+                        <div className="flex h-[42px] items-center justify-between rounded-xl border border-slate-200 bg-white px-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDurationChange(Math.max(1, durationHours - 1))}
+                            disabled={durationHours <= 1}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-sm active:scale-95 transition cursor-pointer"
+                            title="Decrease hours"
+                          >
+                            -
+                          </button>
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={1}
+                              max={18}
+                              value={durationHours}
+                              onChange={e => {
+                                const val = parseInt(e.target.value);
+                                if (!isNaN(val)) {
+                                  handleDurationChange(Math.max(1, Math.min(18, val)));
+                                }
+                              }}
+                              className="w-8 sm:w-10 text-center text-xs font-semibold text-slate-800 bg-transparent focus:outline-none"
+                            />
+                            <span className="text-xs font-semibold text-slate-600">
+                              {durationHours === 1 ? 'Hour' : 'Hours'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDurationChange(Math.min(18, durationHours + 1))}
+                            disabled={durationHours >= 18}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-sm active:scale-95 transition cursor-pointer"
+                            title="Increase hours"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-                  {/* Sketch or Painting? */}
-                  <div>
-                    <label className="block text-[11px] font-extrabold text-[#7C2D12] mb-1.5">
-                      Subject: Sketch or Painting?
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        {id: 'sketching', label: '✏️ Sketching'},
-                        {id: 'painting', label: '🎨 Painting'},
-                        {id: 'both', label: '🖌️ Both'},
-                      ].map(item => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => setClassSubject(item.id as any)}
-                          className={`py-2 px-2 rounded-xl text-[11px] font-black border transition ${
-                            classSubject === item.id
-                              ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-orange-50'
+                    {/* Preferred Time Slot (Custom Timing) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                          Preferred Time Slot <span className="text-[#EA580C]">*</span>
+                        </label>
+                        <span
+                          className={`text-xs font-bold ${
+                            isValidTimeRange ? 'text-[#EA580C]' : 'text-rose-500'
                           }`}
                         >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                          {isValidTimeRange ? formattedSlotRange : 'Invalid Range'}
+                        </span>
+                      </div>
 
-                  {/* Level & Schedule Grid */}
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {/* Beginner or Advanced */}
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                        {/* Start Time Input */}
+                        <div className="relative">
+                          <input
+                            type="time"
+                            min="06:00"
+                            max="23:59"
+                            value={startTime}
+                            onChange={e => handleStartTimeChange(e.target.value)}
+                            className="w-full h-[42px] px-3 text-xs font-semibold text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
+                            title="Start Time"
+                            required
+                          />
+                        </div>
+
+                        <span className="text-xs font-bold text-slate-400 px-1">to</span>
+
+                        {/* End Time Input */}
+                        <div className="relative">
+                          <input
+                            type="time"
+                            min="06:00"
+                            max="23:59"
+                            value={endTime === '24:00' ? '00:00' : endTime}
+                            onChange={e => handleEndTimeChange(e.target.value)}
+                            className="w-full h-[42px] px-3 text-xs font-semibold text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
+                            title="End Time"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quick Slot Presets */}
+                      <div className="mt-2 flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+                        {quickSlots.map(slot => {
+                          const isSelected =
+                            startTime === slot.start &&
+                            (endTime === slot.end || (endTime === '24:00' && slot.end === '00:00'));
+                          return (
+                            <button
+                              key={slot.label}
+                              type="button"
+                              onClick={() => handleSelectQuickSlot(slot.start, slot.end)}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition cursor-pointer border ${
+                                isSelected
+                                  ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C]'
+                                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                              }`}
+                            >
+                              {slot.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {!isValidTimeRange && (
+                        <p className="mt-1 text-xs font-semibold text-rose-500">
+                          End time must be at least 1 hour after start time (within 06:00 AM – 12:00 AM).
+                        </p>
+                      )}
+                    </div>
+
+                    {/* People Count: Adults & Kids */}
                     <div>
-                      <label className="block text-[10.5px] font-extrabold text-[#7C2D12] mb-1">
-                        Skill Level
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                        Guest Count
                       </label>
-                      <div className="grid grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        {/* Adults */}
+                        <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50/50">
+                          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                            <Users className="h-4 w-4 text-[#EA580C] shrink-0" />
+                            <span className="text-xs font-semibold text-slate-700 truncate">Adults</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setAdultsCount(prev => Math.max(1, prev - 1))}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span className="w-5 text-center text-xs font-semibold text-slate-800">
+                              {adultsCount}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setAdultsCount(prev => prev + 1)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 cursor-pointer"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Kids */}
+                        <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 bg-slate-50/50">
+                          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                            <Baby className="h-4 w-4 text-[#7C3AED] shrink-0" />
+                            <span className="text-xs font-semibold text-slate-700 truncate">Kids</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setKidsCount(prev => Math.max(0, prev - 1))}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span className="w-5 text-center text-xs font-semibold text-slate-800">
+                              {kidsCount}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setKidsCount(prev => prev + 1)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 cursor-pointer"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* DYNAMIC SECTION 1: Classes & Courses */}
+                {category === 'classes' && (
+                  <div className="p-3.5 rounded-2xl bg-[#FFF8F2] border border-[#FFEDD5] space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Palette className="h-4 w-4 text-[#EA580C]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#EA580C]">
+                        Class Specifics
+                      </h4>
+                    </div>
+
+                    {/* Sketch or Painting? */}
+                    <div>
+                      <label className="block text-xs font-semibold text-[#7C2D12] mb-1.5">
+                        Subject: Sketch or Painting?
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
                         {[
-                          {id: 'beginner', label: 'Beginner'},
-                          {id: 'advanced', label: 'Advanced'},
-                        ].map(lvl => (
+                          {id: 'sketching', label: '✏️ Sketching'},
+                          {id: 'painting', label: '🎨 Painting'},
+                          {id: 'both', label: '🖌️ Both'},
+                        ].map(item => (
                           <button
-                            key={lvl.id}
+                            key={item.id}
                             type="button"
-                            onClick={() => setSkillLevel(lvl.id as any)}
-                            className={`py-1.5 rounded-lg text-[10.5px] font-black border transition ${
-                              skillLevel === lvl.id
-                                ? 'bg-[#EA580C] text-white border-[#EA580C]'
-                                : 'bg-white text-slate-700 border-slate-200'
+                            onClick={() => setClassSubject(item.id as any)}
+                            className={`py-2 px-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                              classSubject === item.id
+                                ? 'bg-[#EA580C] text-white border-[#EA580C] shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-orange-50'
                             }`}
                           >
-                            {lvl.label}
+                            {item.label}
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    {/* Weekday or Weekend */}
+                    {/* Level & Schedule Grid */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {/* Beginner or Advanced */}
+                      <div>
+                        <label className="block text-xs font-semibold text-[#7C2D12] mb-1">
+                          Skill Level
+                        </label>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {[
+                            {id: 'beginner', label: 'Beginner'},
+                            {id: 'advanced', label: 'Advanced'},
+                          ].map(lvl => (
+                            <button
+                              key={lvl.id}
+                              type="button"
+                              onClick={() => setSkillLevel(lvl.id as any)}
+                              className={`py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                                skillLevel === lvl.id
+                                  ? 'bg-[#EA580C] text-white border-[#EA580C]'
+                                  : 'bg-white text-slate-700 border-slate-200'
+                              }`}
+                            >
+                              {lvl.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Weekday or Weekend */}
+                      <div>
+                        <label className="block text-xs font-semibold text-[#7C2D12] mb-1">
+                          Schedule
+                        </label>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {[
+                            {id: 'weekday', label: 'Weekday'},
+                            {id: 'weekend', label: 'Weekend'},
+                          ].map(sch => (
+                            <button
+                              key={sch.id}
+                              type="button"
+                              onClick={() => setSchedule(sch.id as any)}
+                              className={`py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                                schedule === sch.id
+                                  ? 'bg-[#EA580C] text-white border-[#EA580C]'
+                                  : 'bg-white text-slate-700 border-slate-200'
+                              }`}
+                            >
+                              {sch.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* DYNAMIC SECTION 2: Photo Framing */}
+                {category === 'framing' && (
+                  <div className="p-3.5 rounded-2xl bg-[#FAF5FF] border border-[#F3E8FF] space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Frame className="h-4 w-4 text-[#7C3AED]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#7C3AED]">
+                        Framing Details
+                      </h4>
+                    </div>
+
+                    {/* Is it painting, sketching, photography? */}
                     <div>
-                      <label className="block text-[10.5px] font-extrabold text-[#7C2D12] mb-1">
-                        Schedule
+                      <label className="block text-xs font-semibold text-[#581C87] mb-1.5">
+                        What are you framing?
                       </label>
-                      <div className="grid grid-cols-2 gap-1.5">
+                      <div className="grid grid-cols-3 gap-2">
                         {[
-                          {id: 'weekday', label: 'Weekday'},
-                          {id: 'weekend', label: 'Weekend'},
-                        ].map(sch => (
+                          {id: 'painting', label: '🎨 Painting'},
+                          {id: 'sketching', label: '✏️ Sketching'},
+                          {id: 'photography', label: '📷 Photography'},
+                        ].map(type => (
                           <button
-                            key={sch.id}
+                            key={type.id}
                             type="button"
-                            onClick={() => setSchedule(sch.id as any)}
-                            className={`py-1.5 rounded-lg text-[10.5px] font-black border transition ${
-                              schedule === sch.id
-                                ? 'bg-[#EA580C] text-white border-[#EA580C]'
-                                : 'bg-white text-slate-700 border-slate-200'
+                            onClick={() => setFramingType(type.id as any)}
+                            className={`py-2 px-1 rounded-xl text-xs font-semibold border text-center transition cursor-pointer ${
+                              framingType === type.id
+                                ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-50'
                             }`}
                           >
-                            {sch.label}
+                            {type.label}
                           </button>
                         ))}
                       </div>
                     </div>
-                  </div>
-                </div>
-              )}
 
-              {/* DYNAMIC SECTION 2: Photo Framing */}
-              {category === 'framing' && (
-                <div className="p-3.5 rounded-2xl bg-[#FAF5FF] border border-[#F3E8FF] space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Frame className="h-4 w-4 text-[#7C3AED]" />
-                    <h4 className="text-[12px] font-black uppercase tracking-wider text-[#7C3AED]">
-                      Framing Details
-                    </h4>
-                  </div>
-
-                  {/* Is it painting, sketching, photography? */}
-                  <div>
-                    <label className="block text-[11px] font-extrabold text-[#581C87] mb-1.5">
-                      What are you framing?
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        {id: 'painting', label: '🎨 Painting'},
-                        {id: 'sketching', label: '✏️ Sketching'},
-                        {id: 'photography', label: '📷 Photography'},
-                      ].map(type => (
-                        <button
-                          key={type.id}
-                          type="button"
-                          onClick={() => setFramingType(type.id as any)}
-                          className={`py-2 px-1 rounded-xl text-[11px] font-black border text-center transition ${
-                            framingType === type.id
-                              ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-xs'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-purple-50'
-                          }`}
-                        >
-                          {type.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Quantity */}
-                  <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-purple-100">
-                    <span className="text-[11.5px] font-black text-[#581C87]">
-                      Frame Quantity
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setFramingQuantity(prev => Math.max(1, prev - 1))}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-bold"
-                      >
-                        -
-                      </button>
-                      <span className="w-5 text-center text-[13px] font-black text-[#111111]">
-                        {framingQuantity}
+                    {/* Quantity */}
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-purple-100">
+                      <span className="text-xs font-semibold text-[#581C87]">
+                        Frame Quantity
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setFramingQuantity(prev => prev + 1)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-bold"
-                      >
-                        +
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFramingQuantity(prev => Math.max(1, prev - 1))}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 border border-slate-200 text-slate-600 font-bold cursor-pointer"
+                        >
+                          -
+                        </button>
+                        <span className="w-5 text-center text-xs font-semibold text-slate-800">
+                          {framingQuantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setFramingQuantity(prev => prev + 1)}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 border border-slate-200 text-slate-600 font-bold cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Contact Info (Name & Phone) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1.5">
-                    Your Name *
-                  </label>
-                  <div className="relative">
-                    <User className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="e.g. Rahul Sharma"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      required
-                      className="w-full h-11 rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-[13px] font-bold text-[#111111] outline-none focus:border-[#EA580C]"
+                {/* Special Requests / Notes - for Birthday Event */}
+                {category === 'birthday' && (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                      Specific Requirements (Optional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Any theme ideas, specific requests, or queries..."
+                      value={notes}
+                      onChange={e => setNotes(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#EA580C]"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1.5">
-                    Mobile Number *
-                  </label>
-                  <div className="relative">
-                    <Phone className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <input
-                      type="tel"
-                      placeholder="10-digit mobile"
-                      maxLength={10}
-                      value={phone}
-                      onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                      required
-                      className="w-full h-11 rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-[13px] font-bold text-[#111111] outline-none focus:border-[#EA580C]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Special Requests / Notes */}
-              <div>
-                <label className="block text-[11px] font-black uppercase tracking-wider text-[#6B7280] mb-1.5">
-                  Specific Requirements (Optional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Any theme ideas, specific frame dimensions, or queries..."
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 p-3 text-[12px] font-medium text-[#111111] outline-none focus:border-[#EA580C]"
-                />
+                )}
               </div>
 
               {/* Sticky Submit Button inside form */}
-              <div className="pt-2">
+              <div className="pt-4 mt-auto shrink-0">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-3.5 px-4 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-black flex items-center justify-center gap-2 hover:bg-[#D97706] transition-all shadow-md cursor-pointer disabled:opacity-50"
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#EA580C] to-[#D97706] hover:from-[#D97706] hover:to-[#EA580C] text-white text-xs sm:text-[13px] font-extrabold flex items-center justify-center gap-2 transition-all shadow-md shadow-orange-500/25 cursor-pointer disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />
-                  <span>Submit & Enquire on WhatsApp</span>
+                  <span>Submit Query</span>
                 </button>
-                <p className="mt-2 text-center text-[10.5px] font-semibold text-[#6B7280]">
-                  Direct instant response via WooWoo Art House WhatsApp concierge.
-                </p>
               </div>
             </form>
           </motion.div>
@@ -688,3 +869,5 @@ export function ServiceQueryModal({
     </AnimatePresence>
   );
 }
+
+export default ServiceQueryModal;

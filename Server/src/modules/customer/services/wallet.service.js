@@ -309,6 +309,7 @@ export const getWalletDashboard = async (customerId, appBaseUrl) => {
       referralCode: referral.referralCode,
       shareUrl: referral.shareUrl,
       shareMessage: referral.shareMessage,
+      discount: referral.discount,
     },
     updatedAt: new Date().toISOString(),
   };

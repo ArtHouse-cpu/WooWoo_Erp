@@ -38,7 +38,6 @@ export function ProductDetailsModal({product, onClose}: ProductDetailsModalProps
 
   if (!product) return null;
   const gallery = product.images.length ? product.images : product.imageUrl ? [product.imageUrl] : [];
-  const inStock = product.availability !== 'out_of_stock';
   const originalPrice = getOriginalPrice(product);
 
   return (
@@ -122,7 +121,7 @@ export function ProductDetailsModal({product, onClose}: ProductDetailsModalProps
               ) : null}
             </div>
 
-            {/* Price & Stock status */}
+            {/* Price */}
             <div className="flex flex-wrap items-baseline gap-2 pt-1">
               <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                 ₹{formatInr(product.price)}
@@ -130,17 +129,6 @@ export function ProductDetailsModal({product, onClose}: ProductDetailsModalProps
               {originalPrice > product.price && (
                 <span className="text-sm sm:text-base font-semibold text-slate-400 line-through">
                   ₹{formatInr(originalPrice)}
-                </span>
-              )}
-              {inStock ? (
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200/60 ml-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  In Stock
-                </span>
-              ) : (
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700 border border-rose-200/60 ml-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-                  Out of Stock
                 </span>
               )}
               {product.unit ? (

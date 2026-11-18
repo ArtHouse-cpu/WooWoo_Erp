@@ -8,10 +8,7 @@ import {
   Gift,
   Users,
   Heart,
-  UserCheck,
   Sparkles,
-  Clock,
-  Lock,
   MessageCircle,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
@@ -386,7 +383,7 @@ export function ServicesBottomSheet({isOpen, onClose}: ServicesBottomSheetProps)
                     <Users className="h-5 w-5" strokeWidth={2} />
                   </div>
                   <h5 className="text-[12px] font-black text-[#111111] mt-2.5 leading-none">
-                    5K+ Served
+                    50K+ Served
                   </h5>
                   <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
                     Trusted by 5000+ happy customers
@@ -404,55 +401,6 @@ export function ServicesBottomSheet({isOpen, onClose}: ServicesBottomSheetProps)
                   <p className="mt-1 text-[8.5px] text-[#9CA3AF] font-bold leading-tight max-w-[95%]">
                     Highly rated & loved by our community
                   </p>
-                  
-                </div>
-              </div>
-
-              {/* Trust Features Peach Strip */}
-              <div className="mx-5 p-3 rounded-[16px] bg-[#FFF7ED] border border-[#FFEDD5] flex items-center justify-between gap-1">
-                {/* Expert Artists */}
-                <div className="flex items-center gap-1">
-                  <UserCheck className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[7.5px] font-bold text-[#111111] leading-tight text-left">
-                    <div className="font-black">Expert Artists</div>
-                    <div className="text-[#6B7280] font-semibold text-[6.5px]"> Skilled & Verified professionals</div>
-                  </div>
-                </div>
-
-                {/* Separator */}
-                <div className="h-6 w-[1px] bg-[#FFEDD5] shrink-0" />
-
-                {/* Quality Materials */}
-                <div className="flex items-center gap-1">
-                  <Sparkles className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[7.5px] font-bold text-[#111111] leading-tight text-left">
-                    <div className="font-black">Quality Materials</div>
-                    <div className="text-[#6B7280] font-semibold text-[6.5px]">Premium & safe materials</div>
-                  </div>
-                </div>
-
-                {/* Separator */}
-                <div className="h-6 w-[1px] bg-[#FFEDD5] shrink-0" />
-
-                {/* On-time Delivery */}
-                <div className="flex items-center gap-1">
-                  <Clock className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[7.5px] font-bold text-[#111111] leading-tight text-left">
-                    <div className="font-black">On-time Delivery</div>
-                    <div className="text-[#6B7280] font-semibold text-[6.5px]">Commitment you can trust</div>
-                  </div>
-                </div>
-
-                {/* Separator */}
-                <div className="h-6 w-[1px] bg-[#FFEDD5] shrink-0" />
-
-                {/* Secure Payments */}
-                <div className="flex items-center gap-1">
-                  <Lock className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[7.5px] font-bold text-[#111111] leading-tight text-left">
-                    <div className="font-black">Secure Payments</div>
-                    <div className="text-[#6B7280] font-semibold text-[6.5px]">Safe & hassle-free transactions</div>
-                  </div>
                 </div>
               </div>
             </div>

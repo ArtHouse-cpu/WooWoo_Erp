@@ -1,7 +1,9 @@
 import {api} from './axios';
 
 const API_ORIGIN = (
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8000'
 ).replace(/\/$/, '');
 
 /** Cloudinary URLs stay as-is. Relative upload paths are resolved against the API. */
@@ -10,8 +12,8 @@ export function resolveSpaceImageUrl(raw?: string | null): string | null {
   if (!value) return null;
   if (/^https?:\/\//i.test(value)) return value;
   if (value.startsWith('//')) return `https:${value}`;
-  if (value.startsWith('/')) return `${API_ORIGIN}${value}`;
-  return `${API_ORIGIN}/${value}`;
+  const cleanPath = value.startsWith('/') ? value : `/${value}`;
+  return API_ORIGIN ? `${API_ORIGIN}${cleanPath}` : cleanPath;
 }
 
 function pickSpaceImage(row: SpaceRecord): string | null {

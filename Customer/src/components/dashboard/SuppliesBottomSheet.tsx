@@ -6,16 +6,13 @@ import {
   ShoppingBag,
   Tag,
   Grid,
-  ShieldCheck,
-  Truck,
-  RotateCcw,
-  Lock,
   MessageCircle,
   Compass,
   Sparkles,
   BookOpen,
   Palette,
   Gift,
+  Package,
 } from 'lucide-react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {recordPortalEnquiry} from '../../services/enquiry.service';
@@ -50,18 +47,31 @@ function formatInr(value: number) {
 function ProductPhoto({
   src,
   alt,
+  className = 'h-full w-full object-cover transition-transform duration-300 group-hover:scale-105',
 }: {
   src: string | null | undefined;
   alt: string;
+  className?: string;
 }) {
   const [broken, setBroken] = useState(false);
-  const fallbackImg = 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80';
+
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
+
+  if (!src || broken) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-amber-50/80 via-orange-50/50 to-purple-50/40 text-[#EA580C]/40">
+        <Package className="h-8 w-8 stroke-[1.5]" />
+      </div>
+    );
+  }
 
   return (
     <img
-      src={!broken && src ? src : fallbackImg}
+      src={src}
       alt={alt}
-      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+      className={className}
       onError={() => setBroken(true)}
     />
   );
@@ -74,215 +84,12 @@ type SuppliesBottomSheetProps = {
 
 type SupplyCategory = 'all' | 'stationery' | 'art-craft' | 'handmade-gifts';
 
-// Curated authentic real supplies catalog
-const defaultSupplies: CustomerProduct[] = [
-  // Stationery
-  {
-    _id: 'stat-1',
-    name: 'Hardbound Dot Grid Journal',
-    brandName: 'WooWoo Stationery',
-    price: 499,
-    category: 'Stationery',
-    subCategory: 'Notebooks',
-    description: '160 GSM bleed-proof bamboo paper with gold foiled accents.',
-    unit: 'piece',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=600&q=80'],
-  },
-  {
-    _id: 'stat-2',
-    name: 'Vintage Calligraphy Ink & Pen Set',
-    brandName: 'WooWoo Studio',
-    price: 899,
-    category: 'Stationery',
-    subCategory: 'Pens',
-    description: 'Hand-crafted brass dip pen with waterproof archival black ink.',
-    unit: 'set',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?auto=format&fit=crop&w=600&q=80'],
-  },
-  {
-    _id: 'stat-3',
-    name: 'Pastel Fineliner Drawing Pens (Set of 12)',
-    brandName: 'WooWoo Craft',
-    price: 349,
-    category: 'Stationery',
-    subCategory: 'Pens',
-    description: '0.4mm precise archival ink pens for sketching & journaling.',
-    unit: 'set',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?auto=format&fit=crop&w=600&q=80'],
-  },
-  {
-    _id: 'stat-4',
-    name: 'Minimalist Vegan Leather Desk Planner',
-    brandName: 'WooWoo Studio',
-    price: 649,
-    category: 'Stationery',
-    subCategory: 'Planners',
-    description: 'Undated yearly & monthly organizer with bookmark ribbons.',
-    unit: 'piece',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1506784983877-45594efa4cbe?auto=format&fit=crop&w=600&q=80'],
-  },
-
-  // Art & Craft
-  {
-    _id: 'art-1',
-    name: 'Artist Heavy Body Acrylics (18 Colors)',
-    brandName: 'WooWoo Art',
-    price: 1199,
-    category: 'Art & Craft',
-    subCategory: 'Paints',
-    description: 'High pigment load artist quality acrylic paints with satin finish.',
-    unit: 'set',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=600&q=80'],
-  },
-  {
-    _id: 'art-2',
-    name: 'Birchwood Professional Brush Collection',
-    brandName: 'WooWoo Art',
-    price: 599,
-    category: 'Art & Craft',
-    subCategory: 'Brushes',
-    description: '10-piece fine artist brushes for acrylics, oil & gouache.',
-    unit: 'set',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=600&q=80'],
-  },
-  {
-    _id: 'art-3',
-    name: 'Cotton Stretched Canvas Boards (Pack of 4)',
-    brandName: 'WooWoo Art',
-    price: 449,
-    category: 'Art & Craft',
-    subCategory: 'Canvases',
-    description: 'Triple gesso primed 380 GSM acid-free stretched canvas.',
-    unit: 'pack',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=600&q=80'],
-  },
-  {
-    _id: 'art-4',
-    name: 'Terracotta Air Dry Pottery Kit',
-    brandName: 'WooWoo Craft',
-    price: 799,
-    category: 'Art & Craft',
-    subCategory: 'Pottery',
-    description: '2kg natural clay, 8 wooden tools, sponge & water-resistant sealant.',
-    unit: 'kit',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&w=600&q=80'],
-  },
-  {
-    _id: 'art-5',
-    name: 'Travel Pocket Watercolor Tin (24 Colors)',
-    brandName: 'WooWoo Art',
-    price: 749,
-    category: 'Art & Craft',
-    subCategory: 'Watercolors',
-    description: 'Vibrant half-pan pigments with water reservoir brush & palette.',
-    unit: 'set',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=600&q=80'],
-  },
-
-  // Handmade Gifts
-  {
-    _id: 'gift-1',
-    name: 'Handcrafted Soy Wax Botanical Candle',
-    brandName: 'WooWoo Artisans',
-    price: 499,
-    category: 'Handmade Gifts',
-    subCategory: 'Candles',
-    description: 'Pure essential lavender oil with dried botanicals, 40hr burn.',
-    unit: 'piece',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=600&q=80'],
-  },
-  {
-    _id: 'gift-2',
-    name: 'Artisan Wheel-Thrown Ceramic Mug',
-    brandName: 'WooWoo Pottery',
-    price: 699,
-    category: 'Handmade Gifts',
-    subCategory: 'Ceramics',
-    description: 'Stoneware coffee mug with organic reactive speckle glaze.',
-    unit: 'piece',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80'],
-  },
-  {
-    _id: 'gift-3',
-    name: 'Boho Macrame Woven Wall Tapestry',
-    brandName: 'WooWoo Artisans',
-    price: 899,
-    category: 'Handmade Gifts',
-    subCategory: 'Home Decor',
-    description: 'Natural twisted unbleached cotton cord on driftwood branch.',
-    unit: 'piece',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?auto=format&fit=crop&w=600&q=80'],
-  },
-  {
-    _id: 'gift-4',
-    name: 'Pressed Wildflower Floral Resin Coasters',
-    brandName: 'WooWoo Artisans',
-    price: 549,
-    category: 'Handmade Gifts',
-    subCategory: 'Resin Art',
-    description: 'Set of 4 clear crystal coasters with real preserved garden blooms.',
-    unit: 'set',
-    discountType: 'flat',
-    discountValue: 0,
-    availability: 'in_stock',
-    imageUrl: 'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=600&q=80',
-    images: ['https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=600&q=80'],
-  },
-];
-
 export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps) {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<SupplyCategory>('all');
   const [activeDot, setActiveDot] = useState(0);
   const [apiProducts, setApiProducts] = useState<CustomerProduct[]>([]);
+  const [loading, setLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<CustomerProduct | null>(null);
 
   const categoryPills: {id: SupplyCategory; label: string; icon: any}[] = [
@@ -302,6 +109,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
   useEffect(() => {
     if (!isOpen) return;
     const controller = new AbortController();
+    setLoading(true);
     fetchCustomerProducts({limit: 100}, controller.signal)
       .then(result => {
         setApiProducts(result.products || []);
@@ -309,6 +117,11 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
       .catch((error: unknown) => {
         if (controller.signal.aborted || axios.isCancel(error)) return;
         setApiProducts([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -316,15 +129,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
     };
   }, [isOpen]);
 
-  // Merge API products with our rich real image defaults, ensuring real photography everywhere
-  const allProducts = useMemo(() => {
-    if (!apiProducts.length) return defaultSupplies;
-    const enrichedApi = apiProducts.map((p, idx) => ({
-      ...p,
-      imageUrl: p.imageUrl || defaultSupplies[idx % defaultSupplies.length].imageUrl,
-    }));
-    return [...enrichedApi, ...defaultSupplies];
-  }, [apiProducts]);
+  const allProducts = apiProducts;
 
   // Filter products by selected category pill
   const displayedProducts = useMemo(() => {
@@ -333,8 +138,10 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
       return allProducts.filter(
         p =>
           p.category?.toLowerCase().includes('stationery') ||
+          p.subCategory?.toLowerCase().includes('stationery') ||
           p.name?.toLowerCase().includes('journal') ||
           p.name?.toLowerCase().includes('pen') ||
+          p.name?.toLowerCase().includes('notebook') ||
           p.name?.toLowerCase().includes('planner')
       );
     }
@@ -343,10 +150,13 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
         p =>
           p.category?.toLowerCase().includes('art') ||
           p.category?.toLowerCase().includes('craft') ||
+          p.subCategory?.toLowerCase().includes('art') ||
+          p.subCategory?.toLowerCase().includes('craft') ||
           p.name?.toLowerCase().includes('acrylic') ||
           p.name?.toLowerCase().includes('brush') ||
           p.name?.toLowerCase().includes('canvas') ||
           p.name?.toLowerCase().includes('clay') ||
+          p.name?.toLowerCase().includes('paint') ||
           p.name?.toLowerCase().includes('color')
       );
     }
@@ -355,6 +165,8 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
         p =>
           p.category?.toLowerCase().includes('gift') ||
           p.category?.toLowerCase().includes('handmade') ||
+          p.subCategory?.toLowerCase().includes('gift') ||
+          p.subCategory?.toLowerCase().includes('handmade') ||
           p.name?.toLowerCase().includes('candle') ||
           p.name?.toLowerCase().includes('mug') ||
           p.name?.toLowerCase().includes('macrame') ||
@@ -377,10 +189,10 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
   const slideIndex = slides.length
     ? ((activeDot % slides.length) + slides.length) % slides.length
     : 0;
-  const featured = selectedProduct ?? slides[slideIndex] ?? defaultSupplies[0];
-  const sideProducts = slides
-    .filter(product => product._id !== featured?._id)
-    .slice(0, 4);
+  const featured = selectedProduct ?? slides[slideIndex] ?? null;
+  const sideProducts = featured
+    ? slides.filter(product => product._id !== featured._id).slice(0, 4)
+    : [];
 
   return (
     <AnimatePresence>
@@ -429,7 +241,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB]"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563] transition hover:bg-[#E5E7EB] cursor-pointer"
                 aria-label="Close sheet"
               >
                 <X className="h-4.5 w-4.5" strokeWidth={2.5} />
@@ -450,7 +262,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                       setActiveDot(0);
                       setSelectedProduct(null);
                     }}
-                    className={`shrink-0 px-3.5 py-1.5 rounded-full border text-[12px] font-extrabold flex items-center gap-1.5 transition-all duration-200 ${
+                    className={`shrink-0 px-3.5 py-1.5 rounded-full border text-[12px] font-extrabold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
                       active
                         ? 'border-[#EA580C] bg-[#FFF8F2] text-[#EA580C]'
                         : 'border-slate-200 text-[#6B7280] hover:bg-slate-50'
@@ -465,131 +277,162 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
 
             {/* Scrollable Contents */}
             <div className="flex-1 overflow-y-auto pb-6">
-              {/* Featured Hero Photo Mosaic */}
-              {featured && (
-                <div className="px-5 mb-4">
+              {loading ? (
+                <div className="px-5 mb-4 space-y-4">
                   <div className="grid grid-cols-2 gap-3">
-                    {/* Featured big photo card */}
-                    <button
-                      type="button"
-                      onClick={() => toggleProduct(featured)}
-                      className={`group relative h-[250px] overflow-hidden rounded-[20px] border text-left shadow-xs transition-all ${
-                        sideProducts.length ? '' : 'col-span-2'
-                      } ${
-                        selectedProduct?._id === featured?._id
-                          ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
-                          : 'border-black/[0.05]'
-                      }`}
-                    >
-                      <ProductPhoto src={featured.imageUrl} alt={featured.name} />
-                      <div className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/35 to-transparent p-3.5 text-left">
-                        <span className="mb-1 inline-block w-fit rounded-[6px] bg-white/20 backdrop-blur-xs px-2 py-0.5 text-[8px] font-black uppercase text-white tracking-wider">
-                          {featured.category || 'Featured'}
-                        </span>
-                        <h4 className="text-[13px] font-black text-white leading-tight line-clamp-2">
-                          {featured.name}
-                        </h4>
-                        <p className="mt-1 text-[11px] font-extrabold text-white leading-none">
-                          ₹{formatInr(featured.price)}
-                        </p>
-                      </div>
-                    </button>
-
-                    {/* Side Products */}
-                    {sideProducts.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {sideProducts.map(product => (
-                          <button
-                            key={product._id}
-                            type="button"
-                            onClick={() => toggleProduct(product)}
-                            className={`group relative h-[119px] overflow-hidden rounded-[16px] border text-left transition-all ${
-                              selectedProduct?._id === product._id
-                                ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
-                                : 'border-black/[0.05]'
-                            }`}
-                          >
-                            <ProductPhoto src={product.imageUrl} alt={product.name} />
-                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 to-transparent" />
-                            <div className="absolute left-2 bottom-2 max-w-[90%] rounded-[6px] bg-black/60 px-2 py-0.5 text-[8px] font-black text-white">
-                              <span className="line-clamp-1">{product.name}</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
+                    <div className="h-[250px] animate-pulse rounded-[20px] bg-slate-100" />
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="h-[119px] animate-pulse rounded-[16px] bg-slate-100" />
+                      <div className="h-[119px] animate-pulse rounded-[16px] bg-slate-100" />
+                      <div className="h-[119px] animate-pulse rounded-[16px] bg-slate-100" />
+                      <div className="h-[119px] animate-pulse rounded-[16px] bg-slate-100" />
+                    </div>
                   </div>
+                  <div className="flex gap-2.5 overflow-hidden">
+                    <div className="h-[160px] w-[136px] shrink-0 animate-pulse rounded-[18px] bg-slate-100" />
+                    <div className="h-[160px] w-[136px] shrink-0 animate-pulse rounded-[18px] bg-slate-100" />
+                    <div className="h-[160px] w-[136px] shrink-0 animate-pulse rounded-[18px] bg-slate-100" />
+                  </div>
+                </div>
+              ) : displayedProducts.length === 0 ? (
+                <div className="mx-5 my-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-8 text-center">
+                  <Package className="mx-auto h-9 w-9 text-slate-300 stroke-[1.5]" />
+                  <p className="mt-2 text-[13.5px] font-extrabold text-slate-700">No supplies found</p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                    {activeCategory !== 'all'
+                      ? 'Try selecting "All Supplies" or another category.'
+                      : 'Products added in inventory will automatically show here.'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Featured Hero Photo Mosaic */}
+                  {featured && (
+                    <div className="px-5 mb-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Featured big photo card */}
+                        <button
+                          type="button"
+                          onClick={() => toggleProduct(featured)}
+                          className={`group relative h-[250px] overflow-hidden rounded-[20px] border text-left shadow-xs transition-all cursor-pointer ${
+                            sideProducts.length ? '' : 'col-span-2'
+                          } ${
+                            selectedProduct?._id === featured?._id
+                              ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
+                              : 'border-black/[0.05]'
+                          }`}
+                        >
+                          <ProductPhoto src={featured.imageUrl} alt={featured.name} />
+                          <div className="pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 via-black/35 to-transparent p-3.5 text-left">
+                            <span className="mb-1 inline-block w-fit rounded-[6px] bg-white/20 backdrop-blur-xs px-2 py-0.5 text-[8px] font-black uppercase text-white tracking-wider">
+                              {featured.category || 'Featured'}
+                            </span>
+                            <h4 className="text-[13px] font-black text-white leading-tight line-clamp-2">
+                              {featured.name}
+                            </h4>
+                            <p className="mt-1 text-[11px] font-extrabold text-white leading-none">
+                              ₹{formatInr(featured.price)}
+                            </p>
+                          </div>
+                        </button>
 
-                  {/* Pagination Dots for Hero Slides */}
-                  {slides.length > 1 ? (
-                    <div className="flex justify-center gap-1.5 mt-3 mb-2">
-                      {slides.map((product, index) => (
+                        {/* Side Products */}
+                        {sideProducts.length > 0 ? (
+                          <div className="grid grid-cols-2 gap-2.5">
+                            {sideProducts.map(product => (
+                              <button
+                                key={product._id}
+                                type="button"
+                                onClick={() => toggleProduct(product)}
+                                className={`group relative h-[119px] overflow-hidden rounded-[16px] border text-left transition-all cursor-pointer ${
+                                  selectedProduct?._id === product._id
+                                    ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
+                                    : 'border-black/[0.05]'
+                                }`}
+                              >
+                                <ProductPhoto src={product.imageUrl} alt={product.name} />
+                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 to-transparent" />
+                                <div className="absolute left-2 bottom-2 max-w-[90%] rounded-[6px] bg-black/60 px-2 py-0.5 text-[8px] font-black text-white">
+                                  <span className="line-clamp-1">{product.name}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Pagination Dots for Hero Slides */}
+                      {slides.length > 1 ? (
+                        <div className="flex justify-center gap-1.5 mt-3 mb-2">
+                          {slides.map((product, index) => (
+                            <button
+                              key={product._id}
+                              type="button"
+                              onClick={() => setActiveDot(index)}
+                              className={`h-1.5 rounded-full transition-all duration-200 cursor-pointer ${
+                                slideIndex === index ? 'bg-[#EA580C] w-3.5' : 'w-1.5 bg-[#E5E7EB]'
+                              }`}
+                              aria-label={`Show ${product.name}`}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {/* Horizontally Scrollable Product Row */}
+                  <div className="px-5 mb-4">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <h4 className="text-[14px] font-black text-[#111111] text-left">
+                        {activeCategory === 'stationery'
+                          ? 'Stationery Collection'
+                          : activeCategory === 'art-craft'
+                          ? 'Art & Craft Supplies'
+                          : activeCategory === 'handmade-gifts'
+                          ? 'Handmade Gifts'
+                          : 'All Supplies'}
+                      </h4>
+                      <span className="text-[11px] font-bold text-[#EA580C]">
+                        {displayedProducts.length} items
+                      </span>
+                    </div>
+                    <div className="flex gap-2.5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2">
+                      {displayedProducts.map(product => (
                         <button
                           key={product._id}
                           type="button"
-                          onClick={() => setActiveDot(index)}
-                          className={`h-1.5 rounded-full transition-all duration-200 ${
-                            slideIndex === index ? 'bg-[#EA580C] w-3.5' : 'w-1.5 bg-[#E5E7EB]'
+                          onClick={() => toggleProduct(product)}
+                          className={`group w-[136px] shrink-0 snap-start overflow-hidden rounded-[18px] bg-white border text-left transition-all duration-200 cursor-pointer ${
+                            selectedProduct?._id === product._id
+                              ? 'border-[#EA580C] ring-2 ring-[#EA580C] shadow-md'
+                              : 'border-slate-100 shadow-2xs hover:border-slate-300'
                           }`}
-                          aria-label={`Show ${product.name}`}
-                        />
+                        >
+                          <div className="relative h-[95px] w-full overflow-hidden bg-slate-100">
+                            <ProductPhoto src={product.imageUrl} alt={product.name} />
+                            {product.category && (
+                              <span className="absolute left-2 top-2 rounded-[5px] bg-black/60 px-1.5 py-0.5 text-[7px] font-black uppercase text-white tracking-wider backdrop-blur-xs">
+                                {product.category}
+                              </span>
+                            )}
+                          </div>
+                          <div className="p-2.5">
+                            <p className="text-[11px] font-black text-[#111111] leading-tight line-clamp-2">
+                              {product.name}
+                            </p>
+                            <p className="mt-1 text-[12.5px] font-black text-[#EA580C] leading-none">
+                              ₹{formatInr(product.price)}
+                            </p>
+                            <p className="mt-1 text-[8.5px] font-semibold text-[#6B7280] line-clamp-1">
+                              {product.description || product.category || 'Quality Supplies'}
+                            </p>
+                          </div>
+                        </button>
                       ))}
                     </div>
-                  ) : null}
-                </div>
+                  </div>
+                </>
               )}
-
-              {/* Horizontally Scrollable Product Row */}
-              <div className="px-5 mb-4">
-                <div className="flex items-center justify-between mb-2.5">
-                  <h4 className="text-[14px] font-black text-[#111111] text-left">
-                    {activeCategory === 'stationery'
-                      ? 'Stationery Collection'
-                      : activeCategory === 'art-craft'
-                      ? 'Art & Craft Supplies'
-                      : activeCategory === 'handmade-gifts'
-                      ? 'Handmade Gifts'
-                      : 'All Supplies'}
-                  </h4>
-                  <span className="text-[11px] font-bold text-[#EA580C]">
-                    {displayedProducts.length} items
-                  </span>
-                </div>
-                <div className="flex gap-2.5 overflow-x-auto scrollbar-none snap-x snap-mandatory pb-2">
-                  {displayedProducts.map(product => (
-                    <button
-                      key={product._id}
-                      type="button"
-                      onClick={() => toggleProduct(product)}
-                      className={`group w-[136px] shrink-0 snap-start overflow-hidden rounded-[18px] bg-white border text-left transition-all duration-200 cursor-pointer ${
-                        selectedProduct?._id === product._id
-                          ? 'border-[#EA580C] ring-2 ring-[#EA580C] shadow-md'
-                          : 'border-slate-100 shadow-2xs hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="relative h-[95px] w-full overflow-hidden bg-slate-100">
-                        <ProductPhoto src={product.imageUrl} alt={product.name} />
-                        {product.category && (
-                          <span className="absolute left-2 top-2 rounded-[5px] bg-black/60 px-1.5 py-0.5 text-[7px] font-black uppercase text-white tracking-wider backdrop-blur-xs">
-                            {product.category}
-                          </span>
-                        )}
-                      </div>
-                      <div className="p-2.5">
-                        <p className="text-[11px] font-black text-[#111111] leading-tight line-clamp-2">
-                          {product.name}
-                        </p>
-                        <p className="mt-1 text-[12.5px] font-black text-[#EA580C] leading-none">
-                          ₹{formatInr(product.price)}
-                        </p>
-                        <p className="mt-1 text-[8.5px] font-semibold text-[#6B7280] line-clamp-1">
-                          {product.description || product.category || 'Quality Supplies'}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               {/* Benefits Section */}
               <div className="grid grid-cols-3 divide-x divide-slate-100 border-t border-b border-slate-100 py-5 px-3 mb-5 mt-4">
@@ -612,7 +455,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                     <ShoppingBag className="h-5 w-5" strokeWidth={2} />
                   </div>
                   <h5 className="text-[12px] font-black text-[#111111] mt-2 leading-none">
-                    {displayedProducts.length > 0 ? `${displayedProducts.length} Items` : 'Products'}
+                    5k+
                   </h5>
                   <p className="mt-1 text-[9px] text-[#9CA3AF] font-bold leading-tight">
                     Everything you need in one place
@@ -625,59 +468,11 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                     <Grid className="h-5 w-5" strokeWidth={2} />
                   </div>
                   <h5 className="text-[12px] font-black text-[#111111] mt-2 leading-none">
-                    Artisan Made
+                    50+ (Categories)
                   </h5>
                   <p className="mt-1 text-[9px] text-[#9CA3AF] font-bold leading-tight">
                     Curated handmade gifts
                   </p>
-                </div>
-              </div>
-
-              {/* Trust Features Peach Strip */}
-              <div className="mx-5 p-3 rounded-[16px] bg-[#FFF7ED] border border-[#FFEDD5] flex items-center justify-between gap-1">
-                {/* Genuine Products */}
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[9px] font-extrabold text-[#111111] leading-tight text-left">
-                    <div>Genuine</div>
-                    <div className="text-[#EA580C]">Products</div>
-                  </div>
-                </div>
-
-                {/* Separator */}
-                <div className="h-6 w-[1px] bg-[#FFEDD5]" />
-
-                {/* Fast Delivery */}
-                <div className="flex items-center gap-1.5">
-                  <Truck className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[9px] font-extrabold text-[#111111] leading-tight text-left">
-                    <div>Fast</div>
-                    <div className="text-[#EA580C]">Delivery</div>
-                  </div>
-                </div>
-
-                {/* Separator */}
-                <div className="h-6 w-[1px] bg-[#FFEDD5]" />
-
-                {/* Easy Returns */}
-                <div className="flex items-center gap-1.5">
-                  <RotateCcw className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[9px] font-extrabold text-[#111111] leading-tight text-left">
-                    <div>Easy</div>
-                    <div className="text-[#EA580C]">Returns</div>
-                  </div>
-                </div>
-
-                {/* Separator */}
-                <div className="h-6 w-[1px] bg-[#FFEDD5]" />
-
-                {/* Secure Payments */}
-                <div className="flex items-center gap-1.5">
-                  <Lock className="h-4.5 w-4.5 text-[#EA580C] shrink-0" strokeWidth={2} />
-                  <div className="text-[9px] font-extrabold text-[#111111] leading-tight text-left">
-                    <div>Secure</div>
-                    <div className="text-[#EA580C]">Payments</div>
-                  </div>
                 </div>
               </div>
             </div>

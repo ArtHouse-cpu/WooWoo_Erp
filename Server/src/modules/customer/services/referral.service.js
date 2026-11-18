@@ -510,13 +510,49 @@ export const getReferralDashboard = async (customerId, appBaseUrl) => {
   );
   const referralCode = customer.referralCode;
   const shareUrl = `${base}/login?ref=${encodeURIComponent(referralCode)}`;
-  const shareMessage = `Join me on WOOWOO Art House! Use my invite code ${referralCode} and start your creative journey. ${shareUrl}`;
+
+  let discountText = 'Flat 10% OFF';
+  let discountValue = 10;
+  let discountType = 'percentage';
+
+  try {
+    const Coupon = (await import('../../../models/coupon.model.js')).default;
+    const couponDoc = referralCode
+      ? await Coupon.findOne({code: referralCode, isActive: true}).lean()
+      : null;
+
+    if (couponDoc && couponDoc.discountValue) {
+      discountValue = Number(couponDoc.discountValue);
+      discountType = couponDoc.discountType === 'flat' ? 'fixed' : 'percentage';
+      discountText =
+        discountType === 'fixed'
+          ? `Flat ₹${discountValue} OFF`
+          : `Flat ${discountValue}% OFF`;
+    } else if (settings?.referralCheckoutDiscount?.enabled !== false) {
+      discountValue = Number(settings?.referralCheckoutDiscount?.discountValue ?? 10);
+      discountType = settings?.referralCheckoutDiscount?.discountType || 'percentage';
+      discountText =
+        discountType === 'fixed'
+          ? `Flat ₹${discountValue} OFF`
+          : `Flat ${discountValue}% OFF`;
+    }
+  } catch (_e) {
+    // fallback
+  }
+
+  const shareMessage = `Join me on WOOWOO Art House! Use my invite code ${referralCode} to get (${discountText})! ${shareUrl}`;
 
   return {
     programEnabled: settings.isEnabled !== false,
     referralCode,
     shareUrl,
     shareMessage,
+    discount: {
+      enabled: true,
+      type: discountType,
+      value: discountValue,
+      displayText: discountText,
+    },
     inviteReward: {
       enabled: inviteRule.enabled !== false,
       type: inviteRule.commissionType || 'fixed',
