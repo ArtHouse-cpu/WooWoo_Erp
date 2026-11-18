@@ -401,6 +401,10 @@ export default function WalletPage() {
 
   const inviteEarnCard = (isFloating = false) => {
     if (!data) return null;
+
+    const discountRaw = data.referral?.discount?.displayText || 'Flat 10% OFF';
+    const discountLabel = discountRaw.startsWith('(') ? discountRaw : `(${discountRaw})`;
+
     return (
       <div
         className={`relative overflow-hidden rounded-[20px] sm:rounded-[24px] border border-[#FFE4D6] bg-gradient-to-r from-[#FFF5F1] via-[#FFF9F6] to-[#FFFBF9] p-4 sm:p-5 shadow-[0_8px_30px_rgba(234,88,12,0.06)] ${
@@ -409,41 +413,51 @@ export default function WalletPage() {
             : ''
         }`}
       >
-        {/* Compact Header with Gift Sticker at top-left */}
-        <div className="mb-3 flex items-center gap-2.5 sm:gap-3">
-          <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center">
-            <svg
-              className="h-9 w-9 sm:h-10 sm:w-10"
-              viewBox="0 0 100 100"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M15 25L18 28M85 30L82 33M20 75L23 72M78 80L81 77"
-                stroke="#F97316"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-              <circle cx="28" cy="20" r="2" fill="#2563EB" />
-              <circle cx="75" cy="22" r="3" fill="#EAB308" />
-              <circle cx="85" cy="70" r="2" fill="#EF4444" />
-              <circle cx="15" cy="65" r="3.5" fill="#22C55E" />
+        {/* Header with Gift Sticker at top-left & Discount Badge at top-right */}
+        <div className="mb-3 flex items-start sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center">
+              <svg
+                className="h-9 w-9 sm:h-10 sm:w-10"
+                viewBox="0 0 100 100"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M15 25L18 28M85 30L82 33M20 75L23 72M78 80L81 77"
+                  stroke="#F97316"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <circle cx="28" cy="20" r="2" fill="#2563EB" />
+                <circle cx="75" cy="22" r="3" fill="#EAB308" />
+                <circle cx="85" cy="70" r="2" fill="#EF4444" />
+                <circle cx="15" cy="65" r="3.5" fill="#22C55E" />
 
-              <g transform="translate(15, 25)">
-                <rect x="5" y="25" width="60" height="45" rx="4" fill="#FEF08A" stroke="#EA580C" strokeWidth="3" />
-                <rect x="0" y="15" width="70" height="12" rx="3" fill="#FDE047" stroke="#EA580C" strokeWidth="3" />
-                <rect x="30" y="25" width="10" height="45" fill="#EF4444" />
-                <rect x="30" y="15" width="10" height="12" fill="#EF4444" />
-                <path d="M35 15C25 5 15 5 25 15C35 25 35 15 35 15Z" fill="#EF4444" stroke="#D97706" strokeWidth="1" />
-                <path d="M35 15C45 5 55 5 45 15C35 25 35 15 35 15Z" fill="#EF4444" stroke="#D97706" strokeWidth="1" />
-              </g>
-            </svg>
+                <g transform="translate(15, 25)">
+                  <rect x="5" y="25" width="60" height="45" rx="4" fill="#FEF08A" stroke="#EA580C" strokeWidth="3" />
+                  <rect x="0" y="15" width="70" height="12" rx="3" fill="#FDE047" stroke="#EA580C" strokeWidth="3" />
+                  <rect x="30" y="25" width="10" height="45" fill="#EF4444" />
+                  <rect x="30" y="15" width="10" height="12" fill="#EF4444" />
+                  <path d="M35 15C25 5 15 5 25 15C35 25 35 15 35 15Z" fill="#EF4444" stroke="#D97706" strokeWidth="1" />
+                  <path d="M35 15C45 5 55 5 45 15C35 25 35 15 35 15Z" fill="#EF4444" stroke="#D97706" strokeWidth="1" />
+                </g>
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-[17px] sm:text-[18px] font-bold leading-tight text-[#EA580C]">Invite &amp; Earn</h3>
+              <p className="mt-0.5 text-[12px] sm:text-[13px] font-medium text-[#6B7280] truncate">
+                Invite friends and earn exciting rewards
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h3 className="text-[18px] font-bold leading-tight text-[#EA580C]">Invite &amp; Earn</h3>
-            <p className="mt-0.5 text-[13px] font-medium text-[#6B7280]">
-              Invite friends and earn exciting rewards
-            </p>
+
+          {/* Top-Right Discount Badge according to coupon/referral code */}
+          <div className="shrink-0 pt-0.5 sm:pt-0">
+            <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#F97316]/60 bg-[#FFF2EA] px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-black tracking-tight text-[#EA580C] shadow-2xs">
+              <Percent className="h-3 w-3 text-[#EA580C]" strokeWidth={2.5} />
+              <span>{discountLabel}</span>
+            </span>
           </div>
         </div>
 
@@ -494,7 +508,7 @@ export default function WalletPage() {
         <button
           type="button"
           onClick={() => void onInvite()}
-          className="mt-4 flex h-[48px] w-full cursor-pointer items-center justify-center rounded-[12px] bg-gradient-to-r from-[#EA580C] to-[#F97316] text-center text-[13px] font-extrabold text-white shadow-[0_4px_12px_rgba(234,88,12,0.2)] transition hover:opacity-95 active:scale-[0.99]"
+          className="mt-3.5 flex h-[48px] w-full cursor-pointer items-center justify-center rounded-[12px] bg-gradient-to-r from-[#EA580C] to-[#F97316] text-center text-[13px] font-extrabold text-white shadow-[0_4px_12px_rgba(234,88,12,0.2)] transition hover:opacity-95 active:scale-[0.99]"
         >
           Invite
         </button>
@@ -528,48 +542,73 @@ export default function WalletPage() {
 
     return (
       <div className="space-y-6">
-        {/* 1. Main Wallet Balance Card */}
-        <div className="relative overflow-hidden rounded-[20px] sm:rounded-[24px] bg-[#0A0F1D] p-4 sm:p-5 text-white shadow-xl">
-          <div className="relative flex flex-row items-center justify-between gap-3 sm:gap-6">
-            <div className="min-w-0 space-y-0.5 sm:space-y-1">
-              <p className="text-[11px] font-semibold tracking-wider text-slate-400">Balance</p>
-              <h2 className="text-[26px] sm:text-[32px] font-black leading-none tracking-tight">
-                {formatInr(data.balances.totalAvailable)}
-              </h2>
-              <p className="pt-0.5 text-[10.5px] sm:text-[11.5px] font-medium text-slate-400 leading-tight">
-                Withdrawable {formatInr(data.balances.withdrawable)} · Non-withdrawable{' '}
-                {formatInr(data.balances.nonWithdrawable ?? 0)}
-              </p>
+        {/* 1. Main Wallet Balance Section */}
+        <div className="space-y-2.5">
+          <div className="relative overflow-hidden rounded-[20px] sm:rounded-[24px] bg-[#0A0F1D] p-4 sm:p-5 text-white shadow-xl">
+            <div className="relative flex flex-row items-center justify-between gap-3 sm:gap-6">
+              <div className="min-w-0 space-y-0.5 sm:space-y-1">
+                <p className="text-[11px] font-semibold tracking-wider text-slate-400">Balance</p>
+                <h2 className="text-[26px] sm:text-[32px] font-black leading-none tracking-tight">
+                  {formatInr(data.balances.totalAvailable)}
+                </h2>
+              </div>
+
+              {/* Action buttons - strictly aligned on same height and level */}
+              <div className="flex items-start gap-3.5 sm:gap-5 shrink-0">
+                <div className="flex flex-col items-center">
+                  <button
+                    type="button"
+                    onClick={() => void onWithdraw()}
+                    className="flex h-10 w-10 sm:h-11 sm:w-11 cursor-pointer items-center justify-center rounded-full bg-[#EA580C] text-white shadow-[0_4px_16px_rgba(234,88,12,0.35)] transition hover:scale-105 hover:bg-[#F97316] active:scale-95"
+                    aria-label="Withdraw"
+                  >
+                    <ArrowUp className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={2.5} />
+                  </button>
+                  <span className="mt-1.5 text-[10px] sm:text-[11px] font-semibold text-slate-300 whitespace-nowrap text-center">
+                    Withdraw
+                  </span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <button
+                    type="button"
+                    onClick={() => void onAddMoney()}
+                    className="flex h-10 w-10 sm:h-11 sm:w-11 cursor-pointer items-center justify-center rounded-full border border-slate-100 bg-white text-[#111111] shadow-[0_4px_16px_rgba(255,255,255,0.05)] transition hover:scale-105 hover:bg-slate-50 active:scale-95"
+                    aria-label="Add Money"
+                  >
+                    <Plus className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={2.5} />
+                  </button>
+                  <span className="mt-1.5 text-[10px] sm:text-[11px] font-semibold text-slate-300 whitespace-nowrap text-center">
+                    Add Money
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Withdrawable / Non-withdrawable breakdown pills */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="flex items-center justify-between gap-1.5 rounded-[18px] border border-[#E5DEF4] bg-[#F4EEFD] px-3 sm:px-4 py-2 sm:py-2.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <Wallet className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-[#451B89] shrink-0" strokeWidth={2.2} />
+                <span className="text-[10.5px] sm:text-xs font-semibold text-[#1E1338] truncate">
+                  Withdrawable
+                </span>
+              </div>
+              <span className="text-xs sm:text-sm font-black text-[#0F0A2A] shrink-0">
+                {formatInr(data.balances.withdrawable)}
+              </span>
             </div>
 
-            {/* Action buttons - strictly aligned on same height and level */}
-            <div className="flex items-start gap-3.5 sm:gap-5 shrink-0">
-              <div className="flex flex-col items-center">
-                <button
-                  type="button"
-                  onClick={() => void onWithdraw()}
-                  className="flex h-10 w-10 sm:h-11 sm:w-11 cursor-pointer items-center justify-center rounded-full bg-[#EA580C] text-white shadow-[0_4px_16px_rgba(234,88,12,0.35)] transition hover:scale-105 hover:bg-[#F97316] active:scale-95"
-                  aria-label="Withdraw"
-                >
-                  <ArrowUp className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={2.5} />
-                </button>
-                <span className="mt-1.5 text-[10px] sm:text-[11px] font-semibold text-slate-300 whitespace-nowrap text-center">
-                  Withdraw
+            <div className="flex items-center justify-between gap-1.5 rounded-[18px] border border-[#E5DEF4] bg-[#F4EEFD] px-3 sm:px-4 py-2 sm:py-2.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <Gift className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-[#451B89] shrink-0" strokeWidth={2.2} />
+                <span className="text-[10.5px] sm:text-xs font-semibold text-[#1E1338] truncate">
+                  Non-withdrawable
                 </span>
               </div>
-              <div className="flex flex-col items-center">
-                <button
-                  type="button"
-                  onClick={() => void onAddMoney()}
-                  className="flex h-10 w-10 sm:h-11 sm:w-11 cursor-pointer items-center justify-center rounded-full border border-slate-100 bg-white text-[#111111] shadow-[0_4px_16px_rgba(255,255,255,0.05)] transition hover:scale-105 hover:bg-slate-50 active:scale-95"
-                  aria-label="Add Money"
-                >
-                  <Plus className="h-4.5 w-4.5 sm:h-5 sm:w-5" strokeWidth={2.5} />
-                </button>
-                <span className="mt-1.5 text-[10px] sm:text-[11px] font-semibold text-slate-300 whitespace-nowrap text-center">
-                  Add Money
-                </span>
-              </div>
+              <span className="text-xs sm:text-sm font-black text-[#0F0A2A] shrink-0">
+                {formatInr(data.balances.nonWithdrawable ?? 0)}
+              </span>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   ArrowRight,
@@ -464,21 +464,28 @@ function InsightsTab({ customer }: { customer: any }) {
 export default function MembershipOnboardingPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const requestedPlan = (searchParams.get("plan") || searchParams.get("selected") || "").trim().toLowerCase();
+  const showBenefitsParam = searchParams.get("benefits") === "true";
+
   const customer = useAuthStore((s) => s.customer);
   const setCustomer = useAuthStore((s) => s.setCustomer);
   const [plans, setPlans] = useState<MembershipPlan[]>(
     FALLBACK_MEMBERSHIP_PLANS,
   );
-  const [selected, setSelected] = useState<MembershipPlanId>("general");
+  const [selected, setSelected] = useState<MembershipPlanId>(() => {
+    return requestedPlan || "general";
+  });
   const [menuOpen, setMenuOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [benefitsOpen, setBenefitsOpen] = useState(false);
+  const [benefitsOpen, setBenefitsOpen] = useState(() => showBenefitsParam);
   const [loading, setLoading] = useState(false);
   const [loadingPlans, setLoadingPlans] = useState(true);
 
   const isOnboarding = location.pathname.startsWith("/onboarding");
 
   const [activeTab, setActiveTab] = useState<"plans" | "insights">(() => {
+    if (requestedPlan) return "plans";
     if (isOnboarding) return "plans";
     return customer?.membershipType && customer.membershipType !== "none"
       ? "insights"
@@ -496,11 +503,18 @@ export default function MembershipOnboardingPage() {
           : [];
         if (apiPlans.length > 0) {
           setPlans(apiPlans);
-          const current = String(customer?.membershipType || "").trim().toLowerCase();
-          const owned = apiPlans.find(
-            (plan) => plan.id.trim().toLowerCase() === current,
-          );
-          setSelected(owned?.id || apiPlans[0].id);
+          if (requestedPlan && apiPlans.some((p) => p.id.toLowerCase() === requestedPlan)) {
+            const matched = apiPlans.find((p) => p.id.toLowerCase() === requestedPlan)!;
+            setSelected(matched.id);
+            setActiveTab("plans");
+            if (showBenefitsParam) setBenefitsOpen(true);
+          } else {
+            const current = String(customer?.membershipType || "").trim().toLowerCase();
+            const owned = apiPlans.find(
+              (plan) => plan.id.trim().toLowerCase() === current,
+            );
+            setSelected(owned?.id || apiPlans[0].id);
+          }
         }
       })
       .catch(() => {

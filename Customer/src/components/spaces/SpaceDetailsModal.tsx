@@ -5,7 +5,7 @@ import {
   Share2,
   Info,
   Sparkles,
-  MessageSquare,
+  // MessageSquare,
   Calendar,
   Clock,
   Users,
@@ -302,7 +302,6 @@ export function SpaceDetailsModal({
   const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [termsActiveTab, setTermsActiveTab] = useState<'disclaimer' | 'guidelines' | 'tcs'>('disclaimer');
-  const [showMorePurposes, setShowMorePurposes] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const timePickerRef = useRef<HTMLDivElement | null>(null);
 
@@ -476,6 +475,7 @@ export function SpaceDetailsModal({
   }, [space]);
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>('day');
+  const [selectedPriceType, setSelectedPriceType] = useState<'regular' | 'membership'>('membership');
   const [bookingPassOverride, setBookingPassOverride] = useState<SpaceCard | null>(null);
 
   useEffect(() => {
@@ -492,6 +492,7 @@ export function SpaceDetailsModal({
     } else {
       setSelectedPlanId('day');
     }
+    setSelectedPriceType('membership');
     setBookingPassOverride(null);
   }, [space]);
 
@@ -988,8 +989,8 @@ export function SpaceDetailsModal({
           </div>
         </div>
 
-        {/* Tab navigation: Info, Highlights, Feedback */}
-        <div className="grid grid-cols-3 shrink-0 px-5 pt-3 pb-2 text-xs sm:text-sm font-bold gap-2">
+        {/* Tab navigation: Info, Highlights (Feedback temporarily commented out) */}
+        <div className="grid grid-cols-2 shrink-0 px-5 pt-3 pb-2 text-xs sm:text-sm font-bold gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('info')}
@@ -1014,6 +1015,7 @@ export function SpaceDetailsModal({
             <Sparkles size={16} />
             <span>Highlights</span>
           </button>
+          {/* Temporarily hidden: Feedback tab
           <button
             type="button"
             onClick={() => setActiveTab('feedback')}
@@ -1026,6 +1028,7 @@ export function SpaceDetailsModal({
             <MessageSquare size={16} />
             <span>Feedback</span>
           </button>
+          */}
         </div>
 
         {/* Modal Scrollable Content */}
@@ -1187,12 +1190,12 @@ export function SpaceDetailsModal({
                     </h4>
                     <div className="rounded-2xl border border-purple-100 bg-white overflow-hidden shadow-xs">
                       {/* Table Header */}
-                      <div className="flex items-center justify-between bg-[#F8FAFC] border-b border-slate-100 px-3 sm:px-4 py-2.5 text-[11px] sm:text-xs font-bold text-slate-500">
+                      <div className="flex items-center justify-between bg-[#F8FAFC] border-b border-slate-100 px-3 sm:px-4 py-2.5 text-[10px] sm:text-xs font-bold text-slate-500">
                         <span className="font-extrabold text-slate-700">Plan</span>
-                        <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
-                          <span className="text-right w-16 sm:w-20 text-slate-600">Regular</span>
-                          <div className="h-3.5 w-px bg-slate-300 shrink-0" />
-                          <span className="text-right min-w-[90px] sm:min-w-[110px] flex items-center justify-end gap-1 text-amber-800">
+                        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                          <span className="text-center w-[74px] sm:w-24 text-slate-600 font-extrabold">Regular</span>
+                          <div className="h-3.5 w-px bg-slate-200 shrink-0" />
+                          <span className="text-center w-[104px] sm:w-34 flex items-center justify-center gap-1 text-amber-800 font-extrabold">
                             <Crown size={12} className="text-amber-600 fill-amber-600 shrink-0" />
                             <span>Membership Price</span>
                           </span>
@@ -1202,7 +1205,10 @@ export function SpaceDetailsModal({
                       {/* Plans List */}
                       <div className="divide-y divide-purple-50/80">
                         {COWORKING_PLANS.map(plan => {
-                          const isSelected = selectedPlanId === plan.id;
+                          const isPlanActive = selectedPlanId === plan.id;
+                          const isRegularSelected = isPlanActive && selectedPriceType === 'regular';
+                          const isMemberSelected = isPlanActive && selectedPriceType === 'membership';
+
                           return (
                             <div
                               key={plan.id}
@@ -1210,49 +1216,94 @@ export function SpaceDetailsModal({
                                 setSelectedPlanId(plan.id);
                               }}
                               className={`flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 transition cursor-pointer select-none ${
-                                isSelected ? 'bg-[#FAF5FF]' : 'hover:bg-slate-50'
+                                isPlanActive
+                                  ? 'bg-[#FAF5FF] border-l-4 border-l-[#7C3AED]'
+                                  : 'hover:bg-slate-50 border-l-4 border-l-transparent'
                               }`}
                             >
-                              {/* Plan Name with Radio */}
-                              <div className="flex items-center gap-2 min-w-0 pr-2">
-                                <div
-                                  className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                    isSelected
-                                      ? 'border-[#7C3AED] bg-white'
-                                      : 'border-slate-300 bg-white'
-                                  }`}
-                                >
-                                  {isSelected && (
-                                    <div className="h-2 w-2 rounded-full bg-[#7C3AED]" />
-                                  )}
-                                </div>
+                              {/* Plan Name */}
+                              <div className="min-w-0 pr-2 flex-1">
                                 <span
-                                  className={`text-xs sm:text-sm font-bold truncate ${
-                                    isSelected ? 'text-[#7C3AED] font-extrabold' : 'text-[#111111]'
+                                  className={`text-xs sm:text-sm truncate block ${
+                                    isPlanActive ? 'text-[#7C3AED] font-black' : 'text-[#111111] font-bold'
                                   }`}
                                 >
                                   {plan.name}
                                 </span>
                               </div>
 
-                              {/* Prices Divided by Line */}
-                              <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
-                                {/* Regular Price */}
-                                <div className="text-right w-16 sm:w-20">
-                                  <span className="font-display font-black text-xs sm:text-sm text-slate-800">
+                              {/* Prices with Selectable Bullets */}
+                              <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+                                {/* Regular Price with Bullet */}
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setSelectedPlanId(plan.id);
+                                    setSelectedPriceType('regular');
+                                  }}
+                                  className={`flex items-center justify-center gap-1.5 w-[74px] sm:w-24 py-1 px-1 rounded-xl transition cursor-pointer select-none ${
+                                    isRegularSelected
+                                      ? 'bg-purple-100/70 text-[#7C3AED]'
+                                      : 'hover:bg-slate-100/80 text-slate-800'
+                                  }`}
+                                >
+                                  <div
+                                    className={`h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                      isRegularSelected
+                                        ? 'border-[#7C3AED] bg-white'
+                                        : 'border-slate-300 bg-white'
+                                    }`}
+                                  >
+                                    {isRegularSelected && (
+                                      <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-[#7C3AED]" />
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`font-display font-black text-xs sm:text-sm ${
+                                      isRegularSelected ? 'text-[#7C3AED]' : 'text-slate-800'
+                                    }`}
+                                  >
                                     ₹{formatInr(plan.regularPrice)}
                                   </span>
-                                </div>
+                                </button>
 
                                 {/* Dividing Line */}
                                 <div className="h-4 sm:h-5 w-px bg-slate-200 shrink-0" />
 
-                                {/* Member Price */}
-                                <div className="text-right min-w-[90px] sm:min-w-[110px]">
-                                  <span className="font-display font-black text-xs sm:text-sm text-[#854D0E]">
+                                {/* Member Price with Bullet */}
+                                <button
+                                  type="button"
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setSelectedPlanId(plan.id);
+                                    setSelectedPriceType('membership');
+                                  }}
+                                  className={`flex items-center justify-center gap-1.5 w-[104px] sm:w-34 py-1 px-1 rounded-xl transition cursor-pointer select-none ${
+                                    isMemberSelected
+                                      ? 'bg-purple-100/70 text-[#7C3AED]'
+                                      : 'hover:bg-amber-50/70 text-[#854D0E]'
+                                  }`}
+                                >
+                                  <div
+                                    className={`h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                      isMemberSelected
+                                        ? 'border-[#7C3AED] bg-white'
+                                        : 'border-slate-300 bg-white'
+                                    }`}
+                                  >
+                                    {isMemberSelected && (
+                                      <div className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-[#7C3AED]" />
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`font-display font-black text-xs sm:text-sm ${
+                                      isMemberSelected ? 'text-[#7C3AED]' : 'text-[#854D0E]'
+                                    }`}
+                                  >
                                     ₹{formatInr(plan.memberPrice)}
                                   </span>
-                                </div>
+                                </button>
                               </div>
                             </div>
                           );
@@ -1269,7 +1320,10 @@ export function SpaceDetailsModal({
                         </div>
                         <button
                           type="button"
-                          onClick={() => setIsDiscountsOpen(true)}
+                          onClick={() => {
+                            onClose();
+                            navigate('/membership?plan=premium&benefits=true');
+                          }}
                           className="inline-flex items-center gap-0.5 rounded-full border border-purple-300 bg-white px-2 py-0.5 text-[9.5px] sm:text-[10.5px] font-bold text-[#7C3AED] hover:bg-purple-50 transition shrink-0 cursor-pointer"
                         >
                           <span>Benefits</span>
@@ -1281,27 +1335,43 @@ export function SpaceDetailsModal({
                 </>
               ) : (
                 <>
-                  {/* 4 Metric KPI Cards (Green Theme) */}
-              <div className="rounded-2xl border border-[#DCFCE7] bg-[#F0FDF4]/70 p-3 sm:p-3.5 grid grid-cols-4 divide-x divide-emerald-200/60 text-center">
-                <div className="flex flex-col items-center justify-center px-1">
-                  <Calendar className="h-5 w-5 text-emerald-600 mb-1" />
-                  <span className="text-base sm:text-lg font-black text-[#111111] leading-tight">50+</span>
-                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-600 mt-0.5">Bookings</span>
+                  {/* 4 Metric KPI Cards (Green Theme Matching Reference) */}
+              <div className="rounded-[22px] sm:rounded-[26px] border border-[#D5ECD8] bg-[#F7FCF9] p-3 sm:p-4 grid grid-cols-4 divide-x divide-[#E5EFE7] shadow-3xs">
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 px-1 sm:px-2">
+                  <div className="flex h-8 w-8 sm:h-9.5 sm:w-9.5 shrink-0 items-center justify-center rounded-[11px] sm:rounded-[13px] bg-[#E8F8ED] text-[#15803D]">
+                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <span className="block text-xs sm:text-[15px] font-black tracking-tight text-[#111827] leading-tight">50+</span>
+                    <span className="block text-[8.5px] sm:text-[11px] font-semibold text-[#475569] leading-tight mt-0.5">Bookings</span>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center justify-center px-1">
-                  <Clock className="h-5 w-5 text-emerald-600 mb-1" />
-                  <span className="text-base sm:text-lg font-black text-[#111111] leading-tight">1.5K+</span>
-                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-600 mt-0.5">Hours Booked</span>
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 px-1 sm:px-2">
+                  <div className="flex h-8 w-8 sm:h-9.5 sm:w-9.5 shrink-0 items-center justify-center rounded-[11px] sm:rounded-[13px] bg-[#E8F8ED] text-[#15803D]">
+                    <Clock className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <span className="block text-xs sm:text-[15px] font-black tracking-tight text-[#111827] leading-tight">1.5K+</span>
+                    <span className="block text-[8.5px] sm:text-[11px] font-semibold text-[#475569] leading-tight mt-0.5">Hours Booked</span>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center justify-center px-1">
-                  <Users className="h-5 w-5 text-emerald-600 mb-1" />
-                  <span className="text-base sm:text-lg font-black text-[#111111] leading-tight">5K+</span>
-                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-600 mt-0.5">People Served</span>
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 px-1 sm:px-2">
+                  <div className="flex h-8 w-8 sm:h-9.5 sm:w-9.5 shrink-0 items-center justify-center rounded-[11px] sm:rounded-[13px] bg-[#E8F8ED] text-[#15803D]">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <span className="block text-xs sm:text-[15px] font-black tracking-tight text-[#111827] leading-tight">5K+</span>
+                    <span className="block text-[8.5px] sm:text-[11px] font-semibold text-[#475569] leading-tight mt-0.5">People Served</span>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center justify-center px-1">
-                  <RefreshCw className="h-5 w-5 text-emerald-600 mb-1" />
-                  <span className="text-base sm:text-lg font-black text-[#111111] leading-tight">30%+</span>
-                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-600 mt-0.5">Repeat Bookings</span>
+                <div className="flex items-center justify-center gap-1.5 sm:gap-2.5 px-1 sm:px-2">
+                  <div className="flex h-8 w-8 sm:h-9.5 sm:w-9.5 shrink-0 items-center justify-center rounded-[11px] sm:rounded-[13px] bg-[#E8F8ED] text-[#15803D]">
+                    <RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <span className="block text-xs sm:text-[15px] font-black tracking-tight text-[#111827] leading-tight">30%+</span>
+                    <span className="block text-[8.5px] sm:text-[11px] font-semibold text-[#475569] leading-tight mt-0.5">Repeat Bookings</span>
+                  </div>
                 </div>
               </div>
 
@@ -1426,73 +1496,54 @@ export function SpaceDetailsModal({
               {/* Best For Section */}
               <div className="space-y-2">
                 <h4 className="font-extrabold text-sm sm:text-base text-[#111111]">Best For</h4>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
-                    <PartyPopper size={14} className="text-[#6344E7]" />
-                    Parties
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
-                    <Drama size={14} className="text-[#6344E7]" />
-                    Shows
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
-                    <Users size={14} className="text-[#6344E7]" />
-                    Meetings
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
-                    <GraduationCap size={14} className="text-[#6344E7]" />
-                    Workshops
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
-                    <Mic size={14} className="text-[#6344E7]" />
-                    Podcasts
-                  </span>
-                  {showMorePurposes && (
-                    <>
-                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
-                        <Clapperboard size={14} className="text-[#6344E7]" />
-                        Photo & Film Shoots
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {[
+                    {label: 'Parties', icon: PartyPopper},
+                    {label: 'Shows', icon: Drama},
+                    {label: 'Meetings', icon: Users},
+                    {label: 'Workshops', icon: GraduationCap},
+                    {label: 'Podcasts', icon: Mic},
+                    {label: 'Photo & Film Shoots', icon: Clapperboard},
+                    {label: 'Art Exhibitions', icon: Sparkles},
+                  ].map((item, idx) => {
+                    const Icon = item.icon;
+                    return (
+                      <span
+                        key={idx}
+                        className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]"
+                      >
+                        <Icon size={14} className="text-[#6344E7] shrink-0" />
+                        <span>{item.label}</span>
                       </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50/50 px-3 py-1.5 text-xs font-bold text-[#6344E7]">
-                        <Sparkles size={14} className="text-[#6344E7]" />
-                        Art Exhibitions
-                      </span>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowMorePurposes(v => !v)}
-                    className="inline-flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-bold text-[#6344E7] hover:bg-purple-50 transition cursor-pointer"
-                  >
-                    {showMorePurposes ? 'Show Less' : '+ More'}
-                  </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* Amenities Section */}
               <div className="space-y-2">
                 <h4 className="font-extrabold text-sm sm:text-base text-[#111111]">Amenities</h4>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
-                    <Wifi size={14} className="text-slate-600" />
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                    <Wifi size={14} className="text-slate-600 shrink-0" />
                     <span>WiFi</span>
                     <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-700">FREE</span>
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
-                    <Volume2 size={14} className="text-slate-600" />
+                  <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                    <Volume2 size={14} className="text-slate-600 shrink-0" />
                     <span>Speaker</span>
                     <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-700">FREE</span>
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
-                    <AirVent size={14} className="text-slate-600" />
+                  <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                    <AirVent size={14} className="text-slate-600 shrink-0" />
                     <span>Air Conditioned</span>
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
-                    <Projector size={14} className="text-slate-600" />
+                  <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                    <Projector size={14} className="text-slate-600 shrink-0" />
                     <span>Projector</span>
                   </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
-                    <Armchair size={14} className="text-slate-600" />
+                  <span className="inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-3xs">
+                    <Armchair size={14} className="text-slate-600 shrink-0" />
                     <span>Flexible Setup</span>
                   </span>
                 </div>
@@ -1941,7 +1992,8 @@ export function SpaceDetailsModal({
             </div>
           )}
 
-          {activeTab === 'feedback' && (
+          {/* Feedback section temporarily hidden */}
+          {/* activeTab === 'feedback' */ false && activeTab === 'feedback' && (
             <div className="space-y-4 py-1 text-left">
               {/* Header: Title, subtitle, and + Add Feedback button */}
               <div className="flex items-center justify-between gap-3">
