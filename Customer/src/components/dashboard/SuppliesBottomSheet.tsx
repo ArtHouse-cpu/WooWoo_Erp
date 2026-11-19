@@ -20,6 +20,7 @@ import {
   fetchCustomerProducts,
   type CustomerProduct,
 } from '../../services/product.service';
+import {ProductEnquiry} from '../supplies/ProductEnquiry';
 
 const SUPPLIES_WHATSAPP = '918073988123';
 
@@ -91,6 +92,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
   const [apiProducts, setApiProducts] = useState<CustomerProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<CustomerProduct | null>(null);
+  const [detailProduct, setDetailProduct] = useState<CustomerProduct | null>(null);
 
   const categoryPills: {id: SupplyCategory; label: string; icon: any}[] = [
     {id: 'all', label: 'All Supplies', icon: Sparkles},
@@ -102,6 +104,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
   useEffect(() => {
     if (isOpen) return;
     setSelectedProduct(null);
+    setDetailProduct(null);
     setActiveDot(0);
     setActiveCategory('all');
   }, [isOpen]);
@@ -176,13 +179,9 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
     return allProducts;
   }, [allProducts, activeCategory]);
 
-  const toggleProduct = (product: CustomerProduct) => {
-    setActiveDot(0);
-    if (selectedProduct?._id === product._id) {
-      setSelectedProduct(null);
-      return;
-    }
+  const openProduct = (product: CustomerProduct) => {
     setSelectedProduct(product);
+    setDetailProduct(product);
   };
 
   const slides = displayedProducts.slice(0, 8);
@@ -313,7 +312,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                         {/* Featured big photo card */}
                         <button
                           type="button"
-                          onClick={() => toggleProduct(featured)}
+                          onClick={() => openProduct(featured)}
                           className={`group relative h-[250px] overflow-hidden rounded-[20px] border text-left shadow-xs transition-all cursor-pointer ${
                             sideProducts.length ? '' : 'col-span-2'
                           } ${
@@ -343,7 +342,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                               <button
                                 key={product._id}
                                 type="button"
-                                onClick={() => toggleProduct(product)}
+                                onClick={() => openProduct(product)}
                                 className={`group relative h-[119px] overflow-hidden rounded-[16px] border text-left transition-all cursor-pointer ${
                                   selectedProduct?._id === product._id
                                     ? 'border-[#EA580C] ring-2 ring-[#EA580C]'
@@ -401,7 +400,7 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
                         <button
                           key={product._id}
                           type="button"
-                          onClick={() => toggleProduct(product)}
+                          onClick={() => openProduct(product)}
                           className={`group w-[136px] shrink-0 snap-start overflow-hidden rounded-[18px] bg-white border text-left transition-all duration-200 cursor-pointer ${
                             selectedProduct?._id === product._id
                               ? 'border-[#EA580C] ring-2 ring-[#EA580C] shadow-md'
@@ -512,6 +511,71 @@ export function SuppliesBottomSheet({isOpen, onClose}: SuppliesBottomSheetProps)
           </motion.div>
         </div>
       )}
+
+      {isOpen && detailProduct ? (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center">
+          <button
+            type="button"
+            aria-label="Close product"
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setDetailProduct(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="supply-product-title"
+            className="relative z-10 flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[32px] bg-white shadow-2xl"
+          >
+            <div className="flex shrink-0 justify-center py-3">
+              <div className="h-1.5 w-12 rounded-full bg-[#E5E7EB]" />
+            </div>
+            <div className="flex shrink-0 items-center justify-between px-5 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-[#F3E8FF] text-[#7C3AED]">
+                  <ShoppingBag className="h-5 w-5" strokeWidth={2} />
+                </div>
+                <h3 className="text-[19px] font-extrabold tracking-tight text-[#111111]">Supplies</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailProduct(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-[#4B5563]"
+                aria-label="Close product details"
+              >
+                <X className="h-4.5 w-4.5" strokeWidth={2.5} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
+              <div className="overflow-hidden rounded-[22px] bg-slate-100">
+                <div className="aspect-[4/3]">
+                  <ProductPhoto
+                    src={detailProduct.imageUrl || detailProduct.images[0]}
+                    alt={detailProduct.name}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </div>
+              <h2 id="supply-product-title" className="mt-4 text-[22px] font-black leading-tight text-[#111111]">
+                {detailProduct.name}
+              </h2>
+              <p className="mt-1 text-[26px] font-black tracking-tight text-[#111111]">
+                ₹{formatInr(detailProduct.price)}
+              </p>
+              <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#F3E8FF] px-3 py-1 text-xs font-bold text-[#7C3AED]">
+                <Package className="h-3.5 w-3.5" />
+                {detailProduct.category || detailProduct.subCategory || 'Craft Supplies'}
+              </span>
+              <p className="mt-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Description</p>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                {detailProduct.description || 'Details for this supply will be shared when you enquire.'}
+              </p>
+              <div className="mt-5">
+                <ProductEnquiry product={detailProduct} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AnimatePresence>
   );
 }
