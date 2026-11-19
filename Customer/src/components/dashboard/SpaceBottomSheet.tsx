@@ -25,6 +25,7 @@ import {
 } from '../../services/space.service';
 import {SpaceDetailsModal, type SpaceDetailsModalState} from '../spaces/SpaceDetailsModal';
 import {SpaceQueryModal} from './SpaceQueryModal';
+import {SPACE_WHATSAPP} from '../spaces/spaceActions';
 
 function SpacePhoto({
   src,
@@ -465,10 +466,13 @@ export function SpaceBottomSheet({isOpen, onClose}: SpaceBottomSheetProps) {
                     <span>Explore Plans</span>
                   </button>
 
-                  {/* Query Now - Opens Space Lead Form without selecting specific space */}
+                  {/* Query Now - Opens WhatsApp with prefilled text for Coworking */}
                   <button
                     type="button"
-                    onClick={() => setIsQueryModalOpen(true)}
+                    onClick={() => {
+                      const waUrl = `https://wa.me/${SPACE_WHATSAPP}?text=${encodeURIComponent('I need co-working space')}`;
+                      window.open(waUrl, '_blank', 'noopener,noreferrer');
+                    }}
                     className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
                   >
                     <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />

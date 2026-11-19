@@ -332,7 +332,7 @@ export function CoworkingBookingModal({
       `💻 *Plan:* CoWorking Plan - ${currentPlan.subtitle}`,
       `📅 *Membership Period:* ${startsOnStr} – ${expiresOnStr}`,
       `📅 *CoWorking Period:* ${startsOnStr} – ${coworkingEndStr}`,
-      `☕ *Complimentary Drink:* ${preferredDrink}`,
+      `☕ *Free Drink:* ${preferredDrink}`,
       `----------------------------------`,
       `💳 *Amount Paid:* ₹${formatInr(finalPayable)}`,
       `🎉 *Total Savings:* ₹${formatInr(totalSavings)}`,
@@ -376,7 +376,7 @@ export function CoworkingBookingModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-t-[32px] sm:rounded-[32px] bg-white p-5 sm:p-6 shadow-2xl text-left animate-in fade-in slide-in-from-bottom duration-200 overflow-y-auto max-h-[94vh] sm:max-h-[90vh] space-y-4"
+        className="w-full max-w-lg rounded-t-[28px] sm:rounded-[28px] bg-white p-3.5 sm:p-4 shadow-2xl text-left animate-in fade-in slide-in-from-bottom duration-200 overflow-y-auto max-h-[96vh] space-y-2 sm:space-y-2.5"
         onClick={e => e.stopPropagation()}
       >
         {/* Top drag handle indicator on mobile */}
@@ -386,15 +386,15 @@ export function CoworkingBookingModal({
           <>
             {/* Modal Header */}
             <div className="flex items-center justify-between gap-3 pb-0.5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-[#F6F2FF] border border-purple-100 text-[#6344E7] shrink-0">
-                  <CalendarCheck className="h-6 w-6 stroke-[2.2]" />
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-[#F6F2FF] border border-purple-100 text-[#6344E7] shrink-0">
+                  <CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5 stroke-[2.2]" />
                 </div>
                 <div>
-                  <h3 className="font-display text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                  <h3 className="font-display text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
                     Complete Your Booking
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
                     Review your plans, dates and preferences to continue.
                   </p>
                 </div>
@@ -402,138 +402,139 @@ export function CoworkingBookingModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F3F4F6] text-slate-500 hover:bg-slate-200 transition cursor-pointer shrink-0"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F3F4F6] text-slate-500 hover:bg-slate-200 transition cursor-pointer shrink-0"
                 aria-label="Close booking modal"
               >
-                <X size={18} />
+                <X size={15} />
               </button>
             </div>
 
             {/* Top Combined Plan Banner */}
-            <div className="rounded-2xl border border-purple-200/90 bg-[#FAF7FF] p-4 flex items-center justify-between gap-3 shadow-2xs">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FEF3C7] text-[#D97706] shrink-0 shadow-2xs">
-                  <Crown className="h-5 w-5 fill-[#D97706] stroke-[2]" />
+            <div className="rounded-xl border border-purple-200/90 bg-[#FAF7FF] px-3 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FEF3C7] text-[#D97706] shrink-0 shadow-2xs">
+                  <Crown className="h-3.5 w-3.5 fill-[#D97706] stroke-[2]" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-black leading-snug text-[#3B0764]">Premium</div>
-                  <div className="text-sm font-black leading-snug text-[#3B0764]">Membership</div>
+                  <div className="text-xs font-black leading-tight text-[#3B0764]">Premium Membership</div>
+                  <div className="text-[10px] font-semibold text-slate-500 leading-none">365 Days Access</div>
                 </div>
               </div>
 
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#7C3AED] text-white shadow-xs">
-                <Plus size={16} strokeWidth={3} />
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#7C3AED] text-white shadow-2xs">
+                <Plus size={11} strokeWidth={3} />
               </div>
 
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FEF3C7] text-[#B45309] shrink-0 shadow-2xs">
-                  <Laptop className="h-5 w-5 stroke-[2.2]" />
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FEF3C7] text-[#B45309] shrink-0 shadow-2xs">
+                  <Laptop className="h-3.5 w-3.5 stroke-[2.2]" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-black leading-snug text-[#3B0764]">CoWorking Plan</div>
-                  <div className="text-xs font-semibold leading-snug text-slate-600">{currentPlan.subtitle}</div>
+                  <div className="text-xs font-black leading-tight text-[#3B0764]">CoWorking Plan</div>
+                  <div className="text-[10px] font-semibold text-slate-600 leading-none truncate">{currentPlan.subtitle}</div>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-3 rounded-2xl border border-purple-200/80 bg-white p-4 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#FEF3C7] text-[#D97706]">
-                  <Crown size={14} className="fill-[#D97706]" />
-                </div>
-                <span className="text-sm font-black leading-snug text-slate-900">
-                  Premium Membership (365 Days)
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
-                <div className="flex items-start gap-2">
-                  <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-[#6344E7]" />
-                  <div>
-                    <div className="text-[11px] font-medium leading-none text-slate-500">Starts On</div>
-                    <div className="mt-1 text-sm font-bold leading-snug text-slate-900">{startsOnStr}</div>
+            {/* Row: Premium Membership & CoWorking Plan Cards */}
+            <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+              {/* Card 1: Premium Membership */}
+              <div className="rounded-xl border border-purple-200/80 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#FEF3C7] text-[#D97706]">
+                    <Crown size={12} className="fill-[#D97706]" />
                   </div>
+                  <span className="text-[11.5px] sm:text-xs font-black text-slate-900 truncate">
+                    Premium (365 Days)
+                  </span>
                 </div>
-                <div className="flex items-start gap-2">
-                  <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-[#6344E7]" />
-                  <div>
-                    <div className="text-[11px] font-medium leading-none text-slate-500">Expires On</div>
-                    <div className="mt-1 text-sm font-bold leading-snug text-slate-900">{expiresOnStr}</div>
+                <div className="border-t border-slate-100 pt-1.5 space-y-0.5">
+                  <div className="flex items-center justify-between text-[10.5px] sm:text-[11px]">
+                    <span className="text-slate-400 font-medium">Starts:</span>
+                    <span className="font-bold text-slate-800">{startsOnStr}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10.5px] sm:text-[11px]">
+                    <span className="text-slate-400 font-medium">Expires:</span>
+                    <span className="font-bold text-slate-800">{expiresOnStr}</span>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-3 rounded-2xl border border-purple-200/80 bg-white p-4 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#FEF3C7] text-[#B45309]">
-                  <Laptop size={14} strokeWidth={2.2} />
+              {/* Card 2: CoWorking Plan */}
+              <div className="rounded-xl border border-purple-200/80 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#FEF3C7] text-[#B45309]">
+                    <Laptop size={12} strokeWidth={2.2} />
+                  </div>
+                  <span className="text-[11.5px] sm:text-xs font-black text-slate-900 truncate">
+                    CoWorking ({currentPlan.subtitle})
+                  </span>
                 </div>
-                <span className="text-sm font-black leading-snug text-slate-900">
-                  CoWorking Plan ({currentPlan.subtitle})
-                </span>
-              </div>
-              <div
-                className="relative flex cursor-pointer items-center gap-2 border-t border-slate-100 pt-3"
-                onClick={() => {
-                  if (dateInputRef.current) {
-                    if (typeof dateInputRef.current.showPicker === 'function') {
-                      dateInputRef.current.showPicker();
-                    } else {
-                      dateInputRef.current.focus();
-                    }
-                  }
-                }}
-              >
-                <Calendar className="h-4 w-4 shrink-0 text-[#6344E7]" />
-                <div>
-                  <div className="text-[11px] font-medium leading-none text-slate-500">Start Date</div>
-                  <div className="mt-1 text-sm font-bold leading-snug text-slate-900">{startsOnStr}</div>
-                </div>
-                <ChevronDown size={16} className="ml-auto text-slate-400" />
-                <input
-                  ref={dateInputRef}
-                  type="date"
-                  value={toInputDateString(startDateObj)}
-                  onChange={e => {
-                    if (e.target.value) {
-                      const [y, m, d] = e.target.value.split('-').map(Number);
-                      setStartDateObj(new Date(y, m - 1, d));
+                <div
+                  className="relative flex cursor-pointer items-center justify-between border-t border-slate-100 pt-1.5"
+                  onClick={() => {
+                    if (dateInputRef.current) {
+                      if (typeof dateInputRef.current.showPicker === 'function') {
+                        dateInputRef.current.showPicker();
+                      } else {
+                        dateInputRef.current.focus();
+                      }
                     }
                   }}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  aria-label="Choose Start Date"
-                />
+                >
+                  <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px]">
+                    <Calendar className="h-3 w-3 text-[#6344E7] shrink-0" />
+                    <div>
+                      <span className="text-slate-400 font-medium mr-1">Start:</span>
+                      <span className="font-bold text-slate-800">{startsOnStr}</span>
+                    </div>
+                  </div>
+                  <ChevronDown size={13} className="text-slate-400 shrink-0 ml-1" />
+                  <input
+                    ref={dateInputRef}
+                    type="date"
+                    value={toInputDateString(startDateObj)}
+                    onChange={e => {
+                      if (e.target.value) {
+                        const [y, m, d] = e.target.value.split('-').map(Number);
+                        setStartDateObj(new Date(y, m - 1, d));
+                      }
+                    }}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    aria-label="Choose Start Date"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="space-y-3 rounded-2xl border border-purple-200/80 bg-white p-4 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <Coffee className="h-5 w-5 shrink-0 text-[#6344E7]" />
-                <span className="text-sm font-black leading-snug text-slate-800">
-                  Preferred Complimentary Drink
+            {/* Free Drink: Free Drink label and Tea/Coffee radio buttons in same row */}
+            <div className="flex items-center justify-between rounded-xl border border-purple-200/80 bg-white px-3 py-1.5 shadow-2xs">
+              <div className="flex items-center gap-1.5">
+                <Coffee className="h-4 w-4 shrink-0 text-[#6344E7]" />
+                <span className="text-xs font-black text-slate-800">
+                  Free Drink
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {/* Tea Radio */}
                 <button
                   type="button"
                   onClick={() => setPreferredDrink('Tea')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
                     preferredDrink === 'Tea'
                       ? 'bg-[#F3E8FF] border border-[#A855F7] text-[#6B21A8] shadow-2xs'
                       : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <div
-                    className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                    className={`flex h-3 w-3 items-center justify-center rounded-full border-2 ${
                       preferredDrink === 'Tea' ? 'border-[#7C3AED]' : 'border-slate-300'
                     }`}
                   >
                     {preferredDrink === 'Tea' && (
-                      <div className="h-2 w-2 rounded-full bg-[#7C3AED]" />
+                      <div className="h-1.5 w-1.5 rounded-full bg-[#7C3AED]" />
                     )}
                   </div>
-                  <span className="text-sm">♨</span>
                   <span>Tea</span>
                 </button>
 
@@ -541,123 +542,112 @@ export function CoworkingBookingModal({
                 <button
                   type="button"
                   onClick={() => setPreferredDrink('Coffee')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
                     preferredDrink === 'Coffee'
                       ? 'bg-[#F3E8FF] border border-[#A855F7] text-[#6B21A8] shadow-2xs'
                       : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <div
-                    className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                    className={`flex h-3 w-3 items-center justify-center rounded-full border-2 ${
                       preferredDrink === 'Coffee' ? 'border-[#7C3AED]' : 'border-slate-300'
                     }`}
                   >
                     {preferredDrink === 'Coffee' && (
-                      <div className="h-2 w-2 rounded-full bg-[#7C3AED]" />
+                      <div className="h-1.5 w-1.5 rounded-full bg-[#7C3AED]" />
                     )}
                   </div>
-                  <span className="text-sm">♨</span>
                   <span>Coffee</span>
                 </button>
               </div>
             </div>
 
             {/* Plan Summary Card */}
-            <div className="space-y-3 rounded-3xl border border-purple-200/80 bg-[#FAF7FF] p-4 shadow-2xs">
-              <h4 className="font-display text-lg font-black text-slate-900">Plan Summary</h4>
-
-              <div className="rounded-2xl bg-white px-3.5 py-3">
-                <div className="flex items-center gap-2">
-                  <Crown size={16} className="shrink-0 fill-[#D97706] text-[#D97706]" />
-                  <p className="text-sm font-bold leading-5 text-slate-900">Premium Membership (365 Days)</p>
-                </div>
-                <dl className="mt-3 space-y-2.5">
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-xs font-semibold text-slate-500">Regular Price</dt>
-                    <dd className="text-sm font-semibold text-slate-400 line-through">₹{formatInr(PREMIUM_MEMBERSHIP.regularPrice)}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-xs font-bold text-slate-800">Your Price</dt>
-                    <dd className="text-base font-black text-slate-900">₹{formatInr(PREMIUM_MEMBERSHIP.discountedPrice)}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-xs font-bold text-emerald-700">You save</dt>
-                    <dd className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800">₹{formatInr(PREMIUM_MEMBERSHIP.savings)}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              <div className="rounded-2xl bg-white px-3.5 py-3">
-                <div className="flex items-center gap-2">
-                  <Laptop size={16} className="shrink-0 text-[#7C3AED]" />
-                  <p className="text-sm font-bold leading-5 text-slate-900">CoWorking Plan – {currentPlan.subtitle}</p>
-                </div>
-                <dl className="mt-3 space-y-2.5">
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-xs font-semibold text-slate-500">Regular Price</dt>
-                    <dd className="text-sm font-semibold text-slate-400 line-through">₹{formatInr(currentPlan.regularPrice)}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-xs font-bold text-slate-800">Your Price</dt>
-                    <dd className="text-base font-black text-slate-900">₹{formatInr(currentPlan.memberPrice)}</dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-xs font-bold text-emerald-700">You save</dt>
-                    <dd className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800">₹{formatInr(currentPlan.savings)}</dd>
-                  </div>
-                </dl>
-              </div>
-
-              <div className="flex items-center justify-between gap-4 rounded-2xl bg-[#EDE9FE] px-4 py-3.5">
-                <span className="text-sm font-black leading-5 text-[#5B21B6]">Total Payable Amount</span>
-                <div className="text-right">
-                  <p className="text-xs font-semibold text-slate-500 line-through">₹{formatInr(totalRegular)}</p>
-                  <p className="text-xl font-black leading-tight text-[#4C1D95]">₹{formatInr(finalPayable)}</p>
+            <div className="space-y-2 rounded-2xl border border-purple-200/80 bg-[#FAF7FF] p-2.5 sm:p-3 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-wider text-[#3B0764]">
+                  Plan Summary
+                </h4>
+                <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  <PiggyBank size={13} className="shrink-0" />
+                  <span>Total Savings: ₹{formatInr(totalSavings)}</span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-4 rounded-2xl border border-green-200 bg-[#EAFBF0] px-4 py-3">
-                <div className="flex items-center gap-2 text-[#15803D]">
-                  <PiggyBank size={18} />
-                  <span className="text-sm font-black">Total Savings</span>
+              {/* Mini Breakdown Cards in One Row (grid-cols-2) */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-white p-2 border border-purple-100 shadow-3xs">
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-800 truncate">
+                    <Crown size={12} className="shrink-0 fill-[#D97706] text-[#D97706]" />
+                    <span className="truncate">Premium (365D)</span>
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-between text-xs">
+                    <span className="text-slate-400 line-through text-[10px]">₹{formatInr(PREMIUM_MEMBERSHIP.regularPrice)}</span>
+                    <span className="font-black text-slate-900 text-xs sm:text-[13px]">₹{formatInr(PREMIUM_MEMBERSHIP.discountedPrice)}</span>
+                  </div>
+                  <div className="text-[10px] font-bold text-emerald-600 text-right">
+                    Save ₹{formatInr(PREMIUM_MEMBERSHIP.savings)}
+                  </div>
                 </div>
-                <span className="rounded-full bg-[#15803D] px-3 py-1 text-sm font-black text-white">₹{formatInr(totalSavings)}</span>
+
+                <div className="rounded-xl bg-white p-2 border border-purple-100 shadow-3xs">
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-800 truncate">
+                    <Laptop size={12} className="shrink-0 text-[#7C3AED]" />
+                    <span className="truncate">{currentPlan.subtitle}</span>
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-between text-xs">
+                    <span className="text-slate-400 line-through text-[10px]">₹{formatInr(currentPlan.regularPrice)}</span>
+                    <span className="font-black text-slate-900 text-xs sm:text-[13px]">₹{formatInr(currentPlan.memberPrice)}</span>
+                  </div>
+                  <div className="text-[10px] font-bold text-emerald-600 text-right">
+                    Save ₹{formatInr(currentPlan.savings)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Total Payable Row */}
+              <div className="flex items-center justify-between rounded-xl bg-[#EDE9FE] px-3 py-1.5 text-xs font-black text-[#5B21B6]">
+                <span>Total Payable Amount</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[10px] font-semibold text-slate-400 line-through">₹{formatInr(totalRegular)}</span>
+                  <span className="text-sm sm:text-base font-black text-[#4C1D95]">₹{formatInr(finalPayable)}</span>
+                </div>
               </div>
             </div>
 
             {/* Apply Coupon Code */}
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
-              <div className="flex items-center gap-2 flex-1 pl-1">
-                <Ticket size={18} className="text-[#7C3AED] stroke-[2.2] shrink-0" />
+            <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-2xs">
+              <div className="flex items-center gap-1.5 flex-1 pl-0.5">
+                <Ticket size={16} className="text-[#7C3AED] stroke-[2.2] shrink-0" />
                 <input
                   type="text"
                   value={couponCode}
                   onChange={e => setCouponCode(e.target.value)}
                   placeholder="Apply Coupon Code"
-                  className="text-xs sm:text-sm text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none flex-1 font-medium"
+                  className="text-xs text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none flex-1 font-medium"
                 />
               </div>
 
               {appliedCoupon ? (
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-green-100 text-green-800 text-xs font-bold px-2 py-1">
-                    <Check size={12} strokeWidth={3} />
+                <div className="flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-green-100 text-green-800 text-[11px] font-bold px-2 py-0.5">
+                    <Check size={11} strokeWidth={3} />
                     -₹{formatInr(appliedCoupon.discount)}
                   </span>
                   <button
                     type="button"
                     onClick={handleRemoveCoupon}
-                    className="text-slate-400 hover:text-slate-600 p-1"
+                    className="text-slate-400 hover:text-slate-600 p-0.5"
                     title="Remove coupon"
                   >
-                    <X size={14} />
+                    <X size={13} />
                   </button>
                 </div>
               ) : (
                 <button
                   type="button"
                   onClick={handleApplyCoupon}
-                  className="rounded-xl border border-purple-300 bg-white hover:bg-purple-50 text-[#6344E7] px-4 py-1.5 text-xs sm:text-sm font-bold transition cursor-pointer shadow-2xs"
+                  className="rounded-lg border border-purple-300 bg-white hover:bg-purple-50 text-[#6344E7] px-3 py-1 text-xs font-bold transition cursor-pointer shadow-2xs"
                 >
                   Apply
                 </button>
@@ -669,17 +659,17 @@ export function CoworkingBookingModal({
               type="button"
               disabled={isProcessing}
               onClick={handleContinueToPayment}
-              className="w-full rounded-2xl bg-[#6344E7] hover:bg-[#5235D9] text-white py-3.5 sm:py-4 text-sm sm:text-base font-black flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25 transition active:scale-[0.99] cursor-pointer disabled:opacity-75"
+              className="w-full rounded-xl bg-[#6344E7] hover:bg-[#5235D9] text-white py-2.5 sm:py-3 text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-md shadow-purple-500/25 transition active:scale-[0.99] cursor-pointer disabled:opacity-75"
             >
               {isProcessing ? (
                 <>
-                  <Loader2 size={18} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin" />
                   <span>Processing...</span>
                 </>
               ) : (
                 <>
                   <span>Continue</span>
-                  <ArrowRight size={18} strokeWidth={2.5} />
+                  <ArrowRight size={16} strokeWidth={2.5} />
                 </>
               )}
             </button>

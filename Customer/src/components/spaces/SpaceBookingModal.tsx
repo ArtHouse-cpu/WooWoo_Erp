@@ -2,8 +2,6 @@ import {useState, useEffect, useMemo} from 'react';
 import {motion, AnimatePresence} from 'framer-motion';
 import {
   X,
-  Calendar,
-  Clock,
   Users,
   Sparkles,
   Utensils,
@@ -14,8 +12,6 @@ import {
   Wifi,
   Send,
   Building,
-  Plus,
-  Minus,
   Check,
   ShieldCheck,
   ChevronDown,
@@ -30,6 +26,7 @@ import {
 } from './spaceActions';
 import {SpacePhoto} from './SpacePhoto';
 import {recordPortalEnquiry} from '../../services/enquiry.service';
+import {useAuthStore} from '../../store/authStore';
 
 export interface SpaceBookingModalProps {
   space: SpaceCard | null;
@@ -42,13 +39,15 @@ export interface SpaceBookingModalProps {
 }
 
 const POPULAR_PURPOSES = [
-  'Show',
-  'Workshop',
-  'Shoot',
-  'Meeting',
-  'Party',
-  'Performance',
-  'Exhibition',
+  'Shows & Performance',
+  'Events & Party',
+  'Workshops & Classes',
+  'Shoots & Media',
+  'Meetups & Seminars',
+  'Coworking & Study',
+  'Exhibition & Gallery',
+  'Birthday / Celebration',
+  'Private Gathering',
   'Other',
 ];
 
@@ -62,30 +61,9 @@ const AVAILABLE_SERVICES = [
 
 const FOOD_OPTIONS = [
   {id: 'starter', label: 'Starter'},
-  {id: 'drinks', label: 'Drinks / Beverages'},
+  {id: 'drinks', label: 'Drinks'},
   {id: 'main_course', label: 'Main Course'},
   {id: 'quick_bites', label: 'Quick Bites'},
-];
-
-const TIME_SLOTS = [
-  '06:00',
-  '07:00',
-  '08:00',
-  '09:00',
-  '10:00',
-  '11:00',
-  '12:00',
-  '13:00',
-  '14:00',
-  '15:00',
-  '16:00',
-  '17:00',
-  '18:00',
-  '19:00',
-  '20:00',
-  '21:00',
-  '22:00',
-  '23:00',
 ];
 
 function toIsoDate(d: Date | string | undefined): string {
@@ -127,14 +105,53 @@ function formatDisplayDate(dateStr: string): string {
   }
 }
 
-function calculateDurationHours(start: string, end: string): number {
-  const [sh = 0, sm = 0] = start.split(':').map(Number);
-  const [eh = 0, em = 0] = end.split(':').map(Number);
-  const sMin = sh * 60 + sm;
-  const eMin = eh * 60 + em;
-  const diffMin = eMin >= sMin ? eMin - sMin : 24 * 60 - sMin + eMin;
-  return Math.max(0.5, Math.round((diffMin / 60) * 10) / 10);
-}
+/** Calculates duration in hours between 24-hr times "HH:MM" */
+const calcDurationHours = (from: string, to: string) => {
+  if (!from || !to) return 0;
+  const [fh, fm = 0] = from.split(':').map(Number);
+  let [th, tm = 0] = to.split(':').map(Number);
+  if (Number.isNaN(fh) || Number.isNaN(th)) return 0;
+  const startM = fh * 60 + (Number.isNaN(fm) ? 0 : fm);
+  let endM = th * 60 + (Number.isNaN(tm) ? 0 : tm);
+  if (endM === 0 && startM > 0) endM = 24 * 60;
+  if (th === 24) endM = 24 * 60 + (Number.isNaN(tm) ? 0 : tm);
+  return Math.max(0.5, Math.round(((endM - startM) / 60) * 10) / 10);
+};
+
+/** Formats 24-hr "HH:MM" into 12-hr AM/PM format (e.g. "09:00 AM") */
+const formatTimeSlotDisplay = (time24: string) => {
+  if (!time24) return '06:00 AM';
+  const [hStr, mStr] = time24.split(':');
+  let h = Number(hStr);
+  const m = Number(mStr) || 0;
+  if (Number.isNaN(h)) h = 6;
+  if (h === 24) h = 0;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+};
+
+/** Generates quick slot presets for the given duration */
+const getQuickSlotsForDuration = (hours: number) => {
+  const dur = Math.max(1, Math.min(18, Math.round(hours || 1)));
+  const slots: {label: string; start: string; end: string}[] = [];
+  const candidateStarts = [9, 12, 15, 18, 20].filter(s => s + dur <= 24);
+  if (candidateStarts.length === 0 && 6 + dur <= 24) {
+    candidateStarts.push(6);
+  }
+
+  candidateStarts.forEach(startH => {
+    const endH = startH + dur;
+    const startStr = `${String(startH).padStart(2, '0')}:00`;
+    const endStr = endH === 24 ? '24:00' : `${String(endH).padStart(2, '0')}:00`;
+    slots.push({
+      label: `${formatTimeSlotDisplay(startStr)} – ${formatTimeSlotDisplay(endStr)}`,
+      start: startStr,
+      end: endStr,
+    });
+  });
+  return slots;
+};
 
 export function SpaceBookingModal({
   space,
@@ -145,12 +162,14 @@ export function SpaceBookingModal({
   initialEndTime,
   membershipTier,
 }: SpaceBookingModalProps) {
-  const [purpose, setPurpose] = useState('Show');
+  const customer = useAuthStore(state => state.customer);
+  const [purpose, setPurpose] = useState(POPULAR_PURPOSES[0]);
   const [customPurpose, setCustomPurpose] = useState('');
-  const [guestCount, setGuestCount] = useState<number>(60);
+  const [guestCount, setGuestCount] = useState<number>(15);
   const [bookingDate, setBookingDate] = useState<string>('');
-  const [startTime, setStartTime] = useState('06:00');
-  const [endTime, setEndTime] = useState('09:00');
+  const [durationHours, setDurationHours] = useState(3);
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('12:00');
 
   // Additional options
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -161,12 +180,16 @@ export function SpaceBookingModal({
   useEffect(() => {
     if (!isOpen || !space) return;
 
-    setPurpose('Show');
+    setPurpose(POPULAR_PURPOSES[0]);
     setCustomPurpose('');
-    setGuestCount(space.capacity > 0 ? space.capacity : 60);
+    setGuestCount(space.capacity > 0 ? Math.min(space.capacity, 15) : 15);
     setBookingDate(toIsoDate(initialDate));
-    setStartTime(initialStartTime || '06:00');
-    setEndTime(initialEndTime || '09:00');
+    const sTime = initialStartTime || '09:00';
+    const eTime = initialEndTime || '12:00';
+    setStartTime(sTime);
+    setEndTime(eTime);
+    const dur = calcDurationHours(sTime, eTime);
+    setDurationHours(dur >= 1 ? dur : 3);
     setSelectedServices([]);
     setIncludeFood(false);
     setSelectedFoodItems([]);
@@ -195,10 +218,10 @@ export function SpaceBookingModal({
     }
   }, [bookingDate]);
 
-  const durationHours = useMemo(
-    () => calculateDurationHours(startTime, endTime),
-    [startTime, endTime],
-  );
+  const currentDuration = calcDurationHours(startTime, endTime);
+  const isValidTimeRange = currentDuration >= 1;
+  const formattedSlotRange = `${formatTimeSlotDisplay(startTime)} – ${formatTimeSlotDisplay(endTime)}`;
+  const quickSlots = getQuickSlotsForDuration(durationHours);
 
   const baseHourlyPrice = useMemo(() => {
     if (!space) return 0;
@@ -215,6 +238,75 @@ export function SpaceBookingModal({
   const finalHourlyPrice = Math.max(0, baseHourlyPrice - unitDiscount);
   const calculatedTotal = finalHourlyPrice * durationHours;
 
+  // Handle hours stepper change
+  const handleDurationChange = (newDur: number) => {
+    const safeDur = Math.max(1, Math.min(18, newDur));
+    setDurationHours(safeDur);
+
+    const [sh = 9, sm = 0] = startTime.split(':').map(Number);
+    let startM = sh * 60 + sm;
+    let endM = startM + Math.round(safeDur * 60);
+
+    if (endM > 24 * 60) {
+      startM = Math.max(6 * 60, 24 * 60 - Math.round(safeDur * 60));
+      endM = startM + Math.round(safeDur * 60);
+      const newStartH = Math.floor(startM / 60);
+      const newStartM = startM % 60;
+      setStartTime(
+        `${String(newStartH).padStart(2, '0')}:${String(newStartM).padStart(2, '0')}`
+      );
+    }
+
+    const newEndH = Math.floor(endM / 60);
+    const newEndM = endM % 60;
+    setEndTime(
+      `${String(newEndH === 24 ? '24' : newEndH).padStart(2, '0')}:${String(newEndM).padStart(2, '0')}`
+    );
+  };
+
+  // Handle custom start time change
+  const handleStartTimeChange = (newStart: string) => {
+    setStartTime(newStart);
+    if (!newStart) return;
+
+    const [sh = 6, sm = 0] = newStart.split(':').map(Number);
+    const startM = sh * 60 + sm;
+    let endM = startM + Math.round(durationHours * 60);
+
+    if (endM > 24 * 60) {
+      endM = 24 * 60;
+      const dur = Math.max(0.5, Math.round(((endM - startM) / 60) * 10) / 10);
+      setDurationHours(dur);
+    }
+
+    const endH = Math.floor(endM / 60);
+    const endMin = endM % 60;
+    setEndTime(
+      `${String(endH === 24 ? '24' : endH).padStart(2, '0')}:${String(endMin).padStart(2, '0')}`
+    );
+  };
+
+  // Handle custom end time change
+  const handleEndTimeChange = (newEnd: string) => {
+    const effectiveEnd = newEnd === '00:00' ? '24:00' : newEnd;
+    setEndTime(effectiveEnd);
+
+    const dur = calcDurationHours(startTime, effectiveEnd);
+    if (dur >= 1) {
+      setDurationHours(dur);
+    }
+  };
+
+  // Handle quick slot preset click
+  const handleSelectQuickSlot = (start: string, end: string) => {
+    setStartTime(start);
+    setEndTime(end);
+    const dur = calcDurationHours(start, end);
+    if (dur >= 1) {
+      setDurationHours(dur);
+    }
+  };
+
   const toggleService = (label: string) => {
     setSelectedServices(prev =>
       prev.includes(label) ? prev.filter(item => item !== label) : [...prev, label],
@@ -227,24 +319,30 @@ export function SpaceBookingModal({
     );
   };
 
-  const handleGuestCountChange = (delta: number) => {
-    setGuestCount(prev => Math.max(1, prev + delta));
-  };
-
   const handleBookSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!space) return;
 
+    if (!isValidTimeRange || durationHours < 1) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Invalid Time Slot',
+        text: 'Please ensure your end time is after start time with at least 1 hour duration.',
+        confirmButtonColor: '#6344E7',
+      });
+      return;
+    }
+
     const trimmedPurpose =
       purpose.toLowerCase() === 'other'
         ? (customPurpose.trim() || 'Other')
-        : (purpose.trim() || 'Show');
+        : (purpose.trim() || 'Shows & Performance');
     const formattedDate = formatDisplayDate(bookingDate);
     const durationText = `${durationHours} ${durationHours === 1 ? 'hour' : 'hours'}`;
-    const timingText = `${startTime} to ${endTime} (${durationText})`;
+    const timingText = `${formattedSlotRange} (${durationText})`;
     const pricingText = `₹${formatInr(calculatedTotal)}`;
     const effectiveGuests = Math.max(1, guestCount || 1);
-    const guestsText = `Up to ${effectiveGuests} ${effectiveGuests === 1 ? 'person' : 'people'}`;
+    const guestsText = `${effectiveGuests} ${effectiveGuests === 1 ? 'Guest' : 'Guests'}`;
     const spaceLink = spaceShareUrl(space.id, membershipTier?.id);
 
     // Build additional section
@@ -273,6 +371,10 @@ export function SpaceBookingModal({
       messageLines.push('');
       messageLines.push('*Additional:*');
       additionalLines.forEach(line => messageLines.push(line));
+    }
+
+    if (customer?.name || customer?.mobile) {
+      messageLines.push(`Customer: ${customer?.name || ''}${customer?.mobile ? ` (${customer.mobile})` : ''}`);
     }
 
     messageLines.push('');
@@ -337,12 +439,17 @@ export function SpaceBookingModal({
                   <Sparkles size={18} className="stroke-[2.2]" />
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                    Book Space
-                  </h2>
-                  <p className="text-xs text-slate-500 font-medium truncate max-w-[220px] sm:max-w-xs">
-                    {space.name}
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#6344E7]">
+                    Book Now
                   </p>
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
+                    {space.name}
+                  </h2>
+                  {customer?.name ? (
+                    <p className="text-xs text-slate-500 font-medium truncate max-w-[220px] sm:max-w-xs">
+                      {customer.name} {customer.mobile ? `· ${customer.mobile}` : ''}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -383,69 +490,74 @@ export function SpaceBookingModal({
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
                     From <span className="font-bold text-slate-900">₹{formatInr(space.fromPrice)}</span>/hr
-                    {space.capacity > 0 && ` · Up to ${space.capacity} people`}
                   </p>
                 </div>
               </div>
 
-              {/* Field 1 & 2: Purpose and Guest Count in 50:50 ratio */}
-              <div className="grid grid-cols-2 gap-3 items-start">
-                {/* Purpose Column */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 truncate">
-                    Purpose <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={purpose}
-                      onChange={e => setPurpose(e.target.value)}
-                      className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 pr-8 text-xs sm:text-sm font-bold text-slate-900 focus:border-[#6344E7] focus:outline-hidden focus:ring-2 focus:ring-[#6344E7]/20 cursor-pointer shadow-2xs"
-                    >
-                      {POPULAR_PURPOSES.map(p => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-slate-400">
-                      <ChevronDown size={15} className="stroke-[2.5]" />
-                    </div>
-                  </div>
+              {/* 1. Purpose (Dropdown) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Purpose <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={purpose}
+                    onChange={e => setPurpose(e.target.value)}
+                    className="w-full h-[42px] px-3.5 text-xs sm:text-sm font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] bg-white cursor-pointer appearance-none pr-9 text-slate-900 shadow-2xs"
+                  >
+                    {POPULAR_PURPOSES.map(p => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 </div>
 
-                {/* Guest Count Column */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="flex items-center gap-1 text-xs font-bold text-slate-700 truncate">
-                      <Users size={13} className="text-slate-500 shrink-0" />
-                      <span>Guest Count <span className="text-rose-500">*</span></span>
-                    </label>
-                    {space.capacity > 0 && (
-                      <span className="text-[10px] font-semibold text-slate-400 truncate hidden sm:inline">
-                        Max {space.capacity}
-                      </span>
-                    )}
+                {purpose.toLowerCase() === 'other' && (
+                  <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <input
+                      type="text"
+                      value={customPurpose}
+                      onChange={e => setCustomPurpose(e.target.value)}
+                      placeholder="Specify your purpose (e.g. Photography, Dance, Workshop...)"
+                      className="w-full h-[42px] px-3.5 text-xs sm:text-sm font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] bg-white text-slate-900 shadow-2xs"
+                      autoFocus
+                    />
                   </div>
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-1 w-full">
+                )}
+              </div>
+
+              {/* 2. Guest Count (Only count with no suggestions) */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[#6344E7] shadow-2xs">
+                      <Users className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 leading-tight">Total Guests</p>
+                      <p className="text-[11px] font-normal text-slate-500 leading-tight">Number of attendees</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => handleGuestCountChange(-1)}
-                      className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-white text-slate-700 shadow-2xs hover:bg-slate-100 transition cursor-pointer shrink-0"
-                      title="Decrease guest count"
+                      onClick={() => setGuestCount(prev => Math.max(1, prev - 1))}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-bold cursor-pointer text-sm active:scale-95 transition"
                       aria-label="Decrease guest count"
                     >
-                      <Minus size={14} strokeWidth={2.5} />
+                      -
                     </button>
                     <input
                       type="number"
                       min={1}
-                      max={space.capacity > 0 ? space.capacity * 2 : 1000}
                       value={guestCount === 0 ? '' : guestCount}
                       onChange={e => {
                         const val = e.target.value;
-                        if (val === '') {
-                          setGuestCount(0);
-                        } else {
+                        if (val === '') setGuestCount(0);
+                        else {
                           const num = parseInt(val, 10);
                           if (!isNaN(num)) setGuestCount(Math.max(1, num));
                         }
@@ -453,106 +565,162 @@ export function SpaceBookingModal({
                       onBlur={() => {
                         if (guestCount < 1) setGuestCount(1);
                       }}
-                      placeholder="1"
-                      className="w-full flex-1 bg-transparent text-center text-xs sm:text-sm font-black text-slate-900 focus:outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none min-w-0"
+                      className="w-12 text-center text-xs sm:text-sm font-bold text-slate-900 bg-white border border-slate-200 rounded-xl py-1 focus:outline-hidden focus:border-[#6344E7]"
                     />
                     <button
                       type="button"
-                      onClick={() => handleGuestCountChange(1)}
-                      className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-white text-slate-700 shadow-2xs hover:bg-slate-100 transition cursor-pointer shrink-0"
-                      title="Increase guest count"
+                      onClick={() => setGuestCount(prev => prev + 1)}
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-bold cursor-pointer text-sm active:scale-95 transition"
                       aria-label="Increase guest count"
                     >
-                      <Plus size={14} strokeWidth={2.5} />
+                      +
                     </button>
                   </div>
                 </div>
+              </div>
 
-                {/* If "Other" is selected, open placeholder input spanning across */}
-                {purpose.toLowerCase() === 'other' && (
-                  <div className="col-span-2 -mt-1 animate-in fade-in slide-in-from-top-1 duration-150">
+              {/* 3. Date & Hours Required */}
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5 truncate">
+                    Select Date <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
                     <input
-                      type="text"
-                      value={customPurpose}
-                      onChange={e => setCustomPurpose(e.target.value)}
-                      placeholder="Specify your purpose (e.g. Photography, Dance, Workshop, Podcast...)"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-900 focus:border-[#6344E7] focus:outline-hidden focus:ring-2 focus:ring-[#6344E7]/20 placeholder:text-slate-400 shadow-2xs"
-                      autoFocus
+                      type="date"
+                      min={todayIso}
+                      value={bookingDate}
+                      onChange={e => setBookingDate(e.target.value)}
+                      required
+                      className="w-full h-[42px] px-3 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] bg-white text-slate-900 cursor-pointer"
                     />
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Field 3: Date */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Date <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
-                    <Calendar size={16} />
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 truncate">
+                      Hours Required <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] font-semibold text-slate-400">Min 1 hr</span>
                   </div>
-                  <input
-                    type="date"
-                    min={todayIso}
-                    value={bookingDate}
-                    onChange={e => setBookingDate(e.target.value)}
-                    required
-                    className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:border-[#6344E7] focus:outline-hidden focus:ring-2 focus:ring-[#6344E7]/20"
-                  />
-                </div>
-                <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Selected: <strong className="text-slate-800">{formatDisplayDate(bookingDate)}</strong></span>
-                  <span className={`font-semibold ${isWeekend ? 'text-amber-600' : 'text-slate-600'}`}>
-                    {isWeekend ? 'Weekend rate applies' : 'Weekday rate applies'}
-                  </span>
+                  <div className="flex h-[42px] items-center justify-between rounded-xl border border-slate-200 bg-white px-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDurationChange(Math.max(1, durationHours - 1))}
+                      disabled={durationHours <= 1}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-sm active:scale-95 transition cursor-pointer"
+                      title="Decrease hours"
+                    >
+                      -
+                    </button>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        max={18}
+                        value={durationHours}
+                        onChange={e => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val)) {
+                            handleDurationChange(Math.max(1, Math.min(18, val)));
+                          }
+                        }}
+                        className="w-7 sm:w-8 text-center text-xs font-bold text-slate-900 bg-transparent focus:outline-hidden"
+                      />
+                      <span className="text-xs font-semibold text-slate-600">
+                        {durationHours === 1 ? 'Hr' : 'Hrs'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDurationChange(Math.min(18, durationHours + 1))}
+                      disabled={durationHours >= 18}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-sm active:scale-95 transition cursor-pointer"
+                      title="Increase hours"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Field 4: Time (Start Time & End Time) */}
+              {/* 4. Preferred Time Slot (Custom Timing) */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Timing <span className="text-rose-500">*</span>
+                  <label className="block text-xs font-bold text-slate-700">
+                    Preferred Time Slot (Custom Timing) <span className="text-rose-500">*</span>
                   </label>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-[#6344E7]">
-                    <Clock size={11} />
-                    {durationHours} {durationHours === 1 ? 'hour' : 'hours'}
+                  <span
+                    className={`text-xs font-bold ${
+                      isValidTimeRange ? 'text-[#6344E7]' : 'text-rose-500'
+                    }`}
+                  >
+                    {isValidTimeRange ? formattedSlotRange : 'Invalid Range'}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-500 mb-1">Start Time</span>
-                    <select
+
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                  <div className="relative">
+                    <input
+                      type="time"
+                      min="06:00"
+                      max="23:59"
                       value={startTime}
-                      onChange={e => setStartTime(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:border-[#6344E7] focus:outline-hidden"
-                    >
-                      {TIME_SLOTS.map(t => (
-                        <option key={`start-${t}`} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={e => handleStartTimeChange(e.target.value)}
+                      className="w-full h-[42px] px-3 text-xs font-semibold text-slate-900 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] cursor-pointer"
+                      title="Start Time"
+                      required
+                    />
                   </div>
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-500 mb-1">End Time</span>
-                    <select
-                      value={endTime}
-                      onChange={e => setEndTime(e.target.value)}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:border-[#6344E7] focus:outline-hidden"
-                    >
-                      {TIME_SLOTS.map(t => (
-                        <option key={`end-${t}`} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
+
+                  <span className="text-xs font-bold text-slate-400 px-1">to</span>
+
+                  <div className="relative">
+                    <input
+                      type="time"
+                      min="06:00"
+                      max="23:59"
+                      value={endTime === '24:00' ? '00:00' : endTime}
+                      onChange={e => handleEndTimeChange(e.target.value)}
+                      className="w-full h-[42px] px-3 text-xs font-semibold text-slate-900 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#6344E7] focus:ring-1 focus:ring-[#6344E7] cursor-pointer"
+                      title="End Time"
+                      required
+                    />
                   </div>
                 </div>
 
+                {/* Quick Slot Presets */}
+                <div className="mt-2 flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+                  {quickSlots.map(slot => {
+                    const isSelected =
+                      startTime === slot.start &&
+                      (endTime === slot.end || (endTime === '24:00' && slot.end === '00:00'));
+                    return (
+                      <button
+                        key={slot.label}
+                        type="button"
+                        onClick={() => handleSelectQuickSlot(slot.start, slot.end)}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition cursor-pointer border ${
+                          isSelected
+                            ? 'border-[#6344E7] bg-[#F5F3FF] text-[#6344E7] shadow-2xs font-bold'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                        }`}
+                      >
+                        {slot.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {!isValidTimeRange && (
+                  <p className="mt-1 text-xs font-semibold text-rose-500">
+                    End time must be at least 1 hour after start time.
+                  </p>
+                )}
+
                 {/* Pricing Breakdown summary */}
-                <div className="mt-2 flex items-center justify-between rounded-xl bg-purple-50/70 border border-purple-100 p-2.5 text-xs">
+                <div className="mt-2.5 flex items-center justify-between rounded-xl bg-[#F5F3FF] border border-[#DDD6FE] p-2.5 text-xs">
                   <div>
                     <span className="text-slate-600 font-medium">Estimated Pricing:</span>{' '}
                     <strong className="text-sm font-black text-[#6344E7]">
@@ -567,22 +735,18 @@ export function SpaceBookingModal({
               </div>
 
               {/* Section Divider */}
-              <div className="pt-2 border-t border-slate-100">
-                <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 mb-2">
-                  Additional Add-ons
-                </h4>
-
-                {/* Additional Services - Sideways scroll & select */}
-                <div className="mb-3">
+              <div className="pt-2 border-t border-slate-100 space-y-4">
+                {/* 5. Additional Services (Scrollable in one row) */}
+                <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-bold text-slate-700">
-                      Services
+                      Additional Services (Optional)
                     </label>
                     <span className="text-[10px] text-slate-400 font-medium">
-                      Scroll sideways to select
+                      Scroll sideways
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-2 pt-0.5 -mx-1 px-1">
+                  <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
                     {AVAILABLE_SERVICES.map(srv => {
                       const Icon = srv.icon;
                       const isSelected = selectedServices.includes(srv.label);
@@ -593,94 +757,116 @@ export function SpaceBookingModal({
                           onClick={() => toggleService(srv.label)}
                           className={`flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 text-left transition cursor-pointer whitespace-nowrap ${
                             isSelected
-                              ? 'bg-purple-50/90 border-[#6344E7] text-[#6344E7] shadow-2xs'
+                              ? 'bg-[#F5F3FF] border-[#6344E7] text-[#6344E7] shadow-2xs font-semibold'
                               : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                           }`}
                         >
                           <div
-                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${
-                              isSelected ? 'bg-[#6344E7] text-white' : 'bg-slate-100 text-slate-500'
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border text-[10px] font-bold ${
+                              isSelected
+                                ? 'bg-[#6344E7] border-[#6344E7] text-white'
+                                : 'border-slate-300 bg-white'
                             }`}
                           >
-                            {isSelected ? <Check size={12} strokeWidth={3} /> : <Icon size={12} />}
+                            {isSelected ? <Check size={11} strokeWidth={3} /> : null}
                           </div>
-                          <span className="text-xs font-semibold">{srv.label}</span>
+                          <Icon size={14} className="shrink-0" />
+                          <span className="text-xs">{srv.label}</span>
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Additional Food (Only Veg) */}
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                        <Utensils size={14} />
+                {/* 6. Food (Only Veg) */}
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 sm:p-3.5 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-2xs">
+                        <Utensils className="h-4 w-4" />
                       </div>
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-slate-900">Food & Catering</span>
+                          <p className="text-xs font-bold text-slate-800 leading-tight">Food (Only Veg)</p>
                           <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.2 text-[9px] font-black text-emerald-700">
                             <ShieldCheck size={10} />
                             Only Veg
                           </span>
                         </div>
-                        <p className="text-[10px] text-slate-500">Strictly vegetarian catering options</p>
+                        <p className="text-[11px] font-normal text-slate-500 leading-tight">Require catering or snacks?</p>
                       </div>
                     </div>
 
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={includeFood}
-                        onChange={e => setIncludeFood(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-10 h-5 bg-slate-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-                    </label>
+                    {/* Yes / No Toggle */}
+                    <div className="flex rounded-xl bg-slate-200/80 p-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIncludeFood(false);
+                          setSelectedFoodItems([]);
+                        }}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                          !includeFood
+                            ? 'bg-white text-slate-900 shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        No
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIncludeFood(true)}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                          includeFood
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Yes
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Food items when enabled - sideways scroll & select */}
+                  {/* If Yes: Starter, Drinks, Main Course, Quick Bites */}
                   {includeFood && (
-                    <div className="mt-3 pt-2.5 border-t border-emerald-100/80">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="block text-[11px] font-bold text-slate-700">
-                          Select food items:
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-medium">
-                          Scroll sideways
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1.5 -mx-1 px-1">
-                        {FOOD_OPTIONS.map(item => {
-                          const isSelected = selectedFoodItems.includes(item.label);
+                    <motion.div
+                      initial={{opacity: 0, height: 0}}
+                      animate={{opacity: 1, height: 'auto'}}
+                      exit={{opacity: 0, height: 0}}
+                      className="pt-2 border-t border-slate-200/60"
+                    >
+                      <p className="text-xs font-semibold text-slate-600 mb-2">
+                        Select Required Veg Food Categories:
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {FOOD_OPTIONS.map(opt => {
+                          const isSelected = selectedFoodItems.includes(opt.label);
                           return (
                             <button
                               type="button"
-                              key={item.id}
-                              onClick={() => toggleFoodItem(item.label)}
-                              className={`flex items-center gap-2 px-3 py-2 rounded-xl border shrink-0 text-left transition cursor-pointer whitespace-nowrap ${
+                              key={opt.id}
+                              onClick={() => toggleFoodItem(opt.label)}
+                              className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
                                 isSelected
-                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                                  : 'bg-white text-slate-700 border-emerald-200/60 hover:bg-emerald-50/50'
+                                  ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-2xs font-bold'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                               }`}
                             >
                               <div
-                                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border ${
+                                className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border text-[9px] font-black ${
                                   isSelected
-                                    ? 'bg-white text-emerald-600 border-white'
+                                    ? 'border-emerald-600 bg-emerald-600 text-white'
                                     : 'border-slate-300 bg-white'
                                 }`}
                               >
-                                {isSelected && <Check size={10} strokeWidth={3} />}
+                                {isSelected ? <Check size={10} strokeWidth={3} /> : null}
                               </div>
-                              <span className="text-xs font-semibold">{item.label}</span>
+                              <span className="truncate">{opt.label}</span>
                             </button>
                           );
                         })}
                       </div>
-                    </div>
+                    </motion.div>
                   )}
                 </div>
               </div>
@@ -694,8 +880,6 @@ export function SpaceBookingModal({
                   <Send size={16} />
                   <span>Book on WhatsApp · ₹{formatInr(calculatedTotal)}</span>
                 </button>
-               
-               
               </div>
             </form>
           </motion.div>

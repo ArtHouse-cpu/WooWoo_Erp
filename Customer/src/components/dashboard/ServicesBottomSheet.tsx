@@ -405,23 +405,13 @@ export function ServicesBottomSheet({isOpen, onClose}: ServicesBottomSheetProps)
               </div>
             </div>
 
-            {/* Bottom sticky CTA Buttons */}
-            <div className="sticky bottom-0 bg-white border-t border-slate-100 p-4 flex gap-3 z-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              {/* Book Now Button */}
+            {/* Bottom sticky CTA Button */}
+            <div className="sticky bottom-0 bg-white border-t border-slate-100 p-4 z-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {/* Query Now Button */}
               <button
                 type="button"
                 onClick={() => openQueryModal()}
-                className="flex-1 py-3 px-3 rounded-[16px] border border-[#EA580C] text-[#EA580C] text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#FFF8F2] transition-colors cursor-pointer"
-              >
-                <Calendar className="h-4.5 w-4.5" strokeWidth={2.5} />
-                <span>Book Now</span>
-              </button>
-
-              {/* Query Now Button (Replaces Visit Today) */}
-              <button
-                type="button"
-                onClick={() => openQueryModal()}
-                className="flex-1 py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
+                className="w-full py-3 px-3 rounded-[16px] bg-[#EA580C] text-white text-[14px] font-extrabold flex items-center justify-center gap-1.5 hover:bg-[#D97706] transition-colors shadow-xs cursor-pointer"
               >
                 <MessageCircle className="h-4.5 w-4.5" strokeWidth={2.5} />
                 <span>Query Now</span>
