@@ -60,7 +60,7 @@ import {
   MEMBERSHIP_TIERS,
 } from './spaceActions';
 import {ShareSpaceModal} from './ShareSpaceModal';
-import {CustomerSpaceCheckout} from './CustomerSpaceCheckout';
+import {SpaceBookingModal} from './SpaceBookingModal';
 import {CoworkingBookingModal} from './CoworkingBookingModal';
 import {ImageCarousel} from '../ui/ImageCarousel';
 
@@ -978,8 +978,6 @@ export function SpaceDetailsModal({
   const weekdayPrice = space.weekdayPrice ?? space.fromPrice;
   const weekendPrice = space.weekendPrice ?? Math.round(weekdayPrice * 1.3);
   const activePrice = activeSegment === 'weekday' ? weekdayPrice : weekendPrice;
-  const comparePrice =
-    activeSegment === 'weekday' && weekendPrice > weekdayPrice ? weekendPrice : null;
 
   // Selected Membership discount auto-calculation
   const selectedTier = MEMBERSHIP_TIERS.find(t => t.id === selectedMembershipId) || null;
@@ -1890,9 +1888,6 @@ export function SpaceDetailsModal({
                     </span>
                     <span className="text-xs sm:text-sm font-bold text-slate-500">/ hour</span>
                   </div>
-                  <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">
-                    Regular pricing: ₹{formatInr(comparePrice || Math.round((finalUnitPrice || activePrice) * 1.25))} / hour
-                  </p>
                 </div>
               </div>
 
@@ -3119,7 +3114,7 @@ export function SpaceDetailsModal({
         onClose={() => setShowShareModal(false)}
       />
 
-      <CustomerSpaceCheckout
+      <SpaceBookingModal
         space={bookingPassOverride || space}
         isOpen={showBookingModal}
         onClose={() => {
@@ -3129,6 +3124,7 @@ export function SpaceDetailsModal({
         initialDate={selectedDate}
         initialStartTime={startTime}
         initialEndTime={endTime}
+        membershipTier={selectedTier}
       />
 
       <CoworkingBookingModal

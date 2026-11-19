@@ -18,7 +18,7 @@ import {
 import {toast} from 'sonner';
 import {SpaceDetailsModal, type SpaceDetailsModalState} from '../../components/spaces/SpaceDetailsModal';
 import {ShareSpaceModal} from '../../components/spaces/ShareSpaceModal';
-import {CustomerSpaceCheckout} from '../../components/spaces/CustomerSpaceCheckout';
+import {SpaceBookingModal} from '../../components/spaces/SpaceBookingModal';
 import {CoworkingBookingModal} from '../../components/spaces/CoworkingBookingModal';
 import {ImageCarousel} from '../../components/ui/ImageCarousel';
 import {
@@ -650,7 +650,7 @@ export default function SpacesMarketplacePage() {
         isOpen={Boolean(shareSpace)}
         onClose={() => setShareSpace(null)}
       />
-      <CustomerSpaceCheckout
+      <SpaceBookingModal
         space={bookingSpace}
         isOpen={Boolean(bookingSpace)}
         onClose={() => setBookingSpace(null)}

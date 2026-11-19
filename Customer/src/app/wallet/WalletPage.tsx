@@ -402,8 +402,10 @@ export default function WalletPage() {
   const inviteEarnCard = (isFloating = false) => {
     if (!data) return null;
 
-    const discountRaw = data.referral?.discount?.displayText || 'Flat 10% OFF';
-    const discountLabel = discountRaw.startsWith('(') ? discountRaw : `(${discountRaw})`;
+    const discountRaw = (data.referral?.discount?.displayText || 'FLAT 10% OFF')
+      .replace(/[()]/g, '')
+      .trim();
+    const discountLabel = discountRaw.toUpperCase();
 
     return (
       <div
@@ -454,8 +456,7 @@ export default function WalletPage() {
 
           {/* Top-Right Discount Badge according to coupon/referral code */}
           <div className="shrink-0 pt-0.5 sm:pt-0">
-            <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-[#F97316]/60 bg-[#FFF2EA] px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-black tracking-tight text-[#EA580C] shadow-2xs">
-              <Percent className="h-3 w-3 text-[#EA580C]" strokeWidth={2.5} />
+            <span className="inline-flex items-center rounded-full border border-dashed border-[#F97316]/60 bg-[#FFF2EA] px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-black tracking-tight text-[#EA580C] shadow-2xs">
               <span>{discountLabel}</span>
             </span>
           </div>
