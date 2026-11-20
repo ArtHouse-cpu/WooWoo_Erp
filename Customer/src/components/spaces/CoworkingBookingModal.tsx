@@ -605,11 +605,11 @@ export function CoworkingBookingModal({
             {/* Card 5: Plan Summary Card */}
             <div className="space-y-2 rounded-2xl border border-purple-200/80 bg-[#FAF7FF] p-2.5 sm:p-3 shadow-2xs">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-black uppercase tracking-wider text-[#3B0764]">
+                <h4 className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-[#3B0764]">
                   PLAN SUMMARY
                 </h4>
-                <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full">
-                  <PiggyBank size={13} className="shrink-0" />
+                <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 sm:px-2.5 py-0.5 rounded-full">
+                  <PiggyBank size={12} className="shrink-0" />
                   <span>Total Savings: ₹{formatInr(totalSavings)}</span>
                 </div>
               </div>
@@ -621,51 +621,51 @@ export function CoworkingBookingModal({
               >
                 {/* Premium Card */}
                 <div className="rounded-xl border border-purple-100 bg-white p-2 sm:p-2.5 shadow-3xs flex flex-col justify-between">
-                  <div className="flex items-center gap-1 text-[11px] font-black text-slate-900 truncate">
+                  <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px] font-black text-slate-900 truncate">
                     <Crown size={12} className="shrink-0 fill-amber-500 text-amber-500" />
                     <span className="truncate">Premium (365D)</span>
                   </div>
                   <div className="mt-1 flex items-baseline justify-between text-xs">
-                    <span className="text-slate-400 line-through text-[10px]">
+                    <span className="text-slate-400 line-through text-[9.5px] sm:text-[10px]">
                       ₹{formatInr(PREMIUM_MEMBERSHIP.regularPrice)}
                     </span>
-                    <span className="font-black text-slate-900 text-xs sm:text-[13px]">
+                    <span className="font-bold text-slate-900 text-[11px] sm:text-xs">
                       ₹{formatInr(PREMIUM_MEMBERSHIP.discountedPrice)}
                     </span>
                   </div>
-                  <div className="text-[10px] font-bold text-emerald-600 text-right">
+                  <div className="text-[9.5px] sm:text-[10px] font-bold text-emerald-600 text-right">
                     Save ₹{formatInr(PREMIUM_MEMBERSHIP.savings)}
                   </div>
                 </div>
 
                 {/* CoWorking Plan Card */}
                 <div className="rounded-xl border border-purple-100 bg-white p-2 sm:p-2.5 shadow-3xs flex flex-col justify-between">
-                  <div className="flex items-center gap-1 text-[11px] font-black text-slate-900 truncate">
+                  <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px] font-black text-slate-900 truncate">
                     <Laptop size={12} className="shrink-0 text-[#673DE6]" />
                     <span className="truncate">{currentPlan.subtitle}</span>
                   </div>
                   <div className="mt-1 flex items-baseline justify-between text-xs">
-                    <span className="text-slate-400 line-through text-[10px]">
+                    <span className="text-slate-400 line-through text-[9.5px] sm:text-[10px]">
                       ₹{formatInr(currentPlan.regularPrice)}
                     </span>
-                    <span className="font-black text-slate-900 text-xs sm:text-[13px]">
+                    <span className="font-bold text-slate-900 text-[11px] sm:text-xs">
                       ₹{formatInr(currentPlan.memberPrice)}
                     </span>
                   </div>
-                  <div className="text-[10px] font-bold text-emerald-600 text-right">
+                  <div className="text-[9.5px] sm:text-[10px] font-bold text-emerald-600 text-right">
                     Save ₹{formatInr(currentPlan.savings)}
                   </div>
                 </div>
               </div>
 
               {/* Total Payable Row */}
-              <div className="flex items-center justify-between rounded-xl bg-[#F0E8FF] px-3 py-2 text-xs font-black text-[#3B0764]">
+              <div className="flex items-center justify-between rounded-xl bg-[#F0E8FF] px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-black text-[#3B0764]">
                 <span>Total Payable Amount</span>
                 <div className="flex items-baseline gap-1.5 sm:gap-2">
-                  <span className="text-[11px] font-medium text-slate-400 line-through">
+                  <span className="text-[10px] sm:text-[11px] font-medium text-slate-400 line-through">
                     ₹{formatInr(totalRegular)}
                   </span>
-                  <span className="text-sm sm:text-base font-black text-[#673DE6]">
+                  <span className="text-xs sm:text-sm font-bold text-[#673DE6]">
                     ₹{formatInr(finalPayable)}
                   </span>
                 </div>

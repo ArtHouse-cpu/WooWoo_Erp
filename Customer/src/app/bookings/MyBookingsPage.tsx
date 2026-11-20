@@ -8,13 +8,11 @@ import {
   Coffee,
   Copy,
   Download,
-  IndianRupee,
   LayoutGrid,
   List,
   Search,
   Sparkles,
   Store,
-  Layers,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -79,7 +77,7 @@ const getBookingCategory = (row: CoworkingReceipt): "Full" | "Space" | "Coworkin
 
 const categoryBadgeStyle = (category: "Full" | "Space" | "Coworking") => {
   if (category === "Full") {
-    return "bg-violet-50 text-[#6344E7] border border-violet-200";
+    return "bg-[#F5F0FF] text-[#673DE6] border border-purple-200";
   }
   if (category === "Coworking") {
     return "bg-emerald-50 text-emerald-700 border border-emerald-200";
@@ -135,8 +133,6 @@ export default function MyBookingsPage() {
     0
   );
 
-  const totalPaid = rows.reduce((sum, r) => sum + (Number(r.payable) || 0), 0);
-
   // Category counts
   const counts = useMemo(() => {
     const res = { All: rows.length, Full: 0, Space: 0, Coworking: 0 };
@@ -171,28 +167,28 @@ export default function MyBookingsPage() {
 
   const content = (
     <div className="w-full space-y-6 pb-12">
-      <div className="overflow-visible rounded-[24px] border border-black/[0.04] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.03)] sm:p-6 md:p-8">
+      <div className="overflow-visible rounded-[24px] border border-black/[0.04] bg-white p-3.5 sm:p-6 md:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
         
         {/* ================= HEADER ================= */}
-        <div className="mb-6 flex flex-nowrap items-center justify-between gap-2 border-b border-gray-100 pb-5 sm:gap-3">
+        <div className="mb-5 flex flex-nowrap items-center justify-between gap-2 border-b border-gray-100 pb-4 sm:mb-6 sm:pb-5">
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
+              className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
               aria-label="Go back"
             >
-              <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-[#111111]" strokeWidth={2.5} />
             </button>
 
             <div className="shrink-0">
               <div className="flex items-center gap-1.5">
-                <h1 className="whitespace-nowrap text-[17px] font-black tracking-tight text-[#0f172a] sm:text-2xl md:text-3xl">
+                <h1 className="whitespace-nowrap text-lg sm:text-2xl md:text-3xl font-black tracking-tight text-[#0f172a]">
                   Bookings
                 </h1>
                 {/* 3 diagonal purple sparks */}
                 <svg
-                  className="h-4 w-4 -mt-2 shrink-0 text-[#6344E7] sm:h-5 sm:w-5"
+                  className="h-3.5 w-3.5 sm:h-5 sm:w-5 -mt-1.5 shrink-0 text-[#673DE6]"
                   viewBox="0 0 16 16"
                   fill="none"
                   stroke="currentColor"
@@ -205,8 +201,8 @@ export default function MyBookingsPage() {
                 </svg>
               </div>
 
-              <p className="whitespace-nowrap text-[11px] font-semibold text-[#94a3b8] sm:text-sm">
-                Space reservations & coworking plans
+              <p className="whitespace-nowrap text-[10px] sm:text-xs md:text-sm font-semibold text-[#94a3b8]">
+                Space reservations &amp; coworking plans
               </p>
             </div>
           </div>
@@ -214,7 +210,7 @@ export default function MyBookingsPage() {
           <div className="flex shrink-0 items-center gap-2">
             <Link
               to="/spaces"
-              className="flex items-center gap-1.5 rounded-xl bg-[#6344E7] px-3.5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#5233d6] active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 rounded-xl bg-[#673DE6] px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#5830d4] active:scale-95 cursor-pointer"
             >
               <Store className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Book Space</span>
@@ -223,114 +219,72 @@ export default function MyBookingsPage() {
         </div>
 
         {/* ================= 2 PROMINENT KPIS: TOTAL BOOKINGS & BENEFIT ================= */}
-        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
+        <div className="mb-5 sm:mb-6 grid grid-cols-2 gap-2.5 sm:gap-4">
           {/* KPI 1: Total Bookings */}
-          <div className="flex flex-col justify-between rounded-2xl border border-violet-100 bg-[#FAF9FF] p-4 transition hover:shadow-sm">
+          <div className="flex flex-col justify-between rounded-2xl border border-purple-100 bg-[#FAF9FF] p-3 sm:p-4 transition hover:shadow-xs">
             <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100/90 text-[#6344E7]">
-                <CalendarCheck className="h-5 w-5" strokeWidth={2.2} />
+              <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-[#F5F0FF] text-[#673DE6]">
+                <CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
               </div>
-              <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-[10px] font-bold text-[#6344E7]">
+              <span className="hidden sm:inline-block rounded-full bg-purple-100/80 px-2.5 py-0.5 text-[10px] font-bold text-[#673DE6]">
                 Reservations
               </span>
             </div>
-            <div className="mt-4">
-              <span className="text-xs font-bold text-slate-500">Total Bookings</span>
-              <p className="mt-0.5 text-2xl font-black text-slate-900 sm:text-3xl">
+            <div className="mt-2.5 sm:mt-3">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500">Total Bookings</span>
+              <p className="mt-0.5 text-xl sm:text-2xl md:text-3xl font-black text-slate-900">
                 {totalBookings}
               </p>
-              <span className="mt-1 block text-[11px] font-medium text-slate-400">
+              <span className="mt-0.5 block text-[10px] sm:text-[11px] font-medium text-slate-400 truncate">
                 Confirmed in your account
               </span>
             </div>
           </div>
 
           {/* KPI 2: Benefit (Discount + Cashback) */}
-          <div className="flex flex-col justify-between rounded-2xl border border-emerald-100 bg-[#F2FBF5] p-4 transition hover:shadow-sm">
+          <div className="flex flex-col justify-between rounded-2xl border border-emerald-100 bg-[#F2FBF5] p-3 sm:p-4 transition hover:shadow-xs">
             <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100/90 text-emerald-700">
-                <Sparkles className="h-5 w-5" strokeWidth={2.2} />
+              <div className="flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100/90 text-emerald-700">
+                <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.2} />
               </div>
-              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800">
-                Saved & Earned
+              <span className="hidden sm:inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-black text-emerald-800">
+                Saved &amp; Earned
               </span>
             </div>
-            <div className="mt-4">
-              <span className="text-xs font-bold text-slate-500">
+            <div className="mt-2.5 sm:mt-3">
+              <span className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate block">
                 Benefit (Discount + Cashback)
               </span>
-              <p className="mt-0.5 text-2xl font-black text-emerald-700 sm:text-3xl">
+              <p className="mt-0.5 text-xl sm:text-2xl md:text-3xl font-black text-emerald-700 truncate">
                 {inr(totalBenefit)}
               </p>
-              <span className="mt-1 block text-[11px] font-semibold text-emerald-700">
+              <span className="mt-0.5 block text-[10px] sm:text-[11px] font-semibold text-emerald-700 truncate">
                 Discount: {inr(totalDiscount)} · Cashback: {inr(totalCashback)}
-              </span>
-            </div>
-          </div>
-
-          {/* KPI 3: Total Paid Amount */}
-          <div className="flex flex-col justify-between rounded-2xl border border-blue-100 bg-[#F4F8FC] p-4 transition hover:shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100/90 text-blue-600">
-                <IndianRupee className="h-5 w-5" strokeWidth={2.2} />
-              </div>
-              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-700">
-                Settled
-              </span>
-            </div>
-            <div className="mt-4">
-              <span className="text-xs font-bold text-slate-500">Total Spent</span>
-              <p className="mt-0.5 text-2xl font-black text-slate-900 sm:text-3xl">
-                {inr(totalPaid)}
-              </p>
-              <span className="mt-1 block text-[11px] font-medium text-slate-400">
-                All booking payments
-              </span>
-            </div>
-          </div>
-
-          {/* KPI 4: Active Spaces / Coworking */}
-          <div className="flex flex-col justify-between rounded-2xl border border-amber-100 bg-[#FCFAF2] p-4 transition hover:shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100/90 text-amber-700">
-                <Layers className="h-5 w-5" strokeWidth={2.2} />
-              </div>
-              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
-                Categories
-              </span>
-            </div>
-            <div className="mt-4">
-              <span className="text-xs font-bold text-slate-500">Active Types</span>
-              <p className="mt-0.5 text-2xl font-black text-slate-900 sm:text-3xl">
-                {counts.Full > 0 && counts.Coworking > 0 ? "Full & Desk" : "Spaces"}
-              </p>
-              <span className="mt-1 block text-[11px] font-medium text-slate-400">
-                {counts.Full} Full · {counts.Space} Space · {counts.Coworking} Desk
               </span>
             </div>
           </div>
         </div>
 
         {/* ================= CATEGORY FILTER PILLS: All, Full, Space, Coworking ================= */}
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-4">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="mb-5 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
             {(["All", "Full", "Space", "Coworking"] as BookingCategory[]).map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-extrabold transition cursor-pointer active:scale-95 ${
+                className={`flex items-center gap-1.5 rounded-xl px-3 sm:px-3.5 py-2 text-xs font-bold transition cursor-pointer active:scale-95 shrink-0 ${
                   selectedCategory === cat
-                    ? "bg-[#6344E7] text-white shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    ? "bg-[#673DE6] text-white shadow-xs"
+                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                <span>{cat === "All" ? "All Bookings" : cat}</span>
+                <span>{cat === "All" ? "All" : cat}</span>
                 <span
                   className={`rounded-full px-1.5 py-0.2 text-[10px] font-black ${
                     selectedCategory === cat
                       ? "bg-white/25 text-white"
-                      : "bg-white text-slate-700"
+                      : "bg-slate-100 text-slate-700"
                   }`}
                 >
                   {counts[cat]}
@@ -341,7 +295,7 @@ export default function MyBookingsPage() {
 
           {/* Search + View Mode Toolbar */}
           <div className="flex items-center gap-2">
-            <div className="relative min-w-[200px] flex-1 sm:w-64">
+            <div className="relative min-w-[180px] flex-1 sm:w-64">
               <Search
                 size={14}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -351,7 +305,7 @@ export default function MyBookingsPage() {
                 placeholder="Search by code or name…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 pl-8 pr-7 text-xs font-medium text-slate-900 outline-none transition focus:border-[#6344E7] focus:bg-white"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 pl-8 pr-7 text-xs font-medium text-slate-900 outline-none transition focus:border-[#673DE6] focus:bg-white"
               />
               {searchQuery && (
                 <button
@@ -364,13 +318,13 @@ export default function MyBookingsPage() {
               )}
             </div>
 
-            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-0.5">
+            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-0.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setViewMode("cards")}
                 className={`p-1.5 rounded-lg transition cursor-pointer ${
                   viewMode === "cards"
-                    ? "bg-white text-[#6344E7] shadow-xs"
+                    ? "bg-white text-[#673DE6] shadow-xs"
                     : "text-slate-400 hover:text-slate-700"
                 }`}
                 title="Cards view"
@@ -382,7 +336,7 @@ export default function MyBookingsPage() {
                 onClick={() => setViewMode("table")}
                 className={`p-1.5 rounded-lg transition cursor-pointer ${
                   viewMode === "table"
-                    ? "bg-white text-[#6344E7] shadow-xs"
+                    ? "bg-white text-[#673DE6] shadow-xs"
                     : "text-slate-400 hover:text-slate-700"
                 }`}
                 title="Table view"
@@ -415,7 +369,7 @@ export default function MyBookingsPage() {
         {/* Empty state */}
         {!loading && filteredRows.length === 0 && !error && (
           <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-14 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-[#6344E7]">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-100 text-[#673DE6]">
               <CalendarCheck size={28} />
             </div>
             <p className="mt-3 text-base font-black text-slate-900">
@@ -428,10 +382,10 @@ export default function MyBookingsPage() {
             </p>
             <Link
               to="/spaces"
-              className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-[#6344E7] px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#5233d6]"
+              className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-[#673DE6] px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#5830d4]"
             >
               <Store size={14} />
-              <span>Browse Spaces & Coworking</span>
+              <span>Browse Spaces &amp; Coworking</span>
             </Link>
           </div>
         )}
@@ -472,7 +426,7 @@ export default function MyBookingsPage() {
                         <button
                           type="button"
                           onClick={() => copyBookingCode(row.bookingCode)}
-                          className="text-slate-400 hover:text-[#6344E7] transition cursor-pointer"
+                          className="text-slate-400 hover:text-[#673DE6] transition cursor-pointer"
                           title="Copy Code"
                         >
                           <Copy size={13} />
@@ -503,20 +457,20 @@ export default function MyBookingsPage() {
                     {/* Dates & Timing */}
                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600">
                       <div className="flex items-center gap-1.5">
-                        <Calendar size={14} className="text-[#6344E7] shrink-0" />
+                        <Calendar size={14} className="text-[#673DE6] shrink-0" />
                         <span className="font-medium">{formattedDate}</span>
                       </div>
 
                       {timeRange && (
                         <div className="flex items-center gap-1.5">
-                          <Clock size={14} className="text-[#6344E7] shrink-0" />
+                          <Clock size={14} className="text-[#673DE6] shrink-0" />
                           <span className="font-medium">{timeRange}</span>
                         </div>
                       )}
 
                       {row.drink && (
                         <div className="flex items-center gap-1.5">
-                          <Coffee size={14} className="text-[#6344E7] shrink-0" />
+                          <Coffee size={14} className="text-[#673DE6] shrink-0" />
                           <span className="font-medium">{row.drink}</span>
                         </div>
                       )}
@@ -552,7 +506,7 @@ export default function MyBookingsPage() {
                       onClick={() => downloadCoworkingInvoice(row)}
                       className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 active:scale-95 cursor-pointer"
                     >
-                      <Download size={13} className="text-[#6344E7]" />
+                      <Download size={13} className="text-[#673DE6]" />
                       <span>Invoice</span>
                     </button>
                   </div>
@@ -648,7 +602,7 @@ export default function MyBookingsPage() {
                             onClick={() => downloadCoworkingInvoice(row)}
                             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
                           >
-                            <Download size={12} className="text-[#6344E7]" />
+                            <Download size={12} className="text-[#673DE6]" />
                             <span>Invoice</span>
                           </button>
                         </td>

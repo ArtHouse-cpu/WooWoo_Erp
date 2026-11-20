@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardSidebar } from "../../components/dashboard/DashboardSidebar";
-import { TopNavbar } from "../../components/dashboard/TopNavbar";
 import { HapJoinModal } from "../../components/dashboard/HapJoinModal";
 import { useHapApplication } from "../../hooks/useHapApplication";
 import { cspProductApi } from "../../services/csp.service";
@@ -557,11 +556,10 @@ export default function HapProgramPage() {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <div className="mx-auto max-w-[1440px] p-4 md:p-6">
+        <div className="mx-auto max-w-[1440px] p-2.5 sm:p-4 md:p-6">
           <div className="hidden gap-6 xl:flex">
             <DashboardSidebar mode="fixed" />
             <div className="min-w-0 flex-1 space-y-6">
-              <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
               <HapAccessCard
                 loaded={loaded}
                 status={application?.status}
@@ -572,8 +570,7 @@ export default function HapProgramPage() {
             </div>
           </div>
           <div className="xl:hidden">
-            <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
-            <div className="mt-4">
+            <div className="pb-6">
               <HapAccessCard
                 loaded={loaded}
                 status={application?.status}
@@ -597,28 +594,28 @@ export default function HapProgramPage() {
 
   const content = (
     <div className="w-full space-y-6 pb-12">
-      <div className="overflow-visible rounded-[24px] border border-black/[0.04] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.03)] sm:p-6 md:p-8">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white p-3.5 sm:p-6 md:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
         
         {/* ================= HEADER ================= */}
-        <div className="mb-6 flex flex-nowrap items-center justify-between gap-2 border-b border-gray-100 pb-5 sm:gap-3">
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="mb-5 sm:mb-6 flex items-center justify-between gap-1.5 sm:gap-3 border-b border-gray-100 pb-4 sm:pb-5">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
+              className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
               aria-label="Go back"
             >
-              <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-[#111111]" strokeWidth={2.5} />
             </button>
 
-            <div className="shrink-0">
+            <div className="min-w-0">
               <div className="flex items-center gap-1">
-                <h1 className="whitespace-nowrap text-[17px] font-black tracking-tight text-[#0f172a] sm:text-2xl md:text-3xl">
+                <h1 className="truncate text-base sm:text-2xl md:text-3xl font-black tracking-tight text-[#0f172a]">
                   HAP Program
                 </h1>
                 {/* 3 diagonal purple spark accent dashes */}
                 <svg
-                  className="h-4 w-4 -mt-2 shrink-0 text-[#7C3AED] sm:h-5 sm:w-5"
+                  className="h-3.5 w-3.5 sm:h-5 sm:w-5 -mt-1 shrink-0 text-[#7C3AED]"
                   viewBox="0 0 16 16"
                   fill="none"
                   stroke="currentColor"
@@ -631,28 +628,28 @@ export default function HapProgramPage() {
                 </svg>
               </div>
 
-              <p className="whitespace-nowrap text-[11px] font-semibold text-[#94a3b8] sm:text-sm">
+              <p className="truncate text-[10px] sm:text-xs font-semibold text-[#94a3b8]">
                 House Affiliate Program
               </p>
             </div>
           </div>
 
           {/* Right Controls: Filter + More */}
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {/* Filter Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setFilterDropdownOpen((v) => !v)}
-                className="flex items-center gap-1.5 rounded-xl border border-gray-200/90 bg-white px-2.5 py-2 text-[11px] font-bold text-gray-700 shadow-sm transition hover:bg-gray-50 sm:gap-2 sm:px-3.5 sm:text-xs cursor-pointer"
+                className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-gray-200/90 bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-[10.5px] sm:text-xs font-bold text-gray-700 shadow-xs transition hover:bg-gray-50 cursor-pointer shrink-0"
               >
-                <Calendar size={15} className="text-gray-500" />
-                <span>{timeFilter}</span>
-                <ChevronDown size={14} className="text-gray-400" />
+                <Calendar size={13} className="text-gray-500 shrink-0" />
+                <span className="truncate max-w-[55px] sm:max-w-none">{timeFilter}</span>
+                <ChevronDown size={13} className="text-gray-400 shrink-0" />
               </button>
 
               {filterDropdownOpen && (
-                <div className="absolute right-0 top-11 z-30 w-40 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
+                <div className="absolute right-0 top-10 sm:top-11 z-30 w-36 sm:w-40 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
                   {timeOptions.map((opt) => (
                     <button
                       key={opt}
@@ -661,7 +658,7 @@ export default function HapProgramPage() {
                         setTimeFilter(opt);
                         setFilterDropdownOpen(false);
                       }}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-medium transition cursor-pointer ${
+                      className={`flex w-full items-center justify-between rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 text-left text-xs font-medium transition cursor-pointer ${
                         timeFilter === opt
                           ? "bg-purple-50 text-[#7C3AED] font-bold"
                           : "text-gray-700 hover:bg-gray-50"
@@ -680,7 +677,7 @@ export default function HapProgramPage() {
               <button
                 type="button"
                 onClick={() => setMenuDropdownOpen((v) => !v)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200/90 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 cursor-pointer"
+                className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-gray-200/90 bg-white text-gray-600 shadow-xs transition hover:bg-gray-50 cursor-pointer shrink-0"
                 aria-label="More options"
               >
                 <MoreVertical size={18} />
@@ -840,19 +837,19 @@ export default function HapProgramPage() {
         </div>
 
         {/* ================= HORIZONTAL TABS ================= */}
-        <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-3">
-          <div className="flex items-center gap-6 sm:gap-10">
+        <div className="mb-6 border-b border-gray-100 pb-3 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-6 sm:gap-10 min-w-max whitespace-nowrap">
             {/* Products Tab */}
             <button
               type="button"
               onClick={() => setActiveTab("products")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer ${
                 activeTab === "products"
                   ? "text-[#7C3AED]"
                   : "text-gray-400 hover:text-gray-700"
               }`}
             >
-              <Package size={18} strokeWidth={activeTab === "products" ? 2.5 : 2} />
+              <Package size={18} strokeWidth={activeTab === "products" ? 2.5 : 2} className="shrink-0" />
               <span>Products</span>
             </button>
 
@@ -860,13 +857,13 @@ export default function HapProgramPage() {
             <button
               type="button"
               onClick={() => setActiveTab("sales")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer ${
                 activeTab === "sales"
                   ? "text-[#7C3AED]"
                   : "text-gray-400 hover:text-gray-700"
               }`}
             >
-              <ShoppingBag size={18} strokeWidth={activeTab === "sales" ? 2.5 : 2} />
+              <ShoppingBag size={18} strokeWidth={activeTab === "sales" ? 2.5 : 2} className="shrink-0" />
               <span>Sales</span>
             </button>
 
@@ -874,13 +871,13 @@ export default function HapProgramPage() {
             <button
               type="button"
               onClick={() => setActiveTab("timeline")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer ${
                 activeTab === "timeline"
                   ? "text-[#7C3AED]"
                   : "text-gray-400 hover:text-gray-700"
               }`}
             >
-              <BarChart2 size={18} strokeWidth={activeTab === "timeline" ? 2.5 : 2} />
+              <BarChart2 size={18} strokeWidth={activeTab === "timeline" ? 2.5 : 2} className="shrink-0" />
               <span>Timeline</span>
             </button>
           </div>
@@ -1159,15 +1156,15 @@ export default function HapProgramPage() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white">
+                <table className="w-full min-w-[560px] text-left text-xs whitespace-nowrap">
                   <thead className="border-b border-gray-100 bg-gray-50/75 text-gray-500 font-bold">
                     <tr>
-                      <th className="px-4 py-3">Order No</th>
-                      <th className="px-4 py-3">Product</th>
-                      <th className="px-4 py-3">Buyer</th>
-                      <th className="px-4 py-3">Amount</th>
-                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Order No</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Product</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Buyer</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Amount</th>
+                      <th className="px-4 py-3 whitespace-nowrap">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -1177,19 +1174,19 @@ export default function HapProgramPage() {
                         onClick={() => setSelectedSale(sale)}
                         className="cursor-pointer hover:bg-gray-50/50 transition"
                       >
-                        <td className="px-4 py-3 font-mono font-bold text-gray-900">
+                        <td className="px-4 py-3 font-mono font-bold text-gray-900 whitespace-nowrap">
                           {sale.orderNo}
                         </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">
+                        <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
                           {sale.productName}
                         </td>
-                        <td className="px-4 py-3 text-gray-600">
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                           {sale.buyerName || "Customer"}
                         </td>
-                        <td className="px-4 py-3 font-bold text-gray-900">
+                        <td className="px-4 py-3 font-bold text-gray-900 whitespace-nowrap">
                           ₹{sale.amount.toLocaleString("en-IN")}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
                             className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
                               sale.status === "Paid"
@@ -1554,17 +1551,15 @@ export default function HapProgramPage() {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      <div className="mx-auto max-w-[1440px] p-4 md:p-6">
+      <div className="mx-auto max-w-[1440px] p-2.5 sm:p-4 md:p-6">
         <div className="hidden gap-6 xl:flex">
           <DashboardSidebar mode="fixed" />
           <div className="min-w-0 flex-1 space-y-6">
-            <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
             {content}
           </div>
         </div>
         <div className="xl:hidden">
-          <div className="space-y-5 pb-6">
-            <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
+          <div className="pb-6">
             {content}
           </div>
         </div>
