@@ -15,14 +15,12 @@ import {
   Gift,
   Coffee,
   CheckCircle2,
-  Plus,
   MessageCircle,
   BookOpen,
   Award,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardSidebar } from "../../components/dashboard/DashboardSidebar";
-import { TopNavbar } from "../../components/dashboard/TopNavbar";
 import { CvpJoinModal } from "../../components/dashboard/CvpJoinModal";
 import { useCvpApplication } from "../../hooks/useCvpApplication";
 import { useAuthStore } from "../../store/authStore";
@@ -129,11 +127,10 @@ export default function CvpProgramPage() {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <div className="mx-auto max-w-[1440px] p-4 md:p-6">
+        <div className="mx-auto max-w-[1440px] p-2.5 sm:p-4 md:p-6">
           <div className="hidden gap-6 xl:flex">
             <DashboardSidebar mode="fixed" />
             <div className="min-w-0 flex-1 space-y-6">
-              <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
               <CvpAccessCard
                 loaded={loaded}
                 status={application?.status}
@@ -143,8 +140,7 @@ export default function CvpProgramPage() {
             </div>
           </div>
           <div className="xl:hidden">
-            <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
-            <div className="mt-4">
+            <div className="pb-6">
               <CvpAccessCard
                 loaded={loaded}
                 status={application?.status}
@@ -172,28 +168,28 @@ export default function CvpProgramPage() {
 
   const content = (
     <div className="w-full space-y-6 pb-12">
-      <div className="overflow-visible rounded-[24px] border border-black/[0.04] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.03)] sm:p-6 md:p-8">
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.04] bg-white p-3.5 sm:p-6 md:p-8 shadow-[0_8px_30px_rgba(0,0,0,0.03)]">
 
         {/* ================= HEADER ================= */}
-        <div className="mb-6 flex flex-nowrap items-center justify-between gap-2 border-b border-gray-100 pb-5 sm:gap-3">
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div className="mb-5 sm:mb-6 flex items-center justify-between gap-1.5 sm:gap-3 border-b border-gray-100 pb-4 sm:pb-5">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
+              className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-[12px] border border-black/[0.04] bg-white text-[#4B5563] shadow-[0_2px_8px_rgba(15,23,42,0.02)] transition hover:scale-95 cursor-pointer"
               aria-label="Go back"
             >
-              <ChevronLeft className="h-5 w-5 text-[#111111]" strokeWidth={2.5} />
+              <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5 text-[#111111]" strokeWidth={2.5} />
             </button>
 
-            <div className="shrink-0">
+            <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <h1 className="whitespace-nowrap text-[17px] font-black tracking-tight text-[#0f172a] sm:text-2xl md:text-3xl">
+                <h1 className="truncate text-base sm:text-2xl md:text-3xl font-black tracking-tight text-[#0f172a]">
                   CVP Program
                 </h1>
                 {/* 3 diagonal emerald spark dashes */}
                 <svg
-                  className="h-4 w-4 -mt-2 shrink-0 text-[#059669] sm:h-5 sm:w-5"
+                  className="h-3.5 w-3.5 sm:h-5 sm:w-5 -mt-1 shrink-0 text-[#059669]"
                   viewBox="0 0 16 16"
                   fill="none"
                   stroke="currentColor"
@@ -206,28 +202,28 @@ export default function CvpProgramPage() {
                 </svg>
               </div>
 
-              <p className="whitespace-nowrap text-[11px] font-semibold text-[#94a3b8] sm:text-sm">
+              <p className="truncate text-[10px] sm:text-xs font-semibold text-[#94a3b8]">
                 Community Volunteering Program
               </p>
             </div>
           </div>
 
           {/* Right Controls: Filter + More */}
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {/* Filter Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setFilterDropdownOpen((v) => !v)}
-                className="flex items-center gap-1.5 rounded-xl border border-gray-200/90 bg-white px-2.5 py-2 text-[11px] font-bold text-gray-700 shadow-sm transition hover:bg-gray-50 sm:gap-2 sm:px-3.5 sm:text-xs cursor-pointer"
+                className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-gray-200/90 bg-white px-2 sm:px-3 py-1.5 sm:py-2 text-[10.5px] sm:text-xs font-bold text-gray-700 shadow-xs transition hover:bg-gray-50 cursor-pointer shrink-0"
               >
-                <Calendar size={15} className="text-gray-500" />
-                <span>{timeFilter}</span>
-                <ChevronDown size={14} className="text-gray-400" />
+                <Calendar size={13} className="text-gray-500 shrink-0" />
+                <span className="truncate max-w-[55px] sm:max-w-none">{timeFilter}</span>
+                <ChevronDown size={13} className="text-gray-400 shrink-0" />
               </button>
 
               {filterDropdownOpen && (
-                <div className="absolute right-0 top-11 z-30 w-40 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
+                <div className="absolute right-0 top-10 sm:top-11 z-30 w-36 sm:w-40 rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
                   {timeOptions.map((opt) => (
                     <button
                       key={opt}
@@ -236,7 +232,7 @@ export default function CvpProgramPage() {
                         setTimeFilter(opt);
                         setFilterDropdownOpen(false);
                       }}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-medium transition cursor-pointer ${
+                      className={`flex w-full items-center justify-between rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 text-left text-xs font-medium transition cursor-pointer ${
                         timeFilter === opt
                           ? "bg-emerald-50 text-emerald-700 font-bold"
                           : "text-gray-700 hover:bg-gray-50"
@@ -255,16 +251,16 @@ export default function CvpProgramPage() {
               <button
                 type="button"
                 onClick={() => setMenuDropdownOpen((v) => !v)}
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200/90 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 cursor-pointer"
+                className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-gray-200/90 bg-white text-gray-600 shadow-xs transition hover:bg-gray-50 cursor-pointer shrink-0"
                 aria-label="More options"
               >
-                <MoreVertical size={18} />
+                <MoreVertical size={16} />
               </button>
 
               {menuDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setMenuDropdownOpen(false)} />
-                  <div className="absolute right-0 top-11 z-40 w-44 rounded-2xl border border-gray-100 bg-white p-2 shadow-[0_12px_32px_rgba(0,0,0,0.12)]">
+                  <div className="absolute right-0 top-10 sm:top-11 z-40 w-44 rounded-2xl border border-gray-100 bg-white p-2 shadow-[0_12px_32px_rgba(0,0,0,0.12)]">
                     <button
                       type="button"
                       onClick={() => {
@@ -425,19 +421,19 @@ export default function CvpProgramPage() {
         </div>
 
         {/* ================= HORIZONTAL TABS ================= */}
-        <div className="mb-6 flex items-center justify-between border-b border-gray-100 pb-3">
-          <div className="flex items-center gap-5 sm:gap-10">
+        <div className="mb-6 border-b border-gray-100 pb-3 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-5 sm:gap-10 min-w-max whitespace-nowrap">
             {/* Hours Log Tab */}
             <button
               type="button"
               onClick={() => setActiveTab("hours")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer ${
                 activeTab === "hours"
                   ? "text-[#059669]"
                   : "text-gray-400 hover:text-gray-700"
               }`}
             >
-              <Clock size={18} strokeWidth={activeTab === "hours" ? 2.5 : 2} />
+              <Clock size={18} strokeWidth={activeTab === "hours" ? 2.5 : 2} className="shrink-0" />
               <span>Hours Log</span>
             </button>
 
@@ -445,13 +441,13 @@ export default function CvpProgramPage() {
             <button
               type="button"
               onClick={() => setActiveTab("perks")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer ${
                 activeTab === "perks"
                   ? "text-[#059669]"
                   : "text-gray-400 hover:text-gray-700"
               }`}
             >
-              <Gift size={18} strokeWidth={activeTab === "perks" ? 2.5 : 2} />
+              <Gift size={18} strokeWidth={activeTab === "perks" ? 2.5 : 2} className="shrink-0" />
               <span>Credits & Perks</span>
             </button>
 
@@ -459,13 +455,13 @@ export default function CvpProgramPage() {
             <button
               type="button"
               onClick={() => setActiveTab("handbook")}
-              className={`flex items-center gap-2 text-sm font-bold transition cursor-pointer ${
+              className={`flex shrink-0 items-center gap-2 text-sm font-bold whitespace-nowrap transition cursor-pointer ${
                 activeTab === "handbook"
                   ? "text-[#059669]"
                   : "text-gray-400 hover:text-gray-700"
               }`}
             >
-              <BookOpen size={18} strokeWidth={activeTab === "handbook" ? 2.5 : 2} />
+              <BookOpen size={18} strokeWidth={activeTab === "handbook" ? 2.5 : 2} className="shrink-0" />
               <span>Handbook & Guidelines</span>
             </button>
           </div>
@@ -474,43 +470,27 @@ export default function CvpProgramPage() {
         {/* ================= TAB 1: HOURS LOG ================= */}
         {activeTab === "hours" && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-black text-slate-900">Volunteer Hours Activity</h4>
-                <p className="text-xs text-slate-500">Every 2 verified hours gives you 1 free studio pass credit</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowLogModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#059669] px-4 py-2 text-xs font-bold text-white hover:bg-[#047857] shadow-xs cursor-pointer self-start sm:self-auto"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Log Self Hours</span>
-              </button>
-            </div>
-
-            <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
+              <table className="w-full min-w-[580px] text-left text-xs whitespace-nowrap">
                 <thead className="border-b border-slate-100 bg-slate-50/75 text-slate-500 font-bold">
                   <tr>
-                    <th className="px-4 py-3">Event / Task</th>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">Role</th>
-                    <th className="px-4 py-3">Hours</th>
-                    <th className="px-4 py-3">Verified By</th>
-                    <th className="px-4 py-3 text-right">Status</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Event / Task</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Date</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Role</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Hours</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Verified By</th>
+                    <th className="px-4 py-3 text-right whitespace-nowrap">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {hoursLog.map((log) => (
                     <tr key={log.id} className="hover:bg-slate-50/50 transition">
-                      <td className="px-4 py-3.5 font-bold text-slate-900">{log.eventName}</td>
-                      <td className="px-4 py-3.5 text-slate-600">{log.date}</td>
-                      <td className="px-4 py-3.5 text-slate-600">{log.role}</td>
-                      <td className="px-4 py-3.5 font-black text-emerald-700">{log.hours} hrs</td>
-                      <td className="px-4 py-3.5 text-slate-500">{log.verifiedBy}</td>
-                      <td className="px-4 py-3.5 text-right">
+                      <td className="px-4 py-3.5 font-bold text-slate-900 whitespace-nowrap">{log.eventName}</td>
+                      <td className="px-4 py-3.5 text-slate-600 whitespace-nowrap">{log.date}</td>
+                      <td className="px-4 py-3.5 text-slate-600 whitespace-nowrap">{log.role}</td>
+                      <td className="px-4 py-3.5 font-black text-emerald-700 whitespace-nowrap">{log.hours} hrs</td>
+                      <td className="px-4 py-3.5 text-slate-500 whitespace-nowrap">{log.verifiedBy}</td>
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
                         <span
                           className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
                             log.status === "Verified"
@@ -755,17 +735,15 @@ export default function CvpProgramPage() {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      <div className="mx-auto max-w-[1440px] p-4 md:p-6">
+      <div className="mx-auto max-w-[1440px] p-2.5 sm:p-4 md:p-6">
         <div className="hidden gap-6 xl:flex">
           <DashboardSidebar mode="fixed" />
           <div className="min-w-0 flex-1 space-y-6">
-            <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
             {content}
           </div>
         </div>
         <div className="xl:hidden">
-          <div className="space-y-5 pb-6">
-            <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
+          <div className="pb-6">
             {content}
           </div>
         </div>
