@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {useNavigate, useLocation} from 'react-router-dom';
+import {useLocation} from 'react-router-dom';
 import {DashboardSidebar} from '../../components/dashboard/DashboardSidebar';
 import {TopNavbar, MobileHeader} from '../../components/dashboard/TopNavbar';
 import {HeroBanner, ProfileAsideCard} from '../../components/dashboard/HeroBanner';
@@ -19,6 +19,7 @@ import {HelpSupportBottomSheet} from '../../components/dashboard/HelpSupportBott
 import {VisitBottomSheet} from '../../components/dashboard/VisitBottomSheet';
 import {ShareBottomSheet} from '../../components/dashboard/ShareBottomSheet';
 import {NotificationsBottomSheet} from '../../components/dashboard/NotificationsBottomSheet';
+import {ProgramsBottomSheet} from '../../components/dashboard/ProgramsBottomSheet';
 
 export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,11 +28,11 @@ export default function HomePage() {
   const [eventsOpen, setEventsOpen] = useState(false);
   const [spaceOpen, setSpaceOpen] = useState(false);
   const [woofooOpen, setWoofooOpen] = useState(false);
+  const [programsOpen, setProgramsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [visitOpen, setVisitOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
@@ -72,7 +73,7 @@ export default function HomePage() {
     } else if (id === 'cafe') {
       setWoofooOpen(true);
     } else if (id === 'programs') {
-      navigate('/ourprograms');
+      setProgramsOpen(true);
     }
   };
  
@@ -84,12 +85,16 @@ export default function HomePage() {
         mode="drawer"
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        onProgramsClick={() => setProgramsOpen(true)}
       />
 
       <div className="mx-auto max-w-[1440px] p-4 md:p-6">
         {/* Desktop / tablet shell */}
         <div className="hidden gap-6 xl:flex">
-          <DashboardSidebar mode="fixed" />
+          <DashboardSidebar
+            mode="fixed"
+            onProgramsClick={() => setProgramsOpen(true)}
+          />
 
           <div className="min-w-0 flex-1 space-y-6">
             <TopNavbar
@@ -136,6 +141,7 @@ export default function HomePage() {
       <EventsBottomSheet isOpen={eventsOpen} onClose={() => setEventsOpen(false)} />
       <SpaceBottomSheet isOpen={spaceOpen} onClose={() => setSpaceOpen(false)} />
       <WoofooBottomSheet isOpen={woofooOpen} onClose={() => setWoofooOpen(false)} />
+      <ProgramsBottomSheet isOpen={programsOpen} onClose={() => setProgramsOpen(false)} />
       <HelpSupportBottomSheet isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
       <VisitBottomSheet isOpen={visitOpen} onClose={() => setVisitOpen(false)} />
       <ShareBottomSheet isOpen={shareOpen} onClose={() => setShareOpen(false)} />

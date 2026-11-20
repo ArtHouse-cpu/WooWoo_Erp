@@ -1,12 +1,12 @@
 import type {LucideIcon} from 'lucide-react';
 import {
   Calendar,
+  CalendarCheck,
   Coffee,
   Compass,
   Crown,
   Gift,
   Home,
-  LayoutDashboard,
   MapPin,
   MessageCircle,
   Settings,
@@ -14,6 +14,7 @@ import {
   Star,
   User,
   Users,
+  Wallet,
   Wrench,
   Activity,
   Sparkles,
@@ -37,16 +38,14 @@ export type ActionItem = {
 };
 
 export const dashboardNav: NavItem[] = [
-  {id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, to: '/home', section: 'Main'},
-
+  {id: 'home', label: 'Home', icon: Home, to: '/home', section: 'Main'},
+  {id: 'bookings', label: 'Bookings', icon: CalendarCheck, to: '/booking', section: 'Main'},
+  {id: 'activities', label: 'Activities', icon: Activity, to: '/activities', section: 'Main'},
   {id: 'programs', label: 'Programs', icon: Sparkles, to: '/ourprograms', section: 'Main'},
-
-  {id: 'activity', label: 'Activities', icon: Activity, to: '/activities', section: 'Main'},
-  
   {id: 'membership', label: 'Membership', icon: Crown, to: '/membership', section: 'Main'},
+  {id: 'wallet', label: 'Wallet', icon: Wallet, to: '/wallet', section: 'Main'},
 
-  {id: 'account', label: 'Account', icon: User, to: '/profile', section: 'Account'},
-
+  {id: 'profile', label: 'Profile', icon: User, to: '/profile', section: 'Account'},
   {id: 'settings', label: 'Settings', icon: Settings, to: '/settings', section: 'Account'},
 ];
 

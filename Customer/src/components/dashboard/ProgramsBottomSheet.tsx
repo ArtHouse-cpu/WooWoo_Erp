@@ -419,11 +419,7 @@ export function ProgramsBottomSheet({
 
   const handleTabClick = (tab: TabId) => {
     setActiveTab(tab);
-    if (
-      asPage ||
-      window.location.pathname.startsWith("/program") ||
-      window.location.pathname.startsWith("/ourprograms")
-    ) {
+    if (asPage) {
       if (tab === "all") {
         navigate("/ourprograms", { replace: true });
       } else {
@@ -540,23 +536,17 @@ export function ProgramsBottomSheet({
       if (!asPage) {
         onClose();
       }
-      navigate("/programs");
+      navigate("/program");
     } else if (tab === "hap") {
       if (!asPage) {
         onClose();
       }
       navigate("/program/hap");
-      if (activeTab !== "hap") {
-        handleTabClick("hap");
-      }
     } else if (tab === "cvp") {
       if (!asPage) {
         onClose();
       }
       navigate("/program/cvp");
-      if (activeTab !== "cvp") {
-        handleTabClick("cvp");
-      }
     }
   };
 

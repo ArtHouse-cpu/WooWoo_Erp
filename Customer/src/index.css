@@ -5,11 +5,18 @@
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --color-brand-blue: #2f6fed;
   --color-brand-orange: #f08a3c;
-  --color-ink: #111827;
-  --color-muted: #6b7280;
+  --color-brand-purple: #673DE6;
+  --color-brand-purple-hover: #5830d4;
+  --color-brand-lavender: #F5F0FF;
+  --color-brand-surface: #FAF7FF;
+  --color-brand-border: #E9D5FF;
+  --color-brand-dark-purple: #3B0764;
+  --color-ink: #0F172A;
+  --color-muted: #64748B;
   --color-surface: #f3f4f6;
   --color-card: #ffffff;
-  --shadow-card: 0 20px 50px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 10px 30px rgba(103, 61, 230, 0.06);
+  --shadow-card-hover: 0 14px 36px rgba(103, 61, 230, 0.12);
 }
 
 @layer base {
@@ -64,6 +71,22 @@
     background: rgba(255, 255, 255, 0.96);
     backdrop-filter: blur(16px);
     box-shadow: var(--shadow-card);
+  }
+
+  .safe-pb {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .safe-pt {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  }
+
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+
+  .h-dvh {
+    height: 100dvh;
   }
 }
 

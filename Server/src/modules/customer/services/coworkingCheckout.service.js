@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import AllBooking from '../../../models/allBooking.model.js';
 import Space from '../../../models/space.model.js';
+import SpaceBooking from '../../../models/spaceBooking.model.js';
 import CustomerSpaceCheckout from '../../../models/customerSpaceCheckout.model.js';
 import {validateCouponForOrder} from '../../../controllers/coupon.controller.js';
 import {createRazorpayOrder, verifyRazorpaySignature} from '../../../services/razorpay.service.js';
@@ -238,28 +239,89 @@ export const verifyCoworkingCheckout = async (customer, body = {}) => {
 
 export const listMyCoworkingBookings = async customer => {
   const phone = String(customer.mobile || '').replace(/\D/g, '').slice(-10);
-  const rows = await AllBooking.find({
-    spaceType: 'Coworking',
-    $or: [{customerId: customer._id}, ...(phone ? [{customerPhone: phone}] : [])],
-  })
-    .sort({createdAt: -1})
-    .lean();
-  return rows.map(row => {
+  const email = String(customer.email || '').trim().toLowerCase();
+
+  const [allRows, spaceRows] = await Promise.all([
+    AllBooking.find({
+      $or: [{customerId: customer._id}, ...(phone ? [{customerPhone: phone}] : [])],
+    })
+      .sort({createdAt: -1})
+      .lean(),
+    SpaceBooking.find({
+      $or: [
+        ...(email ? [{customerEmail: email}] : []),
+        ...(phone ? [{customerPhone: {$regex: `${phone}$`}}] : []),
+      ],
+    })
+      .sort({createdAt: -1})
+      .lean(),
+  ]);
+
+  const allItems = (allRows || []).map(row => {
     const payment = Array.isArray(row.payments) ? row.payments[0] : null;
+    const discount = (row.membershipDiscount || 0) + Math.max(0, (row.subTotal || 0) - (row.grandTotal || 0));
+    const cashback = row.cashbackTotal || 0;
     return {
       id: String(row._id),
       bookingCode: row.bookingCode || `AB-${String(row._id).slice(-6).toUpperCase()}`,
-      planName: row.spaceCategory || row.spaceName,
+      planName: row.spaceCategory || row.spaceName || 'Booking',
       spaceName: row.spaceName,
+      spaceType: row.spaceType || 'Coworking',
       startDate: row.bookingDate,
+      startTime: row.startTime,
+      endTime: row.endTime,
+      durationHours: row.durationHours,
       payable: row.grandTotal,
-      regularTotal: row.subTotal,
-      savings: money((row.subTotal || 0) - (row.grandTotal || 0)),
+      regularTotal: row.subTotal || row.grandTotal,
+      savings: money(discount),
+      discount: money(discount),
+      cashback: money(cashback),
+      benefit: money(discount + cashback),
       paymentStatus: row.paymentStatus,
       paymentMode: payment?.mode || '',
       razorpayPaymentId: payment?.referenceId || '',
       status: row.status,
       notes: row.notes || '',
+      createdAt: row.createdAt,
     };
   });
+
+  const spaceItems = (spaceRows || []).map(b => {
+    const discount = (b.discountAmount || 0) + (b.offerDiscount || 0);
+    const cashback = b.cashbackAmount || 0;
+    return {
+      id: String(b._id),
+      bookingCode: b.bookingCode || `SP-${String(b._id).slice(-6).toUpperCase()}`,
+      planName: b.spaceName || 'Space Booking',
+      spaceName: b.spaceName,
+      spaceType: b.spaceType || 'Space',
+      startDate: b.bookingDate,
+      startTime: b.startTime,
+      endTime: b.endTime,
+      durationHours: b.durationHours,
+      payable: b.paidAmount || b.grandTotal,
+      regularTotal: b.subTotal || b.grandTotal,
+      savings: money(discount),
+      discount: money(discount),
+      cashback: money(cashback),
+      benefit: money(discount + cashback),
+      paymentStatus: b.paymentStatus,
+      paymentMode: b.paymentMode,
+      status: b.status || 'Upcoming',
+      notes: b.notes || '',
+      createdAt: b.createdAt,
+    };
+  });
+
+  const combined = [...allItems, ...spaceItems];
+  const seen = new Set();
+  const deduped = [];
+  for (const item of combined) {
+    if (!seen.has(item.bookingCode)) {
+      seen.add(item.bookingCode);
+      deduped.push(item);
+    }
+  }
+  deduped.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  return deduped;
 };

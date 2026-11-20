@@ -106,6 +106,7 @@ export function SpaceQueryModal({
 
   const [purpose, setPurpose] = useState(POPULAR_PURPOSES[0]);
   const [customPurpose, setCustomPurpose] = useState('');
+  const [isPurposeDropdownOpen, setIsPurposeDropdownOpen] = useState(false);
   const [date, setDate] = useState('');
   const [durationHours, setDurationHours] = useState(3);
   const [startTime, setStartTime] = useState('09:00');
@@ -121,7 +122,10 @@ export function SpaceQueryModal({
   const todayIso = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setIsPurposeDropdownOpen(false);
+      return;
+    }
     if (!date) {
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
@@ -344,6 +348,50 @@ export function SpaceQueryModal({
               <div className="h-1.5 w-12 rounded-full bg-slate-200" />
             </div>
 
+            {/* In-Modal Purpose Selection Overlay (Covers within this modal only on mobile) */}
+            {isPurposeDropdownOpen && (
+              <div className="absolute inset-0 z-30 bg-white flex flex-col sm:hidden animate-in fade-in duration-150">
+                <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-orange-50/60 via-white to-white">
+                  <span className="text-sm font-semibold text-slate-800">
+                    Select Purpose
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsPurposeDropdownOpen(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition cursor-pointer"
+                    aria-label="Close purpose selection"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                  {POPULAR_PURPOSES.map(p => {
+                    const isSelected = purpose === p;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          setPurpose(p);
+                          setIsPurposeDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition cursor-pointer text-left ${
+                          isSelected
+                            ? 'bg-[#FFF0EB] text-[#EA580C]'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>{p}</span>
+                        {isSelected && (
+                          <span className="text-xs font-medium text-[#EA580C]">✓</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Modal Header */}
             <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-orange-50/60 via-white to-white">
               <div className="flex items-center gap-3">
@@ -351,7 +399,7 @@ export function SpaceQueryModal({
                   <Compass className="h-5 w-5 stroke-[2.2]" />
                 </div>
                 <div>
-                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 tracking-tight">
                     Space Enquiry &amp; Availability
                   </h3>
                 </div>
@@ -368,17 +416,30 @@ export function SpaceQueryModal({
             </div>
 
             {/* Modal Form Scrollable Area */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4 sm:space-y-4.5 text-left">
-              {/* 1. Purpose (Dropdown) */}
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4 text-left">
+              {/* 1. Purpose */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
                   Purpose
                 </label>
-                <div className="relative">
+                {/* Mobile Button: opens in-modal dropdown */}
+                <div className="sm:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setIsPurposeDropdownOpen(true)}
+                    className="w-full h-10 px-3.5 text-xs font-medium rounded-xl border border-slate-200 bg-white text-slate-800 flex items-center justify-between cursor-pointer text-left focus:outline-hidden focus:border-[#EA580C]"
+                  >
+                    <span className="truncate">{purpose}</span>
+                    <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
+                  </button>
+                </div>
+
+                {/* Desktop Native Select */}
+                <div className="hidden sm:block relative">
                   <select
                     value={purpose}
                     onChange={e => setPurpose(e.target.value)}
-                    className="w-full h-[42px] px-3.5 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white cursor-pointer appearance-none pr-9 text-slate-800"
+                    className="w-full h-10 px-3.5 text-xs font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white cursor-pointer appearance-none pr-9 text-slate-800"
                   >
                     {POPULAR_PURPOSES.map(p => (
                       <option key={p} value={p}>
@@ -396,7 +457,7 @@ export function SpaceQueryModal({
                       value={customPurpose}
                       onChange={e => setCustomPurpose(e.target.value)}
                       placeholder="Please specify your event / purpose..."
-                      className="w-full h-[42px] px-3.5 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800"
+                      className="w-full h-10 px-3.5 text-xs font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800"
                     />
                   </div>
                 )}
@@ -405,7 +466,7 @@ export function SpaceQueryModal({
               {/* 2. Select Date & Hours Required in Same Row */}
               <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 truncate">
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5 truncate">
                     Select Date <span className="text-[#EA580C]">*</span>
                   </label>
                   <input
@@ -414,20 +475,20 @@ export function SpaceQueryModal({
                     value={date}
                     onChange={e => setDate(e.target.value)}
                     required
-                    className="w-full h-[42px] px-3 text-xs font-semibold rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800 cursor-pointer"
+                    className="w-full h-10 px-3 text-xs font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800 cursor-pointer"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 truncate">
+                  <label className="block text-xs font-medium text-slate-600 mb-1.5 truncate">
                     Hours Required <span className="text-[#EA580C]">*</span>
                   </label>
-                  <div className="flex h-[42px] items-center justify-between rounded-xl border border-slate-200 bg-white px-2">
+                  <div className="flex h-10 items-center justify-between rounded-xl border border-slate-200 bg-white px-2">
                     <button
                       type="button"
                       onClick={() => handleDurationChange(Math.max(1, durationHours - 1))}
                       disabled={durationHours <= 1}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-sm active:scale-95 transition cursor-pointer"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs active:scale-95 transition cursor-pointer"
                       title="Decrease hours"
                     >
                       -
@@ -444,9 +505,9 @@ export function SpaceQueryModal({
                             handleDurationChange(Math.max(1, Math.min(18, val)));
                           }
                         }}
-                        className="w-8 sm:w-10 text-center text-xs font-semibold text-slate-800 bg-transparent focus:outline-none"
+                        className="w-8 sm:w-10 text-center text-xs font-medium text-slate-800 bg-transparent focus:outline-none"
                       />
-                      <span className="text-xs font-semibold text-slate-600">
+                      <span className="text-xs font-medium text-slate-600">
                         {durationHours === 1 ? 'Hour' : 'Hours'}
                       </span>
                     </div>
@@ -454,7 +515,7 @@ export function SpaceQueryModal({
                       type="button"
                       onClick={() => handleDurationChange(Math.min(18, durationHours + 1))}
                       disabled={durationHours >= 18}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-bold text-sm active:scale-95 transition cursor-pointer"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-xs active:scale-95 transition cursor-pointer"
                       title="Increase hours"
                     >
                       +
@@ -466,11 +527,11 @@ export function SpaceQueryModal({
               {/* 3. Custom Time Slot Selection */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <label className="block text-xs font-medium text-slate-600">
                     Preferred Time Slot <span className="text-[#EA580C]">*</span>
                   </label>
                   <span
-                    className={`text-xs font-bold ${
+                    className={`text-xs font-medium ${
                       isValidTimeRange ? 'text-[#EA580C]' : 'text-rose-500'
                     }`}
                   >
@@ -487,13 +548,13 @@ export function SpaceQueryModal({
                       max="23:59"
                       value={startTime}
                       onChange={e => handleStartTimeChange(e.target.value)}
-                      className="w-full h-[42px] px-3 text-xs font-semibold text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
+                      className="w-full h-10 px-3 text-xs font-medium text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
                       title="Start Time"
                       required
                     />
                   </div>
 
-                  <span className="text-xs font-bold text-slate-400 px-1">to</span>
+                  <span className="text-xs font-medium text-slate-400 px-1">to</span>
 
                   {/* End Time Input */}
                   <div className="relative">
@@ -503,7 +564,7 @@ export function SpaceQueryModal({
                       max="23:59"
                       value={endTime === '24:00' ? '00:00' : endTime}
                       onChange={e => handleEndTimeChange(e.target.value)}
-                      className="w-full h-[42px] px-3 text-xs font-semibold text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
+                      className="w-full h-10 px-3 text-xs font-medium text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
                       title="End Time"
                       required
                     />
@@ -521,7 +582,7 @@ export function SpaceQueryModal({
                         key={slot.label}
                         type="button"
                         onClick={() => handleSelectQuickSlot(slot.start, slot.end)}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition cursor-pointer border ${
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-medium shrink-0 transition cursor-pointer border ${
                           isSelected
                             ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C]'
                             : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
@@ -534,7 +595,7 @@ export function SpaceQueryModal({
                 </div>
 
                 {!isValidTimeRange && (
-                  <p className="mt-1 text-xs font-semibold text-rose-500">
+                  <p className="mt-1 text-xs font-medium text-rose-500">
                     End time must be at least 1 hour after start time (within 06:00 AM – 12:00 AM).
                   </p>
                 )}
@@ -548,7 +609,7 @@ export function SpaceQueryModal({
                       <Users className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-700 leading-tight">Total Guests</p>
+                      <p className="text-xs font-medium text-slate-700 leading-tight">Total Guests</p>
                       <p className="text-xs font-normal text-slate-500 leading-tight">Number of attendees</p>
                     </div>
                   </div>
@@ -557,7 +618,7 @@ export function SpaceQueryModal({
                     <button
                       type="button"
                       onClick={() => setGuestsCount(prev => Math.max(1, prev - 1))}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-bold cursor-pointer text-sm active:scale-95 transition"
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-medium cursor-pointer text-xs active:scale-95 transition"
                     >
                       -
                     </button>
@@ -566,12 +627,12 @@ export function SpaceQueryModal({
                       min={1}
                       value={guestsCount}
                       onChange={e => setGuestsCount(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-12 text-center text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl py-1 focus:outline-hidden focus:border-[#EA580C]"
+                      className="w-12 text-center text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-xl py-1 focus:outline-hidden focus:border-[#EA580C]"
                     />
                     <button
                       type="button"
                       onClick={() => setGuestsCount(prev => prev + 1)}
-                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-bold cursor-pointer text-sm active:scale-95 transition"
+                      className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 font-medium cursor-pointer text-xs active:scale-95 transition"
                     >
                       +
                     </button>
@@ -581,7 +642,7 @@ export function SpaceQueryModal({
 
               {/* 5. Additional Services (One Row Scrollable) */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                <label className="block text-xs font-medium text-slate-600 mb-2">
                   Additional Services (Optional)
                 </label>
                 <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
@@ -600,7 +661,7 @@ export function SpaceQueryModal({
                         }`}
                       >
                         <div
-                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border text-[10px] font-bold ${
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-md border text-[10px] font-medium ${
                             isChecked
                               ? 'border-[#EA580C] bg-[#EA580C] text-white'
                               : 'border-slate-300 bg-white'
@@ -609,7 +670,7 @@ export function SpaceQueryModal({
                           {isChecked ? '✓' : ''}
                         </div>
                         <Icon className="h-3.5 w-3.5 shrink-0" />
-                        <span className="text-xs font-semibold whitespace-nowrap">
+                        <span className="text-xs font-medium whitespace-nowrap">
                           {amenity.label}
                         </span>
                       </button>
@@ -626,7 +687,7 @@ export function SpaceQueryModal({
                       <Utensils className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-700 leading-tight">Food (Only Veg)</p>
+                      <p className="text-xs font-medium text-slate-700 leading-tight">Food (Only Veg)</p>
                       <p className="text-xs font-normal text-slate-500 leading-tight">Require catering or snacks?</p>
                     </div>
                   </div>
@@ -639,7 +700,7 @@ export function SpaceQueryModal({
                         setFoodVegRequired(false);
                         setSelectedFoodItems([]);
                       }}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
                         !foodVegRequired
                           ? 'bg-white text-slate-900 shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
@@ -652,7 +713,7 @@ export function SpaceQueryModal({
                       onClick={() => {
                         setFoodVegRequired(true);
                       }}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      className={`px-3 py-1 rounded-lg text-xs font-medium transition cursor-pointer ${
                         foodVegRequired
                           ? 'bg-emerald-600 text-white shadow-xs'
                           : 'text-slate-600 hover:text-slate-900'
@@ -671,7 +732,7 @@ export function SpaceQueryModal({
                     exit={{opacity: 0, height: 0}}
                     className="pt-2 border-t border-slate-200/60"
                   >
-                    <p className="text-xs font-semibold text-slate-600 mb-2">
+                    <p className="text-xs font-medium text-slate-600 mb-2">
                       Select Required Veg Food Categories:
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -682,14 +743,14 @@ export function SpaceQueryModal({
                             type="button"
                             key={opt}
                             onClick={() => toggleFoodItem(opt)}
-                            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+                            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-medium transition cursor-pointer ${
                               isSelected
                                 ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-2xs'
                                 : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                             }`}
                           >
                             <div
-                              className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border text-[9px] font-black ${
+                              className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border text-[9px] font-medium ${
                                 isSelected
                                   ? 'border-emerald-600 bg-emerald-600 text-white'
                                   : 'border-slate-300 bg-white'
@@ -708,7 +769,7 @@ export function SpaceQueryModal({
 
               {/* 7. Additional Notes */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">
                   Additional Notes or Specific Requests
                 </label>
                 <textarea
@@ -716,7 +777,7 @@ export function SpaceQueryModal({
                   onChange={e => setNotes(e.target.value)}
                   rows={2}
                   placeholder="e.g. Need acoustic setup, specific stage decoration, extended hours..."
-                  className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] text-slate-800 placeholder:text-slate-400"
+                  className="w-full px-3.5 py-2 text-xs font-medium rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] text-slate-800 placeholder:text-slate-400"
                 />
               </div>
 
@@ -725,7 +786,7 @@ export function SpaceQueryModal({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#EA580C] to-[#D97706] hover:from-[#D97706] hover:to-[#EA580C] text-white text-xs sm:text-[13px] font-extrabold flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition active:scale-[0.99] cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#EA580C] to-[#D97706] hover:from-[#D97706] hover:to-[#EA580C] text-white text-sm font-medium flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition active:scale-[0.99] cursor-pointer"
                 >
                   <Send className="h-4 w-4" />
                   <span>Submit Query</span>
