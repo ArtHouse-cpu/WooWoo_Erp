@@ -5,19 +5,27 @@ export type CoworkingReceipt = {
   bookingCode: string;
   planName: string;
   spaceName?: string;
+  spaceType?: string;
   drink?: string;
   startDate?: string;
+  startTime?: string;
+  endTime?: string;
+  durationHours?: number;
   coworkingEnd?: string;
   membershipEnd?: string;
   membershipName?: string;
   regularTotal: number;
   payable: number;
   savings: number;
+  discount?: number;
+  cashback?: number;
+  benefit?: number;
   paymentStatus?: string;
   paymentMode?: string;
   razorpayPaymentId?: string;
   status?: string;
   notes?: string;
+  createdAt?: string;
 };
 
 type Envelope<T> = {success: boolean; message?: string; data: T};

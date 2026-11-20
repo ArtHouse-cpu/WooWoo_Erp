@@ -1209,16 +1209,16 @@ export function SpaceDetailsModal({
                   </div>
 
                   {/* Cashback Banner */}
-                  <div className="rounded-2xl border border-purple-100 bg-[#FAF7FF] p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-3xs cursor-pointer hover:bg-purple-50/70 transition">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 shadow-3xs">
-                        <Gift size={20} className="stroke-[2.2]" />
+                  <div className="rounded-2xl border border-purple-100 bg-[#FAF7FF] p-2.5 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3 shadow-3xs cursor-pointer hover:bg-purple-50/70 transition">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                      <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl bg-amber-100 text-amber-600 shadow-3xs">
+                        <Gift size={18} className="stroke-[2.2]" />
                       </div>
-                      <div className="min-w-0">
-                        <h4 className="font-display font-black text-xs sm:text-sm text-[#6344E7] leading-tight">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-display font-black text-[11px] min-[360px]:text-xs sm:text-sm text-[#6344E7] leading-tight whitespace-nowrap truncate">
                           ₹500 Cashback on Monthly &amp; Above Plans
                         </h4>
-                        <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 leading-snug truncate">
+                        <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 leading-snug whitespace-nowrap truncate">
                           Redeem on inhouse food orders, supplies shopping, space bookings.
                         </p>
                       </div>
@@ -1651,6 +1651,15 @@ export function SpaceDetailsModal({
               <div className="grid grid-cols-2 gap-2 sm:gap-2.5 pt-1">
                 {/* Dates Selector with Calendar Popover */}
                 <div className="relative" ref={calendarRef}>
+                  <label
+                    onClick={() => {
+                      setShowDatePicker(v => !v);
+                      setShowTimePicker(false);
+                    }}
+                    className="block text-xs sm:text-sm font-extrabold text-[#111111] mb-1.5 cursor-pointer"
+                  >
+                    Select Date
+                  </label>
                   <button
                     type="button"
                     onClick={() => {
@@ -1760,6 +1769,15 @@ export function SpaceDetailsModal({
 
                 {/* Timing Selector with Popover */}
                 <div className="relative" ref={timePickerRef}>
+                  <label
+                    onClick={() => {
+                      setShowTimePicker(v => !v);
+                      setShowDatePicker(false);
+                    }}
+                    className="block text-xs sm:text-sm font-extrabold text-[#111111] mb-1.5 cursor-pointer"
+                  >
+                    Select Time
+                  </label>
                   <button
                     type="button"
                     onClick={() => {

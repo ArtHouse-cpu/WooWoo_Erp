@@ -34,6 +34,8 @@ import {useAuthStore} from './store/authStore';
 import {getPostAuthPath} from './utils/onboarding';
 import ProgramsPage from './app/programs/ProgramsPage';
 import OurProgramsPage from './app/programs/OurProgramsPage';
+import HapProgramPage from './app/programs/HapProgramPage';
+import CvpProgramPage from './app/programs/CvpProgramPage';
 import MyBookingsPage from './app/bookings/MyBookingsPage';
 import CspProgramPage from './app/programs/CspProgramPage';
 import ActivityPage from './app/activity/ActivityPage';
@@ -97,13 +99,15 @@ export default function App() {
                 <Route path="/settings" element={<ProfilePage />} />
                 <Route path="/membership" element={<MembershipOnboardingPage />} />
                 <Route path="/programs" element={<ProgramsPage />} />
+                <Route path="/program" element={<ProgramsPage />} />
                 <Route path="/ourprograms" element={<OurProgramsPage />} />
-                <Route path="/program/csp" element={<OurProgramsPage defaultTab="csp" />} />
-                <Route path="/program/cvp" element={<OurProgramsPage defaultTab="cvp" />} />
-                <Route path="/program/hap" element={<OurProgramsPage defaultTab="hap" />} />
+                <Route path="/program/csp" element={<ProgramsPage />} />
+                <Route path="/program/cvp" element={<CvpProgramPage />} />
+                <Route path="/program/hap" element={<HapProgramPage />} />
                 <Route path="/program/:tab" element={<OurProgramsPage />} />
                 <Route path="/programs/:tab" element={<OurProgramsPage />} />
                 <Route path="/booking" element={<MyBookingsPage />} />
+                <Route path="/bookings" element={<Navigate to="/booking" replace />} />
                 <Route path="/csp-program" element={<CspProgramPage />} />
                 <Route path="/activities" element={<ActivityPage />} />
 
@@ -131,9 +135,11 @@ export default function App() {
             <Route path="/exhibition" element={<ExhibitionPage />} />
             <Route path="/supplies/product/:id" element={<PublicProductPage />} />
             <Route path="/spaces/space/:id" element={<PublicSpacePage />} />
-            <Route path="/program/csp" element={<OurProgramsPage defaultTab="csp" />} />
-            <Route path="/program/cvp" element={<OurProgramsPage defaultTab="cvp" />} />
-            <Route path="/program/hap" element={<OurProgramsPage defaultTab="hap" />} />
+            <Route path="/programs" element={<ProgramsPage />} />
+            <Route path="/program" element={<ProgramsPage />} />
+            <Route path="/program/csp" element={<ProgramsPage />} />
+            <Route path="/program/cvp" element={<CvpProgramPage />} />
+            <Route path="/program/hap" element={<HapProgramPage />} />
             <Route path="/program/:tab" element={<OurProgramsPage />} />
             <Route path="/programs/:tab" element={<OurProgramsPage />} />
             <Route path="*" element={<RootRedirect />} />

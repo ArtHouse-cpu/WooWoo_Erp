@@ -11,9 +11,10 @@ type Props = {
   mode?: 'fixed' | 'drawer';
   open?: boolean;
   onClose?: () => void;
+  onProgramsClick?: () => void;
 };
 
-export function DashboardSidebar({mode = 'fixed', open = true, onClose}: Props) {
+export function DashboardSidebar({mode = 'fixed', open = true, onClose, onProgramsClick}: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const logout = useAuthStore(s => s.logout);
@@ -66,19 +67,45 @@ export function DashboardSidebar({mode = 'fixed', open = true, onClose}: Props) 
           return (
             <div key={section} className="mb-4">
               {section !== 'Main' ? (
-                <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
-                  {section}
-                </p>
+                <>
+                  <div className="my-3 mx-2 border-t border-slate-100" />
+                  <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-[#9CA3AF]">
+                    {section}
+                  </p>
+                </>
               ) : null}
               <ul className="space-y-1">
                 {items.map(item => {
-                  const active = item.to ? location.pathname === item.to : false;
+                  const active = item.to
+                    ? location.pathname === item.to ||
+                      (item.id === 'bookings' && (location.pathname === '/booking' || location.pathname === '/bookings')) ||
+                      (item.id === 'home' && (location.pathname === '/home' || location.pathname === '/')) ||
+                      (item.id === 'programs' && (location.pathname === '/programs' || location.pathname === '/program' || location.pathname === '/ourprograms' || location.pathname.startsWith('/program/')))
+                    : false;
                   const Icon = item.icon;
                   const className = `flex h-12 w-full items-center gap-3 rounded-[14px] px-3 text-[14px] font-medium transition ${
                     active
                       ? 'bg-[#EEF4FF] text-[#2563EB]'
                       : 'text-[#374151] hover:bg-[#F3F4F6]'
                   }`;
+
+                  if (item.id === 'programs' && onProgramsClick) {
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose?.();
+                            onProgramsClick();
+                          }}
+                          className={className}
+                        >
+                          <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
+                          {item.label}
+                        </button>
+                      </li>
+                    );
+                  }
 
                   if (item.to) {
                     return (

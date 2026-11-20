@@ -150,6 +150,7 @@ export function CoworkingBookingModal({
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>(detectedPlanId || 'monthly');
   const [preferredDrink, setPreferredDrink] = useState<'Tea' | 'Coffee'>('Tea');
+  const [isPlanDropdownOpen, setIsPlanDropdownOpen] = useState(false);
 
   // Start Date state - defaults to Nov 1 2026 or current/initial date
   const [startDateObj, setStartDateObj] = useState<Date>(() => {
@@ -376,25 +377,25 @@ export function CoworkingBookingModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-t-[28px] sm:rounded-[28px] bg-white p-3.5 sm:p-4 shadow-2xl text-left animate-in fade-in slide-in-from-bottom duration-200 overflow-y-auto max-h-[96vh] space-y-2 sm:space-y-2.5"
+        className="w-full max-w-md rounded-t-[28px] sm:rounded-3xl bg-white p-3.5 sm:p-4 shadow-2xl text-left animate-in fade-in slide-in-from-bottom duration-200 overflow-y-auto max-h-[96dvh] space-y-2.5"
         onClick={e => e.stopPropagation()}
       >
         {/* Top drag handle indicator on mobile */}
-        <div className="h-1.5 w-12 bg-slate-300 rounded-full mx-auto mb-1 sm:hidden" />
+        <div className="h-1.5 w-12 bg-slate-200 rounded-full mx-auto mb-1 sm:hidden" />
 
         {step === 'booking' ? (
           <>
             {/* Modal Header */}
             <div className="flex items-center justify-between gap-3 pb-0.5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-[#F6F2FF] border border-purple-100 text-[#6344E7] shrink-0">
-                  <CalendarCheck className="h-4 w-4 sm:h-5 sm:w-5 stroke-[2.2]" />
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-2xl bg-[#F5F0FF] border border-purple-100/90 text-[#673DE6] shrink-0">
+                  <CalendarCheck className="h-5 w-5 stroke-[2.2]" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-display text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
                     Complete Your Booking
                   </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate mt-0.5">
                     Review your plans, dates and preferences to continue.
                   </p>
                 </div>
@@ -402,137 +403,176 @@ export function CoworkingBookingModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F3F4F6] text-slate-500 hover:bg-slate-200 transition cursor-pointer shrink-0"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition cursor-pointer shrink-0"
                 aria-label="Close booking modal"
               >
-                <X size={15} />
+                <X size={16} />
               </button>
             </div>
 
-            {/* Top Combined Plan Banner */}
-            <div className="rounded-xl border border-purple-200/90 bg-[#FAF7FF] px-3 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FEF3C7] text-[#D97706] shrink-0 shadow-2xs">
-                  <Crown className="h-3.5 w-3.5 fill-[#D97706] stroke-[2]" />
+            {/* Combined Plan Selection Banner */}
+            <div className="rounded-2xl border border-purple-200/70 bg-[#FAF7FF] p-2.5 sm:p-3 flex items-center justify-between gap-2 shadow-2xs">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-2.5 flex-1">
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-[#FEF3C7] border border-amber-200/60 text-amber-500 shrink-0">
+                  <Crown className="h-4 w-4 sm:h-4.5 sm:w-4.5 fill-amber-500 text-amber-500" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-black leading-tight text-[#3B0764]">Premium Membership</div>
-                  <div className="text-[10px] font-semibold text-slate-500 leading-none">365 Days Access</div>
+                  <div className="text-xs sm:text-sm font-black leading-tight text-slate-900">
+                    Premium Membership
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-none mt-0.5">
+                    365 Days Access
+                  </div>
                 </div>
               </div>
 
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#7C3AED] text-white shadow-2xs">
-                <Plus size={11} strokeWidth={3} />
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#673DE6] text-white shadow-xs">
+                <Plus size={12} strokeWidth={3} />
               </div>
 
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FEF3C7] text-[#B45309] shrink-0 shadow-2xs">
-                  <Laptop className="h-3.5 w-3.5 stroke-[2.2]" />
+              <div className="flex min-w-0 items-center gap-2 sm:gap-2.5 flex-1 pl-1">
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-[#FEF3C7] border border-amber-200/60 text-amber-600 shrink-0">
+                  <Laptop className="h-4 w-4 sm:h-4.5 sm:w-4.5 stroke-[2.2]" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-black leading-tight text-[#3B0764]">CoWorking Plan</div>
-                  <div className="text-[10px] font-semibold text-slate-600 leading-none truncate">{currentPlan.subtitle}</div>
+                  <div className="text-xs sm:text-sm font-black leading-tight text-slate-900">
+                    CoWorking Plan
+                  </div>
+                  <div className="text-[10px] sm:text-[11px] font-semibold text-slate-500 leading-none truncate mt-0.5">
+                    {currentPlan.subtitle}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Row: Premium Membership & CoWorking Plan Cards */}
-            <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
-              {/* Card 1: Premium Membership */}
-              <div className="rounded-xl border border-purple-200/80 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#FEF3C7] text-[#D97706]">
-                    <Crown size={12} className="fill-[#D97706]" />
-                  </div>
-                  <span className="text-[11.5px] sm:text-xs font-black text-slate-900 truncate">
-                    Premium (365 Days)
-                  </span>
+            {/* Card 2: Premium (365 Days) */}
+            <div className="rounded-2xl border border-purple-100/90 bg-white p-2.5 sm:p-3 shadow-2xs space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#FEF3C7] border border-amber-200/60 text-amber-500 shrink-0">
+                  <Crown size={13} className="fill-amber-500 text-amber-500" />
                 </div>
-                <div className="border-t border-slate-100 pt-1.5 space-y-0.5">
-                  <div className="flex items-center justify-between text-[10.5px] sm:text-[11px]">
-                    <span className="text-slate-400 font-medium">Starts:</span>
-                    <span className="font-bold text-slate-800">{startsOnStr}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[10.5px] sm:text-[11px]">
-                    <span className="text-slate-400 font-medium">Expires:</span>
-                    <span className="font-bold text-slate-800">{expiresOnStr}</span>
-                  </div>
-                </div>
+                <span className="text-xs sm:text-sm font-black text-slate-900">
+                  Premium (365 Days)
+                </span>
               </div>
 
-              {/* Card 2: CoWorking Plan */}
-              <div className="rounded-xl border border-purple-200/80 bg-white p-2.5 shadow-2xs flex flex-col justify-between">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#FEF3C7] text-[#B45309]">
-                    <Laptop size={12} strokeWidth={2.2} />
+              <div className="grid grid-cols-2 divide-x divide-slate-100 pt-0.5 text-[11px] sm:text-xs">
+                <div className="flex items-center gap-1.5 text-slate-700 pr-2">
+                  <Calendar size={13} className="text-[#673DE6] shrink-0" />
+                  <span className="text-slate-400 font-medium">Starts:</span>
+                  <span className="font-bold text-slate-900 truncate">{startsOnStr}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-slate-700 pl-3">
+                  <Calendar size={13} className="text-[#673DE6] shrink-0" />
+                  <span className="text-slate-400 font-medium">Expires:</span>
+                  <span className="font-bold text-slate-900 truncate">{expiresOnStr}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: CoWorking Plan */}
+            <div className="rounded-2xl border border-purple-100/90 bg-white p-2.5 sm:p-3 shadow-2xs space-y-1.5">
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setIsPlanDropdownOpen(v => !v)}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#FEF3C7] border border-amber-200/60 text-amber-600 shrink-0">
+                    <Laptop size={13} strokeWidth={2.2} />
                   </div>
-                  <span className="text-[11.5px] sm:text-xs font-black text-slate-900 truncate">
+                  <span className="text-xs sm:text-sm font-black text-slate-900">
                     CoWorking ({currentPlan.subtitle})
                   </span>
                 </div>
-                <div
-                  className="relative flex cursor-pointer items-center justify-between border-t border-slate-100 pt-1.5"
-                  onClick={() => {
-                    if (dateInputRef.current) {
-                      if (typeof dateInputRef.current.showPicker === 'function') {
-                        dateInputRef.current.showPicker();
-                      } else {
-                        dateInputRef.current.focus();
-                      }
+                <ChevronDown
+                  size={15}
+                  className={`text-slate-400 transition-transform ${isPlanDropdownOpen ? 'rotate-180' : ''}`}
+                />
+              </div>
+
+              {isPlanDropdownOpen && (
+                <div className="py-1 border-t border-slate-100 grid grid-cols-1 gap-1">
+                  {COWORKING_BOOKING_PLANS.map(plan => (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPlanId(plan.id);
+                        setIsPlanDropdownOpen(false);
+                      }}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                        selectedPlanId === plan.id
+                          ? 'bg-[#F5F0FF] text-[#673DE6]'
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{plan.subtitle}</span>
+                      <span>₹{formatInr(plan.memberPrice)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div
+                className="relative flex items-center gap-1.5 pt-0.5 text-[11px] sm:text-xs cursor-pointer"
+                onClick={() => {
+                  if (dateInputRef.current) {
+                    if (typeof dateInputRef.current.showPicker === 'function') {
+                      dateInputRef.current.showPicker();
+                    } else {
+                      dateInputRef.current.focus();
+                    }
+                  }
+                }}
+              >
+                <Calendar size={13} className="text-[#673DE6] shrink-0" />
+                <span className="text-slate-400 font-medium">Start:</span>
+                <span className="font-bold text-slate-900">{startsOnStr}</span>
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  value={toInputDateString(startDateObj)}
+                  onChange={e => {
+                    if (e.target.value) {
+                      const [y, m, d] = e.target.value.split('-').map(Number);
+                      setStartDateObj(new Date(y, m - 1, d));
                     }
                   }}
-                >
-                  <div className="flex items-center gap-1 text-[10.5px] sm:text-[11px]">
-                    <Calendar className="h-3 w-3 text-[#6344E7] shrink-0" />
-                    <div>
-                      <span className="text-slate-400 font-medium mr-1">Start:</span>
-                      <span className="font-bold text-slate-800">{startsOnStr}</span>
-                    </div>
-                  </div>
-                  <ChevronDown size={13} className="text-slate-400 shrink-0 ml-1" />
-                  <input
-                    ref={dateInputRef}
-                    type="date"
-                    value={toInputDateString(startDateObj)}
-                    onChange={e => {
-                      if (e.target.value) {
-                        const [y, m, d] = e.target.value.split('-').map(Number);
-                        setStartDateObj(new Date(y, m - 1, d));
-                      }
-                    }}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    aria-label="Choose Start Date"
-                  />
-                </div>
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  aria-label="Choose Start Date"
+                />
               </div>
             </div>
 
-            {/* Free Drink: Free Drink label and Tea/Coffee radio buttons in same row */}
-            <div className="flex items-center justify-between rounded-xl border border-purple-200/80 bg-white px-3 py-1.5 shadow-2xs">
-              <div className="flex items-center gap-1.5">
-                <Coffee className="h-4 w-4 shrink-0 text-[#6344E7]" />
-                <span className="text-xs font-black text-slate-800">
+            {/* Card 4: Free Drink */}
+            <div className="flex items-center justify-between rounded-2xl border border-purple-100/90 bg-white px-3 py-2 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Coffee className="h-4 w-4 shrink-0 text-[#673DE6]" />
+                <span className="text-xs sm:text-sm font-black text-slate-800">
                   Free Drink
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
+
+              <div className="h-4 w-px bg-slate-200 mx-2" />
+
+              <div className="flex items-center gap-2">
                 {/* Tea Radio */}
                 <button
                   type="button"
                   onClick={() => setPreferredDrink('Tea')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
                     preferredDrink === 'Tea'
-                      ? 'bg-[#F3E8FF] border border-[#A855F7] text-[#6B21A8] shadow-2xs'
+                      ? 'bg-[#F5F0FF] border border-[#673DE6] text-[#673DE6] shadow-2xs'
                       : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <div
-                    className={`flex h-3 w-3 items-center justify-center rounded-full border-2 ${
-                      preferredDrink === 'Tea' ? 'border-[#7C3AED]' : 'border-slate-300'
+                    className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 ${
+                      preferredDrink === 'Tea' ? 'border-[#673DE6]' : 'border-slate-300'
                     }`}
                   >
                     {preferredDrink === 'Tea' && (
-                      <div className="h-1.5 w-1.5 rounded-full bg-[#7C3AED]" />
+                      <div className="h-1.5 w-1.5 rounded-full bg-[#673DE6]" />
                     )}
                   </div>
                   <span>Tea</span>
@@ -542,19 +582,19 @@ export function CoworkingBookingModal({
                 <button
                   type="button"
                   onClick={() => setPreferredDrink('Coffee')}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
                     preferredDrink === 'Coffee'
-                      ? 'bg-[#F3E8FF] border border-[#A855F7] text-[#6B21A8] shadow-2xs'
+                      ? 'bg-[#F5F0FF] border border-[#673DE6] text-[#673DE6] shadow-2xs'
                       : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   <div
-                    className={`flex h-3 w-3 items-center justify-center rounded-full border-2 ${
-                      preferredDrink === 'Coffee' ? 'border-[#7C3AED]' : 'border-slate-300'
+                    className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 ${
+                      preferredDrink === 'Coffee' ? 'border-[#673DE6]' : 'border-slate-300'
                     }`}
                   >
                     {preferredDrink === 'Coffee' && (
-                      <div className="h-1.5 w-1.5 rounded-full bg-[#7C3AED]" />
+                      <div className="h-1.5 w-1.5 rounded-full bg-[#673DE6]" />
                     )}
                   </div>
                   <span>Coffee</span>
@@ -562,42 +602,55 @@ export function CoworkingBookingModal({
               </div>
             </div>
 
-            {/* Plan Summary Card */}
+            {/* Card 5: Plan Summary Card */}
             <div className="space-y-2 rounded-2xl border border-purple-200/80 bg-[#FAF7FF] p-2.5 sm:p-3 shadow-2xs">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-black uppercase tracking-wider text-[#3B0764]">
-                  Plan Summary
+                  PLAN SUMMARY
                 </h4>
-                <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full">
                   <PiggyBank size={13} className="shrink-0" />
                   <span>Total Savings: ₹{formatInr(totalSavings)}</span>
                 </div>
               </div>
 
-              {/* Mini Breakdown Cards in One Row (grid-cols-2) */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-white p-2 border border-purple-100 shadow-3xs">
-                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-800 truncate">
-                    <Crown size={12} className="shrink-0 fill-[#D97706] text-[#D97706]" />
+              {/* Side by side pricing cards in ONE ROW (strictly grid-cols-2 repeat(2, minmax(0, 1fr))) */}
+              <div
+                className="grid grid-cols-2 gap-2"
+                style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}
+              >
+                {/* Premium Card */}
+                <div className="rounded-xl border border-purple-100 bg-white p-2 sm:p-2.5 shadow-3xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1 text-[11px] font-black text-slate-900 truncate">
+                    <Crown size={12} className="shrink-0 fill-amber-500 text-amber-500" />
                     <span className="truncate">Premium (365D)</span>
                   </div>
                   <div className="mt-1 flex items-baseline justify-between text-xs">
-                    <span className="text-slate-400 line-through text-[10px]">₹{formatInr(PREMIUM_MEMBERSHIP.regularPrice)}</span>
-                    <span className="font-black text-slate-900 text-xs sm:text-[13px]">₹{formatInr(PREMIUM_MEMBERSHIP.discountedPrice)}</span>
+                    <span className="text-slate-400 line-through text-[10px]">
+                      ₹{formatInr(PREMIUM_MEMBERSHIP.regularPrice)}
+                    </span>
+                    <span className="font-black text-slate-900 text-xs sm:text-[13px]">
+                      ₹{formatInr(PREMIUM_MEMBERSHIP.discountedPrice)}
+                    </span>
                   </div>
                   <div className="text-[10px] font-bold text-emerald-600 text-right">
                     Save ₹{formatInr(PREMIUM_MEMBERSHIP.savings)}
                   </div>
                 </div>
 
-                <div className="rounded-xl bg-white p-2 border border-purple-100 shadow-3xs">
-                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-800 truncate">
-                    <Laptop size={12} className="shrink-0 text-[#7C3AED]" />
+                {/* CoWorking Plan Card */}
+                <div className="rounded-xl border border-purple-100 bg-white p-2 sm:p-2.5 shadow-3xs flex flex-col justify-between">
+                  <div className="flex items-center gap-1 text-[11px] font-black text-slate-900 truncate">
+                    <Laptop size={12} className="shrink-0 text-[#673DE6]" />
                     <span className="truncate">{currentPlan.subtitle}</span>
                   </div>
                   <div className="mt-1 flex items-baseline justify-between text-xs">
-                    <span className="text-slate-400 line-through text-[10px]">₹{formatInr(currentPlan.regularPrice)}</span>
-                    <span className="font-black text-slate-900 text-xs sm:text-[13px]">₹{formatInr(currentPlan.memberPrice)}</span>
+                    <span className="text-slate-400 line-through text-[10px]">
+                      ₹{formatInr(currentPlan.regularPrice)}
+                    </span>
+                    <span className="font-black text-slate-900 text-xs sm:text-[13px]">
+                      ₹{formatInr(currentPlan.memberPrice)}
+                    </span>
                   </div>
                   <div className="text-[10px] font-bold text-emerald-600 text-right">
                     Save ₹{formatInr(currentPlan.savings)}
@@ -606,31 +659,35 @@ export function CoworkingBookingModal({
               </div>
 
               {/* Total Payable Row */}
-              <div className="flex items-center justify-between rounded-xl bg-[#EDE9FE] px-3 py-1.5 text-xs font-black text-[#5B21B6]">
+              <div className="flex items-center justify-between rounded-xl bg-[#F0E8FF] px-3 py-2 text-xs font-black text-[#3B0764]">
                 <span>Total Payable Amount</span>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-[10px] font-semibold text-slate-400 line-through">₹{formatInr(totalRegular)}</span>
-                  <span className="text-sm sm:text-base font-black text-[#4C1D95]">₹{formatInr(finalPayable)}</span>
+                <div className="flex items-baseline gap-1.5 sm:gap-2">
+                  <span className="text-[11px] font-medium text-slate-400 line-through">
+                    ₹{formatInr(totalRegular)}
+                  </span>
+                  <span className="text-sm sm:text-base font-black text-[#673DE6]">
+                    ₹{formatInr(finalPayable)}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Apply Coupon Code */}
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-2xs">
-              <div className="flex items-center gap-1.5 flex-1 pl-0.5">
-                <Ticket size={16} className="text-[#7C3AED] stroke-[2.2] shrink-0" />
+            {/* Card 6: Apply Coupon Code */}
+            <div className="flex items-center justify-between gap-2 rounded-2xl border border-purple-100/90 bg-white p-1 pl-3 shadow-2xs">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Ticket size={16} className="text-[#673DE6] stroke-[2.2] shrink-0" />
                 <input
                   type="text"
                   value={couponCode}
                   onChange={e => setCouponCode(e.target.value)}
                   placeholder="Apply Coupon Code"
-                  className="text-xs text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none flex-1 font-medium"
+                  className="w-full text-xs font-medium text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none"
                 />
               </div>
 
               {appliedCoupon ? (
-                <div className="flex items-center gap-1">
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-green-100 text-green-800 text-[11px] font-bold px-2 py-0.5">
+                <div className="flex items-center gap-1 pr-2">
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5">
                     <Check size={11} strokeWidth={3} />
                     -₹{formatInr(appliedCoupon.discount)}
                   </span>
@@ -647,7 +704,7 @@ export function CoworkingBookingModal({
                 <button
                   type="button"
                   onClick={handleApplyCoupon}
-                  className="rounded-lg border border-purple-300 bg-white hover:bg-purple-50 text-[#6344E7] px-3 py-1 text-xs font-bold transition cursor-pointer shadow-2xs"
+                  className="px-4 py-1.5 rounded-xl border border-purple-200 bg-white hover:bg-[#F5F0FF] text-[#673DE6] text-xs font-black transition cursor-pointer shadow-3xs"
                 >
                   Apply
                 </button>
@@ -655,24 +712,26 @@ export function CoworkingBookingModal({
             </div>
 
             {/* Bottom CTA Button: Continue -> */}
-            <button
-              type="button"
-              disabled={isProcessing}
-              onClick={handleContinueToPayment}
-              className="w-full rounded-xl bg-[#6344E7] hover:bg-[#5235D9] text-white py-2.5 sm:py-3 text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-md shadow-purple-500/25 transition active:scale-[0.99] cursor-pointer disabled:opacity-75"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Processing...</span>
-                </>
-              ) : (
-                <>
-                  <span>Continue</span>
-                  <ArrowRight size={16} strokeWidth={2.5} />
-                </>
-              )}
-            </button>
+            <div className="sticky bottom-0 left-0 right-0 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-white">
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={handleContinueToPayment}
+                className="w-full h-12 rounded-2xl bg-[#673DE6] hover:bg-[#5830d4] text-white text-xs sm:text-sm font-black flex items-center justify-center gap-2 shadow-md shadow-purple-500/25 transition active:scale-[0.99] cursor-pointer disabled:opacity-75"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Continue</span>
+                    <ArrowRight size={16} strokeWidth={2.5} />
+                  </>
+                )}
+              </button>
+            </div>
           </>
         ) : (
           /* STEP 2: BOOKING CONFIRMED SCREEN */
