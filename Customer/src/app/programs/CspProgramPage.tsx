@@ -20,7 +20,7 @@ export default function CspProgramPage() {
             ? ` Reason: ${application.rejectionReason}`
             : ''}
         </p>
-        <Link to="/programs" className="mt-4 inline-block text-sm font-semibold text-[#EA580C]">
+        <Link to="/ourprograms?tab=csp" className="mt-4 inline-block text-sm font-semibold text-[#EA580C]">
           Back to programs
         </Link>
       </div>
@@ -36,7 +36,7 @@ export default function CspProgramPage() {
             ? 'Your application is under review. The program appears in the sidebar after it is approved.'
             : 'Apply from Programs. The CSP Program appears in the sidebar only after approval.'}
         </p>
-        <Link to="/programs" className="mt-4 inline-block text-sm font-semibold text-[#EA580C]">
+        <Link to="/ourprograms?tab=csp" className="mt-4 inline-block text-sm font-semibold text-[#EA580C]">
           Go to programs
         </Link>
       </div>

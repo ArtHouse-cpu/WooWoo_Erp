@@ -352,7 +352,7 @@ export function SpaceQueryModal({
             {isPurposeDropdownOpen && (
               <div className="absolute inset-0 z-30 bg-white flex flex-col sm:hidden animate-in fade-in duration-150">
                 <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-gradient-to-r from-orange-50/60 via-white to-white">
-                  <span className="text-sm font-semibold text-slate-800">
+                  <span className="text-xs font-semibold text-slate-800">
                     Select Purpose
                   </span>
                   <button
@@ -375,7 +375,7 @@ export function SpaceQueryModal({
                           setPurpose(p);
                           setIsPurposeDropdownOpen(false);
                         }}
-                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition cursor-pointer text-left ${
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-[10px] font-medium transition cursor-pointer text-left ${
                           isSelected
                             ? 'bg-[#FFF0EB] text-[#EA580C]'
                             : 'text-slate-700 hover:bg-slate-50'
@@ -383,7 +383,7 @@ export function SpaceQueryModal({
                       >
                         <span>{p}</span>
                         {isSelected && (
-                          <span className="text-xs font-medium text-[#EA580C]">✓</span>
+                          <span className="text-[10px] font-medium text-[#EA580C]">✓</span>
                         )}
                       </button>
                     );
@@ -419,7 +419,7 @@ export function SpaceQueryModal({
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4 text-left">
               {/* 1. Purpose */}
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1.5">
+                <label className="block text-[10px] font-medium text-slate-600 mb-1">
                   Purpose
                 </label>
                 {/* Mobile Button: opens in-modal dropdown */}
@@ -427,10 +427,10 @@ export function SpaceQueryModal({
                   <button
                     type="button"
                     onClick={() => setIsPurposeDropdownOpen(true)}
-                    className="w-full h-10 px-3.5 text-xs font-medium rounded-xl border border-slate-200 bg-white text-slate-800 flex items-center justify-between cursor-pointer text-left focus:outline-hidden focus:border-[#EA580C]"
+                    className="w-full h-9 px-3 text-[10px] font-medium rounded-xl border border-slate-200 bg-white text-slate-800 flex items-center justify-between cursor-pointer text-left focus:outline-hidden focus:border-[#EA580C]"
                   >
                     <span className="truncate">{purpose}</span>
-                    <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
+                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   </button>
                 </div>
 
@@ -439,7 +439,7 @@ export function SpaceQueryModal({
                   <select
                     value={purpose}
                     onChange={e => setPurpose(e.target.value)}
-                    className="w-full h-10 px-3.5 text-xs font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white cursor-pointer appearance-none pr-9 text-slate-800"
+                    className="w-full h-9 px-3 text-[10px] font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white cursor-pointer appearance-none pr-8 text-slate-800"
                   >
                     {POPULAR_PURPOSES.map(p => (
                       <option key={p} value={p}>
@@ -447,7 +447,7 @@ export function SpaceQueryModal({
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
                 </div>
 
                 {purpose === 'Other' && (
@@ -457,7 +457,7 @@ export function SpaceQueryModal({
                       value={customPurpose}
                       onChange={e => setCustomPurpose(e.target.value)}
                       placeholder="Please specify your event / purpose..."
-                      className="w-full h-10 px-3.5 text-xs font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800"
+                      className="w-full h-9 px-3 text-[10px] font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800"
                     />
                   </div>
                 )}
@@ -466,7 +466,7 @@ export function SpaceQueryModal({
               {/* 2. Select Date & Hours Required in Same Row */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5 truncate">
+                  <label className="block text-[10px] font-medium text-slate-600 mb-1 truncate">
                     Select Date <span className="text-[#EA580C]">*</span>
                   </label>
                   <input
@@ -475,39 +475,39 @@ export function SpaceQueryModal({
                     value={date}
                     onChange={e => setDate(e.target.value)}
                     required
-                    className="w-full h-9 sm:h-10 px-2.5 sm:px-3 text-[11px] sm:text-xs font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800 cursor-pointer"
+                    className="w-full h-9 px-2.5 text-[10px] font-medium rounded-xl border border-slate-200 focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] bg-white text-slate-800 cursor-pointer"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1.5 truncate">
+                  <label className="block text-[10px] font-medium text-slate-600 mb-1 truncate">
                     Hours Required <span className="text-[#EA580C]">*</span>
                   </label>
-                  <div className="flex h-9 sm:h-10 items-center justify-between rounded-xl border border-slate-200 bg-white px-1.5 sm:px-2">
+                  <div className="flex h-9 items-center justify-between rounded-xl border border-slate-200 bg-white px-2">
                     <button
                       type="button"
                       onClick={() => handleDurationChange(Math.max(1, durationHours - 1))}
                       disabled={durationHours <= 1}
-                      className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[11px] sm:text-xs active:scale-95 transition cursor-pointer"
+                      className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[10px] active:scale-95 transition cursor-pointer"
                       title="Decrease hours"
                     >
                       -
                     </button>
-                    <div className="flex items-center gap-0.5 sm:gap-1">
+                    <div className="flex items-center gap-1">
                       <input
                         type="number"
                         min={1}
                         max={18}
                         value={durationHours}
                         onChange={e => {
-                          const val = parseInt(e.target.value);
+                           const val = parseInt(e.target.value);
                           if (!isNaN(val)) {
                             handleDurationChange(Math.max(1, Math.min(18, val)));
                           }
                         }}
-                        className="w-6 sm:w-8 text-center text-[11px] sm:text-xs font-medium text-slate-800 bg-transparent focus:outline-none"
+                        className="w-7 sm:w-8 text-center text-[10px] font-medium text-slate-800 bg-transparent focus:outline-none"
                       />
-                      <span className="text-[11px] sm:text-xs font-medium text-slate-600">
+                      <span className="text-[10px] font-medium text-slate-600">
                         {durationHours === 1 ? 'Hour' : 'Hours'}
                       </span>
                     </div>
@@ -515,7 +515,7 @@ export function SpaceQueryModal({
                       type="button"
                       onClick={() => handleDurationChange(Math.min(18, durationHours + 1))}
                       disabled={durationHours >= 18}
-                      className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[11px] sm:text-xs active:scale-95 transition cursor-pointer"
+                      className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed font-medium text-[10px] active:scale-95 transition cursor-pointer"
                       title="Increase hours"
                     >
                       +
@@ -526,12 +526,12 @@ export function SpaceQueryModal({
 
               {/* 3. Custom Time Slot Selection */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-medium text-slate-600">
-                    Preferred Time Slot <span className="text-[#EA580C]">*</span>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] font-medium text-slate-600">
+                    Select Time Slot <span className="text-[#EA580C]">*</span>
                   </label>
                   <span
-                    className={`text-[11px] sm:text-xs font-medium ${
+                    className={`text-[10px] font-medium ${
                       isValidTimeRange ? 'text-[#EA580C]' : 'text-rose-500'
                     }`}
                   >
@@ -548,13 +548,13 @@ export function SpaceQueryModal({
                       max="23:59"
                       value={startTime}
                       onChange={e => handleStartTimeChange(e.target.value)}
-                      className="w-full h-9 sm:h-10 px-2 sm:px-3 text-[11px] sm:text-xs font-medium text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
+                      className="w-full h-9 px-2.5 text-[10px] font-medium text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
                       title="Start Time"
                       required
                     />
                   </div>
 
-                  <span className="text-[11px] sm:text-xs font-medium text-slate-400 px-0.5 sm:px-1 text-center">to</span>
+                  <span className="text-[10px] font-medium text-slate-400 px-1 text-center">to</span>
 
                   {/* End Time Input */}
                   <div className="relative">
@@ -564,7 +564,7 @@ export function SpaceQueryModal({
                       max="23:59"
                       value={endTime === '24:00' ? '00:00' : endTime}
                       onChange={e => handleEndTimeChange(e.target.value)}
-                      className="w-full h-9 sm:h-10 px-2 sm:px-3 text-[11px] sm:text-xs font-medium text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
+                      className="w-full h-9 px-2.5 text-[10px] font-medium text-slate-800 rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:border-[#EA580C] focus:ring-1 focus:ring-[#EA580C] cursor-pointer"
                       title="End Time"
                       required
                     />
@@ -582,7 +582,7 @@ export function SpaceQueryModal({
                         key={slot.label}
                         type="button"
                         onClick={() => handleSelectQuickSlot(slot.start, slot.end)}
-                        className={`px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-medium shrink-0 transition cursor-pointer border ${
+                        className={`px-2 py-1 sm:px-2.5 sm:py-1 rounded-lg text-[9px] sm:text-[10px] font-medium shrink-0 transition cursor-pointer border ${
                           isSelected
                             ? 'border-[#EA580C] bg-[#FFF0EB] text-[#EA580C]'
                             : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
